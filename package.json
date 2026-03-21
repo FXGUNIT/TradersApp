@@ -1,0 +1,43 @@
+{
+  "name": "tradersapp",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "lint": "eslint .",
+    "preview": "vite preview",
+    "test:performance": "node performanceTestRunner.js",
+    "test:security": "node securityTestRunner.js",
+    "test:leakage-prevention": "node leakagePreventionTestRunner.js",
+    "test:social-engineering": "node socialEngineeringTestRunner.js",
+    "test:fact-groundedness": "node factGroundednessTestRunner.js",
+    "test:numerical-integrity": "node numericalIntegrityTestRunner.js",
+    "test:context-window": "node contextWindowTestRunner.js"
+  },
+  "dependencies": {
+    "@babel/runtime": "^7.29.2",
+    "@emailjs/browser": "^4.4.1",
+    "emailjs-com": "^3.2.0",
+    "firebase": "^12.10.0",
+    "lucide-react": "^0.577.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "react-markdown": "^10.1.0",
+    "react-syntax-highlighter": "^16.1.1",
+    "remark-gfm": "^4.0.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.0",
+    "eslint": "^9.39.4",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.5.2",
+    "globals": "^17.4.0",
+    "vite": "^8.0.0",
+    "vitest": "^4.1.0"
+  }
+}

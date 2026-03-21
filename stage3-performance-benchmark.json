@@ -1,0 +1,31 @@
+{
+  "timestamp": "2026-03-17T23:35:33.472Z",
+  "duration": "1049",
+  "tests": {
+    "dataLoad": {
+      "totalTraders": 500,
+      "avgFps": 60.1,
+      "minFps": 44.9,
+      "peakMemory": 151,
+      "renderTime": 1162,
+      "status": "EXCELLENT"
+    },
+    "firebaseHeartbeat": {
+      "singleListenerLatency": 72,
+      "batchUpdateLatency": 82,
+      "concurrentListenerLatency": 100,
+      "p95Latency": 130,
+      "p99Latency": 160,
+      "listenerHealthScore": 50,
+      "status": "NEEDS OPTIMIZATION"
+    },
+    "imageOptimization": {
+      "totalImages": 310,
+      "oversizedImages": 31,
+      "totalOversizedSize": 22365,
+      "potentialSavings": 6454,
+      "savingsPercentage": 29,
+      "status": "NEEDS OPTIMIZATION"
+    }
+  }
+}
