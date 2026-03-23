@@ -6,3 +6,5 @@ const firebaseConfig = {
   messagingSenderId: "your-messaging-sender-id",
   appId: "your-app-id"
 };
+
+const DATABASE_URL = firebaseConfig.databaseURL;
