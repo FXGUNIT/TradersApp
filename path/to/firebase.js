@@ -10,7 +10,13 @@ const firebaseConfig = {
   appId: "your-app-id"
 };
 
-const firebaseApp = initializeApp(firebaseConfig);
-setPersistence(firebaseAuth, browserLocalPersistence);
+try {
+  const firebaseApp = initializeApp(firebaseConfig);
+  setPersistence(firebaseAuth, browserLocalPersistence).catch((error) => {
+    console.warn("Failed to set auth persistence", error);
+  });
+} catch (error) {
+  console.error("Error initializing Firebase app", error);
+}
 
 export const db = getFirestore(firebaseApp);
