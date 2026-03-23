@@ -8,3 +8,7 @@ const firebaseConfig = {
 };
 
 const DATABASE_URL = firebaseConfig.databaseURL;
+const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({
+  hd: "gmail.com"
+});
