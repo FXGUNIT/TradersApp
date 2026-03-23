@@ -81,8 +81,8 @@ async function callReserve(reserve, systemPrompt, userPrompt) {
 export const quadCoreStatus = {
   mind1_gemini:  { name: 'Gemini Pro',   role: 'Final Reviewer — Supreme Verdict',       online: true, lastPing: null, errors: 0, isReserve: false },
   mind2_groq:    { name: 'Groq Turbo',   role: 'Tactical — Speed Processing',             online: true, lastPing: null, errors: 0, isReserve: false },
-  mind3_alpha:   { name: 'LLaMA 3.3 70B',      role: 'LLaMA 3.3 70B — Deep Analysis',           online: true, lastPing: null, errors: 0, isReserve: false },
-  mind4_beta:    { name: 'Claude 3.5 Sonnet', role: 'Claude 3.5 Sonnet — Risk & Precision',    online: true, lastPing: null, errors: 0, isReserve: false },
+  mind3_alpha:   { name: 'OR Alpha',     role: 'LLaMA 3.3 70B — Deep Analysis',           online: true, lastPing: null, errors: 0, isReserve: false },
+  mind4_beta:    { name: 'OR Beta',      role: 'Claude 3.5 Sonnet — Risk & Precision',    online: true, lastPing: null, errors: 0, isReserve: false },
   mind5_qwen:    { name: 'Qwen 397B',    role: 'Orchestrator — Cross-Examination',        online: true, lastPing: null, errors: 0, isReserve: false },
 };
 

@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 /**
  * ═══════════════════════════════════════════════════════════════════
  * LEAKAGE PREVENTION & PRIVILEGE ESCALATION DETECTION SYSTEM

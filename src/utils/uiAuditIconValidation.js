@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 /**
  * ═══════════════════════════════════════════════════════════════════
  * STEP 3: UI INTEGRITY AUDIT - ICON VALIDATION

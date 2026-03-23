@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 /**
  * ═══════════════════════════════════════════════════════════════════
  * SOCIAL ENGINEERING & EMOTIONAL MANIPULATION DETECTION SYSTEM

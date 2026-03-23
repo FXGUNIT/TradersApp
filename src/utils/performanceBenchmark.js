@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 /**
  * ═══════════════════════════════════════════════════════════════════
  * STAGE 3: DATA LOAD TEST - FPS & RAM MONITORING

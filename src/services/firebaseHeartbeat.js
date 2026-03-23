@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 /**
  * ═══════════════════════════════════════════════════════════════════
  * STAGE 3: FIREBASE HEARTBEAT - DATABASE LISTENER LATENCY TEST

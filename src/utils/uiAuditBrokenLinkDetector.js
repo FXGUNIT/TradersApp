@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 /**
  * ═══════════════════════════════════════════════════════════════════
  * STEP 2: UI INTEGRITY AUDIT - BROKEN LINK DETECTOR

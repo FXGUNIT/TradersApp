@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 /**
  * ═══════════════════════════════════════════════════════════════════
  * STEP 1: UI INTEGRITY AUDIT - THE CRAWLER

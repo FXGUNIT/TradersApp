@@ -17,7 +17,6 @@
     "test:context-window": "node contextWindowTestRunner.js"
   },
   "dependencies": {
-    "@babel/runtime": "^7.29.2",
     "@emailjs/browser": "^4.4.1",
     "emailjs-com": "^3.2.0",
     "firebase": "^12.10.0",
@@ -37,7 +36,6 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.4.0",
-    "vite": "^8.0.0",
-    "vitest": "^4.1.0"
+    "vite": "^8.0.0"
   }
 }

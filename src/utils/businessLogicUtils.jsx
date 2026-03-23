@@ -1,4 +1,3 @@
-/* eslint-disable react-refresh/only-export-components */
 /**
  * Business Logic Utilities & Formatters
  * Handles data cleaning and consistent formatting across the app
