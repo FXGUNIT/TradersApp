@@ -1,3 +1,4 @@
+
 # Logs
 logs
 *.log
@@ -10,6 +11,7 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+artifacts
 *.local
 
 # Editor directories and files
@@ -22,3 +24,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Special Windows files
+nul
