@@ -3,7 +3,7 @@ import React, { useState, useRef, useCallback, useEffect, useMemo, createContext
 import { initializeApp } from "firebase/app";
 import { getAuth, sendPasswordResetEmail, setPersistence, browserLocalPersistence, onAuthStateChanged, fetchSignInMethodsForEmail, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import GoogleOnboard from './components/GoogleOnboard.jsx';
-import { getDatabase, ref, onValue, get, set } from "firebase/database";
+import { getDatabase, ref, onValue, get, set, push } from "firebase/database";
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import emailjs from '@emailjs/browser';
 import { notifyTelegram } from './utils/telegram.js';
@@ -11,11 +11,12 @@ import { sendInviteEmail, sendWelcomeEmail } from './utils/email.js';
 import InviteScreen from './components/InviteScreen.jsx';
 import { useInvites } from './hooks/useInvites';
 import AdminInvitesPanel from './components/AdminInvitesPanel.jsx';
+import FloatingChatWidget from './components/FloatingChatWidget.jsx';
+import FounderCard from './components/FounderCard.jsx';
+import { quadCoreStatus as aiQuadCoreStatus } from './services/ai-router.js';
 
 // math-engine & ai-router — both inlined (files exist but have no exports)
 // Swap to real imports once those files are complete
-
-// FounderCard — inlined to avoid lucide-react dependency
 
 import './index.css';
 
@@ -39,13 +40,6 @@ function calculateThrottledRisk(basePct = 0.3, VR = 1.0, currentBalance = 0, max
 
 // ai-router inline (ai-router.js exists but has no exports yet)
 const councilStage = { current: 'stage1', label: 'Analyzing...' };
-
-const quadCoreStatus = {
-  claude:  { name: 'Claude Sonnet', online: true,  isReserve: false },
-  groq:    { name: 'Groq Llama',   online: false, isReserve: true  },
-  mistral: { name: 'Mistral',      online: false, isReserve: true  },
-  gemini:  { name: 'Gemini Flash', online: false, isReserve: true  },
-};
 
 async function runDeliberation(systemPrompt, userContent) {
   councilStage.current = 'stage1'; councilStage.label = 'Initializing...';
@@ -153,26 +147,6 @@ const ExchangeFacilityBadge = () => (
     background: 'rgba(10,132,255,0.08)', border: '1px solid rgba(10,132,255,0.2)',
     borderRadius: 20, marginBottom: 16, fontSize: 11, fontWeight: 600, color: '#0A84FF' }}>
     🏛 REGULATED EXCHANGE FACILITY
-  </div>
-);
-
-// FounderCard inline (avoids lucide-react import issue)
-const FounderCard = ({ linkedInUrl = "https://linkedin.com/in/singhgunit/", theme = 'day' }) => (
-  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '16px 24px',
-    background: theme === 'day' ? '#F8FAFC' : 'rgba(255,255,255,0.05)',
-    border: theme === 'day' ? '1px solid #E2E8F0' : '1px solid rgba(255,255,255,0.1)',
-    borderRadius: 12, cursor: 'pointer' }}
-    onClick={() => window.open(linkedInUrl, '_blank')}>
-    <div style={{ width: 48, height: 48, borderRadius: '50%', background: '#0A84FF',
-      display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 20 }}>G</div>
-    <div style={{ textAlign: 'center' }}>
-      <div style={{ fontWeight: 700, fontSize: 14, color: theme === 'day' ? '#111827' : '#F2F2F7' }}>Gunit Singh</div>
-      <div style={{ fontSize: 12, color: '#6B7280' }}>Founder · Traders Regiment</div>
-    </div>
-    <a href={linkedInUrl} target="_blank" rel="noopener noreferrer"
-      style={{ fontSize: 11, color: '#0A84FF', textDecoration: 'none', fontWeight: 600 }}>
-      LinkedIn →
-    </a>
   </div>
 );
 
@@ -5097,8 +5071,8 @@ function SupportChatModal({ isOpen, userId, userName, onClose, auth, showToast }
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
   
-  // Firebase path for chat
-  const chatPath = `support_chats/${[auth?.uid, userId].sort().join('_')}`;
+  // Firebase path for chat - matches user's FloatingChatWidget path
+  const chatPath = `support_chats/${userId}`;
   
   // Scroll to bottom of messages
   const scrollToBottom = () => {
@@ -5113,54 +5087,40 @@ function SupportChatModal({ isOpen, userId, userName, onClose, auth, showToast }
   useEffect(() => {
     if (!isOpen || !userId) return;
     
-    // Optimized chat listener with connection pooling & caching
-    const unsubscribe = firebaseOptimizer.createOptimizedListener(
-      chatPath,
-      (result) => {
-        const data = result.isBatched ? result.updates[result.updates.length - 1] : result;
-        if (data) {
-          const msgs = Object.entries(data)
-            .filter(([key]) => !key.startsWith('typing_'))
-            .map(([, msg]) => msg)
-            .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
-          setMessages(msgs);
-        }
-      },
-      firebaseDb, ref, onValue
-    );
-    
-    // Optimized typing indicator listener
-    const typingUnsub = firebaseOptimizer.createOptimizedListener(
-      `${chatPath}/typing_${userId}`,
-      (result) => {
-        const data = result.isBatched ? result.updates[result.updates.length - 1] : result;
-        setOtherUserTyping(data === true);
-      },
-      firebaseDb, ref, onValue
-    );
+    // Listen to messages subcollection - matches FloatingChatWidget path
+    const messagesRef = ref(firebaseDb, `${chatPath}/messages`);
+    const unsubscribe = onValue(messagesRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        const msgs = Object.entries(data)
+          .map(([, msg]) => msg)
+          .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+        setMessages(msgs);
+      } else {
+        setMessages([]);
+      }
+    });
     
     return () => {
       unsubscribe();
-      typingUnsub();
     };
   }, [isOpen, userId, chatPath]);
   
   // Send message handler
   const handleSendMessage = async () => {
-    if (!input.trim() || !auth?.uid) return;
+    if (!input.trim()) return;
     
     try {
-      const msgRef = ref(firebaseDb, `${chatPath}/msg_${Date.now()}`);
-      await set(msgRef, {
-        sender: auth.uid,
-        senderName: auth.displayName || 'Admin',
+      const messagesRef = ref(firebaseDb, `${chatPath}/messages`);
+      const newMessageRef = push(messagesRef);
+      await set(newMessageRef, {
+        sender: 'admin',
+        senderName: auth?.displayName || 'Admin',
         text: input.trim(),
         timestamp: Date.now(),
         read: false
       });
       
-      // Clear typing indicator
-      await set(ref(firebaseDb, `${chatPath}/typing_${auth.uid}`), null);
       setInput('');
       _setIsTyping(false);
     } catch {
@@ -5258,7 +5218,7 @@ function SupportChatModal({ isOpen, userId, userName, onClose, auth, showToast }
             </div>
           ) : (
             messages.map((msg) => {
-              const isAdmin = msg.sender === auth?.uid;
+              const isAdmin = msg.sender === 'admin';
               return (
                 <div
                   key={`msg_${msg.timestamp}`}
@@ -5280,7 +5240,7 @@ function SupportChatModal({ isOpen, userId, userName, onClose, auth, showToast }
                   >
                     {!isAdmin && (
                       <div style={{ color: '#A1A1A6', fontSize: 10, marginBottom: 4 }}>
-                        {msg.senderName}
+                        {msg.senderName || msg.email || 'User'}
                       </div>
                     )}
                     <div style={{ color: '#F2F2F7', fontSize: 13, lineHeight: 1.4 }}>
@@ -9680,19 +9640,6 @@ export default function TradersRegiment() {
   })();
 
   return (
-    <>
-      {maybeInviteScreen}
-      {screenContent}
-    </>
-  );
-
-  return (
-    <>
-      {maybeInviteScreen}
-      {screenContent}
-    </>
-  );
-  return (
     <div className={`app-container theme-${theme}`}>
       {/* RULE #295, #296: Maintenance Mode - Show "Back Soon" screen if active, except for Master Admin */}
       {maintenanceModeActive && auth?.uid !== ADMIN_UID && screen !== 'admin' ? (
@@ -9717,6 +9664,7 @@ export default function TradersRegiment() {
         auth={auth}
       />
       <Toast toasts={toasts} onDismiss={handleDismissToast} />
+      <FloatingChatWidget auth={auth} profile={profile} />
       
       {/* Officers Briefing Footer - Rotating Quotes & Founder Card */}
       <div style={{
@@ -9761,7 +9709,7 @@ export default function TradersRegiment() {
           <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#475569', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
             AI System Status
           </span>
-          {Object.entries(quadCoreStatus).map(([key, mind]) => {
+          {Object.entries(aiQuadCoreStatus).map(([key, mind]) => {
             const isReserve = mind.isReserve;
             const dotColor = isReserve ? '#A855F7' : (mind.online ? '#22C55E' : '#EF4444');
             const textColor = isReserve ? '#7E22CE' : (mind.online ? '#166534' : '#991B1B');
