@@ -189,6 +189,8 @@ export default function MainTerminal({
   onSaveAccount,
   onSaveFirmRules: _onSaveFirmRules,
   showToast,
+  auth: _auth,
+  privacyMode: _privacyMode,
 }) {
   const [activeTab, setActiveTab] = useState("capture");
   const [screenshots, setScreenshots] = useState([]);

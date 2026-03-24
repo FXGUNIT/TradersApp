@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { initializeApp } from 'firebase/app';
-import { getDatabase, ref, onValue, push, set, get } from 'firebase/database';
+import { getDatabase, ref, onValue, push, set } from 'firebase/database';
 
 const firebaseConfig = {
   apiKey: "AIzaSyBPN7fIZ-UfVQ5EMti1TzrFPsi4wtUEtKI",
@@ -50,7 +50,7 @@ const FloatingChatWidget = ({ auth, profile }) => {
     return () => {
       unsubscribe();
     };
-  }, [isOpen, userId]);
+  }, [isOpen, userId, injectWelcomeMessage, isInitialized]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });

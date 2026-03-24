@@ -36,6 +36,7 @@ import { useInvites } from "./hooks/useInvites";
 import AdminInvitesPanel from "./components/AdminInvitesPanel.jsx";
 import FloatingChatWidget from "./components/FloatingChatWidget.jsx";
 import FounderCard from "./components/FounderCard.jsx";
+import MainTerminal from "./features/terminal/MainTerminal.jsx";
 import { quadCoreStatus as aiQuadCoreStatus } from "./services/ai-router.js";
 import { setupConsoleInterceptor } from "./services/telemetry.js";
 import { setupNetworkMonitor } from "./services/networkMonitor.js";
@@ -11817,18 +11818,8 @@ function SessionsManagementScreen({
 
 // ═══════════════════════════════════════════════════════════════════
 //  MAIN TRADING TERMINAL (PART 1: State & Math Engine)
+// Note: MainTerminal is now imported from features/terminal/MainTerminal.jsx
 // ═══════════════════════════════════════════════════════════════════
-function MainTerminal({
-  profile,
-  onLogout,
-  onSaveJournal,
-  onSaveAccount,
-  onSaveFirmRules,
-  showToast,
-}) {
-  const [part, setPart] = useState("1");
-  return <div>MainTerminal placeholder - needs reconstruction</div>;
-}
 
 //  ROOT — AUTH STATE MACHINE
 // ═══════════════════════════════════════════════════════════════════

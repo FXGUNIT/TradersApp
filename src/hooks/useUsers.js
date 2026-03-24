@@ -11,8 +11,10 @@ export const useUsers = (userId = null) => {
   useEffect(() => {
     const cachedUsers = getCachedUserList();
     if (cachedUsers) {
-      setUsers(cachedUsers);
-      setLoading(false);
+      setTimeout(() => {
+        setUsers(cachedUsers);
+        setLoading(false);
+      }, 0);
     }
   }, []);
 
