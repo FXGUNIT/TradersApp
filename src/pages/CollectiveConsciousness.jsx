@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import MessageRenderer from '../components/MessageRenderer.jsx';
-import { runDeliberation, askGroq, councilStage, quadCoreStatus } from '../services/ai-router.js';
+import { runDeliberation, councilStage, quadCoreStatus } from '../services/ai-router.js';
 
 const PHASE_DEFINITIONS = [
   { key: 'stage1', label: 'Phase 1: Alpha, Beta, & Groq deployed', icon: '📡' },
@@ -138,10 +138,13 @@ function WarRoomLoader() {
   );
 }
 
-export default function CollectiveConsciousness({ onBack, theme }) {
+import { useUsers } from '../hooks/useUsers';
+
+export default function CollectiveConsciousness({ onBack, theme, auth }) {
   const isDark = theme === 'night';
+  const { users } = useUsers();
   const [messages, setMessages] = useState([]);
-  const [conversationHistory, setConversationHistory] = useState([]);
+  const [localHistory, setLocalHistory] = useState([]);
   const [input, setInput] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [engineMode, setEngineMode] = useState(() => {
@@ -151,15 +154,7 @@ export default function CollectiveConsciousness({ onBack, theme }) {
   const chatEndRef = useRef(null);
   const inputRef = useRef(null);
 
-  // Time-shift engine check every 30s
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const h = new Date().getHours();
-      setEngineMode((h >= 8 && h < 17) ? 'fast' : 'full');
-    }, 30000);
-    return () => clearInterval(interval);
-  }, []);
-
+  const userData = auth?.uid ? users[auth.uid] : null;
   const isFastMode = engineMode === 'fast';
 
   const bgColor = isDark ? '#0F0F0F' : '#FFFFFF';
@@ -185,37 +180,42 @@ export default function CollectiveConsciousness({ onBack, theme }) {
     setInput('');
     setIsProcessing(true);
 
-    // Reset council stage
     councilStage.current = 'idle';
     councilStage.label = '';
 
-    const SYSTEM_PROMPT = `You are the Collective Consciousness of the Traders Regiment. Provide military-grade, institutional market analysis. Be concise, ruthless with risk, and highly structured. Use clear formatting, tables where appropriate, and explicit risk acknowledgments. Be precise, quantitative, and actionable. LANGUAGE RULE: Mirror the user's language. If they write in Hindi, respond in Hindi. If they write in English, respond in English. If they write in Hinglish (mixed Hindi-English), respond in Hinglish. Always match their tone and language naturally.`;
+    // Build user context
+    const userContext = userData ? `
+USER ACCOUNT DATA:
+- Name: ${userData.fullName || 'N/A'}
+- Email: ${userData.email || 'N/A'}
+- Status: ${userData.status || 'N/A'}
+- Balance: ${userData.balance || 0}
+- Journal Entries: ${userData.journal ? Object.keys(userData.journal).length : 0}
+- Join Date: ${userData.joinDate || 'N/A'}
+- Mobile: ${userData.mobile || 'N/A'}
+` : '';
 
-    // Build contextual memory ledger
-    const updatedHistory = [...conversationHistory, { role: 'user', content: trimmed }];
-    const contextBlock = updatedHistory.map(m => `${m.role === 'user' ? 'USER' : 'ASSISTANT'}: ${m.content}`).join('\n\n');
-    const contextualPrompt = updatedHistory.length > 1
-      ? `CONVERSATION LEDGER (maintain context):\n${contextBlock}\n\nRespond to the latest USER message above.`
-      : trimmed;
+    // Build chat history
+    const historyContext = localHistory.length > 0 ? `
+OUR CONVERSATION HISTORY:
+${localHistory.map(m => `${m.role === 'user' ? 'USER' : 'ASSISTANT'}: ${m.content}`).join('\n\n')}
+` : '';
+
+    const fullPrompt = `${userContext}${historyContext}
+CURRENT QUESTION: ${trimmed}
+
+If this question is about trading, finance, money, or investing - use the user's account data above to give personalized advice.
+If this is a general question - just answer it normally.
+Keep your answer focused and practical.`;
 
     try {
-      let response;
-      const currentHour = new Date().getHours();
-
-      if (currentHour >= 8 && currentHour < 17) {
-        // ⚡ FAST MODE: Groq only
-        response = await askGroq(SYSTEM_PROMPT, contextualPrompt);
-      } else {
-        // 🌌 FULL CAPACITY: 5-Phase RCE
-        response = await runDeliberation(SYSTEM_PROMPT, contextualPrompt);
-      }
-
+      const response = await runDeliberation('', fullPrompt);
       setMessages(prev => [...prev, { role: 'assistant', content: response, timestamp: Date.now() }]);
-      setConversationHistory([...updatedHistory, { role: 'assistant', content: response }]);
+      setLocalHistory(prev => [...prev, { role: 'user', content: trimmed }, { role: 'assistant', content: response }]);
     } catch (err) {
-      const errMsg = `**Engine Fault:** ${err.message}\n\nThe Intelligence Grid encountered a fault. Please retry your query.`;
+      const errMsg = `Error: ${err.message}`;
       setMessages(prev => [...prev, { role: 'assistant', content: errMsg, timestamp: Date.now() }]);
-      setConversationHistory([...updatedHistory, { role: 'assistant', content: errMsg }]);
+      setLocalHistory(prev => [...prev, { role: 'user', content: trimmed }, { role: 'assistant', content: errMsg }]);
     } finally {
       setIsProcessing(false);
       councilStage.current = 'idle';

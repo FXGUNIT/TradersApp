@@ -6,8 +6,8 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
 /* ─────────────────────────────────────────────────────────────────
-   CSS VARIABLES - THREE THEME SYSTEM
-   ───────────────────────────────────────────────────────────────── */
+    CSS VARIABLES - THREE THEME SYSTEM
+    ───────────────────────────────────────────────────────────────── */
 
 :root {
   /* DAY MODE (Primary) - Professional SaaS White Design */
@@ -19,22 +19,22 @@
   --day-accent: #000000;
   --day-accent-text: #FFFFFF;
 
-  /* NIGHT MODE */
-  --night-bg: #FFFFFF;
-  --night-card: #FFFFFF;
-  --night-text: #111827;
-  --night-subtext: #64748B;
-  --night-border: #E5E7EB;
-  --night-accent: #000000;
+  /* NIGHT MODE - Dark theme with blue accents */
+  --night-bg: #0F172A;
+  --night-card: #1E293B;
+  --night-text: #F2F2F7;
+  --night-subtext: #94A3B8;
+  --night-border: #334155;
+  --night-accent: #0A84FF;
   --night-accent-text: #FFFFFF;
 
-  /* EYE COMFORT MODE */
-  --comfort-bg: #FFFFFF;
-  --comfort-card: #FFFFFF;
-  --comfort-text: #111827;
-  --comfort-subtext: #64748B;
-  --comfort-border: #E5E7EB;
-  --comfort-accent: #000000;
+  /* EYE COMFORT MODE - Warm, soft colors for reduced eye strain */
+  --comfort-bg: #FDF6E3;
+  --comfort-card: #FAF3E0;
+  --comfort-text: #5D4037;
+  --comfort-subtext: #8D6E63;
+  --comfort-border: #D7CCC8;
+  --comfort-accent: #8D6E63;
   --comfort-accent-text: #FFFFFF;
 
   /* Default to Day Mode */

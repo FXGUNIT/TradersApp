@@ -37,6 +37,7 @@ import AdminInvitesPanel from "./components/AdminInvitesPanel.jsx";
 import FloatingChatWidget from "./components/FloatingChatWidget.jsx";
 import FounderCard from "./components/FounderCard.jsx";
 import MainTerminal from "./features/terminal/MainTerminal.jsx";
+import CollectiveConsciousnessPage from "./pages/CollectiveConsciousness.jsx";
 import { quadCoreStatus as aiQuadCoreStatus, councilStage as aiCouncilStage } from "./services/ai-router.js";
 import { setupConsoleInterceptor } from "./services/telemetry.js";
 import { setupNetworkMonitor } from "./services/networkMonitor.js";
@@ -379,40 +380,6 @@ const RegimentHub = ({ onNavigate, theme }) => (
           {item.label}
         </button>
       ))}
-    </div>
-  </div>
-);
-
-const CollectiveConsciousness = ({ onBack }) => (
-  <div
-    style={{
-      minHeight: "100vh",
-      background: "#FFF",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      fontFamily: "system-ui",
-    }}
-  >
-    <div style={{ textAlign: "center", padding: 40 }}>
-      <h1 style={{ fontSize: 24, fontWeight: 800, marginBottom: 16 }}>
-        Collective Consciousness
-      </h1>
-      <button
-        onClick={onBack}
-        style={{
-          padding: "12px 24px",
-          background: "#000",
-          color: "#fff",
-          border: "none",
-          borderRadius: 8,
-          cursor: "pointer",
-          fontSize: 14,
-          fontWeight: 600,
-        }}
-      >
-        ← Back to Hub
-      </button>
     </div>
   </div>
 );
@@ -13624,9 +13591,10 @@ export default function TradersRegiment() {
 
       case "consciousness":
         return (
-          <CollectiveConsciousness
+          <CollectiveConsciousnessPage
             onBack={() => setScreen("hub")}
             theme={theme}
+            auth={auth}
           />
         );
 
