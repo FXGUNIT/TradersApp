@@ -37,7 +37,7 @@ import AdminInvitesPanel from "./components/AdminInvitesPanel.jsx";
 import FloatingChatWidget from "./components/FloatingChatWidget.jsx";
 import FounderCard from "./components/FounderCard.jsx";
 import MainTerminal from "./features/terminal/MainTerminal.jsx";
-import { quadCoreStatus as aiQuadCoreStatus } from "./services/ai-router.js";
+import { quadCoreStatus as aiQuadCoreStatus, councilStage as aiCouncilStage } from "./services/ai-router.js";
 import { setupConsoleInterceptor } from "./services/telemetry.js";
 import { setupNetworkMonitor } from "./services/networkMonitor.js";
 import { setupTTITracker } from "./services/ttiTracker.js";
@@ -85,42 +85,7 @@ function calculateThrottledRisk(
   };
 }
 
-// ai-router inline (ai-router.js exists but has no exports yet)
-const councilStage = { current: "stage1", label: "Analyzing..." };
-
-async function runDeliberation(systemPrompt, userContent) {
-  councilStage.current = "stage1";
-  councilStage.label = "Initializing...";
-  try {
-    councilStage.current = "stage2";
-    councilStage.label = "Running analysis...";
-    let messages;
-    try {
-      const parsed = JSON.parse(userContent);
-      messages = [{ role: "user", content: parsed }];
-    } catch {
-      messages = [{ role: "user", content: userContent }];
-    }
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 8000,
-        system: systemPrompt,
-        messages,
-      }),
-    });
-    councilStage.current = "stage5";
-    councilStage.label = "Complete.";
-    const data = await res.json();
-    return data.content?.map((b) => b.text || "").join("\n") || "No response.";
-  } catch (e) {
-    councilStage.current = "stage5";
-    councilStage.label = "Error.";
-    throw e;
-  }
-}
+// ai-router is now imported from ./services/ai-router.js
 
 // firebaseOptimizer
 const firebaseOptimizer = {
@@ -12443,17 +12408,15 @@ export default function TradersRegiment() {
 
   // Update body background color based on theme to prevent white flashes
   useEffect(() => {
-    const themeColors = {
-      day: "#FFFFFF",
-      night: "#0F172A",
-      comfort: "#FDF6E3",
-    };
+    // Extract background and text colors from the current _THEME
+    const bgColor = _THEME?.background || "#FFFFFF";
+    const textColor = _THEME?.text || "#000000";
 
-    document.body.style.backgroundColor = themeColors[theme] || themeColors.day;
-    document.body.style.color = theme === "day" ? "#000000" : "#F2F2F7";
+    document.body.style.backgroundColor = bgColor;
+    document.body.style.color = textColor;
     document.body.style.transition =
-      "background-color 300ms cubic-bezier(0.4, 0, 0.2, 1)";
-  }, [theme]);
+      "background-color 300ms cubic-bezier(0.4, 0, 0.2, 1), color 300ms cubic-bezier(0.4, 0, 0.2, 1)";
+  }, [_THEME]);
 
   // Check user status and route to appropriate screen
   const checkUserStatus = useCallback(
