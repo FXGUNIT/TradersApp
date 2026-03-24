@@ -13,6 +13,50 @@
  */
 
 import { getDatabase, ref, get, set, update } from "firebase/database";
+import { DATABASE_URL } from './firebase';
+
+const dbR = async (p, t) => {
+  try {
+    const r = await fetch(`${DATABASE_URL}${p}.json${t ? `?auth=${t}` : ''}`);
+    return r.ok ? r.json() : null;
+  } catch {
+    return null;
+  }
+};
+
+const dbW = async (p, d, t) => {
+  try {
+    await fetch(`${DATABASE_URL}${p}.json?auth=${t}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(d)
+    });
+  } catch {
+    console.error('dbW error');
+  }
+};
+
+const dbM = async (p, d, t) => {
+  try {
+    await fetch(`${DATABASE_URL}${p}.json?auth=${t}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(d)
+    });
+  } catch {
+    console.error('dbM error');
+  }
+};
+
+const dbDel = async (p, t) => {
+  try {
+    await fetch(`${DATABASE_URL}${p}.json?auth=${t}`, { method: 'DELETE' });
+  } catch {
+    console.error('dbDel error');
+  }
+};
+
+export { dbR, dbW, dbM, dbDel };
 
 // ═══════════════════════════════════════════════════════════════════
 // TASK 1.3: DATABASE PROVISIONING - CREATE USER RECORD
@@ -335,4 +379,8 @@ export default {
   updateUserProfile,
   recordUserLogin,
   incrementFailedAttempts,
+  dbR,
+  dbW,
+  dbM,
+  dbDel,
 };

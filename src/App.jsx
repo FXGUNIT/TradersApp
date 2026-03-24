@@ -1,24 +1,52 @@
 /* eslint-disable */
-import React, { useState, useRef, useCallback, useEffect, useMemo, createContext, useContext, Suspense } from "react";
+import React, {
+  useState,
+  useRef,
+  useCallback,
+  useEffect,
+  useMemo,
+  createContext,
+  useContext,
+  Suspense,
+} from "react";
 import { initializeApp } from "firebase/app";
-import { getAuth, sendPasswordResetEmail, setPersistence, browserLocalPersistence, onAuthStateChanged, fetchSignInMethodsForEmail, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
-import GoogleOnboard from './components/GoogleOnboard.jsx';
+import {
+  getAuth,
+  sendPasswordResetEmail,
+  setPersistence,
+  browserLocalPersistence,
+  onAuthStateChanged,
+  fetchSignInMethodsForEmail,
+  GoogleAuthProvider,
+  signInWithPopup,
+} from "firebase/auth";
+import GoogleOnboard from "./components/GoogleOnboard.jsx";
 import { getDatabase, ref, onValue, get, set, push } from "firebase/database";
-import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
-import emailjs from '@emailjs/browser';
-import { notifyTelegram } from './utils/telegram.js';
-import { sendInviteEmail, sendWelcomeEmail } from './utils/email.js';
-import InviteScreen from './components/InviteScreen.jsx';
-import { useInvites } from './hooks/useInvites';
-import AdminInvitesPanel from './components/AdminInvitesPanel.jsx';
-import FloatingChatWidget from './components/FloatingChatWidget.jsx';
-import FounderCard from './components/FounderCard.jsx';
-import { quadCoreStatus as aiQuadCoreStatus } from './services/ai-router.js';
+import {
+  getStorage,
+  ref as storageRef,
+  uploadBytes,
+  getDownloadURL,
+} from "firebase/storage";
+import emailjs from "@emailjs/browser";
+import { notifyTelegram } from "./utils/telegram.js";
+import { sendInviteEmail, sendWelcomeEmail } from "./utils/email.js";
+import InviteScreen from "./components/InviteScreen.jsx";
+import { useInvites } from "./hooks/useInvites";
+import AdminInvitesPanel from "./components/AdminInvitesPanel.jsx";
+import FloatingChatWidget from "./components/FloatingChatWidget.jsx";
+import FounderCard from "./components/FounderCard.jsx";
+import { quadCoreStatus as aiQuadCoreStatus } from "./services/ai-router.js";
+import { setupConsoleInterceptor } from "./services/telemetry.js";
+import { setupNetworkMonitor } from "./services/networkMonitor.js";
+import { setupTTITracker } from "./services/ttiTracker.js";
+import { SecuritySentinel } from "./services/securitySentinel.js";
+import { detectDuplicateIPs as scanDuplicateIPs } from "./services/ipScanner.js";
 
 // math-engine & ai-router — both inlined (files exist but have no exports)
 // Swap to real imports once those files are complete
 
-import './index.css';
+import "./index.css";
 
 // ═══════════════════════════════════════════════════════════════
 // INLINE MOCKS — these files don't exist in your project yet
@@ -31,33 +59,64 @@ function calculateVolatilityRatio(fiveDayATR, twentyDayATR) {
 }
 function getDynamicParameters(VR = 1.0) {
   const v = Math.max(0.5, Math.min(2.0, VR));
-  return { vwapSD1: v * 15, vwapSD2: v * 30, trendSLMult: v < 0.85 ? 1.5 : v > 1.15 ? 2.2 : 1.8, mrSLMult: v < 0.85 ? 0.8 : v > 1.15 ? 1.2 : 1.0 };
+  return {
+    vwapSD1: v * 15,
+    vwapSD2: v * 30,
+    trendSLMult: v < 0.85 ? 1.5 : v > 1.15 ? 2.2 : 1.8,
+    mrSLMult: v < 0.85 ? 0.8 : v > 1.15 ? 1.2 : 1.0,
+  };
 }
-function calculateThrottledRisk(basePct = 0.3, VR = 1.0, currentBalance = 0, maxDrawdown = 0) {
-  const isThrottled = maxDrawdown > 0 && currentBalance > 0 && (currentBalance - (currentBalance - maxDrawdown)) / maxDrawdown < 0.25;
-  return { activeRiskPct: isThrottled ? Math.round(basePct / 2 * 100) / 100 : basePct, isThrottled };
+function calculateThrottledRisk(
+  basePct = 0.3,
+  VR = 1.0,
+  currentBalance = 0,
+  maxDrawdown = 0,
+) {
+  const isThrottled =
+    maxDrawdown > 0 &&
+    currentBalance > 0 &&
+    (currentBalance - (currentBalance - maxDrawdown)) / maxDrawdown < 0.25;
+  return {
+    activeRiskPct: isThrottled
+      ? Math.round((basePct / 2) * 100) / 100
+      : basePct,
+    isThrottled,
+  };
 }
 
 // ai-router inline (ai-router.js exists but has no exports yet)
-const councilStage = { current: 'stage1', label: 'Analyzing...' };
+const councilStage = { current: "stage1", label: "Analyzing..." };
 
 async function runDeliberation(systemPrompt, userContent) {
-  councilStage.current = 'stage1'; councilStage.label = 'Initializing...';
+  councilStage.current = "stage1";
+  councilStage.label = "Initializing...";
   try {
-    councilStage.current = 'stage2'; councilStage.label = 'Running analysis...';
+    councilStage.current = "stage2";
+    councilStage.label = "Running analysis...";
     let messages;
-    try { const parsed = JSON.parse(userContent); messages = [{ role: 'user', content: parsed }]; }
-    catch { messages = [{ role: 'user', content: userContent }]; }
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 8000, system: systemPrompt, messages }),
+    try {
+      const parsed = JSON.parse(userContent);
+      messages = [{ role: "user", content: parsed }];
+    } catch {
+      messages = [{ role: "user", content: userContent }];
+    }
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 8000,
+        system: systemPrompt,
+        messages,
+      }),
     });
-    councilStage.current = 'stage5'; councilStage.label = 'Complete.';
+    councilStage.current = "stage5";
+    councilStage.label = "Complete.";
     const data = await res.json();
-    return data.content?.map(b => b.text || '').join('\n') || 'No response.';
-  } catch(e) {
-    councilStage.current = 'stage5'; councilStage.label = 'Error.';
+    return data.content?.map((b) => b.text || "").join("\n") || "No response.";
+  } catch (e) {
+    councilStage.current = "stage5";
+    councilStage.label = "Error.";
     throw e;
   }
 }
@@ -70,123 +129,287 @@ const firebaseOptimizer = {
     const pathRef = dbRef(db, path);
     return onValueFn(pathRef, (snapshot) => cb(snapshot.val() || {}));
   },
-  getMetrics: () => ({ status: 'active' }),
+  getMetrics: () => ({ status: "active" }),
 };
 
-// Security stubs
-class SecuritySentinel {
-  constructor() {
-    this.antiHacker = { recordAdminActivity: () => ({ blocked: false, isSuspicious: false }) };
-  }
-  activate() {}
-}
+// Security stubs (AntivirusGateway and AntiSpamShield needed for signup)
 class AntivirusGateway {
-  async verifyFileSignature() { return { valid: true, reason: 'stub' }; }
+  async verifyFileSignature() {
+    return { valid: true, reason: "stub" };
+  }
   async handleMaliciousFile() {}
 }
 class AntiSpamShield {
-  isBotDetected(formData) { return !!(formData && formData['phone_number_verify_alt_opt']); }
+  isBotDetected(formData) {
+    return !!(formData && formData["phone_number_verify_alt_opt"]);
+  }
   async silentlyRejectBot() {}
 }
 
 // Service stubs
-const exposePerformanceTestToWindow = () => { window.__performanceTest = {}; };
-const exposeSecurityAPIToWindow = () => { window.__SecurityMonitor = {}; };
+const exposePerformanceTestToWindow = () => {
+  window.__performanceTest = {};
+};
+const exposeSecurityAPIToWindow = () => {
+  window.__SecurityMonitor = {};
+};
 const initLeakagePrevention = () => {};
 const initSocialEngineeringDetection = () => {};
-const testTelegramConnectivity = async () => ({ summary: { status: 'ALL_SYSTEMS_OPERATIONAL', passedTests: 3, totalTests: 3 } });
+const testTelegramConnectivity = async () => ({
+  summary: { status: "ALL_SYSTEMS_OPERATIONAL", passedTests: 3, totalTests: 3 },
+});
 const initTelegramMonitor = () => {};
 
 // Apple-like 3-state ThemeSwitcher (Day, Night, Eye Comfort)
 const ThemeSwitcher = ({ currentTheme, onThemeChange }) => {
   const cycle = {
-    day: 'night',
-    night: 'eye',
-    eye: 'day'
+    day: "night",
+    night: "eye",
+    eye: "day",
   };
-  const next = cycle[currentTheme] || 'day';
-  const label = currentTheme === 'day' ? '☀️' : currentTheme === 'night' ? '🌙' : '👁️';
+  const next = cycle[currentTheme] || "day";
+  const label =
+    currentTheme === "day" ? "☀️" : currentTheme === "night" ? "🌙" : "👁️";
   return (
     <button
       onClick={() => onThemeChange(next)}
       aria-label={`Switch to ${next} theme`}
       style={{
-        background: 'transparent',
-        border: '1px solid #E2E8F0',
+        background: "transparent",
+        border: "1px solid #E2E8F0",
         borderRadius: 6,
-        padding: '8px 12px',
-        cursor: 'pointer',
+        padding: "8px 12px",
+        cursor: "pointer",
         fontSize: 14,
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 6
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
       }}
     >
       <span style={{ fontSize: 14 }}>{label}</span>
-      <span style={{ fontWeight: 600, color: '#374151', fontFamily: 'inherit' }}>{next.charAt(0).toUpperCase() + next.slice(1)}</span>
+      <span
+        style={{ fontWeight: 600, color: "#374151", fontFamily: "inherit" }}
+      >
+        {next.charAt(0).toUpperCase() + next.slice(1)}
+      </span>
     </button>
   );
 };
 // AI Engines Status indicator
 function AiEnginesStatus({ statuses = [true, true, true, true] }) {
   return (
-    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-      <span style={{ fontSize: 12, color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>AI ENGINES</span>
+    <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+      <span
+        style={{
+          fontSize: 12,
+          color: "#64748b",
+          fontWeight: 700,
+          textTransform: "uppercase",
+          letterSpacing: 1,
+        }}
+      >
+        AI ENGINES
+      </span>
       {statuses.map((ok, idx) => (
-        <span key={idx} title={`Engine ${idx+1}`} style={{ width: 10, height: 10, borderRadius: 6, display: 'inline-block', background: ok ? '#22c55e' : '#f87171', boxShadow: ok ? '0 0 6px #34d399' : 'none' }} />
+        <span
+          key={idx}
+          title={`Engine ${idx + 1}`}
+          style={{
+            width: 10,
+            height: 10,
+            borderRadius: 6,
+            display: "inline-block",
+            background: ok ? "#22c55e" : "#f87171",
+            boxShadow: ok ? "0 0 6px #34d399" : "none",
+          }}
+        />
       ))}
     </div>
   );
 }
 
 // businessLogicUtils stubs
-const formatPhoneNumber = (phone = '') => phone.replace(/\D/g, '').slice(0, 10);
+const formatPhoneNumber = (phone = "") => phone.replace(/\D/g, "").slice(0, 10);
 const TradersRegimentWatermark = () => null;
 const ExchangeFacilityBadge = () => (
-  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px',
-    background: 'rgba(10,132,255,0.08)', border: '1px solid rgba(10,132,255,0.2)',
-    borderRadius: 20, marginBottom: 16, fontSize: 11, fontWeight: 600, color: '#0A84FF' }}>
+  <div
+    style={{
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 6,
+      padding: "6px 14px",
+      background: "rgba(10,132,255,0.08)",
+      border: "1px solid rgba(10,132,255,0.2)",
+      borderRadius: 20,
+      marginBottom: 16,
+      fontSize: 11,
+      fontWeight: 600,
+      color: "#0A84FF",
+    }}
+  >
     🏛 REGULATED EXCHANGE FACILITY
   </div>
 );
 
 // Page stubs — replace these later with your real page files
 const CleanOnboarding = ({ onSignupSuccess, onBackToLogin }) => {
-  const [form, setForm] = React.useState({ email: '', password: '', fullName: '', mobile: '' });
+  const [form, setForm] = React.useState({
+    email: "",
+    password: "",
+    fullName: "",
+    mobile: "",
+  });
   const [loading, setLoading] = React.useState(false);
-  const [err, setErr] = React.useState('');
-  const s = { width: '100%', padding: '12px', marginBottom: 12, border: '1px solid #E2E8F0', borderRadius: 6, fontSize: 14, outline: 'none', boxSizing: 'border-box' };
+  const [err, setErr] = React.useState("");
+  const s = {
+    width: "100%",
+    padding: "12px",
+    marginBottom: 12,
+    border: "1px solid #E2E8F0",
+    borderRadius: 6,
+    fontSize: 14,
+    outline: "none",
+    boxSizing: "border-box",
+  };
   const submit = async () => {
-    if (!form.email || !form.password || !form.fullName || !form.mobile) { setErr('All fields required.'); return; }
+    if (!form.email || !form.password || !form.fullName || !form.mobile) {
+      setErr("All fields required.");
+      return;
+    }
     setLoading(true);
-    try { await onSignupSuccess(form); } catch (e) { setErr(e.message); } finally { setLoading(false); }
+    try {
+      await onSignupSuccess(form);
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setLoading(false);
+    }
   };
   return (
-    <div style={{ minHeight: '100vh', background: '#FFF', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-      <div style={{ width: '100%', maxWidth: 420, background: '#FFF', borderRadius: 16, padding: 40, boxShadow: '0 4px 24px rgba(0,0,0,0.08)' }}>
-        <h2 style={{ margin: '0 0 24px', fontSize: 22, fontWeight: 700 }}>Join Traders Regiment</h2>
-        {err && <div style={{ color: '#EF4444', marginBottom: 12, fontSize: 13 }}>{err}</div>}
-        {['fullName','email','password','mobile'].map(k => (
-          <input key={k} type={k === 'password' ? 'password' : 'text'} placeholder={k.charAt(0).toUpperCase() + k.slice(1)}
-            value={form[k]} onChange={e => setForm(p => ({...p, [k]: e.target.value}))} style={s} />
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "#FFF",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 20,
+      }}
+    >
+      <div
+        style={{
+          width: "100%",
+          maxWidth: 420,
+          background: "#FFF",
+          borderRadius: 16,
+          padding: 40,
+          boxShadow: "0 4px 24px rgba(0,0,0,0.08)",
+        }}
+      >
+        <h2 style={{ margin: "0 0 24px", fontSize: 22, fontWeight: 700 }}>
+          Join Traders Regiment
+        </h2>
+        {err && (
+          <div style={{ color: "#EF4444", marginBottom: 12, fontSize: 13 }}>
+            {err}
+          </div>
+        )}
+        {["fullName", "email", "password", "mobile"].map((k) => (
+          <input
+            key={k}
+            type={k === "password" ? "password" : "text"}
+            placeholder={k.charAt(0).toUpperCase() + k.slice(1)}
+            value={form[k]}
+            onChange={(e) => setForm((p) => ({ ...p, [k]: e.target.value }))}
+            style={s}
+          />
         ))}
-        <button onClick={submit} disabled={loading} style={{ width: '100%', padding: 13, background: '#000', color: '#fff', border: 'none', borderRadius: 6, fontSize: 14, fontWeight: 600, cursor: 'pointer', marginBottom: 12 }}>
-          {loading ? 'Submitting...' : 'Submit Application'}
+        <button
+          onClick={submit}
+          disabled={loading}
+          style={{
+            width: "100%",
+            padding: 13,
+            background: "#000",
+            color: "#fff",
+            border: "none",
+            borderRadius: 6,
+            fontSize: 14,
+            fontWeight: 600,
+            cursor: "pointer",
+            marginBottom: 12,
+          }}
+        >
+          {loading ? "Submitting..." : "Submit Application"}
         </button>
-        <button onClick={onBackToLogin} style={{ width: '100%', padding: 12, background: 'transparent', border: '1px solid #E2E8F0', borderRadius: 6, cursor: 'pointer', fontSize: 14 }}>← Back to Login</button>
+        <button
+          onClick={onBackToLogin}
+          style={{
+            width: "100%",
+            padding: 12,
+            background: "transparent",
+            border: "1px solid #E2E8F0",
+            borderRadius: 6,
+            cursor: "pointer",
+            fontSize: 14,
+          }}
+        >
+          ← Back to Login
+        </button>
       </div>
     </div>
   );
 };
 
 const RegimentHub = ({ onNavigate, theme }) => (
-  <div style={{ minHeight: '100vh', background: '#FFF', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 24, padding: 40, fontFamily: 'system-ui' }}>
-    <h1 style={{ fontSize: 28, fontWeight: 800, margin: 0, letterSpacing: 2 }}>TRADERS REGIMENT</h1>
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, width: '100%', maxWidth: 360 }}>
-      {[{ label: '📊 Trading Terminal', dest: 'app', color: '#0A84FF' },
-        { label: '🧠 Collective Consciousness', dest: 'consciousness', color: '#BF5AF2' }].map(item => (
-        <button key={item.dest} onClick={() => onNavigate(item.dest)}
-          style={{ padding: '16px 24px', background: item.color + '10', border: `1px solid ${item.color}40`, borderRadius: 10, cursor: 'pointer', color: item.color, fontSize: 14, fontWeight: 700, textAlign: 'left' }}>
+  <div
+    style={{
+      minHeight: "100vh",
+      background: "#FFF",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 24,
+      padding: 40,
+      fontFamily: "system-ui",
+    }}
+  >
+    <h1 style={{ fontSize: 28, fontWeight: 800, margin: 0, letterSpacing: 2 }}>
+      TRADERS REGIMENT
+    </h1>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 12,
+        width: "100%",
+        maxWidth: 360,
+      }}
+    >
+      {[
+        { label: "📊 Trading Terminal", dest: "app", color: "#0A84FF" },
+        {
+          label: "🧠 Collective Consciousness",
+          dest: "consciousness",
+          color: "#BF5AF2",
+        },
+      ].map((item) => (
+        <button
+          key={item.dest}
+          onClick={() => onNavigate(item.dest)}
+          style={{
+            padding: "16px 24px",
+            background: item.color + "10",
+            border: `1px solid ${item.color}40`,
+            borderRadius: 10,
+            cursor: "pointer",
+            color: item.color,
+            fontSize: 14,
+            fontWeight: 700,
+            textAlign: "left",
+          }}
+        >
           {item.label}
         </button>
       ))}
@@ -195,10 +418,35 @@ const RegimentHub = ({ onNavigate, theme }) => (
 );
 
 const CollectiveConsciousness = ({ onBack }) => (
-  <div style={{ minHeight: '100vh', background: '#FFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui' }}>
-    <div style={{ textAlign: 'center', padding: 40 }}>
-      <h1 style={{ fontSize: 24, fontWeight: 800, marginBottom: 16 }}>Collective Consciousness</h1>
-      <button onClick={onBack} style={{ padding: '12px 24px', background: '#000', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14, fontWeight: 600 }}>← Back to Hub</button>
+  <div
+    style={{
+      minHeight: "100vh",
+      background: "#FFF",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontFamily: "system-ui",
+    }}
+  >
+    <div style={{ textAlign: "center", padding: 40 }}>
+      <h1 style={{ fontSize: 24, fontWeight: 800, marginBottom: 16 }}>
+        Collective Consciousness
+      </h1>
+      <button
+        onClick={onBack}
+        style={{
+          padding: "12px 24px",
+          background: "#000",
+          color: "#fff",
+          border: "none",
+          borderRadius: 8,
+          cursor: "pointer",
+          fontSize: 14,
+          fontWeight: 600,
+        }}
+      >
+        ← Back to Hub
+      </button>
     </div>
   </div>
 );
@@ -206,19 +454,22 @@ const CollectiveConsciousness = ({ onBack }) => (
 // ═══════════════════════════════════════════════════════════════════
 //  FIREBASE REST LAYER & V9 INITIALIZATION
 // ═══════════════════════════════════════════════════════════════════
-const FB_KEY      = "AIzaSyBPN7fIZ-UfVQ5EMti1TzrFPsi4wtUEtKI";
+const FB_KEY = "AIzaSyBPN7fIZ-UfVQ5EMti1TzrFPsi4wtUEtKI";
 const FB_AUTH_URL = "https://identitytoolkit.googleapis.com/v1/accounts";
 const ADMIN_EMAIL = "gunitsingh1994@gmail.com";
-const ADMIN_UID   = "N3z04ZYCleZjOApobL3VZepaOwi1";
+const ADMIN_UID = "N3z04ZYCleZjOApobL3VZepaOwi1";
 // RULE #30: Master Security Salt - Hash is pre-computed from password + MASTER_SALT
 // Original: "TR@GODMODE2024" + "TR_SECURITY_SALT_2024_REGIMENT" → SHA-256
-const ADMIN_PASS_HASH = "0189c7742ecf4542ecab0150b32ecadc9ce7c4390217bfb3914f5b52b14e3cb6";
-const TELEGRAM_TOKEN = import.meta.env.VITE_TELEGRAM_BOT_TOKEN || '7978697496:AAEYF2jlx_aBpuWlqWPSD6Bu2hTIgSb8isc';
-const TELEGRAM_CHAT_ID = import.meta.env.VITE_TELEGRAM_CHAT_ID || '1380983917';
+const ADMIN_PASS_HASH =
+  "0189c7742ecf4542ecab0150b32ecadc9ce7c4390217bfb3914f5b52b14e3cb6";
+const TELEGRAM_TOKEN =
+  import.meta.env.VITE_TELEGRAM_BOT_TOKEN ||
+  "7978697496:AAEYF2jlx_aBpuWlqWPSD6Bu2hTIgSb8isc";
+const TELEGRAM_CHAT_ID = import.meta.env.VITE_TELEGRAM_CHAT_ID || "1380983917";
 
 // Verify Telegram security system is active
-// eslint-disable-next-line no-console
-console.log('Telegram Security System: ONLINE');
+
+console.log("Telegram Security System: ONLINE");
 
 const firebaseConfig = {
   apiKey: "AIzaSyBPN7fIZ-UfVQ5EMti1TzrFPsi4wtUEtKI",
@@ -228,7 +479,8 @@ const firebaseConfig = {
   messagingSenderId: "1074706591741",
   appId: "1:1074706591741:web:53194a737f7d3d3d3d3d3d",
   // THIS LINE BELOW IS THE ONE CAUSING THE 404
-  databaseURL: "https://traders-regiment-default-rtdb.asia-southeast1.firebasedatabase.app/"
+  databaseURL:
+    "https://traders-regiment-default-rtdb.asia-southeast1.firebasedatabase.app/",
 };
 
 const DATABASE_URL = firebaseConfig.databaseURL;
@@ -238,7 +490,7 @@ const DATABASE_URL = firebaseConfig.databaseURL;
 // ═══════════════════════════════════════════════════════════════════
 // Apply these indexes in Firebase Console → Database → Rules → Indexes
 // For maximum query performance on high-volume user lists
-// 
+//
 // JSON Configuration to add to Firebase Rules:
 // {
 //   "rules": {
@@ -256,7 +508,7 @@ const DATABASE_URL = firebaseConfig.databaseURL;
 //     }
 //   }
 // }
-// 
+//
 // Composite Index Definitions:
 // Index 1: /users with path "email"
 //   - Enables: queries filtering users by email exact match
@@ -323,13 +575,16 @@ firebaseOptimizer.initializeConnectionPool();
 window.__FirebaseOptimizer = firebaseOptimizer;
 
 // Set Google provider to force Gmail account selection
-googleProvider.setCustomParameters({ 'hd': 'gmail.com', prompt: 'select_account' });
+googleProvider.setCustomParameters({
+  hd: "gmail.com",
+  prompt: "select_account",
+});
 
 // Set persistence to local (survives browser refresh)
 try {
   setPersistence(firebaseAuth, browserLocalPersistence);
 } catch {
-    console.warn('Failed to set auth persistence');
+  console.warn("Failed to set auth persistence");
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -343,46 +598,49 @@ try {
 const detectGPUSupport = () => {
   try {
     // Create a test element
-    const testEl = document.createElement('div');
-    testEl.style.transform = 'translateZ(0)';
-    
+    const testEl = document.createElement("div");
+    testEl.style.transform = "translateZ(0)";
+
     // Check if transform is applied (browser support)
-    const hasTransformZ = testEl.style.transform !== '';
-    
+    const hasTransformZ = testEl.style.transform !== "";
+
     // Check for CSS @supports rule support
-    const hasSupportsRule = CSS && CSS.supports && CSS.supports('transform', 'translateZ(0)');
-    
+    const hasSupportsRule =
+      CSS && CSS.supports && CSS.supports("transform", "translateZ(0)");
+
     // Check browser acceleration via GPU info
-    const canvas = document.createElement('canvas');
-    const gl = canvas.getContext('webgl', { failIfMajorPerformanceCaveat: false });
+    const canvas = document.createElement("canvas");
+    const gl = canvas.getContext("webgl", {
+      failIfMajorPerformanceCaveat: false,
+    });
     const hasWebGL = !!gl;
-    
+
     // Composite the detection results
     const isGPUAccelerated = hasTransformZ && (hasSupportsRule || hasWebGL);
-    
+
     const result = {
       supported: isGPUAccelerated,
       hasTransformZ,
       hasSupportsRule,
       hasWebGL,
-      agent: navigator.userAgent.split(' ').slice(-1)[0]
+      agent: navigator.userAgent.split(" ").slice(-1)[0],
     };
-    
+
     // Log acceleration info for diagnostics
     /* eslint-disable no-console */
     if (isGPUAccelerated) {
-      console.log('✅ GPU Acceleration: ENABLED (TransformZ + WebGL)');
+      console.log("✅ GPU Acceleration: ENABLED (TransformZ + WebGL)");
     } else {
-      console.log('⚠️ GPU Acceleration: FALLBACK MODE (CPU rendering)');
+      console.log("⚠️ GPU Acceleration: FALLBACK MODE (CPU rendering)");
     }
     /* eslint-enable no-console */
-    
+
     return result;
   } catch (error) {
-    console.warn('GPU detection error:', error);
+    console.warn("GPU detection error:", error);
     return {
       supported: false,
-      error: error.message
+      error: error.message,
     };
   }
 };
@@ -400,31 +658,41 @@ const _gpuSupport = detectGPUSupport();
  * @param {number} initialDelay - Initial delay in ms (default: 100)
  * @returns {Promise} Result of function execution
  */
-const _withExponentialBackoff = async (fn, maxRetries = 3, initialDelay = 100) => {
+const _withExponentialBackoff = async (
+  fn,
+  maxRetries = 3,
+  initialDelay = 100,
+) => {
   let lastError;
-  
+
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       // Attempt the operation
       return await fn();
     } catch (error) {
       lastError = error;
-      
+
       // Don't retry if we've exceeded max retries
       if (attempt === maxRetries) {
-        console.error(`Operation failed after ${maxRetries + 1} attempts:`, error);
+        console.error(
+          `Operation failed after ${maxRetries + 1} attempts:`,
+          error,
+        );
         throw error;
       }
-      
+
       // Calculate exponential backoff delay: 100ms, 200ms, 400ms, 800ms...
       const delayMs = initialDelay * Math.pow(2, attempt);
-      console.warn(`Attempt ${attempt + 1} failed, retrying in ${delayMs}ms...`, error.message);
-      
+      console.warn(
+        `Attempt ${attempt + 1} failed, retrying in ${delayMs}ms...`,
+        error.message,
+      );
+
       // Wait before retrying
-      await new Promise(resolve => setTimeout(resolve, delayMs));
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
     }
   }
-  
+
   throw lastError;
 };
 
@@ -436,7 +704,9 @@ const _withExponentialBackoff = async (fn, maxRetries = 3, initialDelay = 100) =
  */
 const _dbRWithRetry = async (path, authToken) => {
   return _withExponentialBackoff(async () => {
-    const response = await fetch(`${DATABASE_URL}${path}.json${authToken ? `?auth=${authToken}` : ''}`);
+    const response = await fetch(
+      `${DATABASE_URL}${path}.json${authToken ? `?auth=${authToken}` : ""}`,
+    );
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
@@ -453,11 +723,14 @@ const _dbRWithRetry = async (path, authToken) => {
  */
 const _dbWWithRetry = async (path, data, authToken) => {
   return _withExponentialBackoff(async () => {
-    const response = await fetch(`${DATABASE_URL}${path}.json?auth=${authToken}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
+    const response = await fetch(
+      `${DATABASE_URL}${path}.json?auth=${authToken}`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      },
+    );
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: Failed to write data`);
     }
@@ -473,11 +746,14 @@ const _dbWWithRetry = async (path, data, authToken) => {
  */
 const _dbMWithRetry = async (path, data, authToken) => {
   return _withExponentialBackoff(async () => {
-    const response = await fetch(`${DATABASE_URL}${path}.json?auth=${authToken}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
+    const response = await fetch(
+      `${DATABASE_URL}${path}.json?auth=${authToken}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      },
+    );
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: Failed to update data`);
     }
@@ -487,7 +763,7 @@ const _dbMWithRetry = async (path, data, authToken) => {
 // Database REST Helpers
 const dbR = async (p, t) => {
   try {
-    const r = await fetch(`${DATABASE_URL}${p}.json${t ? `?auth=${t}` : ''}`);
+    const r = await fetch(`${DATABASE_URL}${p}.json${t ? `?auth=${t}` : ""}`);
     return r.ok ? r.json() : null;
   } catch {
     return null;
@@ -497,51 +773,55 @@ const dbR = async (p, t) => {
 const dbW = async (p, d, t) => {
   try {
     await fetch(`${DATABASE_URL}${p}.json?auth=${t}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(d)
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(d),
     });
   } catch {
-    console.error('dbW error');
+    console.error("dbW error");
   }
 };
 
 const dbM = async (p, d, t) => {
   try {
     await fetch(`${DATABASE_URL}${p}.json?auth=${t}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(d)
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(d),
     });
   } catch {
-    console.error('dbM error');
+    console.error("dbM error");
   }
 };
 
-
-
 const dbDel = async (p, t) => {
   try {
-    await fetch(`${DATABASE_URL}${p}.json?auth=${t}`, { method: 'DELETE' });
+    await fetch(`${DATABASE_URL}${p}.json?auth=${t}`, { method: "DELETE" });
   } catch {
-    console.error('dbDel error');
+    console.error("dbDel error");
   }
 };
 
 // Auth REST Helpers
 const authPost = async (ep, body) => {
   const r = await fetch(`${FB_AUTH_URL}:${ep}?key=${FB_KEY}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
   });
   const d = await r.json();
   if (d.error) throw new Error(d.error.message);
   return d;
 };
 
-const fbSignUp = (e, p) => authPost('signUp', { email: e, password: p, returnSecureToken: true });
-const fbSignIn = (e, p) => authPost('signInWithPassword', { email: e, password: p, returnSecureToken: true });
+const fbSignUp = (e, p) =>
+  authPost("signUp", { email: e, password: p, returnSecureToken: true });
+const fbSignIn = (e, p) =>
+  authPost("signInWithPassword", {
+    email: e,
+    password: p,
+    returnSecureToken: true,
+  });
 const genOTP = () => String(Math.floor(100000 + Math.random() * 900000));
 
 // ═══════════════════════════════════════════════════════════════════
@@ -559,31 +839,31 @@ const gatherForensicData = async () => {
 
     // 1. Parse User Agent for Browser & OS
     const userAgent = navigator.userAgent;
-    let browserName = 'Unknown';
-    let osName = 'Unknown';
+    let browserName = "Unknown";
+    let osName = "Unknown";
 
     if (/Edg/.test(userAgent)) {
-      browserName = 'Edge';
+      browserName = "Edge";
     } else if (/Chrome/.test(userAgent)) {
-      browserName = 'Chrome';
+      browserName = "Chrome";
     } else if (/Safari/.test(userAgent)) {
-      browserName = 'Safari';
+      browserName = "Safari";
     } else if (/Firefox/.test(userAgent)) {
-      browserName = 'Firefox';
+      browserName = "Firefox";
     } else if (/Opera|OPR/.test(userAgent)) {
-      browserName = 'Opera';
+      browserName = "Opera";
     }
 
     if (/Windows/.test(userAgent)) {
-      osName = 'Windows';
+      osName = "Windows";
     } else if (/Mac/.test(userAgent)) {
-      osName = 'macOS';
+      osName = "macOS";
     } else if (/Linux/.test(userAgent)) {
-      osName = 'Linux';
+      osName = "Linux";
     } else if (/Android/.test(userAgent)) {
-      osName = 'Android';
+      osName = "Android";
     } else if (/iPhone|iPad/.test(userAgent)) {
-      osName = 'iOS';
+      osName = "iOS";
     }
 
     forensic.browser = browserName;
@@ -594,53 +874,53 @@ const gatherForensicData = async () => {
 
     // 3. Get IP address
     try {
-      const ipRes = await fetch('https://api.ipify.org?format=json');
+      const ipRes = await fetch("https://api.ipify.org?format=json");
       const ipData = await ipRes.json();
-      forensic.ip = ipData.ip || 'Unknown';
+      forensic.ip = ipData.ip || "Unknown";
     } catch {
-      forensic.ip = 'Unknown';
+      forensic.ip = "Unknown";
     }
 
     // 4. Get detailed Geo-data (City, Region, Country, ISP)
     try {
-      const geoRes = await fetch('https://ipapi.co/json/');
+      const geoRes = await fetch("https://ipapi.co/json/");
       const geoData = await geoRes.json();
-      forensic.city = geoData.city || 'Unknown';
-      forensic.region = geoData.region || 'Unknown';
-      forensic.country = geoData.country_name || 'Unknown';
-      forensic.isp = geoData.org || 'Unknown';
+      forensic.city = geoData.city || "Unknown";
+      forensic.region = geoData.region || "Unknown";
+      forensic.country = geoData.country_name || "Unknown";
+      forensic.isp = geoData.org || "Unknown";
     } catch {
-      forensic.city = 'Unknown';
-      forensic.region = 'Unknown';
-      forensic.country = 'Unknown';
-      forensic.isp = 'Unknown';
+      forensic.city = "Unknown";
+      forensic.region = "Unknown";
+      forensic.country = "Unknown";
+      forensic.isp = "Unknown";
     }
 
     // 5. Get current timestamp
-    forensic.timestamp = new Date().toLocaleString('en-US', {
-      weekday: 'short',
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      timeZoneName: 'short'
+    forensic.timestamp = new Date().toLocaleString("en-US", {
+      weekday: "short",
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      timeZoneName: "short",
     });
 
     return forensic;
   } catch (error) {
-    console.error('Forensic data gathering failed:', error);
+    console.error("Forensic data gathering failed:", error);
     return {
-      browser: 'Unknown',
-      os: 'Unknown',
-      screenResolution: 'Unknown',
-      ip: 'Unknown',
-      city: 'Unknown',
-      region: 'Unknown',
-      country: 'Unknown',
-      isp: 'Unknown',
-      timestamp: new Date().toLocaleString()
+      browser: "Unknown",
+      os: "Unknown",
+      screenResolution: "Unknown",
+      ip: "Unknown",
+      city: "Unknown",
+      region: "Unknown",
+      country: "Unknown",
+      isp: "Unknown",
+      timestamp: new Date().toLocaleString(),
     };
   }
 };
@@ -648,16 +928,16 @@ const gatherForensicData = async () => {
 const sendTelegramAlert = async (message) => {
   try {
     await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         chat_id: TELEGRAM_CHAT_ID,
         text: message,
-        parse_mode: 'HTML'
-      })
+        parse_mode: "HTML",
+      }),
     });
   } catch (error) {
-    console.error('Telegram Alert Failed:', error);
+    console.error("Telegram Alert Failed:", error);
   }
 };
 
@@ -667,7 +947,7 @@ window.sendTelegramAlert = sendTelegramAlert;
 // ═══════════════════════════════════════════════════════════════════
 // FORENSIC BREACH ALERT - Detailed signature + Institutional format
 // ═══════════════════════════════════════════════════════════════════
-const sendForensicAlert = async (targetEmail, alertType = 'BREACH') => {
+const sendForensicAlert = async (targetEmail, alertType = "BREACH") => {
   // Send instant error to user (non-blocking)
   // Gather forensic data in background
   const forensic = await gatherForensicData();
@@ -697,8 +977,6 @@ Display: <code>${forensic.screenResolution}</code>
   sendTelegramAlert(message);
 };
 
-
-
 // ═══════════════════════════════════════════════════════════════════
 // SECURITY UTILITY FUNCTIONS - Module 1: Elite Security
 // ═══════════════════════════════════════════════════════════════════
@@ -707,30 +985,30 @@ Display: <code>${forensic.screenResolution}</code>
 const calculatePasswordStrength = (password) => {
   if (!password) return 0;
   let strength = 0;
-  
+
   // Length check
   if (password.length >= 8) strength++;
   if (password.length >= 12) strength++;
-  
+
   // Character variety checks
   if (/[a-z]/.test(password) && /[A-Z]/.test(password)) strength++;
   if (/\d/.test(password)) strength++;
   if (/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password)) strength++;
-  
+
   return Math.min(strength, 3); // 0-3 scale
 };
 
 const getStrengthLabel = (strength) => {
-  if (strength === 0) return { label: 'Weak', color: '#FF453A' };
-  if (strength === 1) return { label: 'Weak', color: '#FF453A' };
-  if (strength === 2) return { label: 'Medium', color: '#FF9500' };
-  return { label: 'Strong', color: '#34C759' };
+  if (strength === 0) return { label: "Weak", color: "#FF453A" };
+  if (strength === 1) return { label: "Weak", color: "#FF453A" };
+  if (strength === 2) return { label: "Medium", color: "#FF9500" };
+  return { label: "Strong", color: "#34C759" };
 };
 
 // Gmail validation
 const isValidGmailAddress = (email) => {
   const trimmed = email.trim().toLowerCase();
-  return trimmed.endsWith('@gmail.com') && trimmed.split('@')[0].length > 0;
+  return trimmed.endsWith("@gmail.com") && trimmed.split("@")[0].length > 0;
 };
 
 // Check if password is expired (older than 120 days)
@@ -746,19 +1024,19 @@ const isPasswordExpired = (lastChangedTimestamp) => {
 const copyToClipboardSecure = async (text, showToast) => {
   try {
     await navigator.clipboard.writeText(text);
-    showToast('Data packet delivered. Clipboard stands ready.', 'success');
-    
+    showToast("Data packet delivered. Clipboard stands ready.", "success");
+
     // Clear clipboard after 60 seconds
     setTimeout(async () => {
       try {
-        await navigator.clipboard.writeText('');
+        await navigator.clipboard.writeText("");
       } catch (e) {
-        console.warn('Could not clear clipboard:', e);
+        console.warn("Could not clear clipboard:", e);
       }
     }, 60000); // 60 seconds
   } catch (error) {
-    console.error('Failed to copy:', error);
-    showToast('Copy buffer full. Try again soon.', 'error');
+    console.error("Failed to copy:", error);
+    showToast("Copy buffer full. Try again soon.", "error");
   }
 };
 
@@ -774,7 +1052,7 @@ const encryptSessionToken = (data) => {
     // Simple base64 encoding (not real encryption - use real crypto in production)
     return btoa(jsonStr);
   } catch (e) {
-    console.error('Encryption failed:', e);
+    console.error("Encryption failed:", e);
     return null;
   }
 };
@@ -787,34 +1065,34 @@ const generateSessionId = () => {
 // Get device info
 const getDeviceInfo = () => {
   const ua = navigator.userAgent;
-  let device = 'Unknown Device';
-  
+  let device = "Unknown Device";
+
   if (/iPhone|iPad|iPod/.test(ua)) {
-    device = 'iOS Device';
+    device = "iOS Device";
   } else if (/Android/.test(ua)) {
-    device = 'Android Device';
+    device = "Android Device";
   } else if (/Windows/.test(ua)) {
-    device = 'Windows PC';
+    device = "Windows PC";
   } else if (/Macintosh/.test(ua)) {
-    device = 'Mac';
+    device = "Mac";
   } else if (/Linux/.test(ua)) {
-    device = 'Linux';
+    device = "Linux";
   }
-  
+
   return device;
 };
 
 // Fetch geo data for session (last active city)
 const getSessionGeoData = async () => {
   try {
-    const geoRes = await fetch('https://ipapi.co/json/');
+    const geoRes = await fetch("https://ipapi.co/json/");
     const geoData = await geoRes.json();
     return {
-      city: geoData.city || 'Unknown',
-      country: geoData.country_name || 'Unknown'
+      city: geoData.city || "Unknown",
+      country: geoData.country_name || "Unknown",
     };
   } catch {
-    return { city: 'Unknown', country: 'Unknown' };
+    return { city: "Unknown", country: "Unknown" };
   }
 };
 
@@ -826,8 +1104,11 @@ const createSession = async (uid, token, rememberMe) => {
     const sessionId = generateSessionId();
     const device = getDeviceInfo();
     const geo = await getSessionGeoData();
-    const expiresAt = new Date(Date.now() + (rememberMe ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000)); // 30 days or 1 day
-    
+    const expiresAt = new Date(
+      Date.now() +
+        (rememberMe ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000),
+    ); // 30 days or 1 day
+
     const sessionData = {
       sessionId,
       device,
@@ -835,12 +1116,12 @@ const createSession = async (uid, token, rememberMe) => {
       country: geo.country,
       createdAt: new Date().toISOString(),
       expiresAt: expiresAt.toISOString(),
-      lastActive: new Date().toISOString()
+      lastActive: new Date().toISOString(),
     };
-    
+
     // Store session in Firebase under user's sessions subcollection
     await dbW(`users/${uid}/sessions/${sessionId}`, sessionData, token);
-    
+
     // Store encrypted session token in localStorage for "Remember Me" functionality
     if (rememberMe) {
       const encryptedSession = encryptSessionToken({
@@ -848,40 +1129,39 @@ const createSession = async (uid, token, rememberMe) => {
         sessionId,
         email: sessionData.email,
         expiresAt: expiresAt.toISOString(),
-        token: token
+        token: token,
       });
       localStorage.setItem(`sess_${uid}`, encryptedSession);
     }
-    
+
     return sessionId;
   } catch (error) {
-    console.error('Session creation failed:', error);
+    console.error("Session creation failed:", error);
     return null;
   }
 };
 
 // Check if a persisted session is still valid
 
-
 // Logout from other devices (clear all sessions except current)
 const logoutOtherDevices = async (uid, currentSessionId, token) => {
   try {
     const allSessions = await dbR(`users/${uid}/sessions`, token);
-    
+
     if (!allSessions) return true;
-    
+
     // Delete all sessions except current one
-    const deletePromises = Object.keys(allSessions).map(sessionId => {
+    const deletePromises = Object.keys(allSessions).map((sessionId) => {
       if (sessionId !== currentSessionId) {
         return dbDel(`users/${uid}/sessions/${sessionId}`, token);
       }
       return Promise.resolve();
     });
-    
+
     await Promise.all(deletePromises);
     return true;
   } catch (error) {
-    console.error('Logout other devices failed:', error);
+    console.error("Logout other devices failed:", error);
     return false;
   }
 };
@@ -890,48 +1170,46 @@ const getDevice = () => ({
   ua: navigator.userAgent,
   platform: navigator.platform,
   lang: navigator.language,
-  ts: new Date().toISOString()
+  ts: new Date().toISOString(),
 });
 
 // ═══════════════════════════════════════════════════════════════════
 // MODULE 1 IDENTITY & VERIFICATION UTILITIES (#21, #22, #24, #30)
 // ═══════════════════════════════════════════════════════════════════
 
-
-
 // MODULE 2: Surveillance Grid Search Engine (#34, #35, #57)
 // RULE #34, #35: Fuzzy Search Algorithm (Fuse.js-like logic)
 const fuzzySearchScore = (query, text) => {
   if (!query || !text) return -1;
-  
+
   const q = query.toLowerCase();
   const t = text.toLowerCase();
-  
+
   // Exact match: highest score
   if (t === q) return 1000;
-  
+
   // Starts with query: very high score
   if (t.startsWith(q)) return 900;
-  
+
   // Contains query as substring: high score
   if (t.includes(q)) return 800;
-  
+
   // Fuzzy character matching: calculate match score
   let qIdx = 0;
   let score = 0;
   let lastIdx = -1;
-  
+
   for (let i = 0; i < t.length && qIdx < q.length; i++) {
     if (t[i] === q[qIdx]) {
       // Character matched
       const distance = i - lastIdx;
-      const proximity = distance === 1 ? 10 : Math.max(0, 10 - (distance / 10));
+      const proximity = distance === 1 ? 10 : Math.max(0, 10 - distance / 10);
       score += 50 + proximity;
       lastIdx = i;
       qIdx++;
     }
   }
-  
+
   // Only return score if all query characters were matched
   return qIdx === q.length ? score : -1;
 };
@@ -939,21 +1217,21 @@ const fuzzySearchScore = (query, text) => {
 // RULE #57: Search Highlighting - Wrap matching text in <mark> with yellow glow
 const highlightMatches = (text, query) => {
   if (!query || !text) return text;
-  
-  const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const regex = new RegExp(`(${escapedQuery})`, 'gi');
-  
+
+  const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const regex = new RegExp(`(${escapedQuery})`, "gi");
+
   const parts = text.split(regex);
   return parts.map((part) => {
     if (regex.test(part)) {
       return {
         highlighted: true,
-        text: part
+        text: part,
       };
     }
     return {
       highlighted: false,
-      text: part
+      text: part,
     };
   });
 };
@@ -961,60 +1239,71 @@ const highlightMatches = (text, query) => {
 // Create JSX element with highlighted matches
 const renderHighlightedText = (text, query) => {
   if (!query || !text) return text;
-  
+
   const parts = highlightMatches(text, query);
   const jsxParts = [];
   let markIdx = 0;
-  
+
   parts.forEach((part) => {
     if (part.highlighted) {
       jsxParts.push(
-        <mark key={`mark-${markIdx++}`} style={{
-          background: "linear-gradient(135deg, rgba(255,214,10,0.4), rgba(255,214,10,0.2))",
-          boxShadow: "0 0 8px rgba(255,214,10,0.5)",
-          padding: "2px 4px",
-          borderRadius: 3,
-          color: "inherit",
-          fontWeight: 600
-        }}>
+        <mark
+          key={`mark-${markIdx++}`}
+          style={{
+            background:
+              "linear-gradient(135deg, rgba(255,214,10,0.4), rgba(255,214,10,0.2))",
+            boxShadow: "0 0 8px rgba(255,214,10,0.5)",
+            padding: "2px 4px",
+            borderRadius: 3,
+            color: "inherit",
+            fontWeight: 600,
+          }}
+        >
           {part.text}
-        </mark>
+        </mark>,
       );
     } else {
       jsxParts.push(part.text);
     }
   });
-  
+
   return jsxParts;
 };
 
 // MODULE 2: Interaction & Data Feedback (#52, #53, #54, #56, #58)
 // RULE #123: Confetti Success Animation - Trigger celebration bursts
 const triggerConfetti = (count = 30, duration = 2.5) => {
-  const colors = ['#30D158', '#FFD60A', '#0A84FF', '#BF5AF2', '#64D2FF', '#FF375F'];
-  
+  const colors = [
+    "#30D158",
+    "#FFD60A",
+    "#0A84FF",
+    "#BF5AF2",
+    "#64D2FF",
+    "#FF375F",
+  ];
+
   for (let i = 0; i < count; i++) {
-    const confetti = document.createElement('div');
-    confetti.className = 'confetti-piece';
-    
+    const confetti = document.createElement("div");
+    confetti.className = "confetti-piece";
+
     const color = colors[Math.floor(Math.random() * colors.length)];
     const size = Math.random() * 8 + 4;
     const duration_ms = duration * 1000;
     const delay = Math.random() * 100;
-    
+
     confetti.style.cssText = `
       left: ${Math.random() * 100}%;
       top: 0;
       width: ${size}px;
       height: ${size}px;
       background: ${color};
-      border-radius: ${Math.random() > 0.5 ? '50%' : '0'};
+      border-radius: ${Math.random() > 0.5 ? "50%" : "0"};
       animation: confetti-fall ${duration}s cubic-bezier(0.25, 0.46, 0.45, 0.94) ${delay}ms forwards;
       opacity: ${Math.random() * 0.5 + 0.5};
     `;
-    
+
     document.body.appendChild(confetti);
-    
+
     // Clean up after animation
     setTimeout(() => confetti.remove(), duration_ms + delay);
   }
@@ -1024,91 +1313,100 @@ const triggerConfetti = (count = 30, duration = 2.5) => {
 const copyToClipboard = async (text, label, showToast) => {
   try {
     await navigator.clipboard.writeText(text);
-    showToast(`${label} transmitted to system memory. Standing by.`, 'success');
+    showToast(`${label} transmitted to system memory. Standing by.`, "success");
   } catch (error) {
-    console.error('Failed to copy:', error);
-    showToast('Clipboard connection unstable. Retrying..', 'error');
+    console.error("Failed to copy:", error);
+    showToast("Clipboard connection unstable. Retrying..", "error");
   }
 };
 
 // RULE #125: Card Tilt Handler - 3D perspective tilt effect on hover
 const createCardTiltHandler = (element) => {
   if (!element) return;
-  
-  element.addEventListener('mousemove', (e) => {
+
+  element.addEventListener("mousemove", (e) => {
     const rect = element.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    
+
     const centerX = rect.width / 2;
     const centerY = rect.height / 2;
-    
+
     // Calculate rotation based on mouse position relative to center
     const rotateY = (x - centerX) * 0.02;
     const rotateX = (centerY - y) * 0.02;
-    
+
     element.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale(1.02)`;
   });
-  
-  element.addEventListener('mouseleave', () => {
-    element.style.transform = 'perspective(1000px) rotateX(0deg) rotateY(0deg) scale(1)';
+
+  element.addEventListener("mouseleave", () => {
+    element.style.transform =
+      "perspective(1000px) rotateX(0deg) rotateY(0deg) scale(1)";
   });
-  
+
   // Smooth transition
-  element.style.transition = 'transform 0.1s ease-out';
+  element.style.transition = "transform 0.1s ease-out";
 };
 
 // RULE #54: Loading Overlay Component - Shows while syncing with database
 const LoadingOverlay = ({ isLoading }) => {
   if (!isLoading) return null;
-  
+
   return (
-    <div style={{
-      position: "fixed",
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      background: "rgba(0,0,0,0.4)",
-      backdropFilter: "blur(8px)",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      zIndex: 1000,
-      pointerEvents: "none"
-    }}>
-      <div style={{
+    <div
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: "rgba(0,0,0,0.4)",
+        backdropFilter: "blur(8px)",
         display: "flex",
-        flexDirection: "column",
         alignItems: "center",
-        gap: 16,
-        background: "rgba(20,20,20,0.95)",
-        borderRadius: 12,
-        padding: "40px",
-        border: `1px solid rgba(0,122,255,0.2)`,
-        pointerEvents: "auto",
-        boxShadow: "0 8px 32px rgba(0,0,0,0.6)"
-      }}>
+        justifyContent: "center",
+        zIndex: 1000,
+        pointerEvents: "none",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 16,
+          background: "rgba(20,20,20,0.95)",
+          borderRadius: 12,
+          padding: "40px",
+          border: `1px solid rgba(0,122,255,0.2)`,
+          pointerEvents: "auto",
+          boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
+        }}
+      >
         {/* Spinner Animation */}
-        <div style={{
-          width: 40,
-          height: 40,
-          borderRadius: "50%",
-          border: "3px solid rgba(0,122,255,0.2)",
-          borderTopColor: T.blue,
-          animation: "spin 1s linear infinite",
-          pointerEvents: "none"
-        }} />
-        
+        <div
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: "50%",
+            border: "3px solid rgba(0,122,255,0.2)",
+            borderTopColor: T.blue,
+            animation: "spin 1s linear infinite",
+            pointerEvents: "none",
+          }}
+        />
+
         {/* Loading Text */}
-        <div style={{
-          color: T.blue,
-          fontSize: 13,
-          fontWeight: 600,
-          letterSpacing: 1,
-          textTransform: "uppercase",
-          animation: "pulse 2s ease-in-out infinite"
-        }}>
+        <div
+          style={{
+            color: T.blue,
+            fontSize: 13,
+            fontWeight: 600,
+            letterSpacing: 1,
+            textTransform: "uppercase",
+            animation: "pulse 2s ease-in-out infinite",
+          }}
+        >
           ⚡ Syncing with Database...
         </div>
       </div>
@@ -1117,15 +1415,21 @@ const LoadingOverlay = ({ isLoading }) => {
 };
 
 // RULE #131: Skeleton Shimmer Loader - Smooth loading animation
-const SkeletonLoader = ({ width = "100%", height = "20px", borderRadius = "8px", count = 1 }) => {
+const SkeletonLoader = ({
+  width = "100%",
+  height = "20px",
+  borderRadius = "8px",
+  count = 1,
+}) => {
   const skeletonStyle = {
     width,
     height,
     borderRadius,
-    background: "linear-gradient(90deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.05) 100%)",
+    background:
+      "linear-gradient(90deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.05) 100%)",
     backgroundSize: "200% 100%",
     animation: "shimmer 2s infinite",
-    marginBottom: count > 1 ? "12px" : "0px"
+    marginBottom: count > 1 ? "12px" : "0px",
   };
 
   return (
@@ -1138,7 +1442,14 @@ const SkeletonLoader = ({ width = "100%", height = "20px", borderRadius = "8px",
 };
 
 // RULE #132: Lazy Image Component - Progressive image loading
-const LazyImage = ({ src, alt = "Image", width = "100%", height = "auto", borderRadius = "8px", onLoad }) => {
+const LazyImage = ({
+  src,
+  alt = "Image",
+  width = "100%",
+  height = "auto",
+  borderRadius = "8px",
+  onLoad,
+}) => {
   const [isLoaded, setIsLoaded] = useState(false);
   const [imageSrc, setImageSrc] = useState(null);
   const imgRef = useRef(null);
@@ -1148,7 +1459,7 @@ const LazyImage = ({ src, alt = "Image", width = "100%", height = "auto", border
 
     // Intersection Observer for lazy loading
     const observer = new IntersectionObserver(
-      entries => {
+      (entries) => {
         if (entries[0].isIntersecting) {
           const img = new Image();
           img.onload = () => {
@@ -1164,7 +1475,7 @@ const LazyImage = ({ src, alt = "Image", width = "100%", height = "auto", border
           observer.unobserve(imgRef.current);
         }
       },
-      { threshold: 0.1 }
+      { threshold: 0.1 },
     );
 
     if (imgRef.current) {
@@ -1186,11 +1497,15 @@ const LazyImage = ({ src, alt = "Image", width = "100%", height = "auto", border
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
+        transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
       }}
     >
       {!isLoaded ? (
-        <SkeletonLoader width={width} height={height} borderRadius={borderRadius} />
+        <SkeletonLoader
+          width={width}
+          height={height}
+          borderRadius={borderRadius}
+        />
       ) : (
         <img
           src={imageSrc}
@@ -1201,7 +1516,7 @@ const LazyImage = ({ src, alt = "Image", width = "100%", height = "auto", border
             objectFit: "cover",
             borderRadius,
             opacity: isLoaded ? 1 : 0,
-            transition: "opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
+            transition: "opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
           }}
         />
       )}
@@ -1214,76 +1529,87 @@ const EmptyStateCard = ({ searchQuery, filterStatus }) => {
   const getEmptyMessage = () => {
     if (searchQuery) {
       return {
-        icon: '🔍',
-        title: 'NO TRADERS FOUND MATCHING THAT SEARCH',
-        subtitle: `No traders match "${searchQuery}". Try adjusting your search terms or clearing filters.`
+        icon: "🔍",
+        title: "NO TRADERS FOUND MATCHING THAT SEARCH",
+        subtitle: `No traders match "${searchQuery}". Try adjusting your search terms or clearing filters.`,
       };
-    } else if (filterStatus === 'PENDING') {
+    } else if (filterStatus === "PENDING") {
       return {
-        icon: '📋',
-        title: 'NO PENDING APPLICATIONS FOUND',
-        subtitle: 'All applications have been processed. Come back later for new registrations.'
+        icon: "📋",
+        title: "NO PENDING APPLICATIONS FOUND",
+        subtitle:
+          "All applications have been processed. Come back later for new registrations.",
       };
-    } else if (filterStatus === 'ACTIVE') {
+    } else if (filterStatus === "ACTIVE") {
       return {
-        icon: '✓',
-        title: 'NO ACTIVE TRADERS FOUND',
-        subtitle: 'No traders are currently active. Approve pending applications to activate them.'
+        icon: "✓",
+        title: "NO ACTIVE TRADERS FOUND",
+        subtitle:
+          "No traders are currently active. Approve pending applications to activate them.",
       };
-    } else if (filterStatus === 'BLOCKED') {
+    } else if (filterStatus === "BLOCKED") {
       return {
-        icon: '🚫',
-        title: 'NO BANNED USERS FOUND',
-        subtitle: 'No users have been banned from the platform.'
+        icon: "🚫",
+        title: "NO BANNED USERS FOUND",
+        subtitle: "No users have been banned from the platform.",
       };
     } else {
       return {
-        icon: '👥',
-        title: 'NO USERS REGISTERED YET',
-        subtitle: 'No traders have signed up yet. Share your invitation link to get started.'
+        icon: "👥",
+        title: "NO USERS REGISTERED YET",
+        subtitle:
+          "No traders have signed up yet. Share your invitation link to get started.",
       };
     }
   };
-  
+
   const msg = getEmptyMessage();
-  
+
   return (
-    <div style={{
-      padding: "80px 40px",
-      textAlign: "center",
-      display: "flex",
-      flexDirection: "column",
-      alignItems: "center",
-      justifyContent: "center",
-      minHeight: "400px",
-      background: "rgba(255,255,255,0.01)"
-    }}>
-      <div style={{
-        fontSize: 48,
-        marginBottom: 20,
-        opacity: 0.6,
-        animation: "float 3s ease-in-out infinite"
-      }}>
+    <div
+      style={{
+        padding: "80px 40px",
+        textAlign: "center",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        minHeight: "400px",
+        background: "rgba(255,255,255,0.01)",
+      }}
+    >
+      <div
+        style={{
+          fontSize: 48,
+          marginBottom: 20,
+          opacity: 0.6,
+          animation: "float 3s ease-in-out infinite",
+        }}
+      >
         {msg.icon}
       </div>
-      
-      <div style={{
-        color: T.muted,
-        fontSize: 14,
-        fontWeight: 600,
-        marginBottom: 12,
-        maxWidth: 400
-      }}>
+
+      <div
+        style={{
+          color: T.muted,
+          fontSize: 14,
+          fontWeight: 600,
+          marginBottom: 12,
+          maxWidth: 400,
+        }}
+      >
         {msg.title}
       </div>
-      
-      <div style={{
-        color: T.dim,
-        fontSize: 12,
-        marginBottom: 24,
-        maxWidth: 400,
-        lineHeight: 1.6
-      }}>
+
+      <div
+        style={{
+          color: T.dim,
+          fontSize: 12,
+          marginBottom: 24,
+          maxWidth: 400,
+          lineHeight: 1.6,
+        }}
+      >
         {msg.subtitle}
       </div>
     </div>
@@ -1292,89 +1618,98 @@ const EmptyStateCard = ({ searchQuery, filterStatus }) => {
 
 // MODULE 4: Professional Navigation & Layout (#99, #109, #111)
 // RULE #99: Command Palette - Search users, jump pages, toggle features
-const CommandPalette = ({ isOpen, onClose, users, onJumpToUser, onToggleGhostMode, ghostMode, showToast }) => {
-  const [query, setQuery] = useState('');
+const CommandPalette = ({
+  isOpen,
+  onClose,
+  users,
+  onJumpToUser,
+  onToggleGhostMode,
+  ghostMode,
+  showToast,
+}) => {
+  const [query, setQuery] = useState("");
   const [selectedIdx, setSelectedIdx] = useState(0);
-  
+
   if (!isOpen) return null;
-  
+
   // Generate command list
   const commands = [
     {
-      id: 'ghost-mode',
-      label: ghostMode ? '👁️ Disable Ghost Mode' : '👁️ Enable Ghost Mode',
-      category: 'Settings',
-      action: () => onToggleGhostMode()
+      id: "ghost-mode",
+      label: ghostMode ? "👁️ Disable Ghost Mode" : "👁️ Enable Ghost Mode",
+      category: "Settings",
+      action: () => onToggleGhostMode(),
     },
     {
-      id: 'refresh-users',
-      label: '↺ Refresh User List',
-      category: 'Data',
+      id: "refresh-users",
+      label: "↺ Refresh User List",
+      category: "Data",
       action: () => {
-        showToast('Refreshing user data...', 'info');
+        showToast("Refreshing user data...", "info");
         // Refresh would be triggered by parent
-      }
+      },
     },
     {
-      id: 'export-users',
-      label: '💾 Export Users (CSV)', 
-      category: 'Data',
-      action: () => showToast('Export feature coming soon!', 'info')
-    }
+      id: "export-users",
+      label: "💾 Export Users (CSV)",
+      category: "Data",
+      action: () => showToast("Export feature coming soon!", "info"),
+    },
   ];
-  
+
   // Add users as commands
   const userCommands = Object.entries(users).map(([uid, user]) => ({
     id: `user-${uid}`,
-    label: `👤 ${user.fullName || 'Unknown'} (${user.email || 'no-email'})`,
-    category: 'Users',
+    label: `👤 ${user.fullName || "Unknown"} (${user.email || "no-email"})`,
+    category: "Users",
     action: () => onJumpToUser(uid),
-    metadata: { uid, user }
+    metadata: { uid, user },
   }));
-  
+
   const allCommands = [...commands, ...userCommands];
-  
+
   // Filter by query
   const queryLower = query.toLowerCase();
-  const filtered = allCommands.filter(cmd =>
-    cmd.label.toLowerCase().includes(queryLower) ||
-    cmd.category.toLowerCase().includes(queryLower)
+  const filtered = allCommands.filter(
+    (cmd) =>
+      cmd.label.toLowerCase().includes(queryLower) ||
+      cmd.category.toLowerCase().includes(queryLower),
   );
-  
+
   // Handle keyboard navigation
   const handleKeyDown = (e) => {
-    if (e.key === 'Escape') {
+    if (e.key === "Escape") {
       onClose();
-    } else if (e.key === 'ArrowDown') {
+    } else if (e.key === "ArrowDown") {
       e.preventDefault();
       setSelectedIdx(Math.min(selectedIdx + 1, filtered.length - 1));
-    } else if (e.key === 'ArrowUp') {
+    } else if (e.key === "ArrowUp") {
       e.preventDefault();
       setSelectedIdx(Math.max(selectedIdx - 1, 0));
-    } else if (e.key === 'Enter' && filtered[selectedIdx]) {
+    } else if (e.key === "Enter" && filtered[selectedIdx]) {
       e.preventDefault();
       filtered[selectedIdx].action();
       onClose();
-      setQuery('');
+      setQuery("");
       setSelectedIdx(0);
     }
   };
-  
+
   return (
     <div
       style={{
-        position: 'fixed',
+        position: "fixed",
         top: 0,
         left: 0,
         right: 0,
         bottom: 0,
-        background: 'rgba(0,0,0,0.5)',
-        display: 'flex',
-        alignItems: 'flex-start',
-        justifyContent: 'center',
-        paddingTop: '20vh',
+        background: "rgba(0,0,0,0.5)",
+        display: "flex",
+        alignItems: "flex-start",
+        justifyContent: "center",
+        paddingTop: "20vh",
         zIndex: 2000,
-        animation: 'fadeInDashboard 0.15s ease-out'
+        animation: "fadeInDashboard 0.15s ease-out",
       }}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
@@ -1385,18 +1720,23 @@ const CommandPalette = ({ isOpen, onClose, users, onJumpToUser, onToggleGhostMod
           background: T.bg,
           borderRadius: 12,
           border: `1px solid rgba(0,122,255,0.3)`,
-          width: '90%',
-          maxWidth: '600px',
-          maxHeight: '70vh',
-          display: 'flex',
-          flexDirection: 'column',
-          boxShadow: '0 20px 60px rgba(0,0,0,0.8)',
-          overflow: 'hidden'
+          width: "90%",
+          maxWidth: "600px",
+          maxHeight: "70vh",
+          display: "flex",
+          flexDirection: "column",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.8)",
+          overflow: "hidden",
         }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Search Input */}
-        <div style={{ padding: '16px', borderBottom: `1px solid rgba(255,255,255,0.1)` }}>
+        <div
+          style={{
+            padding: "16px",
+            borderBottom: `1px solid rgba(255,255,255,0.1)`,
+          }}
+        >
           <input
             autoFocus
             type="text"
@@ -1408,26 +1748,34 @@ const CommandPalette = ({ isOpen, onClose, users, onJumpToUser, onToggleGhostMod
             }}
             onKeyDown={handleKeyDown}
             style={{
-              width: '100%',
-              background: 'rgba(0,0,0,0.4)',
+              width: "100%",
+              background: "rgba(0,0,0,0.4)",
               border: `1px solid rgba(0,122,255,0.3)`,
               borderRadius: 6,
-              padding: '12px 16px',
+              padding: "12px 16px",
               color: T.text,
               fontSize: 14,
               fontFamily: T.font,
-              outline: 'none',
-              transition: 'all 0.2s ease'
+              outline: "none",
+              transition: "all 0.2s ease",
             }}
           />
         </div>
-        
+
         {/* Results List */}
-        <div style={{ overflowY: 'auto', flex: 1 }}>
+        <div style={{ overflowY: "auto", flex: 1 }}>
           {filtered.length === 0 ? (
-            <div style={{ padding: '32px 16px', textAlign: 'center', color: T.muted }}>
+            <div
+              style={{
+                padding: "32px 16px",
+                textAlign: "center",
+                color: T.muted,
+              }}
+            >
               <div style={{ fontSize: 20, marginBottom: 8 }}>∅</div>
-              <div style={{ fontSize: 12 }}>No commands or users match "{query}"</div>
+              <div style={{ fontSize: 12 }}>
+                No commands or users match "{query}"
+              </div>
             </div>
           ) : (
             filtered.map((cmd, idx) => (
@@ -1436,37 +1784,59 @@ const CommandPalette = ({ isOpen, onClose, users, onJumpToUser, onToggleGhostMod
                 onClick={() => {
                   cmd.action();
                   onClose();
-                  setQuery('');
+                  setQuery("");
                   setSelectedIdx(0);
                 }}
                 style={{
-                  padding: '12px 16px',
+                  padding: "12px 16px",
                   borderBottom: `1px solid rgba(255,255,255,0.05)`,
-                  background: selectedIdx === idx ? 'rgba(0,122,255,0.15)' : 'transparent',
-                  cursor: 'pointer',
-                  transition: 'background 0.15s ease',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center'
+                  background:
+                    selectedIdx === idx
+                      ? "rgba(0,122,255,0.15)"
+                      : "transparent",
+                  cursor: "pointer",
+                  transition: "background 0.15s ease",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
                 }}
                 onMouseEnter={() => setSelectedIdx(idx)}
               >
                 <div>
-                  <div style={{ color: T.text, fontSize: 13, fontWeight: 500 }}>{cmd.label}</div>
-                  <div style={{ color: T.dim, fontSize: 10, marginTop: 2, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                  <div style={{ color: T.text, fontSize: 13, fontWeight: 500 }}>
+                    {cmd.label}
+                  </div>
+                  <div
+                    style={{
+                      color: T.dim,
+                      fontSize: 10,
+                      marginTop: 2,
+                      fontWeight: 600,
+                      textTransform: "uppercase",
+                      letterSpacing: 0.5,
+                    }}
+                  >
                     {cmd.category}
                   </div>
                 </div>
                 <div style={{ color: T.muted, fontSize: 10, fontWeight: 600 }}>
-                  {selectedIdx === idx && '⏎'}
+                  {selectedIdx === idx && "⏎"}
                 </div>
               </div>
             ))
           )}
         </div>
-        
+
         {/* Footer Help */}
-        <div style={{ padding: '8px 16px', background: 'rgba(0,122,255,0.05)', borderTop: `1px solid rgba(255,255,255,0.1)`, fontSize: 10, color: T.muted }}>
+        <div
+          style={{
+            padding: "8px 16px",
+            background: "rgba(0,122,255,0.05)",
+            borderTop: `1px solid rgba(255,255,255,0.1)`,
+            fontSize: 10,
+            color: T.muted,
+          }}
+        >
           <span style={{ marginRight: 16 }}>↑↓ Navigate</span>
           <span style={{ marginRight: 16 }}>⏎ Select</span>
           <span>ESC Close</span>
@@ -1477,67 +1847,86 @@ const CommandPalette = ({ isOpen, onClose, users, onJumpToUser, onToggleGhostMod
 };
 
 // RULE #109, #111: User Switcher - Shadow Mode to view as another user
-const UserSwitcher = ({ users, currentViewAsUser, onSwitchUser, ghostMode }) => {
+const UserSwitcher = ({
+  users,
+  currentViewAsUser,
+  onSwitchUser,
+  ghostMode,
+}) => {
   const [isOpen, setIsOpen] = useState(false);
-  
-  const currentUser = currentViewAsUser 
+
+  const currentUser = currentViewAsUser
     ? Object.entries(users).find(([uid]) => uid === currentViewAsUser)?.[1]
     : null;
-  
+
   return (
-    <div style={{ position: 'relative' }}>
+    <div style={{ position: "relative" }}>
       <button
         onClick={() => setIsOpen(!isOpen)}
         style={{
-          background: ghostMode ? 'rgba(0,255,127,0.15)' : currentViewAsUser ? 'rgba(0,122,255,0.15)' : 'transparent',
-          border: `1px solid ${ghostMode ? 'rgba(0,255,127,0.4)' : currentViewAsUser ? 'rgba(0,122,255,0.4)' : 'rgba(255,255,255,0.2)'}`,
+          background: ghostMode
+            ? "rgba(0,255,127,0.15)"
+            : currentViewAsUser
+              ? "rgba(0,122,255,0.15)"
+              : "transparent",
+          border: `1px solid ${ghostMode ? "rgba(0,255,127,0.4)" : currentViewAsUser ? "rgba(0,122,255,0.4)" : "rgba(255,255,255,0.2)"}`,
           borderRadius: 6,
-          padding: '8px 12px',
-          cursor: 'pointer',
-          color: ghostMode ? '#00FF7F' : currentViewAsUser ? T.blue : T.muted,
+          padding: "8px 12px",
+          cursor: "pointer",
+          color: ghostMode ? "#00FF7F" : currentViewAsUser ? T.blue : T.muted,
           fontFamily: T.font,
           fontSize: 11,
           fontWeight: 700,
           letterSpacing: 1,
-          transition: 'all 0.2s ease-in-out',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8
+          transition: "all 0.2s ease-in-out",
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
         }}
-        onMouseEnter={e => {
+        onMouseEnter={(e) => {
           if (!currentViewAsUser && !ghostMode) {
-            e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
-            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)';
+            e.currentTarget.style.background = "rgba(255,255,255,0.05)";
+            e.currentTarget.style.borderColor = "rgba(255,255,255,0.3)";
           }
         }}
-        onMouseLeave={e => {
+        onMouseLeave={(e) => {
           if (!currentViewAsUser && !ghostMode) {
-            e.currentTarget.style.background = 'transparent';
-            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)';
+            e.currentTarget.style.background = "transparent";
+            e.currentTarget.style.borderColor = "rgba(255,255,255,0.2)";
           }
         }}
-        title={currentViewAsUser ? `Viewing as: ${currentUser?.fullName}` : 'Switch to view as another user'}
+        title={
+          currentViewAsUser
+            ? `Viewing as: ${currentUser?.fullName}`
+            : "Switch to view as another user"
+        }
       >
-        <span>{ghostMode ? '👻' : currentViewAsUser ? '👁️' : '👥'}</span>
-        <span>{ghostMode ? 'GHOST' : currentViewAsUser ? `AS: ${currentUser?.fullName?.split(' ')[0].toUpperCase()}` : 'SHADOW MODE'}</span>
+        <span>{ghostMode ? "👻" : currentViewAsUser ? "👁️" : "👥"}</span>
+        <span>
+          {ghostMode
+            ? "GHOST"
+            : currentViewAsUser
+              ? `AS: ${currentUser?.fullName?.split(" ")[0].toUpperCase()}`
+              : "SHADOW MODE"}
+        </span>
       </button>
-      
+
       {isOpen && (
         <div
           style={{
-            position: 'absolute',
-            top: '100%',
+            position: "absolute",
+            top: "100%",
             right: 0,
             marginTop: 4,
-            background: 'rgba(20,20,20,0.95)',
+            background: "rgba(20,20,20,0.95)",
             border: `1px solid rgba(0,122,255,0.3)`,
             borderRadius: 6,
-            padding: '8px 0',
-            minWidth: '200px',
-            maxHeight: '300px',
-            overflowY: 'auto',
+            padding: "8px 0",
+            minWidth: "200px",
+            maxHeight: "300px",
+            overflowY: "auto",
             zIndex: 1001,
-            boxShadow: '0 8px 24px rgba(0,0,0,0.5)'
+            boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
           }}
           onClick={(e) => e.stopPropagation()}
         >
@@ -1549,67 +1938,79 @@ const UserSwitcher = ({ users, currentViewAsUser, onSwitchUser, ghostMode }) => 
                 setIsOpen(false);
               }}
               style={{
-                width: '100%',
-                padding: '8px 16px',
-                background: 'rgba(255,69,58,0.15)',
-                border: 'none',
-                cursor: 'pointer',
+                width: "100%",
+                padding: "8px 16px",
+                background: "rgba(255,69,58,0.15)",
+                border: "none",
+                cursor: "pointer",
                 color: T.red,
                 fontSize: 10,
                 fontWeight: 600,
-                textAlign: 'left',
+                textAlign: "left",
                 borderBottom: `1px solid rgba(255,69,58,0.2)`,
-                transition: 'all 0.15s ease'
+                transition: "all 0.15s ease",
               }}
-              onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,69,58,0.25)'}
-              onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,69,58,0.15)'}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.background = "rgba(255,69,58,0.25)")
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.background = "rgba(255,69,58,0.15)")
+              }
             >
               ✕ Exit Shadow Mode
             </button>
           )}
-          
+
           {/* User List */}
-          {Object.entries(users).slice(0, 20).map(([uid, user]) => (
-            <button
-              key={uid}
-              onClick={() => {
-                onSwitchUser(uid);
-                setIsOpen(false);
-              }}
-              style={{
-                width: '100%',
-                padding: '8px 16px',
-                background: currentViewAsUser === uid ? 'rgba(0,122,255,0.2)' : 'transparent',
-                border: 'none',
-                cursor: 'pointer',
-                color: currentViewAsUser === uid ? T.blue : T.muted,
-                fontSize: 10,
-                fontWeight: 600,
-                textAlign: 'left',
-                transition: 'all 0.15s ease',
-                borderBottom: `1px solid rgba(255,255,255,0.05)`
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.background = 'rgba(0,122,255,0.15)';
-                e.currentTarget.style.color = T.text;
-              }}
-              onMouseLeave={e => {
-                if (currentViewAsUser !==uid) {
-                  e.currentTarget.style.background = 'transparent';
-                  e.currentTarget.style.color = T.muted;
-                }
-              }}
-            >
-              <div style={{ fontSize: 9, fontWeight: 700 }}>👤 {user.fullName || 'Unknown'}</div>
-              <div style={{ fontSize: 8, color: T.dim, marginTop: 2 }}>{user.email || 'no-email'}</div>
-            </button>
-          ))}
+          {Object.entries(users)
+            .slice(0, 20)
+            .map(([uid, user]) => (
+              <button
+                key={uid}
+                onClick={() => {
+                  onSwitchUser(uid);
+                  setIsOpen(false);
+                }}
+                style={{
+                  width: "100%",
+                  padding: "8px 16px",
+                  background:
+                    currentViewAsUser === uid
+                      ? "rgba(0,122,255,0.2)"
+                      : "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  color: currentViewAsUser === uid ? T.blue : T.muted,
+                  fontSize: 10,
+                  fontWeight: 600,
+                  textAlign: "left",
+                  transition: "all 0.15s ease",
+                  borderBottom: `1px solid rgba(255,255,255,0.05)`,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "rgba(0,122,255,0.15)";
+                  e.currentTarget.style.color = T.text;
+                }}
+                onMouseLeave={(e) => {
+                  if (currentViewAsUser !== uid) {
+                    e.currentTarget.style.background = "transparent";
+                    e.currentTarget.style.color = T.muted;
+                  }
+                }}
+              >
+                <div style={{ fontSize: 9, fontWeight: 700 }}>
+                  👤 {user.fullName || "Unknown"}
+                </div>
+                <div style={{ fontSize: 8, color: T.dim, marginTop: 2 }}>
+                  {user.email || "no-email"}
+                </div>
+              </button>
+            ))}
         </div>
       )}
     </div>
   );
 };
-
 
 // MODULE 6: UI Polish (#93, #97, #101, #103, #106)
 // RULE #97: Dynamic Tab Title Management - Updates based on notifications/alerts
@@ -1617,41 +2018,48 @@ const UserSwitcher = ({ users, currentViewAsUser, onSwitchUser, ghostMode }) => 
 // RULE #101: Full-Screen Toggle - Hide browser UI for deep trading focus
 const FullScreenToggle = ({ showToast }) => {
   const [isFullScreen, setIsFullScreen] = useState(false);
-  
+
   useEffect(() => {
     const handleFullscreenChange = () => {
       const isCurrentlyFullscreen = document.fullscreenElement !== null;
       setIsFullScreen(isCurrentlyFullscreen);
     };
-    
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () =>
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
   }, []);
-  
+
   const toggleFullScreen = async () => {
     try {
       if (!document.fullscreenElement) {
         // Enter fullscreen
-        await document.documentElement.requestFullscreen().catch(err => {
-          console.warn('Fullscreen request denied:', err);
-          showToast('Fullscreen mode is sleeping. Wake it later.', 'warning');
+        await document.documentElement.requestFullscreen().catch((err) => {
+          console.warn("Fullscreen request denied:", err);
+          showToast("Fullscreen mode is sleeping. Wake it later.", "warning");
         });
         setIsFullScreen(true);
-        showToast('Viewport expanded. Immersive mode engaged. [ESC] to exit.', 'success');
+        showToast(
+          "Viewport expanded. Immersive mode engaged. [ESC] to exit.",
+          "success",
+        );
       } else {
         // Exit fullscreen
         await document.exitFullscreen();
         setIsFullScreen(false);
-        showToast('📺 Full-Screen Mode Disabled', 'info');
+        showToast("📺 Full-Screen Mode Disabled", "info");
       }
     } catch (error) {
-      console.error('Fullscreen toggle error:', error);
-      showToast('Fullscreen dimension unavailable. Adjust your timeline.', 'error');
+      console.error("Fullscreen toggle error:", error);
+      showToast(
+        "Fullscreen dimension unavailable. Adjust your timeline.",
+        "error",
+      );
     }
   };
-  
+
   return (
-    <button 
+    <button
       onClick={toggleFullScreen}
       style={{
         background: isFullScreen ? "rgba(0,122,255,0.2)" : "transparent",
@@ -1665,18 +2073,18 @@ const FullScreenToggle = ({ showToast }) => {
         fontWeight: 700,
         letterSpacing: 1,
         transition: "all 0.2s ease-in-out",
-        display: 'flex',
-        alignItems: 'center',
-        gap: 6
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
       }}
-      onMouseEnter={e => {
+      onMouseEnter={(e) => {
         if (!isFullScreen) {
           e.currentTarget.style.background = "rgba(255,255,255,0.05)";
           e.currentTarget.style.borderColor = "rgba(255,255,255,0.3)";
           e.currentTarget.style.transform = "translateY(-2px)";
         }
       }}
-      onMouseLeave={e => {
+      onMouseLeave={(e) => {
         if (!isFullScreen) {
           e.currentTarget.style.background = "transparent";
           e.currentTarget.style.borderColor = "rgba(255,255,255,0.2)";
@@ -1686,7 +2094,7 @@ const FullScreenToggle = ({ showToast }) => {
       className="btn-glass"
       title={isFullScreen ? "Exit Full-Screen (ESC)" : "Enter Full-Screen Mode"}
     >
-      {isFullScreen ? '⛶' : '⛶'}
+      {isFullScreen ? "⛶" : "⛶"}
     </button>
   );
 };
@@ -1695,75 +2103,76 @@ const FullScreenToggle = ({ showToast }) => {
 // RULE #113: Mobile Bottom Navigation Bar - Appears on screens < 768px
 const MobileBottomNav = ({ currentPage, onNavigate }) => {
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
-  
+
   useEffect(() => {
     const handleResize = () => setWindowWidth(window.innerWidth);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
-  
+
   const isMobile = windowWidth < 768;
-  
+
   if (!isMobile) return null;
-  
+
   const navItems = [
-    { icon: '📊', label: 'Dashboard', id: 'dashboard' },
-    { icon: '👥', label: 'Users', id: 'users' },
-    { icon: '🔔', label: 'Alerts', id: 'alerts' },
-    { icon: '⚙️', label: 'Settings', id: 'settings' }
+    { icon: "📊", label: "Dashboard", id: "dashboard" },
+    { icon: "👥", label: "Users", id: "users" },
+    { icon: "🔔", label: "Alerts", id: "alerts" },
+    { icon: "⚙️", label: "Settings", id: "settings" },
   ];
-  
+
   return (
     <div
       style={{
-        position: 'fixed',
+        position: "fixed",
         bottom: 0,
         left: 0,
         right: 0,
-        height: '60px',
-        background: 'rgba(20,20,20,0.95)',
+        height: "60px",
+        background: "rgba(20,20,20,0.95)",
         borderTop: `1px solid rgba(0,122,255,0.3)`,
-        display: 'flex',
-        justifyContent: 'space-around',
-        alignItems: 'center',
+        display: "flex",
+        justifyContent: "space-around",
+        alignItems: "center",
         zIndex: 999,
-        backdropFilter: 'blur(10px)',
-        paddingBottom: 'max(0px, env(safe-area-inset-bottom))'
+        backdropFilter: "blur(10px)",
+        paddingBottom: "max(0px, env(safe-area-inset-bottom))",
       }}
     >
-      {navItems.map(item => (
+      {navItems.map((item) => (
         <button
           key={item.id}
           onClick={() => onNavigate(item.id)}
           style={{
-            background: currentPage === item.id ? 'rgba(0,122,255,0.2)' : 'transparent',
-            border: 'none',
-            borderTop: currentPage === item.id ? `2px solid ${T.blue}` : 'none',
-            cursor: 'pointer',
+            background:
+              currentPage === item.id ? "rgba(0,122,255,0.2)" : "transparent",
+            border: "none",
+            borderTop: currentPage === item.id ? `2px solid ${T.blue}` : "none",
+            cursor: "pointer",
             color: currentPage === item.id ? T.blue : T.muted,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
             gap: 4,
-            padding: '8px 12px',
+            padding: "8px 12px",
             fontSize: 10,
             fontFamily: T.font,
             fontWeight: 700,
             letterSpacing: 0.5,
-            transition: 'all 0.2s ease',
+            transition: "all 0.2s ease",
             flx: 1,
-            width: '100%'
+            width: "100%",
           }}
-          onMouseEnter={e => {
+          onMouseEnter={(e) => {
             if (currentPage !== item.id) {
               e.currentTarget.style.color = T.blue;
-              e.currentTarget.style.background = 'rgba(0,122,255,0.1)';
+              e.currentTarget.style.background = "rgba(0,122,255,0.1)";
             }
           }}
-          onMouseLeave={e => {
+          onMouseLeave={(e) => {
             if (currentPage !== item.id) {
               e.currentTarget.style.color = T.muted;
-              e.currentTarget.style.background = 'transparent';
+              e.currentTarget.style.background = "transparent";
             }
           }}
         >
@@ -1781,10 +2190,10 @@ const SafeAreaWrapper = ({ children, style = {} }) => {
     <div
       style={{
         ...style,
-        paddingTop: 'max(16px, env(safe-area-inset-top))',
-        paddingBottom: 'max(16px, env(safe-area-inset-bottom))',
-        paddingLeft: 'max(16px, env(safe-area-inset-left))',
-        paddingRight: 'max(16px, env(safe-area-inset-right))'
+        paddingTop: "max(16px, env(safe-area-inset-top))",
+        paddingBottom: "max(16px, env(safe-area-inset-bottom))",
+        paddingLeft: "max(16px, env(safe-area-inset-left))",
+        paddingRight: "max(16px, env(safe-area-inset-right))",
       }}
     >
       {children}
@@ -1795,88 +2204,109 @@ const SafeAreaWrapper = ({ children, style = {} }) => {
 // RULE #119: Notification Center - Sidebar on desktop, overlay on mobile
 const NotificationCenter = ({ isOpen, onClose, notifications = [] }) => {
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
-  
+
   useEffect(() => {
     const handleResize = () => setWindowWidth(window.innerWidth);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
-  
+
   const isMobile = windowWidth < 768;
-  
+
   // Mobile: Full-screen overlay
   if (isMobile) {
     if (!isOpen) return null;
-    
+
     return (
       <div
         style={{
-          position: 'fixed',
+          position: "fixed",
           top: 0,
           left: 0,
           right: 0,
           bottom: 0,
-          background: 'rgba(0,0,0,0.9)',
+          background: "rgba(0,0,0,0.9)",
           zIndex: 1001,
-          display: 'flex',
-          flexDirection: 'column',
-          animation: 'fadeInDashboard 0.3s ease-out',
-          paddingTop: 'env(safe-area-inset-top)',
-          paddingBottom: 'env(safe-area-inset-bottom)'
+          display: "flex",
+          flexDirection: "column",
+          animation: "fadeInDashboard 0.3s ease-out",
+          paddingTop: "env(safe-area-inset-top)",
+          paddingBottom: "env(safe-area-inset-bottom)",
         }}
       >
         {/* Header */}
         <div
           style={{
-            padding: '16px',
+            padding: "16px",
             borderBottom: `1px solid rgba(0,122,255,0.3)`,
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center'
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
           }}
         >
-          <div style={{ color: T.blue, fontSize: 16, fontWeight: 700, letterSpacing: 1 }}>
+          <div
+            style={{
+              color: T.blue,
+              fontSize: 16,
+              fontWeight: 700,
+              letterSpacing: 1,
+            }}
+          >
             🔔 NOTIFICATIONS
           </div>
           <button
             onClick={onClose}
             style={{
-              background: 'transparent',
-              border: 'none',
+              background: "transparent",
+              border: "none",
               color: T.muted,
               fontSize: 20,
-              cursor: 'pointer',
-              padding: '4px 8px'
+              cursor: "pointer",
+              padding: "4px 8px",
             }}
           >
             ✕
           </button>
         </div>
-        
+
         {/* Content */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
+        <div style={{ flex: 1, overflowY: "auto", padding: "16px" }}>
           {notifications.length === 0 ? (
-            <div style={{ textAlign: 'center', color: T.muted, paddingTop: '32px' }}>
+            <div
+              style={{
+                textAlign: "center",
+                color: T.muted,
+                paddingTop: "32px",
+              }}
+            >
               <div style={{ fontSize: 32, marginBottom: 16 }}>🔇</div>
-              <div style={{ fontSize: 12, fontWeight: 600 }}>No new notifications</div>
+              <div style={{ fontSize: 12, fontWeight: 600 }}>
+                No new notifications
+              </div>
             </div>
           ) : (
             notifications.map((notif, idx) => (
               <div
                 key={idx}
                 style={{
-                  padding: '12px',
-                  background: 'rgba(0,122,255,0.1)',
+                  padding: "12px",
+                  background: "rgba(0,122,255,0.1)",
                   border: `1px solid rgba(0,122,255,0.2)`,
                   borderRadius: 6,
                   marginBottom: 12,
                   color: T.text,
-                  fontSize: 12
+                  fontSize: 12,
                 }}
               >
-                <div style={{ fontWeight: 700, marginBottom: 4 }}>{notif.title}</div>
-                <div style={{ color: T.muted, fontSize: 11 }}>{notif.message}</div>
-                <div style={{ color: T.dim, fontSize: 10, marginTop: 6 }}>{notif.time}</div>
+                <div style={{ fontWeight: 700, marginBottom: 4 }}>
+                  {notif.title}
+                </div>
+                <div style={{ color: T.muted, fontSize: 11 }}>
+                  {notif.message}
+                </div>
+                <div style={{ color: T.dim, fontSize: 10, marginTop: 6 }}>
+                  {notif.time}
+                </div>
               </div>
             ))
           )}
@@ -1884,67 +2314,76 @@ const NotificationCenter = ({ isOpen, onClose, notifications = [] }) => {
       </div>
     );
   }
-  
+
   // Desktop: Sidebar
   if (!isOpen) return null;
-  
+
   return (
     <div
       style={{
-        position: 'fixed',
+        position: "fixed",
         right: 0,
         top: 0,
         bottom: 0,
-        width: '320px',
-        background: 'rgba(20,20,20,0.95)',
+        width: "320px",
+        background: "rgba(20,20,20,0.95)",
         borderLeft: `1px solid rgba(0,122,255,0.3)`,
         zIndex: 1001,
-        display: 'flex',
-        flexDirection: 'column',
-        animation: 'slideInToast 0.3s ease-out',
-        backdropFilter: 'blur(10px)'
+        display: "flex",
+        flexDirection: "column",
+        animation: "slideInToast 0.3s ease-out",
+        backdropFilter: "blur(10px)",
       }}
     >
       {/* Header */}
       <div
         style={{
-          padding: '16px',
+          padding: "16px",
           borderBottom: `1px solid rgba(0,122,255,0.3)`,
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexShrink: 0
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexShrink: 0,
         }}
       >
-        <div style={{ color: T.blue, fontSize: 14, fontWeight: 700, letterSpacing: 1 }}>
+        <div
+          style={{
+            color: T.blue,
+            fontSize: 14,
+            fontWeight: 700,
+            letterSpacing: 1,
+          }}
+        >
           ALERTS
         </div>
         <button
           onClick={onClose}
           style={{
-            background: 'transparent',
-            border: 'none',
+            background: "transparent",
+            border: "none",
             color: T.muted,
             fontSize: 18,
-            cursor: 'pointer',
-            padding: '4px 8px',
-            transition: 'all 0.2s ease'
+            cursor: "pointer",
+            padding: "4px 8px",
+            transition: "all 0.2s ease",
           }}
-          onMouseEnter={e => {
+          onMouseEnter={(e) => {
             e.currentTarget.style.color = T.blue;
           }}
-          onMouseLeave={e => {
+          onMouseLeave={(e) => {
             e.currentTarget.style.color = T.muted;
           }}
         >
           ✕
         </button>
       </div>
-      
+
       {/* Content */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '12px' }}>
+      <div style={{ flex: 1, overflowY: "auto", padding: "12px" }}>
         {notifications.length === 0 ? (
-          <div style={{ textAlign: 'center', color: T.muted, paddingTop: '48px' }}>
+          <div
+            style={{ textAlign: "center", color: T.muted, paddingTop: "48px" }}
+          >
             <div style={{ fontSize: 32, marginBottom: 16 }}>🔇</div>
             <div style={{ fontSize: 11, fontWeight: 600 }}>No alerts</div>
           </div>
@@ -1953,18 +2392,24 @@ const NotificationCenter = ({ isOpen, onClose, notifications = [] }) => {
             <div
               key={idx}
               style={{
-                padding: '12px',
-                background: 'rgba(0,122,255,0.1)',
+                padding: "12px",
+                background: "rgba(0,122,255,0.1)",
                 border: `1px solid rgba(0,122,255,0.2)`,
                 borderRadius: 6,
                 marginBottom: 12,
                 color: T.text,
-                fontSize: 11
+                fontSize: 11,
               }}
             >
-              <div style={{ fontWeight: 700, marginBottom: 4 }}>{notif.title}</div>
-              <div style={{ color: T.muted, fontSize: 10 }}>{notif.message}</div>
-              <div style={{ color: T.dim, fontSize: 9, marginTop: 6 }}>{notif.time}</div>
+              <div style={{ fontWeight: 700, marginBottom: 4 }}>
+                {notif.title}
+              </div>
+              <div style={{ color: T.muted, fontSize: 10 }}>
+                {notif.message}
+              </div>
+              <div style={{ color: T.dim, fontSize: 9, marginTop: 6 }}>
+                {notif.time}
+              </div>
             </div>
           ))
         )}
@@ -1979,32 +2424,41 @@ const SystemThemeSync = ({ isDarkMode, onThemeChange }) => {
     <button
       onClick={() => onThemeChange(!isDarkMode)}
       style={{
-        background: isDarkMode ? 'rgba(0,122,255,0.15)' : 'rgba(255,193,7,0.15)',
-        border: `1px solid ${isDarkMode ? 'rgba(0,122,255,0.3)' : 'rgba(255,193,7,0.3)'}`,
+        background: isDarkMode
+          ? "rgba(0,122,255,0.15)"
+          : "rgba(255,193,7,0.15)",
+        border: `1px solid ${isDarkMode ? "rgba(0,122,255,0.3)" : "rgba(255,193,7,0.3)"}`,
         borderRadius: 6,
-        padding: '8px 12px',
-        cursor: 'pointer',
-        color: isDarkMode ? '#0A84FF' : '#FFD60A',
-        fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto',
+        padding: "8px 12px",
+        cursor: "pointer",
+        color: isDarkMode ? "#0A84FF" : "#FFD60A",
+        fontFamily:
+          '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto',
         fontSize: 11,
         fontWeight: 700,
         letterSpacing: 1,
-        transition: 'all 0.2s ease-in-out',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 6
+        transition: "all 0.2s ease-in-out",
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
       }}
-      onMouseEnter={e => {
-        e.currentTarget.style.background = isDarkMode ? 'rgba(0,122,255,0.2)' : 'rgba(255,193,7,0.2)';
-        e.currentTarget.style.boxShadow = isDarkMode ? '0 0 15px rgba(0,122,255,0.2)' : '0 0 15px rgba(255,193,7,0.2)';
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = isDarkMode
+          ? "rgba(0,122,255,0.2)"
+          : "rgba(255,193,7,0.2)";
+        e.currentTarget.style.boxShadow = isDarkMode
+          ? "0 0 15px rgba(0,122,255,0.2)"
+          : "0 0 15px rgba(255,193,7,0.2)";
       }}
-      onMouseLeave={e => {
-        e.currentTarget.style.background = isDarkMode ? 'rgba(0,122,255,0.15)' : 'rgba(255,193,7,0.15)';
-        e.currentTarget.style.boxShadow = 'none';
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = isDarkMode
+          ? "rgba(0,122,255,0.15)"
+          : "rgba(255,193,7,0.15)";
+        e.currentTarget.style.boxShadow = "none";
       }}
-      title={isDarkMode ? 'Light Mode' : 'Dark Mode'}
+      title={isDarkMode ? "Light Mode" : "Dark Mode"}
     >
-      {isDarkMode ? '🌙' : '☀️'}
+      {isDarkMode ? "🌙" : "☀️"}
     </button>
   );
 };
@@ -2012,42 +2466,47 @@ const SystemThemeSync = ({ isDarkMode, onThemeChange }) => {
 // RULE #91: Interactive Breadcrumbs - Shows navigation path
 const Breadcrumbs = ({ items, onNavigate }) => {
   return (
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: 8,
-      padding: '12px 32px',
-      borderBottom: `1px solid rgba(255,255,255,0.1)`,
-      background: 'rgba(0,0,0,0.3)',
-      overflowX: 'auto'
-    }}>
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        padding: "12px 32px",
+        borderBottom: `1px solid rgba(255,255,255,0.1)`,
+        background: "rgba(0,0,0,0.3)",
+        overflowX: "auto",
+      }}
+    >
       {items.map((item, idx) => (
-        <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div
+          key={idx}
+          style={{ display: "flex", alignItems: "center", gap: 8 }}
+        >
           <button
             onClick={() => item.onNavigate && onNavigate(item.path)}
             style={{
-              background: item.active ? 'rgba(0,122,255,0.2)' : 'transparent',
-              border: 'none',
+              background: item.active ? "rgba(0,122,255,0.2)" : "transparent",
+              border: "none",
               color: item.active ? T.blue : T.muted,
-              cursor: item.onNavigate ? 'pointer' : 'default',
+              cursor: item.onNavigate ? "pointer" : "default",
               fontSize: 11,
               fontFamily: T.font,
               fontWeight: 700,
               letterSpacing: 1,
-              padding: '4px 8px',
+              padding: "4px 8px",
               borderRadius: 4,
-              transition: 'all 0.2s ease',
-              pointerEvents: item.onNavigate ? 'auto' : 'none'
+              transition: "all 0.2s ease",
+              pointerEvents: item.onNavigate ? "auto" : "none",
             }}
-            onMouseEnter={e => {
+            onMouseEnter={(e) => {
               if (item.onNavigate && !item.active) {
-                e.currentTarget.style.background = 'rgba(0,122,255,0.1)';
+                e.currentTarget.style.background = "rgba(0,122,255,0.1)";
                 e.currentTarget.style.color = T.blue;
               }
             }}
-            onMouseLeave={e => {
+            onMouseLeave={(e) => {
               if (item.onNavigate && !item.active) {
-                e.currentTarget.style.background = 'transparent';
+                e.currentTarget.style.background = "transparent";
                 e.currentTarget.style.color = T.muted;
               }
             }}
@@ -2068,41 +2527,41 @@ const Breadcrumbs = ({ items, onNavigate }) => {
 const MegaMenu = ({ isOpen, onClose }) => {
   const toolsCategories = [
     {
-      name: 'Analytics',
-      icon: '📊',
+      name: "Analytics",
+      icon: "📊",
       items: [
-        { label: 'Dashboard', icon: '📈', action: () => void 0 },
-        { label: 'Performance', icon: '⚡', action: () => void 0 },
-        { label: 'Reports', icon: '📋', action: () => void 0 }
-      ]
+        { label: "Dashboard", icon: "📈", action: () => void 0 },
+        { label: "Performance", icon: "⚡", action: () => void 0 },
+        { label: "Reports", icon: "📋", action: () => void 0 },
+      ],
     },
     {
-      name: 'Management',
-      icon: '⚙️',
+      name: "Management",
+      icon: "⚙️",
       items: [
-        { label: 'Users', icon: '👥', action: () => void 0 },
-        { label: 'Permissions', icon: '🔐', action: () => void 0 },
-        { label: 'Settings', icon: '🛠️', action: () => void 0 }
-      ]
+        { label: "Users", icon: "👥", action: () => void 0 },
+        { label: "Permissions", icon: "🔐", action: () => void 0 },
+        { label: "Settings", icon: "🛠️", action: () => void 0 },
+      ],
     },
     {
-      name: 'Data',
-      icon: '💾',
+      name: "Data",
+      icon: "💾",
       items: [
-        { label: 'Backup', icon: '💿', action: () => void 0 },
-        { label: 'Exports', icon: '📤', action: () => void 0 },
-        { label: 'Imports', icon: '📥', action: () => void 0 }
-      ]
+        { label: "Backup", icon: "💿", action: () => void 0 },
+        { label: "Exports", icon: "📤", action: () => void 0 },
+        { label: "Imports", icon: "📥", action: () => void 0 },
+      ],
     },
     {
-      name: 'Security',
-      icon: '🔒',
+      name: "Security",
+      icon: "🔒",
       items: [
-        { label: 'Audit Log', icon: '📝', action: () => void 0 },
-        { label: 'Encryption', icon: '🔐', action: () => void 0 },
-        { label: 'Access Control', icon: '🛡️', action: () => void 0 }
-      ]
-    }
+        { label: "Audit Log", icon: "📝", action: () => void 0 },
+        { label: "Encryption", icon: "🔐", action: () => void 0 },
+        { label: "Access Control", icon: "🛡️", action: () => void 0 },
+      ],
+    },
   ];
 
   if (!isOpen) return null;
@@ -2110,41 +2569,50 @@ const MegaMenu = ({ isOpen, onClose }) => {
   return (
     <div
       style={{
-        position: 'fixed',
-        top: 'var(--header-height, 60px)',
+        position: "fixed",
+        top: "var(--header-height, 60px)",
         left: 0,
         right: 0,
-        background: 'rgba(0,0,0,0.95)',
+        background: "rgba(0,0,0,0.95)",
         borderBottom: `1px solid rgba(0,122,255,0.3)`,
-        backdropFilter: 'blur(10px)',
+        backdropFilter: "blur(10px)",
         zIndex: 999,
-        padding: '24px 32px',
-        maxHeight: '80vh',
-        overflowY: 'auto',
-        animation: 'fadeInDashboard 0.2s ease-out'
+        padding: "24px 32px",
+        maxHeight: "80vh",
+        overflowY: "auto",
+        animation: "fadeInDashboard 0.2s ease-out",
       }}
       onClick={onClose}
     >
       <div
         style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
           gap: 24,
-          onClick: (e) => e.stopPropagation()
+          onClick: (e) => e.stopPropagation(),
         }}
       >
         {toolsCategories.map((category) => (
-          <div key={category.name} style={{ minWidth: '240px' }}>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              marginBottom: 12,
-              paddingBottom: 8,
-              borderBottom: `1px solid rgba(0,122,255,0.3)`
-            }}>
+          <div key={category.name} style={{ minWidth: "240px" }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                marginBottom: 12,
+                paddingBottom: 8,
+                borderBottom: `1px solid rgba(0,122,255,0.3)`,
+              }}
+            >
               <span style={{ fontSize: 16 }}>{category.icon}</span>
-              <div style={{ color: T.blue, fontSize: 12, fontWeight: 700, letterSpacing: 1 }}>
+              <div
+                style={{
+                  color: T.blue,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  letterSpacing: 1,
+                }}
+              >
                 {category.name.toUpperCase()}
               </div>
             </div>
@@ -2156,32 +2624,32 @@ const MegaMenu = ({ isOpen, onClose }) => {
                   onClose();
                 }}
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
+                  display: "flex",
+                  alignItems: "center",
                   gap: 10,
-                  width: '100%',
-                  padding: '10px 12px',
-                  background: 'transparent',
-                  border: 'none',
+                  width: "100%",
+                  padding: "10px 12px",
+                  background: "transparent",
+                  border: "none",
                   color: T.muted,
-                  cursor: 'pointer',
+                  cursor: "pointer",
                   fontSize: 11,
                   fontFamily: T.font,
                   fontWeight: 600,
-                  transition: 'all 0.15s ease',
+                  transition: "all 0.15s ease",
                   borderRadius: 4,
                   marginBottom: 4,
-                  textAlign: 'left'
+                  textAlign: "left",
                 }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.background = 'rgba(0,122,255,0.15)';
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "rgba(0,122,255,0.15)";
                   e.currentTarget.style.color = T.blue;
-                  e.currentTarget.style.transform = 'translateX(4px)';
+                  e.currentTarget.style.transform = "translateX(4px)";
                 }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.background = 'transparent';
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "transparent";
                   e.currentTarget.style.color = T.muted;
-                  e.currentTarget.style.transform = 'translateX(0)';
+                  e.currentTarget.style.transform = "translateX(0)";
                 }}
               >
                 <span style={{ fontSize: 14, minWidth: 20 }}>{item.icon}</span>
@@ -2198,56 +2666,56 @@ const MegaMenu = ({ isOpen, onClose }) => {
 // RULE #95: Back-to-Top button appears after scrolling 300px
 const BackToTopButton = () => {
   const [isVisible, setIsVisible] = useState(false);
-  
+
   useEffect(() => {
     const handleScroll = () => {
       const scrolled = window.scrollY || document.documentElement.scrollTop;
       setIsVisible(scrolled > 300);
     };
-    
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
   }, []);
-  
+
   const scrollToTop = () => {
     window.scrollTo({
       top: 0,
-      behavior: 'smooth'
+      behavior: "smooth",
     });
   };
-  
+
   if (!isVisible) return null;
-  
+
   return (
     <button
       onClick={scrollToTop}
       style={{
-        position: 'fixed',
-        bottom: '30px',
-        right: '30px',
+        position: "fixed",
+        bottom: "30px",
+        right: "30px",
         background: `linear-gradient(135deg, ${T.purple}, ${T.blue})`,
-        border: 'none',
-        borderRadius: '50%',
-        width: '48px',
-        height: '48px',
-        cursor: 'pointer',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
+        border: "none",
+        borderRadius: "50%",
+        width: "48px",
+        height: "48px",
+        cursor: "pointer",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
         color: T.text,
         fontSize: 20,
         fontWeight: 700,
         zIndex: 900,
-        transition: 'all 0.3s ease-in-out',
+        transition: "all 0.3s ease-in-out",
         boxShadow: `0 8px 24px rgba(0,0,0,0.4), 0 0 20px ${T.purple}40`,
-        animation: 'float 3s ease-in-out infinite'
+        animation: "float 3s ease-in-out infinite",
       }}
-      onMouseEnter={e => {
-        e.currentTarget.style.transform = 'scale(1.1)';
+      onMouseEnter={(e) => {
+        e.currentTarget.style.transform = "scale(1.1)";
         e.currentTarget.style.boxShadow = `0 12px 32px rgba(0,0,0,0.6), 0 0 30px ${T.purple}60`;
       }}
-      onMouseLeave={e => {
-        e.currentTarget.style.transform = 'scale(1)';
+      onMouseLeave={(e) => {
+        e.currentTarget.style.transform = "scale(1)";
         e.currentTarget.style.boxShadow = `0 8px 24px rgba(0,0,0,0.4), 0 0 20px ${T.purple}40`;
       }}
       title="Back to Top"
@@ -2258,17 +2726,19 @@ const BackToTopButton = () => {
 };
 
 // RULE #30: Master Security Salt - Hash admin password with unique salt
-const MASTER_SALT = 'TR_SECURITY_SALT_2024_REGIMENT';
+const MASTER_SALT = "TR_SECURITY_SALT_2024_REGIMENT";
 
 const hashAdminPasswordWithSalt = async (password) => {
   const saltedPassword = password + MASTER_SALT;
-  
+
   const encoder = new TextEncoder();
   const data = encoder.encode(saltedPassword);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
-  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-  
+  const hashHex = hashArray
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+
   return hashHex;
 };
 
@@ -2283,7 +2753,12 @@ const hashAdminPasswordWithSalt = async (password) => {
  * @param {number} quality - JPEG quality 0-1 (default: 0.75)
  * @returns {Promise<File>} Compressed image file
  */
-const compressIdentityProofImage = async (file, maxSize = 512000, maxWidth = 1920, quality = 0.75) => {
+const compressIdentityProofImage = async (
+  file,
+  maxSize = 512000,
+  maxWidth = 1920,
+  quality = 0.75,
+) => {
   return new Promise((resolve, reject) => {
     // If already under 500KB, return original
     if (file.size <= maxSize) {
@@ -2293,124 +2768,137 @@ const compressIdentityProofImage = async (file, maxSize = 512000, maxWidth = 192
 
     const reader = new FileReader();
     reader.readAsDataURL(file);
-    
+
     reader.onload = (event) => {
       const img = new Image();
       img.src = event.target.result;
-      
+
       img.onload = () => {
-        const canvas = document.createElement('canvas');
+        const canvas = document.createElement("canvas");
         let width = img.width;
         let height = img.height;
-        
+
         // Scale down if wider than maxWidth
         if (width > maxWidth) {
           height = (maxWidth / width) * height;
           width = maxWidth;
         }
-        
+
         canvas.width = width;
         canvas.height = height;
-        
-        const ctx = canvas.getContext('2d');
+
+        const ctx = canvas.getContext("2d");
         ctx.drawImage(img, 0, 0, width, height);
-        
+
         // Convert to compressed blob
-        canvas.toBlob((blob) => {
-          // Check if still over size limit, reduce quality if needed
-          if (blob.size > maxSize && quality > 0.3) {
-            compressIdentityProofImage(
-              new File([blob], file.name, { type: 'image/jpeg' }),
-              maxSize,
-              maxWidth,
-              quality - 0.15
-            ).then(resolve).catch(reject);
-          } else {
-            const compressedFile = new File([blob], file.name, {
-              type: 'image/jpeg',
-              lastModified: file.lastModified
-            });
-            resolve(compressedFile);
-          }
-        }, 'image/jpeg', quality);
+        canvas.toBlob(
+          (blob) => {
+            // Check if still over size limit, reduce quality if needed
+            if (blob.size > maxSize && quality > 0.3) {
+              compressIdentityProofImage(
+                new File([blob], file.name, { type: "image/jpeg" }),
+                maxSize,
+                maxWidth,
+                quality - 0.15,
+              )
+                .then(resolve)
+                .catch(reject);
+            } else {
+              const compressedFile = new File([blob], file.name, {
+                type: "image/jpeg",
+                lastModified: file.lastModified,
+              });
+              resolve(compressedFile);
+            }
+          },
+          "image/jpeg",
+          quality,
+        );
       };
-      
+
       img.onerror = () => {
-        reject(new Error('Failed to load image for compression'));
+        reject(new Error("Failed to load image for compression"));
       };
     };
-    
+
     reader.onerror = () => {
-      reject(new Error('Failed to read file for compression'));
+      reject(new Error("Failed to read file for compression"));
     };
   });
 };
-
 
 // RULE #24: Identity Verification - Upload documents to Firebase Storage
 // RULE #158: Integrated compression for identity proof images
 // RULE #SECURITY: Antivirus Gateway - MIME type verification
 const uploadIdentityDoc = async (file, uid, docType) => {
   try {
-    if (!file) throw new Error('No file selected');
-    
+    if (!file) throw new Error("No file selected");
+
     // ═══════════════════════════════════════════════════════════════════
     // LAYER 2 SECURITY: ANTIVIRUS GATEWAY - Verify file signature
     // ═══════════════════════════════════════════════════════════════════
     const antivirusGateway = new AntivirusGateway(window.showToastNotification);
     const verification = await antivirusGateway.verifyFileSignature(file);
-    
+
     if (!verification.valid) {
       // Block malicious file
-      console.error('🚨 MALWARE DETECTED:', verification);
+      console.error("🚨 MALWARE DETECTED:", verification);
       if (window.showToastNotification) {
         window.showToastNotification(
-          '⚠️ MALICIOUS PAYLOAD DETECTED. REPORTING TO SECURITY.',
-          'error',
-          5000
+          "⚠️ MALICIOUS PAYLOAD DETECTED. REPORTING TO SECURITY.",
+          "error",
+          5000,
         );
       }
-      
+
       // Log alert to Telegram (via Cloud Function)
       await antivirusGateway.handleMaliciousFile(
         verification,
         uid,
-        window.sendTelegramAlert
+        window.sendTelegramAlert,
       );
-      
+
       throw new Error(`File verification failed: ${verification.reason}`);
     }
 
     // Validate file type (must be image or PDF)
-    const allowedTypes = ['image/jpeg', 'application/pdf', 'image/png', 'image/gif'];
+    const allowedTypes = [
+      "image/jpeg",
+      "application/pdf",
+      "image/png",
+      "image/gif",
+    ];
     if (!allowedTypes.includes(file.type)) {
-      throw new Error('Only image and PDF files are allowed');
+      throw new Error("Only image and PDF files are allowed");
     }
-    
+
     let uploadFile = file;
-    
+
     // RULE #158: Compress JPEG images to under 500KB
-    if (file.type === 'image/jpeg') {
+    if (file.type === "image/jpeg") {
       uploadFile = await compressIdentityProofImage(file);
     }
-    
+
     // Validate file size (max 5MB after compression)
     const maxSize = 5 * 1024 * 1024;
     if (uploadFile.size > maxSize) {
-      throw new Error('File size must be less than 5MB');
+      throw new Error("File size must be less than 5MB");
     }
-    
+
     // Create storage reference
     const timestamp = new Date().getTime();
     const fileName = `${docType}_${timestamp}_${file.name}`;
-    const fileRef = storageRef(firebaseStorage, `verification_docs/${uid}/${fileName}`);
-    
+    const fileRef = storageRef(
+      firebaseStorage,
+      `verification_docs/${uid}/${fileName}`,
+    );
+
     // Upload file (compressed if JPEG, original if PDF)
     const snapshot = await uploadBytes(fileRef, uploadFile);
-    
+
     // Get download URL
     const downloadURL = await getDownloadURL(snapshot.ref);
-    
+
     return {
       fileName,
       url: downloadURL,
@@ -2419,10 +2907,13 @@ const uploadIdentityDoc = async (file, uid, docType) => {
       size: uploadFile.size,
       mimeType: uploadFile.type,
       originalSize: file.size,
-      compressionRatio: uploadFile.size > 0 ? ((file.size - uploadFile.size) / file.size * 100).toFixed(1) + '%' : '0%'
+      compressionRatio:
+        uploadFile.size > 0
+          ? (((file.size - uploadFile.size) / file.size) * 100).toFixed(1) + "%"
+          : "0%",
     };
   } catch (error) {
-    console.error('Identity doc upload failed:', error);
+    console.error("Identity doc upload failed:", error);
     throw error;
   }
 };
@@ -2430,37 +2921,210 @@ const uploadIdentityDoc = async (file, uid, docType) => {
 // ═══════════════════════════════════════════════════════════════════
 //  SESSION PARSER & DATA ENGINE
 // ═══════════════════════════════════════════════════════════════════
-function getSession(h,m){const t=h*60+m;if(t>=23*60||t<4*60+30)return'PRE';if(t>=4*60+30&&t<11*60+30)return'TRADING';if(t>=11*60+30&&t<22*60)return'POSTMARKET';return'MAINTENANCE';}
-function getTradingDate(ds,h){if(h>=23){const y=parseInt(ds.slice(0,4)),mo=parseInt(ds.slice(4,6))-1,d=parseInt(ds.slice(6,8));const dt=new Date(Date.UTC(y,mo,d+1));return dt.toISOString().slice(0,10).replace(/-/g,'');}return ds;}
-function parseAndAggregate(raw){
-  const lines=raw.trim().split('\n').filter(l=>{const t=l.trim().toLowerCase();return t&&!t.startsWith('date')&&!t.startsWith('time');});
-  const minuteBars=[];
-  for(const line of lines){const sep=line.includes(';')?';':',';const p=line.trim().replace(/\r/g,'').split(sep);if(p.length<5)continue;const dtRaw=p[0].trim();const[datePart,timePart]=dtRaw.includes(' ')?dtRaw.split(' '):[dtRaw.slice(0,8),dtRaw.slice(8)];const h=parseInt(timePart.slice(0,2)),m=parseInt(timePart.slice(2,4));const[o,hi,lo,c,v]=p.slice(1,6).map(Number);if(isNaN(o)||o<=0)continue;minuteBars.push({date:datePart,h,m,o,hi,lo,c,v:v||0});}
-  if(!minuteBars.length)return{error:'No bars parsed.'};
-  const sessionMap={};
-  for(const bar of minuteBars){const sess=getSession(bar.h,bar.m);if(sess==='MAINTENANCE')continue;const td=getTradingDate(bar.date,bar.h);if(!sessionMap[td])sessionMap[td]={PRE:[],TRADING:[],POSTMARKET:[]};sessionMap[td][sess].push(bar);}
-  function agg(bars){if(!bars.length)return null;return{o:bars[0].o,h:Math.max(...bars.map(b=>b.hi)),l:Math.min(...bars.map(b=>b.lo)),c:bars[bars.length-1].c,v:bars.reduce((s,b)=>s+b.v,0),count:bars.length};}
-  const days={};
-  for(const[td,sess]of Object.entries(sessionMap)){const allBars=[...sess.PRE,...sess.TRADING,...sess.POSTMARKET].sort((a,b)=>(a.date+String(a.h).padStart(2,'0')+String(a.m).padStart(2,'0')).localeCompare(b.date+String(b.h).padStart(2,'0')+String(b.m).padStart(2,'0')));const full=agg(allBars);if(full){const hourlyStats={};for(const bar of sess.TRADING){if(!hourlyStats[bar.h])hourlyStats[bar.h]={hi:-Infinity,lo:Infinity};hourlyStats[bar.h].hi=Math.max(hourlyStats[bar.h].hi,bar.hi);hourlyStats[bar.h].lo=Math.min(hourlyStats[bar.h].lo,bar.lo);}days[td]={date:td,pre:agg(sess.PRE),trading:agg(sess.TRADING),post:agg(sess.POSTMARKET),full,hourlyStats};}}
-  const sorted=Object.values(days).sort((a,b)=>b.date.localeCompare(a.date));
-  const oldest=[...sorted].reverse();
-  const trs=[],atrVals=new Array(oldest.length).fill(null);
-  for(let i=0;i<oldest.length;i++){const cur=oldest[i].full;trs.push(i===0?cur.h-cur.l:Math.max(cur.h-cur.l,Math.abs(cur.h-oldest[i-1].full.c),Math.abs(cur.l-oldest[i-1].full.c)));}
-  if(trs.length>=14){let atr=trs.slice(0,14).reduce((s,v)=>s+v,0)/14;atrVals[13]=atr;for(let i=14;i<trs.length;i++){atr=(atr*13+trs[i])/14;atrVals[i]=atr;}}
-  sorted.forEach((d,i)=>{const idx=oldest.length-1-i;d.atr14=atrVals[idx]?Math.round(atrVals[idx]*100)/100:null;});
-  const tradOldest=oldest.map(d=>d.trading).filter(Boolean),tradTrs=[];
-  for(let i=0;i<tradOldest.length;i++){const cur=tradOldest[i];tradTrs.push(i===0?cur.h-cur.l:Math.max(cur.h-cur.l,Math.abs(cur.h-tradOldest[i-1].c),Math.abs(cur.l-tradOldest[i-1].c)));}
-  let tradAtr=null;if(tradTrs.length>=14){tradAtr=tradTrs.slice(0,14).reduce((s,v)=>s+v,0)/14;for(let i=14;i<tradTrs.length;i++)tradAtr=(tradAtr*13+tradTrs[i])/14;}
-  const hourlyHeatmap={};
-  for(const day of oldest.slice(-45)){if(!day.trading||!day.hourlyStats)continue;const dayRange=day.trading.h-day.trading.l,dayNet=Math.abs(day.trading.c-day.trading.o),isTrending=dayRange>0&&dayNet/dayRange>0.45;for(const[hStr]of Object.entries(day.hourlyStats)){const hr=parseInt(hStr);if(!hourlyHeatmap[hr])hourlyHeatmap[hr]={trend:0,range:0,total:0};hourlyHeatmap[hr].total++;if(isTrending)hourlyHeatmap[hr].trend++;else hourlyHeatmap[hr].range++;}}
-  return{days:sorted,tradingHoursAtr14:tradAtr?Math.round(tradAtr*100)/100:null,totalBars:minuteBars.length,totalDays:sorted.length,hourlyHeatmap};
+function getSession(h, m) {
+  const t = h * 60 + m;
+  if (t >= 23 * 60 || t < 4 * 60 + 30) return "PRE";
+  if (t >= 4 * 60 + 30 && t < 11 * 60 + 30) return "TRADING";
+  if (t >= 11 * 60 + 30 && t < 22 * 60) return "POSTMARKET";
+  return "MAINTENANCE";
 }
-function buildDataSummary(data){
-  const lines=[`PARSED: ${data.totalBars.toLocaleString()} bars → ${data.totalDays} trading days`,`Trading Hours ATR(14): ${data.tradingHoursAtr14||'N/A'} pts`,'','=== SESSION DATA (most recent first) ===',''];
-  for(const d of data.days.slice(0,20)){const fmt=s=>s?`O=${s.o} H=${s.h} L=${s.l} C=${s.c} Range=${Math.round((s.h-s.l)*100)/100} Net=${(s.c-s.o)>=0?'+':''}${Math.round((s.c-s.o)*100)/100}`:'NO DATA';lines.push(`DATE: ${d.date} | ATR14=${d.atr14||'N/A'}`);lines.push(`  Pre:     ${fmt(d.pre)}`);lines.push(`  Trading: ${fmt(d.trading)}`);lines.push(`  Post:    ${fmt(d.post)}`);lines.push(`  Full:    ${fmt(d.full)}`);lines.push('');}
-  return lines.join('\n');
+function getTradingDate(ds, h) {
+  if (h >= 23) {
+    const y = parseInt(ds.slice(0, 4)),
+      mo = parseInt(ds.slice(4, 6)) - 1,
+      d = parseInt(ds.slice(6, 8));
+    const dt = new Date(Date.UTC(y, mo, d + 1));
+    return dt.toISOString().slice(0, 10).replace(/-/g, "");
+  }
+  return ds;
 }
-function calcRoR(wr,avgWin,avgLoss,maxDD){if(!wr||wr<=0||wr>=1||!avgWin||!avgLoss||avgWin<=0||avgLoss<=0||!maxDD)return null;const n=maxDD/avgLoss,ratio=((1-wr)*avgLoss)/(wr*avgWin);if(ratio>=1)return 0.99;return Math.pow(ratio,n);}
+function parseAndAggregate(raw) {
+  const lines = raw
+    .trim()
+    .split("\n")
+    .filter((l) => {
+      const t = l.trim().toLowerCase();
+      return t && !t.startsWith("date") && !t.startsWith("time");
+    });
+  const minuteBars = [];
+  for (const line of lines) {
+    const sep = line.includes(";") ? ";" : ",";
+    const p = line.trim().replace(/\r/g, "").split(sep);
+    if (p.length < 5) continue;
+    const dtRaw = p[0].trim();
+    const [datePart, timePart] = dtRaw.includes(" ")
+      ? dtRaw.split(" ")
+      : [dtRaw.slice(0, 8), dtRaw.slice(8)];
+    const h = parseInt(timePart.slice(0, 2)),
+      m = parseInt(timePart.slice(2, 4));
+    const [o, hi, lo, c, v] = p.slice(1, 6).map(Number);
+    if (isNaN(o) || o <= 0) continue;
+    minuteBars.push({ date: datePart, h, m, o, hi, lo, c, v: v || 0 });
+  }
+  if (!minuteBars.length) return { error: "No bars parsed." };
+  const sessionMap = {};
+  for (const bar of minuteBars) {
+    const sess = getSession(bar.h, bar.m);
+    if (sess === "MAINTENANCE") continue;
+    const td = getTradingDate(bar.date, bar.h);
+    if (!sessionMap[td])
+      sessionMap[td] = { PRE: [], TRADING: [], POSTMARKET: [] };
+    sessionMap[td][sess].push(bar);
+  }
+  function agg(bars) {
+    if (!bars.length) return null;
+    return {
+      o: bars[0].o,
+      h: Math.max(...bars.map((b) => b.hi)),
+      l: Math.min(...bars.map((b) => b.lo)),
+      c: bars[bars.length - 1].c,
+      v: bars.reduce((s, b) => s + b.v, 0),
+      count: bars.length,
+    };
+  }
+  const days = {};
+  for (const [td, sess] of Object.entries(sessionMap)) {
+    const allBars = [...sess.PRE, ...sess.TRADING, ...sess.POSTMARKET].sort(
+      (a, b) =>
+        (
+          a.date +
+          String(a.h).padStart(2, "0") +
+          String(a.m).padStart(2, "0")
+        ).localeCompare(
+          b.date + String(b.h).padStart(2, "0") + String(b.m).padStart(2, "0"),
+        ),
+    );
+    const full = agg(allBars);
+    if (full) {
+      const hourlyStats = {};
+      for (const bar of sess.TRADING) {
+        if (!hourlyStats[bar.h])
+          hourlyStats[bar.h] = { hi: -Infinity, lo: Infinity };
+        hourlyStats[bar.h].hi = Math.max(hourlyStats[bar.h].hi, bar.hi);
+        hourlyStats[bar.h].lo = Math.min(hourlyStats[bar.h].lo, bar.lo);
+      }
+      days[td] = {
+        date: td,
+        pre: agg(sess.PRE),
+        trading: agg(sess.TRADING),
+        post: agg(sess.POSTMARKET),
+        full,
+        hourlyStats,
+      };
+    }
+  }
+  const sorted = Object.values(days).sort((a, b) =>
+    b.date.localeCompare(a.date),
+  );
+  const oldest = [...sorted].reverse();
+  const trs = [],
+    atrVals = new Array(oldest.length).fill(null);
+  for (let i = 0; i < oldest.length; i++) {
+    const cur = oldest[i].full;
+    trs.push(
+      i === 0
+        ? cur.h - cur.l
+        : Math.max(
+            cur.h - cur.l,
+            Math.abs(cur.h - oldest[i - 1].full.c),
+            Math.abs(cur.l - oldest[i - 1].full.c),
+          ),
+    );
+  }
+  if (trs.length >= 14) {
+    let atr = trs.slice(0, 14).reduce((s, v) => s + v, 0) / 14;
+    atrVals[13] = atr;
+    for (let i = 14; i < trs.length; i++) {
+      atr = (atr * 13 + trs[i]) / 14;
+      atrVals[i] = atr;
+    }
+  }
+  sorted.forEach((d, i) => {
+    const idx = oldest.length - 1 - i;
+    d.atr14 = atrVals[idx] ? Math.round(atrVals[idx] * 100) / 100 : null;
+  });
+  const tradOldest = oldest.map((d) => d.trading).filter(Boolean),
+    tradTrs = [];
+  for (let i = 0; i < tradOldest.length; i++) {
+    const cur = tradOldest[i];
+    tradTrs.push(
+      i === 0
+        ? cur.h - cur.l
+        : Math.max(
+            cur.h - cur.l,
+            Math.abs(cur.h - tradOldest[i - 1].c),
+            Math.abs(cur.l - tradOldest[i - 1].c),
+          ),
+    );
+  }
+  let tradAtr = null;
+  if (tradTrs.length >= 14) {
+    tradAtr = tradTrs.slice(0, 14).reduce((s, v) => s + v, 0) / 14;
+    for (let i = 14; i < tradTrs.length; i++)
+      tradAtr = (tradAtr * 13 + tradTrs[i]) / 14;
+  }
+  const hourlyHeatmap = {};
+  for (const day of oldest.slice(-45)) {
+    if (!day.trading || !day.hourlyStats) continue;
+    const dayRange = day.trading.h - day.trading.l,
+      dayNet = Math.abs(day.trading.c - day.trading.o),
+      isTrending = dayRange > 0 && dayNet / dayRange > 0.45;
+    for (const [hStr] of Object.entries(day.hourlyStats)) {
+      const hr = parseInt(hStr);
+      if (!hourlyHeatmap[hr])
+        hourlyHeatmap[hr] = { trend: 0, range: 0, total: 0 };
+      hourlyHeatmap[hr].total++;
+      if (isTrending) hourlyHeatmap[hr].trend++;
+      else hourlyHeatmap[hr].range++;
+    }
+  }
+  return {
+    days: sorted,
+    tradingHoursAtr14: tradAtr ? Math.round(tradAtr * 100) / 100 : null,
+    totalBars: minuteBars.length,
+    totalDays: sorted.length,
+    hourlyHeatmap,
+  };
+}
+function buildDataSummary(data) {
+  const lines = [
+    `PARSED: ${data.totalBars.toLocaleString()} bars → ${data.totalDays} trading days`,
+    `Trading Hours ATR(14): ${data.tradingHoursAtr14 || "N/A"} pts`,
+    "",
+    "=== SESSION DATA (most recent first) ===",
+    "",
+  ];
+  for (const d of data.days.slice(0, 20)) {
+    const fmt = (s) =>
+      s
+        ? `O=${s.o} H=${s.h} L=${s.l} C=${s.c} Range=${Math.round((s.h - s.l) * 100) / 100} Net=${s.c - s.o >= 0 ? "+" : ""}${Math.round((s.c - s.o) * 100) / 100}`
+        : "NO DATA";
+    lines.push(`DATE: ${d.date} | ATR14=${d.atr14 || "N/A"}`);
+    lines.push(`  Pre:     ${fmt(d.pre)}`);
+    lines.push(`  Trading: ${fmt(d.trading)}`);
+    lines.push(`  Post:    ${fmt(d.post)}`);
+    lines.push(`  Full:    ${fmt(d.full)}`);
+    lines.push("");
+  }
+  return lines.join("\n");
+}
+function calcRoR(wr, avgWin, avgLoss, maxDD) {
+  if (
+    !wr ||
+    wr <= 0 ||
+    wr >= 1 ||
+    !avgWin ||
+    !avgLoss ||
+    avgWin <= 0 ||
+    avgLoss <= 0 ||
+    !maxDD
+  )
+    return null;
+  const n = maxDD / avgLoss,
+    ratio = ((1 - wr) * avgLoss) / (wr * avgWin);
+  if (ratio >= 1) return 0.99;
+  return Math.pow(ratio, n);
+}
 
 // ═══════════════════════════════════════════════════════════════════
 //  IST CLOCK & UTILS
@@ -2469,96 +3133,118 @@ function getISTState() {
   const now = new Date();
   const utcMs = now.getTime() + now.getTimezoneOffset() * 60000;
   const ist = new Date(utcMs + 5.5 * 3600 * 1000);
-  
+
   const h = ist.getHours();
   const m = ist.getMinutes();
   const s = ist.getSeconds();
-  
+
   const tot = h * 60 + m;
   const OPEN = 10 * 60;
   const CLOSE = 17 * 60;
-  
+
   const isOpen = tot >= OPEN && tot < CLOSE;
   let sec, lbl;
-  
+
   if (tot < OPEN) {
     sec = (OPEN - tot) * 60 - s;
-    lbl = 'OPENS IN';
+    lbl = "OPENS IN";
   } else if (tot < CLOSE) {
     sec = (CLOSE - tot) * 60 - s;
-    lbl = 'CLOSES IN';
+    lbl = "CLOSES IN";
   } else {
     sec = (24 * 60 - tot + OPEN) * 60 - s;
-    lbl = 'OPENS IN';
+    lbl = "OPENS IN";
   }
-  
-  const ch = String(Math.floor(sec / 3600)).padStart(2, '0');
-  const cm = String(Math.floor((sec % 3600) / 60)).padStart(2, '0');
-  const cs = String(sec % 60).padStart(2, '0');
-  
+
+  const ch = String(Math.floor(sec / 3600)).padStart(2, "0");
+  const cm = String(Math.floor((sec % 3600) / 60)).padStart(2, "0");
+  const cs = String(sec % 60).padStart(2, "0");
+
   return {
-    isOpen, h, m, s, lbl,
+    isOpen,
+    h,
+    m,
+    s,
+    lbl,
     countdown: `${ch}:${cm}:${cs}`,
-    istStr: `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')} IST`
+    istStr: `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")} IST`,
   };
 }
 
 // RULE #150: Dynamic Greeting - Time-based greeting helper
-const getTimeBasedGreeting = (userName = '') => {
+const getTimeBasedGreeting = (userName = "") => {
   const hour = new Date().getHours();
-  const firstName = userName ? userName.split(' ')[0] : 'Trader';
-  
-  let greeting = '';
-  let emoji = '';
-  
+  const firstName = userName ? userName.split(" ")[0] : "Trader";
+
+  let greeting = "";
+  let emoji = "";
+
   if (hour < 5) {
-    greeting = 'Night Owl';
-    emoji = '🌙';
+    greeting = "Night Owl";
+    emoji = "🌙";
   } else if (hour < 12) {
-    greeting = 'Good Morning';
-    emoji = '☀️';
+    greeting = "Good Morning";
+    emoji = "☀️";
   } else if (hour < 17) {
-    greeting = 'Good Afternoon';
-    emoji = '🌤️';
+    greeting = "Good Afternoon";
+    emoji = "🌤️";
   } else if (hour < 21) {
-    greeting = 'Good Evening';
-    emoji = '🌅';
+    greeting = "Good Evening";
+    emoji = "🌅";
   } else {
-    greeting = 'Night Trading';
-    emoji = '🌙';
+    greeting = "Night Trading";
+    emoji = "🌙";
   }
-  
-  return { greeting, emoji, fullGreeting: `${emoji} ${greeting}, ${firstName}` };
+
+  return {
+    greeting,
+    emoji,
+    fullGreeting: `${emoji} ${greeting}, ${firstName}`,
+  };
 };
 
 // RULE #149: User Level Badge Helper - Determine user level based on status/role
 const getUserLevelBadge = (user) => {
-  if (!user) return { level: 'User', color: '#A1A1A6', bg: 'rgba(161,161,166,0.15)' };
-  
+  if (!user)
+    return { level: "User", color: "#A1A1A6", bg: "rgba(161,161,166,0.15)" };
+
   // Admin takes priority
-  if (user.role === 'admin') {
-    return { level: '⭐ Admin', color: '#FFD60A', bg: 'rgba(255,214,10,0.15)' };
+  if (user.role === "admin") {
+    return { level: "⭐ Admin", color: "#FFD60A", bg: "rgba(255,214,10,0.15)" };
   }
-  
+
   // Determine level based on status and activity
-  if (user.status === 'ACTIVE') {
+  if (user.status === "ACTIVE") {
     // Check if user has journal/trading history (simple heuristic)
-    const hasActiveTrading = user.journal && Object.keys(user.journal || {}).length >= 10;
+    const hasActiveTrading =
+      user.journal && Object.keys(user.journal || {}).length >= 10;
     if (hasActiveTrading) {
-      return { level: '💎 Elite', color: '#30B0C0', bg: 'rgba(48,176,192,0.15)' };
+      return {
+        level: "💎 Elite",
+        color: "#30B0C0",
+        bg: "rgba(48,176,192,0.15)",
+      };
     }
-    return { level: '⬆️ Pro', color: '#30D158', bg: 'rgba(48,209,88,0.15)' };
+    return { level: "⬆️ Pro", color: "#30D158", bg: "rgba(48,209,88,0.15)" };
   }
-  
-  if (user.status === 'PENDING') {
-    return { level: '🔄 Pending', color: '#FFD60A', bg: 'rgba(255,214,10,0.15)' };
+
+  if (user.status === "PENDING") {
+    return {
+      level: "🔄 Pending",
+      color: "#FFD60A",
+      bg: "rgba(255,214,10,0.15)",
+    };
   }
-  
-  if (user.status === 'BLOCKED') {
-    return { level: '⛔ Blocked', color: '#FF453A', bg: 'rgba(255,69,58,0.15)' };
+
+  if (user.status === "BLOCKED") {
+    return {
+      level: "⛔ Blocked",
+      color: "#FF453A",
+      bg: "rgba(255,69,58,0.15)",
+    };
   }
-  
-  return { level: 'Member', color: '#0A84FF', bg: 'rgba(10,132,255,0.15)' };
+
+  return { level: "Member", color: "#0A84FF", bg: "rgba(10,132,255,0.15)" };
 };
 
 // ═══════════════════════════════════════════════════════════════════
@@ -2574,12 +3260,12 @@ const cacheUserList = (users) => {
     const cacheData = {
       users,
       timestamp: Date.now(),
-      version: 1
+      version: 1,
     };
-    localStorage.setItem('TradersApp_UserListCache', JSON.stringify(cacheData));
+    localStorage.setItem("TradersApp_UserListCache", JSON.stringify(cacheData));
     return true;
   } catch (error) {
-    console.warn('Failed to cache user list:', error);
+    console.warn("Failed to cache user list:", error);
     return false;
   }
 };
@@ -2591,26 +3277,30 @@ const cacheUserList = (users) => {
  */
 const getCachedUserList = (maxAgeMs = 5 * 60 * 1000) => {
   try {
-    const cached = localStorage.getItem('TradersApp_UserListCache');
+    const cached = localStorage.getItem("TradersApp_UserListCache");
     if (!cached) return null;
-    
+
     const cacheData = JSON.parse(cached);
-    
+
     // Check if cache is expired
     if (Date.now() - cacheData.timestamp > maxAgeMs) {
-      localStorage.removeItem('TradersApp_UserListCache');
+      localStorage.removeItem("TradersApp_UserListCache");
       return null;
     }
-    
+
     // Verify cache structure
-    if (cacheData.version !== 1 || !cacheData.users || typeof cacheData.users !== 'object') {
-      localStorage.removeItem('TradersApp_UserListCache');
+    if (
+      cacheData.version !== 1 ||
+      !cacheData.users ||
+      typeof cacheData.users !== "object"
+    ) {
+      localStorage.removeItem("TradersApp_UserListCache");
       return null;
     }
-    
+
     return cacheData.users;
   } catch (error) {
-    console.warn('Failed to retrieve cached user list:', error);
+    console.warn("Failed to retrieve cached user list:", error);
     return null;
   }
 };
@@ -2622,10 +3312,10 @@ const getCachedUserList = (maxAgeMs = 5 * 60 * 1000) => {
  */
 const clearUserListCache = () => {
   try {
-    localStorage.removeItem('TradersApp_UserListCache');
+    localStorage.removeItem("TradersApp_UserListCache");
     return true;
   } catch (error) {
-    console.warn('Failed to clear user list cache:', error);
+    console.warn("Failed to clear user list cache:", error);
     return false;
   }
 };
@@ -2636,26 +3326,32 @@ const clearUserListCache = () => {
  */
 const _getUserListCacheMetadata = () => {
   try {
-    const cached = localStorage.getItem('TradersApp_UserListCache');
+    const cached = localStorage.getItem("TradersApp_UserListCache");
     if (!cached) {
-      return { exists: false, size: 0, age: null, isExpired: true, userCount: 0 };
+      return {
+        exists: false,
+        size: 0,
+        age: null,
+        isExpired: true,
+        userCount: 0,
+      };
     }
-    
+
     const cacheData = JSON.parse(cached);
     const age = Date.now() - cacheData.timestamp;
     const maxAge = 5 * 60 * 1000; // 5 minutes
     const isExpired = age > maxAge;
-    
+
     return {
       exists: true,
       size: cached.length,
       age,
       isExpired,
       userCount: Object.keys(cacheData.users || {}).length,
-      createdAt: new Date(cacheData.timestamp).toLocaleString()
+      createdAt: new Date(cacheData.timestamp).toLocaleString(),
     };
   } catch (error) {
-    console.warn('Failed to get cache metadata:', error);
+    console.warn("Failed to get cache metadata:", error);
     return { exists: false, size: 0, age: null, isExpired: true, userCount: 0 };
   }
 };
@@ -2668,110 +3364,176 @@ const _getUserListCacheMetadata = () => {
 // RULE #121: System Theme Sync - Auto-detect OS dark/light mode preference
 const useSystemTheme = () => {
   // Initialize from OS preference
-  const [isDarkMode, setIsDarkMode] = useState(() => window.matchMedia('(prefers-color-scheme: dark)').matches);
-  
+  const [isDarkMode, setIsDarkMode] = useState(
+    () => window.matchMedia("(prefers-color-scheme: dark)").matches,
+  );
+
   useEffect(() => {
     // Listen for OS theme changes
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
     const handleChange = (e) => setIsDarkMode(e.matches);
-    
-    mediaQuery.addEventListener('change', handleChange);
-    return () => mediaQuery.removeEventListener('change', handleChange);
+
+    mediaQuery.addEventListener("change", handleChange);
+    return () => mediaQuery.removeEventListener("change", handleChange);
   }, []);
-  
+
   return isDarkMode;
 };
 
 // ACCENT COLOR DEFINITIONS FOR THEME PICKER
 const ACCENT_COLORS = {
-  TRADING_GREEN: { name: 'Trading Green', hex: '#30D158', primary: '#30D158', light: 'rgba(48,209,88,0.2)', glow: 'rgba(48,209,88,0.6)' },
-  GOLD: { name: 'Gold', hex: '#FFD60A', primary: '#FFD60A', light: 'rgba(255,214,10,0.2)', glow: 'rgba(255,214,10,0.6)' },
-  BLUE: { name: 'Electric Blue', hex: '#0A84FF', primary: '#0A84FF', light: 'rgba(10,132,255,0.2)', glow: 'rgba(10,132,255,0.6)' },
-  PURPLE: { name: 'Purple', hex: '#BF5AF2', primary: '#BF5AF2', light: 'rgba(191,90,242,0.2)', glow: 'rgba(191,90,242,0.6)' },
-  CYAN: { name: 'Cyan', hex: '#64D2FF', primary: '#64D2FF', light: 'rgba(100,210,255,0.2)', glow: 'rgba(100,210,255,0.6)' },
-  PINK: { name: 'Pink', hex: '#FF375F', primary: '#FF375F', light: 'rgba(255,55,95,0.2)', glow: 'rgba(255,55,95,0.6)' }
+  TRADING_GREEN: {
+    name: "Trading Green",
+    hex: "#30D158",
+    primary: "#30D158",
+    light: "rgba(48,209,88,0.2)",
+    glow: "rgba(48,209,88,0.6)",
+  },
+  GOLD: {
+    name: "Gold",
+    hex: "#FFD60A",
+    primary: "#FFD60A",
+    light: "rgba(255,214,10,0.2)",
+    glow: "rgba(255,214,10,0.6)",
+  },
+  BLUE: {
+    name: "Electric Blue",
+    hex: "#0A84FF",
+    primary: "#0A84FF",
+    light: "rgba(10,132,255,0.2)",
+    glow: "rgba(10,132,255,0.6)",
+  },
+  PURPLE: {
+    name: "Purple",
+    hex: "#BF5AF2",
+    primary: "#BF5AF2",
+    light: "rgba(191,90,242,0.2)",
+    glow: "rgba(191,90,242,0.6)",
+  },
+  CYAN: {
+    name: "Cyan",
+    hex: "#64D2FF",
+    primary: "#64D2FF",
+    light: "rgba(100,210,255,0.2)",
+    glow: "rgba(100,210,255,0.6)",
+  },
+  PINK: {
+    name: "Pink",
+    hex: "#FF375F",
+    primary: "#FF375F",
+    light: "rgba(255,55,95,0.2)",
+    glow: "rgba(255,55,95,0.6)",
+  },
 };
 
 // RULE #126: Glassmorphism Effect - Premium institutional terminal aesthetic
 // Enhanced theme with glassmorphic styling and accent color support
-const createTheme = (isDark = true, accentKey = 'BLUE') => {
+const createTheme = (isDark = true, accentKey = "BLUE") => {
   const accent = ACCENT_COLORS[accentKey] || ACCENT_COLORS.BLUE;
   return {
-  // Core backgrounds
-  bg: isDark ? "#0A0E27" : "#FFFFFF",
-  card: isDark ? "rgba(20,24,50,0.5)" : "rgba(255,255,255,0.6)",
-  cardGlass: isDark ? "rgba(20,24,50,0.4)" : "rgba(255,255,255,0.5)",
-  
-  // Borders - use accent color
-  border: isDark ? `${accent.light}` : "rgba(0,0,0,0.1)",
-  border2: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)",
-  borderGlass: isDark ? `${accent.light}` : "rgba(0,0,0,0.1)",
-  
-  // Accent colors
-  green: "#30D158",
-  red: "#FF453A",
-  gold: "#FFD60A",
-  blue: "#0A84FF",
-  purple: "#BF5AF2",
-  orange: "#FF9F0A",
-  cyan: "#64D2FF",
-  pink: "#FF375F",
-  
-  // Primary accent color from picker
-  accent: accent.primary,
-  accentLight: accent.light,
-  accentGlow: accent.glow,
-  
-  // Text colors
-  muted: isDark ? "#8E8E93" : "#9CA3AF",
-  dim: isDark ? "#3A3A3C" : "#D1D1D6",
-  text: isDark ? "#F2F2F7" : "#111827",
-  textSecondary: isDark ? "#A1A1A6" : "#64748B",
-  
-  // Fonts
-  font: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
-  mono: '"SF Mono", "ui-monospace", "Cascadia Mono", "Roboto Mono", "IBM Plex Mono", monospace',
-  
-  // AMD colors
-  amdA: "#0A84FF",
-  amdM: "#BF5AF2",
-  amdD: "#30D158",
-  amdDB: "#FF453A",
-  amdT: "#8E8E93",
-  
-  // Glassmorphism
-  glassmorphism: {
-    backdropFilter: 'blur(12px)',
-    backgroundColor: isDark ? 'rgba(20,24,50,0.4)' : 'rgba(255,255,255,0.5)',
-    border: `1px solid ${accent.light}`,
-    borderRadius: '12px'
-  }
+    // Core backgrounds
+    bg: isDark ? "#0A0E27" : "#FFFFFF",
+    card: isDark ? "rgba(20,24,50,0.5)" : "rgba(255,255,255,0.6)",
+    cardGlass: isDark ? "rgba(20,24,50,0.4)" : "rgba(255,255,255,0.5)",
+
+    // Borders - use accent color
+    border: isDark ? `${accent.light}` : "rgba(0,0,0,0.1)",
+    border2: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)",
+    borderGlass: isDark ? `${accent.light}` : "rgba(0,0,0,0.1)",
+
+    // Accent colors
+    green: "#30D158",
+    red: "#FF453A",
+    gold: "#FFD60A",
+    blue: "#0A84FF",
+    purple: "#BF5AF2",
+    orange: "#FF9F0A",
+    cyan: "#64D2FF",
+    pink: "#FF375F",
+
+    // Primary accent color from picker
+    accent: accent.primary,
+    accentLight: accent.light,
+    accentGlow: accent.glow,
+
+    // Text colors
+    muted: isDark ? "#8E8E93" : "#9CA3AF",
+    dim: isDark ? "#3A3A3C" : "#D1D1D6",
+    text: isDark ? "#F2F2F7" : "#111827",
+    textSecondary: isDark ? "#A1A1A6" : "#64748B",
+
+    // Fonts
+    font: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+    mono: '"SF Mono", "ui-monospace", "Cascadia Mono", "Roboto Mono", "IBM Plex Mono", monospace',
+
+    // AMD colors
+    amdA: "#0A84FF",
+    amdM: "#BF5AF2",
+    amdD: "#30D158",
+    amdDB: "#FF453A",
+    amdT: "#8E8E93",
+
+    // Glassmorphism
+    glassmorphism: {
+      backdropFilter: "blur(12px)",
+      backgroundColor: isDark ? "rgba(20,24,50,0.4)" : "rgba(255,255,255,0.5)",
+      border: `1px solid ${accent.light}`,
+      borderRadius: "12px",
+    },
   };
 };
 
 // Default theme - Pure White SaaS Aesthetic (Supreme SaaS)
-const T = createTheme(false, 'BLUE');
+const T = createTheme(false, "BLUE");
 
 // Time options for IST timezone
 const TIME_OPTIONS = (() => {
-  const opts = [{ v: '', l: '— time IST —' }];
+  const opts = [{ v: "", l: "— time IST —" }];
   for (let h = 10; h <= 17; h++) {
     for (let m = 0; m < 60; m += 5) {
       if (h === 17 && m > 0) continue;
-      const hh = h > 12 ? h - 12 : (h === 0 ? 12 : h);
-      const ampm = h >= 12 ? 'PM' : 'AM';
-      opts.push({ v: `${hh}:${String(m).padStart(2, '0')} ${ampm}`, l: `${hh}:${String(m).padStart(2, '0')} ${ampm} IST` });
+      const hh = h > 12 ? h - 12 : h === 0 ? 12 : h;
+      const ampm = h >= 12 ? "PM" : "AM";
+      opts.push({
+        v: `${hh}:${String(m).padStart(2, "0")} ${ampm}`,
+        l: `${hh}:${String(m).padStart(2, "0")} ${ampm} IST`,
+      });
     }
   }
   return opts;
 })();
 
 const AMD_PHASES = {
-  ACCUMULATION: { color: T.amdA, icon: "◎", label: "Accumulation (Mean Reversion)", desc: "Smart money building long positions" },
-  MANIPULATION: { color: T.amdM, icon: "⚡", label: "Manipulation (Reversal)", desc: "Stop hunt / false breakout" },
-  DISTRIBUTION: { color: T.amdD, icon: "◈", label: "Distribution (Trend)", desc: "Smart money offloading into strength" },
-  TRANSITION: { color: T.amdT, icon: "⟳", label: "Transition (No Trade)", desc: "Phase shifting — stay flat" },
-  UNCLEAR: { color: T.muted, icon: "?", label: "Phase Unclear", desc: "No clear institutional signature" },
+  ACCUMULATION: {
+    color: T.amdA,
+    icon: "◎",
+    label: "Accumulation (Mean Reversion)",
+    desc: "Smart money building long positions",
+  },
+  MANIPULATION: {
+    color: T.amdM,
+    icon: "⚡",
+    label: "Manipulation (Reversal)",
+    desc: "Stop hunt / false breakout",
+  },
+  DISTRIBUTION: {
+    color: T.amdD,
+    icon: "◈",
+    label: "Distribution (Trend)",
+    desc: "Smart money offloading into strength",
+  },
+  TRANSITION: {
+    color: T.amdT,
+    icon: "⟳",
+    label: "Transition (No Trade)",
+    desc: "Phase shifting — stay flat",
+  },
+  UNCLEAR: {
+    color: T.muted,
+    icon: "?",
+    label: "Phase Unclear",
+    desc: "No clear institutional signature",
+  },
 };
 
 // Officer's Briefing - Rotating Quotes
@@ -2796,10 +3558,12 @@ const OFFICERS_BRIEFING = [
 ];
 
 function getRandomQuote() {
-  return OFFICERS_BRIEFING[Math.floor(Math.random() * OFFICERS_BRIEFING.length)];
+  return OFFICERS_BRIEFING[
+    Math.floor(Math.random() * OFFICERS_BRIEFING.length)
+  ];
 }
 // ═══════════════════════════════════════════════════════════════════
-//  SYSTEM PROMPTS 
+//  SYSTEM PROMPTS
 // ═══════════════════════════════════════════════════════════════════
 const SCREENSHOT_EXTRACT_PROMPT = `Extract all visible trading indicator values from the screenshot. Return ONLY this JSON:
 {"currentPrice":null,"atr":null,"adx":null,"ci":null,"vwap":null,"vwapSlope":null,"sessionHigh":null,"sessionLow":null,"sessionOpen":null,"volume":null,"other":[],"notes":""}
@@ -2990,76 +3754,309 @@ OVERALL: [GREEN/YELLOW/RED] | RECOMMENDED ACTION: [specific 1-2 sentence instruc
 // ═══════════════════════════════════════════════════════════════════
 //  DESIGN PRIMITIVES (iOS Styled)
 // ═══════════════════════════════════════════════════════════════════
-const authCard = { 
-  background: "#FFFFFF", 
-  backgroundImage: "linear-gradient(rgba(255,255,255,0.97), rgba(255,255,255,0.97)), url('/wallpaper.png')",
+const authCard = {
+  background: "#FFFFFF",
+  backgroundImage:
+    "linear-gradient(rgba(255,255,255,0.97), rgba(255,255,255,0.97)), url('/wallpaper.png')",
   backgroundSize: "cover",
   backgroundPosition: "center",
   backgroundBlendMode: "lighten",
   backgroundAttachment: "fixed",
   border: "none",
-  borderRadius: 24, 
-  padding: "clamp(56px, 12vw, 90px)", 
-  width: "100%", 
-  maxWidth: 460, 
-  margin: "0 auto", 
-  backdropFilter: "blur(20px)", 
-  WebkitBackdropFilter: "blur(20px)", 
-  boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
-  position: "relative"
+  borderRadius: 24,
+  padding: "clamp(56px, 12vw, 90px)",
+  width: "100%",
+  maxWidth: 460,
+  margin: "0 auto",
+  backdropFilter: "blur(20px)",
+  WebkitBackdropFilter: "blur(20px)",
+  boxShadow:
+    "0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
+  position: "relative",
 };
-const authInp = { background: "#FFFFFF", border: `1px solid #E2E8F0`, borderRadius: 6, padding: "12px 40px 12px 40px", color: "#0F172A", fontSize: 14, width: "100%", boxSizing: "border-box", outline: "none", transition: "all 0.2s ease", marginBottom: 16, backdropFilter: "none", WebkitBackdropFilter: "none", height: 44 };
-const authBtn = (color, disabled) => ({ background: disabled ? "rgba(0,0,0,0.3)" : "#000000", border: `none`, borderRadius: 6, height: 44, display: "flex", alignItems: "center", justifyContent: "center", cursor: disabled ? "not-allowed" : "pointer", color: disabled ? "rgba(255,255,255,0.6)" : "#FFFFFF", fontFamily: T.font, fontSize: 14, fontWeight: 600, letterSpacing: "0.05em", width: "100%", transition: "all 0.2s ease", opacity: disabled ? 0.6 : 1, backdropFilter: "none", WebkitBackdropFilter: "none", className: "btn-glass", boxShadow: disabled ? "none" : "0 4px 6px -1px rgba(0, 0, 0, 0.1)" });
-const lbl = { color: "#64748B", fontSize: 11, letterSpacing: 1.5, marginBottom: 6, display: "block", textTransform: "uppercase", fontWeight: 600, fontFamily: T.font };
-const inp = { background: "#F9FAFB", border: `1px solid rgba(0,0,0,0.08)`, borderRadius: 8, padding: "12px 14px", color: T.text, fontFamily: T.mono, fontSize: 14, width: "100%", boxSizing: "border-box", outline: "none", transition: "all 0.2s ease", backdropFilter: "none", WebkitBackdropFilter: "none" };
-const cardS = (e = {}) => ({ background: "#FFFFFF", border: "none", borderRadius: 12, padding: "24px 32px", marginBottom: 16, boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)", ...e });
-const glowBtn = (color, disabled) => ({ background: disabled ? "rgba(0,0,0,0.05)" : `${color}08`, border: `1px solid ${disabled ? "rgba(0,0,0,0.1)" : `${color}30`}`, borderRadius: 8, padding: "14px 28px", cursor: disabled ? "not-allowed" : "pointer", color: disabled ? "#9CA3AF" : color, fontFamily: T.font, fontSize: 13, fontWeight: 600, letterSpacing: 1.5, transition: "all 0.2s ease", opacity: disabled ? 0.6 : 1, backdropFilter: "none", WebkitBackdropFilter: "none", className: "btn-glass" });
+const authInp = {
+  background: "#FFFFFF",
+  border: `1px solid #E2E8F0`,
+  borderRadius: 6,
+  padding: "12px 40px 12px 40px",
+  color: "#0F172A",
+  fontSize: 14,
+  width: "100%",
+  boxSizing: "border-box",
+  outline: "none",
+  transition: "all 0.2s ease",
+  marginBottom: 16,
+  backdropFilter: "none",
+  WebkitBackdropFilter: "none",
+  height: 44,
+};
+const authBtn = (color, disabled) => ({
+  background: disabled ? "rgba(0,0,0,0.3)" : "#000000",
+  border: `none`,
+  borderRadius: 6,
+  height: 44,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  cursor: disabled ? "not-allowed" : "pointer",
+  color: disabled ? "rgba(255,255,255,0.6)" : "#FFFFFF",
+  fontFamily: T.font,
+  fontSize: 14,
+  fontWeight: 600,
+  letterSpacing: "0.05em",
+  width: "100%",
+  transition: "all 0.2s ease",
+  opacity: disabled ? 0.6 : 1,
+  backdropFilter: "none",
+  WebkitBackdropFilter: "none",
+  className: "btn-glass",
+  boxShadow: disabled ? "none" : "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
+});
+const lbl = {
+  color: "#64748B",
+  fontSize: 11,
+  letterSpacing: 1.5,
+  marginBottom: 6,
+  display: "block",
+  textTransform: "uppercase",
+  fontWeight: 600,
+  fontFamily: T.font,
+};
+const inp = {
+  background: "#F9FAFB",
+  border: `1px solid rgba(0,0,0,0.08)`,
+  borderRadius: 8,
+  padding: "12px 14px",
+  color: T.text,
+  fontFamily: T.mono,
+  fontSize: 14,
+  width: "100%",
+  boxSizing: "border-box",
+  outline: "none",
+  transition: "all 0.2s ease",
+  backdropFilter: "none",
+  WebkitBackdropFilter: "none",
+};
+const cardS = (e = {}) => ({
+  background: "#FFFFFF",
+  border: "none",
+  borderRadius: 12,
+  padding: "24px 32px",
+  marginBottom: 16,
+  boxShadow:
+    "0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)",
+  ...e,
+});
+const glowBtn = (color, disabled) => ({
+  background: disabled ? "rgba(0,0,0,0.05)" : `${color}08`,
+  border: `1px solid ${disabled ? "rgba(0,0,0,0.1)" : `${color}30`}`,
+  borderRadius: 8,
+  padding: "14px 28px",
+  cursor: disabled ? "not-allowed" : "pointer",
+  color: disabled ? "#9CA3AF" : color,
+  fontFamily: T.font,
+  fontSize: 13,
+  fontWeight: 600,
+  letterSpacing: 1.5,
+  transition: "all 0.2s ease",
+  opacity: disabled ? 0.6 : 1,
+  backdropFilter: "none",
+  WebkitBackdropFilter: "none",
+  className: "btn-glass",
+});
 
-function LED({ color, size = 10, pulse = true }) { return <div style={{ width: size, height: size, borderRadius: "50%", background: color, boxShadow: `0 0 ${size}px ${color},0 0 ${size * 2}px ${color}60`, animation: pulse ? `led-pulse 1.8s ease-in-out infinite` : "none", flexShrink: 0 }} />; }
-function Tag({ label, color }) { return <span style={{ background: color + "15", color, border: `1px solid ${color}35`, borderRadius: 6, padding: "4px 10px", fontSize: 11, letterSpacing: 1, fontWeight: 600, whiteSpace: "nowrap" }}>{label}</span>; }
-function SHead({ icon, title, color, sub, right }) { return <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18, paddingBottom: 12, borderBottom: `1px solid ${color}20` }}><span style={{ color, fontSize: 18 }}>{icon}</span><div style={{ flex: 1 }}><div style={{ color, fontSize: 13, letterSpacing: 1.5, fontWeight: 700 }}>{title}</div>{sub && <div style={{ color: T.muted, fontSize: 11, marginTop: 4, fontWeight: 400 }}>{sub}</div>}</div>{right}</div>; }
+function LED({ color, size = 10, pulse = true }) {
+  return (
+    <div
+      style={{
+        width: size,
+        height: size,
+        borderRadius: "50%",
+        background: color,
+        boxShadow: `0 0 ${size}px ${color},0 0 ${size * 2}px ${color}60`,
+        animation: pulse ? `led-pulse 1.8s ease-in-out infinite` : "none",
+        flexShrink: 0,
+      }}
+    />
+  );
+}
+function Tag({ label, color }) {
+  return (
+    <span
+      style={{
+        background: color + "15",
+        color,
+        border: `1px solid ${color}35`,
+        borderRadius: 6,
+        padding: "4px 10px",
+        fontSize: 11,
+        letterSpacing: 1,
+        fontWeight: 600,
+        whiteSpace: "nowrap",
+      }}
+    >
+      {label}
+    </span>
+  );
+}
+function SHead({ icon, title, color, sub, right }) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        marginBottom: 18,
+        paddingBottom: 12,
+        borderBottom: `1px solid ${color}20`,
+      }}
+    >
+      <span style={{ color, fontSize: 18 }}>{icon}</span>
+      <div style={{ flex: 1 }}>
+        <div
+          style={{ color, fontSize: 13, letterSpacing: 1.5, fontWeight: 700 }}
+        >
+          {title}
+        </div>
+        {sub && (
+          <div
+            style={{
+              color: T.muted,
+              fontSize: 11,
+              marginTop: 4,
+              fontWeight: 400,
+            }}
+          >
+            {sub}
+          </div>
+        )}
+      </div>
+      {right}
+    </div>
+  );
+}
 
-function Field({ label, type = "text", value, onChange, placeholder, options, highlight, disabled, mono }) { 
+function Field({
+  label,
+  type = "text",
+  value,
+  onChange,
+  placeholder,
+  options,
+  highlight,
+  disabled,
+  mono,
+}) {
   return (
     <div style={{ marginBottom: 12 }}>
       <label style={lbl}>{label}</label>
       {options ? (
-        <select value={value} onChange={e => onChange(e.target.value)} disabled={disabled} style={{ ...inp, borderColor: highlight ? T.green : "rgba(255,255,255,0.12)", opacity: disabled ? 0.5 : 1, fontFamily: T.font }} className="input-glass">
-          {options.map(o => <option key={o.v ?? o} value={o.v ?? o}>{o.l ?? o}</option>)}
+        <select
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          disabled={disabled}
+          style={{
+            ...inp,
+            borderColor: highlight ? T.green : "rgba(255,255,255,0.12)",
+            opacity: disabled ? 0.5 : 1,
+            fontFamily: T.font,
+          }}
+          className="input-glass"
+        >
+          {options.map((o) => (
+            <option key={o.v ?? o} value={o.v ?? o}>
+              {o.l ?? o}
+            </option>
+          ))}
         </select>
       ) : (
-        <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} disabled={disabled} style={{ ...inp, borderColor: highlight ? T.green : "rgba(255,255,255,0.12)", opacity: disabled ? 0.5 : 1, fontFamily: mono ? T.mono : T.font }} className="input-glass" />
+        <input
+          type={type}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          disabled={disabled}
+          style={{
+            ...inp,
+            borderColor: highlight ? T.green : "rgba(255,255,255,0.12)",
+            opacity: disabled ? 0.5 : 1,
+            fontFamily: mono ? T.mono : T.font,
+          }}
+          className="input-glass"
+        />
       )}
     </div>
-  ); 
+  );
 }
 
-function Loader({ color, label }) { 
+function Loader({ color, label }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 240, gap: 16 }}>
-      <div style={{ display: "flex", gap: 4, alignItems: "flex-end", height: 28 }}>
-        {[8, 15, 10, 20, 12, 17, 9].map((h, i) => <div key={i} style={{ width: 4, height: h, background: color, borderRadius: 2, animation: `bar ${0.85 + i * 0.05}s ${i * 0.1}s ease-in-out infinite alternate` }} />)}
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        minHeight: 240,
+        gap: 16,
+      }}
+    >
+      <div
+        style={{ display: "flex", gap: 4, alignItems: "flex-end", height: 28 }}
+      >
+        {[8, 15, 10, 20, 12, 17, 9].map((h, i) => (
+          <div
+            key={i}
+            style={{
+              width: 4,
+              height: h,
+              background: color,
+              borderRadius: 2,
+              animation: `bar ${0.85 + i * 0.05}s ${i * 0.1}s ease-in-out infinite alternate`,
+            }}
+          />
+        ))}
       </div>
-      <span style={{ color: T.muted, fontSize: 12, letterSpacing: 2, fontWeight: 600 }}>{label}</span>
+      <span
+        style={{
+          color: T.muted,
+          fontSize: 12,
+          letterSpacing: 2,
+          fontWeight: 600,
+        }}
+      >
+        {label}
+      </span>
     </div>
-  ); 
+  );
 }
 
 // Premium Video Loader - AI Processing State
 function VideoLoader({ label = "PROCESSING..." }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 240, gap: 20 }}>
-      <div style={{
-        width: 100,
-        height: 100,
-        borderRadius: "50%",
-        overflow: "hidden",
-        boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
-        background: "#F9FAFB",
+    <div
+      style={{
         display: "flex",
+        flexDirection: "column",
         alignItems: "center",
-        justifyContent: "center"
-      }}>
+        justifyContent: "center",
+        minHeight: 240,
+        gap: 20,
+      }}
+    >
+      <div
+        style={{
+          width: 100,
+          height: 100,
+          borderRadius: "50%",
+          overflow: "hidden",
+          boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
+          background: "#F9FAFB",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
         <video
           src="/logo.mp4"
           autoPlay
@@ -3068,19 +4065,28 @@ function VideoLoader({ label = "PROCESSING..." }) {
           style={{
             width: "100%",
             height: "100%",
-            objectFit: "cover"
+            objectFit: "cover",
           }}
           onError={(e) => {
             // Fallback to animated spinner if video fails
-            e.target.parentElement.innerHTML = '🔄';
-            e.target.parentElement.style.fontSize = '48px';
-            e.target.parentElement.style.display = 'flex';
-            e.target.parentElement.style.alignItems = 'center';
-            e.target.parentElement.style.justifyContent = 'center';
+            e.target.parentElement.innerHTML = "🔄";
+            e.target.parentElement.style.fontSize = "48px";
+            e.target.parentElement.style.display = "flex";
+            e.target.parentElement.style.alignItems = "center";
+            e.target.parentElement.style.justifyContent = "center";
           }}
         />
       </div>
-      <span style={{ color: "#6B7280", fontSize: 12, letterSpacing: 2, fontWeight: 600 }}>{label}</span>
+      <span
+        style={{
+          color: "#6B7280",
+          fontSize: 12,
+          letterSpacing: 2,
+          fontWeight: 600,
+        }}
+      >
+        {label}
+      </span>
     </div>
   );
 }
@@ -3101,119 +4107,306 @@ function TableSkeletonLoader() {
     >
       {/* Name skeleton */}
       <div>
-        <div style={{
-          height: 12,
-          background: "rgba(255,255,255,0.06)",
-          borderRadius: 4,
-          marginBottom: 6,
-          animation: "pulse 1.5s ease-in-out infinite",
-          width: "70%"
-        }} />
-        <div style={{
-          height: 10,
-          background: "rgba(255,255,255,0.04)",
-          borderRadius: 4,
-          width: "50%",
-          animation: "pulse 1.5s ease-in-out infinite",
-          animationDelay: "0.1s"
-        }} />
+        <div
+          style={{
+            height: 12,
+            background: "rgba(255,255,255,0.06)",
+            borderRadius: 4,
+            marginBottom: 6,
+            animation: "pulse 1.5s ease-in-out infinite",
+            width: "70%",
+          }}
+        />
+        <div
+          style={{
+            height: 10,
+            background: "rgba(255,255,255,0.04)",
+            borderRadius: 4,
+            width: "50%",
+            animation: "pulse 1.5s ease-in-out infinite",
+            animationDelay: "0.1s",
+          }}
+        />
       </div>
       {/* Email skeleton */}
-      <div style={{
-        height: 11,
-        background: "rgba(255,255,255,0.06)",
-        borderRadius: 4,
-        animation: "pulse 1.5s ease-in-out infinite",
-        animationDelay: "0.2s",
-        width: "80%"
-      }} />
-      {/* Date skeleton */}
-      <div style={{
-        height: 11,
-        background: "rgba(255,255,255,0.06)",
-        borderRadius: 4,
-        animation: "pulse 1.5s ease-in-out infinite",
-        animationDelay: "0.3s",
-        width: "60%"
-      }} />
-      {/* Status pill skeleton */}
-      <div style={{
-        height: 24,
-        background: "rgba(255,255,255,0.06)",
-        borderRadius: 20,
-        animation: "pulse 1.5s ease-in-out infinite",
-        animationDelay: "0.4s",
-        width: "80px"
-      }} />
-      {/* Actions skeleton */}
-      <div style={{
-        display: "flex",
-        gap: 8,
-        justifyContent: "flex-end"
-      }}>
-        <div style={{
-          height: 24,
-          width: 70,
+      <div
+        style={{
+          height: 11,
           background: "rgba(255,255,255,0.06)",
           borderRadius: 4,
           animation: "pulse 1.5s ease-in-out infinite",
-          animationDelay: "0.5s"
-        }} />
+          animationDelay: "0.2s",
+          width: "80%",
+        }}
+      />
+      {/* Date skeleton */}
+      <div
+        style={{
+          height: 11,
+          background: "rgba(255,255,255,0.06)",
+          borderRadius: 4,
+          animation: "pulse 1.5s ease-in-out infinite",
+          animationDelay: "0.3s",
+          width: "60%",
+        }}
+      />
+      {/* Status pill skeleton */}
+      <div
+        style={{
+          height: 24,
+          background: "rgba(255,255,255,0.06)",
+          borderRadius: 20,
+          animation: "pulse 1.5s ease-in-out infinite",
+          animationDelay: "0.4s",
+          width: "80px",
+        }}
+      />
+      {/* Actions skeleton */}
+      <div
+        style={{
+          display: "flex",
+          gap: 8,
+          justifyContent: "flex-end",
+        }}
+      >
+        <div
+          style={{
+            height: 24,
+            width: 70,
+            background: "rgba(255,255,255,0.06)",
+            borderRadius: 4,
+            animation: "pulse 1.5s ease-in-out infinite",
+            animationDelay: "0.5s",
+          }}
+        />
       </div>
     </div>
   ));
 
-  return (
-    <div>
-      {skeletonRows}
-    </div>
-  );
+  return <div>{skeletonRows}</div>;
 }
 
 function RenderOut({ text }) {
   if (!text) return null;
-  return <div style={{ fontFamily: T.font, lineHeight: 1.8, fontSize: 13 }}>
-    {text.split('\n').map((line, i) => {
-      const t = line.trim();
-      if (t.startsWith('## ')) return <h2 key={i} style={{ color: T.gold, fontSize: 15, margin: "24px 0 10px", borderBottom: `1px solid rgba(255,255,255,0.1)`, paddingBottom: 8, letterSpacing: 1, fontWeight: 700 }} className="gemini-gradient-text">{t.slice(3)}</h2>;
-      if (t.startsWith('### ')) return <h3 key={i} style={{ color: T.blue, fontSize: 13, margin: "14px 0 6px", letterSpacing: 0.5, fontWeight: 600 }}>{t.slice(4)}</h3>;
-      if (t.includes('🚫')) return <div key={i} style={{ background: "rgba(255,69,58,0.1)", border: `1px solid rgba(255,69,58,0.3)`, borderRadius: 6, padding: "12px 16px", margin: "8px 0", color: T.red, fontSize: 13, fontWeight: 600 }}>{t}</div>;
-      if (t.includes('✅')) return <div key={i} style={{ background: "rgba(48,209,88,0.1)", border: `1px solid rgba(48,209,88,0.3)`, borderRadius: 6, padding: "12px 16px", margin: "8px 0", color: T.green, fontSize: 13, fontWeight: 600 }}>{t}</div>;
-      if (t.includes('⚠️') || t.includes('⚠')) return <div key={i} style={{ background: "rgba(255,214,10,0.1)", border: `1px solid rgba(255,214,10,0.3)`, borderRadius: 6, padding: "12px 16px", margin: "8px 0", color: T.gold, fontSize: 13, fontWeight: 600 }}>{t}</div>;
-      if (t.includes('**')) { const parts = t.split(/(\*\*[^*]+\*\*)/g); return <p key={i} style={{ color: "#A1A1A6", margin: "4px 0" }}>{parts.map((p2, j) => p2.startsWith('**') ? <strong key={j} style={{ color: T.text, fontWeight: 600 }}>{p2.replace(/\*\*/g, '')}</strong> : p2)}</p>; }
-      if (!t) return <div key={i} style={{ height: 6 }} />;
-      return <p key={i} style={{ color: t.startsWith('→') || t.startsWith('AMD') ? T.cyan : "#A1A1A6", margin: "3px 0" }}>{line}</p>;
-    })}
-  </div>;
+  return (
+    <div style={{ fontFamily: T.font, lineHeight: 1.8, fontSize: 13 }}>
+      {text.split("\n").map((line, i) => {
+        const t = line.trim();
+        if (t.startsWith("## "))
+          return (
+            <h2
+              key={i}
+              style={{
+                color: T.gold,
+                fontSize: 15,
+                margin: "24px 0 10px",
+                borderBottom: `1px solid rgba(255,255,255,0.1)`,
+                paddingBottom: 8,
+                letterSpacing: 1,
+                fontWeight: 700,
+              }}
+              className="gemini-gradient-text"
+            >
+              {t.slice(3)}
+            </h2>
+          );
+        if (t.startsWith("### "))
+          return (
+            <h3
+              key={i}
+              style={{
+                color: T.blue,
+                fontSize: 13,
+                margin: "14px 0 6px",
+                letterSpacing: 0.5,
+                fontWeight: 600,
+              }}
+            >
+              {t.slice(4)}
+            </h3>
+          );
+        if (t.includes("🚫"))
+          return (
+            <div
+              key={i}
+              style={{
+                background: "rgba(255,69,58,0.1)",
+                border: `1px solid rgba(255,69,58,0.3)`,
+                borderRadius: 6,
+                padding: "12px 16px",
+                margin: "8px 0",
+                color: T.red,
+                fontSize: 13,
+                fontWeight: 600,
+              }}
+            >
+              {t}
+            </div>
+          );
+        if (t.includes("✅"))
+          return (
+            <div
+              key={i}
+              style={{
+                background: "rgba(48,209,88,0.1)",
+                border: `1px solid rgba(48,209,88,0.3)`,
+                borderRadius: 6,
+                padding: "12px 16px",
+                margin: "8px 0",
+                color: T.green,
+                fontSize: 13,
+                fontWeight: 600,
+              }}
+            >
+              {t}
+            </div>
+          );
+        if (t.includes("⚠️") || t.includes("⚠"))
+          return (
+            <div
+              key={i}
+              style={{
+                background: "rgba(255,214,10,0.1)",
+                border: `1px solid rgba(255,214,10,0.3)`,
+                borderRadius: 6,
+                padding: "12px 16px",
+                margin: "8px 0",
+                color: T.gold,
+                fontSize: 13,
+                fontWeight: 600,
+              }}
+            >
+              {t}
+            </div>
+          );
+        if (t.includes("**")) {
+          const parts = t.split(/(\*\*[^*]+\*\*)/g);
+          return (
+            <p key={i} style={{ color: "#A1A1A6", margin: "4px 0" }}>
+              {parts.map((p2, j) =>
+                p2.startsWith("**") ? (
+                  <strong key={j} style={{ color: T.text, fontWeight: 600 }}>
+                    {p2.replace(/\*\*/g, "")}
+                  </strong>
+                ) : (
+                  p2
+                ),
+              )}
+            </p>
+          );
+        }
+        if (!t) return <div key={i} style={{ height: 6 }} />;
+        return (
+          <p
+            key={i}
+            style={{
+              color:
+                t.startsWith("→") || t.startsWith("AMD") ? T.cyan : "#A1A1A6",
+              margin: "3px 0",
+            }}
+          >
+            {line}
+          </p>
+        );
+      })}
+    </div>
+  );
 }
 
 function AMDPhaseTag({ phase }) {
   const cfg = AMD_PHASES[phase] || AMD_PHASES.UNCLEAR;
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 14px", background: cfg.color + "15", border: `1px solid ${cfg.color}40`, borderRadius: 8 }} className="glass-panel">
-      <LED color={cfg.color} size={10} pulse={phase !== 'UNCLEAR'} />
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "8px 14px",
+        background: cfg.color + "15",
+        border: `1px solid ${cfg.color}40`,
+        borderRadius: 8,
+      }}
+      className="glass-panel"
+    >
+      <LED color={cfg.color} size={10} pulse={phase !== "UNCLEAR"} />
       <div>
-        <div style={{ color: cfg.color, fontSize: 12, fontWeight: 700, letterSpacing: 1 }}>{cfg.icon} {cfg.label}</div>
-        <div style={{ color: T.muted, fontSize: 11, marginTop: 2 }}>{cfg.desc}</div>
-              </div>
-            </div>
-          );
+        <div
+          style={{
+            color: cfg.color,
+            fontSize: 12,
+            fontWeight: 700,
+            letterSpacing: 1,
+          }}
+        >
+          {cfg.icon} {cfg.label}
+        </div>
+        <div style={{ color: T.muted, fontSize: 11, marginTop: 2 }}>
+          {cfg.desc}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function TrafficLight({ state }) {
-  if (state === 'none') return null;
-  const cfg = { 
-    green: { color: T.green, label: "TRADE CLEAR", sub: "All systems go · Compliance passed" }, 
-    yellow: { color: T.gold, label: "CAUTION ACTIVE", sub: "Warning detected — review analysis" }, 
-    red: { color: T.red, label: "TERMINAL LOCKED", sub: "Compliance breach or market closed" } 
+  if (state === "none") return null;
+  const cfg = {
+    green: {
+      color: T.green,
+      label: "TRADE CLEAR",
+      sub: "All systems go · Compliance passed",
+    },
+    yellow: {
+      color: T.gold,
+      label: "CAUTION ACTIVE",
+      sub: "Warning detected — review analysis",
+    },
+    red: {
+      color: T.red,
+      label: "TERMINAL LOCKED",
+      sub: "Compliance breach or market closed",
+    },
   };
   const c = cfg[state];
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 16, padding: "14px 20px", background: "rgba(0,0,0,0.4)", border: `1px solid ${c.color}30`, borderRadius: 10, marginBottom: 16 }} className="glass-panel">
-      <div style={{ width: 22, height: 22, borderRadius: "50%", background: c.color, boxShadow: `0 0 12px ${c.color},0 0 32px ${c.color}60`, animation: `led-pulse 1.6s ease-in-out infinite`, flexShrink: 0 }} />
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 16,
+        padding: "14px 20px",
+        background: "rgba(0,0,0,0.4)",
+        border: `1px solid ${c.color}30`,
+        borderRadius: 10,
+        marginBottom: 16,
+      }}
+      className="glass-panel"
+    >
+      <div
+        style={{
+          width: 22,
+          height: 22,
+          borderRadius: "50%",
+          background: c.color,
+          boxShadow: `0 0 12px ${c.color},0 0 32px ${c.color}60`,
+          animation: `led-pulse 1.6s ease-in-out infinite`,
+          flexShrink: 0,
+        }}
+      />
       <div>
-        <div style={{ color: c.color, fontSize: 13, letterSpacing: 2, fontWeight: 800 }}>{c.label}</div>
-        <div style={{ color: T.muted, fontSize: 11, marginTop: 3 }}>{c.sub}</div>
+        <div
+          style={{
+            color: c.color,
+            fontSize: 13,
+            letterSpacing: 2,
+            fontWeight: 800,
+          }}
+        >
+          {c.label}
+        </div>
+        <div style={{ color: T.muted, fontSize: 11, marginTop: 3 }}>
+          {c.sub}
+        </div>
       </div>
     </div>
   );
@@ -3221,19 +4414,83 @@ function TrafficLight({ state }) {
 
 function CountdownBanner({ ist }) {
   const color = ist.isOpen ? T.green : T.red;
-  const [hh, mm, ss] = ist.countdown.split(':');
+  const [hh, mm, ss] = ist.countdown.split(":");
   const urgent = ist.isOpen && parseInt(hh) === 0 && parseInt(mm) < 30;
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 16, padding: "12px 28px", background: urgent ? "rgba(255,69,58,0.1)" : ist.isOpen ? "rgba(48,209,88,0.05)" : "rgba(255,69,58,0.05)", borderBottom: `1px solid ${color}25`, borderTop: `1px solid ${color}15`, flexWrap: "wrap" }} className="glass-panel">
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 16,
+        padding: "12px 28px",
+        background: urgent
+          ? "rgba(255,69,58,0.1)"
+          : ist.isOpen
+            ? "rgba(48,209,88,0.05)"
+            : "rgba(255,69,58,0.05)",
+        borderBottom: `1px solid ${color}25`,
+        borderTop: `1px solid ${color}15`,
+        flexWrap: "wrap",
+      }}
+      className="glass-panel"
+    >
       <LED color={color} size={8} pulse />
       <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-        <span style={{ color: T.muted, fontSize: 11, letterSpacing: 2, fontWeight: 600 }}>{ist.lbl}</span>
-        <span style={{ color, fontSize: 24, fontFamily: T.mono, fontWeight: 700, letterSpacing: 4 }}>{hh}:{mm}:{ss}</span>
+        <span
+          style={{
+            color: T.muted,
+            fontSize: 11,
+            letterSpacing: 2,
+            fontWeight: 600,
+          }}
+        >
+          {ist.lbl}
+        </span>
+        <span
+          style={{
+            color,
+            fontSize: 24,
+            fontFamily: T.mono,
+            fontWeight: 700,
+            letterSpacing: 4,
+          }}
+        >
+          {hh}:{mm}:{ss}
+        </span>
       </div>
-      <div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.1)" }} />
-      <span style={{ color: T.muted, fontSize: 12, fontWeight: 600 }}>{ist.istStr}</span>
-      {!ist.isOpen && <span style={{ marginLeft: "auto", color: T.red, fontSize: 11, letterSpacing: 1, fontWeight: 700 }}>LOCKED · 10:00AM–5:00PM IST ONLY</span>}
-      {urgent && <span style={{ marginLeft: "auto", color: T.gold, fontSize: 11, letterSpacing: 1, fontWeight: 700, animation: "led-pulse 1s infinite" }}>⚠ SESSION ENDING SOON</span>}
+      <div
+        style={{ width: 1, height: 20, background: "rgba(255,255,255,0.1)" }}
+      />
+      <span style={{ color: T.muted, fontSize: 12, fontWeight: 600 }}>
+        {ist.istStr}
+      </span>
+      {!ist.isOpen && (
+        <span
+          style={{
+            marginLeft: "auto",
+            color: T.red,
+            fontSize: 11,
+            letterSpacing: 1,
+            fontWeight: 700,
+          }}
+        >
+          LOCKED · 10:00AM–5:00PM IST ONLY
+        </span>
+      )}
+      {urgent && (
+        <span
+          style={{
+            marginLeft: "auto",
+            color: T.gold,
+            fontSize: 11,
+            letterSpacing: 1,
+            fontWeight: 700,
+            animation: "led-pulse 1s infinite",
+          }}
+        >
+          ⚠ SESSION ENDING SOON
+        </span>
+      )}
     </div>
   );
 }
@@ -3241,9 +4498,35 @@ function CountdownBanner({ ist }) {
 function PasteZone({ zoneId, activeZone, setActiveZone, children, style }) {
   const isActive = activeZone === zoneId;
   return (
-    <div onClick={() => setActiveZone(zoneId)} style={{ position: "relative", cursor: "pointer", ...style, outline: isActive ? `2px solid ${T.blue}60` : "2px solid transparent", borderRadius: 12, transition: "all 0.2s ease" }} className="glass-panel">
+    <div
+      onClick={() => setActiveZone(zoneId)}
+      style={{
+        position: "relative",
+        cursor: "pointer",
+        ...style,
+        outline: isActive ? `2px solid ${T.blue}60` : "2px solid transparent",
+        borderRadius: 12,
+        transition: "all 0.2s ease",
+      }}
+      className="glass-panel"
+    >
       {children}
-      <div style={{ position: "absolute", top: 8, right: 8, background: isActive ? T.blue + "25" : "rgba(0,0,0,0.6)", border: isActive ? `1px solid ${T.blue}50` : "none", borderRadius: 6, padding: "4px 10px", fontSize: 10, color: isActive ? T.blue : T.muted, fontWeight: 600, pointerEvents: "none", letterSpacing: 1 }}>
+      <div
+        style={{
+          position: "absolute",
+          top: 8,
+          right: 8,
+          background: isActive ? T.blue + "25" : "rgba(0,0,0,0.6)",
+          border: isActive ? `1px solid ${T.blue}50` : "none",
+          borderRadius: 6,
+          padding: "4px 10px",
+          fontSize: 10,
+          color: isActive ? T.blue : T.muted,
+          fontWeight: 600,
+          pointerEvents: "none",
+          letterSpacing: 1,
+        }}
+      >
         {isActive ? "CTRL+V READY" : "Click → Ctrl+V"}
       </div>
     </div>
@@ -3252,27 +4535,137 @@ function PasteZone({ zoneId, activeZone, setActiveZone, children, style }) {
 
 function HourlyHeatmap({ hourlyHeatmap }) {
   if (!hourlyHeatmap || !Object.keys(hourlyHeatmap).length) return null;
-  const hrs = [4, 5, 6, 7, 8, 9, 10, 11], nowUTC = new Date().getUTCHours();
-  const lbls = ['9:30', '10:30', '11:30', '12:30', '1:30', '2:30', '3:30', '4:30'];
+  const hrs = [4, 5, 6, 7, 8, 9, 10, 11],
+    nowUTC = new Date().getUTCHours();
+  const lbls = [
+    "9:30",
+    "10:30",
+    "11:30",
+    "12:30",
+    "1:30",
+    "2:30",
+    "3:30",
+    "4:30",
+  ];
   return (
-    <div style={{ padding: "16px 20px", background: "rgba(0,0,0,0.3)", border: `1px solid rgba(255,255,255,0.08)`, borderRadius: 10, marginBottom: 16 }} className="glass-panel heatmap">
-      <div style={{ color: T.muted, fontSize: 11, letterSpacing: 2, marginBottom: 12, fontWeight: 600 }}>45D HOURLY HEATMAP (IST) · TREND vs RANGE</div>
-      <div style={{ display: "flex", gap: 4, alignItems: "flex-end", overflowX: "auto" }} className="hourly-heatmap">
-        {hrs.map((utcH, i) => { 
-          const st = hourlyHeatmap[utcH], isCur = utcH === nowUTC; 
-          if (!st || !st.total) return <div key={utcH} style={{ flex: 1, minWidth: 40, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}><div style={{ height: 40, background: "rgba(255,255,255,0.03)", borderRadius: 4, width: "100%" }} /><div style={{ color: T.dim, fontSize: 10 }}>{lbls[i]}</div></div>; 
-          const tp = st.trend / st.total, barH = 40, tH = Math.round(tp * barH); 
-          const heatColor = tp > 0.7 ? T.green : tp > 0.5 ? "#88cc44" : tp > 0.35 ? "#ccaa22" : tp > 0.2 ? "#cc6622" : T.red; 
-          return (
-            <div key={utcH} title={`${lbls[i]} IST | Trend ${Math.round(tp * 100)}% | ${st.total} days`} style={{ flex: 1, minWidth: 40, display: "flex", flexDirection: "column", alignItems: "center", gap: 4, cursor: "default" }}>
-              <div style={{ height: barH, width: "100%", borderRadius: 4, overflow: "hidden", display: "flex", flexDirection: "column", position: "relative", border: isCur ? `2px solid ${T.gold}` : "none", boxSizing: "border-box" }}>
-                <div style={{ height: tH, background: heatColor + "90" }} />
-                <div style={{ height: barH - tH, background: "rgba(0,0,0,0.5)" }} />
+    <div
+      style={{
+        padding: "16px 20px",
+        background: "rgba(0,0,0,0.3)",
+        border: `1px solid rgba(255,255,255,0.08)`,
+        borderRadius: 10,
+        marginBottom: 16,
+      }}
+      className="glass-panel heatmap"
+    >
+      <div
+        style={{
+          color: T.muted,
+          fontSize: 11,
+          letterSpacing: 2,
+          marginBottom: 12,
+          fontWeight: 600,
+        }}
+      >
+        45D HOURLY HEATMAP (IST) · TREND vs RANGE
+      </div>
+      <div
+        style={{
+          display: "flex",
+          gap: 4,
+          alignItems: "flex-end",
+          overflowX: "auto",
+        }}
+        className="hourly-heatmap"
+      >
+        {hrs.map((utcH, i) => {
+          const st = hourlyHeatmap[utcH],
+            isCur = utcH === nowUTC;
+          if (!st || !st.total)
+            return (
+              <div
+                key={utcH}
+                style={{
+                  flex: 1,
+                  minWidth: 40,
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: 4,
+                }}
+              >
+                <div
+                  style={{
+                    height: 40,
+                    background: "rgba(255,255,255,0.03)",
+                    borderRadius: 4,
+                    width: "100%",
+                  }}
+                />
+                <div style={{ color: T.dim, fontSize: 10 }}>{lbls[i]}</div>
               </div>
-              <div style={{ color: isCur ? T.gold : T.muted, fontSize: 10, fontWeight: 600 }}>{lbls[i]}</div>
-              <div style={{ color: heatColor, fontSize: 10, fontFamily: T.mono }}>{Math.round(tp * 100)}%</div>
+            );
+          const tp = st.trend / st.total,
+            barH = 40,
+            tH = Math.round(tp * barH);
+          const heatColor =
+            tp > 0.7
+              ? T.green
+              : tp > 0.5
+                ? "#88cc44"
+                : tp > 0.35
+                  ? "#ccaa22"
+                  : tp > 0.2
+                    ? "#cc6622"
+                    : T.red;
+          return (
+            <div
+              key={utcH}
+              title={`${lbls[i]} IST | Trend ${Math.round(tp * 100)}% | ${st.total} days`}
+              style={{
+                flex: 1,
+                minWidth: 40,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 4,
+                cursor: "default",
+              }}
+            >
+              <div
+                style={{
+                  height: barH,
+                  width: "100%",
+                  borderRadius: 4,
+                  overflow: "hidden",
+                  display: "flex",
+                  flexDirection: "column",
+                  position: "relative",
+                  border: isCur ? `2px solid ${T.gold}` : "none",
+                  boxSizing: "border-box",
+                }}
+              >
+                <div style={{ height: tH, background: heatColor + "90" }} />
+                <div
+                  style={{ height: barH - tH, background: "rgba(0,0,0,0.5)" }}
+                />
+              </div>
+              <div
+                style={{
+                  color: isCur ? T.gold : T.muted,
+                  fontSize: 10,
+                  fontWeight: 600,
+                }}
+              >
+                {lbls[i]}
+              </div>
+              <div
+                style={{ color: heatColor, fontSize: 10, fontFamily: T.mono }}
+              >
+                {Math.round(tp * 100)}%
+              </div>
             </div>
-          ); 
+          );
         })}
       </div>
     </div>
@@ -3280,45 +4673,112 @@ function HourlyHeatmap({ hourlyHeatmap }) {
 }
 const AuthLogo = () => (
   <div style={{ textAlign: "center", marginBottom: 36 }}>
-    <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 8, marginBottom: 20 }}>
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        gap: 8,
+        marginBottom: 20,
+      }}
+    >
       {/* Logo Image - Left aligned */}
-      <img 
-        src="/logo.png" 
+      <img
+        src="/logo.png"
         alt="Logo"
         style={{
-          borderRadius: '50%',
-          overflow: 'hidden',
-          objectFit: 'cover',
-          width: '60px',
-          height: '60px',
-          border: 'none',
-          display: 'block'
+          borderRadius: "50%",
+          overflow: "hidden",
+          objectFit: "cover",
+          width: "60px",
+          height: "60px",
+          border: "none",
+          display: "block",
         }}
         onError={(e) => {
-          e.target.style.display = 'none';
+          e.target.style.display = "none";
         }}
       />
       {/* Header Text */}
       <div style={{ textAlign: "left" }}>
-        <div style={{ color: "#111827", fontSize: "clamp(16px, 3vw, 18px)", letterSpacing: 1.5, fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif", fontWeight: 700 }}>THE DEPARTMENT OF INSTITUTIONAL ARTILLERY</div>
-        <div style={{ color: "#1e40af", fontSize: "0.7rem", letterSpacing: 0.5, fontFamily: "Arial, 'Courier New', monospace", fontWeight: 700 }}>TRADERS' REGIMENT Territory.</div>
+        <div
+          style={{
+            color: "#111827",
+            fontSize: "clamp(16px, 3vw, 18px)",
+            letterSpacing: 1.5,
+            fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif",
+            fontWeight: 700,
+          }}
+        >
+          THE DEPARTMENT OF INSTITUTIONAL ARTILLERY
+        </div>
+        <div
+          style={{
+            color: "#1e40af",
+            fontSize: "0.7rem",
+            letterSpacing: 0.5,
+            fontFamily: "Arial, 'Courier New', monospace",
+            fontWeight: 700,
+          }}
+        >
+          TRADERS' REGIMENT Territory.
+        </div>
       </div>
     </div>
   </div>
 );
 
-function SplashScreen() { 
+function SplashScreen() {
   return (
-    <div style={{ minHeight: "100vh", background: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: T.font }}>
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "#FFFFFF",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontFamily: T.font,
+      }}
+    >
       <div style={{ textAlign: "center" }}>
         <AuthLogo />
-        <div style={{ display: "flex", justifyContent: "center", gap: 5, alignItems: "flex-end", height: 30, marginTop: 24 }}>
-          {[10, 18, 12, 24, 15, 20, 11].map((h, i) => <div key={i} style={{ width: 5, height: h, background: "#10B981", borderRadius: 3, animation: `bar 0.85s ${i * 0.1}s ease-in-out infinite alternate` }} />)}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            gap: 5,
+            alignItems: "flex-end",
+            height: 30,
+            marginTop: 24,
+          }}
+        >
+          {[10, 18, 12, 24, 15, 20, 11].map((h, i) => (
+            <div
+              key={i}
+              style={{
+                width: 5,
+                height: h,
+                background: "#10B981",
+                borderRadius: 3,
+                animation: `bar 0.85s ${i * 0.1}s ease-in-out infinite alternate`,
+              }}
+            />
+          ))}
         </div>
-        <div style={{ color: "#64748B", fontSize: 11, letterSpacing: 4, marginTop: 16, fontWeight: 600 }}>INITIALIZING...</div>
+        <div
+          style={{
+            color: "#64748B",
+            fontSize: 11,
+            letterSpacing: 4,
+            marginTop: 16,
+            fontWeight: 600,
+          }}
+        >
+          INITIALIZING...
+        </div>
       </div>
     </div>
-  ); 
+  );
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -3328,35 +4788,60 @@ function SplashScreen() {
 function Toast({ toasts, onDismiss }) {
   const [swipedToast, setSwipedToast] = useState(null);
   const [touchStart, setTouchStart] = useState(null);
-  
+
   const getToastColor = (type) => {
     const colors = {
-      success: { border: '#30D158', bg: 'rgba(48, 209, 88, 0.1)', text: '#30D158', icon: '✓' },
-      error: { border: '#FF453A', bg: 'rgba(255, 69, 58, 0.1)', text: '#FF453A', icon: '✕' },
-      warning: { border: '#FFD60A', bg: 'rgba(255, 214, 10, 0.1)', text: '#FFD60A', icon: '⚠' },
-      info: { border: '#0A84FF', bg: 'rgba(10, 132, 255, 0.1)', text: '#0A84FF', icon: 'ℹ' },
-      critical: { border: '#FF3B30', bg: 'rgba(255, 59, 48, 0.15)', text: '#FF3B30', icon: '🚨' },
+      success: {
+        border: "#30D158",
+        bg: "rgba(48, 209, 88, 0.1)",
+        text: "#30D158",
+        icon: "✓",
+      },
+      error: {
+        border: "#FF453A",
+        bg: "rgba(255, 69, 58, 0.1)",
+        text: "#FF453A",
+        icon: "✕",
+      },
+      warning: {
+        border: "#FFD60A",
+        bg: "rgba(255, 214, 10, 0.1)",
+        text: "#FFD60A",
+        icon: "⚠",
+      },
+      info: {
+        border: "#0A84FF",
+        bg: "rgba(10, 132, 255, 0.1)",
+        text: "#0A84FF",
+        icon: "ℹ",
+      },
+      critical: {
+        border: "#FF3B30",
+        bg: "rgba(255, 59, 48, 0.15)",
+        text: "#FF3B30",
+        icon: "🚨",
+      },
     };
     return colors[type] || colors.info;
   };
-  
+
   // RULE #181: Handle swipe-to-dismiss on touch devices
   const handleTouchStart = (e, toastId) => {
     setTouchStart({ x: e.touches[0].clientX, id: toastId });
   };
-  
+
   const handleTouchMove = (e, toastId) => {
     if (!touchStart || touchStart.id !== toastId) return;
-    
+
     const currentX = e.touches[0].clientX;
     const diffX = currentX - touchStart.x;
-    
+
     // Swipe right to dismiss (>50px threshold)
     if (diffX > 50) {
       setSwipedToast(toastId);
     }
   };
-  
+
   const handleTouchEnd = (toastId) => {
     if (swipedToast === toastId) {
       onDismiss(toastId);
@@ -3364,26 +4849,28 @@ function Toast({ toasts, onDismiss }) {
     }
     setTouchStart(null);
   };
-  
+
   const isMobile = window.innerWidth < 768;
-  
+
   return (
-    <div style={{
-      position: "fixed",
-      top: 20,
-      right: isMobile ? 12 : 20,
-      left: isMobile ? 12 : 'auto',
-      zIndex: 9999,
-      display: "flex",
-      flexDirection: "column",
-      gap: 12,
-      pointerEvents: 'none',
-      maxWidth: isMobile ? 'calc(100% - 24px)' : 420
-    }}>
+    <div
+      style={{
+        position: "fixed",
+        top: 20,
+        right: isMobile ? 12 : 20,
+        left: isMobile ? 12 : "auto",
+        zIndex: 9999,
+        display: "flex",
+        flexDirection: "column",
+        gap: 12,
+        pointerEvents: "none",
+        maxWidth: isMobile ? "calc(100% - 24px)" : 420,
+      }}
+    >
       {toasts.map((toast) => {
         const color = getToastColor(toast.type);
         const isBeingSwiped = swipedToast === toast.id;
-        
+
         return (
           <div
             key={toast.id}
@@ -3392,9 +4879,9 @@ function Toast({ toasts, onDismiss }) {
             onTouchEnd={() => handleTouchEnd(toast.id)}
             style={{
               background: color.bg,
-              border: color.border.startsWith('#') ? 
-                `1px solid ${color.border}30` : 
-                `1px solid rgba(10,132,255,0.3)`,
+              border: color.border.startsWith("#")
+                ? `1px solid ${color.border}30`
+                : `1px solid rgba(10,132,255,0.3)`,
               borderLeft: `4px solid ${color.border}`,
               borderRadius: 8,
               padding: "14px 16px ",
@@ -3408,70 +4895,76 @@ function Toast({ toasts, onDismiss }) {
               fontWeight: 600,
               animation: `slideInToast-gpu 0.3s ease-out`,
               boxShadow: `0 0 20px rgba(0,0,0,0.4)`,
-              pointerEvents: 'auto',
-              cursor: isMobile ? 'grab' : 'default',
-              userSelect: 'none',
-              transform: isBeingSwiped ? 'translateX(100%)' : 'translateX(0)',
+              pointerEvents: "auto",
+              cursor: isMobile ? "grab" : "default",
+              userSelect: "none",
+              transform: isBeingSwiped ? "translateX(100%)" : "translateX(0)",
               opacity: isBeingSwiped ? 0.5 : 1,
-              transition: isBeingSwiped ? 'none' : 'all 0.2s ease',
-              position: 'relative',
-              overflow: 'hidden',
-              minWidth: isMobile ? '100%' : 320,
-              maxWidth: isMobile ? '100%' : 400
+              transition: isBeingSwiped ? "none" : "all 0.2s ease",
+              position: "relative",
+              overflow: "hidden",
+              minWidth: isMobile ? "100%" : 320,
+              maxWidth: isMobile ? "100%" : 400,
             }}
           >
             {/* Progress bar for auto-dismiss */}
-            <div style={{
-              position: 'absolute',
-              bottom: 0,
-              left: 0,
-              height: '3px',
-              background: color.border,
-              width: `${((toast.time_remaining || toast.duration || 3000) / (toast.duration || 3000)) * 100}%`,
-              animation: `${toast.duration || 3000}ms linear backwards`,
-              borderRadius: '0 0 0 8px'
-            }} />
-            
-            <span style={{ fontSize: 18, fontWeight: 700, flexShrink: 0 }}>{color.icon}</span>
+            <div
+              style={{
+                position: "absolute",
+                bottom: 0,
+                left: 0,
+                height: "3px",
+                background: color.border,
+                width: `${((toast.time_remaining || toast.duration || 3000) / (toast.duration || 3000)) * 100}%`,
+                animation: `${toast.duration || 3000}ms linear backwards`,
+                borderRadius: "0 0 0 8px",
+              }}
+            />
+
+            <span style={{ fontSize: 18, fontWeight: 700, flexShrink: 0 }}>
+              {color.icon}
+            </span>
             <span style={{ flex: 1, lineHeight: 1.4 }}>{toast.message}</span>
-            
+
             {/* Close button */}
             <button
               onClick={() => onDismiss(toast.id)}
               style={{
-                background: 'transparent',
-                border: 'none',
+                background: "transparent",
+                border: "none",
                 color: color.text,
                 fontSize: 18,
-                cursor: 'pointer',
-                padding: '4px 8px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
+                cursor: "pointer",
+                padding: "4px 8px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
                 flexShrink: 0,
                 opacity: 0.6,
-                transition: 'opacity 0.2s',
-                marginLeft: '8px'
+                transition: "opacity 0.2s",
+                marginLeft: "8px",
               }}
-              onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
-              onMouseLeave={(e) => e.currentTarget.style.opacity = '0.6'}
+              onMouseEnter={(e) => (e.currentTarget.style.opacity = "1")}
+              onMouseLeave={(e) => (e.currentTarget.style.opacity = "0.6")}
             >
               ✕
             </button>
-            
+
             {/* Mobile swipe hint */}
             {isMobile && toasts.length > 1 && (
-              <div style={{
-                position: 'absolute',
-                right: 4,
-                top: '50%',
-                transform: 'translateY(-50%)',
-                width: 4,
-                height: 4,
-                borderRadius: '50%',
-                background: color.border,
-                opacity: 0.4
-              }} />
+              <div
+                style={{
+                  position: "absolute",
+                  right: 4,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  width: 4,
+                  height: 4,
+                  borderRadius: "50%",
+                  background: color.border,
+                  opacity: 0.4,
+                }}
+              />
             )}
           </div>
         );
@@ -3487,86 +4980,124 @@ function ThemePicker({ isOpen, onClose, onSelectTheme, currentTheme }) {
   if (!isOpen) return null;
 
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      background: 'rgba(0,0,0,0.6)',
-      backdropFilter: 'blur(8px)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 10000
-    }}>
-      <div style={{
-        background: T.card,
-        border: `1px solid ${T.border}`,
-        borderRadius: '16px',
-        backdropFilter: 'blur(20px)',
-        padding: '24px',
-        minWidth: '380px',
-        fontFamily: T.font
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-          <h2 style={{ color: T.text, margin: 0, fontSize: '18px', fontWeight: 600 }}>Theme Picker</h2>
+    <div
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: "rgba(0,0,0,0.6)",
+        backdropFilter: "blur(8px)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 10000,
+      }}
+    >
+      <div
+        style={{
+          background: T.card,
+          border: `1px solid ${T.border}`,
+          borderRadius: "16px",
+          backdropFilter: "blur(20px)",
+          padding: "24px",
+          minWidth: "380px",
+          fontFamily: T.font,
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: "20px",
+          }}
+        >
+          <h2
+            style={{
+              color: T.text,
+              margin: 0,
+              fontSize: "18px",
+              fontWeight: 600,
+            }}
+          >
+            Theme Picker
+          </h2>
           <button
             onClick={onClose}
             style={{
-              background: 'none',
-              border: 'none',
+              background: "none",
+              border: "none",
               color: T.muted,
-              fontSize: '24px',
-              cursor: 'pointer',
-              padding: 0
+              fontSize: "24px",
+              cursor: "pointer",
+              padding: 0,
             }}
           >
             ✕
           </button>
         </div>
-        
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(2, 1fr)",
+            gap: "12px",
+          }}
+        >
           {Object.entries(ACCENT_COLORS).map(([key, color]) => (
             <button
               key={key}
               onClick={() => onSelectTheme(key)}
               style={{
-                background: currentTheme === key ? color.light : 'rgba(255,255,255,0.05)',
+                background:
+                  currentTheme === key ? color.light : "rgba(255,255,255,0.05)",
                 border: `2px solid ${currentTheme === key ? color.primary : T.border}`,
-                borderRadius: '12px',
-                padding: '16px',
-                cursor: 'pointer',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '8px',
-                transition: 'all 0.3s ease',
-                boxShadow: currentTheme === key ? `0 0 12px ${color.glow}` : 'none',
-                fontFamily: T.font
+                borderRadius: "12px",
+                padding: "16px",
+                cursor: "pointer",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: "8px",
+                transition: "all 0.3s ease",
+                boxShadow:
+                  currentTheme === key ? `0 0 12px ${color.glow}` : "none",
+                fontFamily: T.font,
               }}
               onMouseEnter={(e) => {
-                e.target.style.transform = 'scale(1.05)';
+                e.target.style.transform = "scale(1.05)";
                 e.target.style.boxShadow = `0 0 12px ${color.glow}`;
               }}
               onMouseLeave={(e) => {
-                e.target.style.transform = currentTheme === key ? 'scale(1)' : 'scale(1)';
-                e.target.style.boxShadow = currentTheme === key ? `0 0 12px ${color.glow}` : 'none';
+                e.target.style.transform =
+                  currentTheme === key ? "scale(1)" : "scale(1)";
+                e.target.style.boxShadow =
+                  currentTheme === key ? `0 0 12px ${color.glow}` : "none";
               }}
             >
-              <div style={{
-                width: '28px',
-                height: '28px',
-                borderRadius: '50%',
-                background: color.primary,
-                boxShadow: `0 0 12px ${color.glow}`,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
-                {currentTheme === key && <span style={{ color: T.bg, fontSize: '16px' }}>✓</span>}
+              <div
+                style={{
+                  width: "28px",
+                  height: "28px",
+                  borderRadius: "50%",
+                  background: color.primary,
+                  boxShadow: `0 0 12px ${color.glow}`,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                {currentTheme === key && (
+                  <span style={{ color: T.bg, fontSize: "16px" }}>✓</span>
+                )}
               </div>
-              <span style={{ color: T.text, fontSize: '13px', fontWeight: 500 }}>{color.name}</span>
+              <span
+                style={{ color: T.text, fontSize: "13px", fontWeight: 500 }}
+              >
+                {color.name}
+              </span>
             </button>
           ))}
         </div>
@@ -3574,28 +5105,34 @@ function ThemePicker({ isOpen, onClose, onSelectTheme, currentTheme }) {
         <button
           onClick={onClose}
           style={{
-            width: '100%',
-            marginTop: '16px',
-            padding: '12px',
+            width: "100%",
+            marginTop: "16px",
+            padding: "12px",
             background: `${ACCENT_COLORS[currentTheme]?.primary || ACCENT_COLORS.BLUE.primary}22`,
             border: `1px solid ${ACCENT_COLORS[currentTheme]?.primary || ACCENT_COLORS.BLUE.primary}`,
-            borderRadius: '8px',
-            color: ACCENT_COLORS[currentTheme]?.primary || ACCENT_COLORS.BLUE.primary,
-            fontSize: '13px',
+            borderRadius: "8px",
+            color:
+              ACCENT_COLORS[currentTheme]?.primary ||
+              ACCENT_COLORS.BLUE.primary,
+            fontSize: "13px",
             fontWeight: 600,
-            cursor: 'pointer',
+            cursor: "pointer",
             fontFamily: T.font,
-            transition: 'all 0.3s ease'
+            transition: "all 0.3s ease",
           }}
           onMouseEnter={(e) => {
-            const accentHex = ACCENT_COLORS[currentTheme]?.primary || ACCENT_COLORS.BLUE.primary;
+            const accentHex =
+              ACCENT_COLORS[currentTheme]?.primary ||
+              ACCENT_COLORS.BLUE.primary;
             e.target.style.background = `${accentHex}33`;
             e.target.style.boxShadow = `0 0 8px ${ACCENT_COLORS[currentTheme]?.glow || ACCENT_COLORS.BLUE.glow}`;
           }}
           onMouseLeave={(e) => {
-            const accentHex = ACCENT_COLORS[currentTheme]?.primary || ACCENT_COLORS.BLUE.primary;
+            const accentHex =
+              ACCENT_COLORS[currentTheme]?.primary ||
+              ACCENT_COLORS.BLUE.primary;
             e.target.style.background = `${accentHex}22`;
-            e.target.style.boxShadow = 'none';
+            e.target.style.boxShadow = "none";
           }}
         >
           Done
@@ -3608,133 +5145,298 @@ function ThemePicker({ isOpen, onClose, onSelectTheme, currentTheme }) {
 // ═══════════════════════════════════════════════════════════════════
 //  LOGIN SCREEN — WITH PASSWORD RESET
 // ═══════════════════════════════════════════════════════════════════
-function LoginScreen({ onLogin, onSignup, onAdmin, onForgotPassword, onGoogleAuth }) {
-  const [email, setEmail] = useState(''); 
-  const [pass, setPass] = useState(''); 
-  const [err, setErr] = useState(''); 
+function LoginScreen({
+  onLogin,
+  onSignup,
+  onAdmin,
+  onForgotPassword,
+  onGoogleAuth,
+}) {
+  const [email, setEmail] = useState("");
+  const [pass, setPass] = useState("");
+  const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
   const [resetMode, setResetMode] = useState(false);
-  const [resetMsg, setResetMsg] = useState('');
+  const [resetMsg, setResetMsg] = useState("");
   const [showPwd, setShowPwd] = useState(false);
   const [stayLoggedIn, setStayLoggedIn] = useState(false);
 
   const handleForgotPassword = async () => {
     const cleanEmail = email.trim().toLowerCase();
-    if (!cleanEmail) { 
-      setErr('Please enter your email address.'); 
-      return; 
+    if (!cleanEmail) {
+      setErr("Please enter your email address.");
+      return;
     }
-    
-    setLoading(true); 
-    setErr(''); 
-    setResetMsg('');
-    
+
+    setLoading(true);
+    setErr("");
+    setResetMsg("");
+
     try {
       // Wait for Firebase to send the password reset email
       await sendPasswordResetEmail(firebaseAuth, cleanEmail);
       // Only show success message after email is sent
-      setResetMsg('✓ Password reset email sent! Check your inbox and spam folder.');
+      setResetMsg(
+        "✓ Password reset email sent! Check your inbox and spam folder.",
+      );
       // Clear error state
-      setErr('');
+      setErr("");
     } catch (error) {
       // Handle specific Firebase error codes
       const errorCode = error.code;
-      let errorMessage = 'Failed to send reset email.';
-      
-      if (errorCode === 'auth/user-not-found') {
-        errorMessage = 'No account found with this email address.';
-      } else if (errorCode === 'auth/invalid-email') {
-        errorMessage = 'Please enter a valid email address.';
-      } else if (errorCode === 'auth/too-many-requests') {
-        errorMessage = 'Too many attempts. Please try again later.';
-      } else if (errorCode === 'auth/user-disabled') {
-        errorMessage = 'This account has been disabled.';
+      let errorMessage = "Failed to send reset email.";
+
+      if (errorCode === "auth/user-not-found") {
+        errorMessage = "No account found with this email address.";
+      } else if (errorCode === "auth/invalid-email") {
+        errorMessage = "Please enter a valid email address.";
+      } else if (errorCode === "auth/too-many-requests") {
+        errorMessage = "Too many attempts. Please try again later.";
+      } else if (errorCode === "auth/user-disabled") {
+        errorMessage = "This account has been disabled.";
       } else {
-        errorMessage = 'Error: ' + (error.message || 'Failed to send reset email.');
+        errorMessage =
+          "Error: " + (error.message || "Failed to send reset email.");
       }
-      
+
       setErr(errorMessage);
-      setResetMsg('');
+      setResetMsg("");
     } finally {
       setLoading(false);
     }
   };
 
   const submit = async () => {
-    if (!email || !pass) { setErr('Email and password required.'); return; }
-    setErr(''); setLoading(true);
-    try { await onLogin(email, pass, stayLoggedIn); } catch (e) { setErr(e.message); }
-    finally { setLoading(false); }
+    if (!email || !pass) {
+      setErr("Email and password required.");
+      return;
+    }
+    setErr("");
+    setLoading(true);
+    try {
+      await onLogin(email, pass, stayLoggedIn);
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: "#FFFFFF", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: T.font, padding: 20, gap: 40 }}>
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "#FFFFFF",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        fontFamily: T.font,
+        padding: 20,
+        gap: 40,
+      }}
+    >
       <AuthLogo />
       <div style={authCard} className="glass-panel">
+        {resetMsg && (
+          <div
+            style={{
+              color: T.green,
+              fontSize: 12,
+              marginBottom: 16,
+              padding: "12px 14px",
+              background: "rgba(48,209,88,0.1)",
+              border: `1px solid rgba(48,209,88,0.3)`,
+              borderRadius: 8,
+              fontWeight: 500,
+              lineHeight: 1.5,
+            }}
+          >
+            {resetMsg}
+          </div>
+        )}
+        {err && (
+          <div
+            style={{
+              color: T.red,
+              fontSize: 12,
+              marginBottom: 16,
+              padding: "12px 14px",
+              background: "rgba(255,69,58,0.1)",
+              border: `1px solid rgba(255,69,58,0.3)`,
+              borderRadius: 8,
+              fontWeight: 500,
+            }}
+          >
+            {err}
+          </div>
+        )}
 
-        {resetMsg && <div style={{ color: T.green, fontSize: 12, marginBottom: 16, padding: "12px 14px", background: "rgba(48,209,88,0.1)", border: `1px solid rgba(48,209,88,0.3)`, borderRadius: 8, fontWeight: 500, lineHeight: 1.5 }}>{resetMsg}</div>}
-        {err && <div style={{ color: T.red, fontSize: 12, marginBottom: 16, padding: "12px 14px", background: "rgba(255,69,58,0.1)", border: `1px solid rgba(255,69,58,0.3)`, borderRadius: 8, fontWeight: 500 }}>{err}</div>}
-
-        {resetMode && <div style={{ color: "#111827", fontSize: 16, letterSpacing: "-0.02em", textAlign: "center", marginBottom: 12, fontWeight: 700, lineHeight: 1.3 }}>ACCOUNT RECOVERY</div>}
+        {resetMode && (
+          <div
+            style={{
+              color: "#111827",
+              fontSize: 16,
+              letterSpacing: "-0.02em",
+              textAlign: "center",
+              marginBottom: 12,
+              fontWeight: 700,
+              lineHeight: 1.3,
+            }}
+          >
+            ACCOUNT RECOVERY
+          </div>
+        )}
 
         <div>
           <label style={lbl}>EMAIL</label>
-          <div style={{ position: 'relative', width: '100%' }}>
-            <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 14, color: '#64748B', pointerEvents: 'none' }}>📡</span>
-            <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="your@email.com" autoComplete="email" style={{...authInp, paddingLeft: 40, fontFamily: T.font}} className="input-glass" />
+          <div style={{ position: "relative", width: "100%" }}>
+            <span
+              style={{
+                position: "absolute",
+                left: 12,
+                top: "50%",
+                transform: "translateY(-50%)",
+                fontSize: 14,
+                color: "#64748B",
+                pointerEvents: "none",
+              }}
+            >
+              📡
+            </span>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="your@email.com"
+              autoComplete="email"
+              style={{ ...authInp, paddingLeft: 40, fontFamily: T.font }}
+              className="input-glass"
+            />
           </div>
         </div>
 
         {!resetMode ? (
           <>
             <div>
-              <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 6}}>
-                <label style={{...lbl, marginBottom: 0}}>PASSWORD</label>
-                <span onClick={() => {setResetMode(true); setErr(''); setResetMsg('');}} style={{...lbl, color: T.blue, cursor: 'pointer', textTransform: 'none', marginBottom: 0}}>Forgot Password?</span>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "flex-end",
+                  marginBottom: 6,
+                }}
+              >
+                <label style={{ ...lbl, marginBottom: 0 }}>PASSWORD</label>
+                <span
+                  onClick={() => {
+                    setResetMode(true);
+                    setErr("");
+                    setResetMsg("");
+                  }}
+                  style={{
+                    ...lbl,
+                    color: T.blue,
+                    cursor: "pointer",
+                    textTransform: "none",
+                    marginBottom: 0,
+                  }}
+                >
+                  Forgot Password?
+                </span>
               </div>
-              <div style={{ position: 'relative', width: '100%', marginBottom: 15 }}>
-                <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 14, color: '#64748B', pointerEvents: 'none' }}>🔑</span>
-                <input 
-                  type={showPwd ? "text" : "password"} 
-                  value={pass} 
-                  onChange={(e) => setPass(e.target.value)} 
-                  style={{ ...authInp, width: '100%', marginBottom: 0, paddingLeft: 40, fontFamily: T.mono, letterSpacing: 4 }} 
+              <div
+                style={{
+                  position: "relative",
+                  width: "100%",
+                  marginBottom: 15,
+                }}
+              >
+                <span
+                  style={{
+                    position: "absolute",
+                    left: 12,
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    fontSize: 14,
+                    color: "#64748B",
+                    pointerEvents: "none",
+                  }}
+                >
+                  🔑
+                </span>
+                <input
+                  type={showPwd ? "text" : "password"}
+                  value={pass}
+                  onChange={(e) => setPass(e.target.value)}
+                  style={{
+                    ...authInp,
+                    width: "100%",
+                    marginBottom: 0,
+                    paddingLeft: 40,
+                    fontFamily: T.mono,
+                    letterSpacing: 4,
+                  }}
                   placeholder="••••••••••••"
-                  onKeyDown={e => e.key === 'Enter' && submit()}
+                  onKeyDown={(e) => e.key === "Enter" && submit()}
                   className="input-glass"
                 />
-                <button 
+                <button
                   type="button"
                   onClick={() => setShowPwd(!showPwd)}
-                  style={{ 
-                    position: 'absolute', 
-                    right: '10px', 
-                    top: '50%', 
-                    transform: 'translateY(-50%)', 
-                    background: 'none', 
-                    border: 'none', 
-                    color: '#888', 
-                    cursor: 'pointer',
-                    fontSize: '12px'
+                  style={{
+                    position: "absolute",
+                    right: "10px",
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    background: "none",
+                    border: "none",
+                    color: "#888",
+                    cursor: "pointer",
+                    fontSize: "12px",
                   }}
                 >
                   {showPwd ? "HIDE" : "SHOW"}
                 </button>
               </div>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
-              <input 
-                type="checkbox" 
-                id="stayLoggedIn" 
-                checked={stayLoggedIn} 
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                marginBottom: 16,
+              }}
+            >
+              <input
+                type="checkbox"
+                id="stayLoggedIn"
+                checked={stayLoggedIn}
                 onChange={(e) => setStayLoggedIn(e.target.checked)}
                 style={{ cursor: "pointer" }}
               />
-              <label htmlFor="stayLoggedIn" style={{ fontSize: 12, color: T.muted, cursor: "pointer", fontFamily: T.font }}>Stay Logged In</label>
+              <label
+                htmlFor="stayLoggedIn"
+                style={{
+                  fontSize: 12,
+                  color: T.muted,
+                  cursor: "pointer",
+                  fontFamily: T.font,
+                }}
+              >
+                Stay Logged In
+              </label>
             </div>
-            <button onClick={submit} disabled={loading} style={authBtn(T.green, loading)} className="btn-glass">{loading ? "⟳ AUTHENTICATING..." : "⚡ INITIALIZE DEPLOYMENT"}</button>
-            
-            <GoogleSignInButton 
+            <button
+              onClick={submit}
+              disabled={loading}
+              style={authBtn(T.green, loading)}
+              className="btn-glass"
+            >
+              {loading ? "⟳ AUTHENTICATING..." : "⚡ INITIALIZE DEPLOYMENT"}
+            </button>
+
+            <GoogleSignInButton
               onSuccess={(user) => {
                 setEmail(user.email);
                 onLogin(user.email, user.uid, true);
@@ -3743,18 +5445,70 @@ function LoginScreen({ onLogin, onSignup, onAdmin, onForgotPassword, onGoogleAut
               buttonText="CONTINUE WITH GOOGLE"
               isLoading={loading}
             />
-            
-            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 24 }}>
-              <button onClick={onSignup} style={{ background: "transparent", border: "none", cursor: "pointer", color: T.muted, fontSize: 11, fontFamily: T.font, letterSpacing: 1, fontWeight: 600 }}>NEW RECRUIT → APPLY</button>
-              <button onClick={onAdmin} style={{ background: "transparent", border: "none", cursor: "pointer", color: T.muted, fontSize: 11, fontFamily: T.font, letterSpacing: 1, fontWeight: 600 }}>⚙ ADMIN</button>
+
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                marginTop: 24,
+              }}
+            >
+              <button
+                onClick={onSignup}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  color: T.muted,
+                  fontSize: 11,
+                  fontFamily: T.font,
+                  letterSpacing: 1,
+                  fontWeight: 600,
+                }}
+              >
+                NEW RECRUIT → APPLY
+              </button>
+              <button
+                onClick={onAdmin}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  color: T.muted,
+                  fontSize: 11,
+                  fontFamily: T.font,
+                  letterSpacing: 1,
+                  fontWeight: 600,
+                }}
+              >
+                ⚙ ADMIN
+              </button>
             </div>
           </>
         ) : (
           <>
-            <button onClick={handleForgotPassword} disabled={loading || !email} style={authBtn(T.blue, loading || !email)} className="btn-glass">
+            <button
+              onClick={handleForgotPassword}
+              disabled={loading || !email}
+              style={authBtn(T.blue, loading || !email)}
+              className="btn-glass"
+            >
               {loading ? "⟳ TRANSMITTING..." : "✉ SEND RECOVERY LINK"}
             </button>
-            <button onClick={() => {setResetMode(false); setErr(''); setResetMsg('');}} style={{ ...authBtn(T.muted, false), background: "transparent", border: "none", marginTop: 12 }} className="btn-glass">
+            <button
+              onClick={() => {
+                setResetMode(false);
+                setErr("");
+                setResetMsg("");
+              }}
+              style={{
+                ...authBtn(T.muted, false),
+                background: "transparent",
+                border: "none",
+                marginTop: 12,
+              }}
+              className="btn-glass"
+            >
               ← BACK TO LOGIN
             </button>
           </>
@@ -3774,80 +5528,113 @@ function ImageCropper({ file, onCrop, onCancel }) {
 
   const handleCrop = () => {
     const reader = new FileReader();
-    
+
     reader.onload = (e) => {
       const img = new Image();
       img.onload = () => {
         const canvas = canvasRef.current;
-        const ctx = canvas.getContext('2d');
+        const ctx = canvas.getContext("2d");
         canvas.width = 200;
         canvas.height = 200;
-        
+
         ctx.translate(100, 100);
         ctx.rotate((rotation * Math.PI) / 180);
         ctx.scale(scale, scale);
         ctx.translate(-100, -100);
         ctx.drawImage(img, 0, 0, 200, 200);
-        
-        canvas.toBlob((blob) => {
-          onCrop(blob);
-        }, 'image/jpeg', 0.9);
+
+        canvas.toBlob(
+          (blob) => {
+            onCrop(blob);
+          },
+          "image/jpeg",
+          0.9,
+        );
       };
       img.src = e.target.result;
     };
-    
+
     reader.readAsDataURL(file);
   };
 
   return (
-    <div style={{ 
-      background: 'rgba(0,0,0,0.8)', 
-      padding: 24, 
-      borderRadius: 12, 
-      marginBottom: 16,
-      border: `1px solid ${T.blue}30`
-    }}>
-      <div style={{ color: T.blue, fontSize: 12, fontWeight: 700, marginBottom: 16 }}>📷 CROP PROFILE PICTURE</div>
-      
+    <div
+      style={{
+        background: "rgba(0,0,0,0.8)",
+        padding: 24,
+        borderRadius: 12,
+        marginBottom: 16,
+        border: `1px solid ${T.blue}30`,
+      }}
+    >
+      <div
+        style={{
+          color: T.blue,
+          fontSize: 12,
+          fontWeight: 700,
+          marginBottom: 16,
+        }}
+      >
+        📷 CROP PROFILE PICTURE
+      </div>
+
       <div style={{ marginBottom: 16 }}>
-        <label style={{ color: T.muted, fontSize: 11, display: 'block', marginBottom: 8 }}>Zoom</label>
-        <input 
-          type="range" 
-          min="1" 
-          max="2" 
-          step="0.1" 
+        <label
+          style={{
+            color: T.muted,
+            fontSize: 11,
+            display: "block",
+            marginBottom: 8,
+          }}
+        >
+          Zoom
+        </label>
+        <input
+          type="range"
+          min="1"
+          max="2"
+          step="0.1"
           value={scale}
           onChange={(e) => setScale(parseFloat(e.target.value))}
-          style={{ width: '100%' }}
+          style={{ width: "100%" }}
         />
       </div>
-      
+
       <div style={{ marginBottom: 16 }}>
-        <label style={{ color: T.muted, fontSize: 11, display: 'block', marginBottom: 8 }}>Rotate (degrees)</label>
-        <input 
-          type="range" 
-          min="0" 
-          max="360" 
-          step="15" 
+        <label
+          style={{
+            color: T.muted,
+            fontSize: 11,
+            display: "block",
+            marginBottom: 8,
+          }}
+        >
+          Rotate (degrees)
+        </label>
+        <input
+          type="range"
+          min="0"
+          max="360"
+          step="15"
           value={rotation}
           onChange={(e) => setRotation(parseInt(e.target.value))}
-          style={{ width: '100%' }}
+          style={{ width: "100%" }}
         />
       </div>
-      
-      <canvas ref={canvasRef} style={{ display: 'none' }} />
-      
-      <div style={{ display: 'flex', gap: 8 }}>
-        <button 
+
+      <canvas ref={canvasRef} style={{ display: "none" }} />
+
+      <div style={{ display: "flex", gap: 8 }}>
+        <button
           onClick={handleCrop}
-          style={{...authBtn(T.green, false), flex: 1}}
+          style={{ ...authBtn(T.green, false), flex: 1 }}
           className="btn-glass"
         >
           ✓ CROP & USE
         </button>
-        <button 
+        <button
           onClick={onCancel}
-          style={{...authBtn(T.red, false), flex: 1}}
+          style={{ ...authBtn(T.red, false), flex: 1 }}
           className="btn-glass"
         >
           ✕ CANCEL
@@ -3862,7 +5649,7 @@ function ImageCropper({ file, onCrop, onCancel }) {
 // ═══════════════════════════════════════════════════════════════════
 function IdentityVerificationComponent({ uid, onSuccess, onError, showToast }) {
   const [uploading, setUploading] = useState(false);
-  const [docType, setDocType] = useState('aadhar');
+  const [docType, setDocType] = useState("aadhar");
   const [uploadedDocs, setUploadedDocs] = useState({});
   const fileInputRef = useRef(null);
 
@@ -3873,20 +5660,28 @@ function IdentityVerificationComponent({ uid, onSuccess, onError, showToast }) {
     setUploading(true);
     try {
       const result = await uploadIdentityDoc(file, uid, docType);
-      
-      setUploadedDocs(prev => ({
+
+      setUploadedDocs((prev) => ({
         ...prev,
-        [docType]: result
+        [docType]: result,
       }));
-      
-      showToast && showToast(`${docType.toUpperCase()} ingested into the archive. Scanning complete.`, 'success');
+
+      showToast &&
+        showToast(
+          `${docType.toUpperCase()} ingested into the archive. Scanning complete.`,
+          "success",
+        );
       onSuccess && onSuccess(result);
-      
+
       if (fileInputRef.current) {
-        fileInputRef.current.value = '';
+        fileInputRef.current.value = "";
       }
     } catch (error) {
-      showToast && showToast('Data transmission halted. The cloud servers are meditating.', 'error');
+      showToast &&
+        showToast(
+          "Data transmission halted. The cloud servers are meditating.",
+          "error",
+        );
       onError && onError(error);
     } finally {
       setUploading(false);
@@ -3894,27 +5689,38 @@ function IdentityVerificationComponent({ uid, onSuccess, onError, showToast }) {
   };
 
   return (
-    <div style={{
-      background: 'rgba(52,199,89,0.1)',
-      border: `1px solid ${T.green}50`,
-      padding: 16,
-      borderRadius: 10,
-      marginBottom: 16
-    }}>
-      <div style={{ color: T.green, fontSize: 12, fontWeight: 700, marginBottom: 12 }}>✓ IDENTITY PROOF (RULE #24)</div>
-      
+    <div
+      style={{
+        background: "rgba(52,199,89,0.1)",
+        border: `1px solid ${T.green}50`,
+        padding: 16,
+        borderRadius: 10,
+        marginBottom: 16,
+      }}
+    >
+      <div
+        style={{
+          color: T.green,
+          fontSize: 12,
+          fontWeight: 700,
+          marginBottom: 12,
+        }}
+      >
+        ✓ IDENTITY PROOF (RULE #24)
+      </div>
+
       <div style={{ marginBottom: 12 }}>
-        <label style={{...lbl, marginBottom: 8}}>Document Type</label>
-        <select 
+        <label style={{ ...lbl, marginBottom: 8 }}>Document Type</label>
+        <select
           value={docType}
           onChange={(e) => setDocType(e.target.value)}
           disabled={uploading}
           style={{
             ...authInp,
-            width: '100%',
-            background: 'rgba(0,0,0,0.4)',
+            width: "100%",
+            background: "rgba(0,0,0,0.4)",
             color: T.blue,
-            padding: '8px 12px'
+            padding: "8px 12px",
           }}
         >
           <option value="aadhar">Aadhar Card</option>
@@ -3923,30 +5729,48 @@ function IdentityVerificationComponent({ uid, onSuccess, onError, showToast }) {
           <option value="pan">PAN Card</option>
         </select>
       </div>
-      
+
       <input
         ref={fileInputRef}
         type="file"
         accept=".jpg,.jpeg,.pdf"
         onChange={handleFileSelect}
         disabled={uploading}
-        style={{ display: 'none' }}
+        style={{ display: "none" }}
       />
-      
+
       <button
         onClick={() => fileInputRef.current?.click()}
         disabled={uploading}
-        style={{...authBtn(T.green, uploading), width: '100%'}}
+        style={{ ...authBtn(T.green, uploading), width: "100%" }}
         className="btn-glass"
       >
-        {uploading ? '⏳ UPLOADING...' : '📄 SELECT & UPLOAD'}
+        {uploading ? "⏳ UPLOADING..." : "📄 SELECT & UPLOAD"}
       </button>
-      
+
       {Object.entries(uploadedDocs).length > 0 && (
-        <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${T.green}30` }}>
-          <div style={{ color: T.green, fontSize: 11, fontWeight: 600, marginBottom: 8 }}>Uploaded Documents:</div>
+        <div
+          style={{
+            marginTop: 12,
+            paddingTop: 12,
+            borderTop: `1px solid ${T.green}30`,
+          }}
+        >
+          <div
+            style={{
+              color: T.green,
+              fontSize: 11,
+              fontWeight: 600,
+              marginBottom: 8,
+            }}
+          >
+            Uploaded Documents:
+          </div>
           {Object.entries(uploadedDocs).map(([type, doc]) => (
-            <div key={type} style={{ fontSize: 11, color: T.muted, marginBottom: 4 }}>
+            <div
+              key={type}
+              style={{ fontSize: 11, color: T.muted, marginBottom: 4 }}
+            >
               • {type.toUpperCase()}: {doc.fileName}
             </div>
           ))}
@@ -3959,21 +5783,26 @@ function IdentityVerificationComponent({ uid, onSuccess, onError, showToast }) {
 // ═══════════════════════════════════════════════════════════════════
 // COMPONENT: Google Sign-In Button (RULE #23 - One-Tap Google Login)
 // ═══════════════════════════════════════════════════════════════════
-function GoogleSignInButton({ onSuccess, onError, buttonText = 'Continue with Google', isLoading = false }) {
+function GoogleSignInButton({
+  onSuccess,
+  onError,
+  buttonText = "Continue with Google",
+  isLoading = false,
+}) {
   const handleGoogleSignIn = async () => {
     try {
       const result = await signInWithPopup(firebaseAuth, googleProvider);
       const user = result.user;
-      
+
       // RULE #23: Gmail-only enforcement
-      if (!user.email || !user.email.toLowerCase().endsWith('@gmail.com')) {
-        throw new Error('Only @gmail.com accounts are allowed');
+      if (!user.email || !user.email.toLowerCase().endsWith("@gmail.com")) {
+        throw new Error("Only @gmail.com accounts are allowed");
       }
-      
+
       onSuccess && onSuccess(user);
     } catch (error) {
-      const errorMsg = error.message.includes('Only @gmail.com') 
-        ? 'Only @gmail.com accounts are allowed'
+      const errorMsg = error.message.includes("Only @gmail.com")
+        ? "Only @gmail.com accounts are allowed"
         : error.message;
       onError && onError(errorMsg);
     }
@@ -3985,17 +5814,17 @@ function GoogleSignInButton({ onSuccess, onError, buttonText = 'Continue with Go
       disabled={isLoading}
       style={{
         ...authBtn(T.blue, isLoading),
-        width: '100%',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
+        width: "100%",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
         gap: 8,
         fontSize: 13,
-        fontWeight: 600
+        fontWeight: 600,
       }}
       className="btn-glass"
     >
-      {isLoading ? '⏳ CONNECTING...' : `🔵 ${buttonText}`}
+      {isLoading ? "⏳ CONNECTING..." : `🔵 ${buttonText}`}
     </button>
   );
 }
@@ -4004,16 +5833,18 @@ function GoogleSignInButton({ onSuccess, onError, buttonText = 'Continue with Go
 //  OTP SCREEN — "UNHACKABLE" EDITION (RATE LIMITS + SANITIZATION)
 // ═══════════════════════════════════════════════════════════════════
 function OTPScreen({ profile, onVerified, onLogout, showToast }) {
-  const [userEmailCode, setUserEmailCode] = useState('');
+  const [userEmailCode, setUserEmailCode] = useState("");
   const [step, setStep] = useState(1);
-  const [, setErr] = useState('');
+  const [, setErr] = useState("");
   const [loading, setLoading] = useState(false);
-  const [msg, setMsg] = useState('');
+  const [msg, setMsg] = useState("");
   const otpInputRef = useRef(null);
 
-  const EMAILJS_SERVICE_ID = import.meta.env.VITE_EMAILJS_SERVICE_ID || 'service_xxx';
-  const EMAILJS_TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_ID || 'template_xxx';
-  const EMAILJS_USER_ID = import.meta.env.VITE_EMAILJS_PUBLIC_KEY || 'user_xxx';
+  const EMAILJS_SERVICE_ID =
+    import.meta.env.VITE_EMAILJS_SERVICE_ID || "service_xxx";
+  const EMAILJS_TEMPLATE_ID =
+    import.meta.env.VITE_EMAILJS_TEMPLATE_ID || "template_xxx";
+  const EMAILJS_USER_ID = import.meta.env.VITE_EMAILJS_PUBLIC_KEY || "user_xxx";
 
   const sendOTPs = async () => {
     setLoading(true);
@@ -4025,32 +5856,38 @@ function OTPScreen({ profile, onVerified, onLogout, showToast }) {
       const userEmail = profile.email; // Use actual user email from profile
 
       await emailjs.send(
-        import.meta.env.VITE_EMAILJS_SERVICE_ID, 
-        import.meta.env.VITE_EMAILJS_TEMPLATE_ID, 
+        import.meta.env.VITE_EMAILJS_SERVICE_ID,
+        import.meta.env.VITE_EMAILJS_TEMPLATE_ID,
         {
-          user_email: userEmail,    // SEND TO ACTUAL USER EMAIL
-          otp_code: emailCode,       // MATCHES YOUR HTML {{otp_code}}
-          to_email: userEmail        // FOR THE DASHBOARD SETTING
-        }, 
-        import.meta.env.VITE_EMAILJS_PUBLIC_KEY
+          user_email: userEmail, // SEND TO ACTUAL USER EMAIL
+          otp_code: emailCode, // MATCHES YOUR HTML {{otp_code}}
+          to_email: userEmail, // FOR THE DASHBOARD SETTING
+        },
+        import.meta.env.VITE_EMAILJS_PUBLIC_KEY,
       );
 
       // Save OTP to Firebase with user's email for verification
       try {
-        await dbW(`otps/${profile.uid}`, {
-          emailCode,
-          email: userEmail,  // Store the user's email for verification
-          createdAt: new Date().toISOString()
-        }, profile.token);
+        await dbW(
+          `otps/${profile.uid}`,
+          {
+            emailCode,
+            email: userEmail, // Store the user's email for verification
+            createdAt: new Date().toISOString(),
+          },
+          profile.token,
+        );
       } catch (dbErr) {
         console.warn("Database save failed, but email was sent:", dbErr);
       }
 
       setStep(2);
-      setMsg('✓ Check your inbox!');
+      setMsg("✓ Check your inbox!");
     } catch (error) {
-      console.error('OTP Send Error:', error);
-      setMsg('✗ Error: ' + (error?.text || error?.message || 'Check configuration'));
+      console.error("OTP Send Error:", error);
+      setMsg(
+        "✗ Error: " + (error?.text || error?.message || "Check configuration"),
+      );
     } finally {
       setLoading(false);
     }
@@ -4059,14 +5896,16 @@ function OTPScreen({ profile, onVerified, onLogout, showToast }) {
   // RULE #11: Smart OTP Paste - Auto-fill on 6-digit paste
   const handlePaste = (e) => {
     e.preventDefault();
-    const pastedText = e.clipboardData.getData('text');
-    const digits = pastedText.replace(/[^\d]/g, ''); // Extract only digits
-    
+    const pastedText = e.clipboardData.getData("text");
+    const digits = pastedText.replace(/[^\d]/g, ""); // Extract only digits
+
     if (digits.length === 6) {
       setUserEmailCode(digits);
-      setMsg('✓ OTP auto-filled from clipboard');
+      setMsg("✓ OTP auto-filled from clipboard");
     } else if (digits.length > 0) {
-      setErr(`Please paste a valid 6-digit code (${digits.length} digits detected)`);
+      setErr(
+        `Please paste a valid 6-digit code (${digits.length} digits detected)`,
+      );
     }
   };
 
@@ -4074,108 +5913,188 @@ function OTPScreen({ profile, onVerified, onLogout, showToast }) {
     setLoading(true);
     try {
       const storedData = await dbR(`otps/${profile.uid}`, profile.token);
-      
+
       if (!storedData) {
-        setMsg('✗ No OTP record found. Please send a new code.');
+        setMsg("✗ No OTP record found. Please send a new code.");
         setLoading(false);
         return;
       }
-      
+
       // Verify OTP code matches
       if (storedData.emailCode !== userEmailCode) {
-        setMsg('✗ Invalid verification code. Please try again.');
+        setMsg("✗ Invalid verification code. Please try again.");
         setLoading(false);
         return;
       }
-      
+
       // Verify email matches (security check)
-      if (storedData.email && storedData.email.toLowerCase() !== profile.email.toLowerCase()) {
-        console.error('Email mismatch in OTP verification:', {
+      if (
+        storedData.email &&
+        storedData.email.toLowerCase() !== profile.email.toLowerCase()
+      ) {
+        console.error("Email mismatch in OTP verification:", {
           stored: storedData.email,
-          profile: profile.email
+          profile: profile.email,
         });
-        setMsg('✗ Email mismatch. Please logout and try again.');
+        setMsg("✗ Email mismatch. Please logout and try again.");
         setLoading(false);
         return;
       }
-      
-      setMsg('✓ Identity Verified.');
+
+      setMsg("✓ Identity Verified.");
       onVerified();
     } catch (error) {
-      console.error('OTP Verification Error:', error);
-      setMsg('✗ Verification failed. Try again.');
+      console.error("OTP Verification Error:", error);
+      setMsg("✗ Verification failed. Try again.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: T.bg, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: T.font, padding: "20px" }}>
+    <div
+      style={{
+        minHeight: "100vh",
+        background: T.bg,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontFamily: T.font,
+        padding: "20px",
+      }}
+    >
       <div style={authCard} className="glass-panel">
         <AuthLogo />
-        <div style={{ color: T.blue, fontSize: "clamp(10px, 3vw, 12px)", letterSpacing: 2, textAlign: "center", marginBottom: 28, fontWeight: 700 }}>EMAIL VERIFICATION</div>
-        
-        {msg && <div style={{ color: T.green, fontSize: 13, marginBottom: 24, padding: "14px 18px", background: "rgba(48,209,88,0.1)", border: `1px solid rgba(48,209,88,0.3)`, borderRadius: 10, fontWeight: 500, lineHeight: 1.5, whiteSpace: "pre-line" }}>{msg}</div>}
+        <div
+          style={{
+            color: T.blue,
+            fontSize: "clamp(10px, 3vw, 12px)",
+            letterSpacing: 2,
+            textAlign: "center",
+            marginBottom: 28,
+            fontWeight: 700,
+          }}
+        >
+          EMAIL VERIFICATION
+        </div>
+
+        {msg && (
+          <div
+            style={{
+              color: T.green,
+              fontSize: 13,
+              marginBottom: 24,
+              padding: "14px 18px",
+              background: "rgba(48,209,88,0.1)",
+              border: `1px solid rgba(48,209,88,0.3)`,
+              borderRadius: 10,
+              fontWeight: 500,
+              lineHeight: 1.5,
+              whiteSpace: "pre-line",
+            }}
+          >
+            {msg}
+          </div>
+        )}
 
         {step === 1 ? (
-          <div style={{ textAlign: 'center' }}>
+          <div style={{ textAlign: "center" }}>
             <p style={{ color: T.muted, fontSize: 13, marginBottom: 20 }}>
-              To secure your account, we will send a verification code to:<br/>
+              To secure your account, we will send a verification code to:
+              <br />
               <strong style={{ color: T.blue }}>{profile.email}</strong>
             </p>
-            
-            <button 
-              onClick={sendOTPs} 
+
+            <button
+              onClick={sendOTPs}
               disabled={loading}
-              style={authBtn(T.blue, loading)} 
+              style={authBtn(T.blue, loading)}
               className="btn-glass"
             >
-              {loading ? 'SENDING...' : '✉ DISPATCH EMAIL CODE'}
+              {loading ? "SENDING..." : "✉ DISPATCH EMAIL CODE"}
             </button>
           </div>
         ) : (
           <div>
             <label style={lbl}>ENTER 6-DIGIT EMAIL CODE</label>
-            <div style={{ fontSize: 10, color: T.muted, marginBottom: 8, fontStyle: 'italic' }}>💡 Tip: Paste a 6-digit code and it will auto-fill</div>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-              <input 
+            <div
+              style={{
+                fontSize: 10,
+                color: T.muted,
+                marginBottom: 8,
+                fontStyle: "italic",
+              }}
+            >
+              💡 Tip: Paste a 6-digit code and it will auto-fill
+            </div>
+            <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+              <input
                 ref={otpInputRef}
-                type="text" 
-                value={userEmailCode} 
-                onChange={(e) => setUserEmailCode(e.target.value.replace(/[^\d]/g, '').slice(0, 6))}
+                type="text"
+                value={userEmailCode}
+                onChange={(e) =>
+                  setUserEmailCode(
+                    e.target.value.replace(/[^\d]/g, "").slice(0, 6),
+                  )
+                }
                 onPaste={handlePaste}
-                style={{...authInp, flex: 1, letterSpacing: '4px', textAlign: 'center', fontWeight: 'bold'}} 
+                style={{
+                  ...authInp,
+                  flex: 1,
+                  letterSpacing: "4px",
+                  textAlign: "center",
+                  fontWeight: "bold",
+                }}
                 placeholder="000000"
                 maxLength="6"
                 inputMode="numeric"
               />
-              <button 
+              <button
                 onClick={() => copyToClipboardSecure(userEmailCode, showToast)}
                 disabled={!userEmailCode}
                 style={{
                   ...authBtn(T.blue, !userEmailCode),
-                  padding: '10px 12px',
-                  minWidth: '60px'
-                }} 
+                  padding: "10px 12px",
+                  minWidth: "60px",
+                }}
                 className="btn-glass"
                 title="Copy code & auto-clear clipboard in 60s"
               >
                 📋 COPY
               </button>
             </div>
-            
-            <button 
-              onClick={verifyOTPs} 
+
+            <button
+              onClick={verifyOTPs}
               disabled={loading}
-              style={authBtn(T.green, loading)} 
+              style={authBtn(T.green, loading)}
               className="btn-glass"
             >
-              {loading ? 'VERIFYING...' : 'UNLOCK TERMINAL'}
+              {loading ? "VERIFYING..." : "UNLOCK TERMINAL"}
             </button>
           </div>
         )}
 
-        <button onClick={onLogout} style={{ background: "transparent", border: "none", cursor: "pointer", color: T.dim, fontSize: 12, fontFamily: T.font, marginTop: 24, display: "block", width: "100%", fontWeight: 600, transition: "color 0.2s" }} onMouseEnter={e=>e.target.style.color=T.red} onMouseLeave={e=>e.target.style.color=T.dim}>← ABORT LOGIN</button>
+        <button
+          onClick={onLogout}
+          style={{
+            background: "transparent",
+            border: "none",
+            cursor: "pointer",
+            color: T.dim,
+            fontSize: 12,
+            fontFamily: T.font,
+            marginTop: 24,
+            display: "block",
+            width: "100%",
+            fontWeight: 600,
+            transition: "color 0.2s",
+          }}
+          onMouseEnter={(e) => (e.target.style.color = T.red)}
+          onMouseLeave={(e) => (e.target.style.color = T.dim)}
+        >
+          ← ABORT LOGIN
+        </button>
       </div>
     </div>
   );
@@ -4185,13 +6104,13 @@ function OTPScreen({ profile, onVerified, onLogout, showToast }) {
 //  FORCE PASSWORD RESET SCREEN — RULE 18 (120-DAY EXPIRY)
 // ═══════════════════════════════════════════════════════════════════
 function ForcePasswordResetScreen({ onReset, onLogout }) {
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [err, setErr] = useState('');
+  const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
-  const [msg, setMsg] = useState('');
+  const [msg, setMsg] = useState("");
   const [capsLock, setCapsLock] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState(0);
 
@@ -4202,34 +6121,34 @@ function ForcePasswordResetScreen({ onReset, onLogout }) {
   };
 
   const handleKeyDown = (e) => {
-    setCapsLock(e.getModifierState('CapsLock'));
+    setCapsLock(e.getModifierState("CapsLock"));
   };
 
   const handleKeyUp = (e) => {
-    setCapsLock(e.getModifierState('CapsLock'));
+    setCapsLock(e.getModifierState("CapsLock"));
   };
 
   const resetPassword = async () => {
-    setErr('');
-    setMsg('');
+    setErr("");
+    setMsg("");
 
     if (!newPassword || !confirmPassword) {
-      setErr('Both password fields are required.');
+      setErr("Both password fields are required.");
       return;
     }
 
     if (newPassword.length < 8) {
-      setErr('Password must be at least 8 characters.');
+      setErr("Password must be at least 8 characters.");
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      setErr('Passwords do not match.');
+      setErr("Passwords do not match.");
       return;
     }
 
     if (passwordStrength < 2) {
-      setErr('Password is too weak. Use uppercase, numbers, and symbols.');
+      setErr("Password is too weak. Use uppercase, numbers, and symbols.");
       return;
     }
 
@@ -4237,58 +6156,126 @@ function ForcePasswordResetScreen({ onReset, onLogout }) {
     try {
       // Call parent handler to update password
       await onReset(newPassword);
-      setMsg('✓ Password reset successfully. Redirecting...');
+      setMsg("✓ Password reset successfully. Redirecting...");
       setTimeout(() => {
         // Will be handled by parent
       }, 1500);
     } catch (error) {
-      setErr(error.message || 'Password reset failed. Try again.');
+      setErr(error.message || "Password reset failed. Try again.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: T.bg, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: T.font, padding: "20px" }}>
+    <div
+      style={{
+        minHeight: "100vh",
+        background: T.bg,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontFamily: T.font,
+        padding: "20px",
+      }}
+    >
       <div style={authCard} className="glass-panel">
         <AuthLogo />
-        <div style={{ color: T.red, fontSize: 12, letterSpacing: 2, textAlign: "center", marginBottom: 24, fontWeight: 700 }}>⏰ MANDATORY PASSWORD RESET</div>
-        
-        <div style={{ background: "rgba(255,69,58,0.1)", border: `1px solid rgba(255,69,58,0.3)`, borderRadius: 8, padding: 12, marginBottom: 20 }}>
-          <p style={{ color: T.muted, fontSize: 12, margin: 0, lineHeight: 1.6 }}>
-            Your password was last changed <strong>over 120 days ago</strong>. For security compliance, you must reset it before accessing your account.
+        <div
+          style={{
+            color: T.red,
+            fontSize: 12,
+            letterSpacing: 2,
+            textAlign: "center",
+            marginBottom: 24,
+            fontWeight: 700,
+          }}
+        >
+          ⏰ MANDATORY PASSWORD RESET
+        </div>
+
+        <div
+          style={{
+            background: "rgba(255,69,58,0.1)",
+            border: `1px solid rgba(255,69,58,0.3)`,
+            borderRadius: 8,
+            padding: 12,
+            marginBottom: 20,
+          }}
+        >
+          <p
+            style={{ color: T.muted, fontSize: 12, margin: 0, lineHeight: 1.6 }}
+          >
+            Your password was last changed <strong>over 120 days ago</strong>.
+            For security compliance, you must reset it before accessing your
+            account.
           </p>
         </div>
 
-        {err && <div style={{ color: T.red, fontSize: 12, marginBottom: 16, padding: "10px 14px", background: "rgba(255,69,58,0.1)", border: `1px solid rgba(255,69,58,0.3)`, borderRadius: 6, fontWeight: 500 }}>{err}</div>}
-        {msg && <div style={{ color: T.green, fontSize: 12, marginBottom: 16, padding: "10px 14px", background: "rgba(48,209,88,0.1)", border: `1px solid rgba(48,209,88,0.3)`, borderRadius: 6, fontWeight: 500 }}>{msg}</div>}
+        {err && (
+          <div
+            style={{
+              color: T.red,
+              fontSize: 12,
+              marginBottom: 16,
+              padding: "10px 14px",
+              background: "rgba(255,69,58,0.1)",
+              border: `1px solid rgba(255,69,58,0.3)`,
+              borderRadius: 6,
+              fontWeight: 500,
+            }}
+          >
+            {err}
+          </div>
+        )}
+        {msg && (
+          <div
+            style={{
+              color: T.green,
+              fontSize: 12,
+              marginBottom: 16,
+              padding: "10px 14px",
+              background: "rgba(48,209,88,0.1)",
+              border: `1px solid rgba(48,209,88,0.3)`,
+              borderRadius: 6,
+              fontWeight: 500,
+            }}
+          >
+            {msg}
+          </div>
+        )}
 
         <div style={{ marginBottom: 16 }}>
           <label style={lbl}>NEW PASSWORD *</label>
-          <div style={{ position: 'relative', width: '100%', marginBottom: 8 }}>
-            <input 
-              type={showPwd ? "text" : "password"} 
-              value={newPassword} 
+          <div style={{ position: "relative", width: "100%", marginBottom: 8 }}>
+            <input
+              type={showPwd ? "text" : "password"}
+              value={newPassword}
               onChange={handlePasswordChange}
               onKeyDown={handleKeyDown}
               onKeyUp={handleKeyUp}
-              placeholder="Min 8 characters" 
-              style={{...authInp, letterSpacing: 2, width: '100%', marginBottom: 0}} 
-              className="input-glass" 
+              placeholder="Min 8 characters"
+              style={{
+                ...authInp,
+                letterSpacing: 2,
+                width: "100%",
+                marginBottom: 0,
+              }}
+              className="input-glass"
             />
-            <button 
+            <button
               type="button"
               onClick={() => setShowPwd(!showPwd)}
-              style={{ 
-                position: 'absolute', 
-                right: '10px', 
-                top: '50%', 
-                transform: 'translateY(-50%)', 
-                background: 'none', 
-                border: 'none', 
-                color: '#888', 
-                cursor: 'pointer',
-                fontSize: '12px'
+              style={{
+                position: "absolute",
+                right: "10px",
+                top: "50%",
+                transform: "translateY(-50%)",
+                background: "none",
+                border: "none",
+                color: "#888",
+                cursor: "pointer",
+                fontSize: "12px",
               }}
             >
               {showPwd ? "HIDE" : "SHOW"}
@@ -4296,29 +6283,49 @@ function ForcePasswordResetScreen({ onReset, onLogout }) {
           </div>
 
           {capsLock && (
-            <div style={{ color: T.red, fontSize: 10, marginBottom: 6, padding: '6px 8px', background: 'rgba(255,69,58,0.1)', borderRadius: 3 }}>
+            <div
+              style={{
+                color: T.red,
+                fontSize: 10,
+                marginBottom: 6,
+                padding: "6px 8px",
+                background: "rgba(255,69,58,0.1)",
+                borderRadius: 3,
+              }}
+            >
               ⚠️ Caps Lock is ON
             </div>
           )}
 
           {newPassword && (
             <div style={{ marginBottom: 8 }}>
-              <div style={{ display: 'flex', gap: 3, height: 3, marginBottom: 4 }}>
+              <div
+                style={{ display: "flex", gap: 3, height: 3, marginBottom: 4 }}
+              >
                 {[0, 1, 2].map((idx) => (
                   <div
                     key={idx}
                     style={{
                       flex: 1,
-                      height: '100%',
-                      background: passwordStrength > idx ? getStrengthLabel(passwordStrength).color : 'rgba(255,255,255,0.1)',
+                      height: "100%",
+                      background:
+                        passwordStrength > idx
+                          ? getStrengthLabel(passwordStrength).color
+                          : "rgba(255,255,255,0.1)",
                       borderRadius: 2,
-                      transition: 'all 0.2s ease'
+                      transition: "all 0.2s ease",
                     }}
                   />
                 ))}
               </div>
-              <div style={{ fontSize: 9, color: getStrengthLabel(passwordStrength).color }}>
-                Strength: <strong>{getStrengthLabel(passwordStrength).label}</strong>
+              <div
+                style={{
+                  fontSize: 9,
+                  color: getStrengthLabel(passwordStrength).color,
+                }}
+              >
+                Strength:{" "}
+                <strong>{getStrengthLabel(passwordStrength).label}</strong>
               </div>
             </div>
           )}
@@ -4326,28 +6333,33 @@ function ForcePasswordResetScreen({ onReset, onLogout }) {
 
         <div style={{ marginBottom: 16 }}>
           <label style={lbl}>CONFIRM PASSWORD *</label>
-          <div style={{ position: 'relative', width: '100%' }}>
-            <input 
-              type={showConfirm ? "text" : "password"} 
-              value={confirmPassword} 
-              onChange={(e) => setConfirmPassword(e.target.value)} 
-              placeholder="Re-enter password" 
-              style={{...authInp, letterSpacing: 2, width: '100%', marginBottom: 0}} 
-              className="input-glass" 
+          <div style={{ position: "relative", width: "100%" }}>
+            <input
+              type={showConfirm ? "text" : "password"}
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="Re-enter password"
+              style={{
+                ...authInp,
+                letterSpacing: 2,
+                width: "100%",
+                marginBottom: 0,
+              }}
+              className="input-glass"
             />
-            <button 
+            <button
               type="button"
               onClick={() => setShowConfirm(!showConfirm)}
-              style={{ 
-                position: 'absolute', 
-                right: '10px', 
-                top: '50%', 
-                transform: 'translateY(-50%)', 
-                background: 'none', 
-                border: 'none', 
-                color: '#888', 
-                cursor: 'pointer',
-                fontSize: '12px'
+              style={{
+                position: "absolute",
+                right: "10px",
+                top: "50%",
+                transform: "translateY(-50%)",
+                background: "none",
+                border: "none",
+                color: "#888",
+                cursor: "pointer",
+                fontSize: "12px",
               }}
             >
               {showConfirm ? "HIDE" : "SHOW"}
@@ -4355,16 +6367,37 @@ function ForcePasswordResetScreen({ onReset, onLogout }) {
           </div>
         </div>
 
-        <button 
-          onClick={resetPassword} 
+        <button
+          onClick={resetPassword}
           disabled={loading || !newPassword || !confirmPassword}
-          style={{ ...authBtn(T.green, loading || !newPassword || !confirmPassword), marginBottom: 12 }} 
+          style={{
+            ...authBtn(T.green, loading || !newPassword || !confirmPassword),
+            marginBottom: 12,
+          }}
           className="btn-glass"
         >
-          {loading ? 'RESETTING...' : '🔐 RESET PASSWORD'}
+          {loading ? "RESETTING..." : "🔐 RESET PASSWORD"}
         </button>
 
-        <button onClick={onLogout} style={{ background: "transparent", border: "none", cursor: "pointer", color: T.dim, fontSize: 12, fontFamily: T.font, display: "block", width: "100%", fontWeight: 600, transition: "color 0.2s" }} onMouseEnter={e=>e.target.style.color=T.red} onMouseLeave={e=>e.target.style.color=T.dim}>← LOGOUT</button>
+        <button
+          onClick={onLogout}
+          style={{
+            background: "transparent",
+            border: "none",
+            cursor: "pointer",
+            color: T.dim,
+            fontSize: 12,
+            fontFamily: T.font,
+            display: "block",
+            width: "100%",
+            fontWeight: 600,
+            transition: "color 0.2s",
+          }}
+          onMouseEnter={(e) => (e.target.style.color = T.red)}
+          onMouseLeave={(e) => (e.target.style.color = T.dim)}
+        >
+          ← LOGOUT
+        </button>
       </div>
     </div>
   );
@@ -4374,18 +6407,24 @@ function ForcePasswordResetScreen({ onReset, onLogout }) {
 //  SIGNUP SCREEN
 // ═══════════════════════════════════════════════════════════════════
 function SignupScreen({ onBack, onSubmit }) {
-  const [f, setF] = useState({ 
-    fullName: '', email: '', password: '', mobile: '', 
-    address: '', instagram: '', linkedin: '', proficiency: 'beginner' 
-  }); 
-  const [device, setDevice] = useState(null); 
-  const [geoOk, setGeoOk] = useState(false); 
-  const [tncAccepted, setTncAccepted] = useState(false); 
-  const [privacyAccepted, setPrivacyAccepted] = useState(false); 
-  const [devPermsGranted, setDevPermsGranted] = useState(false); 
-  const [err, setErr] = useState(''); 
-  const [loading, setLoading] = useState(false); 
-  const [showTnc, setShowTnc] = useState(false); 
+  const [f, setF] = useState({
+    fullName: "",
+    email: "",
+    password: "",
+    mobile: "",
+    address: "",
+    instagram: "",
+    linkedin: "",
+    proficiency: "beginner",
+  });
+  const [device, setDevice] = useState(null);
+  const [geoOk, setGeoOk] = useState(false);
+  const [tncAccepted, setTncAccepted] = useState(false);
+  const [privacyAccepted, setPrivacyAccepted] = useState(false);
+  const [devPermsGranted, setDevPermsGranted] = useState(false);
+  const [err, setErr] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [showTnc, setShowTnc] = useState(false);
   const [showSignupPwd, setShowSignupPwd] = useState(false);
   const [stayLoggedIn, setStayLoggedIn] = useState(false);
   const [capsLockOn, setCapsLockOn] = useState(false);
@@ -4393,23 +6432,23 @@ function SignupScreen({ onBack, onSubmit }) {
   const [profilePicture, setProfilePicture] = useState(null);
   const [showImageCropper, setShowImageCropper] = useState(false);
   const [selectedImageFile, setSelectedImageFile] = useState(null);
-  
-  const sf = k => v => setF(p => ({ ...p, [k]: v }));
-  
+
+  const sf = (k) => (v) => setF((p) => ({ ...p, [k]: v }));
+
   // Check if form can be submitted: valid Gmail email and password >= 8 characters
   const isFormValid = () => {
     return isValidGmailAddress(f.email) && f.password.length >= 8;
   };
-  
+
   const handlePasswordChange = (e) => {
     const pwd = e.target.value;
-    sf('password')(pwd);
+    sf("password")(pwd);
     setPasswordStrength(calculatePasswordStrength(pwd));
   };
 
   const handlePasswordKeyDown = (e) => {
     // Detect Caps Lock
-    if (e.getModifierState('CapsLock')) {
+    if (e.getModifierState("CapsLock")) {
       setCapsLockOn(true);
     } else {
       setCapsLockOn(false);
@@ -4418,75 +6457,96 @@ function SignupScreen({ onBack, onSubmit }) {
 
   const handlePasswordKeyUp = (e) => {
     // Re-check on key up
-    setCapsLockOn(e.getModifierState('CapsLock'));
+    setCapsLockOn(e.getModifierState("CapsLock"));
   };
-  
-  const requestPerms = async () => { 
-    const d = getDevice(); 
-    setDevice(d); 
-    try { 
+
+  const requestPerms = async () => {
+    const d = getDevice();
+    setDevice(d);
+    try {
       navigator.geolocation.getCurrentPosition(
-        (pos) => { setGeoOk(Boolean(pos)); }, 
-        () => setGeoOk(false)
-      ); 
-      if (Notification.permission === 'default') {
-        await Notification.requestPermission(); 
+        (pos) => {
+          setGeoOk(Boolean(pos));
+        },
+        () => setGeoOk(false),
+      );
+      if (Notification.permission === "default") {
+        await Notification.requestPermission();
       }
-    } catch { 
+    } catch {
       // Geolocation or notification permission failed silently
-    } 
-    setDevPermsGranted(true); 
+    }
+    setDevPermsGranted(true);
   };
-  
-  const submit = async () => { 
-    if (!f.fullName || !f.email || !f.password || !f.mobile) { 
-      setErr('Full Name, Email, Password, and Mobile are required.'); 
-      return; 
+
+  const submit = async () => {
+    if (!f.fullName || !f.email || !f.password || !f.mobile) {
+      setErr("Full Name, Email, Password, and Mobile are required.");
+      return;
     }
 
     // RULE 29: Gmail-Only Registration
     if (!isValidGmailAddress(f.email)) {
-      setErr('Institutional Rule: Only @gmail.com accounts are permitted for the Regiment.');
+      setErr(
+        "Institutional Rule: Only @gmail.com accounts are permitted for the Regiment.",
+      );
       return;
     }
-    
-    if (!tncAccepted || !privacyAccepted) { 
-      setErr('You must accept Terms & Conditions and the Privacy Notice.'); 
-      return; 
-    } 
-    if (!devPermsGranted) { 
-      setErr('You must grant device permissions to proceed.'); 
-      return; 
-    } 
-    
-    setErr(''); 
-    setLoading(true); 
-    
-    try { 
-      await onSubmit({ ...f, device, geoGranted: geoOk, stayLoggedIn }); 
-    } catch (e) { 
-      setErr(e.message); 
-    } finally { 
-      setLoading(false); 
-    } 
+
+    if (!tncAccepted || !privacyAccepted) {
+      setErr("You must accept Terms & Conditions and the Privacy Notice.");
+      return;
+    }
+    if (!devPermsGranted) {
+      setErr("You must grant device permissions to proceed.");
+      return;
+    }
+
+    setErr("");
+    setLoading(true);
+
+    try {
+      await onSubmit({ ...f, device, geoGranted: geoOk, stayLoggedIn });
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setLoading(false);
+    }
   };
-  
+
   return (
-    <div style={{ minHeight: "100vh", background: T.bg, overflowY: "auto", fontFamily: T.font, padding: 20 }}>
+    <div
+      style={{
+        minHeight: "100vh",
+        background: T.bg,
+        overflowY: "auto",
+        fontFamily: T.font,
+        padding: 20,
+      }}
+    >
       <div style={{ ...authCard, maxWidth: 560 }} className="glass-panel">
         <AuthLogo />
-        <div style={{ color: T.gold, fontSize: 12, letterSpacing: 2, textAlign: "center", marginBottom: 24, fontWeight: 700 }}>
+        <div
+          style={{
+            color: T.gold,
+            fontSize: 12,
+            letterSpacing: 2,
+            textAlign: "center",
+            marginBottom: 24,
+            fontWeight: 700,
+          }}
+        >
           RECRUIT APPLICATION FORM
         </div>
-        
+
         {/* RULE #23: Google Sign-In Alternative */}
         <div style={{ marginBottom: 16 }}>
-          <GoogleSignInButton 
+          <GoogleSignInButton
             onSuccess={(user) => {
               // Pre-fill form with Google data
-              sf('email')(user.email);
+              sf("email")(user.email);
               if (user.displayName) {
-                sf('fullName')(user.displayName);
+                sf("fullName")(user.displayName);
               }
             }}
             onError={(error) => setErr(error)}
@@ -4494,52 +6554,100 @@ function SignupScreen({ onBack, onSubmit }) {
             isLoading={loading}
           />
         </div>
-        
-        <div style={{ marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ flex: 1, height: '1px', background: `${T.muted}40` }} />
+
+        <div
+          style={{
+            marginBottom: 20,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+          }}
+        >
+          <div style={{ flex: 1, height: "1px", background: `${T.muted}40` }} />
           <span style={{ fontSize: 11, color: T.muted }}>OR MANUAL ENTRY</span>
-          <div style={{ flex: 1, height: '1px', background: `${T.muted}40` }} />
+          <div style={{ flex: 1, height: "1px", background: `${T.muted}40` }} />
         </div>
-        
-        <div style={{ color: T.muted, fontSize: 11, letterSpacing: 2, marginBottom: 12, paddingBottom: 8, borderBottom: `1px solid rgba(255,255,255,0.1)`, fontWeight: 600 }}>
+
+        <div
+          style={{
+            color: T.muted,
+            fontSize: 11,
+            letterSpacing: 2,
+            marginBottom: 12,
+            paddingBottom: 8,
+            borderBottom: `1px solid rgba(255,255,255,0.1)`,
+            fontWeight: 600,
+          }}
+        >
           PERSONAL INFORMATION
         </div>
-        
+
         <div>
           <label style={lbl}>FULL NAME *</label>
-          <input value={f.fullName} onChange={e => sf('fullName')(e.target.value)} placeholder="Your full legal name" style={{...authInp, fontFamily: T.font}} className="input-glass" />
+          <input
+            value={f.fullName}
+            onChange={(e) => sf("fullName")(e.target.value)}
+            placeholder="Your full legal name"
+            style={{ ...authInp, fontFamily: T.font }}
+            className="input-glass"
+          />
         </div>
-        
+
         <div>
           <label style={lbl}>EMAIL ADDRESS *</label>
-          <input type="email" value={f.email} onChange={e => sf('email')(e.target.value)} placeholder="your@email.com" style={{...authInp, fontFamily: T.font}} className="input-glass" />
+          <input
+            type="email"
+            value={f.email}
+            onChange={(e) => sf("email")(e.target.value)}
+            placeholder="your@email.com"
+            style={{ ...authInp, fontFamily: T.font }}
+            className="input-glass"
+          />
         </div>
 
         {/* LAYER 4 SECURITY: ANTI-SPAM HONEYPOT FIELD - Hidden from humans, visible to bots */}
-        <div style={{display: 'none', visibility: 'hidden', position: 'absolute', left: '-9999px'}}>
-          <input 
-            type="text" 
+        <div
+          style={{
+            display: "none",
+            visibility: "hidden",
+            position: "absolute",
+            left: "-9999px",
+          }}
+        >
+          <input
+            type="text"
             id="phone_number_verify_alt_opt"
             name="phone_number_verify_alt_opt"
-            value={f['phone_number_verify_alt_opt'] || ''}
-            onChange={e => sf('phone_number_verify_alt_opt')(e.target.value)}
+            value={f["phone_number_verify_alt_opt"] || ""}
+            onChange={(e) => sf("phone_number_verify_alt_opt")(e.target.value)}
             placeholder="Do not fill this field"
             aria-hidden="true"
             tabIndex="-1"
             autoComplete="off"
           />
         </div>
-        
+
         {/* RULE #21 & #22: Profile Picture Upload & Cropper */}
-        <div style={{ 
-          background: 'rgba(52,199,89,0.1)', 
-          border: `1px solid ${T.green}50`, 
-          padding: 16, 
-          borderRadius: 10, 
-          marginBottom: 16 
-        }}>
-          <div style={{ color: T.green, fontSize: 12, fontWeight: 700, marginBottom: 12 }}>📷 PROFESSIONAL HEADSHOT (OPTIONAL)</div>
-          
+        <div
+          style={{
+            background: "rgba(52,199,89,0.1)",
+            border: `1px solid ${T.green}50`,
+            padding: 16,
+            borderRadius: 10,
+            marginBottom: 16,
+          }}
+        >
+          <div
+            style={{
+              color: T.green,
+              fontSize: 12,
+              fontWeight: 700,
+              marginBottom: 12,
+            }}
+          >
+            📷 PROFESSIONAL HEADSHOT (OPTIONAL)
+          </div>
+
           {!showImageCropper && !profilePicture ? (
             <>
               <input
@@ -4552,22 +6660,31 @@ function SignupScreen({ onBack, onSubmit }) {
                     setShowImageCropper(true);
                   }
                 }}
-                style={{ display: 'none' }}
+                style={{ display: "none" }}
                 id="profileUpload"
               />
               <button
-                onClick={() => document.getElementById('profileUpload')?.click()}
-                style={{...authBtn(T.green, false), width: '100%'}}
+                onClick={() =>
+                  document.getElementById("profileUpload")?.click()
+                }
+                style={{ ...authBtn(T.green, false), width: "100%" }}
                 className="btn-glass"
               >
                 📤 UPLOAD & CROP PHOTO
               </button>
-              <div style={{ fontSize: 10, color: T.muted, marginTop: 8, textAlign: 'center' }}>
+              <div
+                style={{
+                  fontSize: 10,
+                  color: T.muted,
+                  marginTop: 8,
+                  textAlign: "center",
+                }}
+              >
                 If no photo is uploaded, Gravatar will be used as fallback
               </div>
             </>
           ) : showImageCropper && selectedImageFile ? (
-            <ImageCropper 
+            <ImageCropper
               file={selectedImageFile}
               onCrop={(blob) => {
                 setProfilePicture(blob);
@@ -4579,15 +6696,33 @@ function SignupScreen({ onBack, onSubmit }) {
               }}
             />
           ) : profilePicture ? (
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ width: 100, height: 100, borderRadius: '50%', border: `2px solid ${T.green}`, background: `url(${URL.createObjectURL(profilePicture)}) center / cover`, margin: '0 auto 12px' }} />
-              <div style={{ color: T.green, fontSize: 11, fontWeight: 600, marginBottom: 8 }}>✓ Photo ready</div>
+            <div style={{ textAlign: "center" }}>
+              <div
+                style={{
+                  width: 100,
+                  height: 100,
+                  borderRadius: "50%",
+                  border: `2px solid ${T.green}`,
+                  background: `url(${URL.createObjectURL(profilePicture)}) center / cover`,
+                  margin: "0 auto 12px",
+                }}
+              />
+              <div
+                style={{
+                  color: T.green,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  marginBottom: 8,
+                }}
+              >
+                ✓ Photo ready
+              </div>
               <button
                 onClick={() => {
                   setProfilePicture(null);
                   setSelectedImageFile(null);
                 }}
-                style={{...authBtn(T.red, false), width: '100%'}}
+                style={{ ...authBtn(T.red, false), width: "100%" }}
                 className="btn-glass"
               >
                 🔄 CHANGE PHOTO
@@ -4595,42 +6730,60 @@ function SignupScreen({ onBack, onSubmit }) {
             </div>
           ) : null}
         </div>
-        
+
         <div>
           <label style={lbl}>PASSWORD *</label>
-          <div style={{ position: 'relative', width: '100%', marginBottom: 8 }}>
-            <input 
-              type={showSignupPwd ? "text" : "password"} 
-              value={f.password} 
+          <div style={{ position: "relative", width: "100%", marginBottom: 8 }}>
+            <input
+              type={showSignupPwd ? "text" : "password"}
+              value={f.password}
               onChange={handlePasswordChange}
               onKeyDown={handlePasswordKeyDown}
               onKeyUp={handlePasswordKeyUp}
-              placeholder="Min 8 characters" 
-              style={{...authInp, letterSpacing: 4, width: '100%', marginBottom: 0}} 
-              className="input-glass" 
+              placeholder="Min 8 characters"
+              style={{
+                ...authInp,
+                letterSpacing: 4,
+                width: "100%",
+                marginBottom: 0,
+              }}
+              className="input-glass"
             />
-            <button 
+            <button
               type="button"
               onClick={() => setShowSignupPwd(!showSignupPwd)}
-              style={{ 
-                position: 'absolute', 
-                right: '10px', 
-                top: '50%', 
-                transform: 'translateY(-50%)', 
-                background: 'none', 
-                border: 'none', 
-                color: '#888', 
-                cursor: 'pointer',
-                fontSize: '12px'
+              style={{
+                position: "absolute",
+                right: "10px",
+                top: "50%",
+                transform: "translateY(-50%)",
+                background: "none",
+                border: "none",
+                color: "#888",
+                cursor: "pointer",
+                fontSize: "12px",
               }}
             >
               {showSignupPwd ? "HIDE" : "SHOW"}
             </button>
           </div>
-          
+
           {/* Caps Lock Warning */}
           {capsLockOn && (
-            <div style={{ color: T.red, fontSize: 11, marginBottom: 8, padding: '8px 10px', background: 'rgba(255,69,58,0.1)', border: `1px solid rgba(255,69,58,0.3)`, borderRadius: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div
+              style={{
+                color: T.red,
+                fontSize: 11,
+                marginBottom: 8,
+                padding: "8px 10px",
+                background: "rgba(255,69,58,0.1)",
+                border: `1px solid rgba(255,69,58,0.3)`,
+                borderRadius: 4,
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+              }}
+            >
               ⚠️ <strong>Caps Lock is ON</strong>
             </div>
           )}
@@ -4638,132 +6791,372 @@ function SignupScreen({ onBack, onSubmit }) {
           {/* Password Strength Meter */}
           {f.password && (
             <div style={{ marginBottom: 12 }}>
-              <div style={{ display: 'flex', gap: 4, height: 4, marginBottom: 6 }}>
+              <div
+                style={{ display: "flex", gap: 4, height: 4, marginBottom: 6 }}
+              >
                 {[0, 1, 2].map((idx) => (
                   <div
                     key={idx}
                     style={{
                       flex: 1,
-                      height: '100%',
-                      background: passwordStrength > idx ? getStrengthLabel(passwordStrength).color : 'rgba(255,255,255,0.1)',
+                      height: "100%",
+                      background:
+                        passwordStrength > idx
+                          ? getStrengthLabel(passwordStrength).color
+                          : "rgba(255,255,255,0.1)",
                       borderRadius: 2,
-                      transition: 'all 0.2s ease'
+                      transition: "all 0.2s ease",
                     }}
                   />
                 ))}
               </div>
-              <div style={{ fontSize: 10, color: getStrengthLabel(passwordStrength).color, fontWeight: 600 }}>
-                Password Strength: <strong>{getStrengthLabel(passwordStrength).label}</strong>
+              <div
+                style={{
+                  fontSize: 10,
+                  color: getStrengthLabel(passwordStrength).color,
+                  fontWeight: 600,
+                }}
+              >
+                Password Strength:{" "}
+                <strong>{getStrengthLabel(passwordStrength).label}</strong>
               </div>
             </div>
           )}
         </div>
-        
+
         <div>
           <label style={lbl}>MOBILE NUMBER *</label>
-          <input value={f.mobile} onChange={e => sf('mobile')(formatPhoneNumber(e.target.value))} placeholder="10-digit phone number" style={authInp} className="input-glass" />
+          <input
+            value={f.mobile}
+            onChange={(e) => sf("mobile")(formatPhoneNumber(e.target.value))}
+            placeholder="10-digit phone number"
+            style={authInp}
+            className="input-glass"
+          />
         </div>
-        
+
         <div>
           <label style={lbl}>ADDRESS</label>
-          <input value={f.address} onChange={e => sf('address')(e.target.value)} placeholder="City, State, Country" style={{...authInp, fontFamily: T.font}} className="input-glass" />
+          <input
+            value={f.address}
+            onChange={(e) => sf("address")(e.target.value)}
+            placeholder="City, State, Country"
+            style={{ ...authInp, fontFamily: T.font }}
+            className="input-glass"
+          />
         </div>
-        
+
         {/* RULE #24: Identity Verification */}
-        <IdentityVerificationComponent 
+        <IdentityVerificationComponent
           uid={f.email}
           token=""
           onSuccess={() => {}}
           onError={() => {}}
           showToast={() => {}}
         />
-        
-        <div style={{ color: T.muted, fontSize: 11, letterSpacing: 2, margin: "20px 0 12px", paddingTop: 12, borderTop: `1px solid rgba(255,255,255,0.1)`, fontWeight: 600 }}>
+
+        <div
+          style={{
+            color: T.muted,
+            fontSize: 11,
+            letterSpacing: 2,
+            margin: "20px 0 12px",
+            paddingTop: 12,
+            borderTop: `1px solid rgba(255,255,255,0.1)`,
+            fontWeight: 600,
+          }}
+        >
           SOCIAL PROFILES
         </div>
-        
+
         <div>
           <label style={lbl}>INSTAGRAM ID</label>
-          <input value={f.instagram} onChange={e => sf('instagram')(e.target.value)} placeholder="@username" style={{...authInp, fontFamily: T.font}} className="input-glass" />
+          <input
+            value={f.instagram}
+            onChange={(e) => sf("instagram")(e.target.value)}
+            placeholder="@username"
+            style={{ ...authInp, fontFamily: T.font }}
+            className="input-glass"
+          />
         </div>
-        
+
         <div>
           <label style={lbl}>LINKEDIN ID</label>
-          <input value={f.linkedin} onChange={e => sf('linkedin')(e.target.value)} placeholder="linkedin.com/in/username" style={{...authInp, fontFamily: T.font}} className="input-glass" />
+          <input
+            value={f.linkedin}
+            onChange={(e) => sf("linkedin")(e.target.value)}
+            placeholder="linkedin.com/in/username"
+            style={{ ...authInp, fontFamily: T.font }}
+            className="input-glass"
+          />
         </div>
-        
+
         <div style={{ marginBottom: 16 }}>
           <label style={lbl}>TRADING PROFICIENCY</label>
-          <select value={f.proficiency} onChange={e => sf('proficiency')(e.target.value)} style={{ ...authInp, marginBottom: 0, fontFamily: T.font }} className="input-glass">
+          <select
+            value={f.proficiency}
+            onChange={(e) => sf("proficiency")(e.target.value)}
+            style={{ ...authInp, marginBottom: 0, fontFamily: T.font }}
+            className="input-glass"
+          >
             <option value="beginner">Beginner — Under 1 year experience</option>
             <option value="intermediate">Intermediate — 1-3 years</option>
             <option value="advanced">Advanced — 3-5 years</option>
             <option value="expert">Expert — 5+ years, prop funded</option>
           </select>
         </div>
-        
-        <div style={{ padding: "16px 20px", background: "rgba(0,0,0,0.3)", border: `1px solid rgba(255,255,255,0.1)`, borderRadius: 10, marginBottom: 20 }} className="glass-panel">
-          <div style={{ color: T.blue, fontSize: 11, letterSpacing: 2, marginBottom: 10, fontWeight: 700 }}>
+
+        <div
+          style={{
+            padding: "16px 20px",
+            background: "rgba(0,0,0,0.3)",
+            border: `1px solid rgba(255,255,255,0.1)`,
+            borderRadius: 10,
+            marginBottom: 20,
+          }}
+          className="glass-panel"
+        >
+          <div
+            style={{
+              color: T.blue,
+              fontSize: 11,
+              letterSpacing: 2,
+              marginBottom: 10,
+              fontWeight: 700,
+            }}
+          >
             ⚙ SYSTEM DEVICE ACCESS
           </div>
-          <div style={{ color: "#A1A1A6", fontSize: 12, lineHeight: 1.6, marginBottom: 14 }}>
-            For security and session monitoring, this terminal requires access to your device's location and notification services. <strong style={{ color: T.gold }}>This system is STRICTLY PROHIBITED from accessing your banking details, personal passwords, or financial credentials.</strong> All data collection is limited to trading activity and session security only.
+          <div
+            style={{
+              color: "#A1A1A6",
+              fontSize: 12,
+              lineHeight: 1.6,
+              marginBottom: 14,
+            }}
+          >
+            For security and session monitoring, this terminal requires access
+            to your device's location and notification services.{" "}
+            <strong style={{ color: T.gold }}>
+              This system is STRICTLY PROHIBITED from accessing your banking
+              details, personal passwords, or financial credentials.
+            </strong>{" "}
+            All data collection is limited to trading activity and session
+            security only.
           </div>
-          {!devPermsGranted ? 
-            <button onClick={requestPerms} style={{ ...authBtn(T.blue, false), padding: "12px 0", fontSize: 12 }} className="btn-glass">⊞ GRANT DEVICE ACCESS</button> : 
-            <div style={{ color: T.green, fontSize: 12, fontWeight: 600 }}>✓ Device permissions granted{geoOk ? " · Location OK" : " · Location denied (optional)"}</div>
-          }
+          {!devPermsGranted ? (
+            <button
+              onClick={requestPerms}
+              style={{
+                ...authBtn(T.blue, false),
+                padding: "12px 0",
+                fontSize: 12,
+              }}
+              className="btn-glass"
+            >
+              ⊞ GRANT DEVICE ACCESS
+            </button>
+          ) : (
+            <div style={{ color: T.green, fontSize: 12, fontWeight: 600 }}>
+              ✓ Device permissions granted
+              {geoOk ? " · Location OK" : " · Location denied (optional)"}
+            </div>
+          )}
         </div>
-        
+
         <div style={{ marginBottom: 20 }}>
-          <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 12 }}>
-            <div onClick={() => setTncAccepted(v => !v)} style={{ width: 20, height: 20, border: `2px solid ${tncAccepted ? T.green : T.muted}`, borderRadius: 4, background: tncAccepted ? "rgba(48,209,88,0.2)" : "transparent", cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.2s ease" }}>
-              {tncAccepted && <span style={{ color: T.green, fontSize: 14, fontWeight: 800 }}>✓</span>}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "flex-start",
+              gap: 12,
+              marginBottom: 12,
+            }}
+          >
+            <div
+              onClick={() => setTncAccepted((v) => !v)}
+              style={{
+                width: 20,
+                height: 20,
+                border: `2px solid ${tncAccepted ? T.green : T.muted}`,
+                borderRadius: 4,
+                background: tncAccepted ? "rgba(48,209,88,0.2)" : "transparent",
+                cursor: "pointer",
+                flexShrink: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                transition: "all 0.2s ease",
+              }}
+            >
+              {tncAccepted && (
+                <span style={{ color: T.green, fontSize: 14, fontWeight: 800 }}>
+                  ✓
+                </span>
+              )}
             </div>
             <div style={{ color: "#A1A1A6", fontSize: 12, lineHeight: 1.6 }}>
-              I accept the <button onClick={() => setShowTnc(v => !v)} style={{ background: "none", border: "none", cursor: "pointer", color: T.blue, fontFamily: T.font, fontSize: 12, padding: 0, textDecoration: "underline", fontWeight: 600 }}>Terms & Conditions</button> of Traders Regiment and understand this is a professional trading system.
+              I accept the{" "}
+              <button
+                onClick={() => setShowTnc((v) => !v)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  color: T.blue,
+                  fontFamily: T.font,
+                  fontSize: 12,
+                  padding: 0,
+                  textDecoration: "underline",
+                  fontWeight: 600,
+                }}
+              >
+                Terms & Conditions
+              </button>{" "}
+              of Traders Regiment and understand this is a professional trading
+              system.
             </div>
           </div>
-          
-          {showTnc && 
-            <div style={{ background: "rgba(0,0,0,0.5)", border: `1px solid rgba(255,255,255,0.1)`, borderRadius: 8, padding: 16, marginBottom: 16, maxHeight: 200, overflowY: "auto", color: T.muted, fontSize: 11, lineHeight: 1.8 }} className="glass-panel">
-              <strong style={{ color: T.gold }}>TRADERS REGIMENT — TERMS & CONDITIONS</strong><br /><br />
-              1. This terminal is for professional futures trading use only. All trades carry significant financial risk.<br />
-              2. The system may collect device metadata for session security. It does NOT collect banking information or passwords.<br />
-              3. Account access is subject to Admin approval. Traders Regiment reserves the right to revoke access at any time.<br />
-              4. All trading decisions remain the sole responsibility of the user. The system's AI guidance is informational only.<br />
-              5. Your data is stored securely in our encrypted database and never sold to third parties.<br />
-              6. Dual-OTP is required for every session login. No exceptions.<br />
-              7. AMD analysis and trade signals are analytical tools, not guaranteed outcomes.
+
+          {showTnc && (
+            <div
+              style={{
+                background: "rgba(0,0,0,0.5)",
+                border: `1px solid rgba(255,255,255,0.1)`,
+                borderRadius: 8,
+                padding: 16,
+                marginBottom: 16,
+                maxHeight: 200,
+                overflowY: "auto",
+                color: T.muted,
+                fontSize: 11,
+                lineHeight: 1.8,
+              }}
+              className="glass-panel"
+            >
+              <strong style={{ color: T.gold }}>
+                TRADERS REGIMENT — TERMS & CONDITIONS
+              </strong>
+              <br />
+              <br />
+              1. This terminal is for professional futures trading use only. All
+              trades carry significant financial risk.
+              <br />
+              2. The system may collect device metadata for session security. It
+              does NOT collect banking information or passwords.
+              <br />
+              3. Account access is subject to Admin approval. Traders Regiment
+              reserves the right to revoke access at any time.
+              <br />
+              4. All trading decisions remain the sole responsibility of the
+              user. The system's AI guidance is informational only.
+              <br />
+              5. Your data is stored securely in our encrypted database and
+              never sold to third parties.
+              <br />
+              6. Dual-OTP is required for every session login. No exceptions.
+              <br />
+              7. AMD analysis and trade signals are analytical tools, not
+              guaranteed outcomes.
             </div>
-          }
-          
+          )}
+
           <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-            <div onClick={() => setPrivacyAccepted(v => !v)} style={{ width: 20, height: 20, border: `2px solid ${privacyAccepted ? T.green : T.muted}`, borderRadius: 4, background: privacyAccepted ? "rgba(48,209,88,0.2)" : "transparent", cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.2s ease" }}>
-              {privacyAccepted && <span style={{ color: T.green, fontSize: 14, fontWeight: 800 }}>✓</span>}
+            <div
+              onClick={() => setPrivacyAccepted((v) => !v)}
+              style={{
+                width: 20,
+                height: 20,
+                border: `2px solid ${privacyAccepted ? T.green : T.muted}`,
+                borderRadius: 4,
+                background: privacyAccepted
+                  ? "rgba(48,209,88,0.2)"
+                  : "transparent",
+                cursor: "pointer",
+                flexShrink: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                transition: "all 0.2s ease",
+              }}
+            >
+              {privacyAccepted && (
+                <span style={{ color: T.green, fontSize: 14, fontWeight: 800 }}>
+                  ✓
+                </span>
+              )}
             </div>
-            <div style={{ color: "#A1A1A6", fontSize: 12, lineHeight: 1.6 }}>I confirm this system has NO access to my banking details, personal passwords, or financial credentials. I grant only the stated device permissions for security purposes.</div>
+            <div style={{ color: "#A1A1A6", fontSize: 12, lineHeight: 1.6 }}>
+              I confirm this system has NO access to my banking details,
+              personal passwords, or financial credentials. I grant only the
+              stated device permissions for security purposes.
+            </div>
           </div>
         </div>
-        
-        {err && <div style={{ color: T.red, fontSize: 12, marginBottom: 16, padding: "10px 14px", background: "rgba(255,69,58,0.1)", border: `1px solid rgba(255,69,58,0.3)`, borderRadius: 6, fontWeight: 500 }}>{err}</div>}
-        
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
-          <input 
-            type="checkbox" 
-            id="signupStayLoggedIn" 
-            checked={stayLoggedIn} 
+
+        {err && (
+          <div
+            style={{
+              color: T.red,
+              fontSize: 12,
+              marginBottom: 16,
+              padding: "10px 14px",
+              background: "rgba(255,69,58,0.1)",
+              border: `1px solid rgba(255,69,58,0.3)`,
+              borderRadius: 6,
+              fontWeight: 500,
+            }}
+          >
+            {err}
+          </div>
+        )}
+
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            marginBottom: 16,
+          }}
+        >
+          <input
+            type="checkbox"
+            id="signupStayLoggedIn"
+            checked={stayLoggedIn}
             onChange={(e) => setStayLoggedIn(e.target.checked)}
             style={{ cursor: "pointer" }}
           />
-          <label htmlFor="signupStayLoggedIn" style={{ fontSize: 12, color: T.muted, cursor: "pointer", fontFamily: T.font }}>Stay Logged In</label>
+          <label
+            htmlFor="signupStayLoggedIn"
+            style={{
+              fontSize: 12,
+              color: T.muted,
+              cursor: "pointer",
+              fontFamily: T.font,
+            }}
+          >
+            Stay Logged In
+          </label>
         </div>
-        
-        <button onClick={submit} disabled={loading || !isFormValid()} style={authBtn(T.green, loading || !isFormValid())} className="btn-glass">
+
+        <button
+          onClick={submit}
+          disabled={loading || !isFormValid()}
+          style={authBtn(T.green, loading || !isFormValid())}
+          className="btn-glass"
+        >
           {loading ? "⟳ SUBMITTING APPLICATION..." : "→ SUBMIT APPLICATION"}
         </button>
-        
-        <button onClick={onBack} style={{ ...authBtn(T.muted, false), marginTop: 12, background: "transparent" }} className="btn-glass">
+
+        <button
+          onClick={onBack}
+          style={{
+            ...authBtn(T.muted, false),
+            marginTop: 12,
+            background: "transparent",
+          }}
+          className="btn-glass"
+        >
           ← BACK TO LOGIN
         </button>
       </div>
@@ -4773,10 +7166,35 @@ function SignupScreen({ onBack, onSubmit }) {
 function WaitingRoom({ onRefresh, onLogout }) {
   const [checking, setChecking] = useState(false);
   return (
-    <div style={{ minHeight: "100vh", background: "#F9FAFB", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: T.font, padding: 20 }}>
-      <div style={{ ...authCard, maxWidth: 540, textAlign: "center" }} className="glass-panel">
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "#F9FAFB",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontFamily: T.font,
+        padding: 20,
+      }}
+    >
+      <div
+        style={{ ...authCard, maxWidth: 540, textAlign: "center" }}
+        className="glass-panel"
+      >
         <AuthLogo />
-        <div style={{ width: 120, height: 120, borderRadius: "50%", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 24px", boxShadow: "0 8px 32px rgba(0, 0, 0, 0.15)" }}>
+        <div
+          style={{
+            width: 120,
+            height: 120,
+            borderRadius: "50%",
+            overflow: "hidden",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            margin: "0 auto 24px",
+            boxShadow: "0 8px 32px rgba(0, 0, 0, 0.15)",
+          }}
+        >
           <video
             src="/logo.mp4"
             autoPlay
@@ -4785,33 +7203,75 @@ function WaitingRoom({ onRefresh, onLogout }) {
             style={{
               width: "100%",
               height: "100%",
-              objectFit: "cover"
+              objectFit: "cover",
             }}
             onError={(e) => {
               // Fallback if video fails
-              e.target.parentElement.innerHTML = '⏳';
-              e.target.parentElement.style.fontSize = '48px';
-              e.target.parentElement.style.display = 'flex';
-              e.target.parentElement.style.alignItems = 'center';
-              e.target.parentElement.style.justifyContent = 'center';
-              e.target.parentElement.style.color = '#D97706';
+              e.target.parentElement.innerHTML = "⏳";
+              e.target.parentElement.style.fontSize = "48px";
+              e.target.parentElement.style.display = "flex";
+              e.target.parentElement.style.alignItems = "center";
+              e.target.parentElement.style.justifyContent = "center";
+              e.target.parentElement.style.color = "#D97706";
             }}
           />
         </div>
-        <div style={{ color: "#D97706", fontSize: 16, letterSpacing: 3, marginBottom: 20, fontWeight: 700 }}>
+        <div
+          style={{
+            color: "#D97706",
+            fontSize: 16,
+            letterSpacing: 3,
+            marginBottom: 20,
+            fontWeight: 700,
+          }}
+        >
           APPLICATION PENDING
         </div>
-        <div style={{ color: "#374151", fontSize: 14, lineHeight: 1.8, marginBottom: 28, padding: "20px 24px", background: "#FFFFFF", border: `1px solid #E5E7EB`, borderRadius: 12, boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.1)" }}>
+        <div
+          style={{
+            color: "#374151",
+            fontSize: 14,
+            lineHeight: 1.8,
+            marginBottom: 28,
+            padding: "20px 24px",
+            background: "#FFFFFF",
+            border: `1px solid #E5E7EB`,
+            borderRadius: 12,
+            boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.1)",
+          }}
+        >
           It will take time to check if you are eligible to use the app or not.
         </div>
-        <div style={{ color: "#6B7280", fontSize: 12, lineHeight: 1.9, marginBottom: 32 }}>
-          Your application has been received and is under review by our team. You will be notified once your account is authorized. This typically takes 24-48 hours.
+        <div
+          style={{
+            color: "#6B7280",
+            fontSize: 12,
+            lineHeight: 1.9,
+            marginBottom: 32,
+          }}
+        >
+          Your application has been received and is under review by our team.
+          You will be notified once your account is authorized. This typically
+          takes 24-48 hours.
         </div>
         <div style={{ display: "flex", gap: 12, flexDirection: "column" }}>
-          <button onClick={async () => { setChecking(true); await onRefresh(); setChecking(false); }} disabled={checking} style={authBtn("#000000", checking)} className="btn-glass">
+          <button
+            onClick={async () => {
+              setChecking(true);
+              await onRefresh();
+              setChecking(false);
+            }}
+            disabled={checking}
+            style={authBtn("#000000", checking)}
+            className="btn-glass"
+          >
             {checking ? "⟳ CHECKING STATUS..." : "↺ CHECK APPROVAL STATUS"}
           </button>
-          <button onClick={onLogout} style={{ ...authBtn("#999999", false), background: "transparent" }} className="btn-glass">
+          <button
+            onClick={onLogout}
+            style={{ ...authBtn("#999999", false), background: "transparent" }}
+            className="btn-glass"
+          >
             ← LOGOUT
           </button>
         </div>
@@ -4829,37 +7289,41 @@ function WaitingRoom({ onRefresh, onLogout }) {
  */
 function LoadingFallback() {
   const [dots, setDots] = React.useState(0);
-  
+
   React.useEffect(() => {
     const interval = setInterval(() => {
-      setDots(d => (d + 1) % 4);
+      setDots((d) => (d + 1) % 4);
     }, 500);
     return () => clearInterval(interval);
   }, []);
-  
+
   return (
-    <div style={{
-      minHeight: "100vh",
-      background: "#F9FAFB",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      fontFamily: '"Inter", "Helvetica", sans-serif',
-      flexDirection: "column",
-      gap: 24
-    }}>
-      {/* Premium Video Loading Indicator */}
-      <div style={{
-        width: 120,
-        height: 120,
-        borderRadius: "50%",
-        overflow: "hidden",
-        boxShadow: "0 8px 32px rgba(0, 0, 0, 0.15)",
-        background: "#FFFFFF",
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "#F9FAFB",
         display: "flex",
         alignItems: "center",
-        justifyContent: "center"
-      }}>
+        justifyContent: "center",
+        fontFamily: '"Inter", "Helvetica", sans-serif',
+        flexDirection: "column",
+        gap: 24,
+      }}
+    >
+      {/* Premium Video Loading Indicator */}
+      <div
+        style={{
+          width: 120,
+          height: 120,
+          borderRadius: "50%",
+          overflow: "hidden",
+          boxShadow: "0 8px 32px rgba(0, 0, 0, 0.15)",
+          background: "#FFFFFF",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
         <video
           src="/logo.mp4"
           autoPlay
@@ -4868,49 +7332,56 @@ function LoadingFallback() {
           style={{
             width: "100%",
             height: "100%",
-            objectFit: "cover"
+            objectFit: "cover",
           }}
           onError={(e) => {
             // Fallback spinner
-            e.target.parentElement.innerHTML = '⟳';
-            e.target.parentElement.style.fontSize = '48px';
-            e.target.parentElement.style.display = 'flex';
-            e.target.parentElement.style.alignItems = 'center';
-            e.target.parentElement.style.justifyContent = 'center';
-            e.target.parentElement.style.animation = 'spin 1s linear infinite';
+            e.target.parentElement.innerHTML = "⟳";
+            e.target.parentElement.style.fontSize = "48px";
+            e.target.parentElement.style.display = "flex";
+            e.target.parentElement.style.alignItems = "center";
+            e.target.parentElement.style.justifyContent = "center";
+            e.target.parentElement.style.animation = "spin 1s linear infinite";
           }}
         />
       </div>
-      
+
       <div style={{ textAlign: "center" }}>
-        <div style={{
-          color: "#111827",
-          fontSize: 14,
-          fontWeight: 600,
-          letterSpacing: 2,
-          marginBottom: 8
-        }}>
+        <div
+          style={{
+            color: "#111827",
+            fontSize: 14,
+            fontWeight: 600,
+            letterSpacing: 2,
+            marginBottom: 8,
+          }}
+        >
           {"LOADING".split("").map((char, i) => (
-            <span key={i} style={{
-              display: "inline-block",
-              animation: `wave 0.6s ease-in-out ${i * 0.1}s infinite`,
-              transformOrigin: "center bottom"
-            }}>
+            <span
+              key={i}
+              style={{
+                display: "inline-block",
+                animation: `wave 0.6s ease-in-out ${i * 0.1}s infinite`,
+                transformOrigin: "center bottom",
+              }}
+            >
               {char}
             </span>
           ))}
           {"...".padStart(1 + (dots || 0), ".")}
         </div>
-        <div style={{
-          color: "#6B7280",
-          fontSize: 12,
-          letterSpacing: 1,
-          marginTop: 12
-        }}>
+        <div
+          style={{
+            color: "#6B7280",
+            fontSize: 12,
+            letterSpacing: 1,
+            marginTop: 12,
+          }}
+        >
           Initializing dashboard · Compiling modules
         </div>
       </div>
-      
+
       <style>{`
         @keyframes spin {
           to { transform: rotate(360deg); }
@@ -4939,35 +7410,92 @@ class ErrorBoundaryAdmin extends React.Component {
   }
 
   componentDidCatch(error, errorInfo) {
-    console.error('AdminDashboard Error:', error, errorInfo);
+    console.error("AdminDashboard Error:", error, errorInfo);
     this.setState({
       error,
-      errorInfo
+      errorInfo,
     });
     // Dispatch custom event for logging or monitoring
-    window.dispatchEvent(new CustomEvent('dashboardError', {
-      detail: { error: error.toString(), componentStack: errorInfo.componentStack }
-    }));
+    window.dispatchEvent(
+      new CustomEvent("dashboardError", {
+        detail: {
+          error: error.toString(),
+          componentStack: errorInfo.componentStack,
+        },
+      }),
+    );
   }
 
   render() {
     if (this.state.hasError) {
       return (
-        <div style={{ minHeight: "100vh", background: T.bg, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: T.font, padding: 20 }}>
-          <div style={{ maxWidth: 540, textAlign: "center", padding: 40, background: "rgba(255,67,54,0.1)", border: `2px solid rgba(255,67,54,0.3)`, borderRadius: 12 }} className="glass-panel">
+        <div
+          style={{
+            minHeight: "100vh",
+            background: T.bg,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontFamily: T.font,
+            padding: 20,
+          }}
+        >
+          <div
+            style={{
+              maxWidth: 540,
+              textAlign: "center",
+              padding: 40,
+              background: "rgba(255,67,54,0.1)",
+              border: `2px solid rgba(255,67,54,0.3)`,
+              borderRadius: 12,
+            }}
+            className="glass-panel"
+          >
             <div style={{ fontSize: 48, marginBottom: 20 }}>⚠️</div>
-            <div style={{ color: "#FF4336", fontSize: 20, fontWeight: 700, marginBottom: 16 }}>
+            <div
+              style={{
+                color: "#FF4336",
+                fontSize: 20,
+                fontWeight: 700,
+                marginBottom: 16,
+              }}
+            >
               DASHBOARD ERROR
             </div>
-            <div style={{ color: "#A1A1A6", fontSize: 14, lineHeight: 1.8, marginBottom: 20 }}>
-              The dashboard encountered an unexpected error. Please try refreshing the page.
+            <div
+              style={{
+                color: "#A1A1A6",
+                fontSize: 14,
+                lineHeight: 1.8,
+                marginBottom: 20,
+              }}
+            >
+              The dashboard encountered an unexpected error. Please try
+              refreshing the page.
             </div>
             {this.state.error && (
-              <div style={{ background: "rgba(0,0,0,0.5)", padding: 12, borderRadius: 8, marginBottom: 20, textAlign: "left", fontSize: 11, color: "#FFF", fontFamily: "monospace", maxHeight: 120, overflow: "auto" }}>
+              <div
+                style={{
+                  background: "rgba(0,0,0,0.5)",
+                  padding: 12,
+                  borderRadius: 8,
+                  marginBottom: 20,
+                  textAlign: "left",
+                  fontSize: 11,
+                  color: "#FFF",
+                  fontFamily: "monospace",
+                  maxHeight: 120,
+                  overflow: "auto",
+                }}
+              >
                 {this.state.error.toString()}
               </div>
             )}
-            <button onClick={() => window.location.reload()} style={{ ...authBtn(T.blue, false) }} className="btn-glass">
+            <button
+              onClick={() => window.location.reload()}
+              style={{ ...authBtn(T.blue, false) }}
+              className="btn-glass"
+            >
               🔄 REFRESH PAGE
             </button>
           </div>
@@ -4993,7 +7521,7 @@ function UserListProvider({ children }) {
     return cached || {};
   });
   const [loading, setLoading] = useState(true);
-  const [dbError, setDbError] = useState('');
+  const [dbError, setDbError] = useState("");
   const [lastUpdated, setLastUpdated] = useState(null);
 
   // RULE #165: Wrap setUsers to also cache the data
@@ -5004,19 +7532,25 @@ function UserListProvider({ children }) {
     setLastUpdated(Date.now());
   }, []);
 
-  const updateUsers = useCallback((newUsers) => {
-    setUsers(newUsers);
-  }, [setUsers]);
+  const updateUsers = useCallback(
+    (newUsers) => {
+      setUsers(newUsers);
+    },
+    [setUsers],
+  );
 
-  const value = useMemo(() => ({
-    users,
-    setUsers: updateUsers,
-    loading,
-    setLoading,
-    dbError,
-    setDbError,
-    lastUpdated
-  }), [users, updateUsers, loading, dbError, lastUpdated]);
+  const value = useMemo(
+    () => ({
+      users,
+      setUsers: updateUsers,
+      loading,
+      setLoading,
+      dbError,
+      setDbError,
+      lastUpdated,
+    }),
+    [users, updateUsers, loading, dbError, lastUpdated],
+  );
 
   return (
     <UserListContext.Provider value={value}>
@@ -5028,7 +7562,7 @@ function UserListProvider({ children }) {
 function useUserList() {
   const context = useContext(UserListContext);
   if (!context) {
-    throw new Error('useUserList must be used within UserListProvider');
+    throw new Error("useUserList must be used within UserListProvider");
   }
   return context;
 }
@@ -5041,52 +7575,59 @@ function useUserList() {
 function detectDuplicateIPs(users) {
   const ipMap = {};
   const duplicates = {};
-  
-  if (!users || typeof users !== 'object') return duplicates;
-  
+
+  if (!users || typeof users !== "object") return duplicates;
+
   Object.entries(users).forEach(([uid, user]) => {
     const ip = user?.forensic?.ip || user?.ip;
-    if (ip && ip !== 'Unknown') {
+    if (ip && ip !== "Unknown") {
       if (!ipMap[ip]) ipMap[ip] = [];
       ipMap[ip].push(uid);
     }
   });
-  
+
   // Mark IPs with multiple users as duplicates
   Object.entries(ipMap).forEach(([ip, uids]) => {
     if (uids.length > 1) {
       duplicates[ip] = uids;
     }
   });
-  
+
   return duplicates;
 }
 
 // Component: Real-time Direct Support Chat Modal (RULE #209: Typing Indicator)
-function SupportChatModal({ isOpen, userId, userName, onClose, auth, showToast }) {
+function SupportChatModal({
+  isOpen,
+  userId,
+  userName,
+  onClose,
+  auth,
+  showToast,
+}) {
   const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState("");
   const [_isTyping, _setIsTyping] = useState(false);
   const [otherUserTyping, setOtherUserTyping] = useState(false);
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
-  
+
   // Firebase path for chat - matches user's FloatingChatWidget path
   const chatPath = `support_chats/${userId}`;
-  
+
   // Scroll to bottom of messages
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
-  
+
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
-  
+
   // Set up real-time message listener
   useEffect(() => {
     if (!isOpen || !userId) return;
-    
+
     // Listen to messages subcollection - matches FloatingChatWidget path
     const messagesRef = ref(firebaseDb, `${chatPath}/messages`);
     const unsubscribe = onValue(messagesRef, (snapshot) => {
@@ -5100,91 +7641,98 @@ function SupportChatModal({ isOpen, userId, userName, onClose, auth, showToast }
         setMessages([]);
       }
     });
-    
+
     return () => {
       unsubscribe();
     };
   }, [isOpen, userId, chatPath]);
-  
+
   // Send message handler
   const handleSendMessage = async () => {
     if (!input.trim()) return;
-    
+
     try {
       const messagesRef = ref(firebaseDb, `${chatPath}/messages`);
       const newMessageRef = push(messagesRef);
       await set(newMessageRef, {
-        sender: 'admin',
-        senderName: auth?.displayName || 'Admin',
+        sender: "admin",
+        senderName: auth?.displayName || "Admin",
         text: input.trim(),
         timestamp: Date.now(),
-        read: false
+        read: false,
       });
-      
-      setInput('');
+
+      setInput("");
       _setIsTyping(false);
     } catch {
-      showToast('Failed to send message. Connection issue.', 'error');
+      showToast("Failed to send message. Connection issue.", "error");
     }
   };
-  
+
   // Typing indicator handler
   const handleTyping = (text) => {
     setInput(text);
-    
+
     if (!auth?.uid) return;
-    
+
     clearTimeout(typingTimeoutRef.current);
     _setIsTyping(true);
     set(ref(firebaseDb, `${chatPath}/typing_${auth.uid}`), true);
-    
+
     typingTimeoutRef.current = setTimeout(() => {
       set(ref(firebaseDb, `${chatPath}/typing_${auth.uid}`), null);
       _setIsTyping(false);
     }, 3000);
   };
-  
+
   if (!isOpen) return null;
-  
+
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      background: 'rgba(0,0,0,0.7)',
-      backdropFilter: 'blur(8px)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 10001
-    }}>
-      <div style={{
-        background: 'rgba(20,20,25,0.95)',
-        border: '1px solid rgba(255,255,255,0.1)',
-        borderRadius: 16,
-        width: '90%',
-        maxWidth: 500,
-        height: 600,
-        display: 'flex',
-        flexDirection: 'column',
-        backdropFilter: 'blur(30px)'
-      }} className="restored-modal">
+    <div
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: "rgba(0,0,0,0.7)",
+        backdropFilter: "blur(8px)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 10001,
+      }}
+    >
+      <div
+        style={{
+          background: "rgba(20,20,25,0.95)",
+          border: "1px solid rgba(255,255,255,0.1)",
+          borderRadius: 16,
+          width: "90%",
+          maxWidth: 500,
+          height: 600,
+          display: "flex",
+          flexDirection: "column",
+          backdropFilter: "blur(30px)",
+        }}
+        className="restored-modal"
+      >
         {/* Header */}
-        <div style={{
-          padding: '16px 20px',
-          borderBottom: '1px solid rgba(255,255,255,0.1)',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        }}>
+        <div
+          style={{
+            padding: "16px 20px",
+            borderBottom: "1px solid rgba(255,255,255,0.1)",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
           <div>
-            <div style={{ color: '#F2F2F7', fontSize: 14, fontWeight: 600 }}>
+            <div style={{ color: "#F2F2F7", fontSize: 14, fontWeight: 600 }}>
               {userName}
             </div>
             {otherUserTyping && (
-              <div style={{ color: '#0A84FF', fontSize: 11, marginTop: 4 }}>
+              <div style={{ color: "#0A84FF", fontSize: 11, marginTop: 4 }}>
                 ✎ typing...
               </div>
             )}
@@ -5192,58 +7740,76 @@ function SupportChatModal({ isOpen, userId, userName, onClose, auth, showToast }
           <button
             onClick={onClose}
             style={{
-              background: 'transparent',
-              border: 'none',
-              color: '#A1A1A6',
+              background: "transparent",
+              border: "none",
+              color: "#A1A1A6",
               fontSize: 24,
-              cursor: 'pointer'
+              cursor: "pointer",
             }}
           >
             ✕
           </button>
         </div>
-        
+
         {/* Messages */}
-        <div style={{
-          flex: 1,
-          overflowY: 'auto',
-          padding: '16px 20px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 12
-        }}>
+        <div
+          style={{
+            flex: 1,
+            overflowY: "auto",
+            padding: "16px 20px",
+            display: "flex",
+            flexDirection: "column",
+            gap: 12,
+          }}
+        >
           {messages.length === 0 ? (
-            <div style={{ color: '#A1A1A6', textAlign: 'center', marginTop: 20 }}>
+            <div
+              style={{ color: "#A1A1A6", textAlign: "center", marginTop: 20 }}
+            >
               No messages yet. Start the conversation.
             </div>
           ) : (
             messages.map((msg) => {
-              const isAdmin = msg.sender === 'admin';
+              const isAdmin = msg.sender === "admin";
               return (
                 <div
                   key={`msg_${msg.timestamp}`}
                   style={{
-                    display: 'flex',
-                    justifyContent: isAdmin ? 'flex-end' : 'flex-start',
-                    marginBottom: 8
+                    display: "flex",
+                    justifyContent: isAdmin ? "flex-end" : "flex-start",
+                    marginBottom: 8,
                   }}
                 >
                   <div
                     style={{
-                      background: isAdmin ? 'rgba(0,122,255,0.3)' : 'rgba(255,255,255,0.1)',
-                      border: `1px solid ${isAdmin ? 'rgba(0,122,255,0.5)' : 'rgba(255,255,255,0.2)'}`,
+                      background: isAdmin
+                        ? "rgba(0,122,255,0.3)"
+                        : "rgba(255,255,255,0.1)",
+                      border: `1px solid ${isAdmin ? "rgba(0,122,255,0.5)" : "rgba(255,255,255,0.2)"}`,
                       borderRadius: 12,
-                      padding: '10px 14px',
-                      maxWidth: '80%',
-                      wordWrap: 'break-word'
+                      padding: "10px 14px",
+                      maxWidth: "80%",
+                      wordWrap: "break-word",
                     }}
                   >
                     {!isAdmin && (
-                      <div style={{ color: '#A1A1A6', fontSize: 10, marginBottom: 4 }}>
-                        {msg.senderName || msg.email || 'User'}
+                      <div
+                        style={{
+                          color: "#A1A1A6",
+                          fontSize: 10,
+                          marginBottom: 4,
+                        }}
+                      >
+                        {msg.senderName || msg.email || "User"}
                       </div>
                     )}
-                    <div style={{ color: '#F2F2F7', fontSize: 13, lineHeight: 1.4 }}>
+                    <div
+                      style={{
+                        color: "#F2F2F7",
+                        fontSize: 13,
+                        lineHeight: 1.4,
+                      }}
+                    >
                       {msg.text}
                     </div>
                   </div>
@@ -5253,20 +7819,22 @@ function SupportChatModal({ isOpen, userId, userName, onClose, auth, showToast }
           )}
           <div ref={messagesEndRef} />
         </div>
-        
+
         {/* Message Input */}
-        <div style={{
-          padding: '16px 20px',
-          borderTop: '1px solid rgba(255,255,255,0.1)',
-          display: 'flex',
-          gap: 12
-        }}>
+        <div
+          style={{
+            padding: "16px 20px",
+            borderTop: "1px solid rgba(255,255,255,0.1)",
+            display: "flex",
+            gap: 12,
+          }}
+        >
           <input
             type="text"
             value={input}
             onChange={(e) => handleTyping(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') {
+              if (e.key === "Enter") {
                 e.preventDefault();
                 handleSendMessage();
               }
@@ -5274,38 +7842,39 @@ function SupportChatModal({ isOpen, userId, userName, onClose, auth, showToast }
             placeholder="Type message..."
             style={{
               flex: 1,
-              background: 'rgba(255,255,255,0.05)',
-              border: '1px solid rgba(255,255,255,0.1)',
+              background: "rgba(255,255,255,0.05)",
+              border: "1px solid rgba(255,255,255,0.1)",
               borderRadius: 8,
-              padding: '10px 12px',
-              color: '#F2F2F7',
+              padding: "10px 12px",
+              color: "#F2F2F7",
               fontSize: 13,
-              fontFamily: 'Consolas, monospace'
+              fontFamily: "Consolas, monospace",
             }}
           />
           <button
             onClick={handleSendMessage}
             disabled={!input.trim()}
             style={{
-              background: input.trim() ? '#0A84FF' : 'rgba(0,122,255,0.3)',
-              border: 'none',
+              background: input.trim() ? "#0A84FF" : "rgba(0,122,255,0.3)",
+              border: "none",
               borderRadius: 8,
-              padding: '10px 16px',
-              color: input.trim() ? '#000' : '#A1A1A6',
+              padding: "10px 16px",
+              color: input.trim() ? "#000" : "#A1A1A6",
               fontSize: 13,
               fontWeight: 700,
-              cursor: input.trim() ? 'pointer' : 'default',
-              transition: 'all 0.2s'
+              cursor: input.trim() ? "pointer" : "default",
+              transition: "all 0.2s",
             }}
             onMouseEnter={(e) => {
               if (input.trim()) {
-                e.currentTarget.style.boxShadow = '0 0 12px rgba(0,122,255,0.5)';
-                e.currentTarget.style.transform = 'scale(1.05)';
+                e.currentTarget.style.boxShadow =
+                  "0 0 12px rgba(0,122,255,0.5)";
+                e.currentTarget.style.transform = "scale(1.05)";
               }
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.boxShadow = 'none';
-              e.currentTarget.style.transform = 'scale(1)';
+              e.currentTarget.style.boxShadow = "none";
+              e.currentTarget.style.transform = "scale(1)";
             }}
           >
             SEND
@@ -5320,189 +7889,230 @@ function SupportChatModal({ isOpen, userId, userName, onClose, auth, showToast }
 //  RULE #295, #296: MAINTENANCE MODE - 'BACK SOON' SCREEN
 // ═══════════════════════════════════════════════════════════════════
 function MaintenanceScreen() {
-  const [timeLeft, setTimeLeft] = useState('');
-  
+  const [timeLeft, setTimeLeft] = useState("");
+
   // Simulate countdown timer
   useEffect(() => {
     const updateTimer = () => {
       const now = new Date();
-      const nextMaintenance = new Date(now.getTime() + Math.random() * 4 * 60 * 60 * 1000); // Random 1-4 hours
-      
+      const nextMaintenance = new Date(
+        now.getTime() + Math.random() * 4 * 60 * 60 * 1000,
+      ); // Random 1-4 hours
+
       const updateCountdown = () => {
         const diff = nextMaintenance - new Date();
         if (diff <= 0) {
-          setTimeLeft('Returning now...');
+          setTimeLeft("Returning now...");
         } else {
           const hours = Math.floor(diff / (1000 * 60 * 60));
           const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
           setTimeLeft(`${hours}h ${minutes}m`);
         }
       };
-      
+
       updateCountdown();
       const interval = setInterval(updateCountdown, 30000); // Update every 30s
       return () => clearInterval(interval);
     };
-    
+
     updateTimer();
   }, []);
-  
+
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: '#F9FAFB',
-      backdropFilter: 'none',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      flexDirection: 'column',
-      padding: '20px',
-      fontFamily: 'Consolas, monospace'
-    }}>
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "#F9FAFB",
+        backdropFilter: "none",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexDirection: "column",
+        padding: "20px",
+        fontFamily: "Consolas, monospace",
+      }}
+    >
       {/* Animated Background Gradient */}
-      <div style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: `radial-gradient(circle at 20% 50%, rgba(0,122,255,0.05) 0%, transparent 50%),
+      <div
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: `radial-gradient(circle at 20% 50%, rgba(0,122,255,0.05) 0%, transparent 50%),
                      radial-gradient(circle at 80% 80%, rgba(48,209,88,0.05) 0%, transparent 50%)`,
-        animation: 'fadeInDashboard 4s ease-in-out infinite',
-        pointerEvents: 'none'
-      }} />
-      
+          animation: "fadeInDashboard 4s ease-in-out infinite",
+          pointerEvents: "none",
+        }}
+      />
+
       {/* Main Content */}
-      <div style={{
-        position: 'relative',
-        zIndex: 1,
-        textAlign: 'center',
-        maxWidth: '600px'
-      }}>
+      <div
+        style={{
+          position: "relative",
+          zIndex: 1,
+          textAlign: "center",
+          maxWidth: "600px",
+        }}
+      >
         {/* Status Icon */}
-        <div style={{
-          fontSize: '80px',
-          marginBottom: '24px',
-          animation: 'float 3s ease-in-out infinite'
-        }}>
+        <div
+          style={{
+            fontSize: "80px",
+            marginBottom: "24px",
+            animation: "float 3s ease-in-out infinite",
+          }}
+        >
           🔧
         </div>
-        
+
         {/* Heading */}
-        <h1 style={{
-          color: '#F2F2F7',
-          fontSize: '48px',
-          fontWeight: 800,
-          marginBottom: '16px',
-          letterSpacing: '2px',
-          textTransform: 'uppercase',
-          background: 'linear-gradient(135deg, #0A84FF 0%, #30D158 100%)',
-          backgroundClip: 'text',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent'
-        }}>
+        <h1
+          style={{
+            color: "#F2F2F7",
+            fontSize: "48px",
+            fontWeight: 800,
+            marginBottom: "16px",
+            letterSpacing: "2px",
+            textTransform: "uppercase",
+            background: "linear-gradient(135deg, #0A84FF 0%, #30D158 100%)",
+            backgroundClip: "text",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+          }}
+        >
           BACK SOON
         </h1>
-        
+
         {/* Subheading */}
-        <div style={{
-          color: '#A1A1A6',
-          fontSize: '16px',
-          fontWeight: 600,
-          marginBottom: '32px',
-          letterSpacing: '1px',
-          lineHeight: '1.6'
-        }}>
-          We're performing scheduled maintenance to enhance your trading experience.
+        <div
+          style={{
+            color: "#A1A1A6",
+            fontSize: "16px",
+            fontWeight: 600,
+            marginBottom: "32px",
+            letterSpacing: "1px",
+            lineHeight: "1.6",
+          }}
+        >
+          We're performing scheduled maintenance to enhance your trading
+          experience.
           <br />
           System integrity checks in progress.
         </div>
-        
+
         {/* Status Box */}
-        <div style={{
-          background: 'rgba(0,122,255,0.1)',
-          border: '1px solid rgba(0,122,255,0.3)',
-          borderRadius: '12px',
-          padding: '24px',
-          marginBottom: '32px',
-          backdropFilter: 'blur(10px)'
-        }}>
-          <div style={{
-            color: '#A1A1A6',
-            fontSize: '13px',
-            fontWeight: 600,
-            marginBottom: '12px',
-            letterSpacing: '1px'
-          }}>
+        <div
+          style={{
+            background: "rgba(0,122,255,0.1)",
+            border: "1px solid rgba(0,122,255,0.3)",
+            borderRadius: "12px",
+            padding: "24px",
+            marginBottom: "32px",
+            backdropFilter: "blur(10px)",
+          }}
+        >
+          <div
+            style={{
+              color: "#A1A1A6",
+              fontSize: "13px",
+              fontWeight: 600,
+              marginBottom: "12px",
+              letterSpacing: "1px",
+            }}
+          >
             ESTIMATED DOWNTIME
           </div>
-          <div style={{
-            color: '#0A84FF',
-            fontSize: '28px',
-            fontWeight: 800,
-            fontFamily: 'Consolas, monospace',
-            letterSpacing: '2px'
-          }}>
-            {timeLeft || 'Loading...'}
+          <div
+            style={{
+              color: "#0A84FF",
+              fontSize: "28px",
+              fontWeight: 800,
+              fontFamily: "Consolas, monospace",
+              letterSpacing: "2px",
+            }}
+          >
+            {timeLeft || "Loading..."}
           </div>
         </div>
-        
+
         {/* Features List */}
-        <div style={{
-          textAlign: 'left',
-          background: 'rgba(255,255,255,0.03)',
-          border: '1px solid rgba(255,255,255,0.1)',
-          borderRadius: '8px',
-          padding: '20px',
-          marginBottom: '32px'
-        }}>
-          <div style={{
-            color: '#F2F2F7',
-            fontSize: '12px',
-            fontWeight: 700,
-            marginBottom: '16px',
-            letterSpacing: '1px',
-            textTransform: 'uppercase'
-          }}>
+        <div
+          style={{
+            textAlign: "left",
+            background: "rgba(255,255,255,0.03)",
+            border: "1px solid rgba(255,255,255,0.1)",
+            borderRadius: "8px",
+            padding: "20px",
+            marginBottom: "32px",
+          }}
+        >
+          <div
+            style={{
+              color: "#F2F2F7",
+              fontSize: "12px",
+              fontWeight: 700,
+              marginBottom: "16px",
+              letterSpacing: "1px",
+              textTransform: "uppercase",
+            }}
+          >
             SYSTEM UPGRADES IN PROGRESS
           </div>
-          <ul style={{
-            listStyle: 'none',
-            padding: 0,
-            margin: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '10px'
-          }}>
-            {['Optimizing database queries', 'Enhancing security protocols', 'Improving performance metrics'].map((item, i) => (
-              <li key={i} style={{
-                color: '#A1A1A6',
-                fontSize: '12px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
-              }}>
-                <span style={{
-                  color: '#30D158',
-                  fontWeight: 800
-                }}>✓</span>
+          <ul
+            style={{
+              listStyle: "none",
+              padding: 0,
+              margin: 0,
+              display: "flex",
+              flexDirection: "column",
+              gap: "10px",
+            }}
+          >
+            {[
+              "Optimizing database queries",
+              "Enhancing security protocols",
+              "Improving performance metrics",
+            ].map((item, i) => (
+              <li
+                key={i}
+                style={{
+                  color: "#A1A1A6",
+                  fontSize: "12px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                }}
+              >
+                <span
+                  style={{
+                    color: "#30D158",
+                    fontWeight: 800,
+                  }}
+                >
+                  ✓
+                </span>
                 {item}
               </li>
             ))}
           </ul>
         </div>
-        
+
         {/* Footer Message */}
-        <div style={{
-          color: '#5A5A5F',
-          fontSize: '12px',
-          fontWeight: 500,
-          letterSpacing: '0.5px'
-        }}>
+        <div
+          style={{
+            color: "#5A5A5F",
+            fontSize: "12px",
+            fontWeight: 500,
+            letterSpacing: "0.5px",
+          }}
+        >
           Thank you for your patience. We're back to full capacity shortly.
           <br />
-          <span style={{ marginTop: '8px', display: 'block' }}>
-            Need immediate support? <span style={{ color: '#0A84FF' }}>contact@tradersapp.io</span>
+          <span style={{ marginTop: "8px", display: "block" }}>
+            Need immediate support?{" "}
+            <span style={{ color: "#0A84FF" }}>contact@tradersapp.io</span>
           </span>
         </div>
       </div>
@@ -5513,25 +8123,34 @@ function MaintenanceScreen() {
 // ═══════════════════════════════════════════════════════════════════
 // RULE #315: ADMIN DEBUG OVERLAY - System Audit & Monitoring
 // ═══════════════════════════════════════════════════════════════════
-function DebugOverlay({ logs, latencies, tti, componentStatus, isOpen, onToggle, auth }) {
+function DebugOverlay({
+  logs,
+  latencies,
+  tti,
+  componentStatus,
+  isOpen,
+  onToggle,
+  auth,
+}) {
   const [expandedSection, setExpandedSection] = useState(null);
   const [hoveredComponent, setHoveredComponent] = useState(null);
-  
+
   // Only show for Master Admin
-  if (!auth?.uid || auth.uid !== 'ADMIN_UID_PLACEHOLDER') return null;
+  if (!auth?.uid || auth.uid !== "ADMIN_UID_PLACEHOLDER") return null;
 
   const logsByType = {
-    log: logs.filter(l => l.type === 'log'),
-    warn: logs.filter(l => l.type === 'warn'),
-    error: logs.filter(l => l.type === 'error'),
-    info: logs.filter(l => l.type === 'info')
+    log: logs.filter((l) => l.type === "log"),
+    warn: logs.filter((l) => l.type === "warn"),
+    error: logs.filter((l) => l.type === "error"),
+    info: logs.filter((l) => l.type === "info"),
   };
 
-  const avgLatency = latencies.length > 0 
-    ? (latencies.reduce((a, b) => a + b.ms, 0) / latencies.length).toFixed(0)
-    : 0;
+  const avgLatency =
+    latencies.length > 0
+      ? (latencies.reduce((a, b) => a + b.ms, 0) / latencies.length).toFixed(0)
+      : 0;
 
-  const slowRequests = latencies.filter(l => l.ms > 2000);
+  const slowRequests = latencies.filter((l) => l.ms > 2000);
 
   return (
     <>
@@ -5540,24 +8159,24 @@ function DebugOverlay({ logs, latencies, tti, componentStatus, isOpen, onToggle,
         onClick={onToggle}
         title="Toggle Debug Overlay"
         style={{
-          position: 'fixed',
+          position: "fixed",
           bottom: isOpen ? 330 : 20,
           left: 20,
           zIndex: 9998,
           width: 44,
           height: 44,
-          borderRadius: '50%',
-          background: 'rgba(191,90,242,0.9)',
-          border: '2px solid rgba(191,90,242,1)',
-          color: '#fff',
+          borderRadius: "50%",
+          background: "rgba(191,90,242,0.9)",
+          border: "2px solid rgba(191,90,242,1)",
+          color: "#fff",
           fontSize: 22,
           fontWeight: 700,
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          transition: 'all 0.3s ease',
-          boxShadow: '0 0 20px rgba(191,90,242,0.5)'
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          transition: "all 0.3s ease",
+          boxShadow: "0 0 20px rgba(191,90,242,0.5)",
         }}
       >
         🔧
@@ -5565,41 +8184,52 @@ function DebugOverlay({ logs, latencies, tti, componentStatus, isOpen, onToggle,
 
       {/* Main Debug Panel */}
       {isOpen && (
-        <div style={{
-          position: 'fixed',
-          bottom: 20,
-          left: 70,
-          width: 420,
-          maxHeight: '80vh',
-          background: 'rgba(10,10,15,0.95)',
-          border: '1px solid rgba(191,90,242,0.3)',
-          borderRadius: 12,
-          backdropFilter: 'blur(20px)',
-          zIndex: 9997,
-          display: 'flex',
-          flexDirection: 'column',
-          boxShadow: '0 0 40px rgba(191,90,242,0.2)'
-        }}>
+        <div
+          style={{
+            position: "fixed",
+            bottom: 20,
+            left: 70,
+            width: 420,
+            maxHeight: "80vh",
+            background: "rgba(10,10,15,0.95)",
+            border: "1px solid rgba(191,90,242,0.3)",
+            borderRadius: 12,
+            backdropFilter: "blur(20px)",
+            zIndex: 9997,
+            display: "flex",
+            flexDirection: "column",
+            boxShadow: "0 0 40px rgba(191,90,242,0.2)",
+          }}
+        >
           {/* Header */}
-          <div style={{
-            padding: '12px 16px',
-            borderBottom: '1px solid rgba(191,90,242,0.2)',
-            background: 'rgba(191,90,242,0.1)',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center'
-          }}>
-            <div style={{ color: '#BF5AF2', fontSize: 13, fontWeight: 700, letterSpacing: 1 }}>
+          <div
+            style={{
+              padding: "12px 16px",
+              borderBottom: "1px solid rgba(191,90,242,0.2)",
+              background: "rgba(191,90,242,0.1)",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <div
+              style={{
+                color: "#BF5AF2",
+                fontSize: 13,
+                fontWeight: 700,
+                letterSpacing: 1,
+              }}
+            >
               🔍 SYSTEM AUDIT
             </div>
             <button
               onClick={onToggle}
               style={{
-                background: 'transparent',
-                border: 'none',
-                color: '#BF5AF2',
-                cursor: 'pointer',
-                fontSize: 16
+                background: "transparent",
+                border: "none",
+                color: "#BF5AF2",
+                cursor: "pointer",
+                fontSize: 16,
               }}
             >
               ✕
@@ -5607,102 +8237,161 @@ function DebugOverlay({ logs, latencies, tti, componentStatus, isOpen, onToggle,
           </div>
 
           {/* TTI & Performance Summary */}
-          <div style={{
-            padding: '12px 16px',
-            background: 'rgba(191,90,242,0.05)',
-            borderBottom: '1px solid rgba(191,90,242,0.1)',
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: 12,
-            fontSize: 11
-          }}>
+          <div
+            style={{
+              padding: "12px 16px",
+              background: "rgba(191,90,242,0.05)",
+              borderBottom: "1px solid rgba(191,90,242,0.1)",
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: 12,
+              fontSize: 11,
+            }}
+          >
             <div>
-              <div style={{ color: '#A1A1A6', fontSize: 10, marginBottom: 4 }}>Time-to-Interactive</div>
-              <div style={{ color: '#BF5AF2', fontSize: 14, fontWeight: 700 }}>
+              <div style={{ color: "#A1A1A6", fontSize: 10, marginBottom: 4 }}>
+                Time-to-Interactive
+              </div>
+              <div style={{ color: "#BF5AF2", fontSize: 14, fontWeight: 700 }}>
                 {tti}ms
               </div>
             </div>
             <div>
-              <div style={{ color: '#A1A1A6', fontSize: 10, marginBottom: 4 }}>Avg API Latency</div>
-              <div style={{ color: tti < 3000 ? '#30D158' : '#FF453A', fontSize: 14, fontWeight: 700 }}>
+              <div style={{ color: "#A1A1A6", fontSize: 10, marginBottom: 4 }}>
+                Avg API Latency
+              </div>
+              <div
+                style={{
+                  color: tti < 3000 ? "#30D158" : "#FF453A",
+                  fontSize: 14,
+                  fontWeight: 700,
+                }}
+              >
                 {avgLatency}ms
               </div>
             </div>
             <div>
-              <div style={{ color: '#A1A1A6', fontSize: 10, marginBottom: 4 }}>Total Logs</div>
-              <div style={{ color: '#FFD60A', fontSize: 14, fontWeight: 700 }}>
+              <div style={{ color: "#A1A1A6", fontSize: 10, marginBottom: 4 }}>
+                Total Logs
+              </div>
+              <div style={{ color: "#FFD60A", fontSize: 14, fontWeight: 700 }}>
                 {logs.length}
               </div>
             </div>
             <div>
-              <div style={{ color: '#A1A1A6', fontSize: 10, marginBottom: 4 }}>Errors: {Object.keys(logsByType).map(key => logsByType[key].length).reduce((a, b) => a + b, 0) === logs.length ? logs.filter(l => l.type === 'error').length : 0}</div>
-              <div style={{ color: logs.filter(l => l.type === 'error').length > 0 ? '#FF453A' : '#30D158', fontSize: 14, fontWeight: 700 }}>
-                {logs.filter(l => l.type === 'error').length}
+              <div style={{ color: "#A1A1A6", fontSize: 10, marginBottom: 4 }}>
+                Errors:{" "}
+                {Object.keys(logsByType)
+                  .map((key) => logsByType[key].length)
+                  .reduce((a, b) => a + b, 0) === logs.length
+                  ? logs.filter((l) => l.type === "error").length
+                  : 0}
+              </div>
+              <div
+                style={{
+                  color:
+                    logs.filter((l) => l.type === "error").length > 0
+                      ? "#FF453A"
+                      : "#30D158",
+                  fontSize: 14,
+                  fontWeight: 700,
+                }}
+              >
+                {logs.filter((l) => l.type === "error").length}
               </div>
             </div>
           </div>
 
           {/* Tabs */}
-          <div style={{
-            display: 'flex',
-            gap: 0,
-            borderBottom: '1px solid rgba(191,90,242,0.1)',
-            background: 'rgba(0,0,0,0.2)'
-          }}>
-            {['Console', 'Network', 'Components'].map(tab => (
+          <div
+            style={{
+              display: "flex",
+              gap: 0,
+              borderBottom: "1px solid rgba(191,90,242,0.1)",
+              background: "rgba(0,0,0,0.2)",
+            }}
+          >
+            {["Console", "Network", "Components"].map((tab) => (
               <button
                 key={tab}
-                onClick={() => setExpandedSection(expandedSection === tab ? null : tab)}
+                onClick={() =>
+                  setExpandedSection(expandedSection === tab ? null : tab)
+                }
                 style={{
                   flex: 1,
-                  padding: '8px',
-                  background: expandedSection === tab ? 'rgba(191,90,242,0.15)' : 'transparent',
-                  border: 'none',
-                  borderBottom: expandedSection === tab ? '2px solid #BF5AF2' : '1px solid rgba(191,90,242,0.1)',
-                  color: expandedSection === tab ? '#BF5AF2' : '#A1A1A6',
+                  padding: "8px",
+                  background:
+                    expandedSection === tab
+                      ? "rgba(191,90,242,0.15)"
+                      : "transparent",
+                  border: "none",
+                  borderBottom:
+                    expandedSection === tab
+                      ? "2px solid #BF5AF2"
+                      : "1px solid rgba(191,90,242,0.1)",
+                  color: expandedSection === tab ? "#BF5AF2" : "#A1A1A6",
                   fontSize: 10,
                   fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
+                  cursor: "pointer",
+                  transition: "all 0.2s",
                 }}
               >
-                {tab} {tab === 'Console' && `(${logs.length})`}
+                {tab} {tab === "Console" && `(${logs.length})`}
               </button>
             ))}
           </div>
 
           {/* Content Area */}
-          <div style={{
-            flex: 1,
-            overflowY: 'auto',
-            fontSize: 11,
-            fontFamily: 'Consolas, monospace'
-          }}>
+          <div
+            style={{
+              flex: 1,
+              overflowY: "auto",
+              fontSize: 11,
+              fontFamily: "Consolas, monospace",
+            }}
+          >
             {/* Console Logs */}
-            {expandedSection === 'Console' && (
-              <div style={{ padding: '8px' }}>
+            {expandedSection === "Console" && (
+              <div style={{ padding: "8px" }}>
                 {logs.length === 0 ? (
-                  <div style={{ color: '#A1A1A6', padding: '8px' }}>No logs yet</div>
+                  <div style={{ color: "#A1A1A6", padding: "8px" }}>
+                    No logs yet
+                  </div>
                 ) : (
                   logs.slice(-15).map((log, i) => (
                     <div
                       key={i}
                       style={{
-                        padding: '6px',
-                        marginBottom: '4px',
-                        background: log.type === 'error' ? 'rgba(255,69,58,0.1)' : 
-                                    log.type === 'warn' ? 'rgba(255,214,10,0.1)' : 'rgba(255,255,255,0.02)',
+                        padding: "6px",
+                        marginBottom: "4px",
+                        background:
+                          log.type === "error"
+                            ? "rgba(255,69,58,0.1)"
+                            : log.type === "warn"
+                              ? "rgba(255,214,10,0.1)"
+                              : "rgba(255,255,255,0.02)",
                         border: `1px solid ${
-                          log.type === 'error' ? 'rgba(255,69,58,0.3)' :
-                          log.type === 'warn' ? 'rgba(255,214,10,0.3)' : 'rgba(255,255,255,0.1)'
+                          log.type === "error"
+                            ? "rgba(255,69,58,0.3)"
+                            : log.type === "warn"
+                              ? "rgba(255,214,10,0.3)"
+                              : "rgba(255,255,255,0.1)"
                         }`,
                         borderRadius: 4,
-                        color: log.type === 'error' ? '#FF453A' : 
-                               log.type === 'warn' ? '#FFD60A' : log.type === 'info' ? '#0A84FF' : '#D1D1D6',
-                        wordBreak: 'break-word'
+                        color:
+                          log.type === "error"
+                            ? "#FF453A"
+                            : log.type === "warn"
+                              ? "#FFD60A"
+                              : log.type === "info"
+                                ? "#0A84FF"
+                                : "#D1D1D6",
+                        wordBreak: "break-word",
                       }}
                     >
-                      <span style={{ opacity: 0.6, fontSize: 10 }}>[{log.timestamp}]</span>
+                      <span style={{ opacity: 0.6, fontSize: 10 }}>
+                        [{log.timestamp}]
+                      </span>
                       <span style={{ marginLeft: 4 }}>{log.message}</span>
                     </div>
                   ))
@@ -5711,93 +8400,140 @@ function DebugOverlay({ logs, latencies, tti, componentStatus, isOpen, onToggle,
             )}
 
             {/* Network Latency */}
-            {expandedSection === 'Network' && (
-              <div style={{ padding: '8px' }}>
-                <div style={{ color: '#BF5AF2', fontSize: 10, fontWeight: 700, marginBottom: 8 }}>
+            {expandedSection === "Network" && (
+              <div style={{ padding: "8px" }}>
+                <div
+                  style={{
+                    color: "#BF5AF2",
+                    fontSize: 10,
+                    fontWeight: 700,
+                    marginBottom: 8,
+                  }}
+                >
                   Slow Requests ({slowRequests.length}):
                 </div>
                 {slowRequests.length === 0 ? (
-                  <div style={{ color: '#30D158' }}>✓ All requests fast (&lt;2s)</div>
+                  <div style={{ color: "#30D158" }}>
+                    ✓ All requests fast (&lt;2s)
+                  </div>
                 ) : (
                   slowRequests.slice(-8).map((req, i) => (
                     <div
                       key={i}
                       style={{
-                        padding: '6px',
-                        background: 'rgba(255,69,58,0.1)',
-                        border: '1px solid rgba(255,69,58,0.3)',
+                        padding: "6px",
+                        background: "rgba(255,69,58,0.1)",
+                        border: "1px solid rgba(255,69,58,0.3)",
                         borderRadius: 4,
                         marginBottom: 4,
-                        color: '#FF453A',
-                        fontSize: 10
+                        color: "#FF453A",
+                        fontSize: 10,
                       }}
                     >
-                      🐢 {req.endpoint || 'API'}: <strong>{req.ms}ms</strong>
+                      🐢 {req.endpoint || "API"}: <strong>{req.ms}ms</strong>
                     </div>
                   ))
                 )}
-                <div style={{ color: '#BF5AF2', fontSize: 10, fontWeight: 700, marginTop: 8, marginBottom: 8 }}>
+                <div
+                  style={{
+                    color: "#BF5AF2",
+                    fontSize: 10,
+                    fontWeight: 700,
+                    marginTop: 8,
+                    marginBottom: 8,
+                  }}
+                >
                   All Requests ({latencies.length}):
                 </div>
                 {latencies.slice(-8).map((req, i) => (
                   <div
                     key={i}
                     style={{
-                      padding: '4px 6px',
-                      background: req.ms > 2000 ? 'rgba(255,69,58,0.05)' : 'rgba(48,209,88,0.05)',
-                      color: req.ms > 2000 ? '#FF453A' : '#30D158',
+                      padding: "4px 6px",
+                      background:
+                        req.ms > 2000
+                          ? "rgba(255,69,58,0.05)"
+                          : "rgba(48,209,88,0.05)",
+                      color: req.ms > 2000 ? "#FF453A" : "#30D158",
                       fontSize: 9,
-                      borderLeft: `2px solid ${req.ms > 2000 ? '#FF453A' : '#30D158'}`,
-                      paddingLeft: 8
+                      borderLeft: `2px solid ${req.ms > 2000 ? "#FF453A" : "#30D158"}`,
+                      paddingLeft: 8,
                     }}
                   >
-                    {req.endpoint || 'request'}: {req.ms}ms
+                    {req.endpoint || "request"}: {req.ms}ms
                   </div>
                 ))}
               </div>
             )}
 
             {/* Components Status */}
-            {expandedSection === 'Components' && (
-              <div style={{ padding: '8px' }}>
+            {expandedSection === "Components" && (
+              <div style={{ padding: "8px" }}>
                 {Object.entries(componentStatus).length === 0 ? (
-                  <div style={{ color: '#A1A1A6', padding: '8px' }}>Inspecting components... Hover over buttons to see status</div>
+                  <div style={{ color: "#A1A1A6", padding: "8px" }}>
+                    Inspecting components... Hover over buttons to see status
+                  </div>
                 ) : (
-                  Object.entries(componentStatus).slice(-12).map(([key, comp], i) => (
-                    <div
-                      key={i}
-                      onMouseEnter={() => setHoveredComponent(key)}
-                      onMouseLeave={() => setHoveredComponent(null)}
-                      style={{
-                        padding: '6px',
-                        background: hoveredComponent === key ? 'rgba(191,90,242,0.15)' : 'rgba(255,255,255,0.02)',
-                        border: '1px solid rgba(191,90,242,0.2)',
-                        borderRadius: 4,
-                        marginBottom: 4,
-                        color: '#D1D1D6',
-                        fontSize: 9,
-                        cursor: 'pointer',
-                        transition: 'all 0.2s'
-                      }}
-                    >
-                      <div style={{ fontWeight: 600, color: '#BF5AF2' }}>{comp.name}</div>
-                      <div style={{ fontSize: 8, color: '#A1A1A6', marginTop: 2 }}>{comp.element}</div>
-                      <div style={{
-                        marginTop: 4,
-                        display: 'inline-block',
-                        padding: '2px 6px',
-                        background: comp.status === 'loading' ? 'rgba(255,214,10,0.2)' : 
-                                    comp.status === 'error' ? 'rgba(255,69,58,0.2)' : 'rgba(48,209,88,0.2)',
-                        color: comp.status === 'loading' ? '#FFD60A' : 
-                               comp.status === 'error' ? '#FF453A' : '#30D158',
-                        borderRadius: 3,
-                        fontSize: 8,
-                        fontWeight: 600
-                      }}>
-                        ● {comp.status.toUpperCase()}
+                  Object.entries(componentStatus)
+                    .slice(-12)
+                    .map(([key, comp], i) => (
+                      <div
+                        key={i}
+                        onMouseEnter={() => setHoveredComponent(key)}
+                        onMouseLeave={() => setHoveredComponent(null)}
+                        style={{
+                          padding: "6px",
+                          background:
+                            hoveredComponent === key
+                              ? "rgba(191,90,242,0.15)"
+                              : "rgba(255,255,255,0.02)",
+                          border: "1px solid rgba(191,90,242,0.2)",
+                          borderRadius: 4,
+                          marginBottom: 4,
+                          color: "#D1D1D6",
+                          fontSize: 9,
+                          cursor: "pointer",
+                          transition: "all 0.2s",
+                        }}
+                      >
+                        <div style={{ fontWeight: 600, color: "#BF5AF2" }}>
+                          {comp.name}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: 8,
+                            color: "#A1A1A6",
+                            marginTop: 2,
+                          }}
+                        >
+                          {comp.element}
+                        </div>
+                        <div
+                          style={{
+                            marginTop: 4,
+                            display: "inline-block",
+                            padding: "2px 6px",
+                            background:
+                              comp.status === "loading"
+                                ? "rgba(255,214,10,0.2)"
+                                : comp.status === "error"
+                                  ? "rgba(255,69,58,0.2)"
+                                  : "rgba(48,209,88,0.2)",
+                            color:
+                              comp.status === "loading"
+                                ? "#FFD60A"
+                                : comp.status === "error"
+                                  ? "#FF453A"
+                                  : "#30D158",
+                            borderRadius: 3,
+                            fontSize: 8,
+                            fontWeight: 600,
+                          }}
+                        >
+                          ● {comp.status.toUpperCase()}
+                        </div>
                       </div>
-                    </div>
-                  ))
+                    ))
                 )}
               </div>
             )}
@@ -5811,29 +8547,37 @@ function DebugOverlay({ logs, latencies, tti, componentStatus, isOpen, onToggle,
 // ═══════════════════════════════════════════════════════════════════
 //  ADMIN DASHBOARD (PART 1: Logic & Header)
 // ═══════════════════════════════════════════════════════════════════
-function AdminDashboard({ auth, onLogout, isAdminAuthenticated, showToast, maintenanceModeActive, handleToggleMaintenanceMode }) {
+function AdminDashboard({
+  auth,
+  onLogout,
+  isAdminAuthenticated,
+  showToast,
+  maintenanceModeActive,
+  handleToggleMaintenanceMode,
+}) {
   // Import global user list from context
-  const { users, setUsers, loading, setLoading, dbError, setDbError } = useUserList();
+  const { users, setUsers, loading, setLoading, dbError, setDbError } =
+    useUserList();
   // Phase 1: Gate alerts bell to only show when there are pending approvals
   const hasPendingApprovals = useMemo(() => {
     if (!users) return false;
     const arr = Object.values(users);
     return arr.some((u) => {
-      const s = (u && u.status) ? String(u.status) : '';
-      return s.toUpperCase() === 'PENDING';
+      const s = u && u.status ? String(u.status) : "";
+      return s.toUpperCase() === "PENDING";
     });
   }, [users]);
-  
+
   // ALL HOOKS MUST BE AT THE TOP (Before any conditional checks)
-  const [, _setUsers] = useState({}); 
-  const [mirror, setMirror] = useState(null); 
-  const [mirrorData, setMirrorData] = useState(null); 
-  const [, setActionMsg] = useState('');
-  const [filterStatus, setFilterStatus] = useState('ALL');
-  const [searchQuery, setSearchQuery] = useState('');
-  
+  const [, _setUsers] = useState({});
+  const [mirror, setMirror] = useState(null);
+  const [mirrorData, setMirrorData] = useState(null);
+  const [, setActionMsg] = useState("");
+  const [filterStatus, setFilterStatus] = useState("ALL");
+  const [searchQuery, setSearchQuery] = useState("");
+
   // RULE #39, #40, #50: Grid Control - Row Density, Pagination, Column Picker
-  const [rowDensity, setRowDensity] = useState('comfortable'); // 'compact' or 'comfortable'
+  const [rowDensity, setRowDensity] = useState("comfortable"); // 'compact' or 'comfortable'
   const [rowsPerPage, setRowsPerPage] = useState(10); // 10, 50, or 100
   const [currentPage, setCurrentPage] = useState(1); // Pagination page number
   const [visibleColumns, setVisibleColumns] = useState({
@@ -5842,22 +8586,22 @@ function AdminDashboard({ auth, onLogout, isAdminAuthenticated, showToast, maint
     joinDate: true,
     status: true,
     uid: false,
-    role: false
+    role: false,
   });
-  
+
   // RULE #56, #58: Grouping & Advanced Filtering
   const [groupByStatus, setGroupByStatus] = useState(false); // Toggle to group by status
   const [showAdvancedFilter, setShowAdvancedFilter] = useState(false); // Toggle advanced filter panel
   const [balanceFilter, setBalanceFilter] = useState({ min: 0, max: Infinity }); // Balance range filter
-  
+
   // MODULE 4: Command Center & Navigation (#99, #109, #111)
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false); // Toggle command palette
   const [ghostMode, setGhostMode] = useState(false); // Invisible navigation mode
   const [currentViewAsUser, setCurrentViewAsUser] = useState(null); // Shadow mode: view as another user
-  
+
   // MODULE 5: Navigation Hierarchy (#91, #92, #94, #95, #105, #108)
   const [megaMenuOpen, setMegaMenuOpen] = useState(false); // Toggle Mega Menu
-  
+
   // MODULE 7: Mobile & Layout Integrity (#113, #116, #118, #119, #120)
   const [notificationCenterOpen, setNotificationCenterOpen] = useState(false); // Toggle notification center
   // If there are no pending approvals, keep the notification center closed
@@ -5866,172 +8610,202 @@ function AdminDashboard({ auth, onLogout, isAdminAuthenticated, showToast, maint
       setNotificationCenterOpen(false);
     }
   }, [notificationCenterOpen, hasPendingApprovals]);
-  const [currentMobilePage, setCurrentMobilePage] = useState('users'); // Current mobile nav page
-  const [notifications] = useState([ // Sample notifications
-    { title: '✓ User Approved', message: 'John Doe has been approved', time: '2 hrs ago' },
-    { title: '🚫 Account Blocked', message: 'Suspicious activity detected', time: '5 hrs ago' }
+  const [currentMobilePage, setCurrentMobilePage] = useState("users"); // Current mobile nav page
+  const [notifications] = useState([
+    // Sample notifications
+    {
+      title: "✓ User Approved",
+      message: "John Doe has been approved",
+      time: "2 hrs ago",
+    },
+    {
+      title: "🚫 Account Blocked",
+      message: "Suspicious activity detected",
+      time: "5 hrs ago",
+    },
   ]);
-  
+
   // MODULE 8: Visual Polish & Experience (#121, #126, #134, #137, #138)
   const systemIsDark = useSystemTheme(); // Detect OS theme preference
   const [isDarkMode, setIsDarkMode] = useState(systemIsDark); // User theme preference
-  
+
   // RULE #313: Session Recovery - Restore modal state from sessionStorage
   const [selectedUserDocs, setSelectedUserDocs] = useState(() => {
     try {
-      const saved = sessionStorage.getItem('TradersApp_SelectedUserDocs');
+      const saved = sessionStorage.getItem("TradersApp_SelectedUserDocs");
       return saved ? JSON.parse(saved) : null;
     } catch {
       return null;
     }
   });
-  
+
   // RULE #244, #246, #247, #266, #270: Support chat modal state with session recovery
   const [chatModalOpen, setChatModalOpen] = useState(() => {
     try {
-      const saved = sessionStorage.getItem('TradersApp_ChatModalOpen');
-      return saved === 'true';
+      const saved = sessionStorage.getItem("TradersApp_ChatModalOpen");
+      return saved === "true";
     } catch {
       return false;
     }
   });
-  
+
   const [chatWith, setChatWith] = useState(() => {
     try {
-      const saved = sessionStorage.getItem('TradersApp_ChatWith');
+      const saved = sessionStorage.getItem("TradersApp_ChatWith");
       return saved ? JSON.parse(saved) : null;
     } catch {
       return null;
     }
   });
-  
+
   const [duplicateIPs, setDuplicateIPs] = useState({});
-  
+
   // RULE #310: Scroll-spy for menu items - track which section user is viewing
-  const [activeSection, setActiveSection] = useState('users');
-  
+  const [activeSection, setActiveSection] = useState("users");
+
   // ═══════════════════════════════════════════════════════════════════
   // SCROLL-SPY: Highlight menu item matching current view
   // ═══════════════════════════════════════════════════════════════════
   useEffect(() => {
     const handleScroll = () => {
       const sections = [
-        { id: 'users', offset: 0 },
-        { id: 'stats', offset: document.getElementById('admin-stats')?.offsetTop || 2000 },
-        { id: 'settings', offset: document.getElementById('admin-settings')?.offsetTop || 4000 }
+        { id: "users", offset: 0 },
+        {
+          id: "stats",
+          offset: document.getElementById("admin-stats")?.offsetTop || 2000,
+        },
+        {
+          id: "settings",
+          offset: document.getElementById("admin-settings")?.offsetTop || 4000,
+        },
       ];
-      
+
       const scrollPos = window.scrollY + 100; // Offset for header
-      let currentSection = 'users';
-      
+      let currentSection = "users";
+
       for (let i = sections.length - 1; i >= 0; i--) {
         if (scrollPos >= sections[i].offset) {
           currentSection = sections[i].id;
           break;
         }
       }
-      
+
       setActiveSection(currentSection);
     };
-    
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
   }, []);
-  
+
   // RULE #244: IP Fraud Detection - Detect users sharing same IP address
-  
+
   // RULE #313: Save modal states to sessionStorage for session recovery
   useEffect(() => {
     try {
-      sessionStorage.setItem('TradersApp_SelectedUserDocs', JSON.stringify(selectedUserDocs));
+      sessionStorage.setItem(
+        "TradersApp_SelectedUserDocs",
+        JSON.stringify(selectedUserDocs),
+      );
     } catch {
       // Fail silently in private mode
     }
   }, [selectedUserDocs]);
-  
+
   useEffect(() => {
     try {
-      sessionStorage.setItem('TradersApp_ChatModalOpen', chatModalOpen.toString());
+      sessionStorage.setItem(
+        "TradersApp_ChatModalOpen",
+        chatModalOpen.toString(),
+      );
     } catch {
       // Fail silently in private mode
     }
   }, [chatModalOpen]);
-  
+
   useEffect(() => {
     try {
-      sessionStorage.setItem('TradersApp_ChatWith', JSON.stringify(chatWith));
+      sessionStorage.setItem("TradersApp_ChatWith", JSON.stringify(chatWith));
     } catch {
       // Fail silently in private mode
     }
   }, [chatWith]);
-  
+
   // ═══════════════════════════════════════════════════════════════════
   // MODULE 6: PERFORMANCE & CONNECTIVITY - DATA OPTIMIZATION
   // ═══════════════════════════════════════════════════════════════════
-  
+
   // RULE #154: Search Debouncing - Wait 300ms after last keystroke before filtering
-  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
-  
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
+
   useEffect(() => {
     // Timer ID for debounce cleanup
     const timerRef = setTimeout(() => {
       setDebouncedSearchQuery(searchQuery);
     }, 300); // 300ms debounce delay
-    
+
     // Cleanup: Cancel the previous timer if component unmounts or searchQuery changes
     return () => clearTimeout(timerRef);
   }, [searchQuery]);
-  
-  useEffect(() => { 
+
+  useEffect(() => {
     // Set up real-time listener for users
     if (!isAdminAuthenticated && !auth?.token) return;
-    
+
     setLoading(true);
-    setDbError('');
-    
+    setDbError("");
+
     try {
       // Optimized users listener with connection pooling & caching
-      firebaseOptimizer.queueUpdate('users', 'critical');
+      firebaseOptimizer.queueUpdate("users", "critical");
       const unsubscribe = firebaseOptimizer.createOptimizedListener(
-        'users',
+        "users",
         (result) => {
-          const data = result.isBatched ? result.updates[result.updates.length - 1] : result;
-          const usersData = (data && typeof data === 'object') ? data : {};
+          const data = result.isBatched
+            ? result.updates[result.updates.length - 1]
+            : result;
+          const usersData = data && typeof data === "object" ? data : {};
           setUsers(usersData);
           setLoading(false);
-          setDbError('');
+          setDbError("");
         },
-        firebaseDb, ref, onValue
+        firebaseDb,
+        ref,
+        onValue,
       );
-      
+
       // Clean up listener on unmount
       return () => unsubscribe();
     } catch (error) {
-      console.error('Failed to set up listener:', error);
-      setDbError(`Network Error: ${error.message || 'Failed to listen for users'}`);
+      console.error("Failed to set up listener:", error);
+      setDbError(
+        `Network Error: ${error.message || "Failed to listen for users"}`,
+      );
       setUsers({});
       setLoading(false);
     }
   }, [isAdminAuthenticated, auth, setUsers, setLoading, setDbError]);
-  
+
   // RULE #99: Keyboard listener for Command Palette (Ctrl+K)
   useEffect(() => {
     const handleKeyDown = (e) => {
       // Ctrl+K or Cmd+K opens command palette
-      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
         e.preventDefault();
         setCommandPaletteOpen(!commandPaletteOpen);
       }
       // Ctrl+Shift+G toggles ghost mode
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'g') {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "g") {
         e.preventDefault();
         setGhostMode(!ghostMode);
-        showToast(`Stealth Protocol ${!ghostMode ? 'ACTIVATED' : 'DEACTIVATED'}. Shadow mode ${!ghostMode ? 'online' : 'offline'}.`, !ghostMode ? 'success' : 'warning');
+        showToast(
+          `Stealth Protocol ${!ghostMode ? "ACTIVATED" : "DEACTIVATED"}. Shadow mode ${!ghostMode ? "online" : "offline"}.`,
+          !ghostMode ? "success" : "warning",
+        );
       }
     };
-    
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [commandPaletteOpen, ghostMode, showToast]);
 
   // ═══════════════════════════════════════════════════════════════════
@@ -6045,34 +8819,40 @@ function AdminDashboard({ auth, onLogout, isAdminAuthenticated, showToast, maint
           auth.uid,
           ADMIN_UID,
           showToast,
-          window.sendTelegramAlert
+          window.sendTelegramAlert,
         );
-        
+
         // Activate only honeypot layer on load (other layers activated per action)
         securitySentinel.activate();
-        showToast('Atomic Sentinel Online: 4-Layer Perimeter Secure', 'success');
-        
+        showToast(
+          "Atomic Sentinel Online: 4-Layer Perimeter Secure",
+          "success",
+        );
+
         // Expose for admin debugging
         window.securitySentinel = securitySentinel;
-        
+
         // eslint-disable-next-line no-console
-        console.log('🛡️ Security Sentinel activated for user:', auth.uid);
+        console.log("🛡️ Security Sentinel activated for user:", auth.uid);
       } catch (error) {
-        console.error('🛡️ CRASH POINT - Security Sentinel Initialization Failed:', error);
-        console.error('Details:', {
+        console.error(
+          "🛡️ CRASH POINT - Security Sentinel Initialization Failed:",
+          error,
+        );
+        console.error("Details:", {
           auth_uid: auth?.uid,
           firebaseDb_exists: !!firebaseDb,
           admin_uid: ADMIN_UID,
           showToast_exists: !!showToast,
-          sendTelegramAlert_exists: !!window.sendTelegramAlert
+          sendTelegramAlert_exists: !!window.sendTelegramAlert,
         });
       }
     }
   }, [auth, showToast]);
-  
+
   // RULE #244, #246, #247, #266, #270: Detect duplicate IPs for fraud detection
   useEffect(() => {
-    if (users && typeof users === 'object') {
+    if (users && typeof users === "object") {
       const duplicates = detectDuplicateIPs(users);
       setDuplicateIPs(duplicates);
     }
@@ -6087,124 +8867,168 @@ function AdminDashboard({ auth, onLogout, isAdminAuthenticated, showToast, maint
    */
   const recordAdminActivity = (action, target = null) => {
     if (isAdminAuthenticated && window.securitySentinel) {
-      const result = window.securitySentinel.antiHacker.recordAdminActivity(action, target);
-      
+      const result = window.securitySentinel.antiHacker.recordAdminActivity(
+        action,
+        target,
+      );
+
       // If admin panel is locked, show error
       if (result && result.blocked) {
-        showToast('🔒 Admin panel is LOCKED. Detected bot activity. OTP required to unlock.', 'error');
+        showToast(
+          "🔒 Admin panel is LOCKED. Detected bot activity. OTP required to unlock.",
+          "error",
+        );
         return false;
       }
-      
+
       // If suspicious activity detected (>2.5 clicks/sec), warn
       if (result && result.isSuspicious) {
-        console.warn('⚠️ Unusual click speed detected:', result.clicksPerSecond, 'clicks/sec');
+        console.warn(
+          "⚠️ Unusual click speed detected:",
+          result.clicksPerSecond,
+          "clicks/sec",
+        );
       }
-      
+
       return true;
     }
     return true;
   };
-  
+
   const approve = async (uid) => {
     // Record admin activity
-    if (!recordAdminActivity('APPROVE_USER', uid)) return;
+    if (!recordAdminActivity("APPROVE_USER", uid)) return;
 
     try {
-      await dbM(`users/${uid}`, { status: 'ACTIVE', approvedAt: new Date().toISOString() }, auth?.token); 
+      await dbM(
+        `users/${uid}`,
+        { status: "ACTIVE", approvedAt: new Date().toISOString() },
+        auth?.token,
+      );
       setActionMsg(`✓ User ${uid.slice(0, 8)}... APPROVED`);
-      showToast(`Authorization granted. User ${uid.slice(0, 8)}... now have system access.`, 'success');
-      
+      showToast(
+        `Authorization granted. User ${uid.slice(0, 8)}... now have system access.`,
+        "success",
+      );
+
       // RULE #123: Confetti Success Animation on approval
       triggerConfetti(40, 2.5);
-      
+
       // No need to manually reload - onSnapshot listener will update automatically
     } catch {
-      showToast('Approval protocol disrupted. Check your authorization vectors.', 'error');
+      showToast(
+        "Approval protocol disrupted. Check your authorization vectors.",
+        "error",
+      );
     }
   };
-  
-  const block = async (uid) => { 
+
+  const block = async (uid) => {
     try {
-      await dbM(`users/${uid}`, { status: 'BLOCKED', blockedAt: new Date().toISOString() }, auth?.token); 
+      await dbM(
+        `users/${uid}`,
+        { status: "BLOCKED", blockedAt: new Date().toISOString() },
+        auth?.token,
+      );
       setActionMsg(`🚫 User ${uid.slice(0, 8)}... BLOCKED`);
-      showToast(`User ${uid.slice(0, 8)}... removed from active roster. Access revoked.`, 'warning');
+      showToast(
+        `User ${uid.slice(0, 8)}... removed from active roster. Access revoked.`,
+        "warning",
+      );
       // No need to manually reload - onSnapshot listener will update automatically
-      if (mirror === uid) { 
-        setMirror(null); 
-        setMirrorData(null); 
+      if (mirror === uid) {
+        setMirror(null);
+        setMirrorData(null);
       }
     } catch {
-      showToast('Block command rejected. User still occupying bandwidth.', 'error');
+      showToast(
+        "Block command rejected. User still occupying bandwidth.",
+        "error",
+      );
     }
   };
-  
-  const openMirror = async (uid) => { 
-    setMirror(uid); 
-    const data = await dbR(`users/${uid}`, auth?.token); 
-    setMirrorData(data); 
+
+  const openMirror = async (uid) => {
+    setMirror(uid);
+    const data = await dbR(`users/${uid}`, auth?.token);
+    setMirrorData(data);
   };
-  
+
   const statusColor = { ACTIVE: T.green, PENDING: T.gold, BLOCKED: T.red };
   const userList = Object.entries(users);
-  
+
   // Deduplicate users by email, keeping only the most recent entry (by createdAt)
   const uniqueUserMap = {};
   userList.forEach(([uid, userData]) => {
     if (!userData || !userData.email) return; // Skip invalid entries
     const email = userData.email.toLowerCase().trim();
-    
+
     // If email not seen before, add it
     if (!uniqueUserMap[email]) {
       uniqueUserMap[email] = [uid, userData];
     } else {
       // If email exists, compare createdAt and keep the newer one
-      const existingCreatedAt = new Date(uniqueUserMap[email][1].createdAt || 0).getTime();
+      const existingCreatedAt = new Date(
+        uniqueUserMap[email][1].createdAt || 0,
+      ).getTime();
       const currentCreatedAt = new Date(userData.createdAt || 0).getTime();
-      
+
       if (currentCreatedAt > existingCreatedAt) {
         uniqueUserMap[email] = [uid, userData];
       }
     }
   });
-  
+
   // Convert back to array format
   const deduplicatedUserList = Object.values(uniqueUserMap);
-  
+
   // Normalize status comparison: case-insensitive
   const normalizeStatus = (status) => {
-    if (!status) return '';
-    return status.toLowerCase() === 'pending' ? 'PENDING' 
-         : status.toUpperCase() === 'ACTIVE' ? 'ACTIVE'
-         : status.toUpperCase() === 'BLOCKED' ? 'BLOCKED'
-         : status.toUpperCase();
+    if (!status) return "";
+    return status.toLowerCase() === "pending"
+      ? "PENDING"
+      : status.toUpperCase() === "ACTIVE"
+        ? "ACTIVE"
+        : status.toUpperCase() === "BLOCKED"
+          ? "BLOCKED"
+          : status.toUpperCase();
   };
-  
+
   // Filter users by status with proper case-insensitive logic (using deduplicated list)
-  const filteredUsers = filterStatus === 'ALL' 
-    ? deduplicatedUserList 
-    : deduplicatedUserList.filter(([, u]) => normalizeStatus(u.status) === filterStatus);
-  
+  const filteredUsers =
+    filterStatus === "ALL"
+      ? deduplicatedUserList
+      : deduplicatedUserList.filter(
+          ([, u]) => normalizeStatus(u.status) === filterStatus,
+        );
+
   // RULE #34, #35: Apply fuzzy search filter with scoring and relevance ranking
   // RULE #154: Uses debouncedSearchQuery (300ms debounce) for performance optimization
   const searchFilteredUsers = debouncedSearchQuery.trim()
     ? filteredUsers
         .map(([uid, u]) => {
-          const nameScore = fuzzySearchScore(debouncedSearchQuery, u.fullName || '');
-          const emailScore = fuzzySearchScore(debouncedSearchQuery, u.email || '');
+          const nameScore = fuzzySearchScore(
+            debouncedSearchQuery,
+            u.fullName || "",
+          );
+          const emailScore = fuzzySearchScore(
+            debouncedSearchQuery,
+            u.email || "",
+          );
           const maxScore = Math.max(nameScore, emailScore);
-          
+
           return {
             uid,
             user: u,
             score: maxScore,
-            matchedField: nameScore > emailScore ? 'name' : 'email'
+            matchedField: nameScore > emailScore ? "name" : "email",
           };
         })
-        .filter(item => item.score >= 0) // Only include matches
+        .filter((item) => item.score >= 0) // Only include matches
         .sort((a, b) => b.score - a.score) // Sort by relevance (highest score first)
-        .map(item => [item.uid, item.user])
+        .map((item) => [item.uid, item.user])
     : filteredUsers;
-  
+
   // RULE #58: Apply Advanced Filter - Balance range filter
   const advancedFilteredUsers = showAdvancedFilter
     ? searchFilteredUsers.filter(([, u]) => {
@@ -6212,106 +9036,130 @@ function AdminDashboard({ auth, onLogout, isAdminAuthenticated, showToast, maint
         return balance >= balanceFilter.min && balance <= balanceFilter.max;
       })
     : searchFilteredUsers;
-  
+
   // Debug: Log if filter results are empty but counts show data
-  if (filterStatus !== 'ALL' && filteredUsers.length === 0 && deduplicatedUserList.length > 0) {
-    console.warn(`Filter '${filterStatus}' returned 0 results. User statuses in DB:`, 
-      deduplicatedUserList.map(([, d]) => d.status).filter(Boolean)
+  if (
+    filterStatus !== "ALL" &&
+    filteredUsers.length === 0 &&
+    deduplicatedUserList.length > 0
+  ) {
+    console.warn(
+      `Filter '${filterStatus}' returned 0 results. User statuses in DB:`,
+      deduplicatedUserList.map(([, d]) => d.status).filter(Boolean),
     );
   }
-  
+
   // Calculate status counts using the deduplicated list
   const statusCounts = {
     ALL: deduplicatedUserList.length,
-    ACTIVE: deduplicatedUserList.filter(([, u]) => normalizeStatus(u.status) === 'ACTIVE').length,
-    PENDING: deduplicatedUserList.filter(([, u]) => normalizeStatus(u.status) === 'PENDING').length,
-    BLOCKED: deduplicatedUserList.filter(([, u]) => normalizeStatus(u.status) === 'BLOCKED').length
+    ACTIVE: deduplicatedUserList.filter(
+      ([, u]) => normalizeStatus(u.status) === "ACTIVE",
+    ).length,
+    PENDING: deduplicatedUserList.filter(
+      ([, u]) => normalizeStatus(u.status) === "PENDING",
+    ).length,
+    BLOCKED: deduplicatedUserList.filter(
+      ([, u]) => normalizeStatus(u.status) === "BLOCKED",
+    ).length,
   };
-  
+
   // RULE #39, #40, #50: Pagination Logic - Calculate displayed rows
   let finalUsers = advancedFilteredUsers;
-  
+
   // RULE #56: Group by Status - Organize users into sections
   if (groupByStatus) {
     const grouped = {
-      ACTIVE: advancedFilteredUsers.filter(([, u]) => normalizeStatus(u.status) === 'ACTIVE'),
-      PENDING: advancedFilteredUsers.filter(([, u]) => normalizeStatus(u.status) === 'PENDING'),
-      BLOCKED: advancedFilteredUsers.filter(([, u]) => normalizeStatus(u.status) === 'BLOCKED')
+      ACTIVE: advancedFilteredUsers.filter(
+        ([, u]) => normalizeStatus(u.status) === "ACTIVE",
+      ),
+      PENDING: advancedFilteredUsers.filter(
+        ([, u]) => normalizeStatus(u.status) === "PENDING",
+      ),
+      BLOCKED: advancedFilteredUsers.filter(
+        ([, u]) => normalizeStatus(u.status) === "BLOCKED",
+      ),
     };
     // Flatten back to array but preserve grouping order
     finalUsers = [...grouped.ACTIVE, ...grouped.PENDING, ...grouped.BLOCKED];
   }
-  
+
   const totalResults = finalUsers.length;
   const totalPages = Math.ceil(totalResults / rowsPerPage);
   const validPage = Math.min(currentPage, Math.max(1, totalPages));
   const startIdx = (validPage - 1) * rowsPerPage;
   const endIdx = startIdx + rowsPerPage;
   const paginatedUsers = finalUsers.slice(startIdx, endIdx);
-  
+
   // Helper function to generate grid template columns based on visible columns
   const getGridTemplateColumns = () => {
     const cols = [];
-    if (visibleColumns.name) cols.push('2fr');
-    if (visibleColumns.email) cols.push('2fr');
-    if (visibleColumns.joinDate) cols.push('1.5fr');
-    if (visibleColumns.uid) cols.push('1.5fr');
-    if (visibleColumns.role) cols.push('1.2fr');
-    if (visibleColumns.status) cols.push('1.2fr');
-    cols.push('1fr'); // Actions column always visible
-    return cols.join(' ');
+    if (visibleColumns.name) cols.push("2fr");
+    if (visibleColumns.email) cols.push("2fr");
+    if (visibleColumns.joinDate) cols.push("1.5fr");
+    if (visibleColumns.uid) cols.push("1.5fr");
+    if (visibleColumns.role) cols.push("1.2fr");
+    if (visibleColumns.status) cols.push("1.2fr");
+    cols.push("1fr"); // Actions column always visible
+    return cols.join(" ");
   };
-  
+
   // RULE #283, #285, #290, #294, #299: Mobile detection for responsive action cards
-  const isMobileView = typeof window !== 'undefined' && window.innerWidth < 768;
-  
+  const isMobileView = typeof window !== "undefined" && window.innerWidth < 768;
+
   // Helper function to get row padding based on density
   const getRowPadding = () => {
-    return rowDensity === 'compact' ? '8px 20px' : '14px 20px';
+    return rowDensity === "compact" ? "8px 20px" : "14px 20px";
   };
-  
+
   return (
-    <div style={{ minHeight: "100vh", background: T.bg, color: T.text, fontFamily: T.font, animation: "fadeInDashboard 0.6s ease-out" }}>
-      
+    <div
+      style={{
+        minHeight: "100vh",
+        background: T.bg,
+        color: T.text,
+        fontFamily: T.font,
+        animation: "fadeInDashboard 0.6s ease-out",
+      }}
+    >
       {/* RULE #54: Loading Overlay - Shows while syncing with database */}
       <LoadingOverlay isLoading={loading} />
-      
+
       {/* RULE #119: Notification Center - Sidebar/Overlay */}
-      <NotificationCenter 
+      <NotificationCenter
         isOpen={notificationCenterOpen}
         onClose={() => setNotificationCenterOpen(false)}
         notifications={notifications}
       />
-      
+
       {/* RULE #113: Mobile Bottom Navigation */}
-      <MobileBottomNav 
+      <MobileBottomNav
         currentPage={currentMobilePage}
         onNavigate={setCurrentMobilePage}
       />
-      
+
       {/* RULE #99 & #111: Command Palette - Ctrl+K to search users/commands */}
-      <CommandPalette 
-        isOpen={commandPaletteOpen} 
-        onClose={() => setCommandPaletteOpen(false)} 
-        users={Array.isArray(users) ? users : Object.values(users || {})} 
+      <CommandPalette
+        isOpen={commandPaletteOpen}
+        onClose={() => setCommandPaletteOpen(false)}
+        users={Array.isArray(users) ? users : Object.values(users || {})}
         onJumpToUser={(uid) => {
           setCurrentViewAsUser(uid);
           setCommandPaletteOpen(false);
-          showToast(`Switched to user: ${uid}`, 'info');
+          showToast(`Switched to user: ${uid}`, "info");
         }}
         onToggleGhostMode={() => setGhostMode(!ghostMode)}
         ghostMode={ghostMode}
         showToast={showToast}
       />
-      
+
       {/* RULE #92: Mega Menu for Tools */}
       <MegaMenu isOpen={megaMenuOpen} onClose={() => setMegaMenuOpen(false)} />
-      
+
       {/* RULE #244, #246, #247, #266, #270: Support Chat Modal */}
       <SupportChatModal
         isOpen={chatModalOpen}
         userId={chatWith}
-        userName={users?.[chatWith]?.fullName || 'User'}
+        userName={users?.[chatWith]?.fullName || "User"}
         onClose={() => {
           setChatModalOpen(false);
           setChatWith(null);
@@ -6319,56 +9167,104 @@ function AdminDashboard({ auth, onLogout, isAdminAuthenticated, showToast, maint
         auth={auth}
         showToast={showToast}
       />
-      
+
       {/* RULE #91: Breadcrumbs Navigation */}
-      <Breadcrumbs 
+      <Breadcrumbs
         items={[
-          { icon: '🏠', label: 'Home', path: '/', onNavigate: true },
-          { icon: '🛡️', label: 'Admin', path: '/admin', onNavigate: true },
-          { icon: '👥', label: 'Users', path: '/admin/users', active: true }
+          { icon: "🏠", label: "Home", path: "/", onNavigate: true },
+          { icon: "🛡️", label: "Admin", path: "/admin", onNavigate: true },
+          { icon: "👥", label: "Users", path: "/admin/users", active: true },
         ]}
         onNavigate={() => void 0}
       />
-      
+
       {/* Admin Dashboard Header */}
-      <div style={{ background: "#FFFFFF", borderBottom: `1px solid #E5E7EB`, padding: "16px 32px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 16, boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.1)" }} className="glass-panel">
+      <div
+        style={{
+          background: "#FFFFFF",
+          borderBottom: `1px solid #E5E7EB`,
+          padding: "16px 32px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          flexWrap: "wrap",
+          gap: 16,
+          boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.1)",
+        }}
+        className="glass-panel"
+      >
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
           <LED color={T.purple} size={12} pulse />
           <div>
-            <div style={{ color: T.purple, fontSize: 15, letterSpacing: 3, fontWeight: 800 }}>
-              {getTimeBasedGreeting('Admin').fullGreeting} — GOD MODE
+            <div
+              style={{
+                color: T.purple,
+                fontSize: 15,
+                letterSpacing: 3,
+                fontWeight: 800,
+              }}
+            >
+              {getTimeBasedGreeting("Admin").fullGreeting} — GOD MODE
             </div>
-            <div style={{ color: T.muted, fontSize: 11, letterSpacing: 2, marginTop: 4, fontWeight: 600 }}>
+            <div
+              style={{
+                color: T.muted,
+                fontSize: 11,
+                letterSpacing: 2,
+                marginTop: 4,
+                fontWeight: 600,
+              }}
+            >
               MASTER ADMIN DASHBOARD · {ADMIN_EMAIL}
             </div>
           </div>
         </div>
-        
-        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", zIndex: 50 }}>
-          {['ALL', 'ACTIVE', 'PENDING', 'BLOCKED'].map(status => (
-            <button 
+
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            flexWrap: "wrap",
+            zIndex: 50,
+          }}
+        >
+          {["ALL", "ACTIVE", "PENDING", "BLOCKED"].map((status) => (
+            <button
               key={status}
               onClick={() => setFilterStatus(status)}
-              style={{ 
-                background: filterStatus === status ? `rgba(${status === 'ACTIVE' ? '48,209,88' : status === 'PENDING' ? '255,214,10' : status === 'BLOCKED' ? '255,69,58' : '0,122,255'},0.2)` : "transparent",
-                border: `1px solid ${filterStatus === status ? (status === 'ACTIVE' ? 'rgba(48,209,88,0.6)' : status === 'PENDING' ? 'rgba(255,214,10,0.6)' : status === 'BLOCKED' ? 'rgba(255,69,58,0.6)' : 'rgba(0,122,255,0.6)') : 'rgba(255,255,255,0.2)'}`,
-                borderRadius: 6, 
-                padding: "8px 16px", 
-                cursor: "pointer", 
-                color: filterStatus === status ? (status === 'ACTIVE' ? T.green : status === 'PENDING' ? T.gold : status === 'BLOCKED' ? T.red : T.blue) : T.muted,
-                fontFamily: T.font, 
-                fontSize: 11, 
-                letterSpacing: 1, 
+              style={{
+                background:
+                  filterStatus === status
+                    ? `rgba(${status === "ACTIVE" ? "48,209,88" : status === "PENDING" ? "255,214,10" : status === "BLOCKED" ? "255,69,58" : "0,122,255"},0.2)`
+                    : "transparent",
+                border: `1px solid ${filterStatus === status ? (status === "ACTIVE" ? "rgba(48,209,88,0.6)" : status === "PENDING" ? "rgba(255,214,10,0.6)" : status === "BLOCKED" ? "rgba(255,69,58,0.6)" : "rgba(0,122,255,0.6)") : "rgba(255,255,255,0.2)"}`,
+                borderRadius: 6,
+                padding: "8px 16px",
+                cursor: "pointer",
+                color:
+                  filterStatus === status
+                    ? status === "ACTIVE"
+                      ? T.green
+                      : status === "PENDING"
+                        ? T.gold
+                        : status === "BLOCKED"
+                          ? T.red
+                          : T.blue
+                    : T.muted,
+                fontFamily: T.font,
+                fontSize: 11,
+                letterSpacing: 1,
                 fontWeight: 700,
-                transition: "all 0.2s ease-in-out"
+                transition: "all 0.2s ease-in-out",
               }}
-              onMouseEnter={e => {
+              onMouseEnter={(e) => {
                 if (filterStatus !== status) {
                   e.currentTarget.style.background = "rgba(255,255,255,0.05)";
                   e.currentTarget.style.transform = "translateY(-2px)";
                 }
               }}
-              onMouseLeave={e => {
+              onMouseLeave={(e) => {
                 if (filterStatus !== status) {
                   e.currentTarget.style.background = "transparent";
                   e.currentTarget.style.transform = "translateY(0)";
@@ -6376,10 +9272,16 @@ function AdminDashboard({ auth, onLogout, isAdminAuthenticated, showToast, maint
               }}
               className="btn-glass"
             >
-              {status === 'ALL' ? `${status} (${statusCounts.ALL})` : status === 'ACTIVE' ? `${status} (${statusCounts.ACTIVE})` : status === 'PENDING' ? `${status} (${statusCounts.PENDING})` : `BANNED (${statusCounts.BLOCKED})`}
+              {status === "ALL"
+                ? `${status} (${statusCounts.ALL})`
+                : status === "ACTIVE"
+                  ? `${status} (${statusCounts.ACTIVE})`
+                  : status === "PENDING"
+                    ? `${status} (${statusCounts.PENDING})`
+                    : `BANNED (${statusCounts.BLOCKED})`}
             </button>
           ))}
-          
+
           {/* RULE #56: Group By Status Toggle */}
           <button
             onClick={() => setGroupByStatus(!groupByStatus)}
@@ -6394,15 +9296,15 @@ function AdminDashboard({ auth, onLogout, isAdminAuthenticated, showToast, maint
               fontSize: 11,
               letterSpacing: 1,
               fontWeight: 700,
-              transition: "all 0.2s ease-in-out"
+              transition: "all 0.2s ease-in-out",
             }}
-            onMouseEnter={e => {
+            onMouseEnter={(e) => {
               if (!groupByStatus) {
                 e.currentTarget.style.background = "rgba(255,255,255,0.05)";
                 e.currentTarget.style.transform = "translateY(-2px)";
               }
             }}
-            onMouseLeave={e => {
+            onMouseLeave={(e) => {
               if (!groupByStatus) {
                 e.currentTarget.style.background = "transparent";
                 e.currentTarget.style.transform = "translateY(0)";
@@ -6411,14 +9313,16 @@ function AdminDashboard({ auth, onLogout, isAdminAuthenticated, showToast, maint
             className="btn-glass"
             title="Group users by their status"
           >
-            {groupByStatus ? '⊟ Grouped' : '⊞ Group By'}
+            {groupByStatus ? "⊟ Grouped" : "⊞ Group By"}
           </button>
-          
+
           {/* RULE #58: Advanced Filter Toggle */}
           <button
             onClick={() => setShowAdvancedFilter(!showAdvancedFilter)}
             style={{
-              background: showAdvancedFilter ? "rgba(0,122,255,0.2)" : "transparent",
+              background: showAdvancedFilter
+                ? "rgba(0,122,255,0.2)"
+                : "transparent",
               border: `1px solid ${showAdvancedFilter ? "rgba(0,122,255,0.5)" : "rgba(255,255,255,0.2)"}`,
               borderRadius: 6,
               padding: "8px 16px",
@@ -6428,15 +9332,15 @@ function AdminDashboard({ auth, onLogout, isAdminAuthenticated, showToast, maint
               fontSize: 11,
               letterSpacing: 1,
               fontWeight: 700,
-              transition: "all 0.2s ease-in-out"
+              transition: "all 0.2s ease-in-out",
             }}
-            onMouseEnter={e => {
+            onMouseEnter={(e) => {
               if (!showAdvancedFilter) {
                 e.currentTarget.style.background = "rgba(255,255,255,0.05)";
                 e.currentTarget.style.transform = "translateY(-2px)";
               }
             }}
-            onMouseLeave={e => {
+            onMouseLeave={(e) => {
               if (!showAdvancedFilter) {
                 e.currentTarget.style.background = "transparent";
                 e.currentTarget.style.transform = "translateY(0)";
@@ -6445,16 +9349,16 @@ function AdminDashboard({ auth, onLogout, isAdminAuthenticated, showToast, maint
             className="btn-glass"
             title="Show advanced filtering options"
           >
-            {showAdvancedFilter ? '⊟ Filters' : '⚙ Filters'}
+            {showAdvancedFilter ? "⊟ Filters" : "⚙ Filters"}
           </button>
-          
-          <button 
+
+          <button
             onClick={async () => {
               // Optional: Manual refresh for users who prefer it, though real-time listener handles updates
               setLoading(true);
-              setDbError('');
+              setDbError("");
               try {
-                const usersRef = ref(firebaseDb, 'users');
+                const usersRef = ref(firebaseDb, "users");
                 const snapshot = await get(usersRef);
                 if (snapshot.exists()) {
                   setUsers(snapshot.val());
@@ -6462,47 +9366,72 @@ function AdminDashboard({ auth, onLogout, isAdminAuthenticated, showToast, maint
                   setUsers({});
                 }
               } catch (error) {
-                console.error('Failed to refresh users:', error);
+                console.error("Failed to refresh users:", error);
                 setDbError(`Network Error: ${error.message}`);
               } finally {
                 setLoading(false);
               }
             }}
-            style={{ background: "transparent", border: `1px solid rgba(255,255,255,0.1)`, borderRadius: 6, padding: "8px 16px", cursor: "pointer", color: T.muted, fontFamily: T.font, fontSize: 11, letterSpacing: 1, fontWeight: 600, transition: "all 0.2s ease-in-out" }} 
-            onMouseEnter={e => {
+            style={{
+              background: "transparent",
+              border: `1px solid rgba(255,255,255,0.1)`,
+              borderRadius: 6,
+              padding: "8px 16px",
+              cursor: "pointer",
+              color: T.muted,
+              fontFamily: T.font,
+              fontSize: 11,
+              letterSpacing: 1,
+              fontWeight: 600,
+              transition: "all 0.2s ease-in-out",
+            }}
+            onMouseEnter={(e) => {
               e.currentTarget.style.background = "rgba(255,255,255,0.05)";
               e.currentTarget.style.borderColor = "rgba(255,255,255,0.3)";
               e.currentTarget.style.transform = "translateY(-2px)";
             }}
-            onMouseLeave={e => {
+            onMouseLeave={(e) => {
               e.currentTarget.style.background = "transparent";
               e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)";
               e.currentTarget.style.transform = "translateY(0)";
             }}
-            className="btn-glass">
+            className="btn-glass"
+          >
             ↺ REFRESH
           </button>
-          
+
           {/* RULE #109 & #111: User Switcher - Shadow Mode */}
-          <UserSwitcher 
-            users={Array.isArray(users) ? users : Object.values(users || {})} 
-            currentViewAsUser={currentViewAsUser} 
+          <UserSwitcher
+            users={Array.isArray(users) ? users : Object.values(users || {})}
+            currentViewAsUser={currentViewAsUser}
             onSwitchUser={setCurrentViewAsUser}
             ghostMode={ghostMode}
           />
-          
+
           {/* RULE #94: Mega Menu Tools Button */}
-          <button 
+          <button
             onClick={() => setMegaMenuOpen(!megaMenuOpen)}
-            style={{ background: megaMenuOpen ? "rgba(0,122,255,0.2)" : "transparent", border: `1px solid ${megaMenuOpen ? "rgba(0,122,255,0.5)" : "rgba(255,255,255,0.2)"}`, borderRadius: 6, padding: "8px 16px", cursor: "pointer", color: megaMenuOpen ? T.blue : T.muted, fontFamily: T.font, fontSize: 11, letterSpacing: 1, fontWeight: 600, transition: "all 0.2s ease-in-out" }}
-            onMouseEnter={e => {
+            style={{
+              background: megaMenuOpen ? "rgba(0,122,255,0.2)" : "transparent",
+              border: `1px solid ${megaMenuOpen ? "rgba(0,122,255,0.5)" : "rgba(255,255,255,0.2)"}`,
+              borderRadius: 6,
+              padding: "8px 16px",
+              cursor: "pointer",
+              color: megaMenuOpen ? T.blue : T.muted,
+              fontFamily: T.font,
+              fontSize: 11,
+              letterSpacing: 1,
+              fontWeight: 600,
+              transition: "all 0.2s ease-in-out",
+            }}
+            onMouseEnter={(e) => {
               if (!megaMenuOpen) {
                 e.currentTarget.style.background = "rgba(255,255,255,0.05)";
                 e.currentTarget.style.borderColor = "rgba(255,255,255,0.3)";
                 e.currentTarget.style.transform = "translateY(-2px)";
               }
             }}
-            onMouseLeave={e => {
+            onMouseLeave={(e) => {
               if (!megaMenuOpen) {
                 e.currentTarget.style.background = "transparent";
                 e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)";
@@ -6514,32 +9443,34 @@ function AdminDashboard({ auth, onLogout, isAdminAuthenticated, showToast, maint
           >
             🛠️ TOOLS
           </button>
-          
+
           {/* RULE #119: Notification Center Button */}
-          <button 
+          <button
             onClick={() => setNotificationCenterOpen(!notificationCenterOpen)}
-            style={{ 
-              background: notificationCenterOpen ? "rgba(0,122,255,0.2)" : "transparent", 
-              border: `1px solid ${notificationCenterOpen ? "rgba(0,122,255,0.5)" : "rgba(255,255,255,0.2)"}`, 
-              borderRadius: 6, 
-              padding: "8px 12px", 
-              cursor: "pointer", 
-              color: notificationCenterOpen ? T.blue : T.muted, 
-              fontFamily: T.font, 
-              fontSize: 11, 
-              letterSpacing: 1, 
+            style={{
+              background: notificationCenterOpen
+                ? "rgba(0,122,255,0.2)"
+                : "transparent",
+              border: `1px solid ${notificationCenterOpen ? "rgba(0,122,255,0.5)" : "rgba(255,255,255,0.2)"}`,
+              borderRadius: 6,
+              padding: "8px 12px",
+              cursor: "pointer",
+              color: notificationCenterOpen ? T.blue : T.muted,
+              fontFamily: T.font,
+              fontSize: 11,
+              letterSpacing: 1,
               fontWeight: 700,
               transition: "all 0.2s ease-in-out",
-              position: 'relative'
+              position: "relative",
             }}
-            onMouseEnter={e => {
+            onMouseEnter={(e) => {
               if (!notificationCenterOpen) {
                 e.currentTarget.style.background = "rgba(255,255,255,0.05)";
                 e.currentTarget.style.borderColor = "rgba(255,255,255,0.3)";
                 e.currentTarget.style.transform = "translateY(-2px)";
               }
             }}
-            onMouseLeave={e => {
+            onMouseLeave={(e) => {
               if (!notificationCenterOpen) {
                 e.currentTarget.style.background = "transparent";
                 e.currentTarget.style.borderColor = "rgba(255,255,255,0.2)";
@@ -6549,124 +9480,205 @@ function AdminDashboard({ auth, onLogout, isAdminAuthenticated, showToast, maint
             className="btn-glass"
             title="Open Notification Center"
           >
-            🔔 {notifications.length > 0 && <span style={{ 
-              position: 'absolute',
-              top: '0px',
-              right: '2px',
-              background: T.red,
-              color: T.text,
-              borderRadius: '50%',
-              width: '16px',
-              height: '16px',
-              fontSize: '9px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontWeight: 700
-            }}>{notifications.length}</span>}
+            🔔{" "}
+            {notifications.length > 0 && (
+              <span
+                style={{
+                  position: "absolute",
+                  top: "0px",
+                  right: "2px",
+                  background: T.red,
+                  color: T.text,
+                  borderRadius: "50%",
+                  width: "16px",
+                  height: "16px",
+                  fontSize: "9px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontWeight: 700,
+                }}
+              >
+                {notifications.length}
+              </span>
+            )}
           </button>
-          
+
           {/* RULE #121: System Theme Sync - Toggle dark/light mode */}
-          <SystemThemeSync 
+          <SystemThemeSync
             isDarkMode={isDarkMode}
             onThemeChange={(newDarkMode) => {
               setIsDarkMode(newDarkMode);
-              showToast(`${newDarkMode ? '🌙 Dark' : '☀️ Light'} Mode Enabled`, 'info');
+              showToast(
+                `${newDarkMode ? "🌙 Dark" : "☀️ Light"} Mode Enabled`,
+                "info",
+              );
             }}
           />
-          
+
           {/* RULE #101: Full-Screen Toggle */}
           <FullScreenToggle showToast={showToast} />
-          
+
           {/* RULE #295, #296: Maintenance Mode Toggle */}
           <button
             onClick={handleToggleMaintenanceMode}
-            title={maintenanceModeActive ? 'Disable Maintenance Mode' : 'Enable Maintenance Mode'}
+            title={
+              maintenanceModeActive
+                ? "Disable Maintenance Mode"
+                : "Enable Maintenance Mode"
+            }
             style={{
-              background: maintenanceModeActive ? 'rgba(255,165,0,0.2)' : 'transparent',
-              border: `1px solid ${maintenanceModeActive ? 'rgba(255,165,0,0.6)' : 'rgba(255,255,255,0.2)'}`,
+              background: maintenanceModeActive
+                ? "rgba(255,165,0,0.2)"
+                : "transparent",
+              border: `1px solid ${maintenanceModeActive ? "rgba(255,165,0,0.6)" : "rgba(255,255,255,0.2)"}`,
               borderRadius: 6,
-              padding: '8px 16px',
-              cursor: 'pointer',
-              color: maintenanceModeActive ? '#FFB340' : T.muted,
+              padding: "8px 16px",
+              cursor: "pointer",
+              color: maintenanceModeActive ? "#FFB340" : T.muted,
               fontFamily: T.font,
               fontSize: 11,
               letterSpacing: 1,
               fontWeight: 700,
-              transition: 'all 0.2s ease-in-out',
-              animation: maintenanceModeActive ? 'pulse 1.5s ease-in-out infinite' : 'none'
+              transition: "all 0.2s ease-in-out",
+              animation: maintenanceModeActive
+                ? "pulse 1.5s ease-in-out infinite"
+                : "none",
             }}
-            onMouseEnter={e => {
-              e.currentTarget.style.background = 'rgba(255,165,0,0.3)';
-              e.currentTarget.style.transform = 'translateY(-2px)';
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "rgba(255,165,0,0.3)";
+              e.currentTarget.style.transform = "translateY(-2px)";
             }}
-            onMouseLeave={e => {
-              e.currentTarget.style.background = maintenanceModeActive ? 'rgba(255,165,0,0.2)' : 'transparent';
-              e.currentTarget.style.transform = 'translateY(0)';
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = maintenanceModeActive
+                ? "rgba(255,165,0,0.2)"
+                : "transparent";
+              e.currentTarget.style.transform = "translateY(0)";
             }}
             className="btn-glass"
           >
-            {maintenanceModeActive ? '⏱️ MAINTENANCE ON' : '⏱️ MAINTENANCE OFF'}
+            {maintenanceModeActive ? "⏱️ MAINTENANCE ON" : "⏱️ MAINTENANCE OFF"}
           </button>
-          
-          <button 
-            onClick={onLogout} 
-            style={{ background: "rgba(255,69,58,0.1)", border: `1px solid rgba(255,69,58,0.3)`, borderRadius: 6, padding: "8px 16px", cursor: "pointer", color: T.red, fontFamily: T.font, fontSize: 11, letterSpacing: 1, fontWeight: 600, transition: "all 0.2s ease-in-out" }}
-            onMouseEnter={e => {
+
+          <button
+            onClick={onLogout}
+            style={{
+              background: "rgba(255,69,58,0.1)",
+              border: `1px solid rgba(255,69,58,0.3)`,
+              borderRadius: 6,
+              padding: "8px 16px",
+              cursor: "pointer",
+              color: T.red,
+              fontFamily: T.font,
+              fontSize: 11,
+              letterSpacing: 1,
+              fontWeight: 600,
+              transition: "all 0.2s ease-in-out",
+            }}
+            onMouseEnter={(e) => {
               e.currentTarget.style.background = "rgba(255,69,58,0.2)";
               e.currentTarget.style.borderColor = "rgba(255,69,58,0.6)";
               e.currentTarget.style.transform = "translateY(-2px)";
             }}
-            onMouseLeave={e => {
+            onMouseLeave={(e) => {
               e.currentTarget.style.background = "rgba(255,69,58,0.1)";
               e.currentTarget.style.borderColor = "rgba(255,69,58,0.3)";
               e.currentTarget.style.transform = "translateY(0)";
             }}
-            className="btn-glass">
+            className="btn-glass"
+          >
             LOGOUT
           </button>
         </div>
       </div>
-      
+
       {/* RULE #310: Scroll-Spy Navigation Menu */}
-      <div style={{ padding: "8px 20px", borderBottom: `1px solid rgba(255,255,255,0.1)`, background: "rgba(0,0,0,0.3)", display: "flex", gap: 8, overflowX: "auto" }} className="glass-panel">
+      <div
+        style={{
+          padding: "8px 20px",
+          borderBottom: `1px solid rgba(255,255,255,0.1)`,
+          background: "rgba(0,0,0,0.3)",
+          display: "flex",
+          gap: 8,
+          overflowX: "auto",
+        }}
+        className="glass-panel"
+      >
         <div
-          className={`menu-item ${activeSection === 'users' ? 'active' : ''}`}
-          onClick={() => document.getElementById('admin-users')?.scrollIntoView({ behavior: 'smooth' })}
+          className={`menu-item ${activeSection === "users" ? "active" : ""}`}
+          onClick={() =>
+            document
+              .getElementById("admin-users")
+              ?.scrollIntoView({ behavior: "smooth" })
+          }
           style={{
-            cursor: 'pointer',
-            whiteSpace: 'nowrap',
-            ...(activeSection === 'users' ? {
-              color: T.blue,
-              background: "rgba(10,132,255,0.15)",
-              borderLeft: `3px solid ${T.blue}`,
-              paddingLeft: '9px'
-            } : {
-              color: T.muted
-            })
+            cursor: "pointer",
+            whiteSpace: "nowrap",
+            ...(activeSection === "users"
+              ? {
+                  color: T.blue,
+                  background: "rgba(10,132,255,0.15)",
+                  borderLeft: `3px solid ${T.blue}`,
+                  paddingLeft: "9px",
+                }
+              : {
+                  color: T.muted,
+                }),
           }}
         >
           👥 Users
         </div>
       </div>
-      
+
       {/* Data Table & Mirror Layout */}
-      <div style={{ display: "flex", height: "calc(100vh - 75px - 48px)", flexWrap: "wrap" }}>
-        
+      <div
+        style={{
+          display: "flex",
+          height: "calc(100vh - 75px - 48px)",
+          flexWrap: "wrap",
+        }}
+      >
         {/* RULE #92: Left Column - Sticky Sidebar with Professional Data Table */}
-        <div id="admin-users" style={{ width: mirror ? 440 : "100%", flex: mirror ? undefined : 1, borderRight: `1px solid rgba(255,255,255,0.1)`, overflowY: "auto", overflowX: "hidden", background: "rgba(0,0,0,0.2)", display: "flex", flexDirection: "column" }}>
-          
+        <div
+          id="admin-users"
+          style={{
+            width: mirror ? 440 : "100%",
+            flex: mirror ? undefined : 1,
+            borderRight: `1px solid rgba(255,255,255,0.1)`,
+            overflowY: "auto",
+            overflowX: "hidden",
+            background: "rgba(0,0,0,0.2)",
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
           {/* Search Bar - Sticky Header */}
-          <div style={{ padding: "16px 20px", borderBottom: `1px solid rgba(255,255,255,0.1)`, background: "rgba(20,20,20,0.8)", display: "flex", alignItems: "center", gap: 8, position: "sticky", top: 0, zIndex: 6, flexShrink: 0 }} className="glass-panel">
-            <span style={{ color: T.cyan, fontSize: 14, fontWeight: 600 }}>🔍</span>
-            <input 
+          <div
+            style={{
+              padding: "16px 20px",
+              borderBottom: `1px solid rgba(255,255,255,0.1)`,
+              background: "rgba(20,20,20,0.8)",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              position: "sticky",
+              top: 0,
+              zIndex: 6,
+              flexShrink: 0,
+            }}
+            className="glass-panel"
+          >
+            <span style={{ color: T.cyan, fontSize: 14, fontWeight: 600 }}>
+              🔍
+            </span>
+            <input
               type="text"
               placeholder="Search by Name or Email"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              style={{ 
+              style={{
                 flex: 1,
-                background: "rgba(0,0,0,0.4)", 
+                background: "rgba(0,0,0,0.4)",
                 border: `1px solid rgba(255,255,255,0.15)`,
                 borderRadius: 6,
                 padding: "10px 14px",
@@ -6675,7 +9687,7 @@ function AdminDashboard({ auth, onLogout, isAdminAuthenticated, showToast, maint
                 fontFamily: T.font,
                 letterSpacing: 0.5,
                 outline: "none",
-                transition: "all 0.2s ease-in-out"
+                transition: "all 0.2s ease-in-out",
               }}
               onFocus={(e) => {
                 e.target.style.background = "rgba(0,0,0,0.6)";
@@ -6691,7 +9703,7 @@ function AdminDashboard({ auth, onLogout, isAdminAuthenticated, showToast, maint
             />
             {searchQuery && (
               <button
-                onClick={() => setSearchQuery('')}
+                onClick={() => setSearchQuery("")}
                 style={{
                   background: "transparent",
                   border: "none",
@@ -6699,31 +9711,60 @@ function AdminDashboard({ auth, onLogout, isAdminAuthenticated, showToast, maint
                   cursor: "pointer",
                   fontSize: 16,
                   padding: 4,
-                  transition: "all 0.2s ease"
+                  transition: "all 0.2s ease",
                 }}
-                onMouseEnter={e => e.currentTarget.style.color = T.text}
-                onMouseLeave={e => e.currentTarget.style.color = T.muted}
+                onMouseEnter={(e) => (e.currentTarget.style.color = T.text)}
+                onMouseLeave={(e) => (e.currentTarget.style.color = T.muted)}
               >
                 ✕
               </button>
             )}
           </div>
-          
+
           {/* RULE #58: Advanced Filter Panel - Balance range filter */}
           {showAdvancedFilter && (
-            <div style={{ padding: "16px 20px", borderBottom: `1px solid rgba(0,122,255,0.2)`, background: "rgba(0,122,255,0.08)", display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }} className="glass-panel">
-              <span style={{ color: T.blue, fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1 }}>💰 Balance Range:</span>
-              
+            <div
+              style={{
+                padding: "16px 20px",
+                borderBottom: `1px solid rgba(0,122,255,0.2)`,
+                background: "rgba(0,122,255,0.08)",
+                display: "flex",
+                alignItems: "center",
+                gap: 16,
+                flexWrap: "wrap",
+              }}
+              className="glass-panel"
+            >
+              <span
+                style={{
+                  color: T.blue,
+                  fontSize: 10,
+                  fontWeight: 600,
+                  textTransform: "uppercase",
+                  letterSpacing: 1,
+                }}
+              >
+                💰 Balance Range:
+              </span>
+
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ color: T.muted, fontSize: 10, fontWeight: 600 }}>Min:</span>
+                  <span
+                    style={{ color: T.muted, fontSize: 10, fontWeight: 600 }}
+                  >
+                    Min:
+                  </span>
                   <input
                     type="number"
                     placeholder="0"
-                    value={balanceFilter.min === 0 ? '' : balanceFilter.min}
+                    value={balanceFilter.min === 0 ? "" : balanceFilter.min}
                     onChange={(e) => {
-                      const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
-                      setBalanceFilter(prev => ({ ...prev, min: Math.max(0, val) }));
+                      const val =
+                        e.target.value === "" ? 0 : parseFloat(e.target.value);
+                      setBalanceFilter((prev) => ({
+                        ...prev,
+                        min: Math.max(0, val),
+                      }));
                     }}
                     style={{
                       background: "rgba(0,0,0,0.4)",
@@ -6736,28 +9777,37 @@ function AdminDashboard({ auth, onLogout, isAdminAuthenticated, showToast, maint
                       fontWeight: 600,
                       width: "70px",
                       outline: "none",
-                      transition: "all 0.2s ease-in-out"
+                      transition: "all 0.2s ease-in-out",
                     }}
-                    onFocus={e => {
+                    onFocus={(e) => {
                       e.target.style.background = "rgba(0,0,0,0.6)";
                       e.target.style.borderColor = "rgba(0,122,255,0.5)";
                     }}
-                    onBlur={e => {
+                    onBlur={(e) => {
                       e.target.style.background = "rgba(0,0,0,0.4)";
                       e.target.style.borderColor = "rgba(0,122,255,0.3)";
                     }}
                   />
                 </div>
-                
+
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ color: T.muted, fontSize: 10, fontWeight: 600 }}>Max:</span>
+                  <span
+                    style={{ color: T.muted, fontSize: 10, fontWeight: 600 }}
+                  >
+                    Max:
+                  </span>
                   <input
                     type="number"
                     placeholder="∞"
-                    value={balanceFilter.max === Infinity ? '' : balanceFilter.max}
+                    value={
+                      balanceFilter.max === Infinity ? "" : balanceFilter.max
+                    }
                     onChange={(e) => {
-                      const val = e.target.value === '' ? Infinity : parseFloat(e.target.value);
-                      setBalanceFilter(prev => ({ ...prev, max: val }));
+                      const val =
+                        e.target.value === ""
+                          ? Infinity
+                          : parseFloat(e.target.value);
+                      setBalanceFilter((prev) => ({ ...prev, max: val }));
                     }}
                     style={{
                       background: "rgba(0,0,0,0.4)",
@@ -6770,19 +9820,19 @@ function AdminDashboard({ auth, onLogout, isAdminAuthenticated, showToast, maint
                       fontWeight: 600,
                       width: "70px",
                       outline: "none",
-                      transition: "all 0.2s ease-in-out"
+                      transition: "all 0.2s ease-in-out",
                     }}
-                    onFocus={e => {
+                    onFocus={(e) => {
                       e.target.style.background = "rgba(0,0,0,0.6)";
                       e.target.style.borderColor = "rgba(0,122,255,0.5)";
                     }}
-                    onBlur={e => {
+                    onBlur={(e) => {
                       e.target.style.background = "rgba(0,0,0,0.4)";
                       e.target.style.borderColor = "rgba(0,122,255,0.3)";
                     }}
                   />
                 </div>
-                
+
                 <button
                   onClick={() => {
                     setBalanceFilter({ min: 0, max: Infinity });
@@ -6797,13 +9847,13 @@ function AdminDashboard({ auth, onLogout, isAdminAuthenticated, showToast, maint
                     fontFamily: T.font,
                     fontSize: 10,
                     fontWeight: 600,
-                    transition: "all 0.2s ease-in-out"
+                    transition: "all 0.2s ease-in-out",
                   }}
-                  onMouseEnter={e => {
+                  onMouseEnter={(e) => {
                     e.currentTarget.style.background = "rgba(0,122,255,0.15)";
                     e.currentTarget.style.borderColor = "rgba(0,122,255,0.5)";
                   }}
-                  onMouseLeave={e => {
+                  onMouseLeave={(e) => {
                     e.currentTarget.style.background = "transparent";
                     e.currentTarget.style.borderColor = "rgba(0,122,255,0.3)";
                   }}
@@ -6813,21 +9863,45 @@ function AdminDashboard({ auth, onLogout, isAdminAuthenticated, showToast, maint
               </div>
             </div>
           )}
-          
+
           {/* RULE #39, #40, #50: Grid Control Bar - Density, Pagination, Column Picker */}
-          <div style={{ padding: "12px 20px", borderBottom: `1px solid rgba(255,255,255,0.1)`, background: "rgba(15,15,15,0.8)", display: "flex", alignItems: "center", gap: 16, justifyContent: "space-between", flexWrap: "wrap" }} className="glass-panel">
-            
+          <div
+            style={{
+              padding: "12px 20px",
+              borderBottom: `1px solid rgba(255,255,255,0.1)`,
+              background: "rgba(15,15,15,0.8)",
+              display: "flex",
+              alignItems: "center",
+              gap: 16,
+              justifyContent: "space-between",
+              flexWrap: "wrap",
+            }}
+            className="glass-panel"
+          >
             {/* Left: Row Density Toggle & Rows Per Page */}
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               {/* Row Density Toggle */}
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ color: T.muted, fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1 }}>Density:</span>
-                {['compact', 'comfortable'].map(density => (
+                <span
+                  style={{
+                    color: T.muted,
+                    fontSize: 10,
+                    fontWeight: 600,
+                    textTransform: "uppercase",
+                    letterSpacing: 1,
+                  }}
+                >
+                  Density:
+                </span>
+                {["compact", "comfortable"].map((density) => (
                   <button
                     key={density}
                     onClick={() => setRowDensity(density)}
                     style={{
-                      background: rowDensity === density ? "rgba(0,122,255,0.2)" : "transparent",
+                      background:
+                        rowDensity === density
+                          ? "rgba(0,122,255,0.2)"
+                          : "transparent",
                       border: `1px solid ${rowDensity === density ? "rgba(0,122,255,0.5)" : "rgba(255,255,255,0.15)"}`,
                       borderRadius: 4,
                       padding: "6px 12px",
@@ -6838,29 +9912,42 @@ function AdminDashboard({ auth, onLogout, isAdminAuthenticated, showToast, maint
                       fontWeight: 600,
                       textTransform: "uppercase",
                       letterSpacing: 0.5,
-                      transition: "all 0.2s ease-in-out"
+                      transition: "all 0.2s ease-in-out",
                     }}
-                    onMouseEnter={e => {
+                    onMouseEnter={(e) => {
                       if (rowDensity !== density) {
-                        e.currentTarget.style.background = "rgba(255,255,255,0.05)";
-                        e.currentTarget.style.borderColor = "rgba(255,255,255,0.3)";
+                        e.currentTarget.style.background =
+                          "rgba(255,255,255,0.05)";
+                        e.currentTarget.style.borderColor =
+                          "rgba(255,255,255,0.3)";
                       }
                     }}
-                    onMouseLeave={e => {
+                    onMouseLeave={(e) => {
                       if (rowDensity !== density) {
                         e.currentTarget.style.background = "transparent";
-                        e.currentTarget.style.borderColor = "rgba(255,255,255,0.15)";
+                        e.currentTarget.style.borderColor =
+                          "rgba(255,255,255,0.15)";
                       }
                     }}
                   >
-                    {density === 'compact' ? '⊡ Compact' : '⊞ Comfortable'}
+                    {density === "compact" ? "⊡ Compact" : "⊞ Comfortable"}
                   </button>
                 ))}
               </div>
-              
+
               {/* Rows Per Page Selector */}
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ color: T.muted, fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1 }}>Rows:</span>
+                <span
+                  style={{
+                    color: T.muted,
+                    fontSize: 10,
+                    fontWeight: 600,
+                    textTransform: "uppercase",
+                    letterSpacing: 1,
+                  }}
+                >
+                  Rows:
+                </span>
                 <select
                   value={rowsPerPage}
                   onChange={(e) => {
@@ -6878,13 +9965,13 @@ function AdminDashboard({ auth, onLogout, isAdminAuthenticated, showToast, maint
                     fontWeight: 600,
                     cursor: "pointer",
                     outline: "none",
-                    transition: "all 0.2s ease-in-out"
+                    transition: "all 0.2s ease-in-out",
                   }}
-                  onFocus={e => {
+                  onFocus={(e) => {
                     e.target.style.background = "rgba(0,0,0,0.6)";
                     e.target.style.borderColor = "rgba(0,122,255,0.5)";
                   }}
-                  onBlur={e => {
+                  onBlur={(e) => {
                     e.target.style.background = "rgba(0,0,0,0.4)";
                     e.target.style.borderColor = "rgba(255,255,255,0.15)";
                   }}
@@ -6895,21 +9982,33 @@ function AdminDashboard({ auth, onLogout, isAdminAuthenticated, showToast, maint
                 </select>
               </div>
             </div>
-            
+
             {/* Right: Column Picker & Pagination Info */}
             <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
               {/* Pagination Info */}
-              <div style={{ color: T.muted, fontSize: 10, fontWeight: 600, whiteSpace: "nowrap" }}>
-                {totalResults > 0 ? `${startIdx + 1}–${Math.min(endIdx, totalResults)} of ${totalResults}` : '0 results'}
+              <div
+                style={{
+                  color: T.muted,
+                  fontSize: 10,
+                  fontWeight: 600,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {totalResults > 0
+                  ? `${startIdx + 1}–${Math.min(endIdx, totalResults)} of ${totalResults}`
+                  : "0 results"}
               </div>
-              
+
               {/* Pagination Controls */}
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <button
                   onClick={() => setCurrentPage(Math.max(1, validPage - 1))}
                   disabled={validPage === 1}
                   style={{
-                    background: validPage === 1 ? "rgba(255,255,255,0.05)" : "rgba(0,122,255,0.15)",
+                    background:
+                      validPage === 1
+                        ? "rgba(255,255,255,0.05)"
+                        : "rgba(0,122,255,0.15)",
                     border: `1px solid ${validPage === 1 ? "rgba(255,255,255,0.1)" : "rgba(0,122,255,0.3)"}`,
                     borderRadius: 4,
                     padding: "6px 8px",
@@ -6918,15 +10017,15 @@ function AdminDashboard({ auth, onLogout, isAdminAuthenticated, showToast, maint
                     fontFamily: T.font,
                     fontSize: 11,
                     fontWeight: 600,
-                    transition: "all 0.2s ease-in-out"
+                    transition: "all 0.2s ease-in-out",
                   }}
-                  onMouseEnter={e => {
+                  onMouseEnter={(e) => {
                     if (validPage !== 1) {
                       e.currentTarget.style.background = "rgba(0,122,255,0.25)";
                       e.currentTarget.style.borderColor = "rgba(0,122,255,0.5)";
                     }
                   }}
-                  onMouseLeave={e => {
+                  onMouseLeave={(e) => {
                     if (validPage !== 1) {
                       e.currentTarget.style.background = "rgba(0,122,255,0.15)";
                       e.currentTarget.style.borderColor = "rgba(0,122,255,0.3)";
@@ -6935,33 +10034,47 @@ function AdminDashboard({ auth, onLogout, isAdminAuthenticated, showToast, maint
                 >
                   ←
                 </button>
-                
-                <span style={{ color: T.muted, fontSize: 10, fontWeight: 600, minWidth: "40px", textAlign: "center" }}>
-                  {totalPages > 0 ? `${validPage}/${totalPages}` : '0/0'}
+
+                <span
+                  style={{
+                    color: T.muted,
+                    fontSize: 10,
+                    fontWeight: 600,
+                    minWidth: "40px",
+                    textAlign: "center",
+                  }}
+                >
+                  {totalPages > 0 ? `${validPage}/${totalPages}` : "0/0"}
                 </span>
-                
+
                 <button
-                  onClick={() => setCurrentPage(Math.min(totalPages, validPage + 1))}
+                  onClick={() =>
+                    setCurrentPage(Math.min(totalPages, validPage + 1))
+                  }
                   disabled={validPage === totalPages}
                   style={{
-                    background: validPage === totalPages ? "rgba(255,255,255,0.05)" : "rgba(0,122,255,0.15)",
+                    background:
+                      validPage === totalPages
+                        ? "rgba(255,255,255,0.05)"
+                        : "rgba(0,122,255,0.15)",
                     border: `1px solid ${validPage === totalPages ? "rgba(255,255,255,0.1)" : "rgba(0,122,255,0.3)"}`,
                     borderRadius: 4,
                     padding: "6px 8px",
-                    cursor: validPage === totalPages ? "not-allowed" : "pointer",
+                    cursor:
+                      validPage === totalPages ? "not-allowed" : "pointer",
                     color: validPage === totalPages ? T.dim : T.blue,
                     fontFamily: T.font,
                     fontSize: 11,
                     fontWeight: 600,
-                    transition: "all 0.2s ease-in-out"
+                    transition: "all 0.2s ease-in-out",
                   }}
-                  onMouseEnter={e => {
+                  onMouseEnter={(e) => {
                     if (validPage !== totalPages) {
                       e.currentTarget.style.background = "rgba(0,122,255,0.25)";
                       e.currentTarget.style.borderColor = "rgba(0,122,255,0.5)";
                     }
                   }}
-                  onMouseLeave={e => {
+                  onMouseLeave={(e) => {
                     if (validPage !== totalPages) {
                       e.currentTarget.style.background = "rgba(0,122,255,0.15)";
                       e.currentTarget.style.borderColor = "rgba(0,122,255,0.3)";
@@ -6971,13 +10084,14 @@ function AdminDashboard({ auth, onLogout, isAdminAuthenticated, showToast, maint
                   →
                 </button>
               </div>
-              
+
               {/* Column Picker Dropdown */}
               <div style={{ position: "relative" }}>
                 <button
                   onClick={(e) => {
                     const menu = e.currentTarget.nextElementSibling;
-                    menu.style.display = menu.style.display === "none" ? "block" : "none";
+                    menu.style.display =
+                      menu.style.display === "none" ? "block" : "none";
                   }}
                   style={{
                     background: "rgba(0,122,255,0.15)",
@@ -6991,20 +10105,20 @@ function AdminDashboard({ auth, onLogout, isAdminAuthenticated, showToast, maint
                     fontWeight: 600,
                     textTransform: "uppercase",
                     letterSpacing: 0.5,
-                    transition: "all 0.2s ease-in-out"
+                    transition: "all 0.2s ease-in-out",
                   }}
-                  onMouseEnter={e => {
+                  onMouseEnter={(e) => {
                     e.currentTarget.style.background = "rgba(0,122,255,0.25)";
                     e.currentTarget.style.borderColor = "rgba(0,122,255,0.5)";
                   }}
-                  onMouseLeave={e => {
+                  onMouseLeave={(e) => {
                     e.currentTarget.style.background = "rgba(0,122,255,0.15)";
                     e.currentTarget.style.borderColor = "rgba(0,122,255,0.3)";
                   }}
                 >
                   ⚙ Columns
                 </button>
-                
+
                 <div
                   style={{
                     display: "none",
@@ -7018,18 +10132,18 @@ function AdminDashboard({ auth, onLogout, isAdminAuthenticated, showToast, maint
                     padding: "8px 0",
                     minWidth: "160px",
                     zIndex: 100,
-                    boxShadow: "0 8px 24px rgba(0,0,0,0.5)"
+                    boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
                   }}
                   onClick={(e) => e.stopPropagation()}
                 >
                   {[
-                    { key: 'name', label: 'Name' },
-                    { key: 'email', label: 'Email' },
-                    { key: 'joinDate', label: 'Join Date' },
-                    { key: 'status', label: 'Status' },
-                    { key: 'uid', label: 'UID' },
-                    { key: 'role', label: 'Role' }
-                  ].map(col => (
+                    { key: "name", label: "Name" },
+                    { key: "email", label: "Email" },
+                    { key: "joinDate", label: "Join Date" },
+                    { key: "status", label: "Status" },
+                    { key: "uid", label: "UID" },
+                    { key: "role", label: "Role" },
+                  ].map((col) => (
                     <label
                       key={col.key}
                       style={{
@@ -7042,13 +10156,14 @@ function AdminDashboard({ auth, onLogout, isAdminAuthenticated, showToast, maint
                         fontSize: 11,
                         fontWeight: 600,
                         transition: "all 0.15s ease",
-                        userSelect: "none"
+                        userSelect: "none",
                       }}
-                      onMouseEnter={e => {
-                        e.currentTarget.style.background = "rgba(0,122,255,0.15)";
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background =
+                          "rgba(0,122,255,0.15)";
                         e.currentTarget.style.color = T.text;
                       }}
-                      onMouseLeave={e => {
+                      onMouseLeave={(e) => {
                         e.currentTarget.style.background = "transparent";
                         e.currentTarget.style.color = T.muted;
                       }}
@@ -7057,16 +10172,16 @@ function AdminDashboard({ auth, onLogout, isAdminAuthenticated, showToast, maint
                         type="checkbox"
                         checked={visibleColumns[col.key]}
                         onChange={(e) => {
-                          setVisibleColumns(prev => ({
+                          setVisibleColumns((prev) => ({
                             ...prev,
-                            [col.key]: e.target.checked
+                            [col.key]: e.target.checked,
                           }));
                         }}
                         style={{
                           cursor: "pointer",
                           width: 14,
                           height: 14,
-                          accentColor: T.blue
+                          accentColor: T.blue,
                         }}
                       />
                       <span>{col.label}</span>
@@ -7076,34 +10191,142 @@ function AdminDashboard({ auth, onLogout, isAdminAuthenticated, showToast, maint
               </div>
             </div>
           </div>
-          
+
           {/* Table Header - Hidden on Mobile */}
-          {!loading && !dbError && paginatedUsers.length > 0 && !isMobileView && (
-            <div style={{ padding: "16px 20px", borderBottom: `1px solid rgba(255,255,255,0.15)`, background: "rgba(20,20,20,0.8)", display: "grid", gridTemplateColumns: getGridTemplateColumns(), gap: 16, position: "sticky", top: 0, zIndex: 5 }} className="glass-panel">
-              {visibleColumns.name && <div style={{ color: T.muted, fontSize: 10, letterSpacing: 1.5, fontWeight: 700, textTransform: "uppercase" }}>Name</div>}
-              {visibleColumns.email && <div style={{ color: T.muted, fontSize: 10, letterSpacing: 1.5, fontWeight: 700, textTransform: "uppercase" }}>Email</div>}
-              {visibleColumns.joinDate && <div style={{ color: T.muted, fontSize: 10, letterSpacing: 1.5, fontWeight: 700, textTransform: "uppercase" }}>Joined</div>}
-              {visibleColumns.uid && <div style={{ color: T.muted, fontSize: 10, letterSpacing: 1.5, fontWeight: 700, textTransform: "uppercase" }}>UID</div>}
-              {visibleColumns.role && <div style={{ color: T.muted, fontSize: 10, letterSpacing: 1.5, fontWeight: 700, textTransform: "uppercase" }}>Role</div>}
-              {visibleColumns.status && <div style={{ color: T.muted, fontSize: 10, letterSpacing: 1.5, fontWeight: 700, textTransform: "uppercase" }}>Status</div>}
-              <div style={{ color: T.muted, fontSize: 10, letterSpacing: 1.5, fontWeight: 700, textTransform: "uppercase" }}>Actions</div>
-            </div>
-          )}
-          
+          {!loading &&
+            !dbError &&
+            paginatedUsers.length > 0 &&
+            !isMobileView && (
+              <div
+                style={{
+                  padding: "16px 20px",
+                  borderBottom: `1px solid rgba(255,255,255,0.15)`,
+                  background: "rgba(20,20,20,0.8)",
+                  display: "grid",
+                  gridTemplateColumns: getGridTemplateColumns(),
+                  gap: 16,
+                  position: "sticky",
+                  top: 0,
+                  zIndex: 5,
+                }}
+                className="glass-panel"
+              >
+                {visibleColumns.name && (
+                  <div
+                    style={{
+                      color: T.muted,
+                      fontSize: 10,
+                      letterSpacing: 1.5,
+                      fontWeight: 700,
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    Name
+                  </div>
+                )}
+                {visibleColumns.email && (
+                  <div
+                    style={{
+                      color: T.muted,
+                      fontSize: 10,
+                      letterSpacing: 1.5,
+                      fontWeight: 700,
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    Email
+                  </div>
+                )}
+                {visibleColumns.joinDate && (
+                  <div
+                    style={{
+                      color: T.muted,
+                      fontSize: 10,
+                      letterSpacing: 1.5,
+                      fontWeight: 700,
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    Joined
+                  </div>
+                )}
+                {visibleColumns.uid && (
+                  <div
+                    style={{
+                      color: T.muted,
+                      fontSize: 10,
+                      letterSpacing: 1.5,
+                      fontWeight: 700,
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    UID
+                  </div>
+                )}
+                {visibleColumns.role && (
+                  <div
+                    style={{
+                      color: T.muted,
+                      fontSize: 10,
+                      letterSpacing: 1.5,
+                      fontWeight: 700,
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    Role
+                  </div>
+                )}
+                {visibleColumns.status && (
+                  <div
+                    style={{
+                      color: T.muted,
+                      fontSize: 10,
+                      letterSpacing: 1.5,
+                      fontWeight: 700,
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    Status
+                  </div>
+                )}
+                <div
+                  style={{
+                    color: T.muted,
+                    fontSize: 10,
+                    letterSpacing: 1.5,
+                    fontWeight: 700,
+                    textTransform: "uppercase",
+                  }}
+                >
+                  Actions
+                </div>
+              </div>
+            )}
+
           {/* Table Body */}
           {loading ? (
             <TableSkeletonLoader />
           ) : dbError ? (
-            <div style={{ padding: "60px 40px", textAlign: "center", color: T.red, fontSize: 13, fontWeight: 600 }}>
+            <div
+              style={{
+                padding: "60px 40px",
+                textAlign: "center",
+                color: T.red,
+                fontSize: 13,
+                fontWeight: 600,
+              }}
+            >
               <div style={{ marginBottom: 16, fontSize: 20 }}>⚠️</div>
-              <div style={{ marginBottom: 20, fontSize: 13, lineHeight: 1.6 }}>{dbError}</div>
-              <button 
+              <div style={{ marginBottom: 20, fontSize: 13, lineHeight: 1.6 }}>
+                {dbError}
+              </div>
+              <button
                 onClick={async () => {
                   // Retry: Manual refresh when error occurs
                   setLoading(true);
-                  setDbError('');
+                  setDbError("");
                   try {
-                    const usersRef = ref(firebaseDb, 'users');
+                    const usersRef = ref(firebaseDb, "users");
                     const snapshot = await get(usersRef);
                     if (snapshot.exists()) {
                       setUsers(snapshot.val());
@@ -7111,51 +10334,83 @@ function AdminDashboard({ auth, onLogout, isAdminAuthenticated, showToast, maint
                       setUsers({});
                     }
                   } catch (error) {
-                    console.error('Failed to retry:', error);
+                    console.error("Failed to retry:", error);
                     setDbError(`Network Error: ${error.message}`);
                   } finally {
                     setLoading(false);
                   }
                 }}
-                style={{ marginTop: 16, background: "rgba(255,69,58,0.2)", border: `1px solid rgba(255,69,58,0.4)`, borderRadius: 6, padding: "10px 20px", cursor: "pointer", color: T.red, fontSize: 12, fontFamily: T.font, letterSpacing: 1, fontWeight: 700, transition: "all 0.2s ease-in-out" }}
-                onMouseEnter={e => {
+                style={{
+                  marginTop: 16,
+                  background: "rgba(255,69,58,0.2)",
+                  border: `1px solid rgba(255,69,58,0.4)`,
+                  borderRadius: 6,
+                  padding: "10px 20px",
+                  cursor: "pointer",
+                  color: T.red,
+                  fontSize: 12,
+                  fontFamily: T.font,
+                  letterSpacing: 1,
+                  fontWeight: 700,
+                  transition: "all 0.2s ease-in-out",
+                }}
+                onMouseEnter={(e) => {
                   e.currentTarget.style.background = "rgba(255,69,58,0.3)";
                   e.currentTarget.style.boxShadow = `0 0 16px rgba(255,69,58,0.4)`;
                   e.currentTarget.style.transform = "translateY(-2px)";
                 }}
-                onMouseLeave={e => {
+                onMouseLeave={(e) => {
                   e.currentTarget.style.background = "rgba(255,69,58,0.2)";
                   e.currentTarget.style.boxShadow = "none";
                   e.currentTarget.style.transform = "translateY(0)";
                 }}
-                className="btn-glass">
+                className="btn-glass"
+              >
                 ↺ RETRY
               </button>
             </div>
           ) : totalResults === 0 ? (
             <>
-              <EmptyStateCard searchQuery={searchQuery} filterStatus={filterStatus} />
-              {(searchQuery || filterStatus !== 'ALL' || showAdvancedFilter) && (
+              <EmptyStateCard
+                searchQuery={searchQuery}
+                filterStatus={filterStatus}
+              />
+              {(searchQuery ||
+                filterStatus !== "ALL" ||
+                showAdvancedFilter) && (
                 <div style={{ textAlign: "center", paddingBottom: "40px" }}>
-                  <button 
-                    onClick={() => { 
-                      setSearchQuery(''); 
-                      if (filterStatus !== 'ALL') setFilterStatus('ALL');
+                  <button
+                    onClick={() => {
+                      setSearchQuery("");
+                      if (filterStatus !== "ALL") setFilterStatus("ALL");
                       if (showAdvancedFilter) setShowAdvancedFilter(false);
                       setBalanceFilter({ min: 0, max: Infinity });
-                    }} 
-                    style={{ background: "rgba(0,122,255,0.2)", border: `1px solid rgba(0,122,255,0.4)`, borderRadius: 6, padding: "10px 20px", cursor: "pointer", color: T.blue, fontSize: 11, fontFamily: T.font, letterSpacing: 1, fontWeight: 700, transition: "all 0.2s ease-in-out" }}
-                    onMouseEnter={e => {
+                    }}
+                    style={{
+                      background: "rgba(0,122,255,0.2)",
+                      border: `1px solid rgba(0,122,255,0.4)`,
+                      borderRadius: 6,
+                      padding: "10px 20px",
+                      cursor: "pointer",
+                      color: T.blue,
+                      fontSize: 11,
+                      fontFamily: T.font,
+                      letterSpacing: 1,
+                      fontWeight: 700,
+                      transition: "all 0.2s ease-in-out",
+                    }}
+                    onMouseEnter={(e) => {
                       e.currentTarget.style.background = "rgba(0,122,255,0.3)";
                       e.currentTarget.style.borderColor = "rgba(0,122,255,0.6)";
                       e.currentTarget.style.transform = "translateY(-2px)";
                     }}
-                    onMouseLeave={e => {
+                    onMouseLeave={(e) => {
                       e.currentTarget.style.background = "rgba(0,122,255,0.2)";
                       e.currentTarget.style.borderColor = "rgba(0,122,255,0.4)";
                       e.currentTarget.style.transform = "translateY(0)";
                     }}
-                    className="btn-glass">
+                    className="btn-glass"
+                  >
                     ← CLEAR ALL FILTERS
                   </button>
                 </div>
@@ -7164,45 +10419,72 @@ function AdminDashboard({ auth, onLogout, isAdminAuthenticated, showToast, maint
           ) : (
             paginatedUsers.map(([uid, user]) => {
               if (!user || !user.fullName || !user.status) return null;
-              
-              const joinDate = user.createdAt ? new Date(user.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }) : '—';
+
+              const joinDate = user.createdAt
+                ? new Date(user.createdAt).toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    year: "2-digit",
+                  })
+                : "—";
               const normalizedStatus = normalizeStatus(user.status);
-              const statusBg = normalizedStatus === 'ACTIVE' ? 'rgba(48,209,88,0.15)' 
-                             : normalizedStatus === 'PENDING' ? 'rgba(255,214,10,0.15)'
-                             : 'rgba(255,69,58,0.15)';
-              const statusBorder = normalizedStatus === 'ACTIVE' ? 'rgba(48,209,88,0.5)' 
-                                 : normalizedStatus === 'PENDING' ? 'rgba(255,214,10,0.5)'
-                                 : 'rgba(255,69,58,0.5)';
-              const statusColor = normalizedStatus === 'ACTIVE' ? T.green
-                                : normalizedStatus === 'PENDING' ? T.gold
-                                : T.red;
-              
+              const statusBg =
+                normalizedStatus === "ACTIVE"
+                  ? "rgba(48,209,88,0.15)"
+                  : normalizedStatus === "PENDING"
+                    ? "rgba(255,214,10,0.15)"
+                    : "rgba(255,69,58,0.15)";
+              const statusBorder =
+                normalizedStatus === "ACTIVE"
+                  ? "rgba(48,209,88,0.5)"
+                  : normalizedStatus === "PENDING"
+                    ? "rgba(255,214,10,0.5)"
+                    : "rgba(255,69,58,0.5)";
+              const statusColor =
+                normalizedStatus === "ACTIVE"
+                  ? T.green
+                  : normalizedStatus === "PENDING"
+                    ? T.gold
+                    : T.red;
+
               return (
-                <div 
-                  key={uid} 
-                  style={{ 
+                <div
+                  key={uid}
+                  style={{
                     padding: isMobileView ? "16px 12px" : getRowPadding(),
                     borderBottom: `1px solid rgba(255,255,255,0.1)`,
-                    background: mirror === uid ? "rgba(191,90,242,0.12)" : "rgba(255,255,255,0.01)",
+                    background:
+                      mirror === uid
+                        ? "rgba(191,90,242,0.12)"
+                        : "rgba(255,255,255,0.01)",
                     display: isMobileView ? "flex" : "grid",
                     flexDirection: isMobileView ? "column" : undefined,
-                    gridTemplateColumns: isMobileView ? undefined : getGridTemplateColumns(),
+                    gridTemplateColumns: isMobileView
+                      ? undefined
+                      : getGridTemplateColumns(),
                     gap: isMobileView ? 12 : 16,
                     alignItems: isMobileView ? "stretch" : "center",
                     cursor: "pointer",
                     transition: "all 0.2s ease",
                     backdropFilter: "blur(10px)",
-                    borderLeft: mirror === uid ? `3px solid ${T.purple}` : "3px solid transparent"
+                    borderLeft:
+                      mirror === uid
+                        ? `3px solid ${T.purple}`
+                        : "3px solid transparent",
                   }}
-                  onMouseEnter={e => {
+                  onMouseEnter={(e) => {
                     if (!isMobileView) {
-                      e.currentTarget.style.background = "rgba(255,255,255,0.05)";
+                      e.currentTarget.style.background =
+                        "rgba(255,255,255,0.05)";
                       e.currentTarget.style.borderBottom = `1px solid rgba(255,255,255,0.2)`;
                     }
                   }}
-                  onMouseLeave={e => {
+                  onMouseLeave={(e) => {
                     if (!isMobileView) {
-                      e.currentTarget.style.background = mirror === uid ? "rgba(191,90,242,0.12)" : "rgba(255,255,255,0.01)";
+                      e.currentTarget.style.background =
+                        mirror === uid
+                          ? "rgba(191,90,242,0.12)"
+                          : "rgba(255,255,255,0.01)";
                       e.currentTarget.style.borderBottom = `1px solid rgba(255,255,255,0.1)`;
                     }
                   }}
@@ -7211,16 +10493,133 @@ function AdminDashboard({ auth, onLogout, isAdminAuthenticated, showToast, maint
                 >
                   {/* Mobile Card Header - Name + Status */}
                   {isMobileView && (
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, paddingBottom: 8, borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "flex-start",
+                        gap: 12,
+                        paddingBottom: 8,
+                        borderBottom: "1px solid rgba(255,255,255,0.1)",
+                      }}
+                    >
                       <div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                          <div style={{ color: T.text, fontSize: 12, fontWeight: 600 }}>
-                            {searchQuery ? renderHighlightedText(user.fullName, searchQuery) : user.fullName}
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                            marginBottom: 4,
+                          }}
+                        >
+                          <div
+                            style={{
+                              color: T.text,
+                              fontSize: 12,
+                              fontWeight: 600,
+                            }}
+                          >
+                            {searchQuery
+                              ? renderHighlightedText(
+                                  user.fullName,
+                                  searchQuery,
+                                )
+                              : user.fullName}
                           </div>
                           {(() => {
                             const badge = getUserLevelBadge(user);
                             return (
-                              <div style={{
+                              <div
+                                style={{
+                                  background: badge.bg,
+                                  border: `1px solid ${badge.color}`,
+                                  borderRadius: 12,
+                                  padding: "2px 8px",
+                                  color: badge.color,
+                                  fontSize: 9,
+                                  fontWeight: 700,
+                                  letterSpacing: 0.5,
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                {badge.level}
+                              </div>
+                            );
+                          })()}
+                        </div>
+                        <div
+                          style={{ color: T.dim, fontSize: 10, marginTop: 2 }}
+                        >
+                          📊 {user.proficiency || "unknown"}
+                        </div>
+                      </div>
+                      <div
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 6,
+                          background: statusBg,
+                          border: `1px solid ${statusBorder}`,
+                          borderRadius: 16,
+                          padding: "4px 10px",
+                          width: "fit-content",
+                          boxShadow: `0 0 8px ${statusBorder}`,
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: 5,
+                            height: 5,
+                            borderRadius: "50%",
+                            background: statusColor,
+                          }}
+                        />
+                        <span
+                          style={{
+                            color: statusColor,
+                            fontSize: 9,
+                            fontWeight: 700,
+                            letterSpacing: 0.5,
+                            textTransform: "uppercase",
+                          }}
+                        >
+                          {normalizedStatus === "PENDING"
+                            ? "pending"
+                            : normalizedStatus === "ACTIVE"
+                              ? "active"
+                              : "banned"}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Desktop: Name */}
+                  {!isMobileView && visibleColumns.name && (
+                    <div>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          marginBottom: 4,
+                        }}
+                      >
+                        <div
+                          style={{
+                            color: T.text,
+                            fontSize: 12,
+                            fontWeight: 600,
+                          }}
+                        >
+                          {searchQuery
+                            ? renderHighlightedText(user.fullName, searchQuery)
+                            : user.fullName}
+                        </div>
+                        {(() => {
+                          const badge = getUserLevelBadge(user);
+                          return (
+                            <div
+                              style={{
                                 background: badge.bg,
                                 border: `1px solid ${badge.color}`,
                                 borderRadius: 12,
@@ -7229,180 +10628,210 @@ function AdminDashboard({ auth, onLogout, isAdminAuthenticated, showToast, maint
                                 fontSize: 9,
                                 fontWeight: 700,
                                 letterSpacing: 0.5,
-                                whiteSpace: "nowrap"
-                              }}>
-                                {badge.level}
-                              </div>
-                            );
-                          })()}
-                        </div>
-                        <div style={{ color: T.dim, fontSize: 10, marginTop: 2 }}>📊 {user.proficiency || 'unknown'}</div>
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {badge.level}
+                            </div>
+                          );
+                        })()}
                       </div>
-                      <div style={{ 
-                        display: "inline-flex", 
-                        alignItems: "center", 
-                        gap: 6,
-                        background: statusBg,
-                        border: `1px solid ${statusBorder}`,
-                        borderRadius: 16,
-                        padding: "4px 10px",
-                        width: "fit-content",
-                        boxShadow: `0 0 8px ${statusBorder}`
-                      }}>
-                        <div style={{ width: 5, height: 5, borderRadius: "50%", background: statusColor }} />
-                        <span style={{ color: statusColor, fontSize: 9, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase" }}>
-                          {normalizedStatus === 'PENDING' ? 'pending' : normalizedStatus === 'ACTIVE' ? 'active' : 'banned'}
-                        </span>
+                      <div style={{ color: T.dim, fontSize: 10, marginTop: 2 }}>
+                        📊 {user.proficiency || "unknown"}
                       </div>
                     </div>
                   )}
-                  
-                  {/* Desktop: Name */}
-                  {!isMobileView && visibleColumns.name && <div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                      <div style={{ color: T.text, fontSize: 12, fontWeight: 600 }}>
-                        {searchQuery ? renderHighlightedText(user.fullName, searchQuery) : user.fullName}
-                      </div>
-                      {(() => {
-                        const badge = getUserLevelBadge(user);
-                        return (
-                          <div style={{
-                            background: badge.bg,
-                            border: `1px solid ${badge.color}`,
-                            borderRadius: 12,
-                            padding: "2px 8px",
-                            color: badge.color,
-                            fontSize: 9,
-                            fontWeight: 700,
-                            letterSpacing: 0.5,
-                            whiteSpace: "nowrap"
-                          }}>
-                            {badge.level}
-                          </div>
-                        );
-                      })()}
-                    </div>
-                    <div style={{ color: T.dim, fontSize: 10, marginTop: 2 }}>📊 {user.proficiency || 'unknown'}</div>
-                  </div>}
-                  
+
                   {/* Mobile: Info Row */}
                   {isMobileView && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 10, color: T.muted }}>
-                      {visibleColumns.email && <div style={{ fontFamily: T.mono, letterSpacing: 0.5 }}>📧 {user.email || '—'}</div>}
-                      {visibleColumns.joinDate && <div style={{ fontFamily: T.mono, letterSpacing: 0.5 }}>📅 {joinDate}</div>}
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 8,
+                        fontSize: 10,
+                        color: T.muted,
+                      }}
+                    >
+                      {visibleColumns.email && (
+                        <div style={{ fontFamily: T.mono, letterSpacing: 0.5 }}>
+                          📧 {user.email || "—"}
+                        </div>
+                      )}
+                      {visibleColumns.joinDate && (
+                        <div style={{ fontFamily: T.mono, letterSpacing: 0.5 }}>
+                          📅 {joinDate}
+                        </div>
+                      )}
                     </div>
                   )}
-                  
+
                   {/* Desktop: Email */}
-                  {!isMobileView && visibleColumns.email && <div 
-                    style={{ 
-                      color: T.muted, 
-                      fontSize: 11, 
-                      fontFamily: T.mono, 
-                      overflow: "hidden", 
-                      textOverflow: "ellipsis", 
-                      whiteSpace: "nowrap", 
-                      letterSpacing: 0.5,
-                      cursor: "pointer",
-                      transition: "all 0.2s ease",
-                      padding: "4px 6px",
-                      borderRadius: 3
-                    }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      copyToClipboard(user.email, 'Email', showToast);
-                    }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.background = "rgba(0,122,255,0.15)";
-                      e.currentTarget.style.color = T.blue;
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.background = "transparent";
-                      e.currentTarget.style.color = T.muted;
-                    }}
-                    title="Click to copy email"
-                  >
-                    {searchQuery ? renderHighlightedText(user.email || '—', searchQuery) : (user.email || '—')}
-                  </div>}
-                  
+                  {!isMobileView && visibleColumns.email && (
+                    <div
+                      style={{
+                        color: T.muted,
+                        fontSize: 11,
+                        fontFamily: T.mono,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                        letterSpacing: 0.5,
+                        cursor: "pointer",
+                        transition: "all 0.2s ease",
+                        padding: "4px 6px",
+                        borderRadius: 3,
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        copyToClipboard(user.email, "Email", showToast);
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background =
+                          "rgba(0,122,255,0.15)";
+                        e.currentTarget.style.color = T.blue;
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = "transparent";
+                        e.currentTarget.style.color = T.muted;
+                      }}
+                      title="Click to copy email"
+                    >
+                      {searchQuery
+                        ? renderHighlightedText(user.email || "—", searchQuery)
+                        : user.email || "—"}
+                    </div>
+                  )}
+
                   {/* Desktop: Join Date */}
-                  {!isMobileView && visibleColumns.joinDate && <div style={{ color: T.muted, fontSize: 11, fontFamily: T.mono, letterSpacing: 0.5 }}>{joinDate}</div>}
-                  
+                  {!isMobileView && visibleColumns.joinDate && (
+                    <div
+                      style={{
+                        color: T.muted,
+                        fontSize: 11,
+                        fontFamily: T.mono,
+                        letterSpacing: 0.5,
+                      }}
+                    >
+                      {joinDate}
+                    </div>
+                  )}
+
                   {/* Desktop: UID */}
-                  {!isMobileView && visibleColumns.uid && <div 
-                    style={{ 
-                      color: T.dim, 
-                      fontSize: 10, 
-                      fontFamily: T.mono, 
-                      letterSpacing: 0.5, 
-                      overflow: "hidden", 
-                      textOverflow: "ellipsis", 
-                      whiteSpace: "nowrap",
-                      cursor: "pointer",
-                      transition: "all 0.2s ease",
-                      padding: "4px 6px",
-                      borderRadius: 3
-                    }}
-                    title={`Click to copy UID: ${uid}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      copyToClipboard(uid, 'UID', showToast);
-                    }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.background = "rgba(0,122,255,0.15)";
-                      e.currentTarget.style.color = T.blue;
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.background = "transparent";
-                      e.currentTarget.style.color = T.dim;
-                    }}
-                  >
-                    {uid.slice(0, 12)}...
-                  </div>}
-                  
+                  {!isMobileView && visibleColumns.uid && (
+                    <div
+                      style={{
+                        color: T.dim,
+                        fontSize: 10,
+                        fontFamily: T.mono,
+                        letterSpacing: 0.5,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                        cursor: "pointer",
+                        transition: "all 0.2s ease",
+                        padding: "4px 6px",
+                        borderRadius: 3,
+                      }}
+                      title={`Click to copy UID: ${uid}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        copyToClipboard(uid, "UID", showToast);
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background =
+                          "rgba(0,122,255,0.15)";
+                        e.currentTarget.style.color = T.blue;
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = "transparent";
+                        e.currentTarget.style.color = T.dim;
+                      }}
+                    >
+                      {uid.slice(0, 12)}...
+                    </div>
+                  )}
+
                   {/* Desktop: Role */}
-                  {!isMobileView && visibleColumns.role && <div style={{ color: T.muted, fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>Trader</div>}
-                  
+                  {!isMobileView && visibleColumns.role && (
+                    <div
+                      style={{
+                        color: T.muted,
+                        fontSize: 10,
+                        fontWeight: 600,
+                        textTransform: "uppercase",
+                        letterSpacing: 0.5,
+                      }}
+                    >
+                      Trader
+                    </div>
+                  )}
+
                   {/* Desktop: Status Pill */}
-                  {!isMobileView && visibleColumns.status && <div style={{ 
-                    display: "inline-flex", 
-                    alignItems: "center", 
-                    gap: 8,
-                    background: statusBg,
-                    border: `1px solid ${statusBorder}`,
-                    borderRadius: 20,
-                    padding: "6px 12px",
-                    width: "fit-content",
-                    boxShadow: `0 0 12px ${statusBorder}`
-                  }}>
-                    <div style={{ width: 6, height: 6, borderRadius: "50%", background: statusColor }} />
-                    <span style={{ color: statusColor, fontSize: 10, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase" }}>
-                      {normalizedStatus === 'PENDING' ? 'pending' : normalizedStatus === 'ACTIVE' ? 'active' : 'banned'}
-                    </span>
-                  </div>}
-                  
+                  {!isMobileView && visibleColumns.status && (
+                    <div
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 8,
+                        background: statusBg,
+                        border: `1px solid ${statusBorder}`,
+                        borderRadius: 20,
+                        padding: "6px 12px",
+                        width: "fit-content",
+                        boxShadow: `0 0 12px ${statusBorder}`,
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: 6,
+                          height: 6,
+                          borderRadius: "50%",
+                          background: statusColor,
+                        }}
+                      />
+                      <span
+                        style={{
+                          color: statusColor,
+                          fontSize: 10,
+                          fontWeight: 700,
+                          letterSpacing: 0.5,
+                          textTransform: "uppercase",
+                        }}
+                      >
+                        {normalizedStatus === "PENDING"
+                          ? "pending"
+                          : normalizedStatus === "ACTIVE"
+                            ? "active"
+                            : "banned"}
+                      </span>
+                    </div>
+                  )}
+
                   {/* RULE #244: IP Fraud Detection Flag */}
                   {(() => {
                     const userIP = user?.forensic?.ip || user?.ip;
-                    const duplicateEntry = Object.entries(duplicateIPs).find(([, uids]) => userIP && uids.includes(uid));
-                    
+                    const duplicateEntry = Object.entries(duplicateIPs).find(
+                      ([, uids]) => userIP && uids.includes(uid),
+                    );
+
                     if (duplicateEntry) {
                       return (
                         <div
                           title={`⚠️ DUPLICATE IP: ${userIP} shared with ${duplicateEntry[1].length - 1} other user(s)`}
                           style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
+                            display: "inline-flex",
+                            alignItems: "center",
                             gap: 6,
-                            background: 'rgba(255,165,0,0.15)',
-                            border: '1px solid rgba(255,165,0,0.5)',
+                            background: "rgba(255,165,0,0.15)",
+                            border: "1px solid rgba(255,165,0,0.5)",
                             borderRadius: 12,
-                            padding: '6px 10px',
-                            color: '#FFB340',
+                            padding: "6px 10px",
+                            color: "#FFB340",
                             fontSize: 9,
                             fontWeight: 700,
                             letterSpacing: 0.5,
-                            whiteSpace: 'nowrap'
+                            whiteSpace: "nowrap",
                           }}
                         >
                           ⚠️ DUP IP
@@ -7411,34 +10840,45 @@ function AdminDashboard({ auth, onLogout, isAdminAuthenticated, showToast, maint
                     }
                     return null;
                   })()}
-                  
+
                   {/* Action Buttons - Flex Column on Mobile */}
-                  <div style={{ display: "flex", flexDirection: isMobileView ? "column" : "row", gap: 8, justifyContent: isMobileView ? "stretch" : "flex-end", flexWrap: isMobileView ? "nowrap" : "wrap" }}>
-                    {normalizedStatus === 'PENDING' && (
-                      <button 
-                        onClick={e => { e.stopPropagation(); approve(uid); }} 
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: isMobileView ? "column" : "row",
+                      gap: 8,
+                      justifyContent: isMobileView ? "stretch" : "flex-end",
+                      flexWrap: isMobileView ? "nowrap" : "wrap",
+                    }}
+                  >
+                    {normalizedStatus === "PENDING" && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          approve(uid);
+                        }}
                         title="Approve User"
                         data-status="pending"
-                        style={{ 
-                          background: T.green, 
-                          border: "none", 
-                          borderRadius: 4, 
-                          padding: isMobileView ? "10px 12px" : "7px 12px", 
-                          cursor: "pointer", 
-                          color: "#000", 
+                        style={{
+                          background: T.green,
+                          border: "none",
+                          borderRadius: 4,
+                          padding: isMobileView ? "10px 12px" : "7px 12px",
+                          cursor: "pointer",
+                          color: "#000",
                           fontSize: 11,
                           fontWeight: 700,
                           transition: "all 0.2s ease",
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
-                          letterSpacing: 0.5
+                          letterSpacing: 0.5,
                         }}
-                        onMouseEnter={e => {
+                        onMouseEnter={(e) => {
                           e.currentTarget.style.boxShadow = `0 0 16px ${T.green}`;
                           e.currentTarget.style.transform = "scale(1.05)";
                         }}
-                        onMouseLeave={e => {
+                        onMouseLeave={(e) => {
                           e.currentTarget.style.boxShadow = "none";
                           e.currentTarget.style.transform = "scale(1)";
                         }}
@@ -7447,30 +10887,38 @@ function AdminDashboard({ auth, onLogout, isAdminAuthenticated, showToast, maint
                         ✓ APPROVE
                       </button>
                     )}
-                    {normalizedStatus !== 'BLOCKED' && (
-                      <button 
-                        onClick={e => { e.stopPropagation(); if (window.confirm(`Ban ${user.fullName}? This cannot be undone.`)) block(uid); }} 
+                    {normalizedStatus !== "BLOCKED" && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (
+                            window.confirm(
+                              `Ban ${user.fullName}? This cannot be undone.`,
+                            )
+                          )
+                            block(uid);
+                        }}
                         title="Ban User"
-                        style={{ 
-                          background: "transparent", 
-                          border: `1.5px solid ${T.red}`, 
-                          borderRadius: 4, 
-                          padding: isMobileView ? "10px 12px" : "6px 12px", 
-                          cursor: "pointer", 
-                          color: T.red, 
+                        style={{
+                          background: "transparent",
+                          border: `1.5px solid ${T.red}`,
+                          borderRadius: 4,
+                          padding: isMobileView ? "10px 12px" : "6px 12px",
+                          cursor: "pointer",
+                          color: T.red,
                           fontSize: 11,
                           fontWeight: 700,
                           transition: "all 0.2s ease",
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
-                          letterSpacing: 0.5
+                          letterSpacing: 0.5,
                         }}
-                        onMouseEnter={e => {
+                        onMouseEnter={(e) => {
                           e.currentTarget.style.background = `rgba(255,69,58,0.2)`;
                           e.currentTarget.style.boxShadow = `0 0 12px rgba(255,69,58,0.5)`;
                         }}
-                        onMouseLeave={e => {
+                        onMouseLeave={(e) => {
                           e.currentTarget.style.background = "transparent";
                           e.currentTarget.style.boxShadow = "none";
                         }}
@@ -7479,30 +10927,33 @@ function AdminDashboard({ auth, onLogout, isAdminAuthenticated, showToast, maint
                         ✕ BAN
                       </button>
                     )}
-                    {normalizedStatus === 'BLOCKED' && (
-                      <button 
-                        onClick={e => { e.stopPropagation(); approve(uid); }} 
+                    {normalizedStatus === "BLOCKED" && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          approve(uid);
+                        }}
                         title="Restore User"
-                        style={{ 
-                          background: "transparent", 
-                          border: `1.5px solid ${T.gold}`, 
-                          borderRadius: 4, 
-                          padding: isMobileView ? "10px 12px" : "6px 12px", 
-                          cursor: "pointer", 
-                          color: T.gold, 
+                        style={{
+                          background: "transparent",
+                          border: `1.5px solid ${T.gold}`,
+                          borderRadius: 4,
+                          padding: isMobileView ? "10px 12px" : "6px 12px",
+                          cursor: "pointer",
+                          color: T.gold,
                           fontSize: 11,
                           fontWeight: 700,
                           transition: "all 0.2s ease",
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
-                          letterSpacing: 0.5
+                          letterSpacing: 0.5,
                         }}
-                        onMouseEnter={e => {
+                        onMouseEnter={(e) => {
                           e.currentTarget.style.background = `rgba(255,214,10,0.2)`;
                           e.currentTarget.style.boxShadow = `0 0 12px rgba(255,214,10,0.5)`;
                         }}
-                        onMouseLeave={e => {
+                        onMouseLeave={(e) => {
                           e.currentTarget.style.background = "transparent";
                           e.currentTarget.style.boxShadow = "none";
                         }}
@@ -7512,33 +10963,34 @@ function AdminDashboard({ auth, onLogout, isAdminAuthenticated, showToast, maint
                       </button>
                     )}
                     {/* RULE #24: View Identity Documents */}
-                    <button 
-                      onClick={e => { 
-                        e.stopPropagation(); 
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
                         setSelectedUserDocs(uid);
-                      }} 
+                      }}
                       title="View uploaded identity documents"
-                      style={{ 
-                        background: "rgba(52,199,89,0.2)", 
-                        border: `1.5px solid ${T.green}`, 
-                        borderRadius: 4, 
-                        padding: isMobileView ? "10px 12px" : "6px 12px", 
-                        cursor: "pointer", 
-                        color: T.green, 
+                      style={{
+                        background: "rgba(52,199,89,0.2)",
+                        border: `1.5px solid ${T.green}`,
+                        borderRadius: 4,
+                        padding: isMobileView ? "10px 12px" : "6px 12px",
+                        cursor: "pointer",
+                        color: T.green,
                         fontSize: 11,
                         fontWeight: 700,
                         transition: "all 0.2s ease",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        letterSpacing: 0.5
+                        letterSpacing: 0.5,
                       }}
-                      onMouseEnter={e => {
+                      onMouseEnter={(e) => {
                         e.currentTarget.style.background = `rgba(52,199,89,0.3)`;
                         e.currentTarget.style.boxShadow = `0 0 12px rgba(52,199,89,0.5)`;
                       }}
-                      onMouseLeave={e => {
-                        e.currentTarget.style.background = "rgba(52,199,89,0.2)";
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background =
+                          "rgba(52,199,89,0.2)";
                         e.currentTarget.style.boxShadow = "none";
                       }}
                       className="btn-glass"
@@ -7547,35 +10999,38 @@ function AdminDashboard({ auth, onLogout, isAdminAuthenticated, showToast, maint
                     </button>
                     {/* RULE #244, #246, #247, #266, #270: Direct Support Chat */}
                     <button
-                      onClick={e => {
+                      onClick={(e) => {
                         e.stopPropagation();
                         setChatWith(uid);
                         setChatModalOpen(true);
                       }}
                       title="Open direct chat with trader"
                       style={{
-                        background: 'rgba(0,122,255,0.2)',
-                        border: '1.5px solid #0A84FF',
+                        background: "rgba(0,122,255,0.2)",
+                        border: "1.5px solid #0A84FF",
                         borderRadius: 4,
-                        padding: isMobileView ? '10px 12px' : '6px 12px',
-                        cursor: 'pointer',
-                        color: '#0A84FF',
+                        padding: isMobileView ? "10px 12px" : "6px 12px",
+                        cursor: "pointer",
+                        color: "#0A84FF",
                         fontSize: 11,
                         fontWeight: 700,
-                        transition: 'all 0.2s ease',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
+                        transition: "all 0.2s ease",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
                         letterSpacing: 0.5,
-                        whiteSpace: 'nowrap'
+                        whiteSpace: "nowrap",
                       }}
-                      onMouseEnter={e => {
-                        e.currentTarget.style.background = 'rgba(0,122,255,0.3)';
-                        e.currentTarget.style.boxShadow = '0 0 12px rgba(0,122,255,0.5)';
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background =
+                          "rgba(0,122,255,0.3)";
+                        e.currentTarget.style.boxShadow =
+                          "0 0 12px rgba(0,122,255,0.5)";
                       }}
-                      onMouseLeave={e => {
-                        e.currentTarget.style.background = 'rgba(0,122,255,0.2)';
-                        e.currentTarget.style.boxShadow = 'none';
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background =
+                          "rgba(0,122,255,0.2)";
+                        e.currentTarget.style.boxShadow = "none";
                       }}
                       className="btn-glass"
                     >
@@ -7589,189 +11044,543 @@ function AdminDashboard({ auth, onLogout, isAdminAuthenticated, showToast, maint
         </div>
         {/* Right Column: Mirror View */}
         {mirror && mirrorData && (
-          <div style={{ flex: 1, overflowY: "auto", padding: "0 0 60px", minWidth: 320 }}>
-            
-            <div style={{ padding: "16px 28px", borderBottom: `1px solid rgba(191,90,242,0.3)`, display: "flex", justifyContent: "space-between", alignItems: "center", background: "rgba(0,0,0,0.5)", position: "sticky", top: 0, zIndex: 10, backdropFilter: "blur(20px)" }} className="glass-panel">
+          <div
+            style={{
+              flex: 1,
+              overflowY: "auto",
+              padding: "0 0 60px",
+              minWidth: 320,
+            }}
+          >
+            <div
+              style={{
+                padding: "16px 28px",
+                borderBottom: `1px solid rgba(191,90,242,0.3)`,
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                background: "rgba(0,0,0,0.5)",
+                position: "sticky",
+                top: 0,
+                zIndex: 10,
+                backdropFilter: "blur(20px)",
+              }}
+              className="glass-panel"
+            >
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <LED color={T.purple} size={10} />
                 <div>
-                  <div style={{ color: T.purple, fontSize: 13, letterSpacing: 2, fontWeight: 700 }}>MIRROR VIEW — READ ONLY</div>
-                  <div style={{ color: T.muted, fontSize: 11, marginTop: 2 }}>{mirrorData.profile?.fullName} · {mirrorData.profile?.email}</div>
+                  <div
+                    style={{
+                      color: T.purple,
+                      fontSize: 13,
+                      letterSpacing: 2,
+                      fontWeight: 700,
+                    }}
+                  >
+                    MIRROR VIEW — READ ONLY
+                  </div>
+                  <div style={{ color: T.muted, fontSize: 11, marginTop: 2 }}>
+                    {mirrorData.profile?.fullName} · {mirrorData.profile?.email}
+                  </div>
                 </div>
               </div>
-              <button onClick={() => { setMirror(null); setMirrorData(null); }} style={{ background: "transparent", border: `1px solid rgba(255,255,255,0.1)`, borderRadius: 6, padding: "6px 14px", cursor: "pointer", color: T.muted, fontSize: 10, fontFamily: T.font, fontWeight: 600 }} className="btn-glass">
+              <button
+                onClick={() => {
+                  setMirror(null);
+                  setMirrorData(null);
+                }}
+                style={{
+                  background: "transparent",
+                  border: `1px solid rgba(255,255,255,0.1)`,
+                  borderRadius: 6,
+                  padding: "6px 14px",
+                  cursor: "pointer",
+                  color: T.muted,
+                  fontSize: 10,
+                  fontFamily: T.font,
+                  fontWeight: 600,
+                }}
+                className="btn-glass"
+              >
                 ✕ CLOSE
               </button>
             </div>
-            
+
             <div style={{ padding: "24px 28px" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 16, marginBottom: 24 }}>
-                {[ 
-                  { l: "Account Balance", v: mirrorData.accountState?.currentBalance ? `$${parseFloat(mirrorData.accountState.currentBalance).toLocaleString()}` : "—", c: T.green }, 
-                  { l: "High-Water Mark", v: mirrorData.accountState?.highWaterMark ? `$${parseFloat(mirrorData.accountState.highWaterMark).toLocaleString()}` : "—", c: T.blue }, 
-                  { l: "Firm", v: mirrorData.firmRules?.firmName || "—", c: T.gold }, 
-                  { l: "Status", v: mirrorData.profile?.status || "—", c: statusColor[mirrorData.profile?.status] || T.muted }, 
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+                  gap: 16,
+                  marginBottom: 24,
+                }}
+              >
+                {[
+                  {
+                    l: "Account Balance",
+                    v: mirrorData.accountState?.currentBalance
+                      ? `$${parseFloat(mirrorData.accountState.currentBalance).toLocaleString()}`
+                      : "—",
+                    c: T.green,
+                  },
+                  {
+                    l: "High-Water Mark",
+                    v: mirrorData.accountState?.highWaterMark
+                      ? `$${parseFloat(mirrorData.accountState.highWaterMark).toLocaleString()}`
+                      : "—",
+                    c: T.blue,
+                  },
+                  {
+                    l: "Firm",
+                    v: mirrorData.firmRules?.firmName || "—",
+                    c: T.gold,
+                  },
+                  {
+                    l: "Status",
+                    v: mirrorData.profile?.status || "—",
+                    c: statusColor[mirrorData.profile?.status] || T.muted,
+                  },
                 ].map((s, i) => (
-                  <div key={i} style={cardS({ margin: 0, textAlign: "center", padding: "16px" })} className="glass-panel">
-                    <div style={{ color: T.dim, fontSize: 10, letterSpacing: 1.5, marginBottom: 8, fontWeight: 600 }}>{s.l}</div>
-                    <div style={{ color: s.c, fontSize: 18, fontWeight: 700, fontFamily: T.mono }}>{s.v}</div>
+                  <div
+                    key={i}
+                    style={cardS({
+                      margin: 0,
+                      textAlign: "center",
+                      padding: "16px",
+                    })}
+                    className="glass-panel"
+                  >
+                    <div
+                      style={{
+                        color: T.dim,
+                        fontSize: 10,
+                        letterSpacing: 1.5,
+                        marginBottom: 8,
+                        fontWeight: 600,
+                      }}
+                    >
+                      {s.l}
+                    </div>
+                    <div
+                      style={{
+                        color: s.c,
+                        fontSize: 18,
+                        fontWeight: 700,
+                        fontFamily: T.mono,
+                      }}
+                    >
+                      {s.v}
+                    </div>
                   </div>
                 ))}
               </div>
-              
-              {(() => { 
-                const journal = mirrorData.journal ? Object.values(mirrorData.journal) : []; 
-                if (!journal.length) return <div style={cardS({ textAlign: "center", color: T.dim, padding: 40, fontSize: 13 })} className="glass-panel">No journal entries yet</div>; 
-                
-                const wins = journal.filter(t => t.result === 'win'); 
-                const pnl = journal.reduce((s, t) => s + parseFloat(t.pnl || 0), 0); 
-                
+
+              {(() => {
+                const journal = mirrorData.journal
+                  ? Object.values(mirrorData.journal)
+                  : [];
+                if (!journal.length)
+                  return (
+                    <div
+                      style={cardS({
+                        textAlign: "center",
+                        color: T.dim,
+                        padding: 40,
+                        fontSize: 13,
+                      })}
+                      className="glass-panel"
+                    >
+                      No journal entries yet
+                    </div>
+                  );
+
+                const wins = journal.filter((t) => t.result === "win");
+                const pnl = journal.reduce(
+                  (s, t) => s + parseFloat(t.pnl || 0),
+                  0,
+                );
+
                 return (
-                  <div style={cardS({ borderLeft: `4px solid ${T.purple}`, padding: 0, overflow: "hidden" })} className="glass-panel">
+                  <div
+                    style={cardS({
+                      borderLeft: `4px solid ${T.purple}`,
+                      padding: 0,
+                      overflow: "hidden",
+                    })}
+                    className="glass-panel"
+                  >
                     <div style={{ padding: "20px 24px" }}>
-                      <SHead icon="📔" title="TRADE JOURNAL MIRROR" color={T.purple} />
-                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 12, marginBottom: 20 }}>
+                      <SHead
+                        icon="📔"
+                        title="TRADE JOURNAL MIRROR"
+                        color={T.purple}
+                      />
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns:
+                            "repeat(auto-fit, minmax(120px, 1fr))",
+                          gap: 12,
+                          marginBottom: 20,
+                        }}
+                      >
                         {[
-                          { l: "Total Trades", v: journal.length, c: T.text }, 
-                          { l: "Win Rate", v: `${Math.round(wins.length / journal.length * 100)}%`, c: wins.length / journal.length >= 0.5 ? T.green : T.red }, 
-                          { l: "Total P&L", v: `${pnl >= 0 ? "+" : ""}$${pnl.toFixed(2)}`, c: pnl >= 0 ? T.green : T.red }
+                          { l: "Total Trades", v: journal.length, c: T.text },
+                          {
+                            l: "Win Rate",
+                            v: `${Math.round((wins.length / journal.length) * 100)}%`,
+                            c:
+                              wins.length / journal.length >= 0.5
+                                ? T.green
+                                : T.red,
+                          },
+                          {
+                            l: "Total P&L",
+                            v: `${pnl >= 0 ? "+" : ""}$${pnl.toFixed(2)}`,
+                            c: pnl >= 0 ? T.green : T.red,
+                          },
                         ].map((s, i) => (
-                          <div key={i} style={{ background: "rgba(0,0,0,0.3)", border: `1px solid rgba(255,255,255,0.05)`, borderRadius: 8, padding: "12px", textAlign: "center" }} className="glass-panel">
-                            <div style={{ color: T.dim, fontSize: 10, marginBottom: 6, fontWeight: 600 }}>{s.l}</div>
-                            <div style={{ color: s.c, fontSize: 16, fontWeight: 700, fontFamily: T.mono }}>{s.v}</div>
+                          <div
+                            key={i}
+                            style={{
+                              background: "rgba(0,0,0,0.3)",
+                              border: `1px solid rgba(255,255,255,0.05)`,
+                              borderRadius: 8,
+                              padding: "12px",
+                              textAlign: "center",
+                            }}
+                            className="glass-panel"
+                          >
+                            <div
+                              style={{
+                                color: T.dim,
+                                fontSize: 10,
+                                marginBottom: 6,
+                                fontWeight: 600,
+                              }}
+                            >
+                              {s.l}
+                            </div>
+                            <div
+                              style={{
+                                color: s.c,
+                                fontSize: 16,
+                                fontWeight: 700,
+                                fontFamily: T.mono,
+                              }}
+                            >
+                              {s.v}
+                            </div>
                           </div>
                         ))}
                       </div>
                     </div>
-                    
+
                     <div style={{ overflowX: "auto" }}>
-                      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                      <table
+                        style={{ width: "100%", borderCollapse: "collapse" }}
+                      >
                         <thead>
                           <tr>
-                            {["Date", "Inst", "Dir", "Type", "AMD", "RRR", "Entry", "Exit", "P&L", "Result"].map(h => (
-                              <th key={h} style={{ padding: "12px 14px", textAlign: "left", color: "#6B7280", fontSize: 10, letterSpacing: 1, background: "#F9FAFB", borderBottom: `1px solid #E5E7EB`, whiteSpace: "nowrap", fontWeight: 700 }} className="gemini-gradient-text">{h}</th>
+                            {[
+                              "Date",
+                              "Inst",
+                              "Dir",
+                              "Type",
+                              "AMD",
+                              "RRR",
+                              "Entry",
+                              "Exit",
+                              "P&L",
+                              "Result",
+                            ].map((h) => (
+                              <th
+                                key={h}
+                                style={{
+                                  padding: "12px 14px",
+                                  textAlign: "left",
+                                  color: "#6B7280",
+                                  fontSize: 10,
+                                  letterSpacing: 1,
+                                  background: "#F9FAFB",
+                                  borderBottom: `1px solid #E5E7EB`,
+                                  whiteSpace: "nowrap",
+                                  fontWeight: 700,
+                                }}
+                                className="gemini-gradient-text"
+                              >
+                                {h}
+                              </th>
                             ))}
                           </tr>
                         </thead>
                         <tbody>
-                          {journal.slice(-20).reverse().map((t, i) => { 
-                            const pv = parseFloat(t.pnl || 0); 
-                            const amdColor = (AMD_PHASES[t.amdPhase] || AMD_PHASES.UNCLEAR).color; 
-                            return (
-                              <tr key={i} style={{ borderBottom: `1px solid #E5E7EB`, background: i % 2 === 0 ? "#F9FAFB" : "#FFFFFF" }}>
-                                <td style={{ padding: "10px 14px", color: "#6B7280", fontSize: 11, fontFamily: T.mono }}>{t.date}</td>
-                                <td style={{ padding: "10px 14px", color: "#111827", fontSize: 11, fontWeight: 700 }}>{t.instrument}</td>
-                                <td style={{ padding: "10px 14px", color: t.direction === 'Long' ? "#10B981" : "#EF4444", fontSize: 11, fontWeight: 600 }}>{t.direction}</td>
-                                <td style={{ padding: "10px 14px", color: "#0EA5E9", fontSize: 11, fontWeight: 500 }}>{t.tradeType}</td>
-                                <td style={{ padding: "10px 14px", color: amdColor, fontSize: 10, fontWeight: 600 }}>{(AMD_PHASES[t.amdPhase]?.label || t.amdPhase || "—").slice(0, 10)}</td>
-                                <td style={{ padding: "10px 14px", color: "#D97706", fontSize: 11, fontFamily: T.mono }}>{t.rrr}</td>
-                                <td style={{ padding: "10px 14px", color: "#6B7280", fontSize: 11, fontFamily: T.mono }}>{t.entry || "—"}</td>
-                                <td style={{ padding: "10px 14px", color: "#6B7280", fontSize: 11, fontFamily: T.mono }}>{t.exit || "—"}</td>
-                                <td style={{ padding: "10px 14px", color: pv >= 0 ? "#10B981" : "#EF4444", fontSize: 12, fontWeight: 700, fontFamily: T.mono }}>{pv >= 0 ? "+" : ""}${pv.toFixed(0)}</td>
-                                <td style={{ padding: "10px 14px", color: t.result === 'win' ? "#10B981" : t.result === 'loss' ? "#EF4444" : "#6B7280", fontSize: 11, fontWeight: 800 }}>{(t.result || "—").toUpperCase()}</td>
-                              </tr>
-                            ); 
-                          })}
+                          {journal
+                            .slice(-20)
+                            .reverse()
+                            .map((t, i) => {
+                              const pv = parseFloat(t.pnl || 0);
+                              const amdColor = (
+                                AMD_PHASES[t.amdPhase] || AMD_PHASES.UNCLEAR
+                              ).color;
+                              return (
+                                <tr
+                                  key={i}
+                                  style={{
+                                    borderBottom: `1px solid #E5E7EB`,
+                                    background:
+                                      i % 2 === 0 ? "#F9FAFB" : "#FFFFFF",
+                                  }}
+                                >
+                                  <td
+                                    style={{
+                                      padding: "10px 14px",
+                                      color: "#6B7280",
+                                      fontSize: 11,
+                                      fontFamily: T.mono,
+                                    }}
+                                  >
+                                    {t.date}
+                                  </td>
+                                  <td
+                                    style={{
+                                      padding: "10px 14px",
+                                      color: "#111827",
+                                      fontSize: 11,
+                                      fontWeight: 700,
+                                    }}
+                                  >
+                                    {t.instrument}
+                                  </td>
+                                  <td
+                                    style={{
+                                      padding: "10px 14px",
+                                      color:
+                                        t.direction === "Long"
+                                          ? "#10B981"
+                                          : "#EF4444",
+                                      fontSize: 11,
+                                      fontWeight: 600,
+                                    }}
+                                  >
+                                    {t.direction}
+                                  </td>
+                                  <td
+                                    style={{
+                                      padding: "10px 14px",
+                                      color: "#0EA5E9",
+                                      fontSize: 11,
+                                      fontWeight: 500,
+                                    }}
+                                  >
+                                    {t.tradeType}
+                                  </td>
+                                  <td
+                                    style={{
+                                      padding: "10px 14px",
+                                      color: amdColor,
+                                      fontSize: 10,
+                                      fontWeight: 600,
+                                    }}
+                                  >
+                                    {(
+                                      AMD_PHASES[t.amdPhase]?.label ||
+                                      t.amdPhase ||
+                                      "—"
+                                    ).slice(0, 10)}
+                                  </td>
+                                  <td
+                                    style={{
+                                      padding: "10px 14px",
+                                      color: "#D97706",
+                                      fontSize: 11,
+                                      fontFamily: T.mono,
+                                    }}
+                                  >
+                                    {t.rrr}
+                                  </td>
+                                  <td
+                                    style={{
+                                      padding: "10px 14px",
+                                      color: "#6B7280",
+                                      fontSize: 11,
+                                      fontFamily: T.mono,
+                                    }}
+                                  >
+                                    {t.entry || "—"}
+                                  </td>
+                                  <td
+                                    style={{
+                                      padding: "10px 14px",
+                                      color: "#6B7280",
+                                      fontSize: 11,
+                                      fontFamily: T.mono,
+                                    }}
+                                  >
+                                    {t.exit || "—"}
+                                  </td>
+                                  <td
+                                    style={{
+                                      padding: "10px 14px",
+                                      color: pv >= 0 ? "#10B981" : "#EF4444",
+                                      fontSize: 12,
+                                      fontWeight: 700,
+                                      fontFamily: T.mono,
+                                    }}
+                                  >
+                                    {pv >= 0 ? "+" : ""}${pv.toFixed(0)}
+                                  </td>
+                                  <td
+                                    style={{
+                                      padding: "10px 14px",
+                                      color:
+                                        t.result === "win"
+                                          ? "#10B981"
+                                          : t.result === "loss"
+                                            ? "#EF4444"
+                                            : "#6B7280",
+                                      fontSize: 11,
+                                      fontWeight: 800,
+                                    }}
+                                  >
+                                    {(t.result || "—").toUpperCase()}
+                                  </td>
+                                </tr>
+                              );
+                            })}
                         </tbody>
                       </table>
                     </div>
-                    
                   </div>
-                ); 
+                );
               })()}
             </div>
           </div>
         )}
-        
+
         {/* RULE #24: Identity Documents Viewer Modal */}
         {selectedUserDocs && (
-          <div style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.8)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-            backdropFilter: 'blur(5px)'
-          }}>
-            <div style={{
-              background: 'rgba(20,20,20,0.95)',
-              border: `1px solid ${T.green}40`,
-              borderRadius: 12,
-              padding: 28,
-              maxWidth: 600,
-              maxHeight: '80vh',
-              overflowY: 'auto',
-              boxShadow: `0 0 40px rgba(52,199,89,0.2)`,
-              backdropFilter: 'blur(10px)'
-            }} className="glass-panel">
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: 20,
-                paddingBottom: 16,
-                borderBottom: `1px solid ${T.green}30`
-              }}>
-                <div style={{
-                  color: T.green,
-                  fontSize: 14,
-                  letterSpacing: 2,
-                  fontWeight: 700
-                }}>
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              background: "rgba(0,0,0,0.8)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 1000,
+              backdropFilter: "blur(5px)",
+            }}
+          >
+            <div
+              style={{
+                background: "rgba(20,20,20,0.95)",
+                border: `1px solid ${T.green}40`,
+                borderRadius: 12,
+                padding: 28,
+                maxWidth: 600,
+                maxHeight: "80vh",
+                overflowY: "auto",
+                boxShadow: `0 0 40px rgba(52,199,89,0.2)`,
+                backdropFilter: "blur(10px)",
+              }}
+              className="glass-panel"
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: 20,
+                  paddingBottom: 16,
+                  borderBottom: `1px solid ${T.green}30`,
+                }}
+              >
+                <div
+                  style={{
+                    color: T.green,
+                    fontSize: 14,
+                    letterSpacing: 2,
+                    fontWeight: 700,
+                  }}
+                >
                   📄 IDENTITY DOCUMENTS (RULE #24)
                 </div>
                 <button
                   onClick={() => setSelectedUserDocs(null)}
                   style={{
-                    background: 'transparent',
-                    border: 'none',
+                    background: "transparent",
+                    border: "none",
                     color: T.muted,
                     fontSize: 20,
-                    cursor: 'pointer',
-                    padding: '4px 8px'
+                    cursor: "pointer",
+                    padding: "4px 8px",
                   }}
                 >
                   ✕
                 </button>
               </div>
-              
+
               <div style={{ marginBottom: 20 }}>
-                <div style={{ color: T.muted, fontSize: 12, marginBottom: 12, fontWeight: 600 }}>
-                  User: {searchFilteredUsers.find(([uid]) => uid === selectedUserDocs)?.[1]?.fullName || 'Unknown'}
+                <div
+                  style={{
+                    color: T.muted,
+                    fontSize: 12,
+                    marginBottom: 12,
+                    fontWeight: 600,
+                  }}
+                >
+                  User:{" "}
+                  {searchFilteredUsers.find(
+                    ([uid]) => uid === selectedUserDocs,
+                  )?.[1]?.fullName || "Unknown"}
                 </div>
-                
-                <div style={{
-                  padding: 16,
-                  background: 'rgba(52,199,89,0.1)',
-                  borderRadius: 8,
-                  border: `1px solid ${T.green}30`,
-                  minHeight: 120,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexDirection: 'column',
-                  gap: 12
-                }}>
+
+                <div
+                  style={{
+                    padding: 16,
+                    background: "rgba(52,199,89,0.1)",
+                    borderRadius: 8,
+                    border: `1px solid ${T.green}30`,
+                    minHeight: 120,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexDirection: "column",
+                    gap: 12,
+                  }}
+                >
                   <div style={{ color: T.green, fontSize: 14 }}>📁</div>
-                  <div style={{ color: T.muted, fontSize: 12, textAlign: 'center' }}>
-                    Identity documents for this user will appear here.<br/>
-                    <span style={{ fontSize: 11, color: T.dim }}>(Currently uploaded documents from Aadhar, Passport, License, PAN)</span>
+                  <div
+                    style={{
+                      color: T.muted,
+                      fontSize: 12,
+                      textAlign: "center",
+                    }}
+                  >
+                    Identity documents for this user will appear here.
+                    <br />
+                    <span style={{ fontSize: 11, color: T.dim }}>
+                      (Currently uploaded documents from Aadhar, Passport,
+                      License, PAN)
+                    </span>
                   </div>
                 </div>
               </div>
-              
-              <div style={{
-                display: 'flex',
-                gap: 12,
-                justifyContent: 'flex-end'
-              }}>
+
+              <div
+                style={{
+                  display: "flex",
+                  gap: 12,
+                  justifyContent: "flex-end",
+                }}
+              >
                 <button
                   onClick={() => setSelectedUserDocs(null)}
                   style={{
                     ...authBtn(T.muted, false),
-                    background: 'transparent'
+                    background: "transparent",
                   }}
                   className="btn-glass"
                 >
@@ -7781,7 +11590,7 @@ function AdminDashboard({ auth, onLogout, isAdminAuthenticated, showToast, maint
             </div>
           </div>
         )}
-        
+
         {/* RULE #95: Back-to-Top Button */}
         <BackToTopButton />
       </div>
@@ -7792,7 +11601,13 @@ function AdminDashboard({ auth, onLogout, isAdminAuthenticated, showToast, maint
 // ═══════════════════════════════════════════════════════════════════
 //  SESSIONS MANAGEMENT SCREEN — Rules #5, #6
 // ═══════════════════════════════════════════════════════════════════
-function SessionsManagementScreen({ profile, auth, currentSessionId, onBack, showToast }) {
+function SessionsManagementScreen({
+  profile,
+  auth,
+  currentSessionId,
+  onBack,
+  showToast,
+}) {
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [logoutLoading, setLogoutLoading] = useState(false);
@@ -7800,20 +11615,32 @@ function SessionsManagementScreen({ profile, auth, currentSessionId, onBack, sho
   useEffect(() => {
     const fetchSessions = async () => {
       if (!auth || !profile) return;
-      
+
       try {
-        const sessionsData = await dbR(`users/${auth.uid}/sessions`, auth.token);
+        const sessionsData = await dbR(
+          `users/${auth.uid}/sessions`,
+          auth.token,
+        );
         if (sessionsData) {
-          const sessionsList = Object.entries(sessionsData).map(([sessionId, sessionData]) => ({
-            sessionId,
-            ...sessionData,
-            isCurrentSession: sessionId === currentSessionId
-          }));
-          setSessions(sessionsList.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
+          const sessionsList = Object.entries(sessionsData).map(
+            ([sessionId, sessionData]) => ({
+              sessionId,
+              ...sessionData,
+              isCurrentSession: sessionId === currentSessionId,
+            }),
+          );
+          setSessions(
+            sessionsList.sort(
+              (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
+            ),
+          );
         }
       } catch (error) {
-        console.error('Failed to fetch sessions:', error);
-        showToast('Session data not responding. Running recovery sequence..', 'error');
+        console.error("Failed to fetch sessions:", error);
+        showToast(
+          "Session data not responding. Running recovery sequence..",
+          "error",
+        );
       } finally {
         setLoading(false);
       }
@@ -7824,75 +11651,161 @@ function SessionsManagementScreen({ profile, auth, currentSessionId, onBack, sho
 
   const handleLogoutOtherDevices = async () => {
     if (!auth || !currentSessionId) return;
-    
+
     setLogoutLoading(true);
     try {
-      const success = await logoutOtherDevices(auth.uid, currentSessionId, auth.token);
+      const success = await logoutOtherDevices(
+        auth.uid,
+        currentSessionId,
+        auth.token,
+      );
       if (success) {
-        showToast('Session termination sequence complete. All terminals closed.', 'success');
-        setSessions(sessions.filter(s => s.isCurrentSession));
+        showToast(
+          "Session termination sequence complete. All terminals closed.",
+          "success",
+        );
+        setSessions(sessions.filter((s) => s.isCurrentSession));
       }
     } catch (error) {
-      console.error('Logout other devices failed:', error);
-      showToast('Logout signal fading across network. Persist and retry.', 'error');
+      console.error("Logout other devices failed:", error);
+      showToast(
+        "Logout signal fading across network. Persist and retry.",
+        "error",
+      );
     } finally {
       setLogoutLoading(false);
     }
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: T.bg, fontFamily: T.font, padding: 20 }}>
+    <div
+      style={{
+        minHeight: "100vh",
+        background: T.bg,
+        fontFamily: T.font,
+        padding: 20,
+      }}
+    >
       <div style={{ maxWidth: 800, margin: "0 auto" }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-          <h1 style={{ margin: 0, color: T.gold, fontSize: 20, fontWeight: 700, letterSpacing: 2 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: 24,
+          }}
+        >
+          <h1
+            style={{
+              margin: 0,
+              color: T.gold,
+              fontSize: 20,
+              fontWeight: 700,
+              letterSpacing: 2,
+            }}
+          >
             ACTIVE SESSIONS
           </h1>
-          <button 
+          <button
             onClick={onBack}
-            style={{ background: 'transparent', border: 'none', color: T.blue, cursor: 'pointer', fontSize: 14 }}
+            style={{
+              background: "transparent",
+              border: "none",
+              color: T.blue,
+              cursor: "pointer",
+              fontSize: 14,
+            }}
           >
             ← Back to Dashboard
           </button>
         </div>
 
         {loading ? (
-          <div style={{ textAlign: 'center', color: T.muted, padding: 40 }}>loading...</div>
+          <div style={{ textAlign: "center", color: T.muted, padding: 40 }}>
+            loading...
+          </div>
         ) : sessions.length === 0 ? (
-          <div style={{ background: 'rgba(0,0,0,0.3)', border: `1px solid rgba(255,255,255,0.1)`, borderRadius: 8, padding: 20, textAlign: 'center', color: T.muted }}>
+          <div
+            style={{
+              background: "rgba(0,0,0,0.3)",
+              border: `1px solid rgba(255,255,255,0.1)`,
+              borderRadius: 8,
+              padding: 20,
+              textAlign: "center",
+              color: T.muted,
+            }}
+          >
             No active sessions
           </div>
         ) : (
           <>
-            <div style={{ marginBottom: 20, background: 'rgba(0,0,0,0.2)', border: `1px solid rgba(255,255,255,0.1)`, borderRadius: 8, overflow: 'hidden' }}>
+            <div
+              style={{
+                marginBottom: 20,
+                background: "rgba(0,0,0,0.2)",
+                border: `1px solid rgba(255,255,255,0.1)`,
+                borderRadius: 8,
+                overflow: "hidden",
+              }}
+            >
               {sessions.map((session) => (
-                <div key={session.sessionId} style={{ padding: 16, borderBottom: `1px solid rgba(255,255,255,0.05)`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div
+                  key={session.sessionId}
+                  style={{
+                    padding: 16,
+                    borderBottom: `1px solid rgba(255,255,255,0.05)`,
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
                   <div>
-                    <div style={{ color: T.blue, fontWeight: 700, marginBottom: 4 }}>
+                    <div
+                      style={{
+                        color: T.blue,
+                        fontWeight: 700,
+                        marginBottom: 4,
+                      }}
+                    >
                       {session.device}
-                      {session.isCurrentSession && <span style={{ color: T.green, fontSize: 11, marginLeft: 8 }}>(Current Device)</span>}
+                      {session.isCurrentSession && (
+                        <span
+                          style={{
+                            color: T.green,
+                            fontSize: 11,
+                            marginLeft: 8,
+                          }}
+                        >
+                          (Current Device)
+                        </span>
+                      )}
                     </div>
                     <div style={{ fontSize: 12, color: T.muted }}>
                       📍 {session.city}, {session.country}
                     </div>
                     <div style={{ fontSize: 11, color: T.dim, marginTop: 4 }}>
-                      Last Active: {new Date(session.lastActive).toLocaleDateString()} {new Date(session.lastActive).toLocaleTimeString()}
+                      Last Active:{" "}
+                      {new Date(session.lastActive).toLocaleDateString()}{" "}
+                      {new Date(session.lastActive).toLocaleTimeString()}
                     </div>
                   </div>
                 </div>
               ))}
             </div>
 
-            {sessions.filter(s => !s.isCurrentSession).length > 0 && (
-              <button 
+            {sessions.filter((s) => !s.isCurrentSession).length > 0 && (
+              <button
                 onClick={handleLogoutOtherDevices}
                 disabled={logoutLoading}
                 style={{
                   ...authBtn(T.red, logoutLoading),
-                  width: '100%'
-                }} 
+                  width: "100%",
+                }}
                 className="btn-glass"
               >
-                {logoutLoading ? 'LOGGING OUT...' : '🚪 LOGOUT ALL OTHER DEVICES'}
+                {logoutLoading
+                  ? "LOGGING OUT..."
+                  : "🚪 LOGOUT ALL OTHER DEVICES"}
               </button>
             )}
           </>
@@ -7905,84 +11818,91 @@ function SessionsManagementScreen({ profile, auth, currentSessionId, onBack, sho
 // ═══════════════════════════════════════════════════════════════════
 //  MAIN TRADING TERMINAL (PART 1: State & Math Engine)
 // ═══════════════════════════════════════════════════════════════════
-function MainTerminal({ profile, onLogout, onSaveJournal, onSaveAccount, onSaveFirmRules, showToast }) {
-  const [part, setPart] = useState('1');
-  return (
-    <div>MainTerminal placeholder - needs reconstruction</div>
-  );
+function MainTerminal({
+  profile,
+  onLogout,
+  onSaveJournal,
+  onSaveAccount,
+  onSaveFirmRules,
+  showToast,
+}) {
+  const [part, setPart] = useState("1");
+  return <div>MainTerminal placeholder - needs reconstruction</div>;
 }
 
 //  ROOT — AUTH STATE MACHINE
 // ═══════════════════════════════════════════════════════════════════
 export default function TradersRegiment() {
-  const [screen, setScreen] = useState('loading');
+  const [screen, setScreen] = useState("loading");
   const [auth, setAuth] = useState(null);
   const [profile, setProfile] = useState(null);
-  const [adminPassInput, setAdminPassInput] = useState('');
+  const [adminPassInput, setAdminPassInput] = useState("");
   const [showAdminPrompt, setShowAdminPrompt] = useState(false);
-  const [adminMasterEmail, setAdminMasterEmail] = useState('');
-  const [adminMasterEmailVerified, setAdminMasterEmailVerified] = useState(false);
+  const [adminMasterEmail, setAdminMasterEmail] = useState("");
+  const [adminMasterEmailVerified, setAdminMasterEmailVerified] =
+    useState(false);
   const [adminOtpStep, setAdminOtpStep] = useState(false); // true when OTPs are sent and need verification
   const [adminOtpsVerified, setAdminOtpsVerified] = useState(false); // true after successful OTP verification
-  const [adminOtps, setAdminOtps] = useState({ otp1: '', otp2: '', otp3: '' });
-  const [adminOtpErr, setAdminOtpErr] = useState('');
-  const [adminPassErr, setAdminPassErr] = useState('');
+  const [adminOtps, setAdminOtps] = useState({ otp1: "", otp2: "", otp3: "" });
+  const [adminOtpErr, setAdminOtpErr] = useState("");
+  const [adminPassErr, setAdminPassErr] = useState("");
   const [showAdminPwd, setShowAdminPwd] = useState(false);
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [toasts, setToasts] = useState([]);
-  const [theme, setTheme] = useState('day');
+  const [theme, setTheme] = useState("day");
   // Phase 3: AI Engines status (default online)
-  const [aiOutages, setAiOutages] = useState([false,false,false,false]);
-  const aiStatuses = aiOutages.map(out => !out);
+  const [aiOutages, setAiOutages] = useState([false, false, false, false]);
+  const aiStatuses = aiOutages.map((out) => !out);
   const [dailyQuote, _setDailyQuote] = useState(getRandomQuote());
-  
+
   // ═══════════════════════════════════════════════════════════════════
   // INITIALIZATION ORDER FIX: playNotificationSound and showToast
   // MUST be defined here, before any code that uses them
   // ═══════════════════════════════════════════════════════════════════
-  const playNotificationSound = useCallback((type = 'success') => {
+  const playNotificationSound = useCallback((type = "success") => {
     try {
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      
-      if (type === 'success' || type === 'info') {
+      const audioContext = new (
+        window.AudioContext || window.webkitAudioContext
+      )();
+
+      if (type === "success" || type === "info") {
         // Notification sound: Pleasant ascending tone (0.5s)
         const now = audioContext.currentTime;
-        
+
         // Oscillator 1: Main ascending tone
         const osc1 = audioContext.createOscillator();
         const gain1 = audioContext.createGain();
         osc1.connect(gain1);
         gain1.connect(audioContext.destination);
-        
-        osc1.type = 'sine';
+
+        osc1.type = "sine";
         osc1.frequency.setValueAtTime(800, now);
         osc1.frequency.exponentialRampToValueAtTime(1200, now + 0.15);
         osc1.frequency.exponentialRampToValueAtTime(1600, now + 0.3);
-        
+
         gain1.gain.setValueAtTime(0.3, now);
         gain1.gain.exponentialRampToValueAtTime(0.1, now + 0.5);
-        
+
         osc1.start(now);
         osc1.stop(now + 0.5);
-        
-      } else if (type === 'error' || type === 'warning') {
+      } else if (type === "error" || type === "warning") {
         // Low Alert sound: Descending warning tone (0.4s)
         const now = audioContext.currentTime;
-        
+
         // Oscillator: Descending tone
         const osc = audioContext.createOscillator();
         const gain = audioContext.createGain();
         osc.connect(gain);
         gain.connect(audioContext.destination);
-        
-        osc.type = 'sine';
+
+        osc.type = "sine";
         osc.frequency.setValueAtTime(600, now);
         osc.frequency.exponentialRampToValueAtTime(300, now + 0.4);
-        
+
         gain.gain.setValueAtTime(0.25, now);
         gain.gain.exponentialRampToValueAtTime(0.05, now + 0.4);
-        
+
         osc.start(now);
         osc.stop(now + 0.4);
       }
@@ -7990,74 +11910,79 @@ export default function TradersRegiment() {
       // Silently fail if Audio API not available
     }
   }, []);
-  
-  const showToast = useCallback((message, type = 'info', duration = 3000) => {
-    const id = `toast-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    const newToast = { 
-      id, 
-      message, 
-      type,
-      duration,
-      time_remaining: duration,
-      createdAt: Date.now()
-    };
-    setToasts((prev) => [...prev, newToast]);
-    
-    // RULE #189: Play institutional notification sound
-    playNotificationSound(type);
-    
-    // Track time remaining for progress bar
-    const startTime = Date.now();
-    const intervalId = setInterval(() => {
-      const elapsed = Date.now() - startTime;
-      const remaining = Math.max(0, duration - elapsed);
-      setToasts((prev) => 
-        prev.map((t) => t.id === id ? { ...t, time_remaining: remaining } : t)
-      );
-    }, 50);
-    
-    // Auto-remove toast after duration
-    const timer = setTimeout(() => {
-      clearInterval(intervalId);
-      setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, duration);
-    
-    // Return function to manually dismiss
-    return () => {
-      clearTimeout(timer);
-      clearInterval(intervalId);
-      setToasts((prev) => prev.filter((t) => t.id !== id));
-    };
-  }, [playNotificationSound]);
-  
+
+  const showToast = useCallback(
+    (message, type = "info", duration = 3000) => {
+      const id = `toast-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const newToast = {
+        id,
+        message,
+        type,
+        duration,
+        time_remaining: duration,
+        createdAt: Date.now(),
+      };
+      setToasts((prev) => [...prev, newToast]);
+
+      // RULE #189: Play institutional notification sound
+      playNotificationSound(type);
+
+      // Track time remaining for progress bar
+      const startTime = Date.now();
+      const intervalId = setInterval(() => {
+        const elapsed = Date.now() - startTime;
+        const remaining = Math.max(0, duration - elapsed);
+        setToasts((prev) =>
+          prev.map((t) =>
+            t.id === id ? { ...t, time_remaining: remaining } : t,
+          ),
+        );
+      }, 50);
+
+      // Auto-remove toast after duration
+      const timer = setTimeout(() => {
+        clearInterval(intervalId);
+        setToasts((prev) => prev.filter((t) => t.id !== id));
+      }, duration);
+
+      // Return function to manually dismiss
+      return () => {
+        clearTimeout(timer);
+        clearInterval(intervalId);
+        setToasts((prev) => prev.filter((t) => t.id !== id));
+      };
+    },
+    [playNotificationSound],
+  );
+
   // MODULE 5: VISUAL POLISH - SYSTEM THEME SYNC & ACCENT COLORS
   const systemIsDark = useSystemTheme(); // Auto-detect OS dark/light mode
   const [accentColor, setAccentColor] = useState(() => {
     try {
-      return localStorage.getItem('appAccentColor') || 'BLUE';
+      return localStorage.getItem("appAccentColor") || "BLUE";
     } catch {
-      return 'BLUE';
+      return "BLUE";
     }
   });
   // Phase 2: Apple-like three-theme system (Day, Night, Eye Comfort)
   const [currentTheme, setCurrentTheme] = useState(() => {
     try {
-      return localStorage.getItem('appTheme') || 'day';
+      return localStorage.getItem("appTheme") || "day";
     } catch {
-      return 'day';
+      return "day";
     }
   });
 
   const handleThemeChange = (newTheme) => {
     setCurrentTheme(newTheme);
     try {
-      localStorage.setItem('appTheme', newTheme);
+      localStorage.setItem("appTheme", newTheme);
     } catch {
       // ignore
     }
   };
   const [showThemePicker, setShowThemePicker] = useState(false);
-  
+
   // MODULE 1 PHASE 2: PRIVACY & SESSION MANAGEMENT
   const [privacyModeActive, setPrivacyModeActive] = useState(false); // Rule #27: Ghost Mode
   const [showInviteScreen, setShowInviteScreen] = useState(false);
@@ -8065,27 +11990,29 @@ export default function TradersRegiment() {
   const [googleUser, setGoogleUser] = useState(null);
   const [, _setActiveSessions] = useState([]);
   const [currentSessionId, setCurrentSessionId] = useState(null);
-  
+
   const [maintenanceModeActive, setMaintenanceModeActive] = useState(() => {
     try {
-      return localStorage.getItem('TradersApp_MaintenanceMode') === 'true';
+      return localStorage.getItem("TradersApp_MaintenanceMode") === "true";
     } catch {
       return false;
     }
   });
-  
+
   // Handler to toggle maintenance mode
   const handleToggleMaintenanceMode = useCallback(() => {
     const newState = !maintenanceModeActive;
     setMaintenanceModeActive(newState);
     try {
-      localStorage.setItem('TradersApp_MaintenanceMode', newState.toString());
+      localStorage.setItem("TradersApp_MaintenanceMode", newState.toString());
       showToast(
-        newState ? 'Maintenance Mode ACTIVATED - Users see "Back Soon" screen' : 'Maintenance Mode DEACTIVATED - Normal access restored',
-        newState ? 'warning' : 'success'
+        newState
+          ? 'Maintenance Mode ACTIVATED - Users see "Back Soon" screen'
+          : "Maintenance Mode DEACTIVATED - Normal access restored",
+        newState ? "warning" : "success",
       );
     } catch {
-      showToast('Failed to save maintenance mode setting', 'error');
+      showToast("Failed to save maintenance mode setting", "error");
     }
   }, [maintenanceModeActive, showToast]);
 
@@ -8098,116 +12025,22 @@ export default function TradersRegiment() {
   const [debugComponentStatus] = useState({});
   const [debugOverlayOpen, setDebugOverlayOpen] = useState(false);
 
-  // Intercept console logs in development/admin mode
-  useEffect(() => {
-    /* eslint-disable no-console */
-    const originalLog = console.log;
-    const originalWarn = console.warn;
-    const originalError = console.error;
-
-    console.log = (...args) => {
-      originalLog(...args);
-      if (isAdminAuthenticated) {
-        setDebugLogs(prev => [...prev.slice(-99), {
-          type: 'log',
-          message: args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' '),
-          timestamp: new Date().toLocaleTimeString()
-        }]);
-      }
-    };
-
-    console.warn = (...args) => {
-      originalWarn(...args);
-      if (isAdminAuthenticated) {
-        setDebugLogs(prev => [...prev.slice(-99), {
-          type: 'warn',
-          message: args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' '),
-          timestamp: new Date().toLocaleTimeString()
-        }]);
-      }
-    };
-
-    console.error = (...args) => {
-      originalError(...args);
-      if (isAdminAuthenticated) {
-        setDebugLogs(prev => [...prev.slice(-99), {
-          type: 'error',
-          message: args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' '),
-          timestamp: new Date().toLocaleTimeString()
-        }]);
-      }
-    };
-
-    return () => {
-      console.log = originalLog;
-      console.warn = originalWarn;
-      console.error = originalError;
-    };
-    /* eslint-enable no-console */
-  }, [isAdminAuthenticated]);
-
-  // Measure Time-to-Interactive (TTI)
-  useEffect(() => {
-    if (isAdminAuthenticated) {
-      const navigationStart = performance.timing.navigationStart;
-      const measureTTI = () => {
-        // Check if interactive (DOM ready + scripts loaded)
-        if (document.readyState === 'interactive' || document.readyState === 'complete') {
-          const tti = performance.now() - (navigationStart || performance.timing.navigationStart);
-          setDebugTTI(tti.toFixed(0));
-        } else {
-          setTimeout(measureTTI, 100);
-        }
-      };
-      measureTTI();
-
-      // Also listen for page visibility changes
-      const handler = () => {
-        if (document.readyState === 'complete') {
-          const tti = performance.now();
-          setDebugTTI(tti.toFixed(0));
-        }
-      };
-      document.addEventListener('readystatechange', handler);
-      return () => document.removeEventListener('readystatechange', handler);
-    }
-  }, [isAdminAuthenticated]);
-
-  // Global network latency tracker (for monitoring fetch calls)
+  // Intercept console logs using modular telemetry service
   useEffect(() => {
     if (!isAdminAuthenticated) return;
-
-    const originalFetch = window.fetch;
-    window.fetch = async (...args) => {
-      const startTime = performance.now();
-      const url = args[0];
-      const endpoint = typeof url === 'string' ? url.split('/').pop() : 'request';
-
-      try {
-        const response = await originalFetch(...args);
-        const latency = performance.now() - startTime;
-        
-        setDebugLatencies(prev => [...prev.slice(-24), {
-          endpoint: endpoint.slice(0, 20),
-          ms: latency.toFixed(0),
-          timestamp: new Date().toLocaleTimeString()
-        }]);
-
-        return response;
-      } catch (error) {
-        const latency = performance.now() - startTime;
-        setDebugLatencies(prev => [...prev.slice(-24), {
-          endpoint: endpoint.slice(0, 20) + ' (ERROR)',
-          ms: latency.toFixed(0),
-          timestamp: new Date().toLocaleTimeString()
-        }]);
-        throw error;
-      }
-    };
-
+    const restoreConsole = setupConsoleInterceptor(setDebugLogs);
+    const restoreNetwork = setupNetworkMonitor(setDebugLatencies);
     return () => {
-      window.fetch = originalFetch;
+      restoreConsole();
+      restoreNetwork();
     };
+  }, [isAdminAuthenticated]);
+
+  // Measure Time-to-Interactive (TTI) using modular tracker
+  useEffect(() => {
+    if (!isAdminAuthenticated) return;
+    const restoreTTI = setupTTITracker(setDebugTTI);
+    return restoreTTI;
   }, [isAdminAuthenticated]);
 
   // Initialize Performance Tests for institutional benchmarking
@@ -8216,28 +12049,41 @@ export default function TradersRegiment() {
       try {
         /* eslint-disable no-console */
         exposePerformanceTestToWindow();
-        console.log('✅ Performance tests initialized - accessible via window.__performanceTest');
-        
+        console.log(
+          "✅ Performance tests initialized - accessible via window.__performanceTest",
+        );
+
         exposeSecurityAPIToWindow();
-        console.log('✅ Security monitor initialized - accessible via window.__SecurityMonitor');
+        console.log(
+          "✅ Security monitor initialized - accessible via window.__SecurityMonitor",
+        );
 
         initLeakagePrevention(showToast);
-        console.log('✅ Leakage Prevention module initialized - accessible via window.__LeakagePrevention');
+        console.log(
+          "✅ Leakage Prevention module initialized - accessible via window.__LeakagePrevention",
+        );
 
         initSocialEngineeringDetection(showToast);
-        console.log('✅ Social Engineering Detection initialized - accessible via window.__SocialEngineeringDetection');
-        
+        console.log(
+          "✅ Social Engineering Detection initialized - accessible via window.__SocialEngineeringDetection",
+        );
+
         // Initialize Telegram Monitor for admin diagnostics
         initTelegramMonitor(TELEGRAM_TOKEN, TELEGRAM_CHAT_ID);
-        console.log('✅ Telegram Monitor initialized - use window.__TelegramMonitor for diagnostics');
+        console.log(
+          "✅ Telegram Monitor initialized - use window.__TelegramMonitor for diagnostics",
+        );
 
         // Expose Firebase Optimizer metrics to admin console
-        window.__FirebaseOptimizerMetrics = () => firebaseOptimizer.getMetrics();
-        console.log('✅ Firebase Optimizer active - use window.__FirebaseOptimizerMetrics() for stats');
+        window.__FirebaseOptimizerMetrics = () =>
+          firebaseOptimizer.getMetrics();
+        console.log(
+          "✅ Firebase Optimizer active - use window.__FirebaseOptimizerMetrics() for stats",
+        );
         /* eslint-enable no-console */
       } catch (error) {
-        console.error('Failed to initialize admin systems:', error);
-        showToast(`Admin setup failed: ${error.message}`, 'error');
+        console.error("Failed to initialize admin systems:", error);
+        showToast(`Admin setup failed: ${error.message}`, "error");
       }
     }
   }, [isAdminAuthenticated, showToast]);
@@ -8253,23 +12099,26 @@ export default function TradersRegiment() {
   const handleAccentColorChange = (newAccent) => {
     setAccentColor(newAccent);
     try {
-      localStorage.setItem('appAccentColor', newAccent);
+      localStorage.setItem("appAccentColor", newAccent);
     } catch (error) {
-      console.error('Failed to save accent color:', error);
+      console.error("Failed to save accent color:", error);
     }
     setShowThemePicker(false);
-    showToast(`Theme updated to ${ACCENT_COLORS[newAccent]?.name || 'Unknown'}`, 'info');
+    showToast(
+      `Theme updated to ${ACCENT_COLORS[newAccent]?.name || "Unknown"}`,
+      "info",
+    );
   };
 
   // CREATE DYNAMIC THEME BASED ON SYSTEM DARK MODE, ACCENT COLOR & USER THEME
   const _THEME = useMemo(() => {
-    if (currentTheme === 'day') {
-      return createTheme(false, 'BLUE');
-    } else if (currentTheme === 'night') {
-      return createTheme(true, 'BLUE');
-    } else if (currentTheme === 'eye') {
+    if (currentTheme === "day") {
+      return createTheme(false, "BLUE");
+    } else if (currentTheme === "night") {
+      return createTheme(true, "BLUE");
+    } else if (currentTheme === "eye") {
       // Eye Comfort: warmer accents (Gold) to reduce blue light
-      return createTheme(false, 'GOLD');
+      return createTheme(false, "GOLD");
     }
     // Fallback to system/theme combo
     return createTheme(systemIsDark, accentColor);
@@ -8277,17 +12126,19 @@ export default function TradersRegiment() {
 
   // MOTION & INTERACTION: Apply tilt effects to dashboard cards
   useEffect(() => {
-    if (screen === 'app' || screen === 'admin') {
+    if (screen === "app" || screen === "admin") {
       // Apply tilt to all cards with card-tilt class
-      const tiltCards = document.querySelectorAll('.card-tilt');
-      tiltCards.forEach(card => {
+      const tiltCards = document.querySelectorAll(".card-tilt");
+      tiltCards.forEach((card) => {
         createCardTiltHandler(card);
       });
-      
+
       // Apply pulse animation to pending buttons
-      const pendingButtons = document.querySelectorAll('[data-status="pending"]');
-      pendingButtons.forEach(btn => {
-        btn.classList.add('btn-pending-pulse');
+      const pendingButtons = document.querySelectorAll(
+        '[data-status="pending"]',
+      );
+      pendingButtons.forEach((btn) => {
+        btn.classList.add("btn-pending-pulse");
       });
     }
   }, [screen]);
@@ -8295,21 +12146,23 @@ export default function TradersRegiment() {
   // Check for persistent admin session on mount
   useEffect(() => {
     try {
-      const savedAdminStatus = localStorage.getItem('isAdminAuthenticated');
-      if (savedAdminStatus === 'true') {
+      const savedAdminStatus = localStorage.getItem("isAdminAuthenticated");
+      if (savedAdminStatus === "true") {
         // Restore admin authentication from localStorage
         setIsAdminAuthenticated(true);
-        setScreen('admin');
-        
+        setScreen("admin");
+
         // Send god mode activation alert
-        sendTelegramAlert('🔥 <b>ADMIN TERMINAL RESUMED</b>\nGod Mode session active on this device.');
+        sendTelegramAlert(
+          "🔥 <b>ADMIN TERMINAL RESUMED</b>\nGod Mode session active on this device.",
+        );
       } else {
         // Not an admin, go to login
-        setScreen('login');
+        setScreen("login");
       }
     } catch (error) {
-      console.warn('Failed to restore admin session:', error);
-      setScreen('login');
+      console.warn("Failed to restore admin session:", error);
+      setScreen("login");
     } finally {
       // Done loading, allow the app to render
       setIsInitialLoading(false);
@@ -8319,43 +12172,52 @@ export default function TradersRegiment() {
   // ═══════════════════════════════════════════════════════════════════
   // RULE #160, #176: Connection Status Toast - Show online/offline status
   // ═══════════════════════════════════════════════════════════════════
-  
+
   // RUN TELEGRAM CONNECTIVITY AUDIT ON APP LOAD
   useEffect(() => {
     // Run diagnostics asynchronously without blocking app initialization
     const runDiagnostics = async () => {
       try {
         /* eslint-disable no-console */
-        console.log('🔌 Starting Telegram connectivity audit...');
-        const diagnostics = await testTelegramConnectivity(TELEGRAM_TOKEN, TELEGRAM_CHAT_ID);
-        
+        console.log("🔌 Starting Telegram connectivity audit...");
+        const diagnostics = await testTelegramConnectivity(
+          TELEGRAM_TOKEN,
+          TELEGRAM_CHAT_ID,
+        );
+
         // Log summary to console
-        console.log('✅ Telegram audit complete:', diagnostics.summary);
-        
+        console.log("✅ Telegram audit complete:", diagnostics.summary);
+
         // Send diagnostic summary as Telegram message (non-blocking)
-        if (diagnostics.summary.status === 'ALL_SYSTEMS_OPERATIONAL') {
-          console.log('📱 Telegram system is fully operational');
+        if (diagnostics.summary.status === "ALL_SYSTEMS_OPERATIONAL") {
+          console.log("📱 Telegram system is fully operational");
         } else {
           /* eslint-enable no-console */
-          console.warn('⚠️ Telegram system issues detected:', diagnostics.summary);
-          
+          console.warn(
+            "⚠️ Telegram system issues detected:",
+            diagnostics.summary,
+          );
+
           // Send alert notification
           try {
-            await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                chat_id: TELEGRAM_CHAT_ID,
-                text: `⚠️ <b>TELEGRAM CONNECTIVITY WARNING</b>\n<code>${diagnostics.summary.status}</code>\n\nDiagnostic tests: ${diagnostics.summary.passedTests}/${diagnostics.summary.totalTests} passed`,
-                parse_mode: 'HTML'
-              })
-            });
+            await fetch(
+              `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  chat_id: TELEGRAM_CHAT_ID,
+                  text: `⚠️ <b>TELEGRAM CONNECTIVITY WARNING</b>\n<code>${diagnostics.summary.status}</code>\n\nDiagnostic tests: ${diagnostics.summary.passedTests}/${diagnostics.summary.totalTests} passed`,
+                  parse_mode: "HTML",
+                }),
+              },
+            );
           } catch (e) {
-            console.error('Could not send diagnostic alert:', e);
+            console.error("Could not send diagnostic alert:", e);
           }
         }
       } catch (error) {
-        console.error('❌ Telegram connectivity audit failed:', error);
+        console.error("❌ Telegram connectivity audit failed:", error);
       }
     };
 
@@ -8379,7 +12241,7 @@ export default function TradersRegiment() {
   // Phase 3.3: Forgot password -> trigger invite flow
   const handleForgotPassword = async (email) => {
     if (!email) {
-      showToast('Please enter an email address to reset password', 'warning');
+      showToast("Please enter an email address to reset password", "warning");
       return;
     }
     try {
@@ -8388,60 +12250,72 @@ export default function TradersRegiment() {
         await sendPasswordResetEmail(authObj, email);
       } else {
         // If Firebase app not initialized, just simulate success for the demo
-        console.log('simulate password reset email to', email);
+        console.log("simulate password reset email to", email);
       }
-      showToast('Password reset email sent. Check Gmail for further steps.', 'success');
+      showToast(
+        "Password reset email sent. Check Gmail for further steps.",
+        "success",
+      );
       // Move to invite flow (no name yet)
-      triggerInviteFlow(email, 'User');
+      triggerInviteFlow(email, "User");
     } catch (err) {
-      console.error('Password reset failed:', err);
-      showToast('Failed to send password reset email', 'error');
+      console.error("Password reset failed:", err);
+      showToast("Failed to send password reset email", "error");
     }
   };
-  
+
   useEffect(() => {
     // Track connection status to avoid duplicate toasts
     let isOnline = navigator.onLine;
-    
+
     // Show initial status on mount if needed
     if (!isOnline) {
-      showToast('Offline Protocol Engaged. Using cached memory. Sync pending.', 'warning');
+      showToast(
+        "Offline Protocol Engaged. Using cached memory. Sync pending.",
+        "warning",
+      );
     }
-    
+
     const handleOnline = () => {
       if (!isOnline) {
         isOnline = true;
-        showToast('Network bridge restored. Data synchronization in progress...', 'success');
-        
+        showToast(
+          "Network bridge restored. Data synchronization in progress...",
+          "success",
+        );
+
         // Trigger any necessary data synchronization after reconnection
-        const reconnectEvent = new CustomEvent('connectionRestored', {
-          detail: { timestamp: Date.now() }
+        const reconnectEvent = new CustomEvent("connectionRestored", {
+          detail: { timestamp: Date.now() },
         });
         window.dispatchEvent(reconnectEvent);
       }
     };
-    
+
     const handleOffline = () => {
       if (isOnline) {
         isOnline = false;
-        showToast('Network link severed. Verify connection strength and retry.', 'warning');
-        
+        showToast(
+          "Network link severed. Verify connection strength and retry.",
+          "warning",
+        );
+
         // Notify app that connection lost for graceful degradation
-        const disconnectEvent = new CustomEvent('connectionLost', {
-          detail: { timestamp: Date.now() }
+        const disconnectEvent = new CustomEvent("connectionLost", {
+          detail: { timestamp: Date.now() },
         });
         window.dispatchEvent(disconnectEvent);
       }
     };
-    
+
     // Add event listeners for connection status changes
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
     // Cleanup: Remove listeners on unmount
     return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
     };
   }, [showToast]);
 
@@ -8450,31 +12324,31 @@ export default function TradersRegiment() {
   // ═══════════════════════════════════════════════════════════════════
   useEffect(() => {
     let resizeTimer = null;
-    
+
     const handleResizeDebounced = () => {
       // Clear previous timer
       if (resizeTimer) clearTimeout(resizeTimer);
-      
+
       // Set new timer - only fire after 150ms of no resize events
       resizeTimer = setTimeout(() => {
         // Trigger any necessary layout recalculations here
         // This prevents excessive re-renders during window resize
-        const event = new CustomEvent('layoutOptimized', {
+        const event = new CustomEvent("layoutOptimized", {
           detail: {
             width: window.innerWidth,
-            height: window.innerHeight
-          }
+            height: window.innerHeight,
+          },
         });
         window.dispatchEvent(event);
       }, 150); // 150ms debounce delay for smooth resizing
     };
-    
+
     // Add resize listener with debouncing
-    window.addEventListener('resize', handleResizeDebounced, { passive: true });
-    
+    window.addEventListener("resize", handleResizeDebounced, { passive: true });
+
     // Cleanup: Remove listener and clear timer
     return () => {
-      window.removeEventListener('resize', handleResizeDebounced);
+      window.removeEventListener("resize", handleResizeDebounced);
       if (resizeTimer) clearTimeout(resizeTimer);
     };
   }, []);
@@ -8491,43 +12365,54 @@ export default function TradersRegiment() {
       try {
         // Optimized heartbeat listener with connection pooling
         unsubscribe = firebaseOptimizer.createOptimizedListener(
-          '.info/connected',
+          ".info/connected",
           (result) => {
-            const isConnected = result.isBatched 
-              ? result.updates[result.updates.length - 1] === true 
+            const isConnected = result.isBatched
+              ? result.updates[result.updates.length - 1] === true
               : result === true;
             lastHeartbeatTime = Date.now();
-            
+
             if (isConnected) {
-              window.dispatchEvent(new CustomEvent('firebaseConnected', {
-                detail: { timestamp: lastHeartbeatTime, status: 'healthy' }
-              }));
+              window.dispatchEvent(
+                new CustomEvent("firebaseConnected", {
+                  detail: { timestamp: lastHeartbeatTime, status: "healthy" },
+                }),
+              );
             } else {
-              window.dispatchEvent(new CustomEvent('firebaseDisconnected', {
-                detail: { timestamp: lastHeartbeatTime, status: 'reconnecting' }
-              }));
+              window.dispatchEvent(
+                new CustomEvent("firebaseDisconnected", {
+                  detail: {
+                    timestamp: lastHeartbeatTime,
+                    status: "reconnecting",
+                  },
+                }),
+              );
             }
           },
-          firebaseDb, ref, onValue
+          firebaseDb,
+          ref,
+          onValue,
         );
 
         // Set up heartbeat check interval - verify connection every 5 seconds
         heartbeatCheckTimer = setInterval(() => {
           const timeSinceLastHeartbeat = Date.now() - lastHeartbeatTime;
-          
+
           // If no heartbeat update in 10 seconds, connection likely stale
           if (timeSinceLastHeartbeat > 10000) {
-            window.dispatchEvent(new CustomEvent('firebaseHeartbeatTimeout', {
-              detail: { 
-                timestamp: Date.now(), 
-                status: 'stale',
-                lastHeartbeat: timeSinceLastHeartbeat 
-              }
-            }));
+            window.dispatchEvent(
+              new CustomEvent("firebaseHeartbeatTimeout", {
+                detail: {
+                  timestamp: Date.now(),
+                  status: "stale",
+                  lastHeartbeat: timeSinceLastHeartbeat,
+                },
+              }),
+            );
           }
         }, 5000); // Check every 5 seconds
       } catch (error) {
-        console.error('Firebase heartbeat initialization error:', error);
+        console.error("Firebase heartbeat initialization error:", error);
       }
     };
 
@@ -8546,21 +12431,21 @@ export default function TradersRegiment() {
   // ═══════════════════════════════════════════════════════════════════
   // THEME MANAGEMENT SYSTEM - Persistence & Body Styling
   // ═══════════════════════════════════════════════════════════════════
-  
+
   // Load theme from localStorage on mount
   useEffect(() => {
-    const savedTheme = localStorage.getItem('appTheme');
+    const savedTheme = localStorage.getItem("appTheme");
     if (savedTheme) {
       setTheme(savedTheme);
     } else {
       // Save default theme
-      localStorage.setItem('appTheme', 'day');
+      localStorage.setItem("appTheme", "day");
     }
   }, []);
 
   // Save theme to localStorage when it changes
   useEffect(() => {
-    localStorage.setItem('appTheme', theme);
+    localStorage.setItem("appTheme", theme);
     // Update document.body class for global theme application
     document.body.className = `theme-${theme}`;
   }, [theme]);
@@ -8568,69 +12453,76 @@ export default function TradersRegiment() {
   // Update body background color based on theme to prevent white flashes
   useEffect(() => {
     const themeColors = {
-      day: '#FFFFFF',
-      night: '#0F172A',
-      comfort: '#FDF6E3'
+      day: "#FFFFFF",
+      night: "#0F172A",
+      comfort: "#FDF6E3",
     };
-    
+
     document.body.style.backgroundColor = themeColors[theme] || themeColors.day;
-    document.body.style.color = theme === 'day' ? '#000000' : '#F2F2F7';
-    document.body.style.transition = 'background-color 300ms cubic-bezier(0.4, 0, 0.2, 1)';
+    document.body.style.color = theme === "day" ? "#000000" : "#F2F2F7";
+    document.body.style.transition =
+      "background-color 300ms cubic-bezier(0.4, 0, 0.2, 1)";
   }, [theme]);
 
   // Check user status and route to appropriate screen
-  const checkUserStatus = useCallback(async (authData) => {
-    try {
-      const userData = await dbR(`users/${authData.uid}`, authData.token);
-      
-      if (!userData) { 
-        setScreen('login'); 
-        return; 
-      }
-      
-      setProfile({ 
-        ...userData, 
-        uid: authData.uid, 
-        token: authData.token, 
-        email: authData.email, 
-        mobile: userData.mobile 
-      });
+  const checkUserStatus = useCallback(
+    async (authData) => {
+      try {
+        const userData = await dbR(`users/${authData.uid}`, authData.token);
 
-      if (userData.status === 'BLOCKED') { 
-        setScreen('login'); 
-        showToast('Account entered stasis mode. Contact the digital guardians.', 'error'); 
-        return; 
-      }
-      
-      if (userData.status === 'PENDING') { 
-        setScreen('waiting'); 
-        return; 
-      }
-      
-      if (authData.uid === ADMIN_UID) { 
-        setScreen('admin'); 
-        return; 
-      }
+        if (!userData) {
+          setScreen("login");
+          return;
+        }
 
-      // Load full user object (journal, rules, account) for standard users
-      const fullData = await dbR(`users/${authData.uid}`, authData.token);
-      
-      setProfile(prev => ({ 
-        ...prev, 
-        ...(fullData?.profile || {}), 
-        uid: authData.uid, 
-        token: authData.token, 
-        journal: fullData?.journal, 
-        firmRules: fullData?.firmRules, 
-        accountState: fullData?.accountState 
-      }));
-      
-      setScreen('hub');
-    } catch (error) { 
-      console.error("Status check failed", error);
-      setScreen('login'); 
-    }
-  }, [showToast]);
+        setProfile({
+          ...userData,
+          uid: authData.uid,
+          token: authData.token,
+          email: authData.email,
+          mobile: userData.mobile,
+        });
+
+        if (userData.status === "BLOCKED") {
+          setScreen("login");
+          showToast(
+            "Account entered stasis mode. Contact the digital guardians.",
+            "error",
+          );
+          return;
+        }
+
+        if (userData.status === "PENDING") {
+          setScreen("waiting");
+          return;
+        }
+
+        if (authData.uid === ADMIN_UID) {
+          setScreen("admin");
+          return;
+        }
+
+        // Load full user object (journal, rules, account) for standard users
+        const fullData = await dbR(`users/${authData.uid}`, authData.token);
+
+        setProfile((prev) => ({
+          ...prev,
+          ...(fullData?.profile || {}),
+          uid: authData.uid,
+          token: authData.token,
+          journal: fullData?.journal,
+          firmRules: fullData?.firmRules,
+          accountState: fullData?.accountState,
+        }));
+
+        setScreen("hub");
+      } catch (error) {
+        console.error("Status check failed", error);
+        setScreen("login");
+      }
+    },
+    [showToast],
+  );
 
   // Auth state listener for persistent login
   useEffect(() => {
@@ -8641,7 +12533,7 @@ export default function TradersRegiment() {
           if (isAdminAuthenticated) {
             return; // Admin is authenticated, don't do normal user flow
           }
-          
+
           // For regular users only
           const token = await user.getIdToken();
           const authData = { uid: user.uid, token, email: user.email };
@@ -8649,18 +12541,18 @@ export default function TradersRegiment() {
           await checkUserStatus(authData);
         } else if (!isAdminAuthenticated) {
           // No valid user and not in admin mode, show login
-          setScreen('login');
+          setScreen("login");
         }
       } catch (error) {
-        console.error('Auth state change error:', error);
+        console.error("Auth state change error:", error);
         // If there's an auth error, sign out and show login
         if (!isAdminAuthenticated) {
           try {
             await firebaseAuth.signOut();
           } catch (signOutError) {
-            console.error('Error signing out:', signOutError);
+            console.error("Error signing out:", signOutError);
           }
-          setScreen('login');
+          setScreen("login");
         }
       }
     });
@@ -8670,16 +12562,21 @@ export default function TradersRegiment() {
   const handleLogin = async (email, password, stayLoggedIn = false) => {
     // Auto-sanitize email: trim whitespace and convert to lowercase
     const sanitizedEmail = email.trim().toLowerCase();
-    
+
     // Permanent ban check
     const blockedEmails = ["arkgproductions@gmail.com", "starg.unit@gmail.com"];
     if (blockedEmails.includes(sanitizedEmail)) {
-      throw new Error("Access Denied: This account has been permanently restricted.");
+      throw new Error(
+        "Access Denied: This account has been permanently restricted.",
+      );
     }
 
     // Check if another user is already logged in
     if (firebaseAuth.currentUser && firebaseAuth.currentUser.email !== email) {
-      showToast('Session collision detected. Previous timeline still active.', 'error');
+      showToast(
+        "Session collision detected. Previous timeline still active.",
+        "error",
+      );
       return;
     }
 
@@ -8688,28 +12585,30 @@ export default function TradersRegiment() {
       try {
         await setPersistence(firebaseAuth, browserLocalPersistence);
       } catch (error) {
-        console.warn('Failed to set persistence:', error);
+        console.warn("Failed to set persistence:", error);
       }
     }
 
     // Get user data first to check for lockout
     let userData;
     try {
-      userData = await dbR(`users/${sanitizedEmail.split('@')[0]}`, ''); // Try to get user
+      userData = await dbR(`users/${sanitizedEmail.split("@")[0]}`, ""); // Try to get user
     } catch (e) {
-      console.warn('Could not fetch user data:', e);
+      console.warn("Could not fetch user data:", e);
     }
 
     // RULE 13: CHECK IF ACCOUNT IS LOCKED
     if (userData && userData.isLocked) {
-      throw new Error('Account Locked: Too many failed attempts. Contact Master Admin.');
+      throw new Error(
+        "Account Locked: Too many failed attempts. Contact Master Admin.",
+      );
     }
 
     // Pass sanitized email to Firebase with breach attempt detection
     let data;
     try {
       data = await fbSignIn(sanitizedEmail, password);
-      
+
       // Login successful - reset failedAttempts counter
       if (userData) {
         await dbM(`users/${data.localId}`, { failedAttempts: 0 }, data.idToken);
@@ -8717,46 +12616,48 @@ export default function TradersRegiment() {
     } catch (error) {
       // Login failed - increment failedAttempts counter
       let userToUpdate = userData;
-      
+
       // If we don't have userData yet, try to fetch it using the email
       if (!userToUpdate) {
         try {
           // Try to find user by searching all users (fallback)
-          const allUsers = await dbR('users', '');
+          const allUsers = await dbR("users", "");
           if (allUsers) {
             userToUpdate = Object.entries(allUsers).find(
-              e => e[1]?.email?.toLowerCase() === sanitizedEmail
+              (e) => e[1]?.email?.toLowerCase() === sanitizedEmail,
             )?.[1];
           }
         } catch (e) {
-          console.warn('Could not fetch user data on login failure:', e);
+          console.warn("Could not fetch user data on login failure:", e);
         }
       }
 
       if (userToUpdate) {
         const currentAttempts = (userToUpdate.failedAttempts || 0) + 1;
         const isNowLocked = currentAttempts >= 10;
-        
+
         // Update failedAttempts in database (if we have user ID)
         try {
-          const userId = Object.entries(await dbR('users', '') || {}).find(
-            e => e[1]?.email?.toLowerCase() === sanitizedEmail
+          const userId = Object.entries((await dbR("users", "")) || {}).find(
+            (e) => e[1]?.email?.toLowerCase() === sanitizedEmail,
           )?.[0];
-          
+
           if (userId) {
             await dbM(`users/${userId}`, {
               failedAttempts: currentAttempts,
-              isLocked: isNowLocked
+              isLocked: isNowLocked,
             });
           }
         } catch (dbError) {
-          console.warn('Could not update failedAttempts:', dbError);
+          console.warn("Could not update failedAttempts:", dbError);
         }
 
         // Show appropriate error message
         if (isNowLocked) {
-          sendForensicAlert(sanitizedEmail, 'ACCOUNT_LOCKOUT');
-          throw new Error('Account Locked: Too many failed attempts. Contact Master Admin.');
+          sendForensicAlert(sanitizedEmail, "ACCOUNT_LOCKOUT");
+          throw new Error(
+            "Account Locked: Too many failed attempts. Contact Master Admin.",
+          );
         } else {
           throw new Error(`Login failed. Attempts: ${currentAttempts}/10`);
         }
@@ -8764,101 +12665,107 @@ export default function TradersRegiment() {
 
       // Breach attempt: Someone tried admin email with wrong credentials
       if (sanitizedEmail === ADMIN_EMAIL.toLowerCase()) {
-        sendForensicAlert(sanitizedEmail, 'UNAUTHORIZED_ACCESS');
+        sendForensicAlert(sanitizedEmail, "UNAUTHORIZED_ACCESS");
       }
       throw error;
     }
 
-    const authData = { 
-      uid: data.localId, 
-      token: data.idToken, 
-      refreshToken: data.refreshToken, 
-      email: data.email 
+    const authData = {
+      uid: data.localId,
+      token: data.idToken,
+      refreshToken: data.refreshToken,
+      email: data.email,
     };
     setAuth(authData);
 
     // RULE #12: Create session for 30-day persistence (Remember Me)
-    const sessionId = await createSession(data.localId, data.idToken, stayLoggedIn);
+    const sessionId = await createSession(
+      data.localId,
+      data.idToken,
+      stayLoggedIn,
+    );
     if (sessionId) {
       setCurrentSessionId(sessionId);
     }
 
     if (data.localId === ADMIN_UID) {
       // Admin login successful - send alert
-      sendTelegramAlert('🔓 <b>GOD MODE ACTIVATED</b>\nMaster Admin has entered the terminal.');
-      
-      const userData = await dbR(`users/${data.localId}`, data.idToken) || {};
-      setProfile({ 
-        ...userData, 
-        uid: data.localId, 
-        token: data.idToken, 
-        email: data.email 
+      sendTelegramAlert(
+        "🔓 <b>GOD MODE ACTIVATED</b>\nMaster Admin has entered the terminal.",
+      );
+
+      const userData = (await dbR(`users/${data.localId}`, data.idToken)) || {};
+      setProfile({
+        ...userData,
+        uid: data.localId,
+        token: data.idToken,
+        email: data.email,
       });
-      setScreen('otp'); 
+      setScreen("otp");
       return;
     }
 
     const userDataFinal = await dbR(`users/${data.localId}`, data.idToken);
     if (!userDataFinal) {
-      const initProfile = { 
-        fullName: '',
+      const initProfile = {
+        fullName: "",
         email: data.email,
-        status: 'PENDING',  // MUST be uppercase
-        role: 'user',
-        createdAt: new Date().toISOString(),  // ISO format for consistency
+        status: "PENDING", // MUST be uppercase
+        role: "user",
+        createdAt: new Date().toISOString(), // ISO format for consistency
         passwordLastChanged: new Date().toISOString(),
         failedAttempts: 0,
         isLocked: false,
-        lastLoginAttempt: new Date().toISOString() 
+        lastLoginAttempt: new Date().toISOString(),
       };
       // CRITICAL: Save under exact Firebase UID (data.localId), never random keys
       await dbM(`users/${data.localId}`, initProfile, data.idToken);
-      setProfile({ 
-        uid: data.localId, 
-        token: data.idToken, 
-        email: data.email, 
-        status: 'PENDING', 
-        mobile: '' 
+      setProfile({
+        uid: data.localId,
+        token: data.idToken,
+        email: data.email,
+        status: "PENDING",
+        mobile: "",
       });
-      setScreen('waiting'); 
+      setScreen("waiting");
       return;
     }
 
     // RULE 18: CHECK IF PASSWORD IS EXPIRED (>120 days)
     if (isPasswordExpired(userDataFinal.passwordLastChanged)) {
       // Store profile and redirect to password reset screen
-      setProfile({ 
-        ...userDataFinal, 
-        uid: data.localId, 
-        token: data.idToken, 
-        email: data.email 
+      setProfile({
+        ...userDataFinal,
+        uid: data.localId,
+        token: data.idToken,
+        email: data.email,
       });
-      setScreen('forcePasswordReset');
+      setScreen("forcePasswordReset");
       return;
     }
 
-    if (userDataFinal.status === 'BLOCKED') { 
-      throw new Error('Account blocked. Contact admin.'); 
-    }
-    
-    if (userDataFinal.status === 'PENDING') { 
-      setProfile({ 
-        ...userDataFinal, 
-        uid: data.localId, 
-        token: data.idToken, 
-        email: data.email 
-      }); 
-      setScreen('waiting'); 
-      return; 
+    if (userDataFinal.status === "BLOCKED") {
+      throw new Error("Account blocked. Contact admin.");
     }
 
-    setProfile({ 
-      ...userDataFinal, 
-      uid: data.localId, 
-      token: data.idToken, 
-      email: data.email 
+    if (userDataFinal.status === "PENDING") {
+      setProfile({
+        ...userDataFinal,
+        uid: data.localId,
+        token: data.idToken,
+        email: data.email,
+      });
+      setScreen("waiting");
+      return;
+    }
+
+    setProfile({
+      ...userDataFinal,
+      uid: data.localId,
+      token: data.idToken,
+      email: data.email,
     });
-    setScreen('otp');
+    setScreen("otp");
   };
 
   const handleSignup = async (formData) => {
@@ -8870,39 +12777,48 @@ export default function TradersRegiment() {
       // Silently reject bot (no error message shown)
       await antiSpamShield.silentlyRejectBot(formData.email, formData);
       // Return success message (to fool bot) but don't actually sign up
-      return { success: true, message: 'Check your email for OTP' };
+      return { success: true, message: "Check your email for OTP" };
     }
 
     // Auto-sanitize email: trim whitespace and convert to lowercase
     const sanitizedEmail = formData.email.trim().toLowerCase();
     const cleanEmail = sanitizedEmail;
-    
+
     // ═══════════════════════════════════════════════════════════════════
     // SECURITY CHECK 1: BLOCK ADMIN EMAIL IMPERSONATION ATTEMPTS
     // ═══════════════════════════════════════════════════════════════════
     if (cleanEmail === ADMIN_EMAIL.toLowerCase()) {
       // Send forensic alert in background (non-blocking)
-      sendForensicAlert(cleanEmail, 'IMPERSONATION_ATTEMPT');
-      throw new Error("🔐 SECURITY BLOCK: Admin email cannot be used for registration.");
+      sendForensicAlert(cleanEmail, "IMPERSONATION_ATTEMPT");
+      throw new Error(
+        "🔐 SECURITY BLOCK: Admin email cannot be used for registration.",
+      );
     }
-    
+
     // ═══════════════════════════════════════════════════════════════════
     // SECURITY CHECK 2: PERMANENT BAN CHECK
     // ═══════════════════════════════════════════════════════════════════
     const blockedEmails = ["arkgproductions@gmail.com", "starg.unit@gmail.com"];
     if (blockedEmails.includes(cleanEmail)) {
-      throw new Error("🔐 Access Denied: This account has been permanently restricted.");
+      throw new Error(
+        "🔐 Access Denied: This account has been permanently restricted.",
+      );
     }
-    
+
     // ═══════════════════════════════════════════════════════════════════
     // SECURITY CHECK 3: PRE-CHECK EMAIL EXISTENCE IN FIREBASE AUTH
     // ═══════════════════════════════════════════════════════════════════
     try {
-      const signInMethods = await fetchSignInMethodsForEmail(firebaseAuth, cleanEmail);
+      const signInMethods = await fetchSignInMethodsForEmail(
+        firebaseAuth,
+        cleanEmail,
+      );
       if (signInMethods && signInMethods.length > 0) {
         // Email already exists in Firebase
-        console.warn('Email already registered in Firebase:', cleanEmail);
-        throw new Error("This email is already part of the Regiment. Please Login instead.");
+        console.warn("Email already registered in Firebase:", cleanEmail);
+        throw new Error(
+          "This email is already part of the Regiment. Please Login instead.",
+        );
       }
     } catch (checkError) {
       // If error is about email already existing, pass it through
@@ -8910,21 +12826,21 @@ export default function TradersRegiment() {
         throw checkError;
       }
       // For other errors, log but continue (network issues, etc)
-      console.warn('Could not pre-check email existence:', checkError);
+      console.warn("Could not pre-check email existence:", checkError);
     }
-    
-    const fullName = formData.fullName || cleanEmail.split('@')[0]; // Default: email prefix
+
+    const fullName = formData.fullName || cleanEmail.split("@")[0]; // Default: email prefix
     const stayLoggedIn = formData.stayLoggedIn || false;
-    
+
     // Enable persistence if "Stay Logged In" is checked
     if (stayLoggedIn) {
       try {
         await setPersistence(firebaseAuth, browserLocalPersistence);
       } catch (error) {
-        console.warn('Failed to set persistence:', error);
+        console.warn("Failed to set persistence:", error);
       }
     }
-    
+
     // ═══════════════════════════════════════════════════════════════════
     // CREATE ACCOUNT IN FIREBASE
     // ═══════════════════════════════════════════════════════════════════
@@ -8933,97 +12849,103 @@ export default function TradersRegiment() {
       data = await fbSignUp(sanitizedEmail, formData.password);
     } catch (signupError) {
       // Handle specific Firebase signup errors
-      const errorMsg = signupError.message || '';
-      if (errorMsg.includes('EMAIL_EXISTS')) {
-        throw new Error("This email is already registered. Please Login instead.");
-      } else if (errorMsg.includes('INVALID_EMAIL')) {
+      const errorMsg = signupError.message || "";
+      if (errorMsg.includes("EMAIL_EXISTS")) {
+        throw new Error(
+          "This email is already registered. Please Login instead.",
+        );
+      } else if (errorMsg.includes("INVALID_EMAIL")) {
         throw new Error("Invalid email format. Please check and try again.");
-      } else if (errorMsg.includes('WEAK_PASSWORD')) {
-        throw new Error("Password is too weak. Use at least 8 characters with numbers.");
+      } else if (errorMsg.includes("WEAK_PASSWORD")) {
+        throw new Error(
+          "Password is too weak. Use at least 8 characters with numbers.",
+        );
       } else {
         throw new Error(`Registration failed: ${errorMsg}`);
       }
     }
-    
+
     // Standardized profile data with uppercase status and ISO timestamp
-    const profileData = { 
+    const profileData = {
       fullName,
       email: cleanEmail,
-      status: 'PENDING',  // MUST be uppercase
-      role: 'user',
-      createdAt: new Date().toISOString(),  // ISO format for consistency
+      status: "PENDING", // MUST be uppercase
+      role: "user",
+      createdAt: new Date().toISOString(), // ISO format for consistency
       // RULE 18: Password expiry tracking
       passwordLastChanged: new Date().toISOString(),
       // RULE 13: Account lockout system
       failedAttempts: 0,
-      isLocked: false
+      isLocked: false,
     };
-    
+
     // CRITICAL: Save under exact Firebase UID (data.localId), never random keys
     await dbW(`users/${data.localId}`, profileData, data.idToken);
-    
+
     // New user signup - send alert with professional formatting for tap-to-copy
-    sendTelegramAlert(`👤 <b>NEW TRADER APPLICATION</b>\nEmail: <code>${cleanEmail}</code>\nStatus: 🟡 PENDING`);
-    
-    const authData = { 
-      uid: data.localId, 
-      token: data.idToken, 
-      refreshToken: data.refreshToken, 
-      email: cleanEmail 
+    sendTelegramAlert(
+      `👤 <b>NEW TRADER APPLICATION</b>\nEmail: <code>${cleanEmail}</code>\nStatus: 🟡 PENDING`,
+    );
+
+    const authData = {
+      uid: data.localId,
+      token: data.idToken,
+      refreshToken: data.refreshToken,
+      email: cleanEmail,
     };
-    
+
     setAuth(authData);
     setProfile({ ...profileData, uid: data.localId, token: data.idToken });
-    setScreen('otp');
+    setScreen("otp");
   };
   const handleOTPVerified = async () => {
     if (!auth) return;
-    
+
     // RULE #26: Role-Based Routing
-    if (auth.uid === ADMIN_UID) { 
-      setScreen('admin'); 
-      return; 
+    if (auth.uid === ADMIN_UID) {
+      setScreen("admin");
+      return;
     }
-    
+
     // Load full user data including trading objects
     const fullData = await dbR(`users/${auth.uid}`, auth.token);
-    
+
     // Check user role for routing
-    const userRole = fullData?.role || 'user';
-    
-    setProfile(prev => ({ 
-      ...prev, 
-      ...(fullData?.profile || {}), 
-      uid: auth.uid, 
-      token: auth.token, 
+    const userRole = fullData?.role || "user";
+
+    setProfile((prev) => ({
+      ...prev,
+      ...(fullData?.profile || {}),
+      uid: auth.uid,
+      token: auth.token,
       role: userRole,
-      journal: fullData?.journal, 
-      firmRules: fullData?.firmRules, 
-      accountState: fullData?.accountState 
+      journal: fullData?.journal,
+      firmRules: fullData?.firmRules,
+      accountState: fullData?.accountState,
     }));
-    
+
     // Route based on role
-    if (userRole === 'admin') {
-      setScreen('admin');
-    } else if (userRole === 'user') {
-      setScreen('hub');
+    if (userRole === "admin") {
+      setScreen("admin");
+    } else if (userRole === "user") {
+      setScreen("hub");
     } else {
       // Default to hub for unknown roles
-      setScreen('hub');
+      setScreen("hub");
     }
   };
 
   // RULE 18: Handle forced password reset
   const handlePasswordReset = async (newPassword) => {
     if (!auth || !profile) {
-      throw new Error('Session expired. Please login again.');
+      throw new Error("Session expired. Please login again.");
     }
 
     try {
       // Update Firebase Auth password
       const user = firebaseAuth.currentUser;
       if (!user) {
-        throw new Error('User session lost.');
+        throw new Error("User session lost.");
       }
 
       // Update password in Firebase Auth
@@ -9032,21 +12954,25 @@ export default function TradersRegiment() {
       }
 
       // Update passwordLastChanged timestamp in database
-      await dbM(`users/${auth.uid}`, {
-        passwordLastChanged: new Date().toISOString()
-      }, auth.token);
+      await dbM(
+        `users/${auth.uid}`,
+        {
+          passwordLastChanged: new Date().toISOString(),
+        },
+        auth.token,
+      );
 
       // Update local profile
-      setProfile(prev => ({
+      setProfile((prev) => ({
         ...prev,
-        passwordLastChanged: new Date().toISOString()
+        passwordLastChanged: new Date().toISOString(),
       }));
 
       // Redirect to OTP screen
-      setScreen('otp');
+      setScreen("otp");
     } catch (error) {
-      console.error('Password reset error:', error);
-      throw new Error(error.message || 'Failed to update password. Try again.');
+      console.error("Password reset error:", error);
+      throw new Error(error.message || "Failed to update password. Try again.");
     }
   };
 
@@ -9055,71 +12981,83 @@ export default function TradersRegiment() {
     await checkUserStatus(auth);
   };
 
-  const handleLogout = async () => { 
+  const handleLogout = async () => {
     try {
       await firebaseAuth.signOut();
     } catch (error) {
-      console.warn('Error signing out:', error);
+      console.warn("Error signing out:", error);
     }
     // RULE #165: Clear cache persistence on logout
     clearUserListCache();
     // Clear admin session from localStorage
-    localStorage.removeItem('isAdminAuthenticated');
-    localStorage.removeItem('admin_session');
-    setAuth(null); 
+    localStorage.removeItem("isAdminAuthenticated");
+    localStorage.removeItem("admin_session");
+    setAuth(null);
     setProfile(null);
     setIsAdminAuthenticated(false);
     setShowAdminPrompt(false);
-    setAdminMasterEmail('');
+    setAdminMasterEmail("");
     setAdminMasterEmailVerified(false);
     setAdminOtpStep(false);
     setAdminOtpsVerified(false);
-    setAdminOtps({ otp1: '', otp2: '', otp3: '' });
-    setAdminPassInput('');
-    setAdminPassErr('');
-    setAdminOtpErr('');
-    setScreen('login'); 
+    setAdminOtps({ otp1: "", otp2: "", otp3: "" });
+    setAdminPassInput("");
+    setAdminPassErr("");
+    setAdminOtpErr("");
+    setScreen("login");
   };
-  
-  const logSecurityAlert = async (attemptType, attemptedEmail, failureReason) => {
+
+  const logSecurityAlert = async (
+    attemptType,
+    attemptedEmail,
+    failureReason,
+  ) => {
     try {
       // Collect telemetry
-      const ipResponse = await fetch('https://api.ipify.org?format=json');
+      const ipResponse = await fetch("https://api.ipify.org?format=json");
       const ipData = await ipResponse.json();
-      const ipAddress = ipData.ip || 'Unknown';
-      
+      const ipAddress = ipData.ip || "Unknown";
+
       const userAgent = navigator.userAgent;
       const timestamp = new Date().toISOString();
-      
+
       // Send alert email
       await emailjs.send(
         import.meta.env.VITE_EMAILJS_SERVICE_ID,
         import.meta.env.VITE_EMAILJS_TEMPLATE_ID,
         {
-          user_email: 'gunitsingh1994@gmail.com',
-          to_email: 'gunitsingh1994@gmail.com',
-          otp_code: `🚨 SECURITY ALERT: Unauthorized God Mode Access Attempt\n\nAttempt Type: ${attemptType}\nAttempted Email: ${attemptedEmail}\nFailure Reason: ${failureReason}\nIP Address: ${ipAddress}\nDevice Info: ${userAgent}\nTimestamp: ${timestamp}`
+          user_email: "gunitsingh1994@gmail.com",
+          to_email: "gunitsingh1994@gmail.com",
+          otp_code: `🚨 SECURITY ALERT: Unauthorized God Mode Access Attempt\n\nAttempt Type: ${attemptType}\nAttempted Email: ${attemptedEmail}\nFailure Reason: ${failureReason}\nIP Address: ${ipAddress}\nDevice Info: ${userAgent}\nTimestamp: ${timestamp}`,
         },
-        import.meta.env.VITE_EMAILJS_PUBLIC_KEY
+        import.meta.env.VITE_EMAILJS_PUBLIC_KEY,
       );
-      
-      console.warn(`[IDS ALERT] ${attemptType} from IP ${ipAddress} at ${timestamp}`);
+
+      console.warn(
+        `[IDS ALERT] ${attemptType} from IP ${ipAddress} at ${timestamp}`,
+      );
     } catch (error) {
-      console.error('Failed to log security alert:', error);
+      console.error("Failed to log security alert:", error);
     }
   };
-  
+
   const sendAdminOTPs = async () => {
     // Master Email verification
     const masterAdminEmail = "gunitsingh1994@gmail.com";
-    if (adminMasterEmail.toLowerCase().trim() !== masterAdminEmail.toLowerCase()) {
+    if (
+      adminMasterEmail.toLowerCase().trim() !== masterAdminEmail.toLowerCase()
+    ) {
       // Log security alert for unauthorized email attempt
-      await logSecurityAlert('Master Email Verification Failed', adminMasterEmail, 'Unauthorized email address');
-      
+      await logSecurityAlert(
+        "Master Email Verification Failed",
+        adminMasterEmail,
+        "Unauthorized email address",
+      );
+
       // Send intrusion alert to Telegram with full forensic signature
-      sendForensicAlert(adminMasterEmail, 'SECURITY_BREACH');
-      
-      setAdminOtpErr('Access Denied: Unauthorized Admin Identity');
+      sendForensicAlert(adminMasterEmail, "SECURITY_BREACH");
+
+      setAdminOtpErr("Access Denied: Unauthorized Admin Identity");
       return;
     }
 
@@ -9127,128 +13065,142 @@ export default function TradersRegiment() {
       const otp1 = genOTP();
       const otp2 = genOTP();
       const otp3 = genOTP();
-      
+
       const emails = [
         "gunitsingh1994@gmail.com",
-        "arkgproductions@gmail.com", 
-        "starg.unit@gmail.com"
+        "arkgproductions@gmail.com",
+        "starg.unit@gmail.com",
       ];
-      
+
       // Send OTPs to all three emails simultaneously
       const otpPromises = emails.map(async (email, index) => {
         const otpCode = [otp1, otp2, otp3][index];
         return emailjs.send(
-          import.meta.env.VITE_EMAILJS_SERVICE_ID, 
-          import.meta.env.VITE_EMAILJS_TEMPLATE_ID, 
+          import.meta.env.VITE_EMAILJS_SERVICE_ID,
+          import.meta.env.VITE_EMAILJS_TEMPLATE_ID,
           {
             user_email: email,
             otp_code: otpCode,
-            to_email: email
-          }, 
-          import.meta.env.VITE_EMAILJS_PUBLIC_KEY
+            to_email: email,
+          },
+          import.meta.env.VITE_EMAILJS_PUBLIC_KEY,
         );
       });
-      
+
       await Promise.all(otpPromises);
-      
+
       // Store OTPs temporarily (in a real app, you'd store hashed versions securely)
-      sessionStorage.setItem('adminOtps', JSON.stringify({ otp1, otp2, otp3, timestamp: Date.now() }));
-      
+      sessionStorage.setItem(
+        "adminOtps",
+        JSON.stringify({ otp1, otp2, otp3, timestamp: Date.now() }),
+      );
+
       setAdminMasterEmailVerified(true);
       setAdminOtpStep(true);
       setAdminOtpsVerified(false);
-      setAdminOtpErr('');
+      setAdminOtpErr("");
     } catch (error) {
-      console.error('Failed to send admin OTPs:', error);
-      setAdminOtpErr('Failed to send verification codes. Please try again.');
+      console.error("Failed to send admin OTPs:", error);
+      setAdminOtpErr("Failed to send verification codes. Please try again.");
     }
   };
-  
+
   const verifyAdminOTPs = () => {
-    const stored = sessionStorage.getItem('adminOtps');
+    const stored = sessionStorage.getItem("adminOtps");
     if (!stored) {
-      setAdminOtpErr('OTP session expired. Please request new codes.');
+      setAdminOtpErr("OTP session expired. Please request new codes.");
       return false;
     }
-    
+
     const { otp1, otp2, otp3, timestamp } = JSON.parse(stored);
-    
+
     // Check if OTPs are expired (5 minutes)
     if (Date.now() - timestamp > 5 * 60 * 1000) {
-      setAdminOtpErr('OTP codes expired. Please request new codes.');
-      sessionStorage.removeItem('adminOtps');
+      setAdminOtpErr("OTP codes expired. Please request new codes.");
+      sessionStorage.removeItem("adminOtps");
       return false;
     }
-    
-    if (adminOtps.otp1 !== otp1 || adminOtps.otp2 !== otp2 || adminOtps.otp3 !== otp3) {
-      setAdminOtpErr('Invalid verification codes. Please check and try again.');
+
+    if (
+      adminOtps.otp1 !== otp1 ||
+      adminOtps.otp2 !== otp2 ||
+      adminOtps.otp3 !== otp3
+    ) {
+      setAdminOtpErr("Invalid verification codes. Please check and try again.");
       return false;
     }
-    
+
     // Clear stored OTPs after successful verification
-    sessionStorage.removeItem('adminOtps');
+    sessionStorage.removeItem("adminOtps");
     setAdminOtpStep(false);
     setAdminOtpsVerified(true);
-    setAdminOtpErr('');
+    setAdminOtpErr("");
     return true;
   };
-  
+
   const handleAdminAccess = async () => {
     // RULE #30: Hash input password with salt before comparing
     const hashedInput = await hashAdminPasswordWithSalt(adminPassInput);
     if (hashedInput !== ADMIN_PASS_HASH) {
       // Log security alert for unauthorized password attempt
-      await logSecurityAlert('Master Password Verification Failed', adminMasterEmail, 'Invalid master password');
-      setAdminPassErr('Invalid admin password.');
-      showToast('Cipher mismatch. Authorization protocol rejected.', 'error');
+      await logSecurityAlert(
+        "Master Password Verification Failed",
+        adminMasterEmail,
+        "Invalid master password",
+      );
+      setAdminPassErr("Invalid admin password.");
+      showToast("Cipher mismatch. Authorization protocol rejected.", "error");
       return;
     }
 
     if (!adminOtpsVerified) {
-      setAdminPassErr('Please verify the OTP codes first.');
-      showToast('OTP verification pending. Authenticate to proceed.', 'warning');
+      setAdminPassErr("Please verify the OTP codes first.");
+      showToast(
+        "OTP verification pending. Authenticate to proceed.",
+        "warning",
+      );
       return;
     }
 
     // Admin already verified by Master Email + Triple OTP verification
     // Save admin session to localStorage for persistence
-    localStorage.setItem('isAdminAuthenticated', 'true');
-    
+    localStorage.setItem("isAdminAuthenticated", "true");
+
     setShowAdminPrompt(false);
-    setAdminPassInput('');
-    setAdminPassErr('');
+    setAdminPassInput("");
+    setAdminPassErr("");
     setAdminOtpsVerified(false);
     setAdminOtpStep(false);
-    setAdminOtps({ otp1: '', otp2: '', otp3: '' });
-    setAdminMasterEmail('');
+    setAdminOtps({ otp1: "", otp2: "", otp3: "" });
+    setAdminMasterEmail("");
     setAdminMasterEmailVerified(false);
     setIsAdminAuthenticated(true);
-    setScreen('admin');
+    setScreen("admin");
   };
 
-  const saveJournal = async (jData) => { 
-    if (!auth) return; 
-    const obj = {}; 
-    jData.forEach((t, i) => { 
-      obj[`entry_${i}`] = t; 
-    }); 
-    await dbW(`users/${auth.uid}/journal`, obj, auth.token); 
+  const saveJournal = async (jData) => {
+    if (!auth) return;
+    const obj = {};
+    jData.forEach((t, i) => {
+      obj[`entry_${i}`] = t;
+    });
+    await dbW(`users/${auth.uid}/journal`, obj, auth.token);
   };
 
-  const saveAccount = async (aData) => { 
-    if (!auth) return; 
-    await dbW(`users/${auth.uid}/accountState`, aData, auth.token); 
+  const saveAccount = async (aData) => {
+    if (!auth) return;
+    await dbW(`users/${auth.uid}/accountState`, aData, auth.token);
   };
 
-  const saveFirmRules = async (fData) => { 
-    if (!auth) return; 
-    await dbW(`users/${auth.uid}/firmRules`, fData, auth.token); 
+  const saveFirmRules = async (fData) => {
+    if (!auth) return;
+    await dbW(`users/${auth.uid}/firmRules`, fData, auth.token);
   };
   // ─── MAIN ROUTER RENDER ───
   // Phase 3: Invite flow overlay (password reset -> invite screen) - simple hook in UI
   // The InviteScreen is shown when user has initiated an invite flow (password reset leading here)
   // The actual flow is wired in future patches; this is a safe default to present the screen when requested
-  
+
   // Render InviteScreen overlay if requested
   const AdminInvitesView = () => {
     const { invites, addInvite, approveInvite, resetInvites } = useInvites();
@@ -9256,15 +13208,19 @@ export default function TradersRegiment() {
     const onApproveInvite = (id, email, name) => {
       approveInvite(id);
       sendWelcomeEmail(email, name);
-      showToast('Welcome email sent', 'success');
-      if (typeof notifyTelegram === 'function') {
-        notifyTelegram('invite_approved', { id, email, name });
+      showToast("Welcome email sent", "success");
+      if (typeof notifyTelegram === "function") {
+        notifyTelegram("invite_approved", { id, email, name });
       }
     };
     const onAddDemoInvite = () => {
-      const invite = addInvite('demo recruit@example.com', 'Demo Recruit');
-      if (typeof notifyTelegram === 'function') {
-        notifyTelegram('invite_requested', { id: invite?.id, email: invite?.email, name: invite?.name });
+      const invite = addInvite("demo recruit@example.com", "Demo Recruit");
+      if (typeof notifyTelegram === "function") {
+        notifyTelegram("invite_requested", {
+          id: invite?.id,
+          email: invite?.email,
+          name: invite?.name,
+        });
       }
     };
     return (
@@ -9283,7 +13239,12 @@ export default function TradersRegiment() {
       onApprove={() => {
         // dismiss and show a friendly toast
         setShowInviteScreen(false);
-        try { showToast('Invite submitted. Chief will review within 48 hours.', 'success'); } catch {}
+        try {
+          showToast(
+            "Invite submitted. Chief will review within 48 hours.",
+            "success",
+          );
+        } catch {}
       }}
       onClose={() => setShowInviteScreen(false)}
     />
@@ -9294,367 +13255,589 @@ export default function TradersRegiment() {
 
   const screenContent = (() => {
     switch (screen) {
-    
-    case 'login': 
-      return (
-        <>
-          <LoginScreen 
-            onLogin={handleLogin} 
-            onForgotPassword={handleForgotPassword} 
-            onSignup={() => setScreen('signup')} 
-            onAdmin={() => setShowAdminPrompt(true)} 
-          />
-          {showAdminPrompt && (
-            <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(10px)" }}>
-              <div style={authCard} className="glass-panel">
-                <SHead icon="🛡️" title="ADMIN AUTHENTICATION" color={T.purple} />
-                
-                {!adminMasterEmailVerified ? (
-                  // Step 1: Master Email Verification
-                  <div style={{ marginBottom: 20 }}>
-                    <div style={{ color: T.red, fontWeight: 700, fontSize: 12, marginBottom: 16, padding: "12px 14px", background: "rgba(255,69,58,0.1)", border: `1px solid rgba(255,69,58,0.3)`, borderRadius: 8, textAlign: "center" }}>
-                      🛑 WARNING: RESTRICTED AREA. Unauthorized entry attempts are actively tracked. Any attempt to breach this panel will result in your IP address, device footprint, and network data being permanently logged and reported.
-                    </div>
-                    <div style={{ marginBottom: 16 }}>
-                      <label style={lbl}>MASTER ADMIN EMAIL</label>
-                      <input 
-                        type="email" 
-                        value={adminMasterEmail} 
-                        onChange={(e) => setAdminMasterEmail(e.target.value)} 
-                        style={{ 
-                          width: '100%', 
-                          padding: '10px', 
-                          background: 'rgba(0,0,0,0.5)', 
-                          border: '1px solid #333', 
-                          color: '#fff', 
-                          borderRadius: '6px',
-                          fontFamily: T.font
-                        }}
-                        placeholder="Enter Master ID"
-                      />
-                    </div>
-                    {adminOtpErr && <div style={{ color: T.red, fontSize: 11, marginBottom: 12, fontWeight: 600 }}>{adminOtpErr}</div>}
-                    <button onClick={sendAdminOTPs} style={authBtn(T.purple, false)} className="btn-glass">
-                      📧 SEND VERIFICATION CODES
-                    </button>
-                  </div>
-                ) : !adminOtpStep ? (
-                  // Step 1b: Request OTPs (after master email verified)
-                  <div style={{ marginBottom: 20 }}>
-                    <div style={{ color: T.muted, fontSize: 12, marginBottom: 16, textAlign: "center" }}>
-                      Master identity verified. OTP codes are being sent to three secure endpoints.<br/>
-                      Click below to proceed to code entry.
-                    </div>
-                    <button onClick={() => setAdminOtpStep(true)} style={authBtn(T.green, false)} className="btn-glass">
-                      ✓ PROCEED TO CODE ENTRY
-                    </button>
-                  </div>
-                ) : (
-                  // Step 2: Enter OTPs
-                  <div style={{ marginBottom: 20 }}>
-                    <div style={{ color: T.muted, fontSize: 12, marginBottom: 16, textAlign: "center" }}>
-                      Enter the 6-digit codes sent to the three verification endpoints:
-                    </div>
-                    
-                    <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 16 }}>
-                      <div>
-                        <label style={{...lbl, fontSize: 11}}>gunitsingh1994@gmail.com</label>
-                        <input 
-                          type="text" 
-                          value={adminOtps.otp1} 
-                          onChange={(e) => setAdminOtps(prev => ({...prev, otp1: e.target.value}))} 
-                          style={{ 
-                            width: '100%', 
-                            padding: '10px', 
-                            background: 'rgba(0,0,0,0.5)', 
-                            border: '1px solid #333', 
-                            color: '#fff', 
-                            borderRadius: '6px',
-                            fontFamily: 'monospace',
-                            textAlign: 'center',
-                            letterSpacing: '2px'
-                          }}
-                          placeholder="000000"
-                          maxLength="6"
-                        />
-                      </div>
-                      
-                      <div>
-                        <label style={{...lbl, fontSize: 11}}>arkgproductions@gmail.com</label>
-                        <input 
-                          type="text" 
-                          value={adminOtps.otp2} 
-                          onChange={(e) => setAdminOtps(prev => ({...prev, otp2: e.target.value}))} 
-                          style={{ 
-                            width: '100%', 
-                            padding: '10px', 
-                            background: 'rgba(0,0,0,0.5)', 
-                            border: '1px solid #333', 
-                            color: '#fff', 
-                            borderRadius: '6px',
-                            fontFamily: 'monospace',
-                            textAlign: 'center',
-                            letterSpacing: '2px'
-                          }}
-                          placeholder="000000"
-                          maxLength="6"
-                        />
-                      </div>
-                      
-                      <div>
-                        <label style={{...lbl, fontSize: 11}}>starg.unit@gmail.com</label>
-                        <input 
-                          type="text" 
-                          value={adminOtps.otp3} 
-                          onChange={(e) => setAdminOtps(prev => ({...prev, otp3: e.target.value}))} 
-                          style={{ 
-                            width: '100%', 
-                            padding: '10px', 
-                            background: 'rgba(0,0,0,0.5)', 
-                            border: '1px solid #333', 
-                            color: '#fff', 
-                            borderRadius: '6px',
-                            fontFamily: 'monospace',
-                            textAlign: 'center',
-                            letterSpacing: '2px'
-                          }}
-                          placeholder="000000"
-                          maxLength="6"
-                        />
-                      </div>
-                    </div>
-                    
-                    {adminOtpErr && <div style={{ color: T.red, fontSize: 11, marginBottom: 12, fontWeight: 600 }}>{adminOtpErr}</div>}
-                    
-                    <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-                      <button onClick={() => { if (verifyAdminOTPs()) setAdminOtpStep(false); }} style={authBtn(T.green, false)} className="btn-glass">
-                        ✓ VERIFY CODES
-                      </button>
-                      <button onClick={() => { setAdminOtpStep(false); setAdminMasterEmailVerified(false); setAdminOtpsVerified(false); setAdminOtps({otp1:'',otp2:'',otp3:''}); setAdminMasterEmail(''); setAdminOtpErr(''); sessionStorage.removeItem('adminOtps'); }} style={{ ...authBtn(T.muted, false), background: "transparent" }} className="btn-glass">
-                        ↺ REQUEST NEW
-                      </button>
-                    </div>
-                  </div>
-                )}
-                
-                {/* Master Admin Password - Only shown after OTP verification */}
-                {adminOtpsVerified && (
-                  <div style={{ marginBottom: 20 }}>
-                    <label style={lbl}>MASTER ADMIN PASSWORD</label>
-                    <div style={{ position: 'relative', width: '100%' }}>
-                      <input 
-                        type={showAdminPwd ? "text" : "password"} 
-                        value={adminPassInput} 
-                        onChange={(e) => setAdminPassInput(e.target.value)} 
-                        style={{ 
-                          width: '100%', 
-                          padding: '12px', 
-                          background: 'rgba(0,0,0,0.5)', 
-                          border: '1px solid #333', 
-                          color: '#fff', 
-                          borderRadius: '8px' 
-                        }}
-                        placeholder="Enter Master Admin Password"
-                        onKeyDown={e => e.key === 'Enter' && handleAdminAccess()}
-                      />
-                      <button 
-                        type="button"
-                        onClick={() => setShowAdminPwd(!showAdminPwd)}
-                        style={{ 
-                          position: 'absolute', 
-                          right: '10px', 
-                          top: '50%', 
-                          transform: 'translateY(-50%)', 
-                          background: 'none', 
-                          border: 'none', 
-                          color: '#888', 
-                          cursor: 'pointer',
-                          fontSize: '12px'
+      case "login":
+        return (
+          <>
+            <LoginScreen
+              onLogin={handleLogin}
+              onForgotPassword={handleForgotPassword}
+              onSignup={() => setScreen("signup")}
+              onAdmin={() => setShowAdminPrompt(true)}
+            />
+            {showAdminPrompt && (
+              <div
+                style={{
+                  position: "fixed",
+                  inset: 0,
+                  background: "rgba(0,0,0,0.85)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  zIndex: 1000,
+                  backdropFilter: "blur(10px)",
+                }}
+              >
+                <div style={authCard} className="glass-panel">
+                  <SHead
+                    icon="🛡️"
+                    title="ADMIN AUTHENTICATION"
+                    color={T.purple}
+                  />
+
+                  {!adminMasterEmailVerified ? (
+                    // Step 1: Master Email Verification
+                    <div style={{ marginBottom: 20 }}>
+                      <div
+                        style={{
+                          color: T.red,
+                          fontWeight: 700,
+                          fontSize: 12,
+                          marginBottom: 16,
+                          padding: "12px 14px",
+                          background: "rgba(255,69,58,0.1)",
+                          border: `1px solid rgba(255,69,58,0.3)`,
+                          borderRadius: 8,
+                          textAlign: "center",
                         }}
                       >
-                        {showAdminPwd ? "HIDE" : "SHOW"}
+                        🛑 WARNING: RESTRICTED AREA. Unauthorized entry attempts
+                        are actively tracked. Any attempt to breach this panel
+                        will result in your IP address, device footprint, and
+                        network data being permanently logged and reported.
+                      </div>
+                      <div style={{ marginBottom: 16 }}>
+                        <label style={lbl}>MASTER ADMIN EMAIL</label>
+                        <input
+                          type="email"
+                          value={adminMasterEmail}
+                          onChange={(e) => setAdminMasterEmail(e.target.value)}
+                          style={{
+                            width: "100%",
+                            padding: "10px",
+                            background: "rgba(0,0,0,0.5)",
+                            border: "1px solid #333",
+                            color: "#fff",
+                            borderRadius: "6px",
+                            fontFamily: T.font,
+                          }}
+                          placeholder="Enter Master ID"
+                        />
+                      </div>
+                      {adminOtpErr && (
+                        <div
+                          style={{
+                            color: T.red,
+                            fontSize: 11,
+                            marginBottom: 12,
+                            fontWeight: 600,
+                          }}
+                        >
+                          {adminOtpErr}
+                        </div>
+                      )}
+                      <button
+                        onClick={sendAdminOTPs}
+                        style={authBtn(T.purple, false)}
+                        className="btn-glass"
+                      >
+                        📧 SEND VERIFICATION CODES
                       </button>
                     </div>
-                    {adminPassErr && <div style={{ color: T.red, fontSize: 11, marginTop: 8, fontWeight: 600 }}>{adminPassErr}</div>}
-                  </div>
-                )}
-                
-                <div style={{ display: "flex", gap: 12 }}>
-                  {adminOtpsVerified && (
-                    <button onClick={handleAdminAccess} style={authBtn(T.purple, false)} className="btn-glass">UNLOCK ADMIN</button>
+                  ) : !adminOtpStep ? (
+                    // Step 1b: Request OTPs (after master email verified)
+                    <div style={{ marginBottom: 20 }}>
+                      <div
+                        style={{
+                          color: T.muted,
+                          fontSize: 12,
+                          marginBottom: 16,
+                          textAlign: "center",
+                        }}
+                      >
+                        Master identity verified. OTP codes are being sent to
+                        three secure endpoints.
+                        <br />
+                        Click below to proceed to code entry.
+                      </div>
+                      <button
+                        onClick={() => setAdminOtpStep(true)}
+                        style={authBtn(T.green, false)}
+                        className="btn-glass"
+                      >
+                        ✓ PROCEED TO CODE ENTRY
+                      </button>
+                    </div>
+                  ) : (
+                    // Step 2: Enter OTPs
+                    <div style={{ marginBottom: 20 }}>
+                      <div
+                        style={{
+                          color: T.muted,
+                          fontSize: 12,
+                          marginBottom: 16,
+                          textAlign: "center",
+                        }}
+                      >
+                        Enter the 6-digit codes sent to the three verification
+                        endpoints:
+                      </div>
+
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 12,
+                          marginBottom: 16,
+                        }}
+                      >
+                        <div>
+                          <label style={{ ...lbl, fontSize: 11 }}>
+                            gunitsingh1994@gmail.com
+                          </label>
+                          <input
+                            type="text"
+                            value={adminOtps.otp1}
+                            onChange={(e) =>
+                              setAdminOtps((prev) => ({
+                                ...prev,
+                                otp1: e.target.value,
+                              }))
+                            }
+                            style={{
+                              width: "100%",
+                              padding: "10px",
+                              background: "rgba(0,0,0,0.5)",
+                              border: "1px solid #333",
+                              color: "#fff",
+                              borderRadius: "6px",
+                              fontFamily: "monospace",
+                              textAlign: "center",
+                              letterSpacing: "2px",
+                            }}
+                            placeholder="000000"
+                            maxLength="6"
+                          />
+                        </div>
+
+                        <div>
+                          <label style={{ ...lbl, fontSize: 11 }}>
+                            arkgproductions@gmail.com
+                          </label>
+                          <input
+                            type="text"
+                            value={adminOtps.otp2}
+                            onChange={(e) =>
+                              setAdminOtps((prev) => ({
+                                ...prev,
+                                otp2: e.target.value,
+                              }))
+                            }
+                            style={{
+                              width: "100%",
+                              padding: "10px",
+                              background: "rgba(0,0,0,0.5)",
+                              border: "1px solid #333",
+                              color: "#fff",
+                              borderRadius: "6px",
+                              fontFamily: "monospace",
+                              textAlign: "center",
+                              letterSpacing: "2px",
+                            }}
+                            placeholder="000000"
+                            maxLength="6"
+                          />
+                        </div>
+
+                        <div>
+                          <label style={{ ...lbl, fontSize: 11 }}>
+                            starg.unit@gmail.com
+                          </label>
+                          <input
+                            type="text"
+                            value={adminOtps.otp3}
+                            onChange={(e) =>
+                              setAdminOtps((prev) => ({
+                                ...prev,
+                                otp3: e.target.value,
+                              }))
+                            }
+                            style={{
+                              width: "100%",
+                              padding: "10px",
+                              background: "rgba(0,0,0,0.5)",
+                              border: "1px solid #333",
+                              color: "#fff",
+                              borderRadius: "6px",
+                              fontFamily: "monospace",
+                              textAlign: "center",
+                              letterSpacing: "2px",
+                            }}
+                            placeholder="000000"
+                            maxLength="6"
+                          />
+                        </div>
+                      </div>
+
+                      {adminOtpErr && (
+                        <div
+                          style={{
+                            color: T.red,
+                            fontSize: 11,
+                            marginBottom: 12,
+                            fontWeight: 600,
+                          }}
+                        >
+                          {adminOtpErr}
+                        </div>
+                      )}
+
+                      <div
+                        style={{ display: "flex", gap: 8, marginBottom: 16 }}
+                      >
+                        <button
+                          onClick={() => {
+                            if (verifyAdminOTPs()) setAdminOtpStep(false);
+                          }}
+                          style={authBtn(T.green, false)}
+                          className="btn-glass"
+                        >
+                          ✓ VERIFY CODES
+                        </button>
+                        <button
+                          onClick={() => {
+                            setAdminOtpStep(false);
+                            setAdminMasterEmailVerified(false);
+                            setAdminOtpsVerified(false);
+                            setAdminOtps({ otp1: "", otp2: "", otp3: "" });
+                            setAdminMasterEmail("");
+                            setAdminOtpErr("");
+                            sessionStorage.removeItem("adminOtps");
+                          }}
+                          style={{
+                            ...authBtn(T.muted, false),
+                            background: "transparent",
+                          }}
+                          className="btn-glass"
+                        >
+                          ↺ REQUEST NEW
+                        </button>
+                      </div>
+                    </div>
                   )}
-                  <button onClick={() => { setShowAdminPrompt(false); setAdminMasterEmail(''); setAdminMasterEmailVerified(false); setAdminOtpStep(false); setAdminOtpsVerified(false); setAdminOtps({otp1:'',otp2:'',otp3:''}); setAdminOtpErr(''); setAdminPassErr(''); sessionStorage.removeItem('adminOtps'); }} style={{ ...authBtn(T.muted, false), background: "transparent" }} className="btn-glass">CANCEL</button>
+
+                  {/* Master Admin Password - Only shown after OTP verification */}
+                  {adminOtpsVerified && (
+                    <div style={{ marginBottom: 20 }}>
+                      <label style={lbl}>MASTER ADMIN PASSWORD</label>
+                      <div style={{ position: "relative", width: "100%" }}>
+                        <input
+                          type={showAdminPwd ? "text" : "password"}
+                          value={adminPassInput}
+                          onChange={(e) => setAdminPassInput(e.target.value)}
+                          style={{
+                            width: "100%",
+                            padding: "12px",
+                            background: "rgba(0,0,0,0.5)",
+                            border: "1px solid #333",
+                            color: "#fff",
+                            borderRadius: "8px",
+                          }}
+                          placeholder="Enter Master Admin Password"
+                          onKeyDown={(e) =>
+                            e.key === "Enter" && handleAdminAccess()
+                          }
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowAdminPwd(!showAdminPwd)}
+                          style={{
+                            position: "absolute",
+                            right: "10px",
+                            top: "50%",
+                            transform: "translateY(-50%)",
+                            background: "none",
+                            border: "none",
+                            color: "#888",
+                            cursor: "pointer",
+                            fontSize: "12px",
+                          }}
+                        >
+                          {showAdminPwd ? "HIDE" : "SHOW"}
+                        </button>
+                      </div>
+                      {adminPassErr && (
+                        <div
+                          style={{
+                            color: T.red,
+                            fontSize: 11,
+                            marginTop: 8,
+                            fontWeight: 600,
+                          }}
+                        >
+                          {adminPassErr}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div style={{ display: "flex", gap: 12 }}>
+                    {adminOtpsVerified && (
+                      <button
+                        onClick={handleAdminAccess}
+                        style={authBtn(T.purple, false)}
+                        className="btn-glass"
+                      >
+                        UNLOCK ADMIN
+                      </button>
+                    )}
+                    <button
+                      onClick={() => {
+                        setShowAdminPrompt(false);
+                        setAdminMasterEmail("");
+                        setAdminMasterEmailVerified(false);
+                        setAdminOtpStep(false);
+                        setAdminOtpsVerified(false);
+                        setAdminOtps({ otp1: "", otp2: "", otp3: "" });
+                        setAdminOtpErr("");
+                        setAdminPassErr("");
+                        sessionStorage.removeItem("adminOtps");
+                      }}
+                      style={{
+                        ...authBtn(T.muted, false),
+                        background: "transparent",
+                      }}
+                      className="btn-glass"
+                    >
+                      CANCEL
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
-        </>
-      );
-    
-    case 'signup': 
-      return <CleanOnboarding onSignupSuccess={handleSignup} onBackToLogin={() => setScreen('login')} />;
-    
-    case 'waiting': 
-      return <WaitingRoom onRefresh={checkApprovalStatus} onLogout={handleLogout} />;
-    
-    case 'otp': 
-      return <OTPScreen profile={profile} onVerified={handleOTPVerified} onLogout={handleLogout} showToast={showToast} />;
-    
-    case 'forcePasswordReset':
-      return <ForcePasswordResetScreen profile={profile} onReset={handlePasswordReset} onLogout={handleLogout} />;
-    
-    case 'sessions':
-      return <SessionsManagementScreen profile={profile} auth={auth} currentSessionId={currentSessionId} onBack={() => setScreen('hub')} showToast={showToast} />;
-    
-    case 'hub':
-      return <RegimentHub onNavigate={(dest) => setScreen(dest)} theme={theme} />;
-    
-    case 'consciousness':
-      return <CollectiveConsciousness onBack={() => setScreen('hub')} theme={theme} />;
-    
-    case 'admin': 
-      return isAdminAuthenticated ? (
-        <ErrorBoundaryAdmin>
-          <React.Suspense fallback={<LoadingFallback />}>
-            <UserListProvider>
-              <AdminDashboard auth={auth} onLogout={handleLogout} isAdminAuthenticated={isAdminAuthenticated} showToast={showToast} maintenanceModeActive={maintenanceModeActive} handleToggleMaintenanceMode={handleToggleMaintenanceMode} />
-              <AdminInvitesView />
-            </UserListProvider>
-          </React.Suspense>
-        </ErrorBoundaryAdmin>
-      ) : <SplashScreen />;
-    
-    case 'app': 
-      return (
-        <div style={{ position: 'relative' }}>
-          {/* RULE #27: Privacy Mode Header */}
-          <div style={{
-            position: 'absolute',
-            top: 10,
-            right: 10,
-            zIndex: 100,
-            display: 'flex',
-            gap: 8,
-            alignItems: 'center'
-          }}>
-            {/* Theme Mode Switcher */}
-            <ThemeSwitcher 
-              currentTheme={currentTheme} 
-              onThemeChange={handleThemeChange}
-            />
-            <AiEnginesStatus statuses={aiStatuses} />
-            
-            <button
-              onClick={() => setShowThemePicker(true)}
-              title="Open theme color picker"
-              style={{
-                background: `${ACCENT_COLORS[accentColor]?.primary || ACCENT_COLORS.BLUE.primary}33`,
-                border: `1px solid ${ACCENT_COLORS[accentColor]?.primary || ACCENT_COLORS.BLUE.primary}`,
-                color: ACCENT_COLORS[accentColor]?.primary || ACCENT_COLORS.BLUE.primary,
-                padding: '8px 12px',
-                borderRadius: 6,
-                cursor: 'pointer',
-                fontSize: 12,
-                fontFamily: T.font,
-                fontWeight: 600,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                transition: 'all 0.3s ease'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = `${ACCENT_COLORS[accentColor]?.primary || ACCENT_COLORS.BLUE.primary}44`;
-                e.currentTarget.style.boxShadow = `0 0 8px ${ACCENT_COLORS[accentColor]?.glow || ACCENT_COLORS.BLUE.glow}`;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = `${ACCENT_COLORS[accentColor]?.primary || ACCENT_COLORS.BLUE.primary}33`;
-                e.currentTarget.style.boxShadow = 'none';
-              }}
-              className="btn-glass"
-            >
-              🎨 THEME
-            </button>
-            <button
-              onClick={() => setPrivacyModeActive(!privacyModeActive)}
-              title="Toggle Ghost Mode - blur sensitive data"
-              style={{
-                background: privacyModeActive ? 'rgba(255,69,58,0.3)' : 'rgba(52,199,89,0.3)',
-                border: `1px solid ${privacyModeActive ? T.red : T.green}`,
-                color: privacyModeActive ? T.red : T.green,
-                padding: '8px 12px',
-                borderRadius: 6,
-                cursor: 'pointer',
-                fontSize: 12,
-                fontFamily: T.font,
-                fontWeight: 600
-              }}
-              className="btn-glass"
-            >
-              {privacyModeActive ? '👻 GHOST MODE ON' : '👁️ PRIVATE MODE OFF'}
-            </button>
-            <button
-              onClick={() => setScreen('sessions')}
-              title="Manage active sessions"
-              style={{
-                background: 'rgba(52,144,220,0.3)',
-                border: `1px solid ${T.blue}`,
-                color: T.blue,
-                padding: '8px 12px',
-                borderRadius: 6,
-                cursor: 'pointer',
-                fontSize: 12,
-                fontFamily: T.font,
-                fontWeight: 600
-              }}
-              className="btn-glass"
-            >
-              📱 SESSIONS
-            </button>
-          </div>
-          
-          {/* Apply Privacy Mode blur to entire app */}
-          <div style={{
-            filter: privacyModeActive ? 'blur(8px)' : 'none',
-            transition: 'filter 0.3s ease',
-            pointerEvents: privacyModeActive ? 'none' : 'auto'
-          }}>
+            )}
+          </>
+        );
+
+      case "signup":
+        return (
+          <CleanOnboarding
+            onSignupSuccess={handleSignup}
+            onBackToLogin={() => setScreen("login")}
+          />
+        );
+
+      case "waiting":
+        return (
+          <WaitingRoom
+            onRefresh={checkApprovalStatus}
+            onLogout={handleLogout}
+          />
+        );
+
+      case "otp":
+        return (
+          <OTPScreen
+            profile={profile}
+            onVerified={handleOTPVerified}
+            onLogout={handleLogout}
+            showToast={showToast}
+          />
+        );
+
+      case "forcePasswordReset":
+        return (
+          <ForcePasswordResetScreen
+            profile={profile}
+            onReset={handlePasswordReset}
+            onLogout={handleLogout}
+          />
+        );
+
+      case "sessions":
+        return (
+          <SessionsManagementScreen
+            profile={profile}
+            auth={auth}
+            currentSessionId={currentSessionId}
+            onBack={() => setScreen("hub")}
+            showToast={showToast}
+          />
+        );
+
+      case "hub":
+        return (
+          <RegimentHub onNavigate={(dest) => setScreen(dest)} theme={theme} />
+        );
+
+      case "consciousness":
+        return (
+          <CollectiveConsciousness
+            onBack={() => setScreen("hub")}
+            theme={theme}
+          />
+        );
+
+      case "admin":
+        return isAdminAuthenticated ? (
+          <ErrorBoundaryAdmin>
             <React.Suspense fallback={<LoadingFallback />}>
-              <MainTerminal 
-                auth={auth} 
-                profile={profile} 
-                onLogout={handleLogout} 
-                onSaveJournal={saveJournal} 
-                onSaveAccount={saveAccount} 
-                onSaveFirmRules={saveFirmRules}
-                showToast={showToast}
-                privacyMode={privacyModeActive}
-              />
+              <UserListProvider>
+                <AdminDashboard
+                  auth={auth}
+                  onLogout={handleLogout}
+                  isAdminAuthenticated={isAdminAuthenticated}
+                  showToast={showToast}
+                  maintenanceModeActive={maintenanceModeActive}
+                  handleToggleMaintenanceMode={handleToggleMaintenanceMode}
+                />
+                <AdminInvitesView />
+              </UserListProvider>
             </React.Suspense>
+          </ErrorBoundaryAdmin>
+        ) : (
+          <SplashScreen />
+        );
+
+      case "app":
+        return (
+          <div style={{ position: "relative" }}>
+            {/* RULE #27: Privacy Mode Header */}
+            <div
+              style={{
+                position: "absolute",
+                top: 10,
+                right: 10,
+                zIndex: 100,
+                display: "flex",
+                gap: 8,
+                alignItems: "center",
+              }}
+            >
+              {/* Theme Mode Switcher */}
+              <ThemeSwitcher
+                currentTheme={currentTheme}
+                onThemeChange={handleThemeChange}
+              />
+              <AiEnginesStatus statuses={aiStatuses} />
+
+              <button
+                onClick={() => setShowThemePicker(true)}
+                title="Open theme color picker"
+                style={{
+                  background: `${ACCENT_COLORS[accentColor]?.primary || ACCENT_COLORS.BLUE.primary}33`,
+                  border: `1px solid ${ACCENT_COLORS[accentColor]?.primary || ACCENT_COLORS.BLUE.primary}`,
+                  color:
+                    ACCENT_COLORS[accentColor]?.primary ||
+                    ACCENT_COLORS.BLUE.primary,
+                  padding: "8px 12px",
+                  borderRadius: 6,
+                  cursor: "pointer",
+                  fontSize: 12,
+                  fontFamily: T.font,
+                  fontWeight: 600,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  transition: "all 0.3s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = `${ACCENT_COLORS[accentColor]?.primary || ACCENT_COLORS.BLUE.primary}44`;
+                  e.currentTarget.style.boxShadow = `0 0 8px ${ACCENT_COLORS[accentColor]?.glow || ACCENT_COLORS.BLUE.glow}`;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = `${ACCENT_COLORS[accentColor]?.primary || ACCENT_COLORS.BLUE.primary}33`;
+                  e.currentTarget.style.boxShadow = "none";
+                }}
+                className="btn-glass"
+              >
+                🎨 THEME
+              </button>
+              <button
+                onClick={() => setPrivacyModeActive(!privacyModeActive)}
+                title="Toggle Ghost Mode - blur sensitive data"
+                style={{
+                  background: privacyModeActive
+                    ? "rgba(255,69,58,0.3)"
+                    : "rgba(52,199,89,0.3)",
+                  border: `1px solid ${privacyModeActive ? T.red : T.green}`,
+                  color: privacyModeActive ? T.red : T.green,
+                  padding: "8px 12px",
+                  borderRadius: 6,
+                  cursor: "pointer",
+                  fontSize: 12,
+                  fontFamily: T.font,
+                  fontWeight: 600,
+                }}
+                className="btn-glass"
+              >
+                {privacyModeActive ? "👻 GHOST MODE ON" : "👁️ PRIVATE MODE OFF"}
+              </button>
+              <button
+                onClick={() => setScreen("sessions")}
+                title="Manage active sessions"
+                style={{
+                  background: "rgba(52,144,220,0.3)",
+                  border: `1px solid ${T.blue}`,
+                  color: T.blue,
+                  padding: "8px 12px",
+                  borderRadius: 6,
+                  cursor: "pointer",
+                  fontSize: 12,
+                  fontFamily: T.font,
+                  fontWeight: 600,
+                }}
+                className="btn-glass"
+              >
+                📱 SESSIONS
+              </button>
+            </div>
+
+            {/* Apply Privacy Mode blur to entire app */}
+            <div
+              style={{
+                filter: privacyModeActive ? "blur(8px)" : "none",
+                transition: "filter 0.3s ease",
+                pointerEvents: privacyModeActive ? "none" : "auto",
+              }}
+            >
+              <React.Suspense fallback={<LoadingFallback />}>
+                <MainTerminal
+                  auth={auth}
+                  profile={profile}
+                  onLogout={handleLogout}
+                  onSaveJournal={saveJournal}
+                  onSaveAccount={saveAccount}
+                  onSaveFirmRules={saveFirmRules}
+                  showToast={showToast}
+                  privacyMode={privacyModeActive}
+                />
+              </React.Suspense>
+            </div>
           </div>
-        </div>
-      );
-    
-    default: 
-      return <SplashScreen />;
+        );
+
+      default:
+        return <SplashScreen />;
     }
   })();
 
   return (
     <div className={`app-container theme-${theme}`}>
       {/* RULE #295, #296: Maintenance Mode - Show "Back Soon" screen if active, except for Master Admin */}
-      {maintenanceModeActive && auth?.uid !== ADMIN_UID && screen !== 'admin' ? (
+      {maintenanceModeActive &&
+      auth?.uid !== ADMIN_UID &&
+      screen !== "admin" ? (
         <MaintenanceScreen />
       ) : (
         screenContent
       )}
-      <ThemePicker 
-        isOpen={showThemePicker} 
-        onClose={() => setShowThemePicker(false)} 
+      <ThemePicker
+        isOpen={showThemePicker}
+        onClose={() => setShowThemePicker(false)}
         onSelectTheme={handleAccentColorChange}
         currentTheme={accentColor}
       />
       {/* Admin Debug Overlay - System Audit Dashboard */}
-      <DebugOverlay 
+      <DebugOverlay
         logs={debugLogs}
         latencies={debugLatencies}
         tti={debugTTI}
@@ -9665,85 +13848,152 @@ export default function TradersRegiment() {
       />
       <Toast toasts={toasts} onDismiss={handleDismissToast} />
       <FloatingChatWidget auth={auth} profile={profile} />
-      
+
       {/* Officers Briefing Footer - Rotating Quotes & Founder Card */}
-      <div style={{
-        marginTop: 'auto',
-        backgroundColor: '#FFFFFF',
-        borderTop: 'none',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: '32px',
-        padding: '60px 40px 40px 40px',
-        boxShadow: "0 -1px 3px 0 rgba(0, 0, 0, 0.05), 0 -1px 2px 0 rgba(0, 0, 0, 0.04)"
-      }}>
+      <div
+        style={{
+          marginTop: "auto",
+          backgroundColor: "#FFFFFF",
+          borderTop: "none",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: "32px",
+          padding: "60px 40px 40px 40px",
+          boxShadow:
+            "0 -1px 3px 0 rgba(0, 0, 0, 0.05), 0 -1px 2px 0 rgba(0, 0, 0, 0.04)",
+        }}
+      >
         {/* Rotating Quote */}
-        <div style={{ textAlign: 'center', maxWidth: 600 }}>
-          <div style={{ color: '#64748B', fontSize: '0.9rem', fontStyle: 'italic', lineHeight: 1.8, fontFamily: T.font }}>
+        <div style={{ textAlign: "center", maxWidth: 600 }}>
+          <div
+            style={{
+              color: "#64748B",
+              fontSize: "0.9rem",
+              fontStyle: "italic",
+              lineHeight: 1.8,
+              fontFamily: T.font,
+            }}
+          >
             "{dailyQuote}" 🦅
           </div>
         </div>
-        
+
         {/* Founder Card */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', textAlign: 'center' }}>
-          <FounderCard 
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexDirection: "column",
+            textAlign: "center",
+          }}
+        >
+          <FounderCard
             linkedInUrl="https://www.linkedin.com/in/singhgunit/"
             theme={theme}
           />
         </div>
-        
+
         {/* AI System Status — Quad-Core Intelligence Network */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '16px',
-          padding: '12px 24px',
-          borderRadius: '10px',
-          background: 'linear-gradient(135deg, #F8FAFC, #F1F5F9)',
-          border: '1px solid #E2E8F0',
-          flexWrap: 'wrap'
-        }}>
-          <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#475569', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "16px",
+            padding: "12px 24px",
+            borderRadius: "10px",
+            background: "linear-gradient(135deg, #F8FAFC, #F1F5F9)",
+            border: "1px solid #E2E8F0",
+            flexWrap: "wrap",
+          }}
+        >
+          <span
+            style={{
+              fontSize: "0.7rem",
+              fontWeight: 700,
+              color: "#475569",
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+            }}
+          >
             AI System Status
           </span>
           {Object.entries(aiQuadCoreStatus).map(([key, mind]) => {
             const isReserve = mind.isReserve;
-            const dotColor = isReserve ? '#A855F7' : (mind.online ? '#22C55E' : '#EF4444');
-            const textColor = isReserve ? '#7E22CE' : (mind.online ? '#166534' : '#991B1B');
-            const glowColor = isReserve ? 'rgba(168,85,247,0.5)' : (mind.online ? 'rgba(34,197,94,0.5)' : 'rgba(239,68,68,0.5)');
+            const dotColor = isReserve
+              ? "#A855F7"
+              : mind.online
+                ? "#22C55E"
+                : "#EF4444";
+            const textColor = isReserve
+              ? "#7E22CE"
+              : mind.online
+                ? "#166534"
+                : "#991B1B";
+            const glowColor = isReserve
+              ? "rgba(168,85,247,0.5)"
+              : mind.online
+                ? "rgba(34,197,94,0.5)"
+                : "rgba(239,68,68,0.5)";
             return (
-            <div key={key} style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}>
-              <div style={{
-                width: 8,
-                height: 8,
-                borderRadius: '50%',
-                background: dotColor,
-                boxShadow: `0 0 6px ${glowColor}`,
-                animation: 'led-pulse 2s ease-in-out infinite'
-              }} />
-              <span style={{
-                fontSize: '0.68rem',
-                fontWeight: 600,
-                color: textColor,
-                fontFamily: 'ui-monospace, monospace'
-              }}>
-                {mind.name}
-              </span>
-            </div>
+              <div
+                key={key}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                }}
+              >
+                <div
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: "50%",
+                    background: dotColor,
+                    boxShadow: `0 0 6px ${glowColor}`,
+                    animation: "led-pulse 2s ease-in-out infinite",
+                  }}
+                />
+                <span
+                  style={{
+                    fontSize: "0.68rem",
+                    fontWeight: 600,
+                    color: textColor,
+                    fontFamily: "ui-monospace, monospace",
+                  }}
+                >
+                  {mind.name}
+                </span>
+              </div>
             );
           })}
         </div>
 
         {/* Security Protocol */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', textAlign: 'center' }}>
-          <div style={{ color: '#94A3B8', fontSize: '0.75rem', letterSpacing: '0.1em', fontWeight: 500, marginBottom: 0, textTransform: 'uppercase' }}>WELCOME TO THE REGIMENT</div>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexDirection: "column",
+            textAlign: "center",
+          }}
+        >
+          <div
+            style={{
+              color: "#94A3B8",
+              fontSize: "0.75rem",
+              letterSpacing: "0.1em",
+              fontWeight: 500,
+              marginBottom: 0,
+              textTransform: "uppercase",
+            }}
+          >
+            WELCOME TO THE REGIMENT
+          </div>
         </div>
       </div>
     </div>

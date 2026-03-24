@@ -53,7 +53,10 @@ const CleanOnboarding = ({ onSignupSuccess, onGoogleSuccess, onBackToLogin }) =>
   };
 
   const handleSignup = async () => {
-    if (!isFormValid) return;
+    if (!isFormValid) {
+      setError('Please fill all fields and accept terms');
+      return;
+    }
     
     setLoading(true);
     setError('');
