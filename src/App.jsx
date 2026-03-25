@@ -2151,8 +2151,8 @@ const MobileBottomNav = ({ currentPage, onNavigate }) => {
         left: 0,
         right: 0,
         height: "60px",
-        background: "rgba(20,20,20,0.95)",
-        borderTop: `1px solid rgba(0,122,255,0.3)`,
+        background: "var(--aura-elevation-2)",
+        borderTop: "1px solid var(--aura-divider)",
         display: "flex",
         justifyContent: "space-around",
         alignItems: "center",
@@ -2167,18 +2167,26 @@ const MobileBottomNav = ({ currentPage, onNavigate }) => {
           onClick={() => onNavigate(item.id)}
           style={{
             background:
-              currentPage === item.id ? "rgba(0,122,255,0.2)" : "transparent",
+              currentPage === item.id
+                ? "var(--aura-elevation-1)"
+                : "transparent",
             border: "none",
-            borderTop: currentPage === item.id ? `2px solid ${T.blue}` : "none",
+            borderTop:
+              currentPage === item.id
+                ? "2px solid var(--aura-accent-primary)"
+                : "none",
             cursor: "pointer",
-            color: currentPage === item.id ? T.blue : T.muted,
+            color:
+              currentPage === item.id
+                ? "var(--aura-accent-primary)"
+                : "var(--aura-text-secondary)",
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
             gap: 4,
             padding: "8px 12px",
             fontSize: 10,
-            fontFamily: T.font,
+            fontFamily: "var(--aura-font-family)",
             fontWeight: 700,
             letterSpacing: 0.5,
             transition: "all 0.2s ease",
@@ -2187,13 +2195,13 @@ const MobileBottomNav = ({ currentPage, onNavigate }) => {
           }}
           onMouseEnter={(e) => {
             if (currentPage !== item.id) {
-              e.currentTarget.style.color = T.blue;
-              e.currentTarget.style.background = "rgba(0,122,255,0.1)";
+              e.currentTarget.style.color = "var(--aura-accent-primary)";
+              e.currentTarget.style.background = "var(--aura-elevation-0)";
             }
           }}
           onMouseLeave={(e) => {
             if (currentPage !== item.id) {
-              e.currentTarget.style.color = T.muted;
+              e.currentTarget.style.color = "var(--aura-text-secondary)";
               e.currentTarget.style.background = "transparent";
             }
           }}
@@ -2323,10 +2331,18 @@ const NotificationCenter = ({ isOpen, onClose, notifications = [] }) => {
                 <div style={{ fontWeight: 700, marginBottom: 4 }}>
                   {notif.title}
                 </div>
-                <div style={{ color: T.muted, fontSize: 11 }}>
+                <div
+                  style={{ color: "var(--aura-text-secondary)", fontSize: 11 }}
+                >
                   {notif.message}
                 </div>
-                <div style={{ color: T.dim, fontSize: 10, marginTop: 6 }}>
+                <div
+                  style={{
+                    color: "var(--aura-text-tertiary)",
+                    fontSize: 10,
+                    marginTop: 6,
+                  }}
+                >
                   {notif.time}
                 </div>
               </div>
@@ -2348,8 +2364,8 @@ const NotificationCenter = ({ isOpen, onClose, notifications = [] }) => {
         top: 0,
         bottom: 0,
         width: "320px",
-        background: "rgba(20,20,20,0.95)",
-        borderLeft: `1px solid rgba(0,122,255,0.3)`,
+        background: "var(--aura-elevation-2)",
+        borderLeft: "1px solid var(--aura-divider)",
         zIndex: 1001,
         display: "flex",
         flexDirection: "column",
@@ -2361,7 +2377,7 @@ const NotificationCenter = ({ isOpen, onClose, notifications = [] }) => {
       <div
         style={{
           padding: "16px",
-          borderBottom: `1px solid rgba(0,122,255,0.3)`,
+          borderBottom: "1px solid var(--aura-divider)",
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
@@ -2370,7 +2386,7 @@ const NotificationCenter = ({ isOpen, onClose, notifications = [] }) => {
       >
         <div
           style={{
-            color: T.blue,
+            color: "var(--aura-accent-primary)",
             fontSize: 14,
             fontWeight: 700,
             letterSpacing: 1,
@@ -2383,17 +2399,17 @@ const NotificationCenter = ({ isOpen, onClose, notifications = [] }) => {
           style={{
             background: "transparent",
             border: "none",
-            color: T.muted,
+            color: "var(--aura-text-secondary)",
             fontSize: 18,
             cursor: "pointer",
             padding: "4px 8px",
             transition: "all 0.2s ease",
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.color = T.blue;
+            e.currentTarget.style.color = "var(--aura-accent-primary)";
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.color = T.muted;
+            e.currentTarget.style.color = "var(--aura-text-secondary)";
           }}
         >
           ✕
@@ -2404,7 +2420,11 @@ const NotificationCenter = ({ isOpen, onClose, notifications = [] }) => {
       <div style={{ flex: 1, overflowY: "auto", padding: "12px" }}>
         {notifications.length === 0 ? (
           <div
-            style={{ textAlign: "center", color: T.muted, paddingTop: "48px" }}
+            style={{
+              textAlign: "center",
+              color: "var(--aura-text-secondary)",
+              paddingTop: "48px",
+            }}
           >
             <div style={{ fontSize: 32, marginBottom: 16 }}>🔇</div>
             <div style={{ fontSize: 11, fontWeight: 600 }}>No alerts</div>
@@ -2415,21 +2435,29 @@ const NotificationCenter = ({ isOpen, onClose, notifications = [] }) => {
               key={idx}
               style={{
                 padding: "12px",
-                background: "rgba(0,122,255,0.1)",
-                border: `1px solid rgba(0,122,255,0.2)`,
+                background: "var(--aura-elevation-1)",
+                border: "1px solid var(--aura-divider)",
                 borderRadius: 6,
                 marginBottom: 12,
-                color: T.text,
+                color: "var(--aura-text-primary)",
                 fontSize: 11,
               }}
             >
               <div style={{ fontWeight: 700, marginBottom: 4 }}>
                 {notif.title}
               </div>
-              <div style={{ color: T.muted, fontSize: 10 }}>
+              <div
+                style={{ color: "var(--aura-text-secondary)", fontSize: 10 }}
+              >
                 {notif.message}
               </div>
-              <div style={{ color: T.dim, fontSize: 9, marginTop: 6 }}>
+              <div
+                style={{
+                  color: "var(--aura-text-tertiary)",
+                  fontSize: 9,
+                  marginTop: 6,
+                }}
+              >
                 {notif.time}
               </div>
             </div>
