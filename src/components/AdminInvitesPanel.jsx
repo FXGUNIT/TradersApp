@@ -1,7 +1,6 @@
 import React from 'react'
-import { sendInviteEmail, sendWelcomeEmail } from '../utils/email.js'
 
-export default function AdminInvitesPanel({ invites, onApproveInvite, onAddDemoInvite, onResetInvites, showToast }) {
+export default function AdminInvitesPanel({ invites, onApproveInvite, onAddDemoInvite, onResetInvites, showToast: _showToast }) {
   return (
     <div className="glass-panel" style={{ padding: 16, borderRadius: 12, marginTop: 16 }}>
       <div style={{ fontWeight: 700, fontSize: 14, color: '#4B5563', marginBottom: 8 }}>Invite Approvals (Test)</div>
