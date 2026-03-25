@@ -13773,10 +13773,6 @@ export default function TradersRegiment() {
                     alignItems: "center",
                   }}
                 >
-                  <ThemeSwitcher
-                    currentTheme={currentTheme}
-                    onThemeChange={handleThemeChange}
-                  />
                   <AiEnginesStatus statuses={aiStatuses} />
                 </div>
                 <AdminDashboard
