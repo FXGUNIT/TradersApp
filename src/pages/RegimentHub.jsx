@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
+import ThemeSwitcher from '../components/ThemeSwitcher.jsx';
+import AiEnginesStatus from '../components/AiEnginesStatus.jsx';
+import { getAIStatuses } from '../services/ai-router.js';
 
-export default function RegimentHub({ onNavigate, theme }) {
+export default function RegimentHub({ onNavigate, theme, currentTheme, onThemeChange }) {
   const isDark = theme === 'night';
   const [hoveredCard, setHoveredCard] = useState(null);
 
@@ -73,7 +76,29 @@ export default function RegimentHub({ onNavigate, theme }) {
       fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
     }}>
       {/* Header */}
-      <div style={{ textAlign: 'center', marginBottom: 56 }}>
+      <div style={{ 
+        textAlign: 'center', 
+        marginBottom: 56,
+        position: 'relative',
+        width: '100%',
+        maxWidth: 900,
+      }}>
+        <div style={{
+          position: 'absolute',
+          top: -20,
+          right: 0,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 16,
+        }}>
+          <AiEnginesStatus />
+          {currentTheme && onThemeChange && (
+            <ThemeSwitcher 
+              currentTheme={currentTheme} 
+              onThemeChange={onThemeChange} 
+            />
+          )}
+        </div>
         <div style={{
           fontSize: 11,
           fontWeight: 700,

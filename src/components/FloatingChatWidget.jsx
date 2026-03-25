@@ -1,33 +1,17 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
-import { initializeApp, getApp } from "firebase/app";
-import { getDatabase, ref, onValue, push, set } from "firebase/database";
+import { ref, onValue, push, set } from "firebase/database";
 import { notifyAdminOfSupportRequest } from "../services/telegramService";
-
-const firebaseConfig = {
-  apiKey: "AIzaSyBPN7fIZ-UfVQ5EMti1TzrFPsi4wtUEtKI",
-  authDomain: "traders-regiment.firebaseapp.com",
-  projectId: "traders-regiment",
-  storageBucket: "traders-regiment.appspot.com",
-  messagingSenderId: "1074706591741",
-  appId: "1:1074706591741:web:53194a737f7d3d3d3d3d3d",
-  databaseURL:
-    "https://traders-regiment-default-rtdb.asia-southeast1.firebasedatabase.app/",
-};
-
-let firebaseApp;
-try {
-  firebaseApp = getApp();
-} catch {
-  firebaseApp = initializeApp(firebaseConfig);
-}
-const db = getDatabase(firebaseApp);
+import { db } from "../services/firebase";
 
 const FloatingChatWidget = ({ auth, profile }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [showPreChatForm, setShowPreChatForm] = useState(true);
+  const [userInfo, setUserInfo] = useState({ name: "", mobile: "" });
   const [messages, setMessages] = useState([]);
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
+  const aiEnabled = true;
   const messagesEndRef = useRef(null);
 
   const userId = auth?.uid || profile?.uid || "anonymous";
@@ -45,6 +29,45 @@ const FloatingChatWidget = ({ auth, profile }) => {
       type: "welcome",
     });
   }, [userId, userEmail, isInitialized]);
+
+  // Handle Pre-chat Form Submission
+  const handleFormSubmit = useCallback(
+    async (e) => {
+      e.preventDefault();
+      if (!userInfo.name.trim() || !userInfo.mobile.trim()) return;
+
+      setShowPreChatForm(false);
+
+      // Notify n8n that a new chat has started (if webhook available)
+      const N8N_WEBHOOK_URL = import.meta.env.VITE_N8N_WEBHOOK_URL;
+      if (N8N_WEBHOOK_URL) {
+        try {
+          await fetch(`${N8N_WEBHOOK_URL}/start`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              name: userInfo.name.trim(),
+              mobile: userInfo.mobile.trim(),
+              pageUrl: window.location.href,
+              startedAt: new Date().toISOString(),
+            }),
+          });
+        } catch (error) {
+          console.error("Failed to notify n8n on chat start:", error);
+        }
+      }
+
+      // Welcome message
+      const welcomeMsg = {
+        id: "welcome",
+        text: `Hi ${userInfo.name}! I'm your 24×7 AI assistant. How can I help you today?`,
+        isUser: false,
+        timestamp: Date.now(),
+      };
+      setMessages([welcomeMsg]);
+    },
+    [userInfo],
+  );
 
   useEffect(() => {
     if (!isOpen || !userId) return;
@@ -81,9 +104,9 @@ const FloatingChatWidget = ({ auth, profile }) => {
   }, [messages]);
 
   const sendMessage = useCallback(async () => {
-    console.log("sendMessage called with:", { inputValue, userId, userEmail });
+    console.warn("sendMessage called with:", { inputValue, userId, userEmail });
     if (!inputValue.trim() || !userId) {
-      console.log("sendMessage aborted: missing input or userId", {
+      console.warn("sendMessage aborted: missing input or userId", {
         inputValue,
         userId,
       });
@@ -95,7 +118,7 @@ const FloatingChatWidget = ({ auth, profile }) => {
     setInputValue("");
 
     try {
-      console.log("Attempting to save message to Firebase:", { userId, text });
+      console.warn("Attempting to save message to Firebase:", { userId, text });
       const messagesRef = ref(db, `support_chats/${userId}/messages`);
       const newMessageRef = push(messagesRef);
 
@@ -105,10 +128,10 @@ const FloatingChatWidget = ({ auth, profile }) => {
         timestamp: Date.now(),
         email: userEmail,
       });
-      console.log("Message saved to Firebase successfully");
+      console.warn("Message saved to Firebase successfully");
 
       // Send Telegram notification using the telegram service
-      console.log("Attempting to send Telegram notification:", {
+      console.warn("Attempting to send Telegram notification:", {
         userEmail,
         text,
       });
@@ -116,7 +139,7 @@ const FloatingChatWidget = ({ auth, profile }) => {
         console.warn("Telegram notification failed:", error);
         // Don't fail the entire message send if Telegram notification fails
       });
-      console.log("Telegram notification process completed");
+      console.warn("Telegram notification process completed");
     } catch (error) {
       console.error("Failed to send message:", error);
     } finally {
@@ -367,41 +390,120 @@ const FloatingChatWidget = ({ auth, profile }) => {
               ✕
             </button>
           </div>
-          <div style={styles.chatBody}>
-            {messages.length === 0 ? (
-              <div style={styles.emptyState}>Start a conversation...</div>
-            ) : (
-              messages.map((msg) => (
-                <div key={msg.id} style={getMessageStyle(msg)}>
-                  {msg.text}
-                  {msg.timestamp && (
-                    <div style={styles.timestamp}>
-                      {formatTime(msg.timestamp)}
-                    </div>
-                  )}
+          {showPreChatForm && (
+            <div className="flex-1 p-6 flex flex-col justify-center bg-gray-50 dark:bg-gray-950">
+              <div className="text-center mb-6">
+                <h3 className="text-xl font-semibold mb-2">Before we start</h3>
+                <p className="text-gray-600 dark:text-gray-400">
+                  Please tell us a bit about yourself
+                </p>
+              </div>
+
+              <form onSubmit={handleFormSubmit} className="space-y-4">
+                <div className="relative">
+                  <User
+                    className="absolute left-4 top-3.5 text-gray-400"
+                    size={20}
+                  />
+                  <input
+                    type="text"
+                    placeholder="Your Full Name"
+                    value={userInfo.name}
+                    onChange={(e) =>
+                      setUserInfo({ ...userInfo, name: e.target.value })
+                    }
+                    className="w-full pl-11 pr-4 py-3 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-2xl focus:outline-none focus:border-blue-500"
+                    required
+                  />
                 </div>
-              ))
-            )}
-            <div ref={messagesEndRef} />
-          </div>
-          <div style={styles.chatFooter}>
-            <input
-              type="text"
-              placeholder="Type a message..."
-              style={styles.input}
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyPress={handleKeyPress}
-            />
-            <button
-              style={styles.sendButton}
-              onClick={sendMessage}
-              disabled={isLoading || !inputValue.trim()}
-              aria-label="Send message"
-            >
-              <SendIcon />
-            </button>
-          </div>
+
+                <div className="relative">
+                  <Phone
+                    className="absolute left-4 top-3.5 text-gray-400"
+                    size={20}
+                  />
+                  <input
+                    type="tel"
+                    placeholder="Mobile Number"
+                    value={userInfo.mobile}
+                    onChange={(e) =>
+                      setUserInfo({ ...userInfo, mobile: e.target.value })
+                    }
+                    className="w-full pl-11 pr-4 py-3 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-2xl focus:outline-none focus:border-blue-500"
+                    required
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-2xl transition-colors"
+                >
+                  Start Chat
+                </button>
+              </form>
+            </div>
+          )}
+          {!showPreChatForm && (
+            <>
+              <div className="flex-1 p-4 overflow-y-auto bg-gray-50 dark:bg-gray-950 space-y-4">
+                {messages.map((msg) => (
+                  <div
+                    key={msg.id}
+                    className={`flex ${msg.isUser ? "justify-end" : "justify-start"}`}
+                  >
+                    <div
+                      className={`max-w-[85%] px-4 py-3 rounded-2xl text-[15px] leading-relaxed ${
+                        msg.isUser
+                          ? "bg-blue-600 text-white rounded-br-none"
+                          : "bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-bl-none"
+                      }`}
+                    >
+                      {msg.text}
+                    </div>
+                  </div>
+                ))}
+
+                {isLoading && (
+                  <div className="flex justify-start">
+                    <div className="bg-white dark:bg-gray-800 px-4 py-3 rounded-2xl rounded-bl-none text-sm flex items-center gap-2">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
+                      AI is thinking...
+                    </div>
+                  </div>
+                )}
+                <div ref={messagesEndRef} />
+              </div>
+
+              {/* Input Area */}
+              <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={inputValue}
+                    onChange={(e) => setInputValue(e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    placeholder={
+                      aiEnabled
+                        ? "Type your message..."
+                        : "AI is off. You can reply manually in Telegram"
+                    }
+                    className="flex-1 px-5 py-3 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-full focus:outline-none focus:border-blue-500 disabled:opacity-60"
+                    disabled={isLoading}
+                  />
+                  <button
+                    onClick={sendMessage}
+                    disabled={isLoading || !inputValue.trim()}
+                    className="w-12 h-12 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-full flex items-center justify-center transition-colors"
+                  >
+                    <Send size={20} />
+                  </button>
+                </div>
+                <p className="text-[10px] text-center text-gray-500 mt-2">
+                  Messages are monitored • AI learns from conversations
+                </p>
+              </div>
+            </>
+          )}
         </div>
       )}
       <button

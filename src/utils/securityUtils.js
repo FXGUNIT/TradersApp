@@ -49,7 +49,7 @@ export const copyToClipboardSecure = async (text, showToast) => {
 };
 
 export const hashAdminPasswordWithSalt = async (password) => {
-  const MASTER_SALT = 'TR_SECURITY_SALT_2024_REGIMENT';
+  const MASTER_SALT = import.meta.env.VITE_MASTER_SALT || 'TR_SECURITY_SALT_2024_REGIMENT';
   const saltedPassword = password + MASTER_SALT;
   
   const encoder = new TextEncoder();

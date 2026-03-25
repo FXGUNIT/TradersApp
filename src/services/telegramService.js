@@ -15,7 +15,7 @@ const TELEGRAM_API = import.meta.env.VITE_TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = import.meta.env.VITE_TELEGRAM_CHAT_ID;
 
 // Debug logging to verify environment variables are loaded
-console.log("Telegram Service Initialized:", {
+console.warn("Telegram Service Initialized:", {
   hasApiKey: !!TELEGRAM_API,
   hasChatId: !!TELEGRAM_CHAT_ID,
   apiKeyPrefix: TELEGRAM_API
@@ -140,7 +140,7 @@ export async function sendAdminBroadcast(title, content) {
  * @returns {object} { success: boolean, error?: object }
  */
 async function sendTelegramMessage(text) {
-  console.log("sendTelegramMessage called with:", {
+  console.warn("sendTelegramMessage called with:", {
     textLength: text.length,
     hasApiKey: !!TELEGRAM_API,
     hasChatId: !!TELEGRAM_CHAT_ID,
@@ -159,7 +159,7 @@ async function sendTelegramMessage(text) {
   }
 
   try {
-    console.log("Attempting to send message to Telegram API");
+    console.warn("Attempting to send message to Telegram API");
     const response = await fetch(
       `https://api.telegram.org/bot${TELEGRAM_API}/sendMessage`,
       {
@@ -173,26 +173,26 @@ async function sendTelegramMessage(text) {
       },
     );
 
-    console.log("Telegram API response received:", {
+    console.warn("Telegram API response received:", {
       status: response.status,
       statusText: response.statusText,
     });
 
     const data = await response.json();
-    console.log("Telegram API response data:", data);
+    console.warn("Telegram API response data:", data);
 
     if (data.ok) {
       console.warn("✅ Telegram message sent successfully");
       return { success: true };
     } else {
-      console.error("❌ Telegram API error:", {
+      console.warn("❌ Telegram API error:", {
         description: data.description,
         errorCode: data.error_code,
       });
       return { success: false, error: data.description };
     }
   } catch (error) {
-    console.error("❌ Telegram request failed:", error);
+    console.warn("❌ Telegram request failed:", error);
     return { success: false, error };
   }
 }

