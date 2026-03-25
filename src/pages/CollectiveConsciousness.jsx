@@ -271,21 +271,24 @@ User Question: ${trimmed}`;
       }}>
         <button
           onClick={onBack}
+          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(59, 130, 246, 0.2)'; e.currentTarget.style.transform = 'scale(1.02)'; }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(59, 130, 246, 0.1)'; e.currentTarget.style.transform = 'scale(1)'; }}
           style={{
-            background: 'none',
-            border: 'none',
-            color: '#0A84FF',
-            cursor: 'pointer',
-            fontSize: 13,
+            background: 'rgba(59, 130, 246, 0.1)',
+            border: '1px solid rgba(59, 130, 246, 0.3)',
+            color: '#60A5FA',
+            fontSize: 14,
             fontWeight: 600,
-            padding: '6px 12px',
+            padding: '8px 16px',
             borderRadius: 8,
-            transition: 'background 0.2s',
+            transition: 'all 0.2s',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
           }}
-          onMouseEnter={e => e.currentTarget.style.background = 'rgba(10,132,255,0.1)'}
-          onMouseLeave={e => e.currentTarget.style.background = 'none'}
         >
-          ← Command Centre
+          <span style={{ fontSize: 16 }}>←</span> Command Centre
         </button>
 
         <div style={{

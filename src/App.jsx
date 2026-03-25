@@ -35,6 +35,7 @@ import InviteScreen from "./components/InviteScreen.jsx";
 import { useInvites } from "./hooks/useInvites";
 import AdminInvitesPanel from "./components/AdminInvitesPanel.jsx";
 import FloatingChatWidget from "./components/FloatingChatWidget.jsx";
+import ChatHelpline from "./components/ChatHelpline.jsx";
 import FounderCard from "./components/FounderCard.jsx";
 import MainTerminal from "./features/terminal/MainTerminal.jsx";
 import CollectiveConsciousnessPage from "./pages/CollectiveConsciousness.jsx";
@@ -125,150 +126,10 @@ const testTelegramConnectivity = async () => ({
 });
 const initTelegramMonitor = () => {};
 
-// AURA Tri-State ThemeSwitcher - Elite UX Edition
-const ThemeSwitcher = ({ currentTheme, onThemeChange }) => {
-  // Legacy to AURA mapping
-  const legacyToAura = {
-    day: "lumiere",
-    night: "midnight",
-    eye: "amber",
-    comfort: "amber",
-  };
+// AURA Tri-State ThemeSwitcher - DISABLED per user request
+// Theme feature completely removed - keeping placeholder for future reference
+const ThemeSwitcher = ({ currentTheme, onThemeChange }) => null;
 
-  // AURA to legacy mapping (for backward compatibility)
-  const auraToLegacy = {
-    lumiere: "day",
-    midnight: "night",
-    amber: "eye",
-  };
-
-  // AURA state cycle
-  const auraCycle = {
-    lumiere: "amber",
-    amber: "midnight",
-    midnight: "lumiere",
-  };
-
-  // Convert current theme to AURA state
-  const currentAura = legacyToAura[currentTheme] || "lumiere";
-  const nextAura = auraCycle[currentAura] || "lumiere";
-  const nextLegacy = auraToLegacy[nextAura] || "day";
-
-  // AURA symbols (no emojis - use SVG-like characters)
-  const auraSymbols = {
-    lumiere: "◉", // Sun disc
-    amber: "◍", // Shield
-    midnight: "◐", // Crescent
-  };
-
-  // AURA state labels
-  const auraLabels = {
-    lumiere: "LUMIERE",
-    amber: "AMBER",
-    midnight: "MIDNIGHT",
-  };
-
-  // AURA color mapping for active state
-  const auraColors = {
-    lumiere: "var(--aura-accent-primary, #2563eb)",
-    amber: "var(--aura-accent-primary, #d97706)",
-    midnight: "var(--aura-accent-primary, #b8860b)",
-  };
-
-  return (
-    <button
-      onClick={() => onThemeChange(nextLegacy)}
-      aria-label={`Switch to ${auraLabels[nextAura]} theme`}
-      style={{
-        background: "var(--aura-surface-elevated, #ffffff)",
-        border: "0.5px solid var(--aura-border-subtle, rgba(0,0,0,0.05))",
-        borderRadius: "24px",
-        padding: "12px 20px",
-        cursor: "pointer",
-        fontSize: "14px",
-        display: "inline-flex",
-        alignItems: "center",
-        gap: "12px",
-        fontFamily: "'Inter', -apple-system, sans-serif",
-        fontWeight: 500,
-        color: "var(--aura-text-primary, #121212)",
-        transition: "all 450ms cubic-bezier(0.175, 0.885, 0.32, 1.275)",
-        backdropFilter: "blur(25px) saturate(160%)",
-        boxShadow:
-          "0 10px 40px rgba(0,0,0,0.04), 0 0 15px var(--aura-gem-glow, rgba(37, 99, 235, 0.1))",
-        position: "relative",
-        overflow: "hidden",
-        willChange: "transform",
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.transform = "scale(1.025) translateY(-2px)";
-        e.currentTarget.style.boxShadow =
-          "0 20px 50px rgba(0,0,0,0.08), 0 0 25px var(--aura-gem-glow, rgba(37, 99, 235, 0.2))";
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.transform = "scale(1) translateY(0)";
-        e.currentTarget.style.boxShadow =
-          "0 10px 40px rgba(0,0,0,0.04), 0 0 15px var(--aura-gem-glow, rgba(37, 99, 235, 0.1))";
-      }}
-      onMouseDown={(e) => {
-        e.currentTarget.style.transform = "scale(0.98) translateY(0)";
-      }}
-      onMouseUp={(e) => {
-        e.currentTarget.style.transform = "scale(1.025) translateY(-2px)";
-      }}
-    >
-      {/* Active state indicator */}
-      <div
-        style={{
-          position: "absolute",
-          top: "4px",
-          left: "4px",
-          right: "4px",
-          height: "2px",
-          background: auraColors[currentAura],
-          borderRadius: "1px",
-          opacity: 0.8,
-          transform: "scaleX(0.8)",
-          transition: "all 300ms ease",
-        }}
-      />
-
-      <span
-        style={{
-          fontSize: "18px",
-          color: auraColors[currentAura],
-          filter: `drop-shadow(${auraColors[currentAura]} 0 0 8px)`,
-          transition: "all 300ms ease",
-        }}
-      >
-        {auraSymbols[currentAura]}
-      </span>
-
-      <span
-        style={{
-          fontWeight: 600,
-          letterSpacing: "0.05em",
-          fontSize: "13px",
-          textTransform: "uppercase",
-        }}
-      >
-        {auraLabels[nextAura]}
-      </span>
-
-      {/* Micro arrow indicator */}
-      <span
-        style={{
-          fontSize: "12px",
-          opacity: 0.6,
-          marginLeft: "4px",
-          transition: "transform 300ms ease",
-        }}
-      >
-        →
-      </span>
-    </button>
-  );
-};
 // AI Engines Status indicator (imported from component)
 
 // businessLogicUtils stubs
@@ -10050,28 +9911,39 @@ function AdminDashboard({
                   style={{
                     background:
                       validPage === 1
-                        ? "rgba(255,255,255,0.05)"
-                        : "rgba(0,122,255,0.15)",
-                    border: `1px solid ${validPage === 1 ? "rgba(255,255,255,0.1)" : "rgba(0,122,255,0.3)"}`,
-                    borderRadius: 4,
-                    padding: "6px 8px",
+                        ? "rgba(255,255,255,0.08)"
+                        : "rgba(59, 130, 246, 0.25)",
+                    border: `1px solid ${validPage === 1 ? "rgba(255,255,255,0.15)" : "rgba(59, 130, 246, 0.5)"}`,
+                    borderRadius: 6,
+                    padding: "8px 14px",
                     cursor: validPage === 1 ? "not-allowed" : "pointer",
-                    color: validPage === 1 ? T.dim : T.blue,
+                    color:
+                      validPage === 1 ? "rgba(255,255,255,0.3)" : "#60A5FA",
                     fontFamily: T.font,
-                    fontSize: 11,
-                    fontWeight: 600,
+                    fontSize: 18,
+                    fontWeight: 700,
                     transition: "all 0.2s ease-in-out",
+                    minWidth: "44px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
                   }}
                   onMouseEnter={(e) => {
                     if (validPage !== 1) {
-                      e.currentTarget.style.background = "rgba(0,122,255,0.25)";
-                      e.currentTarget.style.borderColor = "rgba(0,122,255,0.5)";
+                      e.currentTarget.style.background =
+                        "rgba(59, 130, 246, 0.4)";
+                      e.currentTarget.style.borderColor =
+                        "rgba(59, 130, 246, 0.8)";
+                      e.currentTarget.style.transform = "scale(1.05)";
                     }
                   }}
                   onMouseLeave={(e) => {
                     if (validPage !== 1) {
-                      e.currentTarget.style.background = "rgba(0,122,255,0.15)";
-                      e.currentTarget.style.borderColor = "rgba(0,122,255,0.3)";
+                      e.currentTarget.style.background =
+                        "rgba(59, 130, 246, 0.25)";
+                      e.currentTarget.style.borderColor =
+                        "rgba(59, 130, 246, 0.5)";
+                      e.currentTarget.style.transform = "scale(1)";
                     }
                   }}
                 >
@@ -10098,29 +9970,42 @@ function AdminDashboard({
                   style={{
                     background:
                       validPage === totalPages
-                        ? "rgba(255,255,255,0.05)"
-                        : "rgba(0,122,255,0.15)",
-                    border: `1px solid ${validPage === totalPages ? "rgba(255,255,255,0.1)" : "rgba(0,122,255,0.3)"}`,
-                    borderRadius: 4,
-                    padding: "6px 8px",
+                        ? "rgba(255,255,255,0.08)"
+                        : "rgba(59, 130, 246, 0.25)",
+                    border: `1px solid ${validPage === totalPages ? "rgba(255,255,255,0.15)" : "rgba(59, 130, 246, 0.5)"}`,
+                    borderRadius: 6,
+                    padding: "8px 14px",
                     cursor:
                       validPage === totalPages ? "not-allowed" : "pointer",
-                    color: validPage === totalPages ? T.dim : T.blue,
+                    color:
+                      validPage === totalPages
+                        ? "rgba(255,255,255,0.3)"
+                        : "#60A5FA",
                     fontFamily: T.font,
-                    fontSize: 11,
-                    fontWeight: 600,
+                    fontSize: 18,
+                    fontWeight: 700,
                     transition: "all 0.2s ease-in-out",
+                    minWidth: "44px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
                   }}
                   onMouseEnter={(e) => {
                     if (validPage !== totalPages) {
-                      e.currentTarget.style.background = "rgba(0,122,255,0.25)";
-                      e.currentTarget.style.borderColor = "rgba(0,122,255,0.5)";
+                      e.currentTarget.style.background =
+                        "rgba(59, 130, 246, 0.4)";
+                      e.currentTarget.style.borderColor =
+                        "rgba(59, 130, 246, 0.8)";
+                      e.currentTarget.style.transform = "scale(1.05)";
                     }
                   }}
                   onMouseLeave={(e) => {
                     if (validPage !== totalPages) {
-                      e.currentTarget.style.background = "rgba(0,122,255,0.15)";
-                      e.currentTarget.style.borderColor = "rgba(0,122,255,0.3)";
+                      e.currentTarget.style.background =
+                        "rgba(59, 130, 246, 0.25)";
+                      e.currentTarget.style.borderColor =
+                        "rgba(59, 130, 246, 0.5)";
+                      e.currentTarget.style.transform = "scale(1)";
                     }
                   }}
                 >
@@ -11751,15 +11636,30 @@ function SessionsManagementScreen({
           </h1>
           <button
             onClick={onBack}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "rgba(59, 130, 246, 0.15)";
+              e.currentTarget.style.transform = "translateX(-3px)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "transparent";
+              e.currentTarget.style.transform = "translateX(0)";
+            }}
             style={{
-              background: "transparent",
-              border: "none",
-              color: T.blue,
+              background: "rgba(59, 130, 246, 0.1)",
+              border: "1px solid rgba(59, 130, 246, 0.3)",
+              color: "#60A5FA",
               cursor: "pointer",
               fontSize: 14,
+              fontWeight: 600,
+              padding: "8px 16px",
+              borderRadius: 8,
+              transition: "all 0.2s ease",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
             }}
           >
-            ← Back to Dashboard
+            <span style={{ fontSize: 16 }}>←</span> Back to Dashboard
           </button>
         </div>
 
@@ -12607,26 +12507,71 @@ export default function TradersRegiment() {
             return; // Admin is authenticated, don't do normal user flow
           }
 
-          // For regular users only
-          const token = await user.getIdToken();
-          const authData = { uid: user.uid, token, email: user.email };
-          setAuth(authData);
-          await checkUserStatus(authData);
+          // For regular users only - get token with refresh if needed
+          try {
+            const token = await user.getIdToken(true); // Force refresh to handle F5 properly
+            const authData = { uid: user.uid, token, email: user.email };
+            setAuth(authData);
+            await checkUserStatus(authData);
+          } catch (tokenError) {
+            // Token refresh failed - try to get non-refreshed token
+            console.warn(
+              "Token refresh failed, trying non-refreshed token:",
+              tokenError.message,
+            );
+            try {
+              const token = await user.getIdToken(false);
+              const authData = { uid: user.uid, token, email: user.email };
+              setAuth(authData);
+              await checkUserStatus(authData);
+            } catch (fallbackError) {
+              // Both token attempts failed - but user IS logged in Firebase
+              // Keep them on current screen or show loading, don't auto-logout
+              console.warn(
+                "All token methods failed but user exists in Firebase:",
+                fallbackError.message,
+              );
+              // Don't redirect to login - just keep current screen or show a subtle indicator
+              // The user is still authenticated, just the ID token refresh had issues
+            }
+          }
         } else if (!isAdminAuthenticated) {
           // No valid user and not in admin mode, show login
           setScreen("login");
         }
       } catch (error) {
         console.error("Auth state change error:", error);
-        // If there's an auth error, sign out and show login
-        if (!isAdminAuthenticated) {
-          try {
-            await firebaseAuth.signOut();
-          } catch (signOutError) {
-            console.error("Error signing out:", signOutError);
-          }
-          setScreen("login");
+        // Only redirect to login if it's clearly an auth issue, not network/timeout
+        const isAuthError =
+          error?.message?.includes("auth") ||
+          error?.code?.includes("auth") ||
+          error?.code === "auth/network-request-failed";
+
+        if (!isAdminAuthenticated && isAuthError) {
+          // Try to keep user logged in by waiting and retrying once
+          console.warn("Auth error on refresh, attempting recovery...");
+          setTimeout(async () => {
+            try {
+              const currentUser = firebaseAuth.currentUser;
+              if (currentUser) {
+                const token = await currentUser.getIdToken();
+                const authData = {
+                  uid: currentUser.uid,
+                  token,
+                  email: currentUser.email,
+                };
+                setAuth(authData);
+                await checkUserStatus(authData);
+              } else {
+                setScreen("login");
+              }
+            } catch (retryError) {
+              console.error("Auth recovery failed:", retryError);
+              setScreen("login");
+            }
+          }, 1500);
         }
+        // For network errors, don't auto-logout - just log the error
       }
     });
     return unsubscribe;
@@ -13942,6 +13887,7 @@ export default function TradersRegiment() {
       />
       <Toast toasts={toasts} onDismiss={handleDismissToast} />
       <FloatingChatWidget auth={auth} profile={profile} />
+      <ChatHelpline />
 
       {/* Officers Briefing Footer - Rotating Quotes & Founder Card */}
       <div
