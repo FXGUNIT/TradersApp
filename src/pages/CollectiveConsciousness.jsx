@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import MessageRenderer from '../components/MessageRenderer.jsx';
 import ThemeSwitcher from '../components/ThemeSwitcher.jsx';
 import AiEnginesStatus from '../components/AiEnginesStatus.jsx';
-import { runDeliberation, councilStage, MASTER_INTELLIGENCE_SYSTEM_PROMPT } from '../services/ai-router.js';
+import { runDeliberation, councilStage, MASTER_INTELLIGENCE_SYSTEM_PROMPT, quadCoreStatus } from '../services/ai-router.js';
 
 const PHASE_DEFINITIONS = [
   { key: 'stage1', label: 'Phase 1: Alpha, Beta, & Groq deployed', icon: '📡' },
@@ -304,7 +304,7 @@ User Question: ${trimmed}`;
             currentTheme={currentTheme || 'day'}
             onThemeChange={onThemeChange}
           />
-          <AiEnginesStatus statuses={getAIStatuses()} />
+          <AiEnginesStatus statuses={Object.values(quadCoreStatus || {}).map(s => s?.online ?? true)} />
         </div>
       </div>
 
