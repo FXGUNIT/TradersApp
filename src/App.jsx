@@ -53,6 +53,7 @@ import { setupNetworkMonitor } from "./services/networkMonitor.js";
 import { setupTTITracker } from "./services/ttiTracker.js";
 import { SecuritySentinel } from "./services/securitySentinel.js";
 import { detectDuplicateIPs as scanDuplicateIPs } from "./services/ipScanner.js";
+import { calculateVolatilityRatio, getDynamicParameters, calculateThrottledRisk } from "./utils/math-engine.js";
 
 // math-engine & ai-router — both inlined (files exist but have no exports)
 // Swap to real imports once those files are complete
@@ -60,40 +61,10 @@ import { detectDuplicateIPs as scanDuplicateIPs } from "./services/ipScanner.js"
 import "./index.css";
 
 // ═══════════════════════════════════════════════════════════════
-// INLINE MOCKS — these files don't exist in your project yet
+// MATH ENGINE - imported from utils/math-engine.js
 // ═══════════════════════════════════════════════════════════════
-
-// math-engine inline
-function calculateVolatilityRatio(fiveDayATR, twentyDayATR) {
-  if (!fiveDayATR || !twentyDayATR || twentyDayATR === 0) return 1.0;
-  return fiveDayATR / twentyDayATR;
-}
-function getDynamicParameters(VR = 1.0) {
-  const v = Math.max(0.5, Math.min(2.0, VR));
-  return {
-    vwapSD1: v * 15,
-    vwapSD2: v * 30,
-    trendSLMult: v < 0.85 ? 1.5 : v > 1.15 ? 2.2 : 1.8,
-    mrSLMult: v < 0.85 ? 0.8 : v > 1.15 ? 1.2 : 1.0,
-  };
-}
-function calculateThrottledRisk(
-  basePct = 0.3,
-  VR = 1.0,
-  currentBalance = 0,
-  maxDrawdown = 0,
-) {
-  const isThrottled =
-    maxDrawdown > 0 &&
-    currentBalance > 0 &&
-    (currentBalance - (currentBalance - maxDrawdown)) / maxDrawdown < 0.25;
-  return {
-    activeRiskPct: isThrottled
-      ? Math.round((basePct / 2) * 100) / 100
-      : basePct,
-    isThrottled,
-  };
-}
+// calculateVolatilityRatio, getDynamicParameters, calculateThrottledRisk
+// are imported from ./utils/math-engine.js
 
 // ai-router is now imported from ./services/ai-router.js
 // firebaseOptimizer is imported from ./services/firebase.js
