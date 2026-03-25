@@ -54,6 +54,7 @@ import { setupTTITracker } from "./services/ttiTracker.js";
 import { SecuritySentinel } from "./services/securitySentinel.js";
 import { detectDuplicateIPs as scanDuplicateIPs } from "./services/ipScanner.js";
 import { calculateVolatilityRatio, getDynamicParameters, calculateThrottledRisk } from "./utils/math-engine.js";
+import { formatPhoneNumber, TradersRegimentWatermark, ExchangeFacilityBadge } from "./utils/businessLogicUtils.jsx";
 
 // math-engine & ai-router — both inlined (files exist but have no exports)
 // Swap to real imports once those files are complete
@@ -103,28 +104,8 @@ const ThemeSwitcher = ({ currentTheme, onThemeChange }) => null;
 
 // AI Engines Status indicator (imported from component)
 
-// businessLogicUtils stubs
-const formatPhoneNumber = (phone = "") => phone.replace(/\D/g, "").slice(0, 10);
-const TradersRegimentWatermark = () => null;
-const ExchangeFacilityBadge = () => (
-  <div
-    style={{
-      display: "inline-flex",
-      alignItems: "center",
-      gap: 6,
-      padding: "6px 14px",
-      background: "rgba(10,132,255,0.08)",
-      border: "1px solid rgba(10,132,255,0.2)",
-      borderRadius: 20,
-      marginBottom: 16,
-      fontSize: 11,
-      fontWeight: 600,
-      color: "#0A84FF",
-    }}
-  >
-    🏛 REGULATED EXCHANGE FACILITY
-  </div>
-);
+// businessLogicUtils - imported from utils/businessLogicUtils.jsx
+// formatPhoneNumber, TradersRegimentWatermark, ExchangeFacilityBadge
 
 // Page stubs — replace these later with your real page files
 const CleanOnboarding = ({ onSignupSuccess, onBackToLogin }) => {
