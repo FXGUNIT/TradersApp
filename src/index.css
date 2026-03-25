@@ -440,6 +440,360 @@ button,
   transform: scale(1.03);
 }
 
+/* ============================================================================
+ * AURA SMART LATTICE NAVIGATION - DIAMOND NAVIGATION LATTICE
+ * Patent Black Shine, Liquid Chrome, Minimalist High-Gloss
+ * ============================================================================
+ */
+
+/* Main Lattice Container */
+.aura-navigation-lattice,
+#aura-navigation-lattice {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 9998;
+  opacity: 0;
+  transform: translateY(20px);
+  transition:
+    opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+    transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Lattice Core - Diamond Structure */
+.aura-lattice-core {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 400px;
+  height: 400px;
+  pointer-events: auto;
+}
+
+/* Smart Arrows - Diamond Navigation Vectors */
+.aura-smart-arrow {
+  position: absolute;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(10px);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: auto;
+  z-index: 10000;
+  overflow: hidden;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* Patent Black Shine Effect */
+.aura-smart-arrow::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.3),
+    transparent
+  );
+  z-index: 1;
+}
+
+/* Liquid Chrome Border */
+.aura-smart-arrow::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  padding: 1px;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.4),
+    rgba(255, 255, 255, 0.1),
+    rgba(255, 255, 255, 0.4)
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* Arrow Glow Effect */
+.aura-arrow-glow {
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at center,
+    var(--aura-accent-primary) 0%,
+    transparent 70%
+  );
+  opacity: 0;
+  filter: blur(8px);
+  transition: opacity 0.3s ease;
+  z-index: -1;
+}
+
+/* Arrow Icon */
+.aura-arrow-icon {
+  width: 20px;
+  height: 20px;
+  margin-bottom: 4px;
+  stroke: currentColor;
+  stroke-width: 2;
+  transition: transform 0.3s ease;
+}
+
+/* Arrow Label */
+.aura-arrow-label {
+  font-size: 8px;
+  opacity: 0.7;
+  transition: opacity 0.3s ease;
+}
+
+/* Arrow Positions - Diamond Layout */
+.aura-arrow-back {
+  top: 50%;
+  left: 20%;
+  transform: translate(-50%, -50%);
+}
+
+.aura-arrow-forward {
+  top: 50%;
+  left: 80%;
+  transform: translate(-50%, -50%);
+}
+
+.aura-arrow-up {
+  top: 20%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.aura-arrow-down {
+  top: 80%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+/* Hover Effects */
+.aura-smart-arrow:hover {
+  background: rgba(0, 0, 0, 0.95);
+  border-color: rgba(255, 255, 255, 0.4);
+  transform: translate(-50%, -50%) scale(1.15);
+  box-shadow:
+    0 12px 48px rgba(0, 0, 0, 0.7),
+    0 0 20px rgba(var(--aura-accent-primary-rgb), 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.aura-smart-arrow:hover .aura-arrow-glow {
+  opacity: 0.6;
+}
+
+.aura-smart-arrow:hover .aura-arrow-icon {
+  transform: scale(1.2);
+}
+
+.aura-smart-arrow:hover .aura-arrow-label {
+  opacity: 1;
+}
+
+/* Center Diamond - Vitality Orb */
+.aura-diamond-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 80px;
+  height: 80px;
+  pointer-events: none;
+}
+
+.aura-diamond-inner {
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  transform: rotate(45deg);
+  position: relative;
+  backdrop-filter: blur(10px);
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* Diamond Sparkles */
+.aura-diamond-sparkle {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  background: white;
+  border-radius: 50%;
+  filter: blur(1px);
+  animation: aura-sparkle-pulse 3s infinite;
+}
+
+.aura-diamond-sparkle:nth-child(1) {
+  top: 15%;
+  left: 15%;
+  animation-delay: 0s;
+}
+
+.aura-diamond-sparkle:nth-child(2) {
+  top: 15%;
+  right: 15%;
+  animation-delay: 1s;
+}
+
+.aura-diamond-sparkle:nth-child(3) {
+  bottom: 15%;
+  left: 50%;
+  transform: translateX(-50%);
+  animation-delay: 2s;
+}
+
+@keyframes aura-sparkle-pulse {
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.5);
+  }
+}
+
+/* Lattice Connection Lines */
+.aura-lattice-lines {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.aura-lattice-line {
+  stroke: url(#aura-line-gradient);
+  stroke-width: 1;
+  stroke-dasharray: 5, 5;
+  animation: aura-line-flow 20s linear infinite;
+}
+
+.aura-lattice-line:nth-child(1) {
+  animation-delay: 0s;
+}
+.aura-lattice-line:nth-child(2) {
+  animation-delay: 5s;
+}
+.aura-lattice-line:nth-child(3) {
+  animation-delay: 10s;
+}
+.aura-lattice-line:nth-child(4) {
+  animation-delay: 15s;
+}
+
+@keyframes aura-line-flow {
+  0% {
+    stroke-dashoffset: 0;
+  }
+  100% {
+    stroke-dashoffset: 100;
+  }
+}
+
+/* Theme-Specific Adjustments */
+[data-aura-theme="lumiere"] .aura-smart-arrow {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(0, 0, 0, 0.1);
+  color: #121212;
+}
+
+[data-aura-theme="lumiere"] .aura-smart-arrow::after {
+  background: linear-gradient(
+    135deg,
+    rgba(0, 0, 0, 0.2),
+    rgba(0, 0, 0, 0.05),
+    rgba(0, 0, 0, 0.2)
+  );
+}
+
+[data-aura-theme="amber"] .aura-smart-arrow {
+  background: rgba(244, 235, 208, 0.9);
+  border-color: rgba(139, 69, 19, 0.2);
+  color: #5c4033;
+}
+
+[data-aura-theme="amber"] .aura-arrow-glow {
+  background: radial-gradient(circle at center, #d4af37 0%, transparent 70%);
+}
+
+[data-aura-theme="midnight"] .aura-smart-arrow {
+  background: rgba(5, 7, 10, 0.95);
+  border-color: rgba(111, 168, 255, 0.2);
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+  .aura-lattice-core {
+    width: 300px;
+    height: 300px;
+  }
+
+  .aura-smart-arrow {
+    width: 50px;
+    height: 50px;
+    font-size: 8px;
+  }
+
+  .aura-arrow-icon {
+    width: 16px;
+    height: 16px;
+  }
+
+  .aura-diamond-center {
+    width: 60px;
+    height: 60px;
+  }
+}
+
+/* Touch Device Optimizations */
+@media (hover: none) and (pointer: coarse) {
+  .aura-smart-arrow {
+    width: 70px;
+    height: 70px;
+  }
+
+  .aura-smart-arrow:active {
+    transform: translate(-50%, -50%) scale(0.95);
+  }
+}
+
 .theme-switcher-btn:active {
   transform: scale(0.98);
 }
@@ -741,4 +1095,140 @@ svg.feather {
   50% {
     opacity: 0.6;
   }
+}
+
+/* ═══════════════════════════════════════════════════════════════════ */
+/* AURA ELITE REFINEMENT SYSTEM - PATENT LEATHER BACKGROUND */
+/* Target: Luxury, Minimalism, High-Gloss Patent Finish */
+/* ═══════════════════════════════════════════════════════════════════ */
+
+/* Dynamic Spacing - Space is Wealth */
+:root {
+  --aura-gutter: 48px;
+  --aura-radius: 4px; /* Sharp, Architectural corners */
+  --aura-glass: blur(35px) saturate(160%);
+  --aura-transition: all 0.7s cubic-bezier(0.19, 1, 0.22, 1);
+}
+
+/* 1. THE GLOBAL CANVAS - THE "PATENT LEATHER" BACKGROUND */
+body {
+  margin: 0;
+  padding: var(--aura-gutter);
+  background-color: var(--aura-base-layer, #05070a); /* True Midnight */
+  background-image: radial-gradient(
+    circle at top right,
+    #0d1117,
+    var(--aura-base-layer, #05070a)
+  );
+  color: var(--aura-text-primary, #e1e1e1);
+  font-family:
+    "Inter",
+    -apple-system,
+    sans-serif;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  transition:
+    background-color 0.7s ease,
+    color 0.5s ease;
+}
+
+/* 2. THE GLASS CARD SYSTEM (REPLACING CHEAP BORDERS) */
+.aura-card,
+.dashboard-widget,
+.journal-entry,
+.glass-panel,
+.input-glass,
+.btn-glass {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.03) 0%,
+    rgba(255, 255, 255, 0.01) 100%
+  );
+  backdrop-filter: var(--aura-glass);
+  -webkit-backdrop-filter: var(--aura-glass);
+  border: 0.5px solid rgba(255, 255, 255, 0.1); /* The "Bling" stroke */
+  border-radius: var(--aura-radius);
+  padding: 40px; /* Luxury Padding */
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5);
+  transition: var(--aura-transition);
+  overflow: hidden;
+  position: relative;
+}
+
+/* The "Patent Shine" Hover Effect */
+.aura-card:hover,
+.glass-panel:hover {
+  transform: translateY(-4px) scale(1.01);
+  border-color: rgba(255, 255, 255, 0.3);
+  box-shadow: 0 40px 80px rgba(0, 0, 0, 0.7);
+}
+
+/* 3. TYPOGRAPHY HIERARCHY (THE "ELITE" CONTRAST) */
+h1,
+.main-title {
+  font-size: 2.5rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: var(--aura-text-primary, #ffffff);
+  margin-bottom: 24px;
+  opacity: 0.9;
+}
+
+.stat-number {
+  font-size: 3.5rem;
+  font-weight: 200; /* Ultra-thin luxury weight */
+  letter-spacing: -0.03em;
+  color: var(--aura-text-primary, #ffffff);
+}
+
+/* 4. THE "ZERO-NOISE" INPUTS */
+input,
+select,
+textarea {
+  background: transparent;
+  border: none;
+  border-bottom: 0.5px solid rgba(255, 255, 255, 0.2);
+  padding: 12px 0;
+  color: var(--aura-text-primary, #ffffff);
+  font-size: 1rem;
+  transition: var(--aura-transition);
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-bottom: 1px solid var(--aura-text-primary, #ffffff);
+  letter-spacing: 0.05em; /* Subtle expansion on focus */
+}
+
+/* 5. HIDING "CHEAP" ELEMENTS */
+.cheap-button,
+.standard-border,
+.default-emoji {
+  display: none !important;
+}
+
+/* 6. AURA VITALITY ORB ENHANCEMENT */
+.aura-vitality-orb {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.1) 0%,
+    rgba(255, 255, 255, 0.05) 100%
+  );
+  backdrop-filter: blur(20px);
+  border: 0.5px solid rgba(255, 255, 255, 0.2);
+  box-shadow:
+    0 20px 40px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transition: var(--aura-transition);
+}
+
+.aura-vitality-orb:hover {
+  transform: scale(1.1);
+  border-color: rgba(255, 255, 255, 0.4);
+  box-shadow:
+    0 30px 60px rgba(0, 0, 0, 0.5),
+    0 0 30px rgba(255, 255, 255, 0.1);
 }

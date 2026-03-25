@@ -63,37 +63,7 @@ import "./index.css";
 // ═══════════════════════════════════════════════════════════════
 
 // math-engine inline
-function calculateVolatilityRatio(fiveDayATR, twentyDayATR) {
-  if (!fiveDayATR || !twentyDayATR || twentyDayATR === 0) return 1.0;
-  return fiveDayATR / twentyDayATR;
-}
-function getDynamicParameters(VR = 1.0) {
-  const v = Math.max(0.5, Math.min(2.0, VR));
-  return {
-    vwapSD1: v * 15,
-    vwapSD2: v * 30,
-    trendSLMult: v < 0.85 ? 1.5 : v > 1.15 ? 2.2 : 1.8,
-    mrSLMult: v < 0.85 ? 0.8 : v > 1.15 ? 1.2 : 1.0,
-  };
-}
-function calculateThrottledRisk(
-  basePct = 0.3,
-  VR = 1.0,
-  currentBalance = 0,
-  maxDrawdown = 0,
-) {
-  const isThrottled =
-    maxDrawdown > 0 &&
-    currentBalance > 0 &&
-    (currentBalance - (currentBalance - maxDrawdown)) / maxDrawdown < 0.25;
-  return {
-    activeRiskPct: isThrottled
-      ? Math.round((basePct / 2) * 100) / 100
-      : basePct,
-    isThrottled,
-  };
-}
-
+// math-engine functions are now imported from ./utils/math-engine.js
 // ai-router is now imported from ./services/ai-router.js
 // firebaseOptimizer is imported from ./services/firebase.js
 
@@ -12019,6 +11989,25 @@ export default function TradersRegiment() {
           : auraTheme === "amber"
             ? "#F4EBD0"
             : "#FBFBFC";
+
+      // Notify AURA Chronos engine of manual theme change
+      // This sets a 24-hour manual override
+      if (
+        window.AuraChronos &&
+        typeof window.AuraChronos.setManualOverride === "function"
+      ) {
+        window.AuraChronos.setManualOverride(auraTheme, newTheme, 24);
+      }
+
+      // Also dispatch custom event for Chronos engine
+      const manualChangeEvent = new CustomEvent("aura-manual-theme-change", {
+        detail: { auraTheme, legacyTheme: newTheme, timestamp: Date.now() },
+      });
+      document.dispatchEvent(manualChangeEvent);
+
+      console.log(
+        `🎨 Theme changed to ${newTheme} (${auraTheme}) - Manual override set for 24 hours`,
+      );
     } catch {
       // ignore
     }
