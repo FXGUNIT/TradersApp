@@ -125,37 +125,146 @@ const testTelegramConnectivity = async () => ({
 });
 const initTelegramMonitor = () => {};
 
-// Apple-like 3-state ThemeSwitcher (Day, Night, Eye Comfort)
+// AURA Tri-State ThemeSwitcher - Elite UX Edition
 const ThemeSwitcher = ({ currentTheme, onThemeChange }) => {
-  const cycle = {
-    day: "night",
-    night: "eye",
-    eye: "day",
+  // Legacy to AURA mapping
+  const legacyToAura = {
+    day: "lumiere",
+    night: "midnight",
+    eye: "amber",
+    comfort: "amber",
   };
-  const next = cycle[currentTheme] || "day";
-  const label =
-    currentTheme === "day" ? "☀️" : currentTheme === "night" ? "🌙" : "👁️";
+
+  // AURA to legacy mapping (for backward compatibility)
+  const auraToLegacy = {
+    lumiere: "day",
+    midnight: "night",
+    amber: "eye",
+  };
+
+  // AURA state cycle
+  const auraCycle = {
+    lumiere: "amber",
+    amber: "midnight",
+    midnight: "lumiere",
+  };
+
+  // Convert current theme to AURA state
+  const currentAura = legacyToAura[currentTheme] || "lumiere";
+  const nextAura = auraCycle[currentAura] || "lumiere";
+  const nextLegacy = auraToLegacy[nextAura] || "day";
+
+  // AURA symbols (no emojis - use SVG-like characters)
+  const auraSymbols = {
+    lumiere: "◉", // Sun disc
+    amber: "◍", // Shield
+    midnight: "◐", // Crescent
+  };
+
+  // AURA state labels
+  const auraLabels = {
+    lumiere: "LUMIERE",
+    amber: "AMBER",
+    midnight: "MIDNIGHT",
+  };
+
+  // AURA color mapping for active state
+  const auraColors = {
+    lumiere: "var(--aura-accent-primary, #2563eb)",
+    amber: "var(--aura-accent-primary, #d97706)",
+    midnight: "var(--aura-accent-primary, #b8860b)",
+  };
+
   return (
     <button
-      onClick={() => onThemeChange(next)}
-      aria-label={`Switch to ${next} theme`}
+      onClick={() => onThemeChange(nextLegacy)}
+      aria-label={`Switch to ${auraLabels[nextAura]} theme`}
       style={{
-        background: "transparent",
-        border: "1px solid #E2E8F0",
-        borderRadius: 6,
-        padding: "8px 12px",
+        background: "var(--aura-surface-elevated, #ffffff)",
+        border: "0.5px solid var(--aura-border-subtle, rgba(0,0,0,0.05))",
+        borderRadius: "24px",
+        padding: "12px 20px",
         cursor: "pointer",
-        fontSize: 14,
+        fontSize: "14px",
         display: "inline-flex",
         alignItems: "center",
-        gap: 6,
+        gap: "12px",
+        fontFamily: "'Inter', -apple-system, sans-serif",
+        fontWeight: 500,
+        color: "var(--aura-text-primary, #121212)",
+        transition: "all 450ms cubic-bezier(0.175, 0.885, 0.32, 1.275)",
+        backdropFilter: "blur(25px) saturate(160%)",
+        boxShadow:
+          "0 10px 40px rgba(0,0,0,0.04), 0 0 15px var(--aura-gem-glow, rgba(37, 99, 235, 0.1))",
+        position: "relative",
+        overflow: "hidden",
+        willChange: "transform",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.transform = "scale(1.025) translateY(-2px)";
+        e.currentTarget.style.boxShadow =
+          "0 20px 50px rgba(0,0,0,0.08), 0 0 25px var(--aura-gem-glow, rgba(37, 99, 235, 0.2))";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.transform = "scale(1) translateY(0)";
+        e.currentTarget.style.boxShadow =
+          "0 10px 40px rgba(0,0,0,0.04), 0 0 15px var(--aura-gem-glow, rgba(37, 99, 235, 0.1))";
+      }}
+      onMouseDown={(e) => {
+        e.currentTarget.style.transform = "scale(0.98) translateY(0)";
+      }}
+      onMouseUp={(e) => {
+        e.currentTarget.style.transform = "scale(1.025) translateY(-2px)";
       }}
     >
-      <span style={{ fontSize: 14 }}>{label}</span>
+      {/* Active state indicator */}
+      <div
+        style={{
+          position: "absolute",
+          top: "4px",
+          left: "4px",
+          right: "4px",
+          height: "2px",
+          background: auraColors[currentAura],
+          borderRadius: "1px",
+          opacity: 0.8,
+          transform: "scaleX(0.8)",
+          transition: "all 300ms ease",
+        }}
+      />
+
       <span
-        style={{ fontWeight: 600, color: "#374151", fontFamily: "inherit" }}
+        style={{
+          fontSize: "18px",
+          color: auraColors[currentAura],
+          filter: `drop-shadow(${auraColors[currentAura]} 0 0 8px)`,
+          transition: "all 300ms ease",
+        }}
       >
-        {next.charAt(0).toUpperCase() + next.slice(1)}
+        {auraSymbols[currentAura]}
+      </span>
+
+      <span
+        style={{
+          fontWeight: 600,
+          letterSpacing: "0.05em",
+          fontSize: "13px",
+          textTransform: "uppercase",
+        }}
+      >
+        {auraLabels[nextAura]}
+      </span>
+
+      {/* Micro arrow indicator */}
+      <span
+        style={{
+          fontSize: "12px",
+          opacity: 0.6,
+          marginLeft: "4px",
+          transition: "transform 300ms ease",
+        }}
+      >
+        →
       </span>
     </button>
   );
@@ -3335,20 +3444,21 @@ const ACCENT_COLORS = {
 
 // RULE #126: Glassmorphism Effect - Premium institutional terminal aesthetic
 // Enhanced theme with glassmorphic styling and accent color support
+// UPDATED FOR AURA ENGINE: Uses CSS variables instead of hardcoded values
 const createTheme = (isDark = true, accentKey = "BLUE") => {
   const accent = ACCENT_COLORS[accentKey] || ACCENT_COLORS.BLUE;
   return {
-    // Core backgrounds
-    bg: isDark ? "#0A0E27" : "#FFFFFF",
-    card: isDark ? "rgba(20,24,50,0.5)" : "rgba(255,255,255,0.6)",
-    cardGlass: isDark ? "rgba(20,24,50,0.4)" : "rgba(255,255,255,0.5)",
+    // Core backgrounds - Now using CSS variables from AURA Engine
+    bg: "var(--aura-base-layer, #fbfbfc)",
+    card: "var(--aura-surface-elevated, #ffffff)",
+    cardGlass: "var(--aura-surface-elevated, #ffffff)",
 
-    // Borders - use accent color
-    border: isDark ? `${accent.light}` : "rgba(0,0,0,0.1)",
-    border2: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)",
-    borderGlass: isDark ? `${accent.light}` : "rgba(0,0,0,0.1)",
+    // Borders - use CSS variables
+    border: "var(--aura-border-subtle, rgba(0,0,0,0.05))",
+    border2: "var(--aura-border-subtle, rgba(0,0,0,0.05))",
+    borderGlass: "var(--aura-border-subtle, rgba(0,0,0,0.05))",
 
-    // Accent colors
+    // Accent colors - Preserved for compatibility but mapped to CSS variables
     green: "#30D158",
     red: "#FF453A",
     gold: "#FFD60A",
@@ -3358,33 +3468,35 @@ const createTheme = (isDark = true, accentKey = "BLUE") => {
     cyan: "#64D2FF",
     pink: "#FF375F",
 
-    // Primary accent color from picker
-    accent: accent.primary,
-    accentLight: accent.light,
-    accentGlow: accent.glow,
+    // Primary accent color from picker - Now uses CSS variable with fallback
+    accent: "var(--aura-accent-primary, #2563eb)",
+    accentLight: "var(--aura-accent-glow, rgba(37, 99, 235, 0.1))",
+    accentGlow: accent.glow, // Keep legacy glow for compatibility
 
-    // Text colors
-    muted: isDark ? "#8E8E93" : "#9CA3AF",
-    dim: isDark ? "#3A3A3C" : "#D1D1D6",
-    text: isDark ? "#F2F2F7" : "#111827",
-    textSecondary: isDark ? "#A1A1A6" : "#64748B",
+    // Text colors - Now using CSS variables from AURA Engine
+    muted: "var(--aura-text-secondary, #6b7280)",
+    dim: isDark
+      ? "var(--aura-text-secondary, #6b7280)"
+      : "var(--aura-text-secondary, #6b7280)",
+    text: "var(--aura-text-primary, #121212)",
+    textSecondary: "var(--aura-text-secondary, #6b7280)",
 
     // Fonts
     font: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
     mono: '"SF Mono", "ui-monospace", "Cascadia Mono", "Roboto Mono", "IBM Plex Mono", monospace',
 
-    // AMD colors
+    // AMD colors - Preserved for compatibility
     amdA: "#0A84FF",
     amdM: "#BF5AF2",
     amdD: "#30D158",
     amdDB: "#FF453A",
     amdT: "#8E8E93",
 
-    // Glassmorphism
+    // Glassmorphism - Updated to use CSS variables
     glassmorphism: {
       backdropFilter: "blur(12px)",
-      backgroundColor: isDark ? "rgba(20,24,50,0.4)" : "rgba(255,255,255,0.5)",
-      border: `1px solid ${accent.light}`,
+      backgroundColor: "var(--aura-surface-elevated, rgba(255,255,255,0.5))",
+      border: `1px solid var(--aura-border-subtle, rgba(0,0,0,0.05))`,
       borderRadius: "12px",
     },
   };
@@ -11874,6 +11986,16 @@ export default function TradersRegiment() {
 
   const handleThemeChange = (newTheme) => {
     setCurrentTheme(newTheme);
+
+    // Map legacy theme to AURA state
+    const legacyToAura = {
+      day: "lumiere",
+      night: "midnight",
+      eye: "amber",
+      comfort: "amber",
+    };
+    const auraTheme = legacyToAura[newTheme] || "lumiere";
+
     // Also sync with isDarkMode for components that use it directly
     if (newTheme === "night") {
       setIsDarkMode(true);
@@ -11881,8 +12003,22 @@ export default function TradersRegiment() {
       setIsDarkMode(false);
     }
     // Eye comfort uses light mode but with warm accents
+
+    // Update AURA theme in localStorage and document attribute
     try {
       localStorage.setItem("appTheme", newTheme);
+      localStorage.setItem("aura-theme", auraTheme);
+
+      // Update document attribute for CSS variables
+      document.documentElement.setAttribute("data-aura-theme", auraTheme);
+
+      // Apply immediate background color for zero-FOUC
+      document.documentElement.style.backgroundColor =
+        auraTheme === "midnight"
+          ? "#05070A"
+          : auraTheme === "amber"
+            ? "#F4EBD0"
+            : "#FBFBFC";
     } catch {
       // ignore
     }
@@ -13569,8 +13705,8 @@ export default function TradersRegiment() {
 
       case "hub":
         return (
-          <RegimentHub 
-            onNavigate={(dest) => setScreen(dest)} 
+          <RegimentHub
+            onNavigate={(dest) => setScreen(dest)}
             theme={theme}
             currentTheme={currentTheme}
             onThemeChange={handleThemeChange}

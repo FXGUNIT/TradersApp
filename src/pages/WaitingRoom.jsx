@@ -139,8 +139,9 @@ const styles = {
     alignItems: "center",
     justifyContent: "center",
     minHeight: "100vh",
-    background: "linear-gradient(135deg, #0b1220 0%, #1a1a2e 100%)",
-    color: "#fff",
+    background:
+      "linear-gradient(135deg, var(--aura-base-layer, #0b1220) 0%, var(--aura-surface-elevated, #1a1a2e) 100%)",
+    color: "var(--aura-text-primary, #fff)",
     padding: "20px",
     fontFamily:
       '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
@@ -151,13 +152,13 @@ const styles = {
   spinner: {
     width: "80px",
     height: "80px",
-    border: "4px solid rgba(255,255,255,0.1)",
-    borderTopColor: "#30D158",
+    border: "4px solid rgba(var(--aura-text-primary-rgb, 255, 255, 255), 0.1)",
+    borderTopColor: "var(--aura-accent-success, #30D158)",
     borderRadius: "50%",
     animation: "spin 1s linear infinite",
   },
   loadingText: {
-    color: "#8E8E93",
+    color: "var(--aura-text-secondary, #8E8E93)",
     fontSize: "14px",
     marginTop: "16px",
   },
@@ -166,28 +167,29 @@ const styles = {
     fontWeight: "700",
     marginBottom: "12px",
     textAlign: "center",
-    background: "linear-gradient(90deg, #fff, #8E8E93)",
+    background:
+      "linear-gradient(90deg, var(--aura-text-primary, #fff), var(--aura-text-secondary, #8E8E93))",
     WebkitBackgroundClip: "text",
     WebkitTextFillColor: "transparent",
   },
   subtitle: {
-    color: "#8E8E93",
+    color: "var(--aura-text-secondary, #8E8E93)",
     fontSize: "16px",
     marginBottom: "24px",
     textAlign: "center",
   },
   email: {
-    color: "#636366",
+    color: "var(--aura-text-tertiary, #636366)",
     fontSize: "12px",
     marginBottom: "16px",
   },
   statusBadge: {
     marginTop: "16px",
     padding: "8px 16px",
-    background: "rgba(255,255,255,0.1)",
+    background: "rgba(var(--aura-text-primary-rgb, 255, 255, 255), 0.1)",
     borderRadius: "8px",
     fontSize: "14px",
-    color: "#FFD60A",
+    color: "var(--aura-accent-warning, #FFD60A)",
   },
   statusValue: {
     fontWeight: "700",
@@ -201,19 +203,20 @@ const styles = {
   progressBar: {
     width: "100%",
     height: "4px",
-    background: "rgba(255,255,255,0.1)",
+    background: "rgba(var(--aura-text-primary-rgb, 255, 255, 255), 0.1)",
     borderRadius: "2px",
     overflow: "hidden",
   },
   progressFill: {
     width: "30%",
     height: "100%",
-    background: "linear-gradient(90deg, #30D158, #34C759)",
+    background:
+      "linear-gradient(90deg, var(--aura-accent-success, #30D158), var(--aura-accent-success-hover, #34C759))",
     borderRadius: "2px",
     animation: "pulse 2s ease-in-out infinite",
   },
   progressText: {
-    color: "#8E8E93",
+    color: "var(--aura-text-secondary, #8E8E93)",
     fontSize: "12px",
     marginTop: "8px",
     textAlign: "center",
@@ -221,19 +224,19 @@ const styles = {
   approvedContainer: {
     marginTop: "32px",
     padding: "16px 24px",
-    background: "rgba(48, 209, 88, 0.1)",
-    border: "1px solid rgba(48, 209, 88, 0.3)",
+    background: "rgba(var(--aura-accent-success-rgb, 48, 209, 88), 0.1)",
+    border: "1px solid rgba(var(--aura-accent-success-rgb, 48, 209, 88), 0.3)",
     borderRadius: "12px",
   },
   approvedText: {
-    color: "#30D158",
+    color: "var(--aura-accent-success, #30D158)",
     fontSize: "16px",
     fontWeight: "600",
   },
   helpText: {
     position: "absolute",
     bottom: "24px",
-    color: "#636366",
+    color: "var(--aura-text-tertiary, #636366)",
     fontSize: "12px",
   },
 };

@@ -1,88 +1,107 @@
 /* ═══════════════════════════════════════════════════════════════════
-   MODERN SaaS DESIGN SYSTEM - Google Fonts & CSS Variables
+   AURA TRI-STATE UNIVERSAL THEME ENGINE - ELITE UX EDITION
    ═══════════════════════════════════════════════════════════════════ */
 
 /* Import Inter from Google Fonts */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
 
 /* ─────────────────────────────────────────────────────────────────
-    CSS VARIABLES - THREE THEME SYSTEM
+    AURA ENGINE - CSS VARIABLES ARCHITECTURE
+    Engine States: [LUMIERE], [AMBER], [MIDNIGHT]
+    Design Standard: International Luxury / Ultra-Premium / Circadian-Aware
     ───────────────────────────────────────────────────────────────── */
 
 :root {
-  /* DAY MODE (Primary) - Professional SaaS White Design */
-  --day-bg: #FFFFFF;
-  --day-card: #FFFFFF;
-  --day-text: #111827;
-  --day-subtext: #64748B;
-  --day-border: #E5E7EB;
-  --day-accent: #000000;
-  --day-accent-text: #FFFFFF;
+  /* Default to LUMIERE mode (Day) */
+  --aura-base-layer: #fbfbfc;
+  --aura-surface-elevated: #ffffff;
+  --aura-text-primary: #121212;
+  --aura-text-secondary: #6b7280;
+  --aura-accent-primary: #2563eb;
+  --aura-accent-glow: rgba(37, 99, 235, 0.1);
+  --aura-border-subtle: rgba(0, 0, 0, 0.05);
+  --aura-gem-glow: 0 0 15px rgba(37, 99, 235, 0.4);
 
-  /* NIGHT MODE - Dark theme with blue accents */
-  --night-bg: #0F172A;
-  --night-card: #1E293B;
-  --night-text: #F2F2F7;
-  --night-subtext: #94A3B8;
-  --night-border: #334155;
-  --night-accent: #0A84FF;
-  --night-accent-text: #FFFFFF;
-
-  /* EYE COMFORT MODE - Warm, soft colors for reduced eye strain */
-  --comfort-bg: #FDF6E3;
-  --comfort-card: #FAF3E0;
-  --comfort-text: #5D4037;
-  --comfort-subtext: #8D6E63;
-  --comfort-border: #D7CCC8;
-  --comfort-accent: #8D6E63;
-  --comfort-accent-text: #FFFFFF;
-
-  /* Default to Day Mode */
-  --bg: var(--day-bg);
-  --card: var(--day-card);
-  --text: var(--day-text);
-  --subtext: var(--day-subtext);
-  --border: var(--day-border);
-  --accent: var(--day-accent);
-  --accent-text: var(--day-accent-text);
+  /* Legacy compatibility variables (mapped to AURA) */
+  --bg: var(--aura-base-layer);
+  --card: var(--aura-surface-elevated);
+  --text: var(--aura-text-primary);
+  --subtext: var(--aura-text-secondary);
+  --border: var(--aura-border-subtle);
+  --accent: var(--aura-accent-primary);
+  --accent-text: #ffffff;
 
   /* CARD STYLING - Professional SaaS */
   --card-radius: 12px;
-  --card-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
-  --card-shadow-hover: 0 4px 6px 0 rgba(0, 0, 0, 0.1), 0 2px 4px 0 rgba(0, 0, 0, 0.06);
+  --card-shadow: 0 10px 40px rgba(0, 0, 0, 0.04);
+  --card-shadow-hover: 0 20px 60px rgba(0, 0, 0, 0.08);
 }
 
-/* DAY MODE THEME - Professional SaaS Light */
+/* LUMIERE MODE (DAY) - High-Definition Gallery */
+:root[data-aura-theme="lumiere"] {
+  --aura-base-layer: #fbfbfc;
+  --aura-surface-elevated: #ffffff;
+  --aura-text-primary: #121212;
+  --aura-text-secondary: #6b7280;
+  --aura-accent-primary: #2563eb;
+  --aura-accent-glow: rgba(37, 99, 235, 0.1);
+  --aura-border-subtle: rgba(0, 0, 0, 0.05);
+  --aura-gem-glow: 0 0 15px rgba(37, 99, 235, 0.4);
+}
+
+/* AMBER MODE (EYE COMFORT) - The Library */
+:root[data-aura-theme="amber"] {
+  --aura-base-layer: #f4ebd0;
+  --aura-surface-elevated: #fdf6e3;
+  --aura-text-primary: #3d2b1f;
+  --aura-text-secondary: #7c6a53;
+  --aura-accent-primary: #d97706;
+  --aura-accent-glow: rgba(217, 119, 6, 0.1);
+  --aura-border-subtle: rgba(139, 92, 24, 0.1);
+  --aura-gem-glow: 0 0 15px rgba(217, 119, 6, 0.4);
+}
+
+/* MIDNIGHT MODE (NIGHT) - The Obsidian Vault */
+:root[data-aura-theme="midnight"] {
+  --aura-base-layer: #05070a;
+  --aura-surface-elevated: #12141c;
+  --aura-text-primary: #e1e1e1;
+  --aura-text-secondary: #94a3b8;
+  --aura-accent-primary: #b8860b;
+  --aura-accent-glow: rgba(56, 189, 248, 0.1);
+  --aura-border-subtle: rgba(255, 255, 255, 0.05);
+  --aura-gem-glow: 0 0 15px rgba(184, 134, 11, 0.4);
+}
+
+/* Legacy theme class compatibility */
 body.theme-day {
-  --bg: var(--day-bg);
-  --card: var(--day-card);
-  --text: var(--day-text);
-  --subtext: var(--day-subtext);
-  --border: var(--day-border);
-  --accent: var(--day-accent);
-  --accent-text: var(--day-accent-text);
+  --bg: var(--aura-base-layer);
+  --card: var(--aura-surface-elevated);
+  --text: var(--aura-text-primary);
+  --subtext: var(--aura-text-secondary);
+  --border: var(--aura-border-subtle);
+  --accent: var(--aura-accent-primary);
+  --accent-text: #ffffff;
 }
 
-/* NIGHT MODE THEME - Also use light design */
 body.theme-night {
-  --bg: var(--day-bg);
-  --card: var(--day-card);
-  --text: var(--day-text);
-  --subtext: var(--day-subtext);
-  --border: var(--day-border);
-  --accent: var(--day-accent);
-  --accent-text: var(--day-accent-text);
+  --bg: var(--aura-base-layer);
+  --card: var(--aura-surface-elevated);
+  --text: var(--aura-text-primary);
+  --subtext: var(--aura-text-secondary);
+  --border: var(--aura-border-subtle);
+  --accent: var(--aura-accent-primary);
+  --accent-text: #ffffff;
 }
 
-/* EYE COMFORT MODE THEME - Also use light design */
 body.theme-comfort {
-  --bg: var(--day-bg);
-  --card: var(--day-card);
-  --text: var(--day-text);
-  --subtext: var(--day-subtext);
-  --border: var(--day-border);
-  --accent: var(--day-accent);
-  --accent-text: var(--day-accent-text);
+  --bg: var(--aura-base-layer);
+  --card: var(--aura-surface-elevated);
+  --text: var(--aura-text-primary);
+  --subtext: var(--aura-text-secondary);
+  --border: var(--aura-border-subtle);
+  --accent: var(--aura-accent-primary);
+  --accent-text: #ffffff;
 }
 
 /* ─────────────────────────────────────────────────────────────────
@@ -95,7 +114,8 @@ body.theme-comfort {
   letter-spacing: -0.01em;
 }
 
-html, body {
+html,
+body {
   margin: 0;
   padding: 0;
 }
@@ -104,25 +124,34 @@ body {
   margin: 0;
   padding: 0;
   min-height: 100vh;
-  background-color: #F9FAFB !important;
+  background-color: #f9fafb !important;
   background-image: none;
   background-attachment: fixed;
   background-size: cover;
   color: var(--text);
   /* Inter Font from Google Fonts */
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-family:
+    "Inter",
+    -apple-system,
+    BlinkMacSystemFont,
+    "SF Pro Display",
+    "Helvetica Neue",
+    Helvetica,
+    Arial,
+    sans-serif;
   font-size: 16px;
   font-weight: 400;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   /* Smooth Transition */
-  transition: background-color 300ms cubic-bezier(0.4, 0.0, 0.2, 1),
-              color 300ms cubic-bezier(0.4, 0.0, 0.2, 1),
-              background-image 300ms cubic-bezier(0.4, 0.0, 0.2, 1);
+  transition:
+    background-color 300ms cubic-bezier(0.4, 0, 0.2, 1),
+    color 300ms cubic-bezier(0.4, 0, 0.2, 1),
+    background-image 300ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Hide the ugly Google reCAPTCHA floating badge */
-.grecaptcha-badge { 
+.grecaptcha-badge {
   visibility: hidden !important;
   opacity: 0 !important;
   display: none !important;
@@ -140,7 +169,7 @@ body {
   box-shadow: var(--card-shadow);
   border: none;
   padding: 24px;
-  transition: all 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .card:hover,
@@ -150,7 +179,7 @@ body {
 
 /* Responsive Glassmorphism Panels - Now light SaaS white */
 .glass-panel {
-  background: #FFFFFF !important;
+  background: #ffffff !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
   border: none !important;
@@ -163,7 +192,7 @@ body {
 .sidebar,
 .nav-sidebar,
 [role="navigation"] {
-  background-color: #FFFFFF;
+  background-color: #ffffff;
   border: none;
   border-radius: var(--card-radius);
   padding: 24px;
@@ -174,19 +203,19 @@ body {
 .app-container.theme-day .sidebar,
 .app-container.theme-day .nav-sidebar,
 .app-container.theme-day [role="navigation"] {
-  background-color: #FFFFFF;
+  background-color: #ffffff;
 }
 
 .app-container.theme-night .sidebar,
 .app-container.theme-night .nav-sidebar,
 .app-container.theme-night [role="navigation"] {
-  background-color: #FFFFFF;
+  background-color: #ffffff;
 }
 
 .app-container.theme-comfort .sidebar,
 .app-container.theme-comfort .nav-sidebar,
 .app-container.theme-comfort [role="navigation"] {
-  background-color: #FFFFFF;
+  background-color: #ffffff;
 }
 
 /* iOS Style Buttons - Ghost Style for SaaS */
@@ -194,15 +223,15 @@ body {
   background: transparent;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
-  border: 1px solid #E5E7EB;
+  border: 1px solid #e5e7eb;
   border-radius: 12px;
   color: #111827;
   transition: all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1);
   font-weight: 500;
 }
 .btn-glass:hover:not(:disabled) {
-  background: #F9FAFB;
-  border-color: #D1D5DB;
+  background: #f9fafb;
+  border-color: #d1d5db;
   transform: translateY(-1px);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
@@ -216,45 +245,67 @@ body {
 
 /* iOS Style Inputs - Clean White */
 .input-glass {
-  background: #FFFFFF;
-  border: 1px solid #E5E7EB;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
   color: #111827;
   border-radius: 8px;
   transition: all 0.2s ease;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif !important;
+  font-family:
+    "Inter",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Helvetica Neue",
+    sans-serif !important;
   padding: 8px 12px;
 }
 .input-glass:focus {
   border-color: #000000 !important;
   box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.05) !important;
-  background: #FFFFFF;
+  background: #ffffff;
 }
 
 /* Dynamic Font Sizing for Mobile -> Desktop */
-h1, .dynamic-title {
+h1,
+.dynamic-title {
   font-size: 2.2rem;
   color: var(--text);
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+  font-family:
+    "Inter",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Helvetica Neue",
+    sans-serif;
   font-weight: 700;
   line-height: 1.2;
   margin: 32px 0 20px 0;
 }
 
-h2, h3, h4, h5, h6 {
+h2,
+h3,
+h4,
+h5,
+h6 {
   font-size: clamp(16px, 4vw, 22px);
   color: #111827;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+  font-family:
+    "Inter",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Helvetica Neue",
+    sans-serif;
   font-weight: 600;
   line-height: 1.4;
 }
 
-p, span, div {
+p,
+span,
+div {
   color: var(--text);
 }
 
 .subtext,
 .muted {
-  color: #6B7280;
+  color: #6b7280;
 }
 
 /* ─────────────────────────────────────────────────────────────────
@@ -266,11 +317,12 @@ p, span, div {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background-color: #FFFFFF !important;
+  background-color: #ffffff !important;
   background-image: none;
   color: var(--text);
-  transition: background-color 300ms cubic-bezier(0.4, 0, 0.2, 1),
-              color 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  transition:
+    background-color 300ms cubic-bezier(0.4, 0, 0.2, 1),
+    color 300ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Theme-specific app container styles */
@@ -309,7 +361,10 @@ p, span, div {
    ───────────────────────────────────────────────────────────────── */
 
 .theme-transition {
-  transition: background-color 300ms ease, color 300ms ease, border-color 300ms ease;
+  transition:
+    background-color 300ms ease,
+    color 300ms ease,
+    border-color 300ms ease;
 }
 
 .bg-primary {
@@ -329,7 +384,12 @@ button,
 .btn,
 [role="button"] {
   font-weight: 500;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+  font-family:
+    "Inter",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Helvetica Neue",
+    sans-serif;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -343,11 +403,16 @@ button,
   gap: 6px;
   padding: 8px 16px;
   border-radius: 20px;
-  border: 1px solid #D1D5DB;
+  border: 1px solid #d1d5db;
   background-color: transparent;
   color: #111827;
   cursor: pointer;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+  font-family:
+    "Inter",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Helvetica Neue",
+    sans-serif;
   font-size: 13px;
   font-weight: 500;
   transition: all 0.3s ease-in-out;
@@ -357,13 +422,13 @@ button,
 
 .theme-switcher-btn:hover:not([aria-pressed="true"]) {
   opacity: 1;
-  background-color: #F9FAFB;
-  border-color: #D1D5DB;
+  background-color: #f9fafb;
+  border-color: #d1d5db;
 }
 
 .theme-switcher-btn[aria-pressed="true"] {
   background-color: #000000;
-  color: #FFFFFF;
+  color: #ffffff;
   border-color: #000000;
   opacity: 1;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
@@ -470,7 +535,7 @@ small {
   font-weight: 500;
   line-height: 1.5;
   letter-spacing: 0.5px;
-  color: #6B7280;
+  color: #6b7280;
 }
 
 /* Extra small text: Helper text (11px, 500 weight) */
@@ -479,7 +544,7 @@ small {
   font-size: 11px;
   font-weight: 500;
   letter-spacing: 1px;
-  color: #9CA3AF;
+  color: #9ca3af;
 }
 
 /* Mono/Code text: Data values (13px, 500 weight) */
@@ -536,7 +601,7 @@ svg.feather {
 }
 
 .icon-button:hover {
-  background: #F9FAFB;
+  background: #f9fafb;
   transform: scale(1.05);
   color: #000000;
 }
@@ -560,10 +625,11 @@ svg.feather {
 /* ═══════════════════════════════════════════════════════════════════ */
 /* Fade transition for theme changes */
 .theme-transition {
-  transition: background-color 1s cubic-bezier(0.4, 0.0, 0.2, 1),
-              color 1s cubic-bezier(0.4, 0.0, 0.2, 1),
-              border-color 1s cubic-bezier(0.4, 0.0, 0.2, 1),
-              box-shadow 1s cubic-bezier(0.4, 0.0, 0.2, 1);
+  transition:
+    background-color 1s cubic-bezier(0.4, 0, 0.2, 1),
+    color 1s cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 1s cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 1s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* ═══════════════════════════════════════════════════════════════════ */
@@ -573,7 +639,7 @@ svg.feather {
 .menu-item {
   position: relative;
   transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-  color: #6B7280;
+  color: #6b7280;
   padding: 10px 12px;
   border-radius: 6px;
   cursor: pointer;
@@ -581,27 +647,27 @@ svg.feather {
 
 .menu-item:hover {
   color: #111827;
-  background: #F9FAFB;
+  background: #f9fafb;
 }
 
 /* Active menu item indicator (scroll-spy) */
 .menu-item.active {
-  color: #0A84FF;
+  color: #0a84ff;
   background: rgba(10, 132, 255, 0.1);
-  border-left: 3px solid #0A84FF;
+  border-left: 3px solid #0a84ff;
   padding-left: 9px;
   font-weight: 600;
   box-shadow: 0 0 12px rgba(10, 132, 255, 0.15);
 }
 
 .menu-item.active::before {
-  content: '';
+  content: "";
   position: absolute;
   left: 0;
   top: 0;
   bottom: 0;
   width: 3px;
-  background: linear-gradient(180deg, #0A84FF 0%, rgba(10, 132, 255, 0.5) 100%);
+  background: linear-gradient(180deg, #0a84ff 0%, rgba(10, 132, 255, 0.5) 100%);
   border-radius: 3px 0 0 3px;
 }
 
@@ -622,9 +688,15 @@ svg.feather {
 }
 
 @keyframes highlightSection {
-  0% { opacity: 0.5; }
-  50% { opacity: 1; }
-  100% { opacity: 1; }
+  0% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════════ */
@@ -655,13 +727,18 @@ svg.feather {
   align-items: center;
   gap: 6px;
   font-size: 11px;
-  color: #FFD60A;
+  color: #ffd60a;
   font-weight: 600;
   letter-spacing: 0.5px;
   animation: pulse 2s ease-in-out infinite;
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
 }

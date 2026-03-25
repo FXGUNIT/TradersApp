@@ -1,144 +1,334 @@
-import React, { useState } from 'react';
-import ThemeSwitcher from '../components/ThemeSwitcher.jsx';
-import AiEnginesStatus from '../components/AiEnginesStatus.jsx';
-import { getAIStatuses } from '../services/ai-router.js';
+import React, { useState } from "react";
+import ThemeSwitcher from "../components/ThemeSwitcher.jsx";
+import AiEnginesStatus from "../components/AiEnginesStatus.jsx";
+import { getAIStatuses } from "../services/ai-router.js";
 
-export default function RegimentHub({ onNavigate, theme, currentTheme, onThemeChange }) {
-  const isDark = theme === 'night';
+export default function RegimentHub({
+  onNavigate,
+  theme,
+  currentTheme,
+  onThemeChange,
+}) {
+  // Map legacy theme to AURA state
+  const auraTheme =
+    theme === "night" ? "midnight" : theme === "eye" ? "amber" : "lumiere";
+  const isDark = auraTheme === "midnight";
+  const isAmber = auraTheme === "amber";
   const [hoveredCard, setHoveredCard] = useState(null);
 
   const cards = [
     {
-      id: 'artillery',
+      id: "artillery",
       title: "TRADERS REGIMENT ARTILLERY CENTRE",
       icon: (
-        <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="24" cy="24" r="22" stroke="currentColor" strokeWidth="1.5" opacity="0.3"/>
-          <circle cx="24" cy="24" r="14" stroke="currentColor" strokeWidth="1.5" opacity="0.5"/>
-          <circle cx="24" cy="24" r="6" stroke="currentColor" strokeWidth="1.5" opacity="0.8"/>
-          <circle cx="24" cy="24" r="2" fill="currentColor"/>
-          <line x1="24" y1="0" x2="24" y2="10" stroke="currentColor" strokeWidth="1" opacity="0.4"/>
-          <line x1="24" y1="38" x2="24" y2="48" stroke="currentColor" strokeWidth="1" opacity="0.4"/>
-          <line x1="0" y1="24" x2="10" y2="24" stroke="currentColor" strokeWidth="1" opacity="0.4"/>
-          <line x1="38" y1="24" x2="48" y2="24" stroke="currentColor" strokeWidth="1" opacity="0.4"/>
+        <svg
+          width="48"
+          height="48"
+          viewBox="0 0 48 48"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <circle
+            cx="24"
+            cy="24"
+            r="22"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            opacity="0.3"
+          />
+          <circle
+            cx="24"
+            cy="24"
+            r="14"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            opacity="0.5"
+          />
+          <circle
+            cx="24"
+            cy="24"
+            r="6"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            opacity="0.8"
+          />
+          <circle cx="24" cy="24" r="2" fill="currentColor" />
+          <line
+            x1="24"
+            y1="0"
+            x2="24"
+            y2="10"
+            stroke="currentColor"
+            strokeWidth="1"
+            opacity="0.4"
+          />
+          <line
+            x1="24"
+            y1="38"
+            x2="24"
+            y2="48"
+            stroke="currentColor"
+            strokeWidth="1"
+            opacity="0.4"
+          />
+          <line
+            x1="0"
+            y1="24"
+            x2="10"
+            y2="24"
+            stroke="currentColor"
+            strokeWidth="1"
+            opacity="0.4"
+          />
+          <line
+            x1="38"
+            y1="24"
+            x2="48"
+            y2="24"
+            stroke="currentColor"
+            strokeWidth="1"
+            opacity="0.4"
+          />
         </svg>
       ),
-      description: "Live MNQ/MES execution, order flow analysis, and capital deployment.",
-      action: 'app',
-      accentColor: '#0A84FF',
-      glowColor: 'rgba(10,132,255,0.3)',
+      description:
+        "Live MNQ/MES execution, order flow analysis, and capital deployment.",
+      action: "app",
+      accentColor: "var(--aura-accent-primary, #0A84FF)",
+      glowColor: "rgba(var(--aura-accent-primary-rgb, 10, 132, 255), 0.3)",
     },
     {
-      id: 'consciousness',
+      id: "consciousness",
       title: "TR'S COLLECTIVE CONSCIOUSNESS",
       icon: (
-        <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="24" cy="12" r="4" stroke="currentColor" strokeWidth="1.5"/>
-          <circle cx="12" cy="30" r="4" stroke="currentColor" strokeWidth="1.5"/>
-          <circle cx="36" cy="30" r="4" stroke="currentColor" strokeWidth="1.5"/>
-          <circle cx="24" cy="38" r="3" stroke="currentColor" strokeWidth="1.5" opacity="0.6"/>
-          <circle cx="8" cy="18" r="3" stroke="currentColor" strokeWidth="1.5" opacity="0.6"/>
-          <circle cx="40" cy="18" r="3" stroke="currentColor" strokeWidth="1.5" opacity="0.6"/>
-          <line x1="24" y1="16" x2="14" y2="27" stroke="currentColor" strokeWidth="1" opacity="0.5"/>
-          <line x1="24" y1="16" x2="34" y2="27" stroke="currentColor" strokeWidth="1" opacity="0.5"/>
-          <line x1="15" y1="32" x2="33" y2="32" stroke="currentColor" strokeWidth="1" opacity="0.5"/>
-          <line x1="10" y1="20" x2="12" y2="27" stroke="currentColor" strokeWidth="1" opacity="0.3"/>
-          <line x1="38" y1="20" x2="36" y2="27" stroke="currentColor" strokeWidth="1" opacity="0.3"/>
-          <line x1="14" y1="33" x2="22" y2="36" stroke="currentColor" strokeWidth="1" opacity="0.3"/>
-          <line x1="34" y1="33" x2="26" y2="36" stroke="currentColor" strokeWidth="1" opacity="0.3"/>
-          <circle cx="24" cy="24" r="1.5" fill="currentColor" opacity="0.8"/>
+        <svg
+          width="48"
+          height="48"
+          viewBox="0 0 48 48"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <circle
+            cx="24"
+            cy="12"
+            r="4"
+            stroke="currentColor"
+            strokeWidth="1.5"
+          />
+          <circle
+            cx="12"
+            cy="30"
+            r="4"
+            stroke="currentColor"
+            strokeWidth="1.5"
+          />
+          <circle
+            cx="36"
+            cy="30"
+            r="4"
+            stroke="currentColor"
+            strokeWidth="1.5"
+          />
+          <circle
+            cx="24"
+            cy="38"
+            r="3"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            opacity="0.6"
+          />
+          <circle
+            cx="8"
+            cy="18"
+            r="3"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            opacity="0.6"
+          />
+          <circle
+            cx="40"
+            cy="18"
+            r="3"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            opacity="0.6"
+          />
+          <line
+            x1="24"
+            y1="16"
+            x2="14"
+            y2="27"
+            stroke="currentColor"
+            strokeWidth="1"
+            opacity="0.5"
+          />
+          <line
+            x1="24"
+            y1="16"
+            x2="34"
+            y2="27"
+            stroke="currentColor"
+            strokeWidth="1"
+            opacity="0.5"
+          />
+          <line
+            x1="15"
+            y1="32"
+            x2="33"
+            y2="32"
+            stroke="currentColor"
+            strokeWidth="1"
+            opacity="0.5"
+          />
+          <line
+            x1="10"
+            y1="20"
+            x2="12"
+            y2="27"
+            stroke="currentColor"
+            strokeWidth="1"
+            opacity="0.3"
+          />
+          <line
+            x1="38"
+            y1="20"
+            x2="36"
+            y2="27"
+            stroke="currentColor"
+            strokeWidth="1"
+            opacity="0.3"
+          />
+          <line
+            x1="14"
+            y1="33"
+            x2="22"
+            y2="36"
+            stroke="currentColor"
+            strokeWidth="1"
+            opacity="0.3"
+          />
+          <line
+            x1="34"
+            y1="33"
+            x2="26"
+            y2="36"
+            stroke="currentColor"
+            strokeWidth="1"
+            opacity="0.3"
+          />
+          <circle cx="24" cy="24" r="1.5" fill="currentColor" opacity="0.8" />
         </svg>
       ),
-      description: "Engage the 5-Layered Intelligence Grid for supreme market strategy and recursive risk analysis.",
-      action: 'consciousness',
-      accentColor: '#BF5AF2',
-      glowColor: 'rgba(191,90,242,0.3)',
-    }
+      description:
+        "Engage the 5-Layered Intelligence Grid for supreme market strategy and recursive risk analysis.",
+      action: "consciousness",
+      accentColor: "var(--aura-accent-secondary, #BF5AF2)",
+      glowColor: "rgba(var(--aura-accent-secondary-rgb, 191, 90, 242), 0.3)",
+    },
   ];
 
-  const _bgColor = isDark ? '#0A0E27' : '#FFFFFF';
-  const textColor = isDark ? '#F2F2F7' : '#111827';
-  const mutedColor = isDark ? '#8E8E93' : '#9CA3AF';
-  const cardBg = isDark ? 'rgba(20,24,50,0.4)' : 'rgba(255,255,255,0.6)';
-  const cardBorder = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)';
+  // Use CSS variables for colors
+  const textColor = "var(--aura-text-primary)";
+  const mutedColor = "var(--aura-text-secondary)";
+  const cardBg =
+    "var(--aura-surface-card, rgba(var(--aura-text-primary-rgb, 255, 255, 255), 0.1))";
+  const cardBorder =
+    "var(--aura-border-subtle, rgba(var(--aura-text-primary-rgb, 255, 255, 255), 0.08))";
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: isDark
-        ? 'radial-gradient(ellipse at 30% 20%, rgba(10,132,255,0.08) 0%, transparent 50%), radial-gradient(ellipse at 70% 80%, rgba(191,90,242,0.08) 0%, transparent 50%), #0A0E27'
-        : 'radial-gradient(ellipse at 30% 20%, rgba(10,132,255,0.04) 0%, transparent 50%), radial-gradient(ellipse at 70% 80%, rgba(191,90,242,0.04) 0%, transparent 50%), #FFFFFF',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '40px 24px',
-      fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
-    }}>
+    <div
+      style={{
+        minHeight: "100vh",
+        background: `
+          radial-gradient(ellipse at 30% 20%, rgba(var(--aura-accent-primary-rgb, 10, 132, 255), 0.08) 0%, transparent 50%),
+          radial-gradient(ellipse at 70% 80%, rgba(var(--aura-accent-secondary-rgb, 191, 90, 242), 0.08) 0%, transparent 50%),
+          var(--aura-base-layer, #0A0E27)
+        `,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "40px 24px",
+        fontFamily:
+          '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
+      }}
+    >
       {/* Header */}
-      <div style={{ 
-        textAlign: 'center', 
-        marginBottom: 56,
-        position: 'relative',
-        width: '100%',
-        maxWidth: 900,
-      }}>
-        <div style={{
-          position: 'absolute',
-          top: -20,
-          right: 0,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 16,
-        }}>
+      <div
+        style={{
+          textAlign: "center",
+          marginBottom: 56,
+          position: "relative",
+          width: "100%",
+          maxWidth: 900,
+        }}
+      >
+        <div
+          style={{
+            position: "absolute",
+            top: -20,
+            right: 0,
+            display: "flex",
+            alignItems: "center",
+            gap: 16,
+          }}
+        >
           <AiEnginesStatus />
           {currentTheme && onThemeChange && (
-            <ThemeSwitcher 
-              currentTheme={currentTheme} 
-              onThemeChange={onThemeChange} 
+            <ThemeSwitcher
+              currentTheme={currentTheme}
+              onThemeChange={onThemeChange}
             />
           )}
         </div>
-        <div style={{
-          fontSize: 11,
-          fontWeight: 700,
-          letterSpacing: 6,
-          color: mutedColor,
-          textTransform: 'uppercase',
-          marginBottom: 16,
-        }}>
+        <div
+          style={{
+            fontSize: 11,
+            fontWeight: 700,
+            letterSpacing: 6,
+            color: mutedColor,
+            textTransform: "uppercase",
+            marginBottom: 16,
+          }}
+        >
           TRADERS REGIMENT
         </div>
-        <h1 style={{
-          fontSize: 'clamp(28px, 5vw, 44px)',
-          fontWeight: 800,
-          color: textColor,
-          margin: 0,
-          letterSpacing: -1,
-          lineHeight: 1.1,
-        }}>
+        <h1
+          style={{
+            fontSize: "clamp(28px, 5vw, 44px)",
+            fontWeight: 800,
+            color: textColor,
+            margin: 0,
+            letterSpacing: -1,
+            lineHeight: 1.1,
+          }}
+        >
           Command Centre
         </h1>
-        <p style={{
-          fontSize: 14,
-          color: mutedColor,
-          marginTop: 12,
-          maxWidth: 400,
-          lineHeight: 1.6,
-        }}>
+        <p
+          style={{
+            fontSize: 14,
+            color: mutedColor,
+            marginTop: 12,
+            maxWidth: 400,
+            lineHeight: 1.6,
+          }}
+        >
           Select your operational wing to proceed.
         </p>
       </div>
 
       {/* Cards Container */}
-      <div style={{
-        display: 'flex',
-        gap: 28,
-        flexWrap: 'wrap',
-        justifyContent: 'center',
-        maxWidth: 900,
-        width: '100%',
-      }}>
+      <div
+        style={{
+          display: "flex",
+          gap: 28,
+          flexWrap: "wrap",
+          justifyContent: "center",
+          maxWidth: 900,
+          width: "100%",
+        }}
+      >
         {cards.map((card) => {
           const isHovered = hoveredCard === card.id;
           return (
@@ -148,91 +338,105 @@ export default function RegimentHub({ onNavigate, theme, currentTheme, onThemeCh
               onMouseEnter={() => setHoveredCard(card.id)}
               onMouseLeave={() => setHoveredCard(null)}
               style={{
-                flex: '1 1 360px',
+                flex: "1 1 360px",
                 maxWidth: 420,
                 minHeight: 320,
                 background: cardBg,
-                backdropFilter: 'blur(24px)',
-                WebkitBackdropFilter: 'blur(24px)',
-                border: `1px solid ${isHovered ? card.accentColor + '55' : cardBorder}`,
+                backdropFilter: "blur(24px)",
+                WebkitBackdropFilter: "blur(24px)",
+                border: `1px solid ${isHovered ? card.accentColor + "55" : cardBorder}`,
                 borderRadius: 20,
-                padding: '44px 36px',
-                cursor: 'pointer',
-                transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-                transform: isHovered ? 'translateY(-6px) scale(1.015)' : 'translateY(0) scale(1)',
+                padding: "44px 36px",
+                cursor: "pointer",
+                transition: "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
+                transform: isHovered
+                  ? "translateY(-6px) scale(1.015)"
+                  : "translateY(0) scale(1)",
                 boxShadow: isHovered
                   ? `0 20px 60px ${card.glowColor}, 0 0 80px ${card.glowColor}`
-                  : `0 4px 24px rgba(0,0,0,${isDark ? '0.3' : '0.06'})`,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'flex-start',
+                  : `0 4px 24px rgba(0,0,0,${isDark ? "0.3" : "0.06"})`,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "flex-start",
                 gap: 20,
-                textAlign: 'left',
-                outline: 'none',
-                position: 'relative',
-                overflow: 'hidden',
+                textAlign: "left",
+                outline: "none",
+                position: "relative",
+                overflow: "hidden",
               }}
             >
               {/* Pulse overlay on hover */}
-              <div style={{
-                position: 'absolute',
-                inset: 0,
-                borderRadius: 20,
-                background: `radial-gradient(circle at 50% 50%, ${card.accentColor}08 0%, transparent 70%)`,
-                opacity: isHovered ? 1 : 0,
-                transition: 'opacity 0.6s ease',
-                animation: isHovered ? 'hub-pulse 3s ease-in-out infinite' : 'none',
-                pointerEvents: 'none',
-              }} />
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  borderRadius: 20,
+                  background: `radial-gradient(circle at 50% 50%, ${card.accentColor}08 0%, transparent 70%)`,
+                  opacity: isHovered ? 1 : 0,
+                  transition: "opacity 0.6s ease",
+                  animation: isHovered
+                    ? "hub-pulse 3s ease-in-out infinite"
+                    : "none",
+                  pointerEvents: "none",
+                }}
+              />
 
               {/* Icon */}
-              <div style={{
-                color: card.accentColor,
-                transition: 'transform 0.4s ease',
-                transform: isHovered ? 'scale(1.1)' : 'scale(1)',
-              }}>
+              <div
+                style={{
+                  color: card.accentColor,
+                  transition: "transform 0.4s ease",
+                  transform: isHovered ? "scale(1.1)" : "scale(1)",
+                }}
+              >
                 {card.icon}
               </div>
 
               {/* Title */}
-              <h2 style={{
-                fontSize: 15,
-                fontWeight: 800,
-                letterSpacing: 2.5,
-                color: isHovered ? card.accentColor : textColor,
-                margin: 0,
-                textTransform: 'uppercase',
-                transition: 'color 0.3s ease',
-                lineHeight: 1.4,
-              }}>
+              <h2
+                style={{
+                  fontSize: 15,
+                  fontWeight: 800,
+                  letterSpacing: 2.5,
+                  color: isHovered ? card.accentColor : textColor,
+                  margin: 0,
+                  textTransform: "uppercase",
+                  transition: "color 0.3s ease",
+                  lineHeight: 1.4,
+                }}
+              >
                 {card.title}
               </h2>
 
               {/* Description */}
-              <p style={{
-                fontSize: 13,
-                color: mutedColor,
-                margin: 0,
-                lineHeight: 1.7,
-                flex: 1,
-              }}>
+              <p
+                style={{
+                  fontSize: 13,
+                  color: mutedColor,
+                  margin: 0,
+                  lineHeight: 1.7,
+                  flex: 1,
+                }}
+              >
                 {card.description}
               </p>
 
               {/* Enter Arrow */}
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                fontSize: 12,
-                fontWeight: 700,
-                color: card.accentColor,
-                letterSpacing: 1.5,
-                textTransform: 'uppercase',
-                opacity: isHovered ? 1 : 0.5,
-                transition: 'opacity 0.3s ease, transform 0.3s ease',
-                transform: isHovered ? 'translateX(4px)' : 'translateX(0)',
-              }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: card.accentColor,
+                  letterSpacing: 1.5,
+                  textTransform: "uppercase",
+                  opacity: isHovered ? 1 : 0.5,
+                  transition: "opacity 0.3s ease, transform 0.3s ease",
+                  transform: isHovered ? "translateX(4px)" : "translateX(0)",
+                }}
+              >
                 ENTER WING →
               </div>
             </button>
@@ -241,15 +445,17 @@ export default function RegimentHub({ onNavigate, theme, currentTheme, onThemeCh
       </div>
 
       {/* Bottom badge */}
-      <div style={{
-        marginTop: 56,
-        fontSize: 10,
-        fontWeight: 600,
-        letterSpacing: 3,
-        color: mutedColor,
-        textTransform: 'uppercase',
-        opacity: 0.5,
-      }}>
+      <div
+        style={{
+          marginTop: 56,
+          fontSize: 10,
+          fontWeight: 600,
+          letterSpacing: 3,
+          color: mutedColor,
+          textTransform: "uppercase",
+          opacity: 0.5,
+        }}
+      >
         ENCRYPTED · MULTI-MODEL · INSTITUTIONAL GRADE
       </div>
 

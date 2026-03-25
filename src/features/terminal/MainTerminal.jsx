@@ -1,9 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
-import {
-  computeJournalMetrics,
-  formatMetricNumber,
-} from "./journalMetrics";
+import { computeJournalMetrics, formatMetricNumber } from "./journalMetrics";
 import {
   makeImgHandler,
   onScreenshotDrop,
@@ -11,17 +8,17 @@ import {
 } from "./terminalUploadUtils";
 
 const SURFACE = {
-  bg: "#07111f",
-  panel: "rgba(8, 18, 35, 0.88)",
-  panelAlt: "rgba(12, 28, 52, 0.82)",
-  border: "rgba(111, 168, 255, 0.22)",
-  muted: "#9fb1cb",
-  text: "#edf4ff",
-  accent: "#5bb7ff",
-  accentStrong: "#79f7d4",
-  success: "#37d67a",
-  danger: "#ff6b6b",
-  warning: "#ffc857",
+  bg: "var(--aura-base-layer, #07111f)",
+  panel: "var(--aura-surface-elevated, rgba(8, 18, 35, 0.88))",
+  panelAlt: "var(--aura-surface-primary, rgba(12, 28, 52, 0.82))",
+  border: "var(--aura-border-subtle, rgba(111, 168, 255, 0.22))",
+  muted: "var(--aura-text-secondary, #9fb1cb)",
+  text: "var(--aura-text-primary, #edf4ff)",
+  accent: "var(--aura-accent-primary, #5bb7ff)",
+  accentStrong: "var(--aura-accent-success, #79f7d4)",
+  success: "var(--aura-accent-success, #37d67a)",
+  danger: "var(--aura-accent-danger, #ff6b6b)",
+  warning: "var(--aura-accent-warning, #ffc857)",
 };
 
 const defaultTradeForm = {
@@ -76,7 +73,9 @@ function dropZoneStyle(active = false) {
       gap: 10,
       borderStyle: "dashed",
       borderColor: active ? SURFACE.accentStrong : SURFACE.border,
-      background: active ? "rgba(35, 78, 125, 0.45)" : SURFACE.panelAlt,
+      background: active
+        ? "var(--aura-accent-primary-hover, rgba(35, 78, 125, 0.45))"
+        : SURFACE.panelAlt,
       textAlign: "center",
     }),
   };
@@ -85,7 +84,7 @@ function dropZoneStyle(active = false) {
 function inputStyle() {
   return {
     width: "100%",
-    background: "rgba(5, 12, 24, 0.9)",
+    background: "var(--aura-surface-primary, rgba(5, 12, 24, 0.9))",
     border: `1px solid ${SURFACE.border}`,
     borderRadius: 10,
     color: SURFACE.text,
@@ -104,13 +103,17 @@ function buttonStyle(kind = "primary") {
         }
       : kind === "danger"
         ? {
-            background: "rgba(255, 107, 107, 0.14)",
-            border: "rgba(255, 107, 107, 0.35)",
+            background:
+              "var(--aura-accent-danger-subtle, rgba(255, 107, 107, 0.14))",
+            border:
+              "var(--aura-accent-danger-border, rgba(255, 107, 107, 0.35))",
             color: SURFACE.danger,
           }
         : {
-            background: "rgba(91, 183, 255, 0.16)",
-            border: "rgba(91, 183, 255, 0.34)",
+            background:
+              "var(--aura-accent-primary-subtle, rgba(91, 183, 255, 0.16))",
+            border:
+              "var(--aura-accent-primary-border, rgba(91, 183, 255, 0.34))",
             color: SURFACE.accent,
           };
 
@@ -197,7 +200,9 @@ export default function MainTerminal({
   const [mpChart, setMpChart] = useState(null);
   const [vwapChart, setVwapChart] = useState(null);
   const [tradeForm, setTradeForm] = useState(defaultTradeForm);
-  const [journal, setJournal] = useState(() => normalizeJournal(profile?.journal));
+  const [journal, setJournal] = useState(() =>
+    normalizeJournal(profile?.journal),
+  );
   const [accountState, setAccountState] = useState(() =>
     buildAccountState(profile?.accountState),
   );
@@ -263,7 +268,10 @@ export default function MainTerminal({
 
   const handleAddTrade = () => {
     if (!tradeForm.entry || !tradeForm.exit || !tradeForm.pnl) {
-      showToast?.("Entry, exit, and P&L are required before saving.", "warning");
+      showToast?.(
+        "Entry, exit, and P&L are required before saving.",
+        "warning",
+      );
       return;
     }
 
@@ -318,7 +326,7 @@ export default function MainTerminal({
       style={{
         minHeight: "100vh",
         background:
-          "radial-gradient(circle at top, rgba(47,112,198,0.24), transparent 34%), linear-gradient(180deg, #030711 0%, #081425 100%)",
+          "var(--aura-gradient-terminal, radial-gradient(circle at top, rgba(47,112,198,0.24), transparent 34%), linear-gradient(180deg, var(--aura-base-layer, #030711) 0%, var(--aura-surface-primary, #081425) 100%))",
         color: SURFACE.text,
         padding: "28px 24px 40px",
       }}
@@ -548,7 +556,9 @@ export default function MainTerminal({
               }}
             >
               <div style={cardStyle()}>
-                <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 16 }}>
+                <div
+                  style={{ fontSize: 18, fontWeight: 700, marginBottom: 16 }}
+                >
                   Add Journal Entry
                 </div>
                 <div style={{ display: "grid", gap: 12 }}>
@@ -602,14 +612,19 @@ export default function MainTerminal({
                     rows={4}
                     style={inputStyle()}
                   />
-                  <button onClick={handleAddTrade} style={buttonStyle("primary")}>
+                  <button
+                    onClick={handleAddTrade}
+                    style={buttonStyle("primary")}
+                  >
                     Save Entry
                   </button>
                 </div>
               </div>
 
               <div style={cardStyle({ overflowX: "auto" })}>
-                <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 16 }}>
+                <div
+                  style={{ fontSize: 18, fontWeight: 700, marginBottom: 16 }}
+                >
                   Journal Ledger
                 </div>
                 <table
@@ -638,7 +653,9 @@ export default function MainTerminal({
                           borderTop: `1px solid ${SURFACE.border}`,
                         }}
                       >
-                        <td style={{ padding: "12px 0" }}>{entry.date || "—"}</td>
+                        <td style={{ padding: "12px 0" }}>
+                          {entry.date || "—"}
+                        </td>
                         <td style={{ padding: "12px 0" }}>
                           {entry.instrument || "—"}
                         </td>
@@ -655,9 +672,15 @@ export default function MainTerminal({
                         >
                           {entry.result || "—"}
                         </td>
-                        <td style={{ padding: "12px 0" }}>{entry.entry || "—"}</td>
-                        <td style={{ padding: "12px 0" }}>{entry.exit || "—"}</td>
-                        <td style={{ padding: "12px 0" }}>{entry.pnl || "—"}</td>
+                        <td style={{ padding: "12px 0" }}>
+                          {entry.entry || "—"}
+                        </td>
+                        <td style={{ padding: "12px 0" }}>
+                          {entry.exit || "—"}
+                        </td>
+                        <td style={{ padding: "12px 0" }}>
+                          {entry.pnl || "—"}
+                        </td>
                         <td style={{ padding: "12px 0" }}>
                           <button
                             onClick={() => handleRemoveTrade(entry.id)}
@@ -718,11 +741,13 @@ export default function MainTerminal({
               </div>
               <div style={{ color: SURFACE.muted, lineHeight: 1.7 }}>
                 Account state changes are pushed upward through
-                <code style={{ marginLeft: 6 }}>onSaveAccount(accountState)</code>.
-                Journal changes are pushed upward through
+                <code style={{ marginLeft: 6 }}>
+                  onSaveAccount(accountState)
+                </code>
+                . Journal changes are pushed upward through
                 <code style={{ marginLeft: 6 }}>onSaveJournal(journal)</code>.
-                This terminal now treats Firebase persistence as a parent concern
-                instead of writing directly from inside the feature.
+                This terminal now treats Firebase persistence as a parent
+                concern instead of writing directly from inside the feature.
               </div>
             </div>
           </div>
