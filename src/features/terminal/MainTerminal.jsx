@@ -11,17 +11,17 @@ import {
 } from "./terminalUploadUtils";
 
 const SURFACE = {
-  bg: "#07111f",
-  panel: "rgba(8, 18, 35, 0.88)",
-  panelAlt: "rgba(12, 28, 52, 0.82)",
-  border: "rgba(111, 168, 255, 0.22)",
-  muted: "#9fb1cb",
-  text: "#edf4ff",
-  accent: "#5bb7ff",
-  accentStrong: "#79f7d4",
-  success: "#37d67a",
-  danger: "#ff6b6b",
-  warning: "#ffc857",
+  bg: "var(--aura-root)",
+  panel: "var(--aura-glass)",
+  panelAlt: "var(--aura-glass-alt)",
+  border: "var(--aura-border)",
+  muted: "var(--aura-text-secondary)",
+  text: "var(--aura-text-primary)",
+  accent: "var(--aura-text-accent)",
+  accentStrong: "var(--aura-text-accent-strong)",
+  success: "var(--aura-text-success)",
+  danger: "var(--aura-text-danger)",
+  warning: "var(--aura-text-warning)",
 };
 
 const defaultTradeForm = {
@@ -85,7 +85,7 @@ function dropZoneStyle(active = false) {
 function inputStyle() {
   return {
     width: "100%",
-    background: "rgba(5, 12, 24, 0.9)",
+    background: "var(--aura-elevation-1)",
     border: `1px solid ${SURFACE.border}`,
     borderRadius: 10,
     color: SURFACE.text,

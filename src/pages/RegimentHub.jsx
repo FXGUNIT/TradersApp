@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import ThemeSwitcher from '../components/ThemeSwitcher.jsx';
 import AiEnginesStatus from '../components/AiEnginesStatus.jsx';
-import { getAIStatuses } from '../services/ai-router.js';
 
 export default function RegimentHub({ onNavigate, theme, currentTheme, onThemeChange }) {
   const isDark = theme === 'night';

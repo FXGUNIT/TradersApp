@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import MessageRenderer from '../components/MessageRenderer.jsx';
 import ThemeSwitcher from '../components/ThemeSwitcher.jsx';
 import AiEnginesStatus from '../components/AiEnginesStatus.jsx';
-import { runDeliberation, councilStage, quadCoreStatus, getAIStatuses, MASTER_INTELLIGENCE_SYSTEM_PROMPT } from '../services/ai-router.js';
+import { runDeliberation, councilStage, MASTER_INTELLIGENCE_SYSTEM_PROMPT } from '../services/ai-router.js';
 
 const PHASE_DEFINITIONS = [
   { key: 'stage1', label: 'Phase 1: Alpha, Beta, & Groq deployed', icon: '📡' },
@@ -149,10 +149,10 @@ export default function CollectiveConsciousness({ onBack, theme, auth, currentTh
   const [localHistory, setLocalHistory] = useState([]);
   const [input, setInput] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [engineMode, setEngineMode] = useState(() => {
+  const engineMode = (() => {
     const h = new Date().getHours();
     return (h >= 8 && h < 17) ? 'fast' : 'full';
-  });
+  })();
   const chatEndRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -186,7 +186,6 @@ export default function CollectiveConsciousness({ onBack, theme, auth, currentTh
     councilStage.label = '';
 
     const hasBalance = userData?.balance && userData.balance > 0;
-    const hasHistory = localHistory.length > 0;
     const journalCount = userData?.journal ? Object.keys(userData.journal).length : 0;
 
     const userContext = userData ? `

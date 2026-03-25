@@ -316,19 +316,6 @@ const FloatingChatWidget = ({ auth, profile }) => {
     },
   };
 
-  const formatTime = (timestamp) => {
-    const date = new Date(timestamp);
-    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  };
-
-  const getMessageStyle = (msg) => {
-    if (msg.type === "welcome")
-      return { ...styles.messageBubble, ...styles.welcomeMessage };
-    return msg.sender === "user"
-      ? { ...styles.messageBubble, ...styles.userMessage }
-      : { ...styles.messageBubble, ...styles.adminMessage };
-  };
-
   const SendIcon = () => (
     <svg
       style={{ width: "20px", height: "20px" }}
