@@ -2,20 +2,20 @@
 
 import { checkInputForPrivilegeEscalation } from './leakagePreventionModule.js';
 
-const GEMINI_KEY = import.meta.env.VITE_GEMINI_PRO_KEY;
-const GROQ_KEY = import.meta.env.VITE_GROQ_TURBO_KEY;
-const OPENROUTER_KEY = import.meta.env.VITE_OPENROUTER_KEY;
-const CEREBRAS_KEY = import.meta.env.VITE_CEREBRAS_KEY;
-const DEEPSEEK_KEY = import.meta.env.VITE_DEEPSEEK_KEY;
-const SAMBANOVA_KEY = import.meta.env.VITE_SAMBANOVA_KEY;
+const GEMINI_KEY = import.meta.env.VITE_GEMINI_PRO_KEY || '';
+const GROQ_KEY = import.meta.env.VITE_GROQ_TURBO_KEY || '';
+const OPENROUTER_KEY = import.meta.env.VITE_OPENROUTER_MIND_ALPHA || import.meta.env.VITE_OPENROUTER_MIND_BETA || '';
+const CEREBRAS_KEY = import.meta.env.VITE_CEREBRAS_KEY || '';
+const DEEPSEEK_KEY = import.meta.env.VITE_DEEPSEEK_KEY || '';
+const SAMBANOVA_KEY = import.meta.env.VITE_SAMBANOVA_KEY || '';
 
 export const aiEngineStatus = {
-  gemini: { name: 'Gemini', key: GEMINI_KEY, online: true, lastPing: null, errors: 0, checkUrl: 'https://generativelanguage.googleapis.com/v1/models' },
-  groq: { name: 'Groq', key: GROQ_KEY, online: true, lastPing: null, errors: 0, checkUrl: 'https://api.groq.com/openai/v1/models' },
-  openrouter: { name: 'OpenRouter', key: OPENROUTER_KEY, online: true, lastPing: null, errors: 0, checkUrl: 'https://openrouter.ai/api/v1/models' },
-  cerebras: { name: 'Cerebras', key: CEREBRAS_KEY, online: true, lastPing: null, errors: 0, checkUrl: 'https://api.cerebras.ai/v1/models' },
-  deepseek: { name: 'DeepSeek', key: DEEPSEEK_KEY, online: true, lastPing: null, errors: 0, checkUrl: 'https://api.deepseek.com/v1/models' },
-  sambanova: { name: 'SambaNova', key: SAMBANOVA_KEY, online: true, lastPing: null, errors: 0, checkUrl: 'https://api.sambanova.ai/v1/models' },
+  gemini: { name: 'Gemini', key: GEMINI_KEY, online: !!GEMINI_KEY, lastPing: null, errors: 0, checkUrl: 'https://generativelanguage.googleapis.com/v1/models' },
+  groq: { name: 'Groq', key: GROQ_KEY, online: !!GROQ_KEY, lastPing: null, errors: 0, checkUrl: 'https://api.groq.com/openai/v1/models' },
+  openrouter: { name: 'OpenRouter', key: OPENROUTER_KEY, online: !!OPENROUTER_KEY, lastPing: null, errors: 0, checkUrl: 'https://openrouter.ai/api/v1/models' },
+  cerebras: { name: 'Cerebras', key: CEREBRAS_KEY, online: !!CEREBRAS_KEY, lastPing: null, errors: 0, checkUrl: 'https://api.cerebras.ai/v1/models' },
+  deepseek: { name: 'DeepSeek', key: DEEPSEEK_KEY, online: !!DEEPSEEK_KEY, lastPing: null, errors: 0, checkUrl: 'https://api.deepseek.com/v1/models' },
+  sambanova: { name: 'SambaNova', key: SAMBANOVA_KEY, online: !!SAMBANOVA_KEY, lastPing: null, errors: 0, checkUrl: 'https://api.sambanova.ai/v1/models' },
 };
 
 export const AI_ENGINES = Object.keys(aiEngineStatus);
