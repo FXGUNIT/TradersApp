@@ -1,6 +1,7 @@
 # TradersApp Architecture Overview
 
 ## Monolith Structure
+
 Our React-based monolith (`src/App.jsx`) consists of:
 
 1. **Core Infrastructure (Lines 1-500)**
@@ -35,6 +36,7 @@ Our React-based monolith (`src/App.jsx`) consists of:
    - Activity logging
 
 ## Dependencies
+
 ```mermaid
 graph TD
     A[React 19.2.4] --> B[Vite]
@@ -49,6 +51,7 @@ graph TD
 ```
 
 ## Microservices Architecture
+
 ```mermaid
 graph LR
     MONOLITH[Main Monolith] -->|API Calls| FIREBASE[Firebase Services]
@@ -62,6 +65,7 @@ graph LR
 ```
 
 ## Microservices Details:
+
 1. **Firebase Services**
    - Authentication
    - Firestore (NoSQL database)
@@ -71,3 +75,14 @@ graph LR
 2. **Telegram Bot Service**
    - Real-time security alerts
    - Admin notifications
+   - System status updates
+
+3. **EmailJS Service**
+   - Transactional emails
+   - OTP delivery
+   - Password reset flows
+
+4. **AI Router Service**
+   - Routes requests to Claude/OpenAI
+   - Manages API rate limiting
+   - Handles fallback between models
