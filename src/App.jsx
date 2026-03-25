@@ -63,7 +63,37 @@ import "./index.css";
 // ═══════════════════════════════════════════════════════════════
 
 // math-engine inline
-// math-engine functions are now imported from ./utils/math-engine.js
+function calculateVolatilityRatio(fiveDayATR, twentyDayATR) {
+  if (!fiveDayATR || !twentyDayATR || twentyDayATR === 0) return 1.0;
+  return fiveDayATR / twentyDayATR;
+}
+function getDynamicParameters(VR = 1.0) {
+  const v = Math.max(0.5, Math.min(2.0, VR));
+  return {
+    vwapSD1: v * 15,
+    vwapSD2: v * 30,
+    trendSLMult: v < 0.85 ? 1.5 : v > 1.15 ? 2.2 : 1.8,
+    mrSLMult: v < 0.85 ? 0.8 : v > 1.15 ? 1.2 : 1.0,
+  };
+}
+function calculateThrottledRisk(
+  basePct = 0.3,
+  VR = 1.0,
+  currentBalance = 0,
+  maxDrawdown = 0,
+) {
+  const isThrottled =
+    maxDrawdown > 0 &&
+    currentBalance > 0 &&
+    (currentBalance - (currentBalance - maxDrawdown)) / maxDrawdown < 0.25;
+  return {
+    activeRiskPct: isThrottled
+      ? Math.round((basePct / 2) * 100) / 100
+      : basePct,
+    isThrottled,
+  };
+}
+
 // ai-router is now imported from ./services/ai-router.js
 // firebaseOptimizer is imported from ./services/firebase.js
 
@@ -1689,7 +1719,7 @@ const CommandPalette = ({
         left: 0,
         right: 0,
         bottom: 0,
-        background: "rgba(0,0,0,0.5)",
+        background: "var(--aura-overlay)",
         display: "flex",
         alignItems: "flex-start",
         justifyContent: "center",
@@ -1703,15 +1733,15 @@ const CommandPalette = ({
     >
       <div
         style={{
-          background: T.bg,
-          borderRadius: 12,
-          border: `1px solid rgba(0,122,255,0.3)`,
+          background: "var(--aura-elevation-1)",
+          borderRadius: "var(--aura-border-radius-lg)",
+          border: "1px solid var(--aura-divider)",
           width: "90%",
           maxWidth: "600px",
           maxHeight: "70vh",
           display: "flex",
           flexDirection: "column",
-          boxShadow: "0 20px 60px rgba(0,0,0,0.8)",
+          boxShadow: "var(--aura-elevation-shadow)",
           overflow: "hidden",
         }}
         onClick={(e) => e.stopPropagation()}
@@ -1719,8 +1749,8 @@ const CommandPalette = ({
         {/* Search Input */}
         <div
           style={{
-            padding: "16px",
-            borderBottom: `1px solid rgba(255,255,255,0.1)`,
+            padding: "var(--aura-spacing-md)",
+            borderBottom: "1px solid var(--aura-divider)",
           }}
         >
           <input
@@ -1735,13 +1765,13 @@ const CommandPalette = ({
             onKeyDown={handleKeyDown}
             style={{
               width: "100%",
-              background: "rgba(0,0,0,0.4)",
-              border: `1px solid rgba(0,122,255,0.3)`,
-              borderRadius: 6,
-              padding: "12px 16px",
-              color: T.text,
-              fontSize: 14,
-              fontFamily: T.font,
+              background: "var(--aura-interactive-hover)",
+              border: "1px solid var(--aura-divider)",
+              borderRadius: "var(--aura-border-radius-sm)",
+              padding: "var(--aura-spacing-sm) var(--aura-spacing-md)",
+              color: "var(--aura-text-primary)",
+              fontSize: "var(--aura-font-size-sm)",
+              fontFamily: "var(--aura-font-family)",
               outline: "none",
               transition: "all 0.2s ease",
             }}
@@ -1753,13 +1783,13 @@ const CommandPalette = ({
           {filtered.length === 0 ? (
             <div
               style={{
-                padding: "32px 16px",
+                padding: "var(--aura-spacing-xl) var(--aura-spacing-md)",
                 textAlign: "center",
-                color: T.muted,
+                color: "var(--aura-text-secondary)",
               }}
             >
               <div style={{ fontSize: 20, marginBottom: 8 }}>∅</div>
-              <div style={{ fontSize: 12 }}>
+              <div style={{ fontSize: "var(--aura-font-size-xs)" }}>
                 No commands or users match "{query}"
               </div>
             </div>
@@ -1774,11 +1804,11 @@ const CommandPalette = ({
                   setSelectedIdx(0);
                 }}
                 style={{
-                  padding: "12px 16px",
-                  borderBottom: `1px solid rgba(255,255,255,0.05)`,
+                  padding: "var(--aura-spacing-sm) var(--aura-spacing-md)",
+                  borderBottom: "1px solid var(--aura-divider)",
                   background:
                     selectedIdx === idx
-                      ? "rgba(0,122,255,0.15)"
+                      ? "var(--aura-interactive-active)"
                       : "transparent",
                   cursor: "pointer",
                   transition: "background 0.15s ease",
@@ -1789,7 +1819,13 @@ const CommandPalette = ({
                 onMouseEnter={() => setSelectedIdx(idx)}
               >
                 <div>
-                  <div style={{ color: T.text, fontSize: 13, fontWeight: 500 }}>
+                  <div
+                    style={{
+                      color: "var(--aura-text-primary)",
+                      fontSize: "var(--aura-font-size-sm)",
+                      fontWeight: 500,
+                    }}
+                  >
                     {cmd.label}
                   </div>
                   <div
@@ -2211,7 +2247,7 @@ const NotificationCenter = ({ isOpen, onClose, notifications = [] }) => {
           left: 0,
           right: 0,
           bottom: 0,
-          background: "rgba(0,0,0,0.9)",
+          background: "var(--aura-overlay)",
           zIndex: 1001,
           display: "flex",
           flexDirection: "column",
@@ -2224,7 +2260,7 @@ const NotificationCenter = ({ isOpen, onClose, notifications = [] }) => {
         <div
           style={{
             padding: "16px",
-            borderBottom: `1px solid rgba(0,122,255,0.3)`,
+            borderBottom: "1px solid var(--aura-divider)",
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
@@ -2232,7 +2268,7 @@ const NotificationCenter = ({ isOpen, onClose, notifications = [] }) => {
         >
           <div
             style={{
-              color: T.blue,
+              color: "var(--aura-accent-primary)",
               fontSize: 16,
               fontWeight: 700,
               letterSpacing: 1,
@@ -2245,7 +2281,7 @@ const NotificationCenter = ({ isOpen, onClose, notifications = [] }) => {
             style={{
               background: "transparent",
               border: "none",
-              color: T.muted,
+              color: "var(--aura-text-secondary)",
               fontSize: 20,
               cursor: "pointer",
               padding: "4px 8px",
@@ -2261,7 +2297,7 @@ const NotificationCenter = ({ isOpen, onClose, notifications = [] }) => {
             <div
               style={{
                 textAlign: "center",
-                color: T.muted,
+                color: "var(--aura-text-secondary)",
                 paddingTop: "32px",
               }}
             >
@@ -2276,11 +2312,11 @@ const NotificationCenter = ({ isOpen, onClose, notifications = [] }) => {
                 key={idx}
                 style={{
                   padding: "12px",
-                  background: "rgba(0,122,255,0.1)",
-                  border: `1px solid rgba(0,122,255,0.2)`,
+                  background: "var(--aura-elevation-2)",
+                  border: "1px solid var(--aura-divider)",
                   borderRadius: 6,
                   marginBottom: 12,
-                  color: T.text,
+                  color: "var(--aura-text-primary)",
                   fontSize: 12,
                 }}
               >
@@ -11972,7 +12008,6 @@ export default function TradersRegiment() {
     } else if (newTheme === "day") {
       setIsDarkMode(false);
     }
-    // Eye comfort uses light mode but with warm accents
 
     // Update AURA theme in localStorage and document attribute
     try {
@@ -11989,25 +12024,6 @@ export default function TradersRegiment() {
           : auraTheme === "amber"
             ? "#F4EBD0"
             : "#FBFBFC";
-
-      // Notify AURA Chronos engine of manual theme change
-      // This sets a 24-hour manual override
-      if (
-        window.AuraChronos &&
-        typeof window.AuraChronos.setManualOverride === "function"
-      ) {
-        window.AuraChronos.setManualOverride(auraTheme, newTheme, 24);
-      }
-
-      // Also dispatch custom event for Chronos engine
-      const manualChangeEvent = new CustomEvent("aura-manual-theme-change", {
-        detail: { auraTheme, legacyTheme: newTheme, timestamp: Date.now() },
-      });
-      document.dispatchEvent(manualChangeEvent);
-
-      console.log(
-        `🎨 Theme changed to ${newTheme} (${auraTheme}) - Manual override set for 24 hours`,
-      );
     } catch {
       // ignore
     }
