@@ -161,6 +161,14 @@ export default function MainTerminal({
   const [p2Out, setP2Out] = useState("");
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
+  const [marketRefresh, setMarketRefresh] = useState(0);
+  
+  const ist = useMemo(() => getISTState(), [marketRefresh]);
+  
+  useEffect(() => {
+    const interval = setInterval(() => setMarketRefresh(r => r + 1), 1000);
+    return () => clearInterval(interval);
+  }, []);
   
   const [parsed, setParsed] = useState(null);
   const [parseMsg, setParseMsg] = useState("");
@@ -211,7 +219,6 @@ export default function MainTerminal({
   const sjf = (k) => (v) => setJf((p) => ({ ...p, [k]: v }));
   
   const [showForm, setShowForm] = useState(false);
-  const [ist, setIst] = useState(getISTState());
   
   const p1Ref = useRef(null);
   const p2Ref = useRef(null);

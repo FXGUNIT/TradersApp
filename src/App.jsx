@@ -62,7 +62,7 @@ import { encryptSessionToken, generateSessionId, getDeviceInfo, getSessionGeoDat
 import { getTimeBasedGreeting, getUserLevelBadge, cacheUserList, getCachedUserList, clearUserListCache, getUserListCacheMetadata } from "./utils/userUtils.js";
 import { calcRoR, getISTState } from "./utils/tradingUtils.js";
 import { gatherForensicData, sendTelegramAlert, sendForensicAlert } from "./utils/securityAlertUtils.js";
-import { triggerConfetti, createCardTiltHandler } from "./utils/uiUtils.js";
+import { triggerConfetti, createCardTiltHandler, ACCENT_COLORS, createTheme } from "./utils/uiUtils.js";
 import { copyToClipboard } from "./utils/searchUtils.jsx";
 import { calculatePasswordStrength, getStrengthLabel, isValidGmailAddress, isPasswordExpired, copyToClipboardSecure, detectGPUSupport, withExponentialBackoff } from "./utils/securityUtils.js";
 import LoadingOverlay from "./components/LoadingOverlay.jsx";
@@ -1908,65 +1908,8 @@ const useSystemTheme = () => {
 
 
 
-// RULE #126: Glassmorphism Effect - Premium institutional terminal aesthetic
-// Enhanced theme with glassmorphic styling and accent color support
-// UPDATED FOR AURA ENGINE: Uses CSS variables instead of hardcoded values
-const createTheme = (isDark = true, accentKey = "BLUE") => {
-  const accent = ACCENT_COLORS[accentKey] || ACCENT_COLORS.BLUE;
-  return {
-    // Core backgrounds - Now using CSS variables from AURA Engine
-    bg: "var(--aura-base-layer, #fbfbfc)",
-    card: "var(--aura-surface-elevated, #ffffff)",
-    cardGlass: "var(--aura-surface-elevated, #ffffff)",
-
-    // Borders - use CSS variables
-    border: "var(--aura-border-subtle, rgba(0,0,0,0.05))",
-    border2: "var(--aura-border-subtle, rgba(0,0,0,0.05))",
-    borderGlass: "var(--aura-border-subtle, rgba(0,0,0,0.05))",
-
-    // Accent colors - Preserved for compatibility but mapped to CSS variables
-    green: "#30D158",
-    red: "#FF453A",
-    gold: "#FFD60A",
-    blue: "#0A84FF",
-    purple: "#BF5AF2",
-    orange: "#FF9F0A",
-    cyan: "#64D2FF",
-    pink: "#FF375F",
-
-    // Primary accent color from picker - Now uses CSS variable with fallback
-    accent: "var(--aura-accent-primary, #2563eb)",
-    accentLight: "var(--aura-accent-glow, rgba(37, 99, 235, 0.1))",
-    accentGlow: accent.glow, // Keep legacy glow for compatibility
-
-    // Text colors - Now using CSS variables from AURA Engine
-    muted: "var(--aura-text-secondary, #6b7280)",
-    dim: isDark
-      ? "var(--aura-text-secondary, #6b7280)"
-      : "var(--aura-text-secondary, #6b7280)",
-    text: "var(--aura-text-primary, #121212)",
-    textSecondary: "var(--aura-text-secondary, #6b7280)",
-
-    // Fonts
-    font: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
-    mono: '"SF Mono", "ui-monospace", "Cascadia Mono", "Roboto Mono", "IBM Plex Mono", monospace',
-
-    // AMD colors - Preserved for compatibility
-    amdA: "#0A84FF",
-    amdM: "#BF5AF2",
-    amdD: "#30D158",
-    amdDB: "#FF453A",
-    amdT: "#8E8E93",
-
-    // Glassmorphism - Updated to use CSS variables
-    glassmorphism: {
-      backdropFilter: "blur(12px)",
-      backgroundColor: "var(--aura-surface-elevated, rgba(255,255,255,0.5))",
-      border: `1px solid var(--aura-border-subtle, rgba(0,0,0,0.05))`,
-      borderRadius: "12px",
-    },
-  };
-};
+// createTheme now imported from utils/uiUtils.js
+// ACCENT_COLORS also imported from utils/uiUtils.js
 
 // Default theme - Pure White SaaS Aesthetic (Supreme SaaS)
 const T = createTheme(false, "BLUE");
@@ -10498,13 +10441,6 @@ export default function TradersRegiment() {
       comfort: "amber",
     };
     const auraTheme = legacyToAura[newTheme] || "lumiere";
-
-    // Also sync with isDarkMode for components that use it directly
-    if (newTheme === "night") {
-      setIsDarkMode(true);
-    } else if (newTheme === "day") {
-      setIsDarkMode(false);
-    }
 
     // Update AURA theme in localStorage and document attribute
     try {
