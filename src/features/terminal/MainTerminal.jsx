@@ -778,7 +778,7 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
       
       {/* Header */}
       <div style={{ 
-        background: CSS_VARS.surface, 
+        background: CSS_VARS.card, 
         borderBottom: `1px solid #E5E7EB`, 
         padding: "16px 32px", 
         display: "flex", 
@@ -833,7 +833,7 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
 
       {/* Navigation Tabs */}
       <div style={{ 
-        background: CSS_VARS.surface, 
+        background: CSS_VARS.card, 
         borderBottom: `1px solid #E5E7EB`, 
         padding: "0 32px", 
         display: "flex", 

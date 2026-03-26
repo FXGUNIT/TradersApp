@@ -10,6 +10,26 @@
   box-sizing: border-box;
 }
 
+/* Aliases for convenience tokens to ease CSS-var usage in JS (Phase 1) */
+:root {
+  --base-layer: var(--aura-base-layer);
+  --surface-elevated: var(--aura-surface-elevated);
+  --surface-glass: var(--aura-surface-elevated);
+  --text-primary: var(--aura-text-primary);
+  --text-secondary: var(--aura-text-secondary);
+  --text-tertiary: var(--aura-text-tertiary);
+  --border-subtle: var(--aura-border-subtle);
+  --border-strong: var(--aura-border-subtle);
+  --accent-primary: var(--aura-accent-primary);
+  --accent-glow: var(--aura-accent-glow);
+  --bg: var(--aura-base-layer);
+  --card: var(--aura-surface-elevated);
+  --text: var(--aura-text-primary);
+  --subtext: var(--aura-text-secondary);
+  --border: var(--aura-border-subtle);
+  --accent: var(--aura-accent-primary);
+  --accent-text: #ffffff;
+}
 html,
 body {
   margin: 0;
