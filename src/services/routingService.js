@@ -15,7 +15,13 @@
 import { getAuth, signOut } from "firebase/auth";
 import { sendSecurityAlert } from "./telegramService.js";
 
-const auth = getAuth();
+const getAuthOrNull = () => {
+  try {
+    return getAuth();
+  } catch {
+    return null;
+  }
+};
 
 // ═══════════════════════════════════════════════════════════════════
 // TASK 2.2: LOCKED ACCOUNT HANDLER
@@ -37,7 +43,10 @@ const auth = getAuth();
  */
 export async function handleLockedAccount(userData) {
   // 1. Sign out immediately
-  await signOut(auth);
+  const auth = getAuthOrNull();
+  if (auth) {
+    await signOut(auth);
+  }
   console.warn("🔒 User signed out - account locked");
 
   // 2. Show error toast
@@ -81,7 +90,10 @@ export async function handleLockedAccount(userData) {
  */
 export async function handleBlockedAccount(userData) {
   // Sign out
-  await signOut(auth);
+  const auth = getAuthOrNull();
+  if (auth) {
+    await signOut(auth);
+  }
   console.warn("🚫 User signed out - account blocked");
 
   // Show error

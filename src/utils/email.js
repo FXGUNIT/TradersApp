@@ -6,9 +6,10 @@ const SERVICE_ID = import.meta.env.VITE_EMAILJS_SERVICE_ID;
 const TEMPLATE_INVITE = import.meta.env.VITE_EMAILJS_TEMPLATE_ID; // Reuse main template for invites
 const TEMPLATE_WELCOME = import.meta.env.VITE_EMAILJS_TEMPLATE_ID; // Reuse main template for welcome
 const USER_ID = import.meta.env.VITE_EMAILJS_PUBLIC_KEY; // Use public key as user ID
+const EMAILJS_READY = Boolean(SERVICE_ID && TEMPLATE_INVITE && USER_ID);
 
 export async function sendInviteEmail(email, name = "") {
-  if (!SERVICE_ID || !TEMPLATE_INVITE) {
+  if (!EMAILJS_READY) {
     console.warn("EmailJS not configured for invite emails");
     return { ok: true };
   }
@@ -27,7 +28,7 @@ export async function sendInviteEmail(email, name = "") {
 }
 
 export async function sendWelcomeEmail(email, name = "") {
-  if (!SERVICE_ID || !TEMPLATE_WELCOME) {
+  if (!EMAILJS_READY || !TEMPLATE_WELCOME) {
     console.warn("EmailJS not configured for welcome emails");
     return { ok: true };
   }

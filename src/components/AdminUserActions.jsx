@@ -16,9 +16,18 @@ import { approveUser, blockUser, lockUser } from "../services/adminService.js";
 function AdminUserActions({ user }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  const admin = getAuth().currentUser;
+  let admin = null;
+  try {
+    admin = getAuth().currentUser;
+  } catch {
+    admin = null;
+  }
 
   const handleApprove = async () => {
+    if (!admin) {
+      setError("Admin auth unavailable");
+      return;
+    }
     setIsLoading(true);
     setError(null);
     const result = await approveUser(user.uid, admin.uid);
@@ -29,6 +38,10 @@ function AdminUserActions({ user }) {
   };
 
   const handleBlock = async () => {
+    if (!admin) {
+      setError("Admin auth unavailable");
+      return;
+    }
     setIsLoading(true);
     setError(null);
     // Note: You might want a confirmation modal here in a real app
@@ -40,6 +53,10 @@ function AdminUserActions({ user }) {
   };
 
   const handleLock = async () => {
+    if (!admin) {
+      setError("Admin auth unavailable");
+      return;
+    }
     setIsLoading(true);
     setError(null);
     const result = await lockUser(user.uid, admin.uid);

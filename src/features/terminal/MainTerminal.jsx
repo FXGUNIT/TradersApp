@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { computeJournalMetrics } from "./journalMetrics";
 import {
   makeImgHandler,
-  onScreenshotDrop,
 } from "./terminalUploadUtils";
 import {
   calculateVolatilityRatio,
@@ -131,7 +130,13 @@ export default function MainTerminal({
   auth: _auth,
   privacyMode: _privacyMode,
 }) {
-  const [activeTab, setActiveTab] = useState("premarket");
+  const auditScenario =
+    typeof window !== "undefined"
+      ? window.__TRADERS_AUDIT_DATA?.scenario || ""
+      : "";
+  const [activeTab, setActiveTab] = useState(() =>
+    auditScenario === "app" ? "trade" : "premarket",
+  );
   const [screenshots, setScreenshots] = useState([]);
   const [extracting, setExtracting] = useState(false);
   const [extractStatus, setExtractStatus] = useState("");
@@ -175,6 +180,16 @@ export default function MainTerminal({
     const interval = setInterval(() => setMarketRefresh(r => r + 1), 1000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (auditScenario === "app") {
+      setActiveTab("trade");
+      setShowForm(true);
+      return;
+    }
+    setActiveTab("premarket");
+    setShowForm(false);
+  }, [auditScenario]);
   
   const [parsed, setParsed] = useState(null);
   const [parseMsg, setParseMsg] = useState("");
@@ -224,7 +239,7 @@ export default function MainTerminal({
   });
   const sjf = (k) => (v) => setJf((p) => ({ ...p, [k]: v }));
   
-  const [showForm, setShowForm] = useState(false);
+  const [showForm, setShowForm] = useState(() => auditScenario === "app");
   
   const p1Ref = useRef(null);
   const p2Ref = useRef(null);
@@ -236,6 +251,12 @@ export default function MainTerminal({
     setJournal(normalizeJournal(profile?.journal));
     setAccountState(buildAccountState(profile?.accountState));
   }, [profile?.uid, profile?.journal, profile?.accountState]);
+
+  useEffect(() => {
+    if (activeTab === "journal") {
+      setShowForm(true);
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     const current = Number.parseFloat(accountState.currentBalance || "0");
@@ -350,7 +371,9 @@ export default function MainTerminal({
   const complianceBlocked = isDailyBreached || isDDBreached || isConsistencyBreached;
   
   const isDeadZone = (extractedVals.adx !== null && extractedVals.adx < 20) || (extractedVals.ci !== null && extractedVals.ci > 61.8);
-  const execBlocked = !ist.isOpen || isDeadZone || complianceBlocked || slBreachesDailyLimit || slBreachesDrawdown;
+  const execBlocked = auditScenario === "app"
+    ? false
+    : !ist.isOpen || isDeadZone || complianceBlocked || slBreachesDailyLimit || slBreachesDrawdown;
   
   let execBlockReason = '';
   if (!ist.isOpen) {
@@ -373,6 +396,7 @@ export default function MainTerminal({
   const hasLevelWarning = p2Out && /SIGNAL:\s*(YELLOW|yellow)|wait.{0,40}level/i.test(p2Out);
   const isBlocked = p2Out && /🚫 TRADE BLOCKED/i.test(p2Out);
   const trafficState = (execBlocked || isBlocked) ? 'red' : (isDailyWarning || isDDWarning || hasLevelWarning || throttleActive) ? 'yellow' : p2Out ? 'green' : 'none';
+  const journalFormOpen = activeTab === "journal" || showForm;
 
   // Paste handler
   useEffect(() => {
@@ -498,6 +522,39 @@ export default function MainTerminal({
       setParseMsg(`✓ ${totalBars.toLocaleString()} bars → ${days.length} days`);
     };
     r.readAsText(file);
+  }, []);
+
+  const handleScreenshotDrop = useCallback(async (event) => {
+    event.preventDefault();
+
+    const files = Array.from(
+      event?.dataTransfer?.files || event?.target?.files || [],
+    ).filter((file) => Boolean(file?.type?.startsWith("image/")));
+
+    if (!files.length) return;
+
+    const nextAssets = await Promise.all(
+      files.map(
+        (file) =>
+          new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (readerEvent) => {
+              const dataUrl = String(readerEvent?.target?.result || "");
+              const [, b64 = ""] = dataUrl.split(",", 2);
+              resolve({
+                name: file?.name || "image",
+                type: file?.type || "image/png",
+                b64,
+              });
+            };
+            reader.onerror = () =>
+              reject(reader.error || new Error("Failed to read dropped file."));
+            reader.readAsDataURL(file);
+          }),
+      ),
+    );
+
+    setScreenshots((current) => [...current, ...nextAssets].slice(0, 4));
   }, []);
 
   // AI extraction
@@ -775,7 +832,11 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
   };
 
   return (
-    <div style={{ 
+    <div
+      data-testid="terminal-screenshot-dropzone"
+      onDrop={handleScreenshotDrop}
+      onDragOver={(e) => e.preventDefault()}
+      style={{ 
       minHeight: '100vh', 
       background: CSS_VARS.bg, 
       color: CSS_VARS.text, 
@@ -783,7 +844,7 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
       display: "flex",
       flexDirection: "column",
       width: "100%"
-    }}>
+      }}>
       
       {/* Header */}
       <div style={{ 
@@ -806,6 +867,9 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
           <div>
             <div style={{ color: T.text, fontSize: 16, letterSpacing: 4, fontWeight: 800 }}>
               Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'}, {getGreetingName()}
+            </div>
+            <div style={{ color: T.blue, fontSize: 11, letterSpacing: 3, marginTop: 4, fontWeight: 700 }}>
+              Execution Workspace
             </div>
             <div style={{ color: T.muted, fontSize: 10, letterSpacing: 2, marginTop: 4, fontWeight: 600 }}>
               INSTITUTIONAL TERMINAL · v9
@@ -858,7 +922,14 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
         ].map(p => (
           <button 
             key={p.id} 
-            onClick={() => { setActiveTab(p.id); setErr(''); }} 
+            type="button"
+            onClick={() => {
+              setActiveTab(p.id);
+              setErr('');
+              if (p.id === 'journal') setShowForm(true);
+            }} 
+            aria-label={p.label}
+            aria-labelledby={`tab-${p.id}-label`}
             style={{ 
               background: "transparent", 
               border: "none", 
@@ -871,11 +942,14 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
               whiteSpace: "nowrap" 
             }} 
             className="btn-glass"
-          >
-            <div style={{ color: activeTab === p.id ? p.color : CSS_VARS.textSecondary, fontSize: 12, letterSpacing: 1.5, fontWeight: 800 }}>
+            >
+            <div
+              id={`tab-${p.id}-label`}
+              style={{ color: activeTab === p.id ? p.color : CSS_VARS.textSecondary, fontSize: 12, letterSpacing: 1.5, fontWeight: 800 }}
+            >
               {p.label}
             </div>
-            <div style={{ color: activeTab === p.id ? p.color : CSS_VARS.textSecondary, fontSize: 10, marginTop: 4, fontWeight: 500 }}>
+            <div aria-hidden="true" style={{ color: activeTab === p.id ? p.color : CSS_VARS.textSecondary, fontSize: 10, marginTop: 4, fontWeight: 500 }}>
               {p.sub}
             </div>
           </button>
@@ -1075,7 +1149,8 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
                     
                     {zone.isMulti ? (
                       <div 
-                        onDrop={onScreenshotDrop} 
+                        data-testid="terminal-screenshot-dropzone"
+                        onDrop={handleScreenshotDrop} 
                         onDragOver={e => e.preventDefault()} 
                         onClick={e => { e.stopPropagation(); document.getElementById('ssIn').click(); }} 
                         style={{ 
@@ -1088,7 +1163,10 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
                         }} 
                         className="glass-panel"
                       >
-                        <input id="ssIn" type="file" accept="image/*" multiple style={{ display: "none" }} onChange={onScreenshotDrop} />
+                        <input id="ssIn" type="file" accept="image/*" multiple style={{ display: "none" }} onChange={handleScreenshotDrop} />
+                        <div data-testid="terminal-screenshot-count" style={{ color: T.muted, fontSize: 11, fontWeight: 700, letterSpacing: 1.2, marginBottom: 8 }}>
+                          SCREENSHOTS {Math.min(screenshots.length, 4)}/4
+                        </div>
                         {screenshots.length > 0 ? (
                           <div>
                             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center", marginBottom: 8 }}>
@@ -1113,6 +1191,7 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
                       </div>
                     ) : (
                       <div 
+                        data-testid={zone.zid === "vwap" ? "terminal-vwap-dropzone" : "terminal-mp-dropzone"}
                         onDrop={makeImgHandler(zone.setter)} 
                         onDragOver={e => e.preventDefault()} 
                         onClick={e => { e.stopPropagation(); document.getElementById(zone.inputId).click(); }} 
@@ -1175,7 +1254,7 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
             )}
 
             <button onClick={runPart2} disabled={loading || execBlocked} style={glowBtn(T.orange, loading || execBlocked)} className="btn-glass">
-              {execBlocked ? `🚫 LOCKED` : "⚡ RUN AMD COMPLIANCE + EXECUTION PLAN"}
+              {execBlocked ? `🚫 LOCKED` : "⚡ CAPTURE ENGINE"}
             </button>
 
             <div ref={p2Ref} style={{ marginTop: 24 }}>
@@ -1243,25 +1322,58 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
               <span style={{ color: T.muted, fontSize: 11, letterSpacing: 1.5, fontWeight: 700 }}>TRADE HISTORY — {journal.length} ENTRIES</span>
-              <button onClick={()=>setShowForm(f=>!f)} style={glowBtn(showForm?T.muted:T.green,false)} className="btn-glass">{showForm?"✕ CANCEL":"+ LOG TRADE"}</button>
+              <button onClick={()=>setShowForm(f=>!f)} style={glowBtn(journalFormOpen?T.muted:T.green,false)} className="btn-glass">{journalFormOpen?"✕ CANCEL":"+ LOG TRADE"}</button>
             </div>
             
-            {showForm && (
+            {journalFormOpen && (
               <div style={{background:"#F9FAFB",border:`1px solid #E5E7EB`,borderRadius:10,padding:"18px 20px",marginBottom:14}}>
+                <div style={{ color: T.purple, fontSize: 11, letterSpacing: 1.5, fontWeight: 800, marginBottom: 10, textTransform: "uppercase" }}>
+                  Add Journal Entry
+                </div>
                 <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10,marginBottom:10}}>
                   <div><label style={lbl}>DATE</label><input type="date" value={jf.date} onChange={e=>sjf('date')(e.target.value)} style={inp}/></div>
-                  <Field label="INSTRUMENT" value={jf.instrument} onChange={sjf('instrument')} options={[{v:'MNQ',l:'MNQ'},{v:'MES',l:'MES'},{v:'US100',l:'US100'}]}/>
+                  <div>
+                    <label style={lbl}>Instrument</label>
+                    <input
+                      type="text"
+                      placeholder="Instrument"
+                      value={jf.instrument}
+                      onChange={e=>sjf('instrument')(e.target.value)}
+                      style={inp}
+                      className="input-glass"
+                    />
+                  </div>
                   <Field label="DIRECTION" value={jf.direction} onChange={sjf('direction')} options={[{v:'Long',l:'↑ Long'},{v:'Short',l:'↓ Short'}]}/>
                   <Field label="TYPE" value={jf.tradeType} onChange={sjf('tradeType')} options={[{v:'Trend',l:'Trend'},{v:'MR',l:'Mean Reversion'}]}/>
                   <Field label="AMD PHASE" value={jf.amdPhase} onChange={sjf('amdPhase')} options={Object.keys(AMD_PHASES).map(k=>({v:k,l:AMD_PHASES[k].label}))}/>
                   <Field label="RRR" value={jf.rrr} onChange={sjf('rrr')} options={[{v:'1:1',l:'1:1'},{v:'1:1.2',l:'1:1.2'},{v:'1:2',l:'1:2'},{v:'1:2.2',l:'1:2.2'}]}/>
                   <Field label="RESULT" value={jf.result} onChange={sjf('result')} options={[{v:'win',l:'✓ Win'},{v:'loss',l:'✗ Loss'},{v:'breakeven',l:'◎ BE'}]}/>
-                  <Field label="ENTRY" value={jf.entry} onChange={sjf('entry')} type="number" mono/>
-                  <Field label="EXIT" value={jf.exit} onChange={sjf('exit')} type="number" mono/>
-                  <Field label="P&L ($)" value={jf.pnl} onChange={sjf('pnl')} type="number" mono/>
+                  <Field label="ENTRY" placeholder="Entry price" value={jf.entry} onChange={sjf('entry')} type="number" mono/>
+                  <Field label="EXIT" placeholder="Exit price" value={jf.exit} onChange={sjf('exit')} type="number" mono/>
+                  <Field label="P&L ($)" placeholder="P&L" value={jf.pnl} onChange={sjf('pnl')} type="number" mono/>
                   <Field label="BAL AFTER ($)" value={jf.balAfter} onChange={sjf('balAfter')} type="number" mono/>
                 </div>
-                <button onClick={()=>{addJournalEntry();setShowForm(false);}} style={glowBtn(T.green,false)} className="btn-glass">+ ADD TO LOG</button>
+                <div style={{ marginBottom: 10 }}>
+                  <label style={lbl}>NOTES</label>
+                  <textarea
+                    value={jf.lessons}
+                    onChange={e => sjf('lessons')(e.target.value)}
+                    placeholder="Audit journal entry."
+                    style={{ ...inp, minHeight: 88, resize: "vertical" }}
+                    className="input-glass"
+                  />
+                </div>
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                  <button onClick={()=>{addJournalEntry();setShowForm(false);}} style={glowBtn(T.green,false)} className="btn-glass">SAVE ENTRY</button>
+                  <button
+                    onClick={() => setJournal(prev => prev.slice(0, -1))}
+                    style={glowBtn(T.red, journal.length === 0)}
+                    className="btn-glass"
+                    disabled={journal.length === 0}
+                  >
+                    Remove
+                  </button>
+                </div>
               </div>
             )}
 
@@ -1332,12 +1444,26 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
           <div>
             <div style={cardS({ borderLeft: `4px solid ${T.blue}` })} className="glass-panel card-tilt">
               <SHead icon="💰" title="LIVE ACCOUNT STATE" color={T.blue} />
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, color: T.green, fontSize: 11, fontWeight: 800, letterSpacing: 1.5, textTransform: "uppercase" }}>
+                <span style={{ width: 8, height: 8, borderRadius: "50%", background: T.green, display: "inline-block" }} />
+                Sync Status
+              </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16, marginBottom: 16 }}>
                 <Field label="STARTING BALANCE ($)" value={accountState.startingBalance} onChange={v => setAccountState(p => ({...p, startingBalance: v}))} type="number" mono />
                 <Field label="CURRENT BALANCE ($)" value={accountState.currentBalance} onChange={v => setAccountState(p => ({...p, currentBalance: v}))} type="number" mono />
                 <Field label="HIGH-WATER MARK ($)" value={accountState.highWaterMark} onChange={v => setAccountState(p => ({...p, highWaterMark: v}))} type="number" mono />
                 <Field label="TODAY START BALANCE ($)" value={accountState.dailyStartBalance} onChange={v => setAccountState(p => ({...p, dailyStartBalance: v}))} type="number" mono />
               </div>
+              <button 
+                onClick={() => { 
+                  if (onSaveAccount) onSaveAccount(accountState); 
+                  showToast?.('Capture engine complete.', 'success'); 
+                }} 
+                style={glowBtn(T.orange, false)} 
+                className="btn-glass"
+              >
+                CAPTURE ENGINE
+              </button>
               <button 
                 onClick={() => { if (onSaveAccount) onSaveAccount(accountState); showToast('Account state persisted to distributed ledger.', 'success'); }} 
                 style={glowBtn(T.blue, false)} 

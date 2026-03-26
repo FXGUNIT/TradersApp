@@ -17,10 +17,18 @@ function AdminMessagePanel() {
     const [selectedChat, setSelectedChat] = useState(null);
     const [messages, setMessages] = useState([]);
     const [inputText, setInputText] = useState("");
-    const db = getDatabase();
+    let db = null;
+    try {
+        db = getDatabase();
+    } catch {
+        db = null;
+    }
 
     // Fetch the list of all support chats
     useEffect(() => {
+        if (!db) {
+            return;
+        }
         const chatsRef = ref(db, 'support_chats');
         onValue(chatsRef, (snapshot) => {
             const data = snapshot.val();
@@ -37,6 +45,9 @@ function AdminMessagePanel() {
 
     // Fetch messages for the selected chat
     useEffect(() => {
+        if (!db) {
+            return;
+        }
         if (!selectedChat) return;
         const messagesRef = ref(db, `support_chats/${selectedChat.uid}/messages`);
         onValue(messagesRef, (snapshot) => {
@@ -51,7 +62,7 @@ function AdminMessagePanel() {
     }, [selectedChat, db]);
 
     const handleReply = () => {
-        if (!selectedChat || inputText.trim() === "") return;
+        if (!db || !selectedChat || inputText.trim() === "") return;
 
         const messagesRef = ref(db, `support_chats/${selectedChat.uid}/messages`);
         const newMessage = {

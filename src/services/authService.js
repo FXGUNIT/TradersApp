@@ -24,6 +24,22 @@ import { getDatabase, ref, get } from "firebase/database";
 import { provisionUserRecord } from "./databaseService";
 import { sendWelcomeEmail } from "./emailService";
 
+const getAuthOrNull = () => {
+  try {
+    return getAuth();
+  } catch {
+    return null;
+  }
+};
+
+const getDbOrNull = () => {
+  try {
+    return getDatabase();
+  } catch {
+    return null;
+  }
+};
+
 // ═══════════════════════════════════════════════════════════════════
 // TASK 1.1: FRONTEND VALIDATION FUNCTION
 // ═══════════════════════════════════════════════════════════════════
@@ -88,7 +104,10 @@ export function validateSignupInput(email, password) {
  * }
  */
 export async function createEmailUser(email, password) {
-  const auth = getAuth();
+  const auth = getAuthOrNull();
+  if (!auth) {
+    return { uid: null, email, success: false };
+  }
   try {
     const userCredential = await createUserWithEmailAndPassword(
       auth,
@@ -135,7 +154,8 @@ const googleProvider = new GoogleAuthProvider();
  * @returns {object|null} User data or null if doesn't exist
  */
 export async function checkUserExists(uid) {
-  const db = getDatabase();
+  const db = getDbOrNull();
+  if (!db) return null;
   try {
     const userRef = ref(db, `users/${uid}`);
     const snapshot = await get(userRef);
@@ -169,7 +189,15 @@ export async function checkUserExists(uid) {
  * }
  */
 export async function handleGoogleSignup() {
-  const auth = getAuth();
+  const auth = getAuthOrNull();
+  if (!auth) {
+    return {
+      success: false,
+      route: "error",
+      uid: null,
+      isNewUser: false,
+    };
+  }
   try {
     // 1. Trigger Google OAuth popup
     const result = await signInWithPopup(auth, googleProvider);
@@ -263,7 +291,13 @@ export async function handleGoogleSignup() {
  * }
  */
 export async function handleGoogleUserPasswordReset(email) {
-  const auth = getAuth();
+  const auth = getAuthOrNull();
+  if (!auth) {
+    return {
+      success: true,
+      message: "Check your email for reset instructions",
+    };
+  }
   try {
     await sendPasswordResetEmail(auth, email);
 
@@ -314,7 +348,15 @@ export async function handleGoogleUserPasswordReset(email) {
  * }
  */
 export async function checkUserStatus(uid) {
-  const db = getDatabase();
+  const db = getDbOrNull();
+  if (!db) {
+    return {
+      action: "error",
+      status: "ERROR",
+      shouldLogout: true,
+      message: "Firebase unavailable",
+    };
+  }
   try {
     // 1. Fetch user record
     const userRef = ref(db, `users/${uid}`);

@@ -1,9 +1,17 @@
 const TELEGRAM_TOKEN = import.meta.env.VITE_TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = import.meta.env.VITE_TELEGRAM_CHAT_ID;
 
-console.log("Telegram Security System: ONLINE");
+const telegramConfigured = Boolean(TELEGRAM_TOKEN && TELEGRAM_CHAT_ID);
+
+if (telegramConfigured) {
+  console.log("Telegram Security System: ONLINE");
+}
 
 const sendTelegramAlert = async (message) => {
+  if (!telegramConfigured) {
+    return;
+  }
+
   try {
     await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
       method: "POST",

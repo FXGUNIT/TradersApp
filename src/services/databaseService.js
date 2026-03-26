@@ -15,7 +15,16 @@
 import { getDatabase, ref, get, set, update } from "firebase/database";
 import { DATABASE_URL } from './firebase';
 
+const getDbOrNull = () => {
+  try {
+    return getDatabase();
+  } catch {
+    return null;
+  }
+};
+
 const dbR = async (p, t) => {
+  if (!DATABASE_URL) return null;
   try {
     const r = await fetch(`${DATABASE_URL}${p}.json${t ? `?auth=${t}` : ''}`);
     return r.ok ? r.json() : null;
@@ -25,6 +34,7 @@ const dbR = async (p, t) => {
 };
 
 const dbW = async (p, d, t) => {
+  if (!DATABASE_URL) return;
   try {
     await fetch(`${DATABASE_URL}${p}.json?auth=${t}`, {
       method: 'PUT',
@@ -37,6 +47,7 @@ const dbW = async (p, d, t) => {
 };
 
 const dbM = async (p, d, t) => {
+  if (!DATABASE_URL) return;
   try {
     await fetch(`${DATABASE_URL}${p}.json?auth=${t}`, {
       method: 'PATCH',
@@ -49,6 +60,7 @@ const dbM = async (p, d, t) => {
 };
 
 const dbDel = async (p, t) => {
+  if (!DATABASE_URL) return;
   try {
     await fetch(`${DATABASE_URL}${p}.json?auth=${t}`, { method: 'DELETE' });
   } catch {
@@ -79,7 +91,14 @@ export { dbR, dbW, dbM, dbDel };
  * console.log('User provisioned with status:', userRecord.status); // 'PENDING'
  */
 export async function provisionUserRecord(uid, userData) {
-  const db = getDatabase();
+  if (!DATABASE_URL) {
+    return { success: false, error: "Firebase unavailable" };
+  }
+
+  const db = getDbOrNull();
+  if (!db) {
+    return { success: false, error: "Firebase unavailable" };
+  }
   const userRef = ref(db, `users/${uid}`);
 
   const userRecord = {
@@ -146,7 +165,9 @@ export async function provisionUserRecord(uid, userData) {
  * @returns {object|null}
  */
 export async function getUserRecord(uid) {
-  const db = getDatabase();
+  if (!DATABASE_URL) return null;
+  const db = getDbOrNull();
+  if (!db) return null;
   try {
     const userRef = ref(db, `users/${uid}`);
     const snapshot = await get(userRef);
@@ -178,7 +199,13 @@ export async function getUserRecord(uid) {
  * // User now gets routed to MainTerminal instead of WaitingRoom
  */
 export async function approveUser(uid, adminUid) {
-  const db = getDatabase();
+  if (!DATABASE_URL) {
+    return { success: false, error: "Firebase unavailable" };
+  }
+  const db = getDbOrNull();
+  if (!db) {
+    return { success: false, error: "Firebase unavailable" };
+  }
   const updates = {
     status: "ACTIVE",
     approvedAt: Date.now(),
@@ -210,7 +237,13 @@ export async function blockUser(
   adminUid,
   reason = "Manual block by admin",
 ) {
-  const db = getDatabase();
+  if (!DATABASE_URL) {
+    return { success: false, error: "Firebase unavailable" };
+  }
+  const db = getDbOrNull();
+  if (!db) {
+    return { success: false, error: "Firebase unavailable" };
+  }
   const updates = {
     status: "BLOCKED",
     blockedAt: Date.now(),
@@ -238,7 +271,13 @@ export async function blockUser(
  * @param {number} failedAttempts - Number of failed login attempts
  */
 export async function lockUserAccount(uid, failedAttempts = 5) {
-  const db = getDatabase();
+  if (!DATABASE_URL) {
+    return { success: false, error: "Firebase unavailable" };
+  }
+  const db = getDbOrNull();
+  if (!db) {
+    return { success: false, error: "Firebase unavailable" };
+  }
   const updates = {
     isLocked: true,
     lockedAt: Date.now(),
@@ -265,7 +304,13 @@ export async function lockUserAccount(uid, failedAttempts = 5) {
  * @param {string} adminUid - UID of admin performing unlock
  */
 export async function unlockUserAccount(uid, adminUid) {
-  const db = getDatabase();
+  if (!DATABASE_URL) {
+    return { success: false, error: "Firebase unavailable" };
+  }
+  const db = getDbOrNull();
+  if (!db) {
+    return { success: false, error: "Firebase unavailable" };
+  }
   const updates = {
     isLocked: false,
     unlockedAt: Date.now(),
@@ -297,7 +342,13 @@ export async function unlockUserAccount(uid, adminUid) {
  * @param {object} profileData - Fields to update
  */
 export async function updateUserProfile(uid, profileData) {
-  const db = getDatabase();
+  if (!DATABASE_URL) {
+    return { success: false, error: "Firebase unavailable" };
+  }
+  const db = getDbOrNull();
+  if (!db) {
+    return { success: false, error: "Firebase unavailable" };
+  }
   const updates = {
     ...profileData,
     updatedAt: Date.now(),
@@ -320,7 +371,9 @@ export async function updateUserProfile(uid, profileData) {
  * @param {string} uid - Firebase UID
  */
 export async function recordUserLogin(uid) {
-  const db = getDatabase();
+  if (!DATABASE_URL) return;
+  const db = getDbOrNull();
+  if (!db) return;
   const updates = {
     lastLoginAt: Date.now(),
     failedAttempts: 0, // Reset failed attempts on successful login
@@ -341,7 +394,9 @@ export async function recordUserLogin(uid) {
  * @returns {number} New failed attempts count
  */
 export async function incrementFailedAttempts(uid) {
-  const db = getDatabase();
+  if (!DATABASE_URL) return 0;
+  const db = getDbOrNull();
+  if (!db) return 0;
   try {
     const userRef = ref(db, `users/${uid}`);
     const snapshot = await get(userRef);

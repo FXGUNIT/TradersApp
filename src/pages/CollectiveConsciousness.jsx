@@ -288,7 +288,7 @@ User Question: ${trimmed}`;
             gap: '8px',
           }}
         >
-          <span style={{ fontSize: 16 }}>←</span> Command Centre
+          <span style={{ fontSize: 16 }}>←</span> Back to Hub
         </button>
 
         <div style={{

@@ -11,18 +11,16 @@
  */
 
 import React, { useEffect, useState } from "react";
-import { getDatabase, ref, onValue } from "firebase/database";
-import { getAuth } from "firebase/auth";
+import { ref, onValue } from "firebase/database";
 import ConfettiCelebration from "../components/ConfettiCelebration.jsx";
+import { auth as firebaseAuth, db as firebaseDb } from "../services/firebase.js";
 
 function WaitingRoom({ onApproved, onNavigate }) {
   const [status, setStatus] = useState("PENDING");
   const [showConfetti, setShowConfetti] = useState(false);
 
-  const db = getDatabase();
-  const auth = getAuth();
-  const uid = auth.currentUser?.uid;
-  const email = auth.currentUser?.email || "";
+  const uid = firebaseAuth?.currentUser?.uid;
+  const email = firebaseAuth?.currentUser?.email || "";
 
   useEffect(() => {
     if (!uid) {
@@ -31,8 +29,14 @@ function WaitingRoom({ onApproved, onNavigate }) {
       return;
     }
 
+    if (!firebaseDb) {
+      console.warn("WaitingRoom Firebase unavailable - falling back to login");
+      if (onNavigate) onNavigate("login");
+      return;
+    }
+
     // === LIVE STATUS LISTENER ===
-    const statusRef = ref(db, `users/${uid}/status`);
+    const statusRef = ref(firebaseDb, `users/${uid}/status`);
     const unsubscribe = onValue(statusRef, (snapshot) => {
       const newStatus = snapshot.val();
       console.warn("📡 Status changed:", newStatus);

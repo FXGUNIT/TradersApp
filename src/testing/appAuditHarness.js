@@ -199,7 +199,21 @@ export function registerAppAuditHarness({
         break;
 
       case "waiting":
-        setAuditData({ sessions: fixtures.sessions });
+        setAuditData({
+          scenario: "waiting",
+          sessions: fixtures.sessions,
+          userProfile: clone({
+            ...fixtures.userProfile,
+            status: "PENDING",
+          }),
+          users: {
+            ...fixtures.users,
+            [fixtures.userAuth.uid]: {
+              ...fixtures.users[fixtures.userAuth.uid],
+              status: "PENDING",
+            },
+          },
+        });
         setCurrentSessionId("session-current");
         setAuth(clone(fixtures.userAuth));
         setProfile(
@@ -254,7 +268,7 @@ export function registerAppAuditHarness({
         break;
 
       case "app":
-        setAuditData({ sessions: fixtures.sessions });
+        setAuditData({ scenario: "app", sessions: fixtures.sessions });
         setCurrentSessionId("session-current");
         setAuth(clone(fixtures.userAuth));
         setProfile(clone(fixtures.userProfile));

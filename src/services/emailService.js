@@ -29,6 +29,15 @@ const EMAILJS_TEMPLATE_APPROVED =
 const EMAILJS_TEMPLATE_INVITE =
   import.meta.env.VITE_EMAILJS_TEMPLATE_INVITE || EMAILJS_TEMPLATE_ID;
 
+const EMAILJS_READY = Boolean(
+  import.meta.env.VITE_EMAILJS_SERVICE_ID &&
+    import.meta.env.VITE_EMAILJS_TEMPLATE_ID &&
+    import.meta.env.VITE_EMAILJS_PUBLIC_KEY &&
+    import.meta.env.VITE_EMAILJS_TEMPLATE_WELCOME &&
+    import.meta.env.VITE_EMAILJS_TEMPLATE_APPROVED &&
+    import.meta.env.VITE_EMAILJS_TEMPLATE_INVITE,
+);
+
 // ═══════════════════════════════════════════════════════════════════
 // TASK 1.4: WELCOME EMAIL - "UNDER REVIEW"
 // ═══════════════════════════════════════════════════════════════════
@@ -46,6 +55,11 @@ const EMAILJS_TEMPLATE_INVITE =
  * // User receives: "Welcome to the Regiment - Under Review"
  */
 export async function sendWelcomeEmail(email, fullName) {
+  if (!EMAILJS_READY) {
+    console.warn("EmailJS not configured for welcome emails");
+    return { success: true, skipped: true };
+  }
+
   const templateParams = {
     user_email: email,
     user_name: fullName || email.split("@")[0],
@@ -90,6 +104,11 @@ export async function sendWelcomeEmail(email, fullName) {
  * // User receives: "Welcome to the Regiment. Your terminal is unlocked."
  */
 export async function sendApprovalConfirmationEmail(email, fullName) {
+  if (!EMAILJS_READY) {
+    console.warn("EmailJS not configured for approval emails");
+    return { success: true, skipped: true };
+  }
+
   const templateParams = {
     user_email: email,
     user_name: fullName || email.split("@")[0],
@@ -138,6 +157,11 @@ export async function sendInviteEmail(
   inviterName = "Traders Regiment",
   customMessage = "",
 ) {
+  if (!EMAILJS_READY) {
+    console.warn("EmailJS not configured for invite emails");
+    return { success: true, skipped: true };
+  }
+
   const templateParams = {
     user_email: email,
     inviter_name: inviterName,

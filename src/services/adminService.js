@@ -15,7 +15,13 @@ import { getDatabase, ref, update, get } from "firebase/database";
 import { sendSecurityAlert } from "./telegramService.js";
 import { sendApprovalConfirmationEmail } from "./emailService.js";
 
-const db = getDatabase();
+const getDbOrNull = () => {
+  try {
+    return getDatabase();
+  } catch {
+    return null;
+  }
+};
 
 // ═══════════════════════════════════════════════════════════════════
 // TASK 3.3: APPROVE USER
@@ -31,6 +37,11 @@ const db = getDatabase();
 export async function approveUser(uid, adminUid) {
   if (!uid || !adminUid) {
     return { success: false, error: "User UID and Admin UID are required." };
+  }
+
+  const db = getDbOrNull();
+  if (!db) {
+    return { success: false, error: "Firebase unavailable" };
   }
 
   const userRef = ref(db, `users/${uid}`);
@@ -77,6 +88,10 @@ export async function approveUser(uid, adminUid) {
 export async function blockUser(uid, adminUid) {
   // (Placeholder for future implementation)
   console.log(`Blocking user ${uid} by ${adminUid}`);
+  const db = getDbOrNull();
+  if (!db) {
+    return { success: false, error: "Firebase unavailable" };
+  }
   const userRef = ref(db, `users/${uid}`);
   await update(userRef, { status: "BLOCKED", blockedBy: adminUid });
   return { success: true };
@@ -92,6 +107,10 @@ export async function blockUser(uid, adminUid) {
 export async function lockUser(uid, adminUid) {
   // (Placeholder for future implementation)
   console.log(`Locking user ${uid} by ${adminUid}`);
+  const db = getDbOrNull();
+  if (!db) {
+    return { success: false, error: "Firebase unavailable" };
+  }
   const userRef = ref(db, `users/${uid}`);
   await update(userRef, { isLocked: true, lockedBy: adminUid });
   return { success: true };
@@ -105,6 +124,10 @@ export async function lockUser(uid, adminUid) {
 export async function listUsers() {
   // (Placeholder for future implementation)
   console.log("Fetching all users");
+  const db = getDbOrNull();
+  if (!db) {
+    return { success: false, error: "Firebase unavailable" };
+  }
   const usersRef = ref(db, "users");
   const snapshot = await get(usersRef);
   if (snapshot.exists()) {

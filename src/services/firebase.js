@@ -42,6 +42,7 @@ const app = hasRequiredConfig ? initializeApp(firebaseConfig) : null;
 export const auth = app ? getAuth(app) : null;
 export const db = app ? getDatabase(app) : null;
 export const storage = app ? getStorage(app) : null;
+export const hasFirebaseRuntime = Boolean(app && auth && db);
 
 const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({

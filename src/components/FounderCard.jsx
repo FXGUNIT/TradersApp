@@ -44,12 +44,17 @@ export const FounderCard = ({
 
   return (
     <div
+      data-testid="founder-card"
       style={{
         padding: "0px",
         borderTop: "none",
         background: "transparent",
         position: "relative",
       }}
+      onMouseEnter={() => setShowTooltip(true)}
+      onMouseLeave={() => setShowTooltip(false)}
+      onMouseOver={() => setShowTooltip(true)}
+      onMouseOut={() => setShowTooltip(false)}
     >
       {/* Founder Card Container */}
         <div
@@ -68,8 +73,6 @@ export const FounderCard = ({
           cursor: "pointer",
           minWidth: "240px",
         }}
-        onMouseEnter={() => setShowTooltip(true)}
-        onMouseLeave={() => setShowTooltip(false)}
       >
         {/* Founder Profile Picture */}
         <div
@@ -139,6 +142,7 @@ export const FounderCard = ({
           {/* Glassmorphism Tooltip */}
           {showTooltip && (
             <div
+              data-testid="founder-tooltip"
               style={{
                 position: "absolute",
                 bottom: "100%",

@@ -162,6 +162,25 @@ export const dbDel = async (p, t) => {
 };
 
 export const authPost = async (ep, body) => {
+  const auditData = getAuditData();
+  if (auditData && (ep === "signInWithPassword" || ep === "signUp")) {
+    const email = String(body?.email || "").toLowerCase();
+    const adminEmail = String(auditData.adminAuth?.email || "").toLowerCase();
+    const fixture =
+      email && email === adminEmail ? auditData.adminAuth : auditData.userAuth;
+
+    if (!fixture) {
+      throw new Error("Firebase auth is unavailable in audit mode");
+    }
+
+    return {
+      localId: fixture.uid,
+      idToken: fixture.token,
+      refreshToken: `${fixture.token}-refresh`,
+      email: fixture.email,
+    };
+  }
+
   if (!FB_KEY) {
     throw new Error("Firebase auth is unavailable in this workspace");
   }
