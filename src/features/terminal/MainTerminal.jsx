@@ -435,6 +435,7 @@ export default function MainTerminal({
   const fr = firmRules;
   const maxDL = parseFloat(fr.maxDailyLoss) || 0;
   const maxDD = parseFloat(fr.maxDrawdown) || 0;
+  const minTradingDays = parseInt(fr.minimumTradingDays, 10) || 0;
   
   const curBal = parseFloat(accountState.currentBalance) || 0;
   const hwmVal = parseFloat(accountState.highWaterMark) || curBal;
@@ -443,6 +444,8 @@ export default function MainTerminal({
   const liqLevel = fr.drawdownType === 'trailing' ? hwmVal - maxDD : startBal - maxDD;
   const distToLiq = curBal - liqLevel;
   const throttleActive = maxDD > 0 && distToLiq / maxDD < 0.25; 
+  const isWeekendRestricted = !fr.weekendTrading && ist.isWeekend;
+  const isMinimumDaysRestricted = minTradingDays > 0 && journal.length < minTradingDays;
 
   const today = new Date().toISOString().slice(0, 10);
   const todayPnl = journal.filter(t => t.date === today).reduce((s, t) => s + parseFloat(t.pnl || 0), 0);
@@ -462,7 +465,7 @@ export default function MainTerminal({
   
   const isDailyWarning = maxDL > 0 && dailyLossUsed / maxDL >= 0.8;
   const isDDWarning = maxDD > 0 && curBal > 0 && (curBal - liqLevel) / maxDD < 0.2;
-  const complianceBlocked = isDailyBreached || isDDBreached || isConsistencyBreached;
+  const complianceBlocked = isDailyBreached || isDDBreached || isConsistencyBreached || isWeekendRestricted || isMinimumDaysRestricted;
   
   const isDeadZone = (extractedVals.adx !== null && extractedVals.adx < 20) || (extractedVals.ci !== null && extractedVals.ci > 61.8);
   const execBlocked = auditScenario === "app"
@@ -478,6 +481,10 @@ export default function MainTerminal({
     execBlockReason = `Account at liquidation level ($${liqLevel.toFixed(0)})`;
   } else if (isConsistencyBreached) {
     execBlockReason = `Consistency cap reached (${consPct}%)`;
+  } else if (isWeekendRestricted) {
+    execBlockReason = `Weekend trading disabled by firm rules`;
+  } else if (isMinimumDaysRestricted) {
+    execBlockReason = `Minimum trading days not yet met (${journal.length}/${minTradingDays})`;
   } else if (slBreachesDailyLimit) {
     execBlockReason = `SL ($${proposedSLDollars.toFixed(0)}) exceeds remaining limit ($${dailyRemaining?.toFixed(0)})`;
   } else if (slBreachesDrawdown) {
@@ -1717,6 +1724,17 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
               {firmRules.parseStatus && (
                 <div style={{ color: String(firmRules.parseStatus).startsWith("✓") ? T.green : T.red, fontSize: 12, textAlign: "center", marginBottom: 12 }}>
                   {firmRules.parseStatus}
+                </div>
+              )}
+              {firmRules.parsed && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center", marginBottom: 12 }}>
+                  <Tag label={`News: ${firmRules.newsTrading ? "Allowed" : "Blocked"}`} color={firmRules.newsTrading ? T.green : T.red} />
+                  <Tag label={`Overnight: ${firmRules.overnightHoldingAllowed ? "Allowed" : "Blocked"}`} color={firmRules.overnightHoldingAllowed ? T.green : T.red} />
+                  <Tag label={`Weekend: ${firmRules.weekendTrading ? "Allowed" : "Blocked"}`} color={firmRules.weekendTrading ? T.green : T.red} />
+                  <Tag label={`Copy: ${firmRules.copyTradingAllowed ? "Allowed" : "Blocked"}`} color={firmRules.copyTradingAllowed ? T.green : T.red} />
+                  <Tag label={`Hedging: ${firmRules.hedgingAllowed ? "Allowed" : "Blocked"}`} color={firmRules.hedgingAllowed ? T.green : T.red} />
+                  <Tag label={`Min Days: ${firmRules.minimumTradingDays || "0"}`} color={T.blue} />
+                  <Tag label={`EOD Flat: ${firmRules.eodFlatRequired ? "Required" : "Optional"}`} color={firmRules.eodFlatRequired ? T.gold : T.muted} />
                 </div>
               )}
               {firmRules.parsed && Array.isArray(firmRules.keyRules) && firmRules.keyRules.length > 0 && (
