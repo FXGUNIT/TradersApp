@@ -60,6 +60,7 @@ import { fuzzySearchScore, highlightMatches, renderHighlightedText } from "./uti
 import { dbR, dbW, dbM, dbDel, authPost, fbSignUp, fbSignIn, genOTP } from "./utils/firebaseDbUtils.js";
 import { triggerConfetti, createCardTiltHandler } from "./utils/uiUtils.js";
 import { copyToClipboard } from "./utils/searchUtils.jsx";
+import LoadingOverlay from "./components/LoadingOverlay.jsx";
 
 // math-engine & ai-router — both inlined (files exist but have no exports)
 // Swap to real imports once those files are complete
@@ -946,72 +947,6 @@ const getDevice = () => ({
 // ═══════════════════════════════════════════════════════════════════
 // MODULE 1 IDENTITY & VERIFICATION UTILITIES (#21, #22, #24, #30)
 // ═══════════════════════════════════════════════════════════════════
-
-// RULE #54: Loading Overlay Component - Shows while syncing with database
-const LoadingOverlay = ({ isLoading }) => {
-  if (!isLoading) return null;
-
-  return (
-    <div
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: "rgba(0,0,0,0.4)",
-        backdropFilter: "blur(8px)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 1000,
-        pointerEvents: "none",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          gap: 16,
-          background: "rgba(20,20,20,0.95)",
-          borderRadius: 12,
-          padding: "40px",
-          border: `1px solid rgba(0,122,255,0.2)`,
-          pointerEvents: "auto",
-          boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
-        }}
-      >
-        {/* Spinner Animation */}
-        <div
-          style={{
-            width: 40,
-            height: 40,
-            borderRadius: "50%",
-            border: "3px solid rgba(0,122,255,0.2)",
-            borderTopColor: T.blue,
-            animation: "spin 1s linear infinite",
-            pointerEvents: "none",
-          }}
-        />
-
-        {/* Loading Text */}
-        <div
-          style={{
-            color: T.blue,
-            fontSize: 13,
-            fontWeight: 600,
-            letterSpacing: 1,
-            textTransform: "uppercase",
-            animation: "pulse 2s ease-in-out infinite",
-          }}
-        >
-          ⚡ Syncing with Database...
-        </div>
-      </div>
-    </div>
-  );
-};
 
 // RULE #131: Skeleton Shimmer Loader - Smooth loading animation
 const SkeletonLoader = ({
