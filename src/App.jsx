@@ -57,6 +57,7 @@ import { calculateVolatilityRatio, getDynamicParameters, calculateThrottledRisk 
 import { formatPhoneNumber, TradersRegimentWatermark, ExchangeFacilityBadge } from "./utils/businessLogicUtils.jsx";
 import { getSession, getTradingDate, parseAndAggregate, buildDataSummary } from "./utils/sessionParser.js";
 import { fuzzySearchScore, highlightMatches, renderHighlightedText } from "./utils/searchUtils.jsx";
+import { dbR, dbW, dbM, dbDel, authPost, fbSignUp, fbSignIn, genOTP } from "./utils/firebaseDbUtils.js";
 
 // math-engine & ai-router — both inlined (files exist but have no exports)
 // Swap to real imports once those files are complete
@@ -590,70 +591,6 @@ const _dbMWithRetry = async (path, data, authToken) => {
     }
   });
 };
-
-// Database REST Helpers
-const dbR = async (p, t) => {
-  try {
-    const r = await fetch(`${DATABASE_URL}${p}.json${t ? `?auth=${t}` : ""}`);
-    return r.ok ? r.json() : null;
-  } catch {
-    return null;
-  }
-};
-
-const dbW = async (p, d, t) => {
-  try {
-    await fetch(`${DATABASE_URL}${p}.json?auth=${t}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(d),
-    });
-  } catch {
-    console.error("dbW error");
-  }
-};
-
-const dbM = async (p, d, t) => {
-  try {
-    await fetch(`${DATABASE_URL}${p}.json?auth=${t}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(d),
-    });
-  } catch {
-    console.error("dbM error");
-  }
-};
-
-const dbDel = async (p, t) => {
-  try {
-    await fetch(`${DATABASE_URL}${p}.json?auth=${t}`, { method: "DELETE" });
-  } catch {
-    console.error("dbDel error");
-  }
-};
-
-// Auth REST Helpers
-const authPost = async (ep, body) => {
-  const r = await fetch(`${FB_AUTH_URL}:${ep}?key=${FB_KEY}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  const d = await r.json();
-  if (d.error) throw new Error(d.error.message);
-  return d;
-};
-
-const fbSignUp = (e, p) =>
-  authPost("signUp", { email: e, password: p, returnSecureToken: true });
-const fbSignIn = (e, p) =>
-  authPost("signInWithPassword", {
-    email: e,
-    password: p,
-    returnSecureToken: true,
-  });
-const genOTP = () => String(Math.floor(100000 + Math.random() * 900000));
 
 // ═══════════════════════════════════════════════════════════════════
 //  TELEGRAM ALERT ENGINE — SECURITY TRIPWIRES
