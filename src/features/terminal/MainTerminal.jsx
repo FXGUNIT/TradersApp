@@ -531,6 +531,16 @@ export default function MainTerminal({
         })
       });
       
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        if (errData.error?.message?.includes('image') || errData.error?.message?.doesNotSupport || res.status === 400) {
+          setExtractStatus("✗ This model doesn't support images. Use text-based extraction.");
+          setExtracting(false);
+          return;
+        }
+        throw new Error(errData.error?.message || `HTTP ${res.status}`);
+      }
+      
       const data = await res.json();
       const content = data.choices?.[0]?.message?.content || '{}';
       const vals = JSON.parse(content.replace(/```json|```/g, '').trim());
@@ -545,8 +555,13 @@ export default function MainTerminal({
       }
       
       setExtractStatus(`✓ ${[vals.adx && `ADX=${vals.adx}`, vals.ci && `CI=${vals.ci}`, vals.atr && `ATR=${vals.atr}`, vals.currentPrice && `Price=${vals.currentPrice}`].filter(Boolean).join(' · ')}`);
-    } catch {
-      setExtractStatus('✗ Extract failed');
+    } catch (err) {
+      const msg = err.message || '';
+      if (msg.includes('image') || msg.includes('does not support')) {
+        setExtractStatus("✗ Model doesn't support images");
+      } else {
+        setExtractStatus(`✗ ${msg || 'Extract failed'}`);
+      }
     } finally {
       setExtracting(false);
     }
@@ -792,35 +807,22 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
           {throttleActive && <Tag label="⚠ DRAWDOWN THROTTLE" color={T.gold} />}
         </div>
         
-        <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <LED color={complianceColor} size={8} />
-            <span style={{ color: T.muted, fontSize: 11, fontWeight: 600 }}>WATCHDOG</span>
-          </div>
-          
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <LED color={parsed?.totalDays >= 20 ? T.green : T.dim} size={8} pulse={false} />
-            <span style={{ color: T.muted, fontSize: 11, fontWeight: 600 }}>
-              {parsed ? `${parsed.totalBars.toLocaleString()} bars` : 'no data'}
-            </span>
-          </div>
-          
-          <div style={{ color: T.text, fontSize: 12, letterSpacing: 1, fontWeight: 600 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 24, flexWrap: "wrap" }}>
+          <span style={{ color: T.text, fontSize: 12, fontWeight: 600 }}>
             {profile?.fullName || profile?.email}
-          </div>
+          </span>
           
           <button onClick={onLogout} style={{ 
-            background: "rgba(255,69,58,0.15)", 
-            border: `1px solid rgba(255,69,58,0.3)`, 
-            borderRadius: 6, 
-            padding: "8px 16px", 
+            background: "transparent", 
+            border: "none", 
+            padding: "4px 8px", 
             cursor: "pointer", 
-            color: T.red, 
+            color: T.muted, 
             fontSize: 11, 
             fontFamily: T.font, 
             letterSpacing: 1, 
-            fontWeight: 700 
-          }} className="btn-glass">
+            fontWeight: 600 
+          }}>
             LOGOUT
           </button>
         </div>
