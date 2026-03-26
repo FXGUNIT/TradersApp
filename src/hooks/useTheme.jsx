@@ -54,6 +54,17 @@ export const ThemeProvider = ({ children }) => {
     });
   }, []);
 
+  const setTheme = useCallback((value) => {
+    const next = normalizeTheme(value);
+    setCurrentTheme(next);
+    localStorage.setItem("theme_mode_name", next);
+    localStorage.setItem("theme_mode", next === "midnight" ? "dark" : "light");
+    localStorage.setItem("appTheme", next);
+    localStorage.setItem("aura-theme", next);
+    setIsDarkMode(next === "midnight");
+    return next;
+  }, []);
+
   const cycleTheme = useCallback(() => {
     setCurrentTheme((prev) => {
       const current = normalizeTheme(prev);
@@ -63,6 +74,7 @@ export const ThemeProvider = ({ children }) => {
       localStorage.setItem("theme_mode", next === "midnight" ? "dark" : "light");
       localStorage.setItem("appTheme", next);
       localStorage.setItem("aura-theme", next);
+      setIsDarkMode(next === "midnight");
       return next;
     });
   }, []);
@@ -99,6 +111,7 @@ export const ThemeProvider = ({ children }) => {
     isDarkMode,
     toggleDarkMode,
     currentTheme,
+    setTheme,
     cycleTheme,
     accentKey,
     setAccent,

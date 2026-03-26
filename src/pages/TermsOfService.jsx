@@ -1,172 +1,206 @@
-import React from 'react';
+import React from "react";
+import { getDocumentMeta } from "../services/clients/ContentClient.js";
 
-const TermsOfService = ({ onClose }) => {
+export default function TermsOfService({ onClose }) {
+  const meta = getDocumentMeta("tos");
   const T = {
-  bg: 'var(--surface-elevated, #FFFFFF)',
-    fg: '#111827',
-    muted: '#64748B',
-    blue: '#2563EB',
-    border: '#E2E8F0',
+    bg: "var(--surface-elevated, #FFFFFF)",
+    fg: "var(--text-primary, #111827)",
+    muted: "var(--text-secondary, #64748B)",
+    blue: "var(--accent-primary, #2563EB)",
+    border: "var(--border-subtle, rgba(0,0,0,0.08))",
   };
 
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      background: 'rgba(0, 0, 0, 0.5)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 1000,
-      padding: '20px',
-      fontFamily: 'Inter, sans-serif',
-    }}>
-      <div style={{
-        background: T.bg,
-        borderRadius: 12,
-        maxWidth: 700,
-        maxHeight: '90vh',
-        overflowY: 'auto',
-        padding: 40,
-        boxShadow: '0 10px 40px rgba(0, 0, 0, 0.2)',
-      }}>
-        
-        {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 }}>
-          <h1 style={{
-            fontSize: 24,
-            fontWeight: 700,
-            color: T.fg,
-            margin: 0,
-          }}>
-            Terms of Service
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "var(--aura-overlay, rgba(0, 0, 0, 0.5))",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 1000,
+        padding: "20px",
+        fontFamily: "Inter, sans-serif",
+        backdropFilter: "blur(10px)",
+      }}
+    >
+      <div
+        style={{
+          background: T.bg,
+          borderRadius: 12,
+          maxWidth: 700,
+          maxHeight: "90vh",
+          overflowY: "auto",
+          padding: 40,
+          border: `1px solid ${T.border}`,
+          boxShadow: "var(--aura-shadow, 0 10px 40px rgba(0, 0, 0, 0.2))",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: 32,
+          }}
+        >
+          <h1
+            style={{
+              fontSize: 24,
+              fontWeight: 700,
+              color: T.fg,
+              margin: 0,
+            }}
+          >
+            {meta?.title || "Terms of Service"}
           </h1>
           <button
             onClick={onClose}
             style={{
-              background: 'none',
-              border: 'none',
+              background: "none",
+              border: "none",
               fontSize: 24,
               color: T.muted,
-              cursor: 'pointer',
+              cursor: "pointer",
             }}
           >
-            ×
+            x
           </button>
         </div>
 
-        {/* Content */}
         <div style={{ lineHeight: 1.8, color: T.fg, fontSize: 14 }}>
           <p style={{ color: T.muted, marginBottom: 24 }}>
             <strong>Last Updated:</strong> March 18, 2026
           </p>
 
           <section style={{ marginBottom: 32 }}>
-            <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>1. Acceptance of Terms</h2>
+            <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>
+              1. Acceptance of Terms
+            </h2>
             <p>
-              By accessing and using the Traders Regiment platform ("Platform"), you accept and agree to be bound by 
-              the terms and provision of this agreement. If you do not agree to abide by the above, please do not 
-              use this service.
+              By accessing and using the Traders Regiment platform
+              ("Platform"), you accept and agree to be bound by the terms and
+              provision of this agreement. If you do not agree to abide by the
+              above, please do not use this service.
             </p>
           </section>
 
           <section style={{ marginBottom: 32 }}>
-            <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>2. Use License</h2>
+            <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>
+              2. Use License
+            </h2>
             <p>
-              Permission is granted to temporarily download one copy of the materials (information or software) on the 
-              Traders Regiment Platform for personal, non-commercial transitory viewing only. This is the grant of a 
-              license, not a transfer of title, and under this license you may not:
+              Permission is granted to temporarily download one copy of the
+              materials (information or software) on the Traders Regiment
+              Platform for personal, non-commercial transitory viewing only.
+              This is the grant of a license, not a transfer of title, and
+              under this license you may not:
             </p>
             <ul style={{ marginLeft: 20 }}>
               <li>Modify or copy the materials</li>
-              <li>Use the materials for any commercial purpose or for any public display</li>
-              <li>Attempt to decompile or reverse engineer any software contained on the Platform</li>
-              <li>Remove any copyright or other proprietary notations from the materials</li>
-              <li>Transfer the materials to another person or "mirror" the materials on any other server</li>
-              <li>Violate any applicable laws or regulations</li>
+              <li>Use the materials for any commercial purpose or public display</li>
+              <li>Attempt to decompile or reverse engineer platform software</li>
+              <li>Remove copyright or proprietary notices</li>
+              <li>Transfer or mirror the materials elsewhere</li>
+              <li>Violate applicable laws or regulations</li>
             </ul>
           </section>
 
           <section style={{ marginBottom: 32 }}>
-            <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>3. User Accounts</h2>
+            <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>
+              3. User Accounts
+            </h2>
             <p>
-              You are responsible for maintaining the confidentiality of your account information and password. You 
-              agree to accept responsibility for all activities that occur under your account. You must notify us 
-              immediately of any unauthorized use of your account.
+              You are responsible for maintaining the confidentiality of your
+              account information and password. You agree to accept
+              responsibility for all activities that occur under your account.
+              You must notify us immediately of any unauthorized use.
             </p>
           </section>
 
           <section style={{ marginBottom: 32 }}>
-            <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>4. Limitation of Liability</h2>
+            <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>
+              4. Limitation of Liability
+            </h2>
             <p>
-              The materials on the Traders Regiment Platform are provided "as is". Traders Regiment makes no warranties, 
-              expressed or implied, and hereby disclaims and negates all other warranties including, without limitation, 
-              implied warranties or conditions of merchantability, fitness for a particular purpose, or non-infringement 
-              of intellectual property or other violation of rights.
+              The materials on the Traders Regiment Platform are provided "as
+              is". Traders Regiment makes no warranties, expressed or implied,
+              including merchantability, fitness for a particular purpose, or
+              non-infringement.
             </p>
           </section>
 
           <section style={{ marginBottom: 32 }}>
-            <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>5. Revisions</h2>
+            <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>
+              5. Revisions
+            </h2>
             <p>
-              Traders Regiment may revise these terms of service at any time without notice. By using this Platform, 
-              you are agreeing to be bound by the then current version of these terms of service.
+              Traders Regiment may revise these terms at any time without
+              notice. By using the Platform, you agree to be bound by the then
+              current version.
             </p>
           </section>
 
           <section style={{ marginBottom: 32 }}>
-            <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>6. Trading Risks</h2>
+            <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>
+              6. Trading Risks
+            </h2>
             <p>
-              Futures trading involves substantial risk of loss. Past performance is not indicative of future results. 
-              Performance results represent past performance and do not guarantee future results. You acknowledge that 
-              you understand these risks and invest only capital you can afford to lose.
+              Futures trading involves substantial risk of loss. Past
+              performance is not indicative of future results. You acknowledge
+              these risks and invest only capital you can afford to lose.
             </p>
           </section>
 
           <section style={{ marginBottom: 32 }}>
-            <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>7. Governing Law</h2>
+            <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>
+              7. Governing Law
+            </h2>
             <p>
-              These terms and conditions are governed by and construed in accordance with the laws of the jurisdiction 
-              in which Traders Regiment operates, and you irrevocably submit to the exclusive jurisdiction of the courts 
-              in that location.
+              These terms and conditions are governed by the laws of the
+              jurisdiction in which Traders Regiment operates, and you submit to
+              the exclusive jurisdiction of the courts there.
             </p>
           </section>
 
           <section>
-            <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>8. Contact Information</h2>
+            <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>
+              8. Contact Information
+            </h2>
             <p>
-              If you have questions about these Terms of Service, please contact us at legal@traders-regiment.com
+              If you have questions about these Terms of Service, contact us at
+              legal@traders-regiment.com.
             </p>
           </section>
         </div>
 
-        {/* Close Button */}
         <button
           onClick={onClose}
           style={{
-            width: '100%',
+            width: "100%",
             marginTop: 32,
-            padding: '12px 24px',
+            padding: "12px 24px",
             background: T.blue,
-            color: 'var(--accent-text, #fff)',
-            border: 'none',
+            color: "var(--accent-text, #fff)",
+            border: "none",
             borderRadius: 6,
             fontSize: 14,
             fontWeight: 600,
-            cursor: 'pointer',
-            transition: 'all 0.2s ease',
+            cursor: "pointer",
+            transition: "filter 0.2s ease",
           }}
-          onMouseOver={(e) => e.target.style.background = '#1d4ed8'}
-          onMouseOut={(e) => e.target.style.background = T.blue}
+          onMouseOver={(event) => {
+            event.currentTarget.style.filter = "brightness(0.95)";
+          }}
+          onMouseOut={(event) => {
+            event.currentTarget.style.filter = "none";
+          }}
         >
           I UNDERSTAND & ACCEPT
         </button>
       </div>
     </div>
   );
-};
-
-export default TermsOfService;
+}
