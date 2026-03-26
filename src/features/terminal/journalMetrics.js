@@ -28,9 +28,46 @@ export function computeJournalMetrics(journal = []) {
   const pf =
     lossDenominator > 0
       ? (avgWin * wins.length) / lossDenominator
-      : wins.length > 0
+    : wins.length > 0
         ? Number.POSITIVE_INFINITY
         : 0;
+
+  const accuracySamples = entries
+    .map((entry) => {
+      const entryPrice = toNumber(entry?.entry, NaN);
+      const predictedTP1 = toNumber(
+        entry?.predictedTP1 ?? entry?.predicted_tp1,
+        NaN,
+      );
+      const actualExit = toNumber(entry?.actualExit ?? entry?.exit, NaN);
+
+      if (
+        !Number.isFinite(entryPrice) ||
+        !Number.isFinite(predictedTP1) ||
+        !Number.isFinite(actualExit)
+      ) {
+        return null;
+      }
+
+      const predictedDistance = Math.abs(predictedTP1 - entryPrice);
+      if (predictedDistance <= 0) return null;
+
+      const actualDistance = Math.abs(actualExit - entryPrice);
+      return Math.max(0, (actualDistance / predictedDistance) * 100);
+    })
+    .filter((value) => Number.isFinite(value));
+
+  const predictionAccuracy =
+    accuracySamples.length > 0
+      ? accuracySamples.reduce((sum, value) => sum + value, 0) /
+        accuracySamples.length
+      : 0;
+  const recentAccuracies = accuracySamples.slice(-5);
+  const predictionAccuracyL5 =
+    recentAccuracies.length > 0
+      ? recentAccuracies.reduce((sum, value) => sum + value, 0) /
+        recentAccuracies.length
+      : 0;
 
   return {
     wins,
@@ -40,6 +77,10 @@ export function computeJournalMetrics(journal = []) {
     avgWin,
     avgLoss,
     pf,
+    predictionAccuracy,
+    predictionAccuracyL5,
+    recentAccuracies,
+    accuracySamples,
   };
 }
 

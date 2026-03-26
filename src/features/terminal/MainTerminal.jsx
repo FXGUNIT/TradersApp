@@ -8,12 +8,15 @@ import {
   getDynamicParameters,
   calculateThrottledRisk,
   calculatePositionSize,
+  calculateLiquiditySweepProbability,
+  detectAmdPhase,
 } from "../../utils/math-engine.js";
 import {
   T,
   AMD_PHASES,
   TIME_OPTIONS,
   SCREENSHOT_EXTRACT_PROMPT,
+  TNC_PARSE_PROMPT,
   PART1_PROMPT,
   PART2_PROMPT,
   LED,
@@ -63,6 +66,12 @@ const defaultFirmRules = {
   notes: "",
   parseStatus: "",
 };
+
+function parseRrrMultiple(rrr) {
+  const parts = String(rrr || "").split(":");
+  const parsed = Number.parseFloat(parts[1]);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+}
 
 function normalizeJournal(journal) {
   if (Array.isArray(journal)) return journal;
@@ -125,7 +134,7 @@ export default function MainTerminal({
   onLogout,
   onSaveJournal,
   onSaveAccount,
-  onSaveFirmRules: _onSaveFirmRules,
+  onSaveFirmRules,
   showToast,
   auth: _auth,
   privacyMode: _privacyMode,
@@ -165,7 +174,11 @@ export default function MainTerminal({
   const [accountState, setAccountState] = useState(() =>
     buildAccountState(profile?.accountState),
   );
-  const [firmRules] = useState(() => profile?.firmRules || defaultFirmRules);
+  const [firmRules, setFirmRules] = useState(
+    () => profile?.firmRules || defaultFirmRules,
+  );
+  const [tcParsing, setTcParsing] = useState(false);
+  const [tcFileName, setTcFileName] = useState("");
   
   const [currentAMD, setCurrentAMD] = useState("UNCLEAR");
   const [p1Out, setP1Out] = useState("");
@@ -230,6 +243,8 @@ export default function MainTerminal({
     result: "win",
     entry: "",
     exit: "",
+    predictedTP1: "",
+    actualExit: "",
     contracts: "1",
     pnl: "",
     session: "Trading Hours",
@@ -246,10 +261,12 @@ export default function MainTerminal({
 
   const journalDidMount = useRef(false);
   const accountDidMount = useRef(false);
+  const firmRulesDidMount = useRef(false);
 
   useEffect(() => {
     setJournal(normalizeJournal(profile?.journal));
     setAccountState(buildAccountState(profile?.accountState));
+    setFirmRules(profile?.firmRules || defaultFirmRules);
   }, [profile?.uid, profile?.journal, profile?.accountState]);
 
   useEffect(() => {
@@ -289,6 +306,16 @@ export default function MainTerminal({
       void onSaveAccount(accountState);
     }
   }, [accountState, onSaveAccount]);
+
+  useEffect(() => {
+    if (!firmRulesDidMount.current) {
+      firmRulesDidMount.current = true;
+      return;
+    }
+    if (onSaveFirmRules) {
+      void onSaveFirmRules(firmRules);
+    }
+  }, [firmRules, onSaveFirmRules]);
 
   const metrics = useMemo(() => computeJournalMetrics(journal), [journal]);
 
@@ -336,6 +363,73 @@ export default function MainTerminal({
   const sd2Target = vwapPrice && vwapSD2 
     ? (f.direction === 'Long' ? vwapPrice + vwapSD2 : vwapPrice - vwapSD2) 
     : null;
+
+  const tradeEntryPrice = Number.parseFloat(f.entryPrice || extractedVals.currentPrice || "");
+  const sweepEstimate = useMemo(() => {
+    const keyLevels = parsed?.keyLevels || {};
+    const candidates = [
+      ["PDH", keyLevels.pdh],
+      ["PDL", keyLevels.pdl],
+      ["PWH", keyLevels.pwh],
+      ["PWL", keyLevels.pwl],
+    ]
+      .map(([label, value]) => ({ label, value: Number.parseFloat(value) }))
+      .filter((item) => Number.isFinite(item.value));
+
+    if (!Number.isFinite(tradeEntryPrice) || !candidates.length) return null;
+
+    const nearest = candidates.reduce((best, item) => {
+      if (!best) return item;
+      const bestDistance = Math.abs(tradeEntryPrice - best.value);
+      const itemDistance = Math.abs(tradeEntryPrice - item.value);
+      return itemDistance < bestDistance ? item : best;
+    }, null);
+
+    const estimatedMinutesSinceTest = Math.min(
+      180,
+      Math.max(30, Math.round((parsed?.totalBars || 180) / Math.max(1, parsed?.totalDays || 1) / 2)),
+    );
+
+    return {
+      ...calculateLiquiditySweepProbability({
+        distanceToLevel: Math.abs(tradeEntryPrice - nearest.value),
+        atr: atrVal || parsed?.tradingHoursAtr14 || 0,
+        timeSinceLastTestMins: estimatedMinutesSinceTest,
+        volumeProfileScore: nearest.label === "PDH" || nearest.label === "PWH" ? 0.35 : 0.65,
+      }),
+      levelName: nearest.label,
+      levelValue: nearest.value,
+      price: tradeEntryPrice,
+      estimatedMinutesSinceTest,
+    };
+  }, [parsed, tradeEntryPrice, atrVal]);
+
+  const predictedP2TP1 = Number.isFinite(tradeEntryPrice)
+    ? tradeEntryPrice +
+      (f.direction === "Long" ? 1 : -1) *
+        slPts *
+        parseRrrMultiple(f.rrr)
+    : null;
+  const predictedP2SL = Number.isFinite(tradeEntryPrice)
+    ? tradeEntryPrice -
+      (f.direction === "Long" ? 1 : -1) * slPts
+    : null;
+  const heuristicAmdPhase = useMemo(() => {
+    if (!parsed?.days?.length) return "UNCLEAR";
+    const latest = parsed.days[parsed.days.length - 1];
+    return detectAmdPhase({
+      range: Math.max(0, (latest?.dayHigh || 0) - (latest?.dayLow || 0)),
+      twentyDayAdr: parsed.tradingHoursAtr14 || latest?.atr14 || 0,
+      volumeNearLows: false,
+      wickRatio: 0,
+      wickToAtr: 0,
+      higherHighs: false,
+      lowerLows: false,
+      conflictingSignals: false,
+      adxDeclining: extractedVals.adx !== null ? extractedVals.adx < 20 : false,
+    }).phase;
+  }, [parsed, extractedVals.adx]);
+  const displayedAmdPhase = currentAMD !== "UNCLEAR" ? currentAMD : heuristicAmdPhase;
 
   // Firm compliance calculations
   const fr = firmRules;
@@ -485,6 +579,8 @@ export default function MainTerminal({
             postMarket: isPostMarket ? 1 : 0,
             atr14: tr,
             tradingHoursAtr14: !isPreMarket && !isPostMarket ? tr : 0,
+            dayHigh: high,
+            dayLow: low,
           });
         } else {
           const d = days[days.length - 1];
@@ -494,6 +590,8 @@ export default function MainTerminal({
           else d.postMarket++;
           d.atr14 = Math.max(d.atr14, tr);
           if (!isPreMarket && !isPostMarket) d.tradingHoursAtr14 = Math.max(d.tradingHoursAtr14, tr);
+          d.dayHigh = Number.isFinite(d.dayHigh) ? Math.max(d.dayHigh, high) : high;
+          d.dayLow = Number.isFinite(d.dayLow) ? Math.min(d.dayLow, low) : low;
         }
         totalBars++;
       }
@@ -511,6 +609,17 @@ export default function MainTerminal({
       }
       
       const tradingHoursAtr = days.reduce((s, d) => s + (d.tradingHoursAtr14 || 0), 0) / (days.length || 1);
+      const priorDays = days.slice(0, -1);
+      const priorWeek = priorDays.slice(-5);
+      const prevDay = priorDays[priorDays.length - 1] || null;
+      const priorWeekHighs = priorWeek.map((d) => d.dayHigh).filter(Number.isFinite);
+      const priorWeekLows = priorWeek.map((d) => d.dayLow).filter(Number.isFinite);
+      const keyLevels = {
+        pdh: prevDay?.dayHigh ?? null,
+        pdl: prevDay?.dayLow ?? null,
+        pwh: priorWeekHighs.length ? Math.max(...priorWeekHighs) : null,
+        pwl: priorWeekLows.length ? Math.min(...priorWeekLows) : null,
+      };
       
       if (days.length < 5) {
         setParseMsg(`⚠ Only ${days.length} days — need 5+`);
@@ -518,7 +627,7 @@ export default function MainTerminal({
         return;
       }
       
-      setParsed({ days, totalBars, totalDays: days.length, tradingHoursAtr14: tradingHoursAtr });
+      setParsed({ days, totalBars, totalDays: days.length, tradingHoursAtr14: tradingHoursAtr, keyLevels });
       setParseMsg(`✓ ${totalBars.toLocaleString()} bars → ${days.length} days`);
     };
     r.readAsText(file);
@@ -556,6 +665,102 @@ export default function MainTerminal({
 
     setScreenshots((current) => [...current, ...nextAssets].slice(0, 4));
   }, []);
+
+  const parseTandC = useCallback(
+    async (text, fileName = "") => {
+      const sourceText = String(text || "").trim();
+      if (!sourceText) {
+        setFirmRules((previous) => ({
+          ...previous,
+          parseStatus: "✗ T&C document is empty.",
+        }));
+        return;
+      }
+
+      setTcParsing(true);
+      setFirmRules((previous) => ({
+        ...previous,
+        parseStatus: `Reading T&C document${fileName ? `: ${fileName}` : ""}...`,
+      }));
+
+      try {
+        const DEEPSEEK_KEY = import.meta.env.VITE_DEEPSEEK_KEY || "";
+        if (!DEEPSEEK_KEY) {
+          throw new Error("No DeepSeek API key configured");
+        }
+
+        const res = await fetch("https://api.deepseek.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${DEEPSEEK_KEY}`,
+          },
+          body: JSON.stringify({
+            model: "deepseek-chat",
+            max_tokens: 1200,
+            messages: [
+              { role: "system", content: TNC_PARSE_PROMPT },
+              {
+                role: "user",
+                content: `Parse these T&C:\n\n${sourceText.slice(0, 12000)}`,
+              },
+            ],
+          }),
+        });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData?.error?.message || `HTTP ${res.status}`);
+        }
+
+        const data = await res.json();
+        const raw = data.choices?.[0]?.message?.content || "{}";
+        const vals = JSON.parse(raw.replace(/```json|```/g, "").trim());
+        const updated = {
+          ...firmRules,
+          ...vals,
+          parsed: true,
+          parseStatus: `✓ Parsed: ${vals.firmName || "Unknown Firm"}`,
+        };
+
+        setFirmRules(updated);
+        showToast?.(
+          `T&C loaded${updated.firmName ? `: ${updated.firmName}` : ""}`,
+          "success",
+        );
+      } catch (error) {
+        setFirmRules((previous) => ({
+          ...previous,
+          parseStatus: `✗ Parse failed — ${error?.message || "Unknown error"}`,
+        }));
+      } finally {
+        setTcParsing(false);
+      }
+    },
+    [firmRules, showToast],
+  );
+
+  const handleFirmRulesDrop = useCallback(
+    (event) => {
+      event.preventDefault();
+      const file = event.dataTransfer?.files?.[0] || event.target?.files?.[0];
+      if (!file) return;
+
+      setTcFileName(file.name || "");
+      const reader = new FileReader();
+      reader.onload = async (readerEvent) => {
+        await parseTandC(String(readerEvent.target?.result || ""), file.name);
+      };
+      reader.onerror = () => {
+        setFirmRules((previous) => ({
+          ...previous,
+          parseStatus: "✗ Failed to read T&C document.",
+        }));
+      };
+      reader.readAsText(file);
+    },
+    [parseTandC],
+  );
 
   // AI extraction
   const extractFromScreenshots = async () => {
@@ -797,6 +1002,9 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
       result: p2Jf.result, 
       entry: f.entryPrice, 
       exit: p2Jf.exit, 
+      actualExit: p2Jf.exit,
+      predictedTP1: Number.isFinite(predictedP2TP1) ? predictedP2TP1.toFixed(2) : "",
+      predictedSL: Number.isFinite(predictedP2SL) ? predictedP2SL.toFixed(2) : "",
       contracts: String(contracts), 
       pnl: p2Jf.pnl, 
       session: 'Trading Hours', 
@@ -822,8 +1030,15 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
   // Add manual journal entry
   const addJournalEntry = () => {
     if (!jf.entry || !jf.exit) return;
-    setJournal(prev => [...prev, { ...jf, id: `trade-${Date.now()}` }]);
-    setJf(p => ({ ...p, entry: '', exit: '', pnl: '', setup: '', lessons: '', balAfter: '' }));
+    const entryPrice = Number.parseFloat(jf.entry);
+    const fallbackPredictedTP1 = Number.isFinite(entryPrice)
+      ? entryPrice +
+        (jf.direction === "Long" ? 1 : -1) *
+          slPts *
+          parseRrrMultiple(jf.rrr)
+      : null;
+    setJournal(prev => [...prev, { ...jf, actualExit: jf.exit, predictedTP1: jf.predictedTP1 || (Number.isFinite(fallbackPredictedTP1) ? fallbackPredictedTP1.toFixed(2) : ""), id: `trade-${Date.now()}` }]);
+    setJf(p => ({ ...p, entry: '', exit: '', predictedTP1: '', actualExit: '', pnl: '', setup: '', lessons: '', balAfter: '' }));
   };
 
   // Get name for greeting
@@ -877,7 +1092,7 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
           </div>
           
           {fr.parsed && <Tag label={fr.firmName} color={T.purple} />}
-          <AMDPhaseTag phase={currentAMD} />
+          <AMDPhaseTag phase={displayedAmdPhase} />
           {throttleActive && <Tag label="⚠ DRAWDOWN THROTTLE" color={T.gold} />}
         </div>
         
@@ -1048,7 +1263,7 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
               {!loading && p1Out && (
                 <div>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-                    <div style={{display:"flex",gap:8,alignItems:"center"}}><Tag label="ANALYSIS COMPLETE" color={T.green}/><AMDPhaseTag phase={currentAMD}/></div>
+                    <div style={{display:"flex",gap:8,alignItems:"center"}}><Tag label="ANALYSIS COMPLETE" color={T.green}/><AMDPhaseTag phase={displayedAmdPhase}/></div>
                     <div style={{display:"flex",gap:8}}>
                       <button onClick={()=>{setActiveTab('trade');setErr('');}} style={glowBtn(T.orange,false)} className="btn-glass">→ TRADE ENTRY</button>
                       <button onClick={()=>navigator.clipboard?.writeText(p1Out)} style={{background:"transparent",border:`1px solid #E5E7EB`,borderRadius:6,padding:"8px 12px",cursor:"pointer",color:"#6B7280",fontSize:10,fontFamily:T.font}}>⎘ COPY</button>
@@ -1066,7 +1281,7 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
           <div>
             <div style={{ display: "flex", gap: 16, marginBottom: 16, flexWrap: "wrap" }}>
               <div style={{ flex: 1, minWidth: 280 }}>
-                <AMDPhaseTag phase={currentAMD} />
+                <AMDPhaseTag phase={displayedAmdPhase} />
               </div>
               <div style={{ flex: 2, minWidth: 280 }}>
                 <TrafficLight state={trafficState} />
@@ -1102,6 +1317,21 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
               <span style={{ color: volatilityRegime === 'Compression' ? T.red : volatilityRegime === 'Expansion' ? T.green : T.blue, fontSize: 14, fontWeight: 800 }}>{volatilityRegime}</span>
               <span style={{ color: T.muted, fontSize: 12, fontFamily: T.mono, fontWeight: 600 }}>(VR = {VR.toFixed(2)})</span>
             </div>
+
+            {sweepEstimate && (
+              <div style={{ padding: "12px 20px", background: "rgba(14,165,233,0.08)", border: `1px solid rgba(14,165,233,0.25)`, borderRadius: 8, marginBottom: 20 }} className="glass-panel">
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  <span style={{ color: T.blue, fontSize: 10, letterSpacing: 1.2, fontWeight: 800 }}>LIQUIDITY SWEEP WATCH</span>
+                  <Tag label={`${sweepEstimate.levelName} ${sweepEstimate.levelValue.toFixed(2)}`} color={T.cyan} />
+                  <span style={{ color: sweepEstimate.probability > 0.7 ? T.red : sweepEstimate.probability > 0.45 ? T.gold : T.green, fontSize: 13, fontWeight: 800 }}>
+                    {(sweepEstimate.probability * 100).toFixed(0)}%
+                  </span>
+                </div>
+                <div style={{ color: T.muted, fontSize: 12, marginTop: 6, lineHeight: 1.5 }}>
+                  {sweepEstimate.alert}. {sweepEstimate.recommendedAction}.
+                </div>
+              </div>
+            )}
 
             {/* Trade Setup */}
             <div style={cardS({ borderLeft: `4px solid ${T.orange}` })} className="glass-panel card-tilt">
@@ -1288,6 +1518,10 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
                         <Field label="P&L ($)" value={p2Jf.pnl} onChange={sp2('pnl')} type="number" mono />
                         <Field label="BALANCE AFTER ($)" value={p2Jf.balAfter} onChange={sp2('balAfter')} type="number" mono />
                       </div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 16 }}>
+                        <Tag label={`Pred TP1: ${Number.isFinite(predictedP2TP1) ? predictedP2TP1.toFixed(2) : "—"}`} color={T.green} />
+                        <Tag label={`Pred SL: ${Number.isFinite(predictedP2SL) ? predictedP2SL.toFixed(2) : "—"}`} color={T.red} />
+                      </div>
                       <button onClick={addP2Trade} style={glowBtn(T.purple, false)} className="btn-glass">+ ADD TO JOURNAL</button>
                     </div>
                   )}
@@ -1311,11 +1545,13 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
               {[
                 { l: "TOTAL P&L", v: `${metrics.pnlTotal >= 0 ? "+" : ""}$${metrics.pnlTotal.toFixed(2)}`, c: metrics.pnlTotal >= 0 ? T.green : T.red }, 
                 { l: "WIN RATE", v: `${metrics.wr.toFixed(1)}%`, c: metrics.wr >= 50 ? T.green : T.red }, 
-                { l: "PROFIT FACTOR", v: metrics.pf ? metrics.pf.toFixed(2) : "—", c: metrics.pf && metrics.pf >= 1.5 ? T.green : metrics.pf && metrics.pf >= 1 ? T.gold : T.red }
+                { l: "PROFIT FACTOR", v: metrics.pf ? metrics.pf.toFixed(2) : "—", c: metrics.pf && metrics.pf >= 1.5 ? T.green : metrics.pf && metrics.pf >= 1 ? T.gold : T.red },
+                { l: "PREDICTION ACCURACY (L5)", v: `${metrics.predictionAccuracyL5 ? metrics.predictionAccuracyL5.toFixed(1) : "0.0"}%`, c: metrics.predictionAccuracyL5 >= 85 ? T.green : metrics.predictionAccuracyL5 >= 70 ? T.gold : T.red, sub: metrics.recentAccuracies.length ? metrics.recentAccuracies.map(v => `${v.toFixed(0)}%`).join(" | ") : "No accuracy samples yet" }
               ].map((s, i) => (
                 <div key={i} style={cardS({ margin: 0, textAlign: "center", padding: "20px" })} className="glass-panel card-tilt">
                   <div style={{ color: T.dim, fontSize: 11, letterSpacing: 1.5, marginBottom: 8, fontWeight: 700 }}>{s.l}</div>
                   <div style={{ color: s.c, fontSize: 24, fontWeight: 800, fontFamily: T.mono }}>{s.v}</div>
+                  {s.sub && <div style={{ color: T.muted, fontSize: 10, marginTop: 8, lineHeight: 1.4 }}>{s.sub}</div>}
                 </div>
               ))}
             </div>
@@ -1349,7 +1585,8 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
                   <Field label="RRR" value={jf.rrr} onChange={sjf('rrr')} options={[{v:'1:1',l:'1:1'},{v:'1:1.2',l:'1:1.2'},{v:'1:2',l:'1:2'},{v:'1:2.2',l:'1:2.2'}]}/>
                   <Field label="RESULT" value={jf.result} onChange={sjf('result')} options={[{v:'win',l:'✓ Win'},{v:'loss',l:'✗ Loss'},{v:'breakeven',l:'◎ BE'}]}/>
                   <Field label="ENTRY" placeholder="Entry price" value={jf.entry} onChange={sjf('entry')} type="number" mono/>
-                  <Field label="EXIT" placeholder="Exit price" value={jf.exit} onChange={sjf('exit')} type="number" mono/>
+                  <Field label="PRED TP1" placeholder="Predicted TP1" value={jf.predictedTP1} onChange={sjf('predictedTP1')} type="number" mono/>
+                  <Field label="ACTUAL EXIT" placeholder="Exit price" value={jf.exit} onChange={sjf('exit')} type="number" mono/>
                   <Field label="P&L ($)" placeholder="P&L" value={jf.pnl} onChange={sjf('pnl')} type="number" mono/>
                   <Field label="BAL AFTER ($)" value={jf.balAfter} onChange={sjf('balAfter')} type="number" mono/>
                 </div>
@@ -1442,6 +1679,57 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
         {/* TAB 4: ACCOUNT */}
         {activeTab === 'account' && (
           <div>
+            <div style={cardS({ borderLeft: `4px solid ${T.green}` })} className="glass-panel card-tilt">
+              <SHead icon="📋" title="PROP FIRM TERMS & CONDITIONS" color={T.green} />
+              <div
+                onDrop={handleFirmRulesDrop}
+                onDragOver={(e) => e.preventDefault()}
+                onClick={() => document.getElementById("tcIn")?.click()}
+                style={{
+                  border: `2px dashed ${firmRules.parsed ? T.green : "rgba(255,255,255,0.15)"}`,
+                  borderRadius: 10,
+                  padding: "32px",
+                  textAlign: "center",
+                  cursor: "pointer",
+                  background: "rgba(0,0,0,0.3)",
+                  marginBottom: 16,
+                  position: "relative",
+                  overflow: "hidden",
+                }}
+                className="glass-panel"
+              >
+                <input id="tcIn" type="file" accept=".pdf,.txt,.doc,.docx" style={{ display: "none" }} onChange={handleFirmRulesDrop} />
+                <div style={{ fontSize: 32, marginBottom: 12, opacity: firmRules.parsed ? 1 : 0.2 }}>
+                  {firmRules.parsed ? "✓" : "📋"}
+                </div>
+                <div style={{ color: firmRules.parsed ? T.green : T.muted, fontSize: 13, marginBottom: 6, fontWeight: 600 }}>
+                  {firmRules.parsed ? `T&C Loaded: ${firmRules.firmName || "Firm Rules"}` : "Drop T&C document or click to browse"}
+                </div>
+                <div style={{ color: T.muted, fontSize: 11 }}>
+                  Best results with text-extractable files. {tcFileName ? `Last file: ${tcFileName}` : ""}
+                </div>
+              </div>
+              {tcParsing && (
+                <div style={{ color: T.blue, fontSize: 12, textAlign: "center", fontWeight: 600, marginBottom: 8 }}>
+                  ⟳ AI ANALYZING COMPLIANCE RULES...
+                </div>
+              )}
+              {firmRules.parseStatus && (
+                <div style={{ color: String(firmRules.parseStatus).startsWith("✓") ? T.green : T.red, fontSize: 12, textAlign: "center", marginBottom: 12 }}>
+                  {firmRules.parseStatus}
+                </div>
+              )}
+              {firmRules.parsed && Array.isArray(firmRules.keyRules) && firmRules.keyRules.length > 0 && (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 12 }}>
+                  {firmRules.keyRules.slice(0, 10).map((rule, idx) => (
+                    <div key={idx} style={{ padding: "10px 14px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, color: T.muted, fontSize: 12 }}>
+                      • {rule}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <div style={cardS({ borderLeft: `4px solid ${T.blue}` })} className="glass-panel card-tilt">
               <SHead icon="💰" title="LIVE ACCOUNT STATE" color={T.blue} />
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, color: T.green, fontSize: 11, fontWeight: 800, letterSpacing: 1.5, textTransform: "uppercase" }}>

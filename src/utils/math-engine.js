@@ -163,6 +163,48 @@ export function calculateManipulationWickValidation({
 }
 
 /**
+ * 5b. LIQUIDITY SWEEP PROBABILITY
+ * Uses the spec's weighted score with a best-effort score for volume profile.
+ */
+export function calculateLiquiditySweepProbability({
+  distanceToLevel = 0,
+  atr = 0,
+  timeSinceLastTestMins = 0,
+  volumeProfileScore = 0.5,
+} = {}) {
+  const distance = Math.max(0, toNumber(distanceToLevel, 0));
+  const atrValue = Math.max(0, toNumber(atr, 0));
+  const minutes = Math.max(0, toNumber(timeSinceLastTestMins, 0));
+  const volumeScore = clamp(toNumber(volumeProfileScore, 0.5), 0, 1);
+
+  const distanceScore =
+    atrValue > 0 ? clamp(1 - distance / (atrValue * 2), 0, 1) : 0;
+  const timeScore = clamp(minutes / 180, 0, 1);
+  const probability = clamp(
+    distanceScore * 0.5 + timeScore * 0.3 + volumeScore * 0.2,
+    0,
+    1,
+  );
+
+  return {
+    probability: roundTo(probability, 3),
+    distanceScore: roundTo(distanceScore, 3),
+    timeScore: roundTo(timeScore, 3),
+    volumeScore: roundTo(volumeScore, 3),
+    alert:
+      probability > 0.7
+        ? "HIGH probability of liquidity sweep"
+        : probability > 0.45
+          ? "Moderate liquidity sweep risk"
+          : "Low liquidity sweep risk",
+    recommendedAction:
+      probability > 0.7
+        ? "Wait for wick + reversal confirmation"
+        : "Monitor key level reaction",
+  };
+}
+
+/**
  * 6. AMD PHASE DETECTION
  */
 export function detectAmdPhase({

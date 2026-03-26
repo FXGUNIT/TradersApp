@@ -93,6 +93,20 @@ select:focus {
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
+:focus-visible {
+  outline: 2px solid #0ea5e9 !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.18) !important;
+}
+
+button:focus:not(:focus-visible),
+a:focus:not(:focus-visible),
+input:focus:not(:focus-visible),
+textarea:focus:not(:focus-visible),
+select:focus:not(:focus-visible) {
+  box-shadow: none;
+}
+
 /* BACK BUTTON STYLES */
 .back-btn,
 .back-button {
