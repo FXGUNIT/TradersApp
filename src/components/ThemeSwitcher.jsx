@@ -14,21 +14,18 @@ const ThemeSwitcher = ({ currentTheme = "day", onThemeChange = () => {} }) => {
   const themes = [
     { 
       id: "day", 
-      label: "Day", 
-      icon: "☀️",
-      description: "Bright & clear"
-    },
-    { 
-      id: "night", 
-      label: "Night", 
-      icon: "🌙",
-      description: "Dark mode"
+      label: "L", 
+      description: "Lumière - Day mode"
     },
     { 
       id: "eye", 
-      label: "Eye Comfort", 
-      icon: "👓",
-      description: "Warm tones"
+      label: "W", 
+      description: "Amber - Eye Comfort"
+    },
+    { 
+      id: "night", 
+      label: "M", 
+      description: "Midnight - Night mode"
     },
   ];
 
@@ -46,27 +43,9 @@ const ThemeSwitcher = ({ currentTheme = "day", onThemeChange = () => {} }) => {
                 ...styles.pillButton,
                 ...(isActive ? styles.pillButtonActive : styles.pillButtonInactive),
               }}
-              onMouseEnter={(e) => {
-                if (!isActive) {
-                  e.currentTarget.style.opacity = "1";
-                  e.currentTarget.style.transform = "scale(1.02)";
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isActive) {
-                  e.currentTarget.style.opacity = "0.75";
-                  e.currentTarget.style.transform = "scale(1)";
-                }
-              }}
               title={theme.description}
               aria-pressed={isActive}
             >
-              <span style={{
-                ...styles.icon,
-                ...(isActive ? styles.iconActive : {})
-              }}>
-                {theme.icon}
-              </span>
               <span style={{
                 ...styles.label,
                 ...(isActive ? styles.labelActive : styles.labelInactive)
@@ -90,69 +69,52 @@ const styles = {
 
   switcherGroup: {
     display: "flex",
-    gap: "4px",
+    gap: "2px",
     alignItems: "center",
-    backgroundColor: "rgba(128, 128, 128, 0.15)",
-    padding: "4px",
-    borderRadius: "28px",
-    border: "1px solid rgba(128, 128, 128, 0.2)",
+    backgroundColor: "rgba(0, 0, 0, 0.08)",
+    padding: "3px",
+    borderRadius: "6px",
+    border: "1px solid rgba(0, 0, 0, 0.06)",
   },
 
   pillButton: {
     display: "flex",
     alignItems: "center",
-    gap: "6px",
-    padding: "8px 14px",
-    borderRadius: "22px",
+    justifyContent: "center",
+    width: "28px",
+    height: "24px",
+    borderRadius: "4px",
     border: "none",
     cursor: "pointer",
-    fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-    fontSize: "12px",
-    fontWeight: "600",
-    transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
+    fontFamily: "'IBM Plex Mono', 'SF Mono', monospace",
+    fontSize: "11px",
+    fontWeight: "700",
+    transition: "all 0.2s ease",
     outline: "none",
-    whiteSpace: "nowrap",
   },
 
   pillButtonActive: {
-    background: "linear-gradient(135deg, #0A84FF 0%, #0066CC 100%)",
-    color: "#FFFFFF",
-    boxShadow: "0 4px 15px rgba(10, 132, 255, 0.4), 0 2px 8px rgba(0, 0, 0, 0.2)",
-    transform: "scale(1.03)",
-    border: "1px solid rgba(255, 255, 255, 0.2)",
+    background: "#1a1a1a",
+    color: "#ffffff",
+    boxShadow: "0 1px 3px rgba(0, 0, 0, 0.2)",
   },
 
   pillButtonInactive: {
     backgroundColor: "transparent",
-    color: "rgba(255, 255, 255, 0.6)",
-    border: "1px solid rgba(255, 255, 255, 0.1)",
-    opacity: 0.75,
-  },
-
-  icon: {
-    fontSize: "14px",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    transition: "transform 0.2s ease",
-  },
-
-  iconActive: {
-    transform: "scale(1.1)",
+    color: "rgba(0, 0, 0, 0.4)",
   },
 
   label: {
     userSelect: "none",
-    letterSpacing: "0.3px",
+    letterSpacing: "0.5px",
   },
 
   labelActive: {
-    color: "#FFFFFF",
-    textShadow: "0 1px 2px rgba(0, 0, 0, 0.3)",
+    color: "#ffffff",
   },
 
   labelInactive: {
-    color: "rgba(255, 255, 255, 0.6)",
+    color: "rgba(0, 0, 0, 0.4)",
   },
 };
 
