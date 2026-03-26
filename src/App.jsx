@@ -56,6 +56,7 @@ import { detectDuplicateIPs as scanDuplicateIPs } from "./services/ipScanner.js"
 import { calculateVolatilityRatio, getDynamicParameters, calculateThrottledRisk } from "./utils/math-engine.js";
 import { formatPhoneNumber, TradersRegimentWatermark, ExchangeFacilityBadge } from "./utils/businessLogicUtils.jsx";
 import { getSession, getTradingDate, parseAndAggregate, buildDataSummary } from "./utils/sessionParser.js";
+import { fuzzySearchScore, highlightMatches, renderHighlightedText } from "./utils/searchUtils.jsx";
 
 // math-engine & ai-router — both inlined (files exist but have no exports)
 // Swap to real imports once those files are complete
@@ -1006,99 +1007,6 @@ const getDevice = () => ({
 // ═══════════════════════════════════════════════════════════════════
 // MODULE 1 IDENTITY & VERIFICATION UTILITIES (#21, #22, #24, #30)
 // ═══════════════════════════════════════════════════════════════════
-
-// MODULE 2: Surveillance Grid Search Engine (#34, #35, #57)
-// RULE #34, #35: Fuzzy Search Algorithm (Fuse.js-like logic)
-const fuzzySearchScore = (query, text) => {
-  if (!query || !text) return -1;
-
-  const q = query.toLowerCase();
-  const t = text.toLowerCase();
-
-  // Exact match: highest score
-  if (t === q) return 1000;
-
-  // Starts with query: very high score
-  if (t.startsWith(q)) return 900;
-
-  // Contains query as substring: high score
-  if (t.includes(q)) return 800;
-
-  // Fuzzy character matching: calculate match score
-  let qIdx = 0;
-  let score = 0;
-  let lastIdx = -1;
-
-  for (let i = 0; i < t.length && qIdx < q.length; i++) {
-    if (t[i] === q[qIdx]) {
-      // Character matched
-      const distance = i - lastIdx;
-      const proximity = distance === 1 ? 10 : Math.max(0, 10 - distance / 10);
-      score += 50 + proximity;
-      lastIdx = i;
-      qIdx++;
-    }
-  }
-
-  // Only return score if all query characters were matched
-  return qIdx === q.length ? score : -1;
-};
-
-// RULE #57: Search Highlighting - Wrap matching text in <mark> with yellow glow
-const highlightMatches = (text, query) => {
-  if (!query || !text) return text;
-
-  const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const regex = new RegExp(`(${escapedQuery})`, "gi");
-
-  const parts = text.split(regex);
-  return parts.map((part) => {
-    if (regex.test(part)) {
-      return {
-        highlighted: true,
-        text: part,
-      };
-    }
-    return {
-      highlighted: false,
-      text: part,
-    };
-  });
-};
-
-// Create JSX element with highlighted matches
-const renderHighlightedText = (text, query) => {
-  if (!query || !text) return text;
-
-  const parts = highlightMatches(text, query);
-  const jsxParts = [];
-  let markIdx = 0;
-
-  parts.forEach((part) => {
-    if (part.highlighted) {
-      jsxParts.push(
-        <mark
-          key={`mark-${markIdx++}`}
-          style={{
-            background:
-              "linear-gradient(135deg, rgba(255,214,10,0.4), rgba(255,214,10,0.2))",
-            boxShadow: "0 0 8px rgba(255,214,10,0.5)",
-            padding: "2px 4px",
-            borderRadius: 3,
-            color: "inherit",
-            fontWeight: 600,
-          }}
-        >
-          {part.text}
-        </mark>,
-      );
-    } else {
-      jsxParts.push(part.text);
-    }
-  });
-
-  return jsxParts;
-};
 
 // MODULE 2: Interaction & Data Feedback (#52, #53, #54, #56, #58)
 // RULE #123: Confetti Success Animation - Trigger celebration bursts
