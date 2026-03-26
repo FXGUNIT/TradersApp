@@ -1,5 +1,20 @@
 // Terminal Helper Components - Matching exact backup UI
 // These components replicate the exact styling from App.jsx.bak
+// Theme-aware using CSS variables from index.css
+
+const getCSSVar = (varName, fallback) => {
+  if (typeof document === 'undefined') return fallback;
+  return getComputedStyle(document.documentElement).getPropertyValue(varName).trim() || fallback;
+};
+
+export const getThemeColors = () => ({
+  text: getCSSVar('--aura-text-primary', '#111827'),
+  muted: getCSSVar('--aura-text-secondary', '#6B7280'),
+  bg: getCSSVar('--aura-base-layer', '#F9FAFB'),
+  card: getCSSVar('--aura-surface-elevated', '#FFFFFF'),
+  border: getCSSVar('--aura-border-subtle', 'rgba(0,0,0,0.08)'),
+  accent: getCSSVar('--aura-accent-primary', '#3B82F6'),
+});
 
 export const T = {
   text: "#111827",
@@ -12,10 +27,10 @@ export const T = {
   red: "#EF4444",
   gold: "#FBBF24",
   cyan: "#06B6D4",
-  amdA: "#10B981",  // Accumulation - green
-  amdM: "#F97316",   // Manipulation - orange
-  amdD: "#EF4444",   // Distribution - red
-  amdT: "#8B5CF6",  // Transition - purple
+  amdA: "#10B981",
+  amdM: "#F97316",
+  amdD: "#EF4444",
+  amdT: "#8B5CF6",
   font: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif",
   mono: "'SF Mono', 'Menlo', 'Monaco', 'Courier New', monospace",
 };
@@ -43,6 +58,23 @@ export const AMD_PHASES = {
 };
 
 // Style constants matching backup exactly
+export const getInputStyle = () => {
+  const colors = getThemeColors();
+  return { 
+    background: colors.card, 
+    border: `1px solid ${colors.border}`, 
+    borderRadius: 8, 
+    padding: "12px 14px", 
+    color: colors.text, 
+    fontFamily: T.mono, 
+    fontSize: 14, 
+    width: "100%", 
+    boxSizing: "border-box", 
+    outline: "none", 
+    transition: "all 0.2s ease", 
+  };
+};
+
 export const inp = { 
   background: "#F9FAFB", 
   border: `1px solid rgba(0,0,0,0.08)`, 
@@ -59,23 +91,26 @@ export const inp = {
   WebkitBackdropFilter: "none" 
 };
 
-export const cardS = (e = {}) => ({ 
-  background: "#FFFFFF", 
-  border: "none", 
-  borderRadius: 12, 
-  padding: "24px 32px", 
-  marginBottom: 16, 
-  boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.05)", 
-  ...e 
-});
+export const cardS = (e = {}) => { 
+  const colors = getThemeColors();
+  return { 
+    background: colors.card, 
+    border: "none", 
+    borderRadius: 12, 
+    padding: "24px 32px", 
+    marginBottom: 16, 
+    boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.05)", 
+    ...e 
+  };
+};
 
 export const glowBtn = (color, disabled) => ({ 
-  background: disabled ? "#f3f4f6" : "#1a1a1a", 
-  border: disabled ? "1px solid #e5e7eb" : "1px solid #1a1a1a", 
+  background: disabled ? "#f3f4f6" : "var(--aura-surface-elevated, #1a1a1a)", 
+  border: disabled ? "1px solid #e5e7eb" : "1px solid var(--aura-border-subtle, #1a1a1a)", 
   borderRadius: 6, 
   padding: "12px 24px", 
   cursor: disabled ? "not-allowed" : "pointer", 
-  color: disabled ? "#9ca3af" : "#ffffff", 
+  color: disabled ? "#9ca3af" : "var(--aura-text-primary, #ffffff)", 
   fontFamily: T.font, 
   fontSize: 12, 
   fontWeight: 700, 
@@ -85,7 +120,7 @@ export const glowBtn = (color, disabled) => ({
 });
 
 export const lbl = { 
-  color: "#64748B", 
+  color: "var(--aura-text-secondary, #64748B)", 
   fontSize: 11, 
   letterSpacing: 1.5, 
   marginBottom: 6, 

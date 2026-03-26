@@ -865,7 +865,7 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
             <div style={{ color: activeTab === p.id ? p.color : "#6B7280", fontSize: 12, letterSpacing: 1.5, fontWeight: 800 }}>
               {p.label}
             </div>
-            <div style={{ color: activeTab === p.id ? "#6B7280" : "#D1D5DB", fontSize: 10, marginTop: 4, fontWeight: 500 }}>
+            <div style={{ color: activeTab === p.id ? p.color : "var(--aura-text-secondary, #6B7280)", fontSize: 10, marginTop: 4, fontWeight: 500 }}>
               {p.sub}
             </div>
           </button>
