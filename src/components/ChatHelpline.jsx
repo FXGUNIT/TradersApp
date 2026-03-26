@@ -8,7 +8,7 @@ export default function ChatHelpline() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [aiEnabled, setAiEnabled] = useState(true);
+  const [aiEnabled] = useState(true);
 
   const messagesEndRef = useRef(null);
   const N8N_WEBHOOK_URL = import.meta.env.VITE_N8N_WEBHOOK_URL;

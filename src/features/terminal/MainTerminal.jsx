@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { computeJournalMetrics, formatMetricNumber } from "./journalMetrics";
+import { computeJournalMetrics } from "./journalMetrics";
 import {
   makeImgHandler,
   onScreenshotDrop,
-  toDataUrl,
 } from "./terminalUploadUtils";
+import { calculateVolatilityRatio, getDynamicParameters, calculateThrottledRisk } from "../../utils/math-engine.js";
 import {
   T,
   AMD_PHASES,
@@ -12,9 +12,6 @@ import {
   SCREENSHOT_EXTRACT_PROMPT,
   PART1_PROMPT,
   PART2_PROMPT,
-  calculateVolatilityRatio,
-  getDynamicParameters,
-  calculateThrottledRisk,
   LED,
   Tag,
   SHead,
@@ -33,16 +30,6 @@ import {
 } from "./terminalHelperComponents";
 
 // Default states
-const defaultTradeForm = {
-  date: new Date().toISOString().slice(0, 10),
-  instrument: "MNQ",
-  result: "win",
-  pnl: "",
-  entry: "",
-  exit: "",
-  notes: "",
-};
-
 const defaultAccountState = {
   startingBalance: "",
   currentBalance: "",
@@ -167,8 +154,7 @@ export default function MainTerminal({
   const [accountState, setAccountState] = useState(() =>
     buildAccountState(profile?.accountState),
   );
-  const [firmRules, setFirmRules] = useState(() => profile?.firmRules || defaultFirmRules);
-  const [dragTarget, setDragTarget] = useState("");
+  const [firmRules] = useState(() => profile?.firmRules || defaultFirmRules);
   
   const [currentAMD, setCurrentAMD] = useState("UNCLEAR");
   const [p1Out, setP1Out] = useState("");
@@ -241,7 +227,7 @@ export default function MainTerminal({
   useEffect(() => {
     setJournal(normalizeJournal(profile?.journal));
     setAccountState(buildAccountState(profile?.accountState));
-  }, [profile?.uid]);
+  }, [profile?.uid, profile?.journal, profile?.accountState]);
 
   useEffect(() => {
     const current = Number.parseFloat(accountState.currentBalance || "0");

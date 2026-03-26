@@ -549,23 +549,4 @@ export const PART2_PROMPT = `SYSTEM DIRECTIVE: Always think and respond with the
 
 🚫 TRADE BLOCKED: [reason] if any check fails`;
 
-// Math functions
-export function calculateVolatilityRatio(fiveDayATR, twentyDayATR) {
-  if (!fiveDayATR || !twentyDayATR || twentyDayATR === 0) return 1.0;
-  return fiveDayATR / twentyDayATR;
-}
-
-export function getDynamicParameters(VR = 1.0) {
-  const v = Math.max(0.5, Math.min(2.0, VR));
-  return { 
-    vwapSD1: v * 15, 
-    vwapSD2: v * 30, 
-    trendSLMult: v < 0.85 ? 1.5 : v > 1.15 ? 2.2 : 1.8, 
-    mrSLMult: v < 0.85 ? 0.8 : v > 1.15 ? 1.2 : 1.0 
-  };
-}
-
-export function calculateThrottledRisk(basePct = 0.3, VR = 1.0, currentBalance = 0, maxDrawdown = 0) {
-  const isThrottled = maxDrawdown > 0 && currentBalance > 0 && (currentBalance - (currentBalance - maxDrawdown)) / maxDrawdown < 0.25;
-  return { activeRiskPct: isThrottled ? Math.round(basePct / 2 * 100) / 100 : basePct, isThrottled };
-}
+// Math functions are imported from utils/math-engine.js in MainTerminal.jsx
