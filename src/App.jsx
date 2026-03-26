@@ -68,6 +68,15 @@ import { calculatePasswordStrength, getStrengthLabel, isValidGmailAddress, isPas
 import LoadingOverlay from "./components/LoadingOverlay.jsx";
 import SkeletonLoader from "./components/SkeletonLoader.jsx";
 import LazyImage from "./components/LazyImage.jsx";
+import { useTheme } from "./hooks/useTheme.jsx";
+import { AppShellProvider } from "./features/shell/AppShellContext.jsx";
+import { SCREEN_IDS } from "./features/shell/screenIds.js";
+import { loadLegacyUserProfile } from "./services/clients/IdentityClient.js";
+import NotificationCenter from "./components/NotificationCenter.jsx";
+import CommandPalette from "./components/CommandPalette.jsx";
+import UserSwitcher from "./components/UserSwitcher.jsx";
+import FullScreenToggle from "./components/FullScreenToggle.jsx";
+import MobileBottomNav from "./components/MobileBottomNav.jsx";
 
 const hasEmailJsConfig = Boolean(
   import.meta.env.VITE_EMAILJS_SERVICE_ID &&
@@ -100,6 +109,13 @@ const useThemeColors = (themeVersion) => {
 // Swap to real imports once those files are complete
 
 import "./index.css";
+
+const CleanOnboarding = React.lazy(
+  () => import("./features/onboarding/CleanOnboardingScreen.jsx"),
+);
+const RegimentHub = React.lazy(
+  () => import("./features/hub-content/RegimentHubScreen.jsx"),
+);
 
 // GPU detection now imported from securityUtils.js
 const _gpuSupport = detectGPUSupport();
@@ -148,7 +164,7 @@ const initTelegramMonitor = () => {};
 // formatPhoneNumber, TradersRegimentWatermark, ExchangeFacilityBadge
 
 // Page stubs — replace these later with your real page files
-const CleanOnboarding = ({ onSignupSuccess, onBackToLogin }) => {
+const LegacyCleanOnboarding = ({ onSignupSuccess, onBackToLogin }) => {
   const [form, setForm] = React.useState({
     email: "",
     password: "",
@@ -258,7 +274,7 @@ const CleanOnboarding = ({ onSignupSuccess, onBackToLogin }) => {
   );
 };
 
-const RegimentHub = ({ onNavigate, theme }) => (
+const LegacyRegimentHub = ({ onNavigate, theme }) => (
   <div
     style={{
       minHeight: "100vh",
@@ -584,7 +600,7 @@ const EmptyStateCard = ({ searchQuery, filterStatus }) => {
 
 // MODULE 4: Professional Navigation & Layout (#99, #109, #111)
 // RULE #99: Command Palette - Search users, jump pages, toggle features
-const CommandPalette = ({
+const LegacyCommandPalette = ({
   isOpen,
   onClose,
   users,
@@ -819,7 +835,7 @@ const CommandPalette = ({
 };
 
 // RULE #109, #111: User Switcher - Shadow Mode to view as another user
-const UserSwitcher = ({
+const LegacyUserSwitcher = ({
   users,
   currentViewAsUser,
   onSwitchUser,
@@ -988,7 +1004,7 @@ const UserSwitcher = ({
 // RULE #97: Dynamic Tab Title Management - Updates based on notifications/alerts
 
 // RULE #101: Full-Screen Toggle - Hide browser UI for deep trading focus
-const FullScreenToggle = ({ showToast }) => {
+const LegacyFullScreenToggle = ({ showToast }) => {
   const [isFullScreen, setIsFullScreen] = useState(false);
 
   useEffect(() => {
@@ -1073,7 +1089,7 @@ const FullScreenToggle = ({ showToast }) => {
 
 // MODULE 7: Mobile & Layout Integrity (#113, #116, #118, #119, #120)
 // RULE #113: Mobile Bottom Navigation Bar - Appears on screens < 768px
-const MobileBottomNav = ({ currentPage, onNavigate }) => {
+const LegacyMobileBottomNav = ({ currentPage, onNavigate }) => {
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
 
   useEffect(() => {
@@ -1182,7 +1198,7 @@ const SafeAreaWrapper = ({ children, style = {} }) => {
 };
 
 // RULE #119: Notification Center - Sidebar on desktop, overlay on mobile
-const NotificationCenter = ({ isOpen, onClose, notifications = [] }) => {
+const LegacyNotificationCenter = ({ isOpen, onClose, notifications = [] }) => {
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
 
   useEffect(() => {
@@ -1419,7 +1435,7 @@ const NotificationCenter = ({ isOpen, onClose, notifications = [] }) => {
 };
 
 // RULE #121: System Theme Sync - Automatic OS dark/light mode detection
-const SystemThemeSync = ({ isDarkMode, onThemeChange }) => {
+const LegacySystemThemeSync = ({ isDarkMode, onThemeChange }) => {
   return (
     <button
       onClick={() => onThemeChange(!isDarkMode)}
@@ -7408,8 +7424,7 @@ function AdminDashboard({
         // Expose for admin debugging
         window.securitySentinel = securitySentinel;
 
-        // eslint-disable-next-line no-console
-        console.log("🛡️ Security Sentinel activated for user:", auth.uid);
+        console.warn("Security Sentinel activated for user:", auth.uid);
       } catch (error) {
         console.error(
           "🛡️ CRASH POINT - Security Sentinel Initialization Failed:",
@@ -10434,7 +10449,8 @@ function SessionsManagementScreen({
 //  ROOT — AUTH STATE MACHINE
 // ═══════════════════════════════════════════════════════════════════
 export default function TradersRegiment() {
-  const [screen, setScreen] = useState("loading");
+  const { currentTheme, setTheme: setAppTheme } = useTheme();
+  const [screen, setScreen] = useState(SCREEN_IDS.LOADING);
   const [auth, setAuth] = useState(null);
   const [profile, setProfile] = useState(null);
   const [adminPassInput, setAdminPassInput] = useState("");
@@ -10451,7 +10467,7 @@ export default function TradersRegiment() {
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [toasts, setToasts] = useState([]);
-  const [theme, setTheme] = useState("lumiere");
+  const theme = currentTheme;
   const [aiStatuses, setAiStatuses] = useState([
     true,
     true,
@@ -10577,30 +10593,7 @@ export default function TradersRegiment() {
       return "BLUE";
     }
   });
-  // Phase 2: Apple-like three-theme system (Lumiere, Amber, Midnight)
-  const [currentTheme, setCurrentTheme] = useState(() => {
-    try {
-      const saved =
-        localStorage.getItem("appTheme") ||
-        localStorage.getItem("aura-theme") ||
-        "lumiere";
-      const normalized = {
-        day: "lumiere",
-        eye: "amber",
-        night: "midnight",
-        lumiere: "lumiere",
-        amber: "amber",
-        midnight: "midnight",
-      };
-      return normalized[saved] || "lumiere";
-    } catch {
-      return "lumiere";
-    }
-  });
-
-  const [themeVersion, setThemeVersion] = useState(0);
-
-  const handleThemeChange = (newTheme) => {
+  const handleThemeChange = useCallback((newTheme) => {
     const normalized = {
       day: "lumiere",
       eye: "amber",
@@ -10609,25 +10602,8 @@ export default function TradersRegiment() {
       amber: "amber",
       midnight: "midnight",
     };
-    const auraTheme = normalized[newTheme] || "lumiere";
-    setCurrentTheme(auraTheme);
-    setThemeVersion((v) => v + 1);
-
-    try {
-      localStorage.setItem("appTheme", auraTheme);
-      localStorage.setItem("aura-theme", auraTheme);
-      document.documentElement.setAttribute("data-aura-theme", auraTheme);
-      document.documentElement.setAttribute("data-theme", auraTheme);
-      document.documentElement.style.backgroundColor =
-        auraTheme === "midnight"
-          ? "#05070A"
-          : auraTheme === "amber"
-            ? "#F4EBD0"
-            : "#FBFBFC";
-    } catch {
-      // ignore
-    }
-  };
+    setAppTheme(normalized[newTheme] || "lumiere");
+  }, [setAppTheme]);
   // MODULE 1 PHASE 2: PRIVACY & SESSION MANAGEMENT
   const [privacyModeActive, setPrivacyModeActive] = useState(false); // Rule #27: Ghost Mode
   const [showInviteScreen, setShowInviteScreen] = useState(false);
@@ -11074,26 +11050,6 @@ export default function TradersRegiment() {
   // THEME MANAGEMENT SYSTEM - Persistence & Body Styling
   // ═══════════════════════════════════════════════════════════════════
 
-  // Load theme from localStorage on mount
-  useEffect(() => {
-    const savedTheme = localStorage.getItem("appTheme");
-    if (savedTheme) {
-      setTheme(
-        {
-          day: "lumiere",
-          eye: "amber",
-          night: "midnight",
-          lumiere: "lumiere",
-          amber: "amber",
-          midnight: "midnight",
-        }[savedTheme] || "lumiere",
-      );
-    } else {
-      // Save default theme
-      localStorage.setItem("appTheme", "lumiere");
-    }
-  }, []);
-
   useEffect(() => {
     if (!import.meta.env.DEV) {
       return undefined;
@@ -11114,7 +11070,7 @@ export default function TradersRegiment() {
           setProfile,
           setIsAdminAuthenticated,
           setCurrentSessionId,
-          setTheme,
+          setTheme: setAppTheme,
           setAccentColor,
           setShowThemePicker: () => {},
           setPrivacyModeActive,
@@ -11138,66 +11094,26 @@ export default function TradersRegiment() {
     setProfile,
     setPrivacyModeActive,
     setScreen,
-    setTheme,
+    setAppTheme,
   ]);
-
-  // Debug helper: log current CSS variable tokens to aid Phase 3 verification
-  useEffect(() => {
-    try {
-      const root = document.documentElement;
-      const v = {
-        base: getComputedStyle(root).getPropertyValue('--base-layer').trim(),
-        text: getComputedStyle(root).getPropertyValue('--text-primary').trim(),
-        bg: getComputedStyle(root).getPropertyValue('--bg').trim(),
-        card: getComputedStyle(root).getPropertyValue('--card').trim(),
-        border: getComputedStyle(root).getPropertyValue('--border').trim(),
-      };
-      console.log('Theme CSS Vars', v);
-    } catch {
-      // ignore
-    }
-  }, [/* theme toggle changes could trigger this */]);
-
-  // Save theme to localStorage when it changes
-  useEffect(() => {
-    localStorage.setItem("appTheme", currentTheme);
-    // Update document.body class for global theme application
-    document.body.className = `theme-${currentTheme}`;
-  }, [currentTheme]);
-
-  // Update body background color based on theme to prevent white flashes
-  useEffect(() => {
-    // Extract background and text colors from the current _THEME
-    const bgColor = _THEME?.background || "#FFFFFF";
-    const textColor = _THEME?.text || "#000000";
-
-    document.body.style.backgroundColor = bgColor;
-    document.body.style.color = textColor;
-    document.body.style.transition =
-      "background-color 300ms cubic-bezier(0.4, 0, 0.2, 1), color 300ms cubic-bezier(0.4, 0, 0.2, 1)";
-  }, [_THEME]);
 
   // Check user status and route to appropriate screen
   const checkUserStatus = useCallback(
     async (authData) => {
       try {
-        const userData = await dbR(`users/${authData.uid}`, authData.token);
+        const { profile: nextProfile, screen: nextScreen, userData } =
+          await loadLegacyUserProfile(authData);
 
-        if (!userData) {
-          setScreen("login");
+        if (!userData || !nextProfile) {
+          setProfile(null);
+          setScreen(SCREEN_IDS.LOGIN);
           return;
         }
 
-        setProfile({
-          ...userData,
-          uid: authData.uid,
-          token: authData.token,
-          email: authData.email,
-          mobile: userData.mobile,
-        });
+        setProfile(nextProfile);
 
         if (userData.status === "BLOCKED") {
-          setScreen("login");
+          setScreen(SCREEN_IDS.LOGIN);
           showToast(
             "Account entered stasis mode. Contact the digital guardians.",
             "error",
@@ -11206,34 +11122,21 @@ export default function TradersRegiment() {
         }
 
         if (userData.status === "PENDING") {
-          setScreen("waiting");
+          setScreen(SCREEN_IDS.WAITING);
           return;
         }
 
         if (authData.uid === ADMIN_UID) {
-          setScreen("admin");
+          setScreen(SCREEN_IDS.ADMIN);
           return;
         }
 
-        // Load full user object (journal, rules, account) for standard users
-        const fullData = await dbR(`users/${authData.uid}`, authData.token);
-
-        setProfile((prev) => ({
-          ...prev,
-          ...(fullData?.profile || {}),
-          uid: authData.uid,
-          token: authData.token,
-          journal: fullData?.journal,
-          firmRules: fullData?.firmRules,
-          accountState: fullData?.accountState,
-        }));
-
-        setScreen("hub");
+        setScreen(nextScreen || SCREEN_IDS.HUB);
       } catch (error) {
         console.error("Status check failed", error);
         // Only redirect to login on auth errors, not network/permission issues
         if (error?.message?.includes("auth") || error?.code?.includes("auth") || error?.message?.includes("permission")) {
-          setScreen("login");
+          setScreen(SCREEN_IDS.LOGIN);
         }
         // Otherwise keep user on current screen - don't disrupt experience for transient errors
       }
@@ -12457,10 +12360,12 @@ export default function TradersRegiment() {
 
       case "signup":
         return (
-          <CleanOnboarding
-            onSignupSuccess={handleSignup}
-            onBackToLogin={() => setScreen("login")}
-          />
+          <Suspense fallback={<LoadingFallback />}>
+            <CleanOnboarding
+              onSignupSuccess={handleSignup}
+              onBackToLogin={() => setScreen("login")}
+            />
+          </Suspense>
         );
 
       case "waiting":
@@ -12503,12 +12408,14 @@ export default function TradersRegiment() {
 
       case "hub":
         return (
-          <RegimentHub
-            onNavigate={(dest) => setScreen(dest)}
-            theme={theme}
-            currentTheme={currentTheme}
-            onThemeChange={handleThemeChange}
-          />
+          <Suspense fallback={<LoadingFallback />}>
+            <RegimentHub
+              onNavigate={(dest) => setScreen(dest)}
+              theme={theme}
+              currentTheme={currentTheme}
+              onThemeChange={handleThemeChange}
+            />
+          </Suspense>
         );
 
       case "consciousness":
@@ -12578,7 +12485,6 @@ export default function TradersRegiment() {
                   const idx = themes.indexOf(currentTheme);
                   const nextTheme = themes[(idx + 1) % themes.length];
                   handleThemeChange(nextTheme);
-                  console.log("Theme changed to:", nextTheme);
                 }}
                 title="Toggle Lumiere/Amber/Midnight mode"
                 style={{
@@ -12670,7 +12576,19 @@ export default function TradersRegiment() {
   })();
 
   return (
-    <div className={`app-container theme-${currentTheme}`}>
+    <AppShellProvider
+      value={{
+        screen,
+        setScreen,
+        navigateToScreen: setScreen,
+        profile,
+        theme,
+        currentTheme,
+        maintenanceMode: maintenanceModeActive,
+        privacyMode: privacyModeActive,
+      }}
+    >
+      <section className={`app-container theme-${currentTheme}`}>
       {/* RULE #295, #296: Maintenance Mode - Show "Back Soon" screen if active, except for Master Admin */}
       {maintenanceModeActive &&
       auth?.uid !== ADMIN_UID &&
@@ -12840,7 +12758,8 @@ export default function TradersRegiment() {
           </div>
         </div>
       </div>
-    </div>
+      </section>
+    </AppShellProvider>
   );
 }
 // ═══════════════════════════════════════════════════════════════════

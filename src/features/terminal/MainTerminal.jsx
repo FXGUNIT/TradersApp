@@ -9,6 +9,7 @@ import {
   calculateThrottledRisk,
   calculatePositionSize,
   calculateLiquiditySweepProbability,
+  calculateManipulationWickValidation,
   detectAmdPhase,
 } from "../../utils/math-engine.js";
 import {
@@ -96,6 +97,77 @@ function buildEquityCurvePath(series, width = 360, height = 100, padding = 14) {
     .join(" ");
 
   return { path, dots: coords, min, max };
+}
+
+function deriveLiveAmdContext(parsed, extractedVals) {
+  const days = Array.isArray(parsed?.days) ? parsed.days : [];
+  const latestDay = days[0] || null;
+  const latestSession = latestDay?.trading || latestDay?.full || null;
+  const atr = Number.parseFloat(
+    extractedVals?.atr || parsed?.tradingHoursAtr14 || latestDay?.atr14 || 0,
+  );
+  const open = Number.parseFloat(latestSession?.o ?? latestDay?.full?.o ?? 0);
+  const high = Number.parseFloat(latestSession?.h ?? latestDay?.full?.h ?? 0);
+  const low = Number.parseFloat(latestSession?.l ?? latestDay?.full?.l ?? 0);
+  const close = Number.parseFloat(latestSession?.c ?? latestDay?.full?.c ?? 0);
+  const range = Math.max(0, high - low);
+  const upperWick = Math.max(0, high - Math.max(open, close));
+  const lowerWick = Math.max(0, Math.min(open, close) - low);
+  const relevantWick = Math.max(upperWick, lowerWick);
+  const wickValidation = calculateManipulationWickValidation({
+    relevantWick,
+    totalRange: range,
+    atr,
+  });
+  const recentSessions = days
+    .slice(0, 3)
+    .map((day) => day?.trading || day?.full || null)
+    .filter(Boolean);
+  const recentHighs = recentSessions.map((session) => Number.parseFloat(session.h || 0));
+  const recentLows = recentSessions.map((session) => Number.parseFloat(session.l || 0));
+  const higherHighs =
+    recentHighs.length === 3 &&
+    recentHighs[0] > recentHighs[1] &&
+    recentHighs[1] > recentHighs[2];
+  const lowerLows =
+    recentLows.length === 3 &&
+    recentLows[0] < recentLows[1] &&
+    recentLows[1] < recentLows[2];
+  const volumeNearLows =
+    range > 0 ? (close - low) / range <= 0.3 : false;
+  const conflictingSignals =
+    Boolean(wickValidation.manipulated) && !(higherHighs || lowerLows);
+  const adxDeclining =
+    extractedVals?.adx !== null && extractedVals?.adx !== undefined
+      ? Number.parseFloat(extractedVals.adx) < 20
+      : false;
+
+  return {
+    phase: detectAmdPhase({
+      range,
+      twentyDayAdr: parsed?.tradingHoursAtr14 || latestDay?.atr14 || 0,
+      volumeNearLows,
+      wickRatio: wickValidation.wickRatio,
+      wickToAtr: atr > 0 ? relevantWick / atr : 0,
+      higherHighs,
+      lowerLows,
+      conflictingSignals,
+      adxDeclining,
+    }).phase,
+    range,
+    atr,
+    open,
+    high,
+    low,
+    close,
+    relevantWick,
+    wickValidation,
+    volumeNearLows,
+    higherHighs,
+    lowerLows,
+    conflictingSignals,
+    adxDeclining,
+  };
 }
 
 function normalizeJournal(journal) {
@@ -433,6 +505,11 @@ export default function MainTerminal({
     };
   }, [parsed, tradeEntryPrice, atrVal]);
 
+  const liveAmdContext = useMemo(
+    () => deriveLiveAmdContext(parsed, extractedVals),
+    [parsed, extractedVals],
+  );
+
   const predictedP2TP1 = Number.isFinite(tradeEntryPrice)
     ? tradeEntryPrice +
       (f.direction === "Long" ? 1 : -1) *
@@ -443,22 +520,23 @@ export default function MainTerminal({
     ? tradeEntryPrice -
       (f.direction === "Long" ? 1 : -1) * slPts
     : null;
-  const heuristicAmdPhase = useMemo(() => {
-    if (!parsed?.days?.length) return "UNCLEAR";
-    const latest = parsed.days[parsed.days.length - 1];
-    return detectAmdPhase({
-      range: Math.max(0, (latest?.dayHigh || 0) - (latest?.dayLow || 0)),
-      twentyDayAdr: parsed.tradingHoursAtr14 || latest?.atr14 || 0,
-      volumeNearLows: false,
-      wickRatio: 0,
-      wickToAtr: 0,
-      higherHighs: false,
-      lowerLows: false,
-      conflictingSignals: false,
-      adxDeclining: extractedVals.adx !== null ? extractedVals.adx < 20 : false,
-    }).phase;
-  }, [parsed, extractedVals.adx]);
-  const displayedAmdPhase = currentAMD !== "UNCLEAR" ? currentAMD : heuristicAmdPhase;
+  const liveAmdPhase = liveAmdContext.phase || "UNCLEAR";
+  const displayedAmdPhase = currentAMD !== "UNCLEAR" ? currentAMD : liveAmdPhase;
+
+  useEffect(() => {
+    setP2Jf((previous) => {
+      if (previous.amdPhase && previous.amdPhase !== "UNCLEAR" && previous.amdPhase !== currentAMD) {
+        return previous;
+      }
+      if (previous.amdPhase === displayedAmdPhase) {
+        return previous;
+      }
+      return {
+        ...previous,
+        amdPhase: displayedAmdPhase,
+      };
+    });
+  }, [currentAMD, displayedAmdPhase]);
 
   // Firm compliance calculations
   const fr = firmRules;
@@ -930,6 +1008,8 @@ Apply ALL sections including SECTION AMD.`;
       const amdMatch = response.match(/MACRO AMD PHASE:\s*([A-Z]+)/i);
       if (amdMatch && AMD_PHASES[amdMatch[1]]) {
         setCurrentAMD(amdMatch[1]);
+      } else if (liveAmdPhase !== "UNCLEAR") {
+        setCurrentAMD(liveAmdPhase);
       }
       
       setTimeout(() => p1Ref.current?.scrollIntoView({ behavior: 'smooth' }), 100);
@@ -961,7 +1041,8 @@ Apply ALL sections including SECTION AMD.`;
       const textContent = `PRE-ENTRY ANALYSIS + TRADE PLAN
 === PART 1 AMD CONTEXT ===
 ${p1Out ? p1Out.slice(0, 2500) + (p1Out.length > 2500 ? '\n[truncated]' : '') : 'No morning analysis.'}
-Current AMD Phase (Part 1): ${currentAMD}
+Current AMD Phase (Part 1): ${displayedAmdPhase}
+Live AMD Phase (Terminal): ${liveAmdPhase}
 
 === LIVE TRADE ===
 Time (IST): ${f.timeIST || '?'} | Instrument: ${f.instrument} ($${ptVal}/pt)
@@ -1354,6 +1435,22 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
               <span style={{ color: T.muted, fontSize: 12, fontFamily: T.mono, fontWeight: 600 }}>(VR = {VR.toFixed(2)})</span>
             </div>
 
+            {(liveAmdContext.range > 0 || liveAmdContext.relevantWick > 0) && (
+              <div style={{ padding: "12px 20px", background: "rgba(191,90,242,0.08)", border: `1px solid rgba(191,90,242,0.22)`, borderRadius: 8, marginBottom: 20 }} className="glass-panel">
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  <span style={{ color: T.purple, fontSize: 10, letterSpacing: 1.2, fontWeight: 800 }}>LIVE AMD SIGNAL</span>
+                  <Tag label={liveAmdPhase} color={T.purple} />
+                  <Tag label={`Range ${liveAmdContext.range.toFixed(2)}`} color={T.blue} />
+                  <Tag label={`Wick ${liveAmdContext.relevantWick.toFixed(2)}`} color={liveAmdContext.wickValidation.manipulated ? T.gold : T.muted} />
+                  <Tag label={liveAmdContext.wickValidation.manipulated ? "Manipulation wick" : "No wick manipulation"} color={liveAmdContext.wickValidation.manipulated ? T.gold : T.green} />
+                </div>
+                <div style={{ color: T.muted, fontSize: 12, marginTop: 6, lineHeight: 1.5 }}>
+                  {liveAmdContext.volumeNearLows ? "Close is holding near the session lows." : "Price is not sitting near the session lows."}{" "}
+                  {liveAmdContext.higherHighs ? "Higher highs are still forming." : liveAmdContext.lowerLows ? "Lower lows are still forming." : "Trend structure is mixed."}
+                </div>
+              </div>
+            )}
+
             {sweepEstimate && (
               <div style={{ padding: "12px 20px", background: "rgba(14,165,233,0.08)", border: `1px solid rgba(14,165,233,0.25)`, borderRadius: 8, marginBottom: 20 }} className="glass-panel">
                 <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
@@ -1418,18 +1515,16 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
                         data-testid="terminal-screenshot-dropzone"
                         onDrop={handleScreenshotDrop} 
                         onDragOver={e => e.preventDefault()} 
-                        onClick={e => { e.stopPropagation(); document.getElementById('ssIn').click(); }} 
                         style={{ 
                           border: `2px dashed ${screenshots.length ? T.purple : "rgba(255,255,255,0.15)"}`, 
                           borderRadius: 8, 
                           padding: "16px", 
                           textAlign: "center", 
-                          cursor: "pointer", 
+                          cursor: "copy", 
                           background: "rgba(0,0,0,0.3)" 
                         }} 
                         className="glass-panel"
                       >
-                        <input id="ssIn" type="file" accept="image/*" multiple style={{ display: "none" }} onChange={handleScreenshotDrop} />
                         <div data-testid="terminal-screenshot-count" style={{ color: T.muted, fontSize: 11, fontWeight: 700, letterSpacing: 1.2, marginBottom: 8 }}>
                           SCREENSHOTS {Math.min(screenshots.length, 4)}/4
                         </div>
@@ -1451,7 +1546,7 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
                           </div>
                         ) : (
                           <div>
-                            <div style={{ color: T.muted, fontSize: 12, marginBottom: 4, fontWeight: 600 }}>Click → Ctrl+V or drag</div>
+                            <div style={{ color: T.muted, fontSize: 12, marginBottom: 4, fontWeight: 600 }}>Paste or drag screenshots here</div>
                           </div>
                         )}
                       </div>

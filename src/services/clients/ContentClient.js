@@ -7,7 +7,7 @@ const HUB_CONTENT = Object.freeze({
   cards: [
     {
       id: "artillery",
-      title: "TRADERS REGIMENT ARTILLERY CENTRE",
+      title: "Trading Terminal",
       description:
         "Live MNQ/MES execution, order flow analysis, and capital deployment.",
       action: SCREEN_IDS.APP,

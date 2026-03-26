@@ -16,16 +16,24 @@ import TermsOfService from './TermsOfService';
 import PrivacyPolicy from './PrivacyPolicy';
 
 const CleanOnboarding = ({ onSignupSuccess, onGoogleSuccess, onBackToLogin }) => {
+  const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [mobile, setMobile] = useState('');
+  const [agreedToTerms, setAgreedToTerms] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
 
-  const isFormValid = email && password && password.length >= 8 && agreedToTerms;
+  const isFormValid =
+    fullName &&
+    email &&
+    password &&
+    mobile &&
+    password.length >= 8 &&
+    agreedToTerms;
 
   const handleGoogleAuth = async () => {
     setLoading(true);
@@ -62,7 +70,7 @@ const CleanOnboarding = ({ onSignupSuccess, onGoogleSuccess, onBackToLogin }) =>
     setError('');
     
     try {
-      await onSignupSuccess({ email, password });
+      await onSignupSuccess({ fullName, email, password, mobile });
     } catch (err) {
       setError(err.message || 'Signup failed. Please try again.');
     } finally {
@@ -211,6 +219,19 @@ const CleanOnboarding = ({ onSignupSuccess, onGoogleSuccess, onBackToLogin }) =>
 
           {/* Email Input */}
           <div>
+            <label style={lbl}>FULL NAME</label>
+            <input
+              type="text"
+              placeholder="Your name"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              style={authInp}
+              disabled={loading}
+            />
+          </div>
+
+          {/* Email Input */}
+          <div>
             <label style={lbl}>EMAIL ADDRESS</label>
             <input
               type="email"
@@ -253,6 +274,19 @@ const CleanOnboarding = ({ onSignupSuccess, onGoogleSuccess, onBackToLogin }) =>
                 {showPassword ? 'HIDE' : 'SHOW'}
               </button>
             </div>
+          </div>
+
+          {/* Mobile Input */}
+          <div>
+            <label style={lbl}>MOBILE</label>
+            <input
+              type="tel"
+              placeholder="+1 555 123 4567"
+              value={mobile}
+              onChange={(e) => setMobile(e.target.value)}
+              style={authInp}
+              disabled={loading}
+            />
           </div>
 
           {/* Terms Checkbox */}
@@ -335,7 +369,7 @@ const CleanOnboarding = ({ onSignupSuccess, onGoogleSuccess, onBackToLogin }) =>
             disabled={!isFormValid || loading}
             style={authBtn(T.blue, !isFormValid || loading)}
           >
-            {loading ? '⟳ CREATING ACCOUNT...' : '→ CREATE ACCOUNT'}
+            {loading ? '⟳ CREATING ACCOUNT...' : 'SUBMIT APPLICATION'}
           </button>
 
           {/* Back to Login */}
