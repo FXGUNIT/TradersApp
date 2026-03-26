@@ -756,7 +756,8 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
       color: T.text, 
       fontFamily: T.font,
       display: "flex",
-      flexDirection: "column"
+      flexDirection: "column",
+      width: "100%"
     }}>
       
       {/* Header */}
@@ -769,7 +770,7 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
         justifyContent: "space-between", 
         flexWrap: "wrap", 
         gap: 16,
-        boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.1)"
+        boxShadow: "0 1px 2px 0 rgba(0, 0, 0, 0.05)"
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
           <div style={{ display: "flex", gap: 4, alignItems: "flex-end" }}>
@@ -833,8 +834,9 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
         borderBottom: `1px solid #E5E7EB`, 
         padding: "0 32px", 
         display: "flex", 
+        gap: 0,
         overflowX: "auto",
-        boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.05)"
+        boxShadow: "none"
       }}>
         {[
           { id: 'premarket', label: 'PREMARKET', sub: 'AMD · Macro · Fuel', color: T.blue }, 
@@ -868,7 +870,7 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
         ))}
       </div>
 
-      <div style={{ maxWidth: 1440, margin: "0 auto", padding: "32px 40px", width: "100%", boxSizing: "border-box" }}>
+      <div style={{ maxWidth: 1440, margin: "0 auto", padding: "24px 32px", width: "100%", boxSizing: "border-box" }}>
         
         {/* Drawdown Throttle Banner */}
         {throttleActive && (

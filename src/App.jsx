@@ -10988,7 +10988,11 @@ export default function TradersRegiment() {
         setScreen("hub");
       } catch (error) {
         console.error("Status check failed", error);
-        setScreen("login");
+        // Only redirect to login on auth errors, not network/permission issues
+        if (error?.message?.includes("auth") || error?.code?.includes("auth") || error?.message?.includes("permission")) {
+          setScreen("login");
+        }
+        // Otherwise keep user on current screen - don't disrupt experience for transient errors
       }
     },
     [showToast],
@@ -11023,56 +11027,31 @@ export default function TradersRegiment() {
               await checkUserStatus(authData);
             } catch (fallbackError) {
               // Both token attempts failed - but user IS logged in Firebase
-              // Keep them on current screen or show loading, don't auto-logout
+              // Keep them on current screen, don't auto-logout
               console.warn(
                 "All token methods failed but user exists in Firebase:",
                 fallbackError.message,
               );
-              // Don't redirect to login - just keep current screen or show a subtle indicator
-              // The user is still authenticated, just the ID token refresh had issues
+              // Keep user on current screen - they're authenticated, just having token issues
             }
           }
         } else if (!isAdminAuthenticated) {
-          // No valid user and not in admin mode, show login
-          setScreen("login");
+          // No valid user and not in admin mode, but only redirect if we're sure they're not authenticated
+          // Don't redirect immediately - give time for Firebase to initialize
+          setTimeout(() => {
+            if (!auth && screen !== "login" && screen !== "splash") {
+              setScreen("login");
+            }
+          }, 2000);
         }
       } catch (error) {
         console.error("Auth state change error:", error);
-        // Only redirect to login if it's clearly an auth issue, not network/timeout
-        const isAuthError =
-          error?.message?.includes("auth") ||
-          error?.code?.includes("auth") ||
-          error?.code === "auth/network-request-failed";
-
-        if (!isAdminAuthenticated && isAuthError) {
-          // Try to keep user logged in by waiting and retrying once
-          console.warn("Auth error on refresh, attempting recovery...");
-          setTimeout(async () => {
-            try {
-              const currentUser = firebaseAuth.currentUser;
-              if (currentUser) {
-                const token = await currentUser.getIdToken();
-                const authData = {
-                  uid: currentUser.uid,
-                  token,
-                  email: currentUser.email,
-                };
-                setAuth(authData);
-                await checkUserStatus(authData);
-              } else {
-                setScreen("login");
-              }
-            } catch (retryError) {
-              console.error("Auth recovery failed:", retryError);
-              setScreen("login");
-            }
-          }, 1500);
-        }
-        // For network errors, don't auto-logout - just log the error
+        // Don't redirect to login on every error - just log it
       }
     });
-    return unsubscribe;
-  }, [isAdminAuthenticated, checkUserStatus]);
+
+    return () => unsubscribe();
+  }, [isAdminAuthenticated]);
 
   const handleLogin = async (email, password, stayLoggedIn = false) => {
     // Auto-sanitize email: trim whitespace and convert to lowercase

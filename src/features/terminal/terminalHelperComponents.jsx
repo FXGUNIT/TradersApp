@@ -65,7 +65,7 @@ export const cardS = (e = {}) => ({
   borderRadius: 12, 
   padding: "24px 32px", 
   marginBottom: 16, 
-  boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)", 
+  boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.05)", 
   ...e 
 });
 
