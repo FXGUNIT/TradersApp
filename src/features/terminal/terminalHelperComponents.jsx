@@ -70,20 +70,18 @@ export const cardS = (e = {}) => ({
 });
 
 export const glowBtn = (color, disabled) => ({ 
-  background: disabled ? "rgba(0,0,0,0.05)" : `${color}08`, 
-  border: `1px solid ${disabled ? "rgba(0,0,0,0.1)" : `${color}30`}`, 
-  borderRadius: 8, 
-  padding: "14px 28px", 
+  background: disabled ? "#f3f4f6" : "#1a1a1a", 
+  border: disabled ? "1px solid #e5e7eb" : "1px solid #1a1a1a", 
+  borderRadius: 6, 
+  padding: "12px 24px", 
   cursor: disabled ? "not-allowed" : "pointer", 
-  color: disabled ? "#9CA3AF" : color, 
+  color: disabled ? "#9ca3af" : "#ffffff", 
   fontFamily: T.font, 
-  fontSize: 13, 
-  fontWeight: 600, 
+  fontSize: 12, 
+  fontWeight: 700, 
   letterSpacing: 1.5, 
   transition: "all 0.2s ease", 
   opacity: disabled ? 0.6 : 1, 
-  backdropFilter: "none", 
-  WebkitBackdropFilter: "none" 
 });
 
 export const lbl = { 

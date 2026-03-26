@@ -12344,7 +12344,6 @@ export default function TradersRegiment() {
       />
       <Toast toasts={toasts} onDismiss={handleDismissToast} />
       <FloatingChatWidget auth={auth} profile={profile} />
-      <ChatHelpline />
 
       {/* Officers Briefing Footer - Rotating Quotes & Founder Card */}
       <div
