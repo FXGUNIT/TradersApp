@@ -58,9 +58,13 @@ import { formatPhoneNumber, TradersRegimentWatermark, ExchangeFacilityBadge } fr
 import { getSession, getTradingDate, parseAndAggregate, buildDataSummary } from "./utils/sessionParser.js";
 import { fuzzySearchScore, highlightMatches, renderHighlightedText } from "./utils/searchUtils.jsx";
 import { dbR, dbW, dbM, dbDel, authPost, fbSignUp, fbSignIn, genOTP } from "./utils/firebaseDbUtils.js";
+import { encryptSessionToken, generateSessionId, getDeviceInfo, getSessionGeoData, createSession, logoutOtherDevices, getDevice } from "./utils/sessionUtils.js";
+import { getTimeBasedGreeting, getUserLevelBadge, cacheUserList, getCachedUserList, clearUserListCache, getUserListCacheMetadata } from "./utils/userUtils.js";
 import { triggerConfetti, createCardTiltHandler } from "./utils/uiUtils.js";
 import { copyToClipboard } from "./utils/searchUtils.jsx";
 import LoadingOverlay from "./components/LoadingOverlay.jsx";
+import SkeletonLoader from "./components/SkeletonLoader.jsx";
+import LazyImage from "./components/LazyImage.jsx";
 
 // math-engine & ai-router — both inlined (files exist but have no exports)
 // Swap to real imports once those files are complete
@@ -104,9 +108,7 @@ const testTelegramConnectivity = async () => ({
 });
 const initTelegramMonitor = () => {};
 
-// AURA Tri-State ThemeSwitcher - DISABLED per user request
-// Theme feature completely removed - keeping placeholder for future reference
-const ThemeSwitcher = ({ currentTheme, onThemeChange }) => null;
+
 
 // AI Engines Status indicator (imported from component)
 
@@ -812,251 +814,8 @@ const copyToClipboardSecure = async (text, showToast) => {
 };
 
 // ═══════════════════════════════════════════════════════════════════
-// SESSION & PRIVACY UTILITIES - Module 1 Phase 2
-// ═══════════════════════════════════════════════════════════════════
-
-// Simple encryption for 30-day persistence token (NOT production-grade)
-// For production, use a proper crypto library like TweetNaCl or libsodium
-const encryptSessionToken = (data) => {
-  try {
-    const jsonStr = JSON.stringify(data);
-    // Simple base64 encoding (not real encryption - use real crypto in production)
-    return btoa(jsonStr);
-  } catch (e) {
-    console.error("Encryption failed:", e);
-    return null;
-  }
-};
-
-// Generate session ID
-const generateSessionId = () => {
-  return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-};
-
-// Get device info
-const getDeviceInfo = () => {
-  const ua = navigator.userAgent;
-  let device = "Unknown Device";
-
-  if (/iPhone|iPad|iPod/.test(ua)) {
-    device = "iOS Device";
-  } else if (/Android/.test(ua)) {
-    device = "Android Device";
-  } else if (/Windows/.test(ua)) {
-    device = "Windows PC";
-  } else if (/Macintosh/.test(ua)) {
-    device = "Mac";
-  } else if (/Linux/.test(ua)) {
-    device = "Linux";
-  }
-
-  return device;
-};
-
-// Fetch geo data for session (last active city)
-const getSessionGeoData = async () => {
-  try {
-    const geoRes = await fetch("https://ipapi.co/json/");
-    const geoData = await geoRes.json();
-    return {
-      city: geoData.city || "Unknown",
-      country: geoData.country_name || "Unknown",
-    };
-  } catch {
-    return { city: "Unknown", country: "Unknown" };
-  }
-};
-
-// ═══════════════════════════════════════════════════════════════════
-// SESSION MANAGEMENT FUNCTIONS
-// ═══════════════════════════════════════════════════════════════════
-const createSession = async (uid, token, rememberMe) => {
-  try {
-    const sessionId = generateSessionId();
-    const device = getDeviceInfo();
-    const geo = await getSessionGeoData();
-    const expiresAt = new Date(
-      Date.now() +
-        (rememberMe ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000),
-    ); // 30 days or 1 day
-
-    const sessionData = {
-      sessionId,
-      device,
-      city: geo.city,
-      country: geo.country,
-      createdAt: new Date().toISOString(),
-      expiresAt: expiresAt.toISOString(),
-      lastActive: new Date().toISOString(),
-    };
-
-    // Store session in Firebase under user's sessions subcollection
-    await dbW(`users/${uid}/sessions/${sessionId}`, sessionData, token);
-
-    // Store encrypted session token in localStorage for "Remember Me" functionality
-    if (rememberMe) {
-      const encryptedSession = encryptSessionToken({
-        uid,
-        sessionId,
-        email: sessionData.email,
-        expiresAt: expiresAt.toISOString(),
-        token: token,
-      });
-      localStorage.setItem(`sess_${uid}`, encryptedSession);
-    }
-
-    return sessionId;
-  } catch (error) {
-    console.error("Session creation failed:", error);
-    return null;
-  }
-};
-
-// Check if a persisted session is still valid
-
-// Logout from other devices (clear all sessions except current)
-const logoutOtherDevices = async (uid, currentSessionId, token) => {
-  try {
-    const allSessions = await dbR(`users/${uid}/sessions`, token);
-
-    if (!allSessions) return true;
-
-    // Delete all sessions except current one
-    const deletePromises = Object.keys(allSessions).map((sessionId) => {
-      if (sessionId !== currentSessionId) {
-        return dbDel(`users/${uid}/sessions/${sessionId}`, token);
-      }
-      return Promise.resolve();
-    });
-
-    await Promise.all(deletePromises);
-    return true;
-  } catch (error) {
-    console.error("Logout other devices failed:", error);
-    return false;
-  }
-};
-
-const getDevice = () => ({
-  ua: navigator.userAgent,
-  platform: navigator.platform,
-  lang: navigator.language,
-  ts: new Date().toISOString(),
-});
-
-// ═══════════════════════════════════════════════════════════════════
 // MODULE 1 IDENTITY & VERIFICATION UTILITIES (#21, #22, #24, #30)
 // ═══════════════════════════════════════════════════════════════════
-
-// RULE #131: Skeleton Shimmer Loader - Smooth loading animation
-const SkeletonLoader = ({
-  width = "100%",
-  height = "20px",
-  borderRadius = "8px",
-  count = 1,
-}) => {
-  const skeletonStyle = {
-    width,
-    height,
-    borderRadius,
-    background:
-      "linear-gradient(90deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.05) 100%)",
-    backgroundSize: "200% 100%",
-    animation: "shimmer 2s infinite",
-    marginBottom: count > 1 ? "12px" : "0px",
-  };
-
-  return (
-    <div>
-      {Array.from({ length: count }).map((_, i) => (
-        <div key={i} style={skeletonStyle} />
-      ))}
-    </div>
-  );
-};
-
-// RULE #132: Lazy Image Component - Progressive image loading
-const LazyImage = ({
-  src,
-  alt = "Image",
-  width = "100%",
-  height = "auto",
-  borderRadius = "8px",
-  onLoad,
-}) => {
-  const [isLoaded, setIsLoaded] = useState(false);
-  const [imageSrc, setImageSrc] = useState(null);
-  const imgRef = useRef(null);
-
-  useEffect(() => {
-    if (!src) return;
-
-    // Intersection Observer for lazy loading
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting) {
-          const img = new Image();
-          img.onload = () => {
-            setImageSrc(src);
-            setIsLoaded(true);
-            if (onLoad) onLoad();
-          };
-          img.onerror = () => {
-            setImageSrc(src); // Still show broken image
-            setIsLoaded(true);
-          };
-          img.src = src;
-          observer.unobserve(imgRef.current);
-        }
-      },
-      { threshold: 0.1 },
-    );
-
-    if (imgRef.current) {
-      observer.observe(imgRef.current);
-    }
-
-    return () => observer.disconnect();
-  }, [src, onLoad]);
-
-  return (
-    <div
-      ref={imgRef}
-      style={{
-        width,
-        height,
-        borderRadius,
-        overflow: "hidden",
-        background: "rgba(255,255,255,0.05)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-      }}
-    >
-      {!isLoaded ? (
-        <SkeletonLoader
-          width={width}
-          height={height}
-          borderRadius={borderRadius}
-        />
-      ) : (
-        <img
-          src={imageSrc}
-          alt={alt}
-          style={{
-            width: "100%",
-            height: "100%",
-            objectFit: "cover",
-            borderRadius,
-            opacity: isLoaded ? 1 : 0,
-            transition: "opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-          }}
-        />
-      )}
-    </div>
-  );
-};
 
 // RULE #53: Enhanced Empty State Card
 const EmptyStateCard = ({ searchQuery, filterStatus }) => {
@@ -2548,191 +2307,6 @@ function getISTState() {
     istStr: `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")} IST`,
   };
 }
-
-// RULE #150: Dynamic Greeting - Time-based greeting helper
-const getTimeBasedGreeting = (userName = "") => {
-  const hour = new Date().getHours();
-  const firstName = userName ? userName.split(" ")[0] : "Trader";
-
-  let greeting = "";
-  let emoji = "";
-
-  if (hour < 5) {
-    greeting = "Night Owl";
-    emoji = "🌙";
-  } else if (hour < 12) {
-    greeting = "Good Morning";
-    emoji = "☀️";
-  } else if (hour < 17) {
-    greeting = "Good Afternoon";
-    emoji = "🌤️";
-  } else if (hour < 21) {
-    greeting = "Good Evening";
-    emoji = "🌅";
-  } else {
-    greeting = "Night Trading";
-    emoji = "🌙";
-  }
-
-  return {
-    greeting,
-    emoji,
-    fullGreeting: `${emoji} ${greeting}, ${firstName}`,
-  };
-};
-
-// RULE #149: User Level Badge Helper - Determine user level based on status/role
-const getUserLevelBadge = (user) => {
-  if (!user)
-    return { level: "User", color: "#A1A1A6", bg: "rgba(161,161,166,0.15)" };
-
-  // Admin takes priority
-  if (user.role === "admin") {
-    return { level: "⭐ Admin", color: "#FFD60A", bg: "rgba(255,214,10,0.15)" };
-  }
-
-  // Determine level based on status and activity
-  if (user.status === "ACTIVE") {
-    // Check if user has journal/trading history (simple heuristic)
-    const hasActiveTrading =
-      user.journal && Object.keys(user.journal || {}).length >= 10;
-    if (hasActiveTrading) {
-      return {
-        level: "💎 Elite",
-        color: "#30B0C0",
-        bg: "rgba(48,176,192,0.15)",
-      };
-    }
-    return { level: "⬆️ Pro", color: "#30D158", bg: "rgba(48,209,88,0.15)" };
-  }
-
-  if (user.status === "PENDING") {
-    return {
-      level: "🔄 Pending",
-      color: "#FFD60A",
-      bg: "rgba(255,214,10,0.15)",
-    };
-  }
-
-  if (user.status === "BLOCKED") {
-    return {
-      level: "⛔ Blocked",
-      color: "#FF453A",
-      bg: "rgba(255,69,58,0.15)",
-    };
-  }
-
-  return { level: "Member", color: "#0A84FF", bg: "rgba(10,132,255,0.15)" };
-};
-
-// ═══════════════════════════════════════════════════════════════════
-// RULE #165: Cache Persistence - Local storage utilities for user grid data
-// ═══════════════════════════════════════════════════════════════════
-/**
- * Save user list to localStorage for offline access and faster loading
- * @param {Object} users - User data dictionary
- * @returns {boolean} Success status
- */
-const cacheUserList = (users) => {
-  try {
-    const cacheData = {
-      users,
-      timestamp: Date.now(),
-      version: 1,
-    };
-    localStorage.setItem("TradersApp_UserListCache", JSON.stringify(cacheData));
-    return true;
-  } catch (error) {
-    console.warn("Failed to cache user list:", error);
-    return false;
-  }
-};
-
-/**
- * Retrieve cached user list from localStorage
- * @param {number} maxAgeMs - Maximum age of cache in milliseconds (default: 5 minutes)
- * @returns {Object|null} Cached users or null if expired/missing
- */
-const getCachedUserList = (maxAgeMs = 5 * 60 * 1000) => {
-  try {
-    const cached = localStorage.getItem("TradersApp_UserListCache");
-    if (!cached) return null;
-
-    const cacheData = JSON.parse(cached);
-
-    // Check if cache is expired
-    if (Date.now() - cacheData.timestamp > maxAgeMs) {
-      localStorage.removeItem("TradersApp_UserListCache");
-      return null;
-    }
-
-    // Verify cache structure
-    if (
-      cacheData.version !== 1 ||
-      !cacheData.users ||
-      typeof cacheData.users !== "object"
-    ) {
-      localStorage.removeItem("TradersApp_UserListCache");
-      return null;
-    }
-
-    return cacheData.users;
-  } catch (error) {
-    console.warn("Failed to retrieve cached user list:", error);
-    return null;
-  }
-};
-
-/**
- * Clear cached user list from localStorage
- * Useful when user logs out or explicitly requests cache clear
- * @returns {boolean} Success status
- */
-const clearUserListCache = () => {
-  try {
-    localStorage.removeItem("TradersApp_UserListCache");
-    return true;
-  } catch (error) {
-    console.warn("Failed to clear user list cache:", error);
-    return false;
-  }
-};
-
-/**
- * Get cache metadata - useful for diagnostics and cache status display
- * @returns {Object} Cache metadata with size, age, and validity info
- */
-const _getUserListCacheMetadata = () => {
-  try {
-    const cached = localStorage.getItem("TradersApp_UserListCache");
-    if (!cached) {
-      return {
-        exists: false,
-        size: 0,
-        age: null,
-        isExpired: true,
-        userCount: 0,
-      };
-    }
-
-    const cacheData = JSON.parse(cached);
-    const age = Date.now() - cacheData.timestamp;
-    const maxAge = 5 * 60 * 1000; // 5 minutes
-    const isExpired = age > maxAge;
-
-    return {
-      exists: true,
-      size: cached.length,
-      age,
-      isExpired,
-      userCount: Object.keys(cacheData.users || {}).length,
-      createdAt: new Date(cacheData.timestamp).toLocaleString(),
-    };
-  } catch (error) {
-    console.warn("Failed to get cache metadata:", error);
-    return { exists: false, size: 0, age: null, isExpired: true, userCount: 0 };
-  }
-};
 
 // ═══════════════════════════════════════════════════════════════════
 //  CONSTANTS & SYSTEM THEME
@@ -8885,8 +8459,6 @@ function AdminDashboard({
             )}
           </button>
 
-          {/* Theme switching now handled by ThemeSwitcher component above */}
-
           {/* RULE #101: Full-Screen Toggle */}
           <FullScreenToggle showToast={showToast} />
 
@@ -11423,8 +10995,6 @@ export default function TradersRegiment() {
       // ignore
     }
   };
-  const [showThemePicker, setShowThemePicker] = useState(false);
-
   // MODULE 1 PHASE 2: PRIVACY & SESSION MANAGEMENT
   const [privacyModeActive, setPrivacyModeActive] = useState(false); // Rule #27: Ghost Mode
   const [showInviteScreen, setShowInviteScreen] = useState(false);
@@ -11537,21 +11107,6 @@ export default function TradersRegiment() {
     setToasts((prev) => prev.filter((t) => t.id !== toastId));
   }, []);
 
-  // THEME PICKER HANDLER
-  const handleAccentColorChange = (newAccent) => {
-    setAccentColor(newAccent);
-    try {
-      localStorage.setItem("appAccentColor", newAccent);
-    } catch (error) {
-      console.error("Failed to save accent color:", error);
-    }
-    setShowThemePicker(false);
-    showToast(
-      `Theme updated to ${ACCENT_COLORS[newAccent]?.name || "Unknown"}`,
-      "info",
-    );
-  };
-
   // CREATE DYNAMIC THEME BASED ON SYSTEM DARK MODE, ACCENT COLOR & USER THEME
   const _THEME = useMemo(() => {
     if (currentTheme === "day") {
@@ -11565,6 +11120,15 @@ export default function TradersRegiment() {
     // Fallback to system/theme combo
     return createTheme(systemIsDark, accentColor);
   }, [systemIsDark, accentColor, currentTheme]);
+
+  // Shadow outer T with dynamic theme for use throughout component
+  const T = _THEME;
+
+  // Apply theme to document body
+  useEffect(() => {
+    document.body.style.backgroundColor = currentTheme === "night" ? "#0D1117" : currentTheme === "eye" ? "#F5F0E6" : "#FFFFFF";
+    document.body.style.color = currentTheme === "night" ? "#E6EDF3" : currentTheme === "eye" ? "#44403C" : "#1F2937";
+  }, [currentTheme]);
 
   // MOTION & INTERACTION: Apply tilt effects to dashboard cards
   useEffect(() => {
@@ -11887,10 +11451,10 @@ export default function TradersRegiment() {
 
   // Save theme to localStorage when it changes
   useEffect(() => {
-    localStorage.setItem("appTheme", theme);
+    localStorage.setItem("appTheme", currentTheme);
     // Update document.body class for global theme application
-    document.body.className = `theme-${theme}`;
-  }, [theme]);
+    document.body.className = `theme-${currentTheme}`;
+  }, [currentTheme]);
 
   // Update body background color based on theme to prevent white flashes
   useEffect(() => {
@@ -13218,44 +12782,30 @@ export default function TradersRegiment() {
                 alignItems: "center",
               }}
             >
-              {/* Theme Mode Switcher */}
-              <ThemeSwitcher
-                currentTheme={currentTheme}
-                onThemeChange={handleThemeChange}
-              />
               <AiEnginesStatus statuses={aiStatuses} />
-
               <button
-                onClick={() => setShowThemePicker(true)}
-                title="Open theme color picker"
+                onClick={() => {
+                  const themes = ["day", "night", "eye"];
+                  const idx = themes.indexOf(currentTheme);
+                  const nextTheme = themes[(idx + 1) % themes.length];
+                  handleThemeChange(nextTheme);
+                  console.log("Theme changed to:", nextTheme);
+                }}
+                title="Toggle Day/Night/Eye Comfort mode"
                 style={{
-                  background: `${ACCENT_COLORS[accentColor]?.primary || ACCENT_COLORS.BLUE.primary}33`,
-                  border: `1px solid ${ACCENT_COLORS[accentColor]?.primary || ACCENT_COLORS.BLUE.primary}`,
-                  color:
-                    ACCENT_COLORS[accentColor]?.primary ||
-                    ACCENT_COLORS.BLUE.primary,
+                  background: "#3B82F6",
+                  border: "1px solid #3B82F6",
+                  color: "#FFFFFF",
                   padding: "8px 12px",
                   borderRadius: 6,
                   cursor: "pointer",
                   fontSize: 12,
                   fontFamily: T.font,
                   fontWeight: 600,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  transition: "all 0.3s ease",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = `${ACCENT_COLORS[accentColor]?.primary || ACCENT_COLORS.BLUE.primary}44`;
-                  e.currentTarget.style.boxShadow = `0 0 8px ${ACCENT_COLORS[accentColor]?.glow || ACCENT_COLORS.BLUE.glow}`;
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = `${ACCENT_COLORS[accentColor]?.primary || ACCENT_COLORS.BLUE.primary}33`;
-                  e.currentTarget.style.boxShadow = "none";
                 }}
                 className="btn-glass"
               >
-                🎨 THEME
+                {currentTheme === "day" ? "☀️ DAY" : currentTheme === "night" ? "🌙 NIGHT" : "👁️ EYE"}
               </button>
               <button
                 onClick={() => setPrivacyModeActive(!privacyModeActive)}
@@ -13327,7 +12877,7 @@ export default function TradersRegiment() {
   })();
 
   return (
-    <div className={`app-container theme-${theme}`}>
+    <div className={`app-container theme-${currentTheme}`}>
       {/* RULE #295, #296: Maintenance Mode - Show "Back Soon" screen if active, except for Master Admin */}
       {maintenanceModeActive &&
       auth?.uid !== ADMIN_UID &&
@@ -13336,12 +12886,7 @@ export default function TradersRegiment() {
       ) : (
         screenContent
       )}
-      <ThemePicker
-        isOpen={showThemePicker}
-        onClose={() => setShowThemePicker(false)}
-        onSelectTheme={handleAccentColorChange}
-        currentTheme={accentColor}
-      />
+
       {/* Admin Debug Overlay - System Audit Dashboard */}
       <DebugOverlay
         logs={debugLogs}
