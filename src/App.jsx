@@ -69,6 +69,27 @@ import LoadingOverlay from "./components/LoadingOverlay.jsx";
 import SkeletonLoader from "./components/SkeletonLoader.jsx";
 import LazyImage from "./components/LazyImage.jsx";
 
+const useThemeColors = (themeVersion) => {
+  return React.useMemo(() => {
+    if (typeof document === 'undefined') {
+      return { bg: '#fbfbfc', card: '#ffffff', text: '#121212', textSecondary: '#6b7280', border: 'rgba(0,0,0,0.05)', accent: '#2563eb' };
+    }
+    const root = document.documentElement;
+    const getVar = (name, fallback) => {
+      const val = getComputedStyle(root).getPropertyValue(name).trim();
+      return val || fallback;
+    };
+    return {
+      bg: getVar('--aura-base-layer', '#fbfbfc'),
+      card: getVar('--aura-surface-elevated', '#ffffff'),
+      text: getVar('--aura-text-primary', '#121212'),
+      textSecondary: getVar('--aura-text-secondary', '#6b7280'),
+      border: getVar('--aura-border-subtle', 'rgba(0,0,0,0.05)'),
+      accent: getVar('--aura-accent-primary', '#2563eb'),
+    };
+  }, [themeVersion]);
+};
+
 // math-engine & ai-router — both inlined (files exist but have no exports)
 // Swap to real imports once those files are complete
 
@@ -10430,10 +10451,12 @@ export default function TradersRegiment() {
     }
   });
 
+  const [themeVersion, setThemeVersion] = useState(0);
+
   const handleThemeChange = (newTheme) => {
     setCurrentTheme(newTheme);
+    setThemeVersion(v => v + 1);
 
-    // Map legacy theme to AURA state
     const legacyToAura = {
       day: "lumiere",
       night: "midnight",
@@ -10442,15 +10465,10 @@ export default function TradersRegiment() {
     };
     const auraTheme = legacyToAura[newTheme] || "lumiere";
 
-    // Update AURA theme in localStorage and document attribute
     try {
       localStorage.setItem("appTheme", newTheme);
       localStorage.setItem("aura-theme", auraTheme);
-
-      // Update document attribute for CSS variables
       document.documentElement.setAttribute("data-aura-theme", auraTheme);
-
-      // Apply immediate background color for zero-FOUC
       document.documentElement.style.backgroundColor =
         auraTheme === "midnight"
           ? "#05070A"

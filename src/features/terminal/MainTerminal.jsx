@@ -28,6 +28,7 @@ import {
   inp,
   lbl,
 } from "./terminalHelperComponents";
+import { CSS_VARS } from "../../styles/cssVars.js";
 
 // Default states
 const defaultAccountState = {
@@ -767,8 +768,8 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
   return (
     <div style={{ 
       minHeight: '100vh', 
-      background: "#FFFFFF", 
-      color: T.text, 
+      background: CSS_VARS.bg, 
+      color: CSS_VARS.text, 
       fontFamily: T.font,
       display: "flex",
       flexDirection: "column",
@@ -777,7 +778,7 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
       
       {/* Header */}
       <div style={{ 
-        background: "#FFFFFF", 
+        background: CSS_VARS.surface, 
         borderBottom: `1px solid #E5E7EB`, 
         padding: "16px 32px", 
         display: "flex", 
@@ -832,7 +833,7 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
 
       {/* Navigation Tabs */}
       <div style={{ 
-        background: "#FFFFFF", 
+        background: CSS_VARS.surface, 
         borderBottom: `1px solid #E5E7EB`, 
         padding: "0 32px", 
         display: "flex", 
@@ -862,10 +863,10 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
             }} 
             className="btn-glass"
           >
-            <div style={{ color: activeTab === p.id ? p.color : "#6B7280", fontSize: 12, letterSpacing: 1.5, fontWeight: 800 }}>
+            <div style={{ color: activeTab === p.id ? p.color : CSS_VARS.textSecondary, fontSize: 12, letterSpacing: 1.5, fontWeight: 800 }}>
               {p.label}
             </div>
-            <div style={{ color: activeTab === p.id ? p.color : "var(--aura-text-secondary, #6B7280)", fontSize: 10, marginTop: 4, fontWeight: 500 }}>
+            <div style={{ color: activeTab === p.id ? p.color : CSS_VARS.textSecondary, fontSize: 10, marginTop: 4, fontWeight: 500 }}>
               {p.sub}
             </div>
           </button>

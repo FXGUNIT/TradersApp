@@ -1,6 +1,7 @@
 // Terminal Helper Components - Matching exact backup UI
 // These components replicate the exact styling from App.jsx.bak
 // Theme-aware using CSS variables from index.css
+import { CSS_VARS } from "../../styles/cssVars.js";
 
 const getCSSVar = (varName, fallback) => {
   if (typeof document === 'undefined') return fallback;
