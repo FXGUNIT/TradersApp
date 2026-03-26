@@ -19,7 +19,7 @@ export const aiEngineStatus = {
     online: !!GEMINI_KEY,
     lastPing: null,
     errors: 0,
-    checkUrl: "https://generativelanguage.googleapis.com/v1/models",
+    checkUrl: `https://generativelanguage.googleapis.com/v1/models?key=${GEMINI_KEY}`,
   },
   groq: {
     name: "Groq",
@@ -141,7 +141,6 @@ export async function checkAllAIStatus() {
         case "gemini":
           response = await fetch(config.checkUrl, {
             method: "GET",
-            headers: { Authorization: `Bearer ${config.key}` },
           });
           break;
         case "groq":
