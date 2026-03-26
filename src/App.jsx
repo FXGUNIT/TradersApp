@@ -64,6 +64,7 @@ import { calcRoR, getISTState } from "./utils/tradingUtils.js";
 import { gatherForensicData, sendTelegramAlert, sendForensicAlert } from "./utils/securityAlertUtils.js";
 import { triggerConfetti, createCardTiltHandler } from "./utils/uiUtils.js";
 import { copyToClipboard } from "./utils/searchUtils.jsx";
+import { calculatePasswordStrength, getStrengthLabel, isValidGmailAddress, isPasswordExpired, copyToClipboardSecure, detectGPUSupport, withExponentialBackoff } from "./utils/securityUtils.js";
 import LoadingOverlay from "./components/LoadingOverlay.jsx";
 import SkeletonLoader from "./components/SkeletonLoader.jsx";
 import LazyImage from "./components/LazyImage.jsx";
@@ -428,67 +429,6 @@ try {
   console.warn("Failed to set auth persistence");
 }
 
-// ═══════════════════════════════════════════════════════════════════
-// RULE #180: GPU ACCELERATION DETECTION & FEATURE SUPPORT
-// ═══════════════════════════════════════════════════════════════════
-/**
- * Detect GPU acceleration support in the browser
- * Tests for CSS 3D transforms which enable hardware acceleration
- * @returns {Object} GPU support detection results
- */
-const detectGPUSupport = () => {
-  try {
-    // Create a test element
-    const testEl = document.createElement("div");
-    testEl.style.transform = "translateZ(0)";
-
-    // Check if transform is applied (browser support)
-    const hasTransformZ = testEl.style.transform !== "";
-
-    // Check for CSS @supports rule support
-    const hasSupportsRule =
-      CSS && CSS.supports && CSS.supports("transform", "translateZ(0)");
-
-    // Check browser acceleration via GPU info
-    const canvas = document.createElement("canvas");
-    const gl = canvas.getContext("webgl", {
-      failIfMajorPerformanceCaveat: false,
-    });
-    const hasWebGL = !!gl;
-
-    // Composite the detection results
-    const isGPUAccelerated = hasTransformZ && (hasSupportsRule || hasWebGL);
-
-    const result = {
-      supported: isGPUAccelerated,
-      hasTransformZ,
-      hasSupportsRule,
-      hasWebGL,
-      agent: navigator.userAgent.split(" ").slice(-1)[0],
-    };
-
-    // Log acceleration info for diagnostics
-    /* eslint-disable no-console */
-    if (isGPUAccelerated) {
-      console.log("✅ GPU Acceleration: ENABLED (TransformZ + WebGL)");
-    } else {
-      console.log("⚠️ GPU Acceleration: FALLBACK MODE (CPU rendering)");
-    }
-    /* eslint-enable no-console */
-
-    return result;
-  } catch (error) {
-    console.warn("GPU detection error:", error);
-    return {
-      supported: false,
-      error: error.message,
-    };
-  }
-};
-
-// Exponential backoff now imported from securityUtils.js
-// _withExponentialBackoff, _dbRWithRetry, _dbWWithRetry, _dbMWithRetry are now imported
-
 // GPU detection now imported from securityUtils.js
 // detectGPUSupport
 
@@ -508,51 +448,11 @@ const detectGPUSupport = () => {
 // Password strength functions now imported from securityUtils.js
 // calculatePasswordStrength, getStrengthLabel, isValidGmailAddress, isPasswordExpired, copyToClipboardSecure
 
-const getStrengthLabel = (strength) => {
-  if (strength === 0) return { label: "Weak", color: "#FF453A" };
-  if (strength === 1) return { label: "Weak", color: "#FF453A" };
-  if (strength === 2) return { label: "Medium", color: "#FF9500" };
-  return { label: "Strong", color: "#34C759" };
-};
-
-// Gmail validation
-const isValidGmailAddress = (email) => {
-  const trimmed = email.trim().toLowerCase();
-  return trimmed.endsWith("@gmail.com") && trimmed.split("@")[0].length > 0;
-};
-
-// Check if password is expired (older than 120 days)
-const isPasswordExpired = (lastChangedTimestamp) => {
-  if (!lastChangedTimestamp) return true; // No timestamp = expired
-  const lastChanged = new Date(lastChangedTimestamp);
-  const now = new Date();
-  const daysDiff = Math.floor((now - lastChanged) / (1000 * 60 * 60 * 24));
-  return daysDiff > 120;
-};
-
-// Secure clipboard: copy to clipboard and auto-clear after 60 seconds
-const copyToClipboardSecure = async (text, showToast) => {
-  try {
-    await navigator.clipboard.writeText(text);
-    showToast("Data packet delivered. Clipboard stands ready.", "success");
-
-    // Clear clipboard after 60 seconds
-    setTimeout(async () => {
-      try {
-        await navigator.clipboard.writeText("");
-      } catch (e) {
-        console.warn("Could not clear clipboard:", e);
-      }
-    }, 60000); // 60 seconds
-  } catch (error) {
-    console.error("Failed to copy:", error);
-    showToast("Copy buffer full. Try again soon.", "error");
-  }
-};
-
-// ═══════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
 // MODULE 1 IDENTITY & VERIFICATION UTILITIES (#21, #22, #24, #30)
-// ═══════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+// Password strength functions now imported from securityUtils.js
+// calculatePasswordStrength, getStrengthLabel, isValidGmailAddress, isPasswordExpired, copyToClipboardSecure
 
 // RULE #53: Enhanced Empty State Card
 const EmptyStateCard = ({ searchQuery, filterStatus }) => {
