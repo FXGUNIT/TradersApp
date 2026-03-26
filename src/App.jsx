@@ -2125,51 +2125,7 @@ const useSystemTheme = () => {
   return isDarkMode;
 };
 
-// ACCENT COLOR DEFINITIONS FOR THEME PICKER
-const ACCENT_COLORS = {
-  TRADING_GREEN: {
-    name: "Trading Green",
-    hex: "#30D158",
-    primary: "#30D158",
-    light: "rgba(48,209,88,0.2)",
-    glow: "rgba(48,209,88,0.6)",
-  },
-  GOLD: {
-    name: "Gold",
-    hex: "#FFD60A",
-    primary: "#FFD60A",
-    light: "rgba(255,214,10,0.2)",
-    glow: "rgba(255,214,10,0.6)",
-  },
-  BLUE: {
-    name: "Electric Blue",
-    hex: "#0A84FF",
-    primary: "#0A84FF",
-    light: "rgba(10,132,255,0.2)",
-    glow: "rgba(10,132,255,0.6)",
-  },
-  PURPLE: {
-    name: "Purple",
-    hex: "#BF5AF2",
-    primary: "#BF5AF2",
-    light: "rgba(191,90,242,0.2)",
-    glow: "rgba(191,90,242,0.6)",
-  },
-  CYAN: {
-    name: "Cyan",
-    hex: "#64D2FF",
-    primary: "#64D2FF",
-    light: "rgba(100,210,255,0.2)",
-    glow: "rgba(100,210,255,0.6)",
-  },
-  PINK: {
-    name: "Pink",
-    hex: "#FF375F",
-    primary: "#FF375F",
-    light: "rgba(255,55,95,0.2)",
-    glow: "rgba(255,55,95,0.6)",
-  },
-};
+
 
 // RULE #126: Glassmorphism Effect - Premium institutional terminal aesthetic
 // Enhanced theme with glassmorphic styling and accent color support
