@@ -14,6 +14,7 @@
 
 import { getDatabase, ref, get, set, update } from "firebase/database";
 import { DATABASE_URL } from './firebase';
+import { approveUser as approveAdminUser } from "./adminService.js";
 
 const getDbOrNull = () => {
   try {
@@ -199,30 +200,7 @@ export async function getUserRecord(uid) {
  * // User now gets routed to MainTerminal instead of WaitingRoom
  */
 export async function approveUser(uid, adminUid) {
-  if (!DATABASE_URL) {
-    return { success: false, error: "Firebase unavailable" };
-  }
-  const db = getDbOrNull();
-  if (!db) {
-    return { success: false, error: "Firebase unavailable" };
-  }
-  const updates = {
-    status: "ACTIVE",
-    approvedAt: Date.now(),
-    approvedBy: adminUid,
-    updatedAt: Date.now(),
-  };
-
-  try {
-    const userRef = ref(db, `users/${uid}`);
-    await update(userRef, updates);
-
-    console.warn("✅ User approved:", uid);
-    return { success: true };
-  } catch (error) {
-    console.error("❌ Approval failed:", error);
-    throw error;
-  }
+  return approveAdminUser(uid, adminUid);
 }
 
 /**

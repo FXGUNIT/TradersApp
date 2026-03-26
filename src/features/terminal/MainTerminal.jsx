@@ -99,12 +99,18 @@ function buildEquityCurvePath(series, width = 360, height = 100, padding = 14) {
   return { path, dots: coords, min, max };
 }
 
+function getISTDateString(date = new Date()) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+  }).format(date);
+}
+
 function deriveLiveAmdContext(parsed, extractedVals) {
   const days = Array.isArray(parsed?.days) ? parsed.days : [];
-  const latestDay = days[0] || null;
+  const latestDay = days.length ? days[days.length - 1] : null;
   const latestSession = latestDay?.trading || latestDay?.full || null;
   const atr = Number.parseFloat(
-    extractedVals?.atr || parsed?.tradingHoursAtr14 || latestDay?.atr14 || 0,
+    extractedVals?.atr || latestDay?.tradingHoursAtr14 || latestDay?.atr14 || parsed?.tradingHoursAtr14 || 0,
   );
   const open = Number.parseFloat(latestSession?.o ?? latestDay?.full?.o ?? 0);
   const high = Number.parseFloat(latestSession?.h ?? latestDay?.full?.h ?? 0);
@@ -120,19 +126,19 @@ function deriveLiveAmdContext(parsed, extractedVals) {
     atr,
   });
   const recentSessions = days
-    .slice(0, 3)
+    .slice(-3)
     .map((day) => day?.trading || day?.full || null)
     .filter(Boolean);
   const recentHighs = recentSessions.map((session) => Number.parseFloat(session.h || 0));
   const recentLows = recentSessions.map((session) => Number.parseFloat(session.l || 0));
   const higherHighs =
     recentHighs.length === 3 &&
-    recentHighs[0] > recentHighs[1] &&
-    recentHighs[1] > recentHighs[2];
+    recentHighs[0] < recentHighs[1] &&
+    recentHighs[1] < recentHighs[2];
   const lowerLows =
     recentLows.length === 3 &&
-    recentLows[0] < recentLows[1] &&
-    recentLows[1] < recentLows[2];
+    recentLows[0] > recentLows[1] &&
+    recentLows[1] > recentLows[2];
   const volumeNearLows =
     range > 0 ? (close - low) / range <= 0.3 : false;
   const conflictingSignals =
@@ -331,7 +337,7 @@ export default function MainTerminal({
   const sp2 = (k) => (v) => setP2Jf((p) => ({ ...p, [k]: v }));
   
   const [jf, setJf] = useState({
-    date: new Date().toISOString().slice(0, 10),
+    date: getISTDateString(),
     instrument: "MNQ",
     direction: "Long",
     tradeType: "Trend",
@@ -364,7 +370,7 @@ export default function MainTerminal({
     setJournal(normalizeJournal(profile?.journal));
     setAccountState(buildAccountState(profile?.accountState));
     setFirmRules(profile?.firmRules || defaultFirmRules);
-  }, [profile?.uid, profile?.journal, profile?.accountState]);
+  }, [profile?.uid, profile?.journal, profile?.accountState, profile?.firmRules]);
 
   useEffect(() => {
     if (activeTab === "journal") {
@@ -425,8 +431,11 @@ export default function MainTerminal({
     ? Math.round(parseFloat(f.accountBalance) * parseFloat(f.riskPct) / 100 * 100) / 100 
     : null;
 
-  const fiveDayATR = extractedVals.fiveDayATR || (parsed && parsed.days && parsed.days.length >= 5 ? parsed.days[4]?.atr14 : null) || 0;
-  const twentyDayATR = extractedVals.twentyDayATR || (parsed && parsed.tradingHoursAtr14) || 0;
+  const latestParsedDay = parsed?.days?.length ? parsed.days[parsed.days.length - 1] : null;
+  const fiveDayFallback = latestParsedDay?.fiveDayATR || latestParsedDay?.atr14 || 0;
+  const twentyDayFallback = latestParsedDay?.twentyDayATR || parsed?.tradingHoursAtr14 || 0;
+  const fiveDayATR = extractedVals.fiveDayATR || fiveDayFallback || 0;
+  const twentyDayATR = extractedVals.twentyDayATR || twentyDayFallback || 0;
   
   const VR = calculateVolatilityRatio(fiveDayATR, twentyDayATR);
   const { vwapSD1, vwapSD2, trendSLMult, mrSLMult } = getDynamicParameters(VR);
@@ -436,7 +445,11 @@ export default function MainTerminal({
   if (VR < 0.85) volatilityRegime = "Compression"; 
   else if (VR > 1.15) volatilityRegime = "Expansion";
 
-  const atrVal = parseFloat(extractedVals.atr) || parseFloat(parsed?.tradingHoursAtr14) || 0;
+  const atrVal =
+    parseFloat(extractedVals.atr) ||
+    parseFloat(latestParsedDay?.tradingHoursAtr14) ||
+    parseFloat(parsed?.tradingHoursAtr14) ||
+    0;
   const slMult = f.tradeType === 'Trend' ? trendSLMult : mrSLMult;
   const slPts = atrVal * slMult;
   const ptVal = f.instrument === 'MNQ' ? 2 : f.instrument === 'MES' ? 5 : f.instrument === 'US100' ? 1 : 10;
@@ -554,7 +567,7 @@ export default function MainTerminal({
   const isWeekendRestricted = !fr.weekendTrading && ist.isWeekend;
   const isMinimumDaysRestricted = minTradingDays > 0 && journal.length < minTradingDays;
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getISTDateString();
   const todayPnl = journal.filter(t => t.date === today).reduce((s, t) => s + parseFloat(t.pnl || 0), 0);
   const dailyLossUsed = Math.abs(Math.min(0, todayPnl));
   const dailyRemaining = maxDL > 0 ? maxDL - dailyLossUsed : null;
@@ -712,13 +725,14 @@ export default function MainTerminal({
       
       if (days.length >= 5) {
         days.sort((a, b) => new Date(a.date) - new Date(b.date));
-        for (let i = 0; i < Math.min(5, days.length); i++) {
-          if (days[i]) days[i].fiveDayATR = days[i].atr14;
-        }
         for (let i = 0; i < days.length; i++) {
-          const slice = days.slice(Math.max(0, i - 19), i + 1);
-          const atrSum = slice.reduce((s, d) => s + (d.atr14 || 0), 0);
-          days[i].twentyDayATR = atrSum / slice.length;
+          const fiveDaySlice = days.slice(Math.max(0, i - 4), i + 1);
+          const fiveDaySum = fiveDaySlice.reduce((s, d) => s + (d.atr14 || 0), 0);
+          days[i].fiveDayATR = fiveDaySum / fiveDaySlice.length;
+
+          const twentyDaySlice = days.slice(Math.max(0, i - 19), i + 1);
+          const twentyDaySum = twentyDaySlice.reduce((s, d) => s + (d.atr14 || 0), 0);
+          days[i].twentyDayATR = twentyDaySum / twentyDaySlice.length;
         }
       }
       
@@ -965,7 +979,7 @@ export default function MainTerminal({
     setP1Out('');
     
     try {
-      const textMsg = `Run full Premarket Analysis. Today: ${parsed.days[0]?.date} | ${ist.istStr}
+      const textMsg = `Run full Premarket Analysis. Today: ${parsed.days[parsed.days.length - 1]?.date} | ${ist.istStr}
 Trading Hours ATR(14): ${parsed.tradingHoursAtr14} pts
 
 Screenshots: ${p1NewsChart ? '✓ Calendar' : '✗ No calendar'} | ${p1PremarketChart ? '✓ Premarket chart' : '✗ No chart'} | ${p1KeyLevelsChart ? '✓ Key levels' : '✗ No levels'}
@@ -1332,7 +1346,7 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
                 <input id="csvIn" type="file" accept=".txt,.csv" style={{display:"none"}} onChange={handleCsvDrop}/>
                 <div style={{fontSize:24,marginBottom:6,opacity:0.25}}>⊞</div>
                 <div style={{color:parseMsg.startsWith('✓')?T.green:"#6B7280",fontSize:12,fontWeight:600}}>{parseMsg||"Drop NinjaTrader .txt / .csv — or click to browse"}</div>
-                {parsed && <div style={{color:"#9CA3AF",fontSize:11,marginTop:4}}>Latest: {parsed.days[0]?.date} · ATR(14) = <span style={{color:T.green,fontWeight:700}}>{parsed.tradingHoursAtr14} pts</span></div>}
+                {parsed && <div style={{color:"#9CA3AF",fontSize:11,marginTop:4}}>Latest: {parsed.days[parsed.days.length - 1]?.date} · ATR(14) = <span style={{color:T.green,fontWeight:700}}>{parsed.tradingHoursAtr14} pts</span></div>}
               </div>
             </div>
 

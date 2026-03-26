@@ -5,10 +5,34 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist', 'node_modules', 'welcomeDispatchFunction.js', 'scripts', 'contextWindowStressTest.js']),
+  globalIgnores([
+    'dist',
+    'node_modules',
+    'welcomeDispatchFunction.js',
+    'scripts',
+    'contextWindowStressTest.js',
+    'src/App.jsx.*',
+    'src/**/*.bak',
+    'src/**/*.broken',
+    'src/**/*.fixed*',
+    'src/**/*.full',
+    'src/**/*.test*',
+  ]),
   {
     files: ['**/*.{js,jsx}'],
-    ignores: ['**/*.config.js', '**/dist/**', '**/node_modules/**', 'welcomeDispatchFunction.js', 'scripts/**'],
+    ignores: [
+      '**/*.config.js',
+      '**/dist/**',
+      '**/node_modules/**',
+      'welcomeDispatchFunction.js',
+      'scripts/**',
+      'src/App.jsx.*',
+      'src/**/*.bak',
+      'src/**/*.broken',
+      'src/**/*.fixed*',
+      'src/**/*.full',
+      'src/**/*.test*',
+    ],
     extends: [
       js.configs.recommended,
       reactHooks.configs.flat.recommended,

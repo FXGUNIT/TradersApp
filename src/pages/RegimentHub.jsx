@@ -239,19 +239,21 @@ export default function RegimentHub({
         style={{
           textAlign: "center",
           marginBottom: 56,
-          position: "relative",
           width: "100%",
           maxWidth: 900,
+          display: "flex",
+          flexDirection: "column",
+          gap: 32,
         }}
       >
         <div
           style={{
-            position: "absolute",
-            top: -20,
-            right: 0,
             display: "flex",
+            width: "100%",
             alignItems: "center",
+            justifyContent: "space-between",
             gap: 16,
+            flexWrap: "wrap",
           }}
         >
           <AiEnginesStatus />

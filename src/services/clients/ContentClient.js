@@ -13,6 +13,7 @@ const HUB_CONTENT = Object.freeze({
       action: SCREEN_IDS.APP,
       accentToken: "var(--accent-primary, #2563eb)",
       glowToken: "var(--accent-glow, rgba(37,99,235,0.3))",
+      surfaceToken: "var(--surface-elevated, #FFFFFF)",
     },
     {
       id: "consciousness",
@@ -22,6 +23,7 @@ const HUB_CONTENT = Object.freeze({
       action: SCREEN_IDS.CONSCIOUSNESS,
       accentToken: "var(--amd-manipulation, #BF5AF2)",
       glowToken: "rgba(191,90,242,0.3)",
+      surfaceToken: "var(--surface-elevated, #FFFFFF)",
     },
   ],
 });

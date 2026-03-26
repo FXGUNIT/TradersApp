@@ -84,10 +84,11 @@ const CleanOnboarding = ({ onSignupSuccess, onGoogleSuccess, onBackToLogin }) =>
     fg: 'var(--text-primary, #111827)',
     muted: 'var(--text-secondary, #64748B)',
     blue: 'var(--accent-primary, #2563EB)', // Emergency Blue for links
-    green: '#22C55E',
-    red: '#EF4444',
+    green: 'var(--status-success, #22C55E)',
+    red: 'var(--status-error, #EF4444)',
     border: 'var(--border-subtle, rgba(0,0,0,0.05))',
     cardBg: 'var(--surface-elevated, #FFFFFF)',
+    ink: 'var(--text-primary, #0F172A)',
   };
 
   const authCard = {
@@ -118,7 +119,7 @@ const CleanOnboarding = ({ onSignupSuccess, onGoogleSuccess, onBackToLogin }) =>
     height: 44,
     padding: '12px 24px',
     background: disabled ? T.border : bgColor,
-    color: disabled ? '#94A3B8' : '#FFFFFF',
+    color: disabled ? 'var(--text-tertiary, #94A3B8)' : 'var(--accent-text, #FFFFFF)',
     fontSize: 14,
     fontWeight: 600,
     letterSpacing: 0.5,
@@ -204,7 +205,7 @@ const CleanOnboarding = ({ onSignupSuccess, onGoogleSuccess, onBackToLogin }) =>
             onClick={handleGoogleAuth}
             disabled={loading}
             style={{
-              ...authBtn('#0F172A', loading),
+              ...authBtn(T.ink, loading),
               marginBottom: 16,
             }}>
             🔑 CONTINUE WITH GOOGLE

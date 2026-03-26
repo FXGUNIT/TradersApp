@@ -11,7 +11,11 @@
 
 import React, { useState } from "react";
 import { getAuth } from "firebase/auth";
-import { approveUser, blockUser, lockUser } from "../services/adminService.js";
+import {
+  approveUser,
+  blockUser,
+  lockUser,
+} from "../services/clients/AdminSecurityClient.js";
 
 function AdminUserActions({ user }) {
   const [isLoading, setIsLoading] = useState(false);
@@ -69,20 +73,32 @@ function AdminUserActions({ user }) {
   return (
     <div style={styles.container}>
       {user.status === "PENDING" && (
-        <button onClick={handleApprove} disabled={isLoading} style={styles.approveButton}>
+        <button
+          onClick={handleApprove}
+          disabled={isLoading}
+          style={styles.approveButton}
+        >
           {isLoading ? "..." : "Approve"}
         </button>
       )}
-      
+
       {user.status === "ACTIVE" && (
-         <button onClick={handleBlock} disabled={isLoading} style={styles.blockButton}>
-            {isLoading ? "..." : "Block"}
+        <button
+          onClick={handleBlock}
+          disabled={isLoading}
+          style={styles.blockButton}
+        >
+          {isLoading ? "..." : "Block"}
         </button>
       )}
 
       {!user.isLocked && (
-         <button onClick={handleLock} disabled={isLoading} style={styles.lockButton}>
-            {isLoading ? "..." : "Lock"}
+        <button
+          onClick={handleLock}
+          disabled={isLoading}
+          style={styles.lockButton}
+        >
+          {isLoading ? "..." : "Lock"}
         </button>
       )}
 
@@ -92,39 +108,42 @@ function AdminUserActions({ user }) {
 }
 
 const styles = {
-    container: {
-        display: 'flex',
-        gap: '8px',
-        alignItems: 'center',
-    },
-    approveButton: {
-        backgroundColor: '#34C759',
-        color: 'white',
-        border: 'none',
-        padding: '8px 12px',
-        borderRadius: '6px',
-        cursor: 'pointer',
-    },
-    blockButton: {
-        backgroundColor: '#FF3B30',
-        color: 'white',
-        border: 'none',
-        padding: '8px 12px',
-        borderRadius: '6px',
-        cursor: 'pointer',
-    },
-    lockButton: {
-        backgroundColor: '#FF9500',
-        color: 'white',
-        border: 'none',
-        padding: '8px 12px',
-        borderRadius: '6px',
-        cursor: 'pointer',
-    },
-    errorText: {
-        color: '#FF3B30',
-        fontSize: '12px',
-    }
+  container: {
+    display: "flex",
+    gap: "8px",
+    alignItems: "center",
+  },
+  approveButton: {
+    background:
+      "linear-gradient(135deg, var(--status-success, #34C759), rgba(52,199,89,0.72))",
+    color: "var(--accent-text, #FFFFFF)",
+    border: "1px solid rgba(52,199,89,0.3)",
+    padding: "8px 12px",
+    borderRadius: "6px",
+    cursor: "pointer",
+  },
+  blockButton: {
+    background:
+      "linear-gradient(135deg, var(--status-error, #FF3B30), rgba(255,59,48,0.72))",
+    color: "var(--accent-text, #FFFFFF)",
+    border: "1px solid rgba(255,59,48,0.3)",
+    padding: "8px 12px",
+    borderRadius: "6px",
+    cursor: "pointer",
+  },
+  lockButton: {
+    background:
+      "linear-gradient(135deg, var(--status-warning, #FF9500), rgba(255,149,0,0.72))",
+    color: "var(--accent-text, #FFFFFF)",
+    border: "1px solid rgba(255,149,0,0.3)",
+    padding: "8px 12px",
+    borderRadius: "6px",
+    cursor: "pointer",
+  },
+  errorText: {
+    color: "var(--status-error, #FF3B30)",
+    fontSize: "12px",
+  },
 };
 
 export default AdminUserActions;

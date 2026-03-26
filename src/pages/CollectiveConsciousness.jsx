@@ -4,6 +4,16 @@ import ThemeSwitcher from '../components/ThemeSwitcher.jsx';
 import AiEnginesStatus from '../components/AiEnginesStatus.jsx';
 import { runDeliberation, councilStage, MASTER_INTELLIGENCE_SYSTEM_PROMPT, quadCoreStatus } from '../services/ai-router.js';
 
+const AURA_COLORS = {
+  info: 'var(--aura-status-info, #0A84FF)',
+  success: 'var(--aura-status-success, #30D158)',
+  warning: 'var(--aura-status-warning, #F59E0B)',
+  manipulation: 'var(--aura-amd-manipulation, #BF5AF2)',
+  muted: 'var(--text-secondary, #8E8E93)',
+  mutedSoft: 'var(--text-secondary, #D1D5DB)',
+  borderSubtle: 'var(--border-subtle, rgba(255,255,255,0.06))',
+};
+
 const PHASE_DEFINITIONS = [
   { key: 'stage1', label: 'Phase 1: Alpha, Beta, & Groq deployed', icon: '📡' },
   { key: 'stage2', label: 'Phase 2: Gemini synthesizing preliminary intel', icon: '⚖️' },
@@ -41,7 +51,7 @@ function WarRoomLoader() {
         fontSize: 11,
         fontWeight: 700,
         letterSpacing: 4,
-        color: '#8E8E93',
+        color: AURA_COLORS.muted,
         textTransform: 'uppercase',
         marginBottom: 8,
         textAlign: 'center',
@@ -63,11 +73,11 @@ function WarRoomLoader() {
             padding: '12px 16px',
             borderRadius: 12,
             background: isDone
-              ? 'rgba(48,209,88,0.06)'
+              ? 'var(--aura-status-success, rgba(48,209,88,0.06))'
               : isActive
-                ? 'rgba(10,132,255,0.06)'
+                ? 'var(--aura-status-info, rgba(10,132,255,0.06))'
                 : 'transparent',
-            border: `1px solid ${isDone ? 'rgba(48,209,88,0.15)' : isActive ? 'rgba(10,132,255,0.15)' : 'rgba(255,255,255,0.04)'}`,
+            border: `1px solid ${isDone ? 'var(--aura-status-success, rgba(48,209,88,0.15))' : isActive ? 'var(--aura-status-info, rgba(10,132,255,0.15))' : AURA_COLORS.borderSubtle}`,
             transition: 'all 0.4s ease',
           }}>
             {/* Status icon */}
@@ -82,12 +92,12 @@ function WarRoomLoader() {
               fontWeight: 700,
               flexShrink: 0,
               background: isDone
-                ? 'rgba(48,209,88,0.15)'
+                ? 'var(--aura-status-success, rgba(48,209,88,0.15))'
                 : isActive
-                  ? 'rgba(10,132,255,0.15)'
-                  : 'rgba(255,255,255,0.04)',
-              color: isDone ? '#30D158' : isActive ? '#0A84FF' : '#3A3A3C',
-              border: `1.5px solid ${isDone ? '#30D158' : isActive ? '#0A84FF' : '#3A3A3C'}`,
+                  ? 'var(--aura-status-info, rgba(10,132,255,0.15))'
+                  : AURA_COLORS.borderSubtle,
+              color: isDone ? AURA_COLORS.success : isActive ? AURA_COLORS.info : 'var(--text-tertiary, #3A3A3C)',
+              border: `1.5px solid ${isDone ? AURA_COLORS.success : isActive ? AURA_COLORS.info : 'var(--text-tertiary, #3A3A3C)'}`,
               animation: isActive ? 'cc-pulse 1.5s ease-in-out infinite' : 'none',
             }}>
               {isDone ? '✓' : phase.icon}
@@ -97,7 +107,7 @@ function WarRoomLoader() {
             <span style={{
               fontSize: 13,
               fontWeight: isDone ? 600 : isActive ? 700 : 500,
-              color: isDone ? '#30D158' : isActive ? '#F2F2F7' : '#3A3A3C',
+              color: isDone ? AURA_COLORS.success : isActive ? 'var(--text-primary, #F2F2F7)' : 'var(--text-tertiary, #3A3A3C)',
               letterSpacing: 0.3,
               animation: isActive ? 'cc-text-pulse 2s ease-in-out infinite' : 'none',
             }}>
@@ -116,8 +126,8 @@ function WarRoomLoader() {
         <div style={{
           width: 24,
           height: 24,
-          border: '2.5px solid rgba(255,255,255,0.08)',
-          borderTopColor: '#0A84FF',
+          border: '2.5px solid var(--border-subtle, rgba(255,255,255,0.08))',
+          borderTopColor: AURA_COLORS.info,
           borderRadius: '50%',
           animation: 'cc-spin 0.8s linear infinite',
         }} />
@@ -143,7 +153,8 @@ function WarRoomLoader() {
 import { useUsers } from '../hooks/useUsers';
 
 export default function CollectiveConsciousness({ onBack, theme, auth, currentTheme, onThemeChange }) {
-  const isDark = theme === 'night';
+  const normalizedTheme = currentTheme || theme || "lumiere";
+  const isDark = normalizedTheme === "midnight" || normalizedTheme === "night";
   const { users } = useUsers();
   const [messages, setMessages] = useState([]);
   const [localHistory, setLocalHistory] = useState([]);
@@ -159,9 +170,9 @@ export default function CollectiveConsciousness({ onBack, theme, auth, currentTh
   const userData = auth?.uid ? users[auth.uid] : null;
   const isFastMode = engineMode === 'fast';
 
-  const bgColor = isDark ? 'var(--surface-elevated, #0F0F0F)' : 'var(--surface-elevated, #FFFFFF)';
-  const textColor = isDark ? '#F2F2F7' : '#111827';
-  const mutedColor = isDark ? '#8E8E93' : '#9CA3AF';
+  const bgColor = "var(--surface-elevated, #FFFFFF)";
+  const textColor = "var(--text-primary, #111827)";
+  const mutedColor = "var(--text-secondary, #9CA3AF)";
   const inputBg = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.03)';
   const inputBorder = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
 
@@ -266,17 +277,17 @@ User Question: ${trimmed}`;
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: '12px 20px',
-        borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
+      borderBottom: `1px solid ${AURA_COLORS.borderSubtle}`,
         flexShrink: 0,
       }}>
         <button
           onClick={onBack}
-          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(59, 130, 246, 0.2)'; e.currentTarget.style.transform = 'scale(1.02)'; }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(59, 130, 246, 0.1)'; e.currentTarget.style.transform = 'scale(1)'; }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent-glow, rgba(59, 130, 246, 0.2))'; e.currentTarget.style.transform = 'scale(1.02)'; }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'var(--accent-glow, rgba(59, 130, 246, 0.1))'; e.currentTarget.style.transform = 'scale(1)'; }}
           style={{
-            background: 'rgba(59, 130, 246, 0.1)',
-            border: '1px solid rgba(59, 130, 246, 0.3)',
-            color: '#60A5FA',
+            background: 'var(--accent-glow, rgba(59, 130, 246, 0.1))',
+            border: `1px solid ${AURA_COLORS.info}`,
+            color: AURA_COLORS.info,
             fontSize: 14,
             fontWeight: 600,
             padding: '8px 16px',
@@ -304,7 +315,7 @@ User Question: ${trimmed}`;
         {/* Theme Switcher + Status */}
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
           <ThemeSwitcher
-            currentTheme={currentTheme || 'day'}
+            currentTheme={normalizedTheme}
             onThemeChange={onThemeChange}
           />
           <AiEnginesStatus statuses={Object.values(quadCoreStatus || {}).map(s => s?.online ?? true)} />
@@ -362,8 +373,8 @@ User Question: ${trimmed}`;
                     key={ex}
                     onClick={() => { setInput(ex); inputRef.current?.focus(); }}
                     style={{
-                      background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
-                      border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
+                      background: 'var(--surface-glass, rgba(255,255,255,0.05))',
+                      border: `1px solid ${AURA_COLORS.borderSubtle}`,
                       borderRadius: 20,
                       padding: '8px 16px',
                       fontSize: 12,
@@ -372,8 +383,8 @@ User Question: ${trimmed}`;
                       transition: 'all 0.2s',
                       fontFamily: 'inherit',
                     }}
-                    onMouseEnter={e => { e.currentTarget.style.borderColor = '#0A84FF'; e.currentTarget.style.color = '#0A84FF'; }}
-                    onMouseLeave={e => { e.currentTarget.style.borderColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'; e.currentTarget.style.color = mutedColor; }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = AURA_COLORS.info; e.currentTarget.style.color = AURA_COLORS.info; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = AURA_COLORS.borderSubtle; e.currentTarget.style.color = mutedColor; }}
                   >
                     {ex}
                   </button>
@@ -395,7 +406,7 @@ User Question: ${trimmed}`;
                 fontSize: 10,
                 fontWeight: 700,
                 letterSpacing: 1.5,
-                color: msg.role === 'user' ? '#0A84FF' : '#BF5AF2',
+                color: msg.role === 'user' ? AURA_COLORS.info : AURA_COLORS.manipulation,
                 textTransform: 'uppercase',
                 marginBottom: 6,
               }}>
@@ -408,9 +419,9 @@ User Question: ${trimmed}`;
                 padding: msg.role === 'user' ? '12px 18px' : '0',
                 borderRadius: msg.role === 'user' ? 16 : 0,
                 background: msg.role === 'user'
-                  ? (isDark ? 'rgba(10,132,255,0.12)' : 'rgba(10,132,255,0.08)')
+                  ? 'var(--accent-glow, rgba(10,132,255,0.08))'
                   : 'transparent',
-                border: msg.role === 'user' ? '1px solid rgba(10,132,255,0.15)' : 'none',
+                border: msg.role === 'user' ? `1px solid ${AURA_COLORS.info}` : 'none',
               }}>
                 {msg.role === 'user' ? (
                   <p style={{
@@ -448,8 +459,8 @@ User Question: ${trimmed}`;
               <div style={{
                 width: 20,
                 height: 20,
-                border: '2.5px solid rgba(255,200,0,0.15)',
-                borderTopColor: '#F59E0B',
+                border: '2.5px solid var(--border-subtle, rgba(255,200,0,0.15))',
+                borderTopColor: AURA_COLORS.warning,
                 borderRadius: '50%',
                 animation: 'cc-spin 0.6s linear infinite',
               }} />
@@ -457,7 +468,7 @@ User Question: ${trimmed}`;
                 fontSize: 12,
                 fontWeight: 700,
                 letterSpacing: 2,
-                color: '#F59E0B',
+                color: AURA_COLORS.warning,
                 textTransform: 'uppercase',
               }}>
                 Groq Tactical Processing...
@@ -512,7 +523,7 @@ User Question: ${trimmed}`;
                 maxHeight: 120,
                 overflow: 'auto',
               }}
-              onFocus={e => e.currentTarget.style.borderColor = '#0A84FF'}
+              onFocus={e => e.currentTarget.style.borderColor = AURA_COLORS.info}
               onBlur={e => e.currentTarget.style.borderColor = inputBorder}
             />
 
@@ -528,8 +539,8 @@ User Question: ${trimmed}`;
                 height: 32,
                 borderRadius: '50%',
                 border: 'none',
-                background: (isProcessing || !input.trim()) ? (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)') : '#0A84FF',
-                color: (isProcessing || !input.trim()) ? mutedColor : '#FFFFFF',
+                background: (isProcessing || !input.trim()) ? 'var(--surface-glass, rgba(255,255,255,0.06))' : AURA_COLORS.info,
+                color: (isProcessing || !input.trim()) ? mutedColor : 'var(--accent-text, #FFFFFF)',
                 cursor: (isProcessing || !input.trim()) ? 'default' : 'pointer',
                 display: 'flex',
                 alignItems: 'center',
@@ -548,7 +559,7 @@ User Question: ${trimmed}`;
           margin: '8px auto 0',
           textAlign: 'center',
           fontSize: 10,
-          color: isDark ? '#3A3A3C' : '#D1D5DB',
+          color: isDark ? 'var(--text-tertiary, #3A3A3C)' : AURA_COLORS.mutedSoft,
           letterSpacing: 0.5,
         }}>
           5-Phase RCE · Groq · LLaMA 3.3 · Claude 3.5 · Qwen 397B · Gemini Pro
@@ -566,10 +577,10 @@ User Question: ${trimmed}`;
           letterSpacing: 1,
           textTransform: 'uppercase',
           background: isFastMode
-            ? 'rgba(245,158,11,0.08)'
-            : 'rgba(124,58,237,0.08)',
-          border: `1px solid ${isFastMode ? 'rgba(245,158,11,0.2)' : 'rgba(124,58,237,0.2)'}`,
-          color: isFastMode ? '#F59E0B' : '#A78BFA',
+            ? 'var(--aura-status-warning, rgba(245,158,11,0.08))'
+            : 'var(--aura-amd-manipulation, rgba(124,58,237,0.08))',
+          border: `1px solid ${isFastMode ? AURA_COLORS.warning : AURA_COLORS.manipulation}`,
+          color: isFastMode ? AURA_COLORS.warning : AURA_COLORS.manipulation,
           animation: isFastMode ? 'cc-fast-pulse 2s ease-in-out infinite' : 'cc-full-glow 3s ease-in-out infinite',
         }}>
           {isFastMode

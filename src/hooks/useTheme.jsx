@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { useState, useEffect, useCallback, createContext, useContext } from "react";
 import { createTheme, ACCENT_COLORS } from "../utils/uiUtils";
 
@@ -93,6 +94,7 @@ export const ThemeProvider = ({ children }) => {
     try {
       document.documentElement.setAttribute("data-aura-theme", auraTheme);
       document.documentElement.setAttribute("data-theme", auraTheme);
+      document.documentElement.style.backgroundColor = "var(--base-layer)";
       document.body.classList.remove(
         "theme-day",
         "theme-night",
@@ -102,6 +104,10 @@ export const ThemeProvider = ({ children }) => {
         "theme-midnight",
       );
       document.body.classList.add(`theme-${auraTheme}`);
+      document.body.style.backgroundColor = "var(--base-layer)";
+      document.body.style.color = "var(--text-primary)";
+      document.body.style.transition =
+        "background-color 300ms cubic-bezier(0.4, 0, 0.2, 1), color 300ms cubic-bezier(0.4, 0, 0.2, 1)";
     } catch {
       // ignore SSR / sandbox contexts
     }
