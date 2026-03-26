@@ -159,7 +159,7 @@ export default function CollectiveConsciousness({ onBack, theme, auth, currentTh
   const userData = auth?.uid ? users[auth.uid] : null;
   const isFastMode = engineMode === 'fast';
 
-  const bgColor = isDark ? '#0F0F0F' : '#FFFFFF';
+  const bgColor = isDark ? 'var(--surface-elevated, #0F0F0F)' : 'var(--surface-elevated, #FFFFFF)';
   const textColor = isDark ? '#F2F2F7' : '#111827';
   const mutedColor = isDark ? '#8E8E93' : '#9CA3AF';
   const inputBg = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.03)';

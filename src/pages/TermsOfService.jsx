@@ -2,7 +2,7 @@ import React from 'react';
 
 const TermsOfService = ({ onClose }) => {
   const T = {
-    bg: '#FFFFFF',
+  bg: 'var(--surface-elevated, #FFFFFF)',
     fg: '#111827',
     muted: '#64748B',
     blue: '#2563EB',
@@ -151,7 +151,7 @@ const TermsOfService = ({ onClose }) => {
             marginTop: 32,
             padding: '12px 24px',
             background: T.blue,
-            color: '#FFFFFF',
+            color: 'var(--accent-text, #fff)',
             border: 'none',
             borderRadius: 6,
             fontSize: 14,

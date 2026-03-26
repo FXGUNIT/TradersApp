@@ -5,7 +5,7 @@ import { cacheUserList, getCachedUserList, clearUserListCache } from '../utils/u
 
 export const useUsers = (userId = null) => {
   const [users, setUsers] = useState({});
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !!db);
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -19,6 +19,10 @@ export const useUsers = (userId = null) => {
   }, []);
 
   useEffect(() => {
+    if (!db) {
+      return;
+    }
+
     const usersRef = ref(db, 'users');
     
     const unsubscribe = onValue(usersRef, (snapshot) => {

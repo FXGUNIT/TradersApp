@@ -24,8 +24,8 @@ export default function RegimentHub({ onNavigate, theme, currentTheme, onThemeCh
       ),
       description: "Live MNQ/MES execution, order flow analysis, and capital deployment.",
       action: 'app',
-      accentColor: '#0A84FF',
-      glowColor: 'rgba(10,132,255,0.3)',
+      accentColor: 'var(--accent-primary, #2563eb)',
+      glowColor: 'var(--accent-glow, rgba(37,99,235,0.3))',
     },
     {
       id: 'consciousness',
@@ -50,8 +50,8 @@ export default function RegimentHub({ onNavigate, theme, currentTheme, onThemeCh
       ),
       description: "Engage the 5-Layered Intelligence Grid for supreme market strategy and recursive risk analysis.",
       action: 'consciousness',
-      accentColor: '#BF5AF2',
-      glowColor: 'rgba(191,90,242,0.3)',
+      accentColor: 'var(--amd-manipulation, #BF5AF2)',
+      glowColor: 'var(--amd-manipulation-glow, rgba(191,90,242,0.3))',
     }
   ];
 

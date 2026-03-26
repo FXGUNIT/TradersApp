@@ -4,7 +4,12 @@ import {
   makeImgHandler,
   onScreenshotDrop,
 } from "./terminalUploadUtils";
-import { calculateVolatilityRatio, getDynamicParameters, calculateThrottledRisk } from "../../utils/math-engine.js";
+import {
+  calculateVolatilityRatio,
+  getDynamicParameters,
+  calculateThrottledRisk,
+  calculatePositionSize,
+} from "../../utils/math-engine.js";
 import {
   T,
   AMD_PHASES,
@@ -162,9 +167,9 @@ export default function MainTerminal({
   const [p2Out, setP2Out] = useState("");
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
-  const [marketRefresh, setMarketRefresh] = useState(0);
+  const [, setMarketRefresh] = useState(0);
   
-  const ist = useMemo(() => getISTState(), [marketRefresh]);
+  const ist = getISTState();
   
   useEffect(() => {
     const interval = setInterval(() => setMarketRefresh(r => r + 1), 1000);
@@ -228,11 +233,6 @@ export default function MainTerminal({
   const accountDidMount = useRef(false);
 
   useEffect(() => {
-    const id = setInterval(() => setIst(getISTState()), 1000);
-    return () => clearInterval(id);
-  }, []);
-  
-  useEffect(() => {
     setJournal(normalizeJournal(profile?.journal));
     setAccountState(buildAccountState(profile?.accountState));
   }, [profile?.uid, profile?.journal, profile?.accountState]);
@@ -292,9 +292,18 @@ export default function MainTerminal({
   const slPts = atrVal * slMult;
   const ptVal = f.instrument === 'MNQ' ? 2 : f.instrument === 'MES' ? 5 : f.instrument === 'US100' ? 1 : 10;
   
-  const contracts = maxRiskUSD && slPts && ptVal 
-    ? Math.max(1, Math.floor((maxRiskUSD * (isThrottled ? 0.5 : 1)) / (slPts * ptVal))) 
-    : 1; 
+  const contracts = maxRiskUSD && slPts && ptVal
+    ? Math.max(
+        1,
+        calculatePositionSize({
+          accountBalance: f.accountBalance,
+          riskPct: f.riskPct,
+          stopLossPoints: slPts,
+          dollarsPerPoint: ptVal,
+          throttleMultiplier: isThrottled ? 0.5 : 1,
+        }),
+      )
+    : 1;
     
   const proposedSLDollars = contracts * slPts * ptVal;
   const vwapPrice = extractedVals.vwap ? parseFloat(extractedVals.vwap) : null;
@@ -991,7 +1000,7 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
             </div>
 
             {fr.parsed && (
-              <div style={{ display: "flex", gap: 16, padding: "14px 20px", background: "#FFFFFF", border: `1px solid ${complianceColor}40`, borderRadius: 10, marginBottom: 16, flexWrap: "wrap", boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.1)" }} className="glass-panel">
+              <div style={{ display: "flex", gap: 16, padding: "14px 20px", background: CSS_VARS.card, border: `1px solid ${complianceColor}40`, borderRadius: 10, marginBottom: 16, flexWrap: "wrap", boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.1)" }} className="glass-panel">
                 <LED color={complianceColor} size={10} />
                 <span style={{ color: complianceColor, fontSize: 11, letterSpacing: 1, fontWeight: 700 }}>WATCHDOG:</span>
                 {maxDL > 0 && <span style={{ color: isDailyBreached ? T.red : isDailyWarning ? T.gold : T.green, fontSize: 11, fontWeight: 600 }}>Daily ${dailyLossUsed.toFixed(0)}/${maxDL}</span>}
@@ -1141,7 +1150,7 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
             </div>
 
             {/* AI Extract Button */}
-            <div style={{ display: "flex", alignItems: "center", gap: 16, margin: "16px 0", padding: "12px 20px", background: "#FFFFFF", border: `1px solid #E5E7EB`, borderRadius: 8, boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.1)" }} className="glass-panel">
+            <div style={{ display: "flex", alignItems: "center", gap: 16, margin: "16px 0", padding: "12px 20px", background: CSS_VARS.card, border: `1px solid var(--border-subtle, rgba(0,0,0,0.05))`, borderRadius: 8, boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.1)" }} className="glass-panel">
               <button onClick={extractFromScreenshots} disabled={extracting || screenshots.length === 0} style={glowBtn(T.purple, extracting || !screenshots.length)} className="btn-glass">
                 {extracting ? "⟳ READING..." : "◉ EXTRACT INDICATORS"}
               </button>
@@ -1191,8 +1200,8 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
                     </div>
                   </div>
                   
-                  {showP2TradeForm && (
-                    <div style={{ background: "#FFFFFF", border: `1px solid #E5E7EB`, borderRadius: 12, padding: "20px 24px", marginBottom: 20, boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)" }} className="glass-panel">
+              {showP2TradeForm && (
+                    <div style={{ background: CSS_VARS.card, border: `1px solid var(--border-subtle, rgba(0,0,0,0.05))`, borderRadius: 12, padding: "20px 24px", marginBottom: 20, boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)" }} className="glass-panel">
                       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16, marginBottom: 16 }}>
                         <Field label="EXIT PRICE" value={p2Jf.exit} onChange={sp2('exit')} type="number" mono />
                         <Field label="RESULT" value={p2Jf.result} onChange={sp2('result')} options={[{ v: 'win', l: '✓ Win' }, { v: 'loss', l: '✗ Loss' }, { v: 'breakeven', l: '◎ BE' }]} />
@@ -1257,11 +1266,11 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
             )}
 
             {journal.length === 0 ? (
-              <div style={{ background: "#FFFFFF", border: `1px solid #E5E7EB`, borderRadius: 12, padding: "60px", textAlign: "center", color: "#6B7280", fontSize: 14, fontWeight: 600, boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.1)" }} className="glass-panel">
+              <div style={{ background: CSS_VARS.card, border: `1px solid var(--border-subtle, rgba(0,0,0,0.05))`, borderRadius: 12, padding: "60px", textAlign: "center", color: CSS_VARS.textSecondary, fontSize: 14, fontWeight: 600, boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.1)" }} className="glass-panel">
                 No trades logged yet
               </div>
             ) : (
-              <div style={{ background: "#FFFFFF", border: `1px solid #E5E7EB`, borderRadius: 12, overflow: "hidden", boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.1)" }} className="glass-panel">
+            <div style={{ background: CSS_VARS.card, border: `1px solid var(--border-subtle, rgba(0,0,0,0.05))`, borderRadius: 12, overflow: "hidden", boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.1)" }} className="glass-panel">
                 <div style={{ overflowX: "auto" }}>
                   <table style={{ width: "100%", borderCollapse: "collapse" }}>
                     <thead>

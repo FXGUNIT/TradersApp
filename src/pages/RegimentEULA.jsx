@@ -780,7 +780,7 @@ CONFIDENTIAL - MASTER EULA DOCUMENT - NOT FOR FURTHER DISTRIBUTION
   `;
 
   return (
-    <div style={{ minHeight: '100vh', background: '#FFFFFF', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: 'Inter, sans-serif', padding: '40px 20px' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--surface-elevated, #FFFFFF)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: 'Inter, sans-serif', padding: '40px 20px' }}>
       <div style={{ maxWidth: 700, width: '100%' }}>
         
         {/* Header */}
@@ -794,7 +794,7 @@ CONFIDENTIAL - MASTER EULA DOCUMENT - NOT FOR FURTHER DISTRIBUTION
           data-eula-container
           ref={eulaRef}
           onScroll={handleScroll}
-          style={{
+              style={{
             height: '400px',
             overflowY: 'scroll',
             padding: '24px',
@@ -920,8 +920,8 @@ CONFIDENTIAL - MASTER EULA DOCUMENT - NOT FOR FURTHER DISTRIBUTION
               flex: 1,
               height: 44,
               borderRadius: 6,
-              border: '1px solid #CBD5E1',
-              background: '#FFFFFF',
+                border: '1px solid #CBD5E1',
+                background: 'var(--surface-elevated, #FFFFFF)',
               color: '#475569',
               fontSize: 14,
               fontWeight: 600,

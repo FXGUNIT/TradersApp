@@ -72,18 +72,18 @@ const CleanOnboarding = ({ onSignupSuccess, onGoogleSuccess, onBackToLogin }) =>
 
   // Theme variables (matching Supreme SaaS design system)
   const T = {
-    bg: '#FFFFFF',
-    fg: '#111827',
-    muted: '#64748B',
-    blue: '#2563EB', // Emergency Blue for links
+    bg: 'var(--surface-elevated, #FFFFFF)',
+    fg: 'var(--text-primary, #111827)',
+    muted: 'var(--text-secondary, #64748B)',
+    blue: 'var(--accent-primary, #2563EB)', // Emergency Blue for links
     green: '#22C55E',
     red: '#EF4444',
-    border: '#E2E8F0',
-    cardBg: '#F8FAFC',
+    border: 'var(--border-subtle, rgba(0,0,0,0.05))',
+    cardBg: 'var(--surface-elevated, #FFFFFF)',
   };
 
   const authCard = {
-    background: '#FFFFFF',
+    background: 'var(--surface-elevated, #FFFFFF)',
     border: `1px solid ${T.border}`,
     borderRadius: 12,
     padding: '40px 32px',
@@ -94,7 +94,7 @@ const CleanOnboarding = ({ onSignupSuccess, onGoogleSuccess, onBackToLogin }) =>
     width: '100%',
     height: 44,
     padding: '12px 16px',
-    background: '#FFFFFF',
+    background: 'var(--surface-elevated, #FFFFFF)',
     border: `1px solid ${T.border}`,
     borderRadius: 6,
     fontSize: 14,

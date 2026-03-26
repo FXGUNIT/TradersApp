@@ -155,7 +155,7 @@ const CleanOnboarding = ({ onSignupSuccess, onBackToLogin }) => {
     width: "100%",
     padding: "12px",
     marginBottom: 12,
-    border: "1px solid var(--border-subtle, #E2E8F0)",
+    border: "1px solid var(--aura-border-subtle, #E2E8F0)",
     borderRadius: 6,
     fontSize: 14,
     outline: "none",
@@ -179,7 +179,7 @@ const CleanOnboarding = ({ onSignupSuccess, onBackToLogin }) => {
     <div
       style={{
         minHeight: "100vh",
-        background: "#FFF",
+        background: "var(--aura-base-layer)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -190,17 +190,17 @@ const CleanOnboarding = ({ onSignupSuccess, onBackToLogin }) => {
         style={{
           width: "100%",
           maxWidth: 420,
-          background: "#FFF",
+          background: "var(--aura-surface-elevated, #FFFFFF)",
           borderRadius: 16,
           padding: 40,
-          boxShadow: "0 4px 24px rgba(0,0,0,0.08)",
+          boxShadow: "var(--aura-shadow)",
         }}
       >
-        <h2 style={{ margin: "0 0 24px", fontSize: 22, fontWeight: 700 }}>
+        <h2 style={{ margin: "0 0 24px", fontSize: 22, fontWeight: 700, color: "var(--aura-text-primary)" }}>
           Join Traders Regiment
         </h2>
         {err && (
-          <div style={{ color: "var(--status-danger, #EF4444)", marginBottom: 12, fontSize: 13 }}>
+          <div style={{ color: "var(--aura-accent-red, #EF4444)", marginBottom: 12, fontSize: 13 }}>
             {err}
           </div>
         )}
@@ -220,8 +220,8 @@ const CleanOnboarding = ({ onSignupSuccess, onBackToLogin }) => {
           style={{
             width: "100%",
             padding: 13,
-            background: "var(--accent-primary, #2563eb)",
-            color: "var(--accent-text, #ffffff)",
+            background: "var(--aura-accent-primary, #2563eb)",
+            color: "var(--aura-surface-elevated, #ffffff)",
             border: "none",
             borderRadius: 6,
             fontSize: 14,
@@ -238,10 +238,11 @@ const CleanOnboarding = ({ onSignupSuccess, onBackToLogin }) => {
             width: "100%",
             padding: 12,
             background: "transparent",
-            border: "1px solid var(--border-subtle, #E2E8F0)",
+            border: "1px solid var(--aura-border-subtle, #E2E8F0)",
             borderRadius: 6,
             cursor: "pointer",
             fontSize: 14,
+            color: "var(--aura-text-secondary)"
           }}
         >
           ← Back to Login
@@ -255,7 +256,7 @@ const RegimentHub = ({ onNavigate, theme }) => (
   <div
     style={{
       minHeight: "100vh",
-      background: "var(--surface-elevated, #FFFFFF)",
+      background: "var(--aura-base-layer)",
       display: "flex",
       flexDirection: "column",
       alignItems: "center",
@@ -265,11 +266,11 @@ const RegimentHub = ({ onNavigate, theme }) => (
       fontFamily: "system-ui",
     }}
   >
-    <h1 style={{ fontSize: 28, fontWeight: 800, margin: 0, letterSpacing: 2 }}>
+    <h1 style={{ fontSize: 28, fontWeight: 800, margin: 0, letterSpacing: 2, color: "var(--aura-text-primary)" }}>
       TRADERS REGIMENT
     </h1>
-    <div
-      style={{
+  <div
+    style={{
         display: "flex",
         flexDirection: "column",
         gap: 12,
@@ -424,10 +425,16 @@ const DATABASE_URL = firebaseConfig.databaseURL;
 //   }
 // }
 
-const firebaseApp = initializeApp(firebaseConfig);
-const firebaseAuth = getAuth(firebaseApp);
-const firebaseDb = getDatabase(firebaseApp);
-const firebaseStorage = getStorage(firebaseApp);
+const hasFirebaseConfig = Boolean(
+  firebaseConfig.apiKey &&
+    firebaseConfig.authDomain &&
+    firebaseConfig.projectId &&
+    firebaseConfig.appId,
+);
+const firebaseApp = hasFirebaseConfig ? initializeApp(firebaseConfig) : null;
+const firebaseAuth = firebaseApp ? getAuth(firebaseApp) : null;
+const firebaseDb = firebaseApp ? getDatabase(firebaseApp) : null;
+const firebaseStorage = firebaseApp ? getStorage(firebaseApp) : null;
 const googleProvider = new GoogleAuthProvider();
 
 // ═══════════════════════════════════════════════════════════════════
@@ -444,10 +451,12 @@ googleProvider.setCustomParameters({
 });
 
 // Set persistence to local (survives browser refresh)
-try {
-  setPersistence(firebaseAuth, browserLocalPersistence);
-} catch {
-  console.warn("Failed to set auth persistence");
+if (firebaseAuth) {
+  try {
+    setPersistence(firebaseAuth, browserLocalPersistence);
+  } catch {
+    console.warn("Failed to set auth persistence");
+  }
 }
 
 // GPU detection now imported from securityUtils.js
@@ -526,7 +535,7 @@ const EmptyStateCard = ({ searchQuery, filterStatus }) => {
         alignItems: "center",
         justifyContent: "center",
         minHeight: "400px",
-        background: "rgba(255,255,255,0.01)",
+        background: "transparent",
       }}
     >
       <div
@@ -788,10 +797,10 @@ const CommandPalette = ({
         <div
           style={{
             padding: "8px 16px",
-            background: "rgba(0,122,255,0.05)",
-            borderTop: `1px solid rgba(255,255,255,0.1)`,
+            background: "var(--aura-accent-glow)",
+            borderTop: `1px solid var(--aura-border-subtle)`,
             fontSize: 10,
-            color: T.muted,
+            color: "var(--aura-text-secondary)",
           }}
         >
           <span style={{ marginRight: 16 }}>↑↓ Navigate</span>
@@ -1019,12 +1028,12 @@ const FullScreenToggle = ({ showToast }) => {
     <button
       onClick={toggleFullScreen}
       style={{
-        background: isFullScreen ? "rgba(0,122,255,0.2)" : "transparent",
-        border: `1px solid ${isFullScreen ? "rgba(0,122,255,0.5)" : "rgba(255,255,255,0.2)"}`,
+        background: isFullScreen ? "var(--accent-glow, rgba(37,99,235,0.2))" : "transparent",
+        border: `1px solid ${isFullScreen ? "var(--accent-primary, #2563eb)" : "var(--border-subtle, rgba(0,0,0,0.05))"}`,
         borderRadius: 6,
         padding: "8px 12px",
         cursor: "pointer",
-        color: isFullScreen ? T.blue : T.muted,
+        color: isFullScreen ? "var(--accent-primary, #2563eb)" : "var(--text-secondary, #6b7280)",
         fontFamily: T.font,
         fontSize: 11,
         fontWeight: 700,
@@ -1416,7 +1425,7 @@ const SystemThemeSync = ({ isDarkMode, onThemeChange }) => {
         borderRadius: 6,
         padding: "8px 12px",
         cursor: "pointer",
-        color: isDarkMode ? "#0A84FF" : "#FFD60A",
+        color: isDarkMode ? "var(--accent-primary, #2563eb)" : "var(--text-secondary, #6b7280)",
         fontFamily:
           '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto',
         fontSize: 11,
@@ -1458,7 +1467,7 @@ const Breadcrumbs = ({ items, onNavigate }) => {
         gap: 8,
         padding: "12px 32px",
         borderBottom: `1px solid rgba(255,255,255,0.1)`,
-        background: "rgba(0,0,0,0.3)",
+        background: "var(--surface-glass, rgba(0,0,0,0.3))",
         overflowX: "auto",
       }}
     >
@@ -2204,7 +2213,7 @@ OVERALL: [GREEN/YELLOW/RED] | RECOMMENDED ACTION: [specific 1-2 sentence instruc
 //  DESIGN PRIMITIVES (iOS Styled)
 // ═══════════════════════════════════════════════════════════════════
 const authCard = {
-  background: "#FFFFFF",
+  background: "var(--surface-elevated, #FFFFFF)",
   backgroundImage:
     "linear-gradient(rgba(255,255,255,0.97), rgba(255,255,255,0.97)), url('/wallpaper.png')",
   backgroundSize: "cover",
@@ -2224,8 +2233,8 @@ const authCard = {
   position: "relative",
 };
 const authInp = {
-  background: "#FFFFFF",
-  border: `1px solid #E2E8F0`,
+  background: "var(--surface-elevated, #FFFFFF)",
+  border: `1px solid var(--border-subtle, rgba(0,0,0,0.05))`,
   borderRadius: 6,
   padding: "12px 40px 12px 40px",
   color: "#0F172A",
@@ -2262,7 +2271,7 @@ const authBtn = (color, disabled) => ({
   boxShadow: disabled ? "none" : "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
 });
 const lbl = {
-  color: "#64748B",
+  color: "var(--text-secondary, #64748B)",
   fontSize: 11,
   letterSpacing: 1.5,
   marginBottom: 6,
@@ -2272,7 +2281,7 @@ const lbl = {
   fontFamily: T.font,
 };
 const inp = {
-  background: "#F9FAFB",
+  background: "var(--surface-elevated, #F9FAFB)",
   border: `1px solid rgba(0,0,0,0.08)`,
   borderRadius: 8,
   padding: "12px 14px",
@@ -2287,7 +2296,7 @@ const inp = {
   WebkitBackdropFilter: "none",
 };
 const cardS = (e = {}) => ({
-  background: "#FFFFFF",
+  background: "var(--surface-elevated, #FFFFFF)",
   border: "none",
   borderRadius: 12,
   padding: "24px 32px",
@@ -3152,7 +3161,7 @@ const AuthLogo = () => (
       <div style={{ textAlign: "left" }}>
         <div
           style={{
-            color: "#111827",
+            color: "var(--text-primary, #111827)",
             fontSize: "clamp(16px, 3vw, 18px)",
             letterSpacing: 1.5,
             fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif",
@@ -3163,7 +3172,7 @@ const AuthLogo = () => (
         </div>
         <div
           style={{
-            color: "#1e40af",
+            color: "var(--text-primary, #1e40af)",
             fontSize: "0.7rem",
             letterSpacing: 0.5,
             fontFamily: "Arial, 'Courier New', monospace",
@@ -3182,7 +3191,7 @@ function SplashScreen() {
     <div
       style={{
         minHeight: "100vh",
-        background: "#FFFFFF",
+        background: "var(--surface-elevated, #FFFFFF)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -3216,7 +3225,7 @@ function SplashScreen() {
         </div>
         <div
           style={{
-            color: "#64748B",
+            color: "var(--text-secondary, #64748B)",
             fontSize: 11,
             letterSpacing: 4,
             marginTop: 16,
@@ -3675,7 +3684,7 @@ function LoginScreen({
     <div
       style={{
         minHeight: "100vh",
-        background: "#FFFFFF",
+        background: "var(--surface-elevated, #FFFFFF)",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
@@ -5378,7 +5387,7 @@ function SignupScreen({ onBack, onSubmit }) {
           </div>
           <div
             style={{
-              color: "#A1A1A6",
+                        color: "var(--text-secondary, #A1A1A6)",
               fontSize: 12,
               lineHeight: 1.6,
               marginBottom: 14,
@@ -5678,13 +5687,13 @@ function WaitingRoom({ onRefresh, onLogout }) {
         </div>
         <div
           style={{
-            color: "#374151",
+            color: "var(--text-primary, #374151)",
             fontSize: 14,
             lineHeight: 1.8,
             marginBottom: 28,
             padding: "20px 24px",
-            background: "#FFFFFF",
-            border: `1px solid #E5E7EB`,
+            background: "var(--surface-elevated, #FFFFFF)",
+            border: `1px solid var(--border-subtle, rgba(0,0,0,0.05))`,
             borderRadius: 12,
             boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.1)",
           }}
@@ -5693,7 +5702,7 @@ function WaitingRoom({ onRefresh, onLogout }) {
         </div>
         <div
           style={{
-            color: "#6B7280",
+            color: "var(--text-secondary, #6B7280)",
             fontSize: 12,
             lineHeight: 1.9,
             marginBottom: 32,
@@ -5767,7 +5776,7 @@ function LoadingFallback() {
           borderRadius: "50%",
           overflow: "hidden",
           boxShadow: "0 8px 32px rgba(0, 0, 0, 0.15)",
-          background: "#FFFFFF",
+            background: "var(--surface-elevated, #FFFFFF)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -5821,7 +5830,7 @@ function LoadingFallback() {
         </div>
         <div
           style={{
-            color: "#6B7280",
+            color: "var(--text-secondary, #6B7280)",
             fontSize: 12,
             letterSpacing: 1,
             marginTop: 12,
@@ -5913,7 +5922,7 @@ class ErrorBoundaryAdmin extends React.Component {
             </div>
             <div
               style={{
-                color: "#A1A1A6",
+                color: "var(--text-secondary, #A1A1A6)",
                 fontSize: 14,
                 lineHeight: 1.8,
                 marginBottom: 20,
@@ -6213,7 +6222,7 @@ function SupportChatModal({
         >
           {messages.length === 0 ? (
             <div
-              style={{ color: "#A1A1A6", textAlign: "center", marginTop: 20 }}
+              style={{ color: "var(--text-secondary, #A1A1A6)", textAlign: "center", marginTop: 20 }}
             >
               No messages yet. Start the conversation.
             </div>
@@ -6254,7 +6263,7 @@ function SupportChatModal({
                     )}
                     <div
                       style={{
-                        color: "#F2F2F7",
+                        color: "var(--text-primary, #F2F2F7)",
                         fontSize: 13,
                         lineHeight: 1.4,
                       }}
@@ -6289,9 +6298,9 @@ function SupportChatModal({
               }
             }}
             placeholder="Type message..."
-            style={{
-              flex: 1,
-              background: "rgba(255,255,255,0.05)",
+              style={{
+                flex: 1,
+                background: "var(--input-bg, rgba(255,255,255,0.05))",
               border: "1px solid rgba(255,255,255,0.1)",
               borderRadius: 8,
               padding: "10px 12px",
@@ -6304,11 +6313,11 @@ function SupportChatModal({
             onClick={handleSendMessage}
             disabled={!input.trim()}
             style={{
-              background: input.trim() ? "#0A84FF" : "rgba(0,122,255,0.3)",
+              background: input.trim() ? "var(--accent-primary, #2563eb)" : "rgba(0,122,255,0.3)", 
               border: "none",
               borderRadius: 8,
               padding: "10px 16px",
-              color: input.trim() ? "#000" : "#A1A1A6",
+              color: input.trim() ? "var(--text-primary, #000)" : "var(--text-secondary, #A1A1A6)",
               fontSize: 13,
               fontWeight: 700,
               cursor: input.trim() ? "pointer" : "default",
@@ -7199,6 +7208,11 @@ function AdminDashboard({
   useEffect(() => {
     // Set up real-time listener for users
     if (!isAdminAuthenticated && !auth?.token) return;
+    if (!firebaseDb) {
+      setUsers({});
+      setLoading(false);
+      return;
+    }
 
     setLoading(true);
     setDbError("");
@@ -7261,7 +7275,7 @@ function AdminDashboard({
   // SECURITY SENTINEL: Initialize multi-layer defense system
   // ═══════════════════════════════════════════════════════════════════
   useEffect(() => {
-    if (auth && auth.uid) {
+    if (auth && auth.uid && firebaseDb) {
       try {
         const securitySentinel = new SecuritySentinel(
           firebaseDb,
@@ -7630,7 +7644,7 @@ function AdminDashboard({
       {/* Admin Dashboard Header */}
       <div
         style={{
-          background: "#FFFFFF",
+          background: "var(--surface-elevated, #FFFFFF)",
           borderBottom: `1px solid #E5E7EB`,
           padding: "16px 32px",
           display: "flex",
@@ -10316,7 +10330,7 @@ export default function TradersRegiment() {
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [toasts, setToasts] = useState([]);
-  const [theme, setTheme] = useState("day");
+  const [theme, setTheme] = useState("lumiere");
   const [aiStatuses, setAiStatuses] = useState([
     true,
     true,
@@ -10442,33 +10456,47 @@ export default function TradersRegiment() {
       return "BLUE";
     }
   });
-  // Phase 2: Apple-like three-theme system (Day, Night, Eye Comfort)
+  // Phase 2: Apple-like three-theme system (Lumiere, Amber, Midnight)
   const [currentTheme, setCurrentTheme] = useState(() => {
     try {
-      return localStorage.getItem("appTheme") || "day";
+      const saved =
+        localStorage.getItem("appTheme") ||
+        localStorage.getItem("aura-theme") ||
+        "lumiere";
+      const normalized = {
+        day: "lumiere",
+        eye: "amber",
+        night: "midnight",
+        lumiere: "lumiere",
+        amber: "amber",
+        midnight: "midnight",
+      };
+      return normalized[saved] || "lumiere";
     } catch {
-      return "day";
+      return "lumiere";
     }
   });
 
   const [themeVersion, setThemeVersion] = useState(0);
 
   const handleThemeChange = (newTheme) => {
-    setCurrentTheme(newTheme);
-    setThemeVersion(v => v + 1);
-
-    const legacyToAura = {
+    const normalized = {
       day: "lumiere",
-      night: "midnight",
       eye: "amber",
-      comfort: "amber",
+      night: "midnight",
+      lumiere: "lumiere",
+      amber: "amber",
+      midnight: "midnight",
     };
-    const auraTheme = legacyToAura[newTheme] || "lumiere";
+    const auraTheme = normalized[newTheme] || "lumiere";
+    setCurrentTheme(auraTheme);
+    setThemeVersion((v) => v + 1);
 
     try {
-      localStorage.setItem("appTheme", newTheme);
+      localStorage.setItem("appTheme", auraTheme);
       localStorage.setItem("aura-theme", auraTheme);
       document.documentElement.setAttribute("data-aura-theme", auraTheme);
+      document.documentElement.setAttribute("data-theme", auraTheme);
       document.documentElement.style.backgroundColor =
         auraTheme === "midnight"
           ? "#05070A"
@@ -10593,11 +10621,11 @@ export default function TradersRegiment() {
 
   // CREATE DYNAMIC THEME BASED ON SYSTEM DARK MODE, ACCENT COLOR & USER THEME
   const _THEME = useMemo(() => {
-    if (currentTheme === "day") {
+    if (currentTheme === "lumiere") {
       return createTheme(false, "BLUE");
-    } else if (currentTheme === "night") {
+    } else if (currentTheme === "midnight") {
       return createTheme(true, "BLUE");
-    } else if (currentTheme === "eye") {
+    } else if (currentTheme === "amber") {
       // Eye Comfort: warmer accents (Gold) to reduce blue light
       return createTheme(false, "GOLD");
     }
@@ -10610,8 +10638,8 @@ export default function TradersRegiment() {
 
   // Apply theme to document body
   useEffect(() => {
-    document.body.style.backgroundColor = currentTheme === "night" ? "#0D1117" : currentTheme === "eye" ? "#F5F0E6" : "#FFFFFF";
-    document.body.style.color = currentTheme === "night" ? "#E6EDF3" : currentTheme === "eye" ? "#44403C" : "#1F2937";
+    document.body.style.backgroundColor = "var(--base-layer)";
+    document.body.style.color = "var(--text-primary)";
   }, [currentTheme]);
 
   // MOTION & INTERACTION: Apply tilt effects to dashboard cards
@@ -10847,6 +10875,10 @@ export default function TradersRegiment() {
   // RULE #175: FIREBASE HEARTBEAT SIGNAL - Monitor real-time database connection
   // ═══════════════════════════════════════════════════════════════════
   useEffect(() => {
+    if (!firebaseDb) {
+      return;
+    }
+
     let unsubscribe = null;
     let heartbeatCheckTimer = null;
     let lastHeartbeatTime = Date.now();
@@ -10926,12 +10958,85 @@ export default function TradersRegiment() {
   useEffect(() => {
     const savedTheme = localStorage.getItem("appTheme");
     if (savedTheme) {
-      setTheme(savedTheme);
+      setTheme(
+        {
+          day: "lumiere",
+          eye: "amber",
+          night: "midnight",
+          lumiere: "lumiere",
+          amber: "amber",
+          midnight: "midnight",
+        }[savedTheme] || "lumiere",
+      );
     } else {
       // Save default theme
-      localStorage.setItem("appTheme", "day");
+      localStorage.setItem("appTheme", "lumiere");
     }
   }, []);
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    let cleanup = () => {};
+
+    import("./testing/appAuditHarness.js")
+      .then(({ registerAppAuditHarness }) => {
+        if (cancelled) return;
+
+        cleanup = registerAppAuditHarness({
+          adminUid: ADMIN_UID,
+          adminEmail: ADMIN_EMAIL,
+          setScreen,
+          setAuth,
+          setProfile,
+          setIsAdminAuthenticated,
+          setCurrentSessionId,
+          setTheme,
+          setAccentColor,
+          setShowThemePicker: () => {},
+          setPrivacyModeActive,
+          setMaintenanceModeActive,
+        });
+      })
+      .catch((error) => {
+        console.warn("App audit harness unavailable:", error);
+      });
+
+    return () => {
+      cancelled = true;
+      cleanup();
+    };
+  }, [
+    setAccentColor,
+    setAuth,
+    setCurrentSessionId,
+    setIsAdminAuthenticated,
+    setMaintenanceModeActive,
+    setProfile,
+    setPrivacyModeActive,
+    setScreen,
+    setTheme,
+  ]);
+
+  // Debug helper: log current CSS variable tokens to aid Phase 3 verification
+  useEffect(() => {
+    try {
+      const root = document.documentElement;
+      const v = {
+        base: getComputedStyle(root).getPropertyValue('--base-layer').trim(),
+        text: getComputedStyle(root).getPropertyValue('--text-primary').trim(),
+        bg: getComputedStyle(root).getPropertyValue('--bg').trim(),
+        card: getComputedStyle(root).getPropertyValue('--card').trim(),
+        border: getComputedStyle(root).getPropertyValue('--border').trim(),
+      };
+      console.log('Theme CSS Vars', v);
+    } catch {
+      // ignore
+    }
+  }, [/* theme toggle changes could trigger this */]);
 
   // Save theme to localStorage when it changes
   useEffect(() => {
@@ -11018,6 +11123,10 @@ export default function TradersRegiment() {
 
   // Auth state listener for persistent login
   useEffect(() => {
+    if (!firebaseAuth) {
+      return () => {};
+    }
+
     const unsubscribe = onAuthStateChanged(firebaseAuth, async (user) => {
       try {
         if (user && user.emailVerified !== false) {
@@ -12248,17 +12357,17 @@ export default function TradersRegiment() {
               <AiEnginesStatus statuses={aiStatuses} />
               <button
                 onClick={() => {
-                  const themes = ["day", "night", "eye"];
+                  const themes = ["lumiere", "amber", "midnight"];
                   const idx = themes.indexOf(currentTheme);
                   const nextTheme = themes[(idx + 1) % themes.length];
                   handleThemeChange(nextTheme);
                   console.log("Theme changed to:", nextTheme);
                 }}
-                title="Toggle Day/Night/Eye Comfort mode"
+                title="Toggle Lumiere/Amber/Midnight mode"
                 style={{
-                  background: "#3B82F6",
-                  border: "1px solid #3B82F6",
-                  color: "#FFFFFF",
+                  background: "var(--accent-primary, #3B82F6)",
+                  border: "1px solid var(--accent-primary, #3B82F6)",
+                  color: "var(--accent-text, #FFFFFF)",
                   padding: "8px 12px",
                   borderRadius: 6,
                   cursor: "pointer",
@@ -12268,7 +12377,11 @@ export default function TradersRegiment() {
                 }}
                 className="btn-glass"
               >
-                {currentTheme === "day" ? "☀️ DAY" : currentTheme === "night" ? "🌙 NIGHT" : "👁️ EYE"}
+                {currentTheme === "lumiere"
+                  ? "☀️ LUMIERE"
+                  : currentTheme === "amber"
+                    ? "🟠 AMBER"
+                    : "🌙 MIDNIGHT"}
               </button>
               <button
                 onClick={() => setPrivacyModeActive(!privacyModeActive)}

@@ -319,9 +319,45 @@ button .arrow-inline {
   --aura-text-primary: #121212;
   --aura-text-secondary: #6b7280;
   --aura-accent-primary: #2563eb;
+  --aura-accent-red: #EF4444;
+  --aura-accent-purple: #BF5AF2;
   --aura-accent-glow: rgba(37, 99, 235, 0.1);
+  --aura-accent-red-glow: rgba(239, 68, 68, 0.15);
+  --aura-accent-green-glow: rgba(0, 255, 127, 0.15);
+  --aura-accent-yellow-glow: rgba(255, 193, 7, 0.15);
   --aura-border-subtle: rgba(0, 0, 0, 0.05);
   --aura-gem-glow: 0 0 15px rgba(37, 99, 235, 0.4);
+  --aura-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+  --aura-overlay: rgba(0, 0, 0, 0.6);
+  --aura-text-tertiary: #9ca3af;
+  --aura-border-strong: rgba(0, 0, 0, 0.12);
+  --aura-surface-glass: rgba(255, 255, 255, 0.8);
+  --aura-status-success: #10b981;
+  --aura-status-warning: #f59e0b;
+  --aura-status-danger: #ef4444;
+  --aura-status-info: #3b82f6;
+  --aura-amd-accumulation: #0a84ff;
+  --aura-amd-manipulation: #bf5af2;
+  --aura-amd-distribution: #30d158;
+  --aura-amd-transition: #8e8e93;
+  --base-layer: var(--aura-base-layer);
+  --surface-elevated: var(--aura-surface-elevated);
+  --surface-glass: var(--aura-surface-glass);
+  --text-primary: var(--aura-text-primary);
+  --text-secondary: var(--aura-text-secondary);
+  --text-tertiary: var(--aura-text-tertiary);
+  --border-subtle: var(--aura-border-subtle);
+  --border-strong: var(--aura-border-strong);
+  --accent-primary: var(--aura-accent-primary);
+  --accent-glow: var(--aura-accent-glow);
+  --status-success: var(--aura-status-success);
+  --status-warning: var(--aura-status-warning);
+  --status-danger: var(--aura-status-danger);
+  --status-info: var(--aura-status-info);
+  --amd-accumulation: var(--aura-amd-accumulation);
+  --amd-manipulation: var(--aura-amd-manipulation);
+  --amd-distribution: var(--aura-amd-distribution);
+  --amd-transition: var(--aura-amd-transition);
 
   /* Legacy compatibility variables (mapped to AURA) */
   --bg: var(--aura-base-layer);
@@ -339,42 +375,129 @@ button .arrow-inline {
 }
 
 /* LUMIERE MODE (DAY) - High-Definition Gallery */
-:root[data-aura-theme="lumiere"] {
+:root[data-aura-theme="lumiere"],
+:root[data-theme="lumiere"] {
   --aura-base-layer: #fbfbfc;
   --aura-surface-elevated: #ffffff;
+  --aura-surface-glass: rgba(255, 255, 255, 0.8);
   --aura-text-primary: #121212;
   --aura-text-secondary: #6b7280;
+  --aura-text-tertiary: #9ca3af;
   --aura-accent-primary: #2563eb;
+  --aura-accent-red: #EF4444;
+  --aura-accent-purple: #BF5AF2;
   --aura-accent-glow: rgba(37, 99, 235, 0.1);
+  --aura-accent-red-glow: rgba(239, 68, 68, 0.15);
+  --aura-accent-green-glow: rgba(0, 255, 127, 0.15);
+  --aura-accent-yellow-glow: rgba(255, 193, 7, 0.15);
   --aura-border-subtle: rgba(0, 0, 0, 0.05);
+  --aura-border-strong: rgba(0, 0, 0, 0.12);
   --aura-gem-glow: 0 0 15px rgba(37, 99, 235, 0.4);
+  --aura-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+  --aura-overlay: rgba(0, 0, 0, 0.6);
+  --aura-status-success: #10B981;
+  --aura-status-warning: #F59E0B;
+  --aura-status-danger: #EF4444;
+  --aura-status-info: #3B82F6;
+  --aura-amd-accumulation: #0A84FF;
+  --aura-amd-manipulation: #BF5AF2;
+  --aura-amd-distribution: #30D158;
+  --aura-amd-transition: #8E8E93;
 }
 
 /* AMBER MODE (EYE COMFORT) - The Library */
-:root[data-aura-theme="amber"] {
+:root[data-aura-theme="amber"],
+:root[data-theme="amber"] {
   --aura-base-layer: #f4ebd0;
   --aura-surface-elevated: #fdf6e3;
+  --aura-surface-glass: rgba(253, 246, 227, 0.85);
   --aura-text-primary: #3d2b1f;
   --aura-text-secondary: #7c6a53;
+  --aura-text-tertiary: #a89680;
   --aura-accent-primary: #d97706;
+  --aura-accent-red: #d9534f;
+  --aura-accent-purple: #9d5fA5;
   --aura-accent-glow: rgba(217, 119, 6, 0.1);
+  --aura-accent-red-glow: rgba(217, 83, 79, 0.15);
+  --aura-accent-green-glow: rgba(92, 184, 92, 0.15);
+  --aura-accent-yellow-glow: rgba(240, 173, 78, 0.15);
   --aura-border-subtle: rgba(139, 92, 24, 0.1);
+  --aura-border-strong: rgba(139, 92, 24, 0.2);
   --aura-gem-glow: 0 0 15px rgba(217, 119, 6, 0.4);
+  --aura-shadow: 0 4px 24px rgba(139, 92, 24, 0.08);
+  --aura-overlay: rgba(139, 92, 24, 0.6);
+  --aura-status-success: #10B981;
+  --aura-status-warning: #F59E0B;
+  --aura-status-danger: #EF4444;
+  --aura-status-info: #3B82F6;
+  --aura-amd-accumulation: #0A84FF;
+  --aura-amd-manipulation: #BF5AF2;
+  --aura-amd-distribution: #30D158;
+  --aura-amd-transition: #8E8E93;
 }
 
 /* MIDNIGHT MODE (NIGHT) - The Obsidian Vault */
-:root[data-aura-theme="midnight"] {
+:root[data-aura-theme="midnight"],
+:root[data-theme="midnight"] {
   --aura-base-layer: #05070a;
   --aura-surface-elevated: #12141c;
+  --aura-surface-glass: rgba(18, 20, 28, 0.7);
   --aura-text-primary: #e1e1e1;
   --aura-text-secondary: #94a3b8;
+  --aura-text-tertiary: #64748b;
   --aura-accent-primary: #b8860b;
+  --aura-accent-red: #d9534f;
+  --aura-accent-purple: #9d5fA5;
   --aura-accent-glow: rgba(56, 189, 248, 0.1);
+  --aura-accent-red-glow: rgba(217, 83, 79, 0.15);
+  --aura-accent-green-glow: rgba(92, 184, 92, 0.15);
+  --aura-accent-yellow-glow: rgba(240, 173, 78, 0.15);
   --aura-border-subtle: rgba(255, 255, 255, 0.05);
+  --aura-border-strong: rgba(255, 255, 255, 0.1);
   --aura-gem-glow: 0 0 15px rgba(184, 134, 11, 0.4);
+  --aura-shadow: 0 4px 24px rgba(255, 255, 255, 0.08);
+  --aura-overlay: rgba(255, 255, 255, 0.6);
+  --aura-status-success: #10B981;
+  --aura-status-warning: #F59E0B;
+  --aura-status-danger: #EF4444;
+  --aura-status-info: #3B82F6;
+  --aura-amd-accumulation: #0A84FF;
+  --aura-amd-manipulation: #BF5AF2;
+  --aura-amd-distribution: #30D158;
+  --aura-amd-transition: #8E8E93;
 }
 
 /* Legacy theme class compatibility */
+body.theme-lumiere {
+  --bg: var(--aura-base-layer);
+  --card: var(--aura-surface-elevated);
+  --text: var(--aura-text-primary);
+  --subtext: var(--aura-text-secondary);
+  --border: var(--aura-border-subtle);
+  --accent: var(--aura-accent-primary);
+  --accent-text: #ffffff;
+}
+
+body.theme-amber {
+  --bg: var(--aura-base-layer);
+  --card: var(--aura-surface-elevated);
+  --text: var(--aura-text-primary);
+  --subtext: var(--aura-text-secondary);
+  --border: var(--aura-border-subtle);
+  --accent: var(--aura-accent-primary);
+  --accent-text: #ffffff;
+}
+
+body.theme-midnight {
+  --bg: var(--aura-base-layer);
+  --card: var(--aura-surface-elevated);
+  --text: var(--aura-text-primary);
+  --subtext: var(--aura-text-secondary);
+  --border: var(--aura-border-subtle);
+  --accent: var(--aura-accent-primary);
+  --accent-text: #ffffff;
+}
+
 body.theme-day {
   --bg: var(--aura-base-layer);
   --card: var(--aura-surface-elevated);

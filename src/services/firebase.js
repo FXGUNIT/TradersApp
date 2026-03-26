@@ -3,10 +3,10 @@ import {
   getAuth,
   setPersistence,
   browserLocalPersistence,
+  GoogleAuthProvider,
 } from "firebase/auth";
 import { getDatabase } from "firebase/database";
 import { getStorage } from "firebase/storage";
-import { GoogleAuthProvider } from "firebase/auth";
 import { firebaseOptimizer } from "./firebaseOptimization.js";
 
 const firebaseConfig = {
@@ -19,10 +19,17 @@ const firebaseConfig = {
   databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL,
 };
 
+const hasRequiredConfig = Boolean(
+  firebaseConfig.apiKey &&
+    firebaseConfig.authDomain &&
+    firebaseConfig.projectId &&
+    firebaseConfig.appId,
+);
+
+export const isFirebaseConfigured = hasRequiredConfig;
 export const DATABASE_URL = firebaseConfig.databaseURL;
 export const FB_KEY = import.meta.env.VITE_FIREBASE_API_KEY;
 export const FB_AUTH_URL = "https://identitytoolkit.googleapis.com/v1/accounts";
-// Admin credentials should be configured via environment variables in production
 export const ADMIN_EMAIL =
   import.meta.env.VITE_ADMIN_EMAIL || "gunitsingh1994@gmail.com";
 export const ADMIN_UID =
@@ -31,10 +38,10 @@ export const ADMIN_PASS_HASH =
   import.meta.env.VITE_ADMIN_PASS_HASH ||
   "0189c7742ecf4542ecab0150b32ecadc9ce7c4390217bfb3914f5b52b14e3cb6";
 
-const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
-export const db = getDatabase(app);
-export const storage = getStorage(app);
+const app = hasRequiredConfig ? initializeApp(firebaseConfig) : null;
+export const auth = app ? getAuth(app) : null;
+export const db = app ? getDatabase(app) : null;
+export const storage = app ? getStorage(app) : null;
 
 const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({
@@ -44,6 +51,8 @@ googleProvider.setCustomParameters({
 export { googleProvider };
 
 export const initializeFirebase = async () => {
+  if (!auth) return;
+
   try {
     setPersistence(auth, browserLocalPersistence);
   } catch (error) {
@@ -51,6 +60,5 @@ export const initializeFirebase = async () => {
   }
 };
 
-// Export the imported firebaseOptimizer
 export { firebaseOptimizer };
 window.__FirebaseOptimizer = firebaseOptimizer;

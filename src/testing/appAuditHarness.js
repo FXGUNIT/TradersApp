@@ -159,7 +159,7 @@ export function registerAppAuditHarness({
     setShowThemePicker(false);
     setPrivacyModeActive(false);
     setMaintenanceModeActive(false);
-    setTheme("day");
+    setTheme("lumiere");
     setAccentColor("BLUE");
   };
 

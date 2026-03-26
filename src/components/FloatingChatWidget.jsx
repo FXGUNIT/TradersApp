@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import { ref, onValue, push, set } from "firebase/database";
+import { User, Phone, Send } from "lucide-react";
 import { notifyAdminOfSupportRequest } from "../services/telegramService";
 import { db } from "../services/firebase";
 
@@ -18,7 +19,7 @@ const FloatingChatWidget = ({ auth, profile }) => {
   const userEmail = profile?.email || auth?.email || "Unknown";
 
   const injectWelcomeMessage = useCallback(async () => {
-    if (isInitialized || !userId) return;
+    if (isInitialized || !userId || !db) return;
     setIsInitialized(true);
 
     const welcomeRef = ref(db, `support_chats/${userId}/messages`);
@@ -70,7 +71,7 @@ const FloatingChatWidget = ({ auth, profile }) => {
   );
 
   useEffect(() => {
-    if (!isOpen || !userId) return;
+    if (!isOpen || !userId || !db) return;
 
     const chatRef = ref(db, `support_chats/${userId}`);
 
@@ -105,7 +106,7 @@ const FloatingChatWidget = ({ auth, profile }) => {
 
   const sendMessage = useCallback(async () => {
     console.warn("sendMessage called with:", { inputValue, userId, userEmail });
-    if (!inputValue.trim() || !userId) {
+    if (!inputValue.trim() || !userId || !db) {
       console.warn("sendMessage aborted: missing input or userId", {
         inputValue,
         userId,
@@ -174,7 +175,7 @@ const FloatingChatWidget = ({ auth, profile }) => {
     chatWindow: {
       width: "360px",
       height: "520px",
-      backgroundColor: "#1a1a2e",
+      backgroundColor: "var(--surface-elevated, #1a1a2e)",
       borderRadius: "16px",
       boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
       display: "flex",
@@ -185,8 +186,8 @@ const FloatingChatWidget = ({ auth, profile }) => {
     },
     chatHeader: {
       padding: "16px 20px",
-      backgroundColor: "#16213e",
-      color: "#fff",
+      backgroundColor: "var(--surface-elevated, #16213e)",
+      color: "var(--accent-text, #fff)",
       display: "flex",
       justifyContent: "space-between",
       alignItems: "center",
@@ -215,7 +216,7 @@ const FloatingChatWidget = ({ auth, profile }) => {
       flex: 1,
       padding: "16px",
       overflowY: "auto",
-      backgroundColor: "#1a1a2e",
+      backgroundColor: "var(--surface-elevated, #1a1a2e)",
       display: "flex",
       flexDirection: "column",
       gap: "12px",
@@ -231,14 +232,14 @@ const FloatingChatWidget = ({ auth, profile }) => {
     },
     userMessage: {
       alignSelf: "flex-end",
-      backgroundColor: "#3b82f6",
-      color: "#fff",
+      backgroundColor: "var(--accent-primary, #2563eb)",
+      color: "var(--accent-text, #fff)",
       borderBottomRightRadius: "4px",
     },
     adminMessage: {
       alignSelf: "flex-start",
-      backgroundColor: "#2d2d44",
-      color: "#e2e8f0",
+      backgroundColor: "var(--surface-elevated, #2d2d44)",
+      color: "var(--text-secondary, #6b7280)",
       borderBottomLeftRadius: "4px",
     },
     welcomeMessage: {
@@ -251,7 +252,7 @@ const FloatingChatWidget = ({ auth, profile }) => {
     chatFooter: {
       padding: "12px 16px",
       borderTop: "1px solid rgba(255,255,255,0.1)",
-      backgroundColor: "#16213e",
+      backgroundColor: "var(--surface-elevated, #16213e)",
       display: "flex",
       gap: "10px",
     },
@@ -260,14 +261,14 @@ const FloatingChatWidget = ({ auth, profile }) => {
       padding: "12px 16px",
       borderRadius: "24px",
       border: "1px solid rgba(255,255,255,0.2)",
-      backgroundColor: "#0f0f1a",
-      color: "#fff",
+      backgroundColor: "var(--surface-elevated, #0f0f1a)",
+      color: "var(--accent-text, #fff)",
       fontSize: "14px",
       outline: "none",
       fontFamily: "system-ui, -apple-system, sans-serif",
     },
     sendButton: {
-      backgroundColor: "#3b82f6",
+      backgroundColor: "var(--accent-primary, #2563eb)",
       color: "white",
       border: "none",
       borderRadius: "50%",
@@ -281,7 +282,7 @@ const FloatingChatWidget = ({ auth, profile }) => {
       transition: "all 0.2s ease",
     },
     chatButton: {
-      backgroundColor: "#3b82f6",
+      backgroundColor: "var(--accent-primary, #2563eb)",
       color: "white",
       border: "none",
       borderRadius: "50%",
@@ -496,7 +497,7 @@ const FloatingChatWidget = ({ auth, profile }) => {
       <button
         style={{
           ...styles.chatButton,
-          backgroundColor: isOpen ? "#ef4444" : "#3b82f6",
+          backgroundColor: isOpen ? "var(--status-danger, #ef4444)" : "var(--accent-primary, #2563eb)",
         }}
         onClick={toggleChat}
         onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.08)")}

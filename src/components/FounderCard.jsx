@@ -52,14 +52,14 @@ export const FounderCard = ({
       }}
     >
       {/* Founder Card Container */}
-      <div
-        style={{
-          display: "flex",
+        <div
+          style={{
+            display: "flex",
           flexDirection: "column",
           alignItems: "center",
           gap: "12px",
           padding: "32px",
-          background: "rgba(255, 255, 255, 0.8)",
+          background: "var(--surface-elevated, rgba(255, 255, 255, 0.8))",
           backdropFilter: "blur(8px)",
           border: "1px solid #F3F4F6",
           borderRadius: "12px",
@@ -82,7 +82,7 @@ export const FounderCard = ({
             border: "3px solid #D4AF37",
             boxShadow:
               "0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
-            background: "#FFFFFF",
+            background: "var(--surface-elevated, #FFFFFF)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -185,7 +185,7 @@ export const FounderCard = ({
 
         {/* LinkedIn Button */}
         <a
-          href={linkedInUrl}
+            href={linkedInUrl}
           target="_blank"
           rel="noopener noreferrer"
           style={{
@@ -194,8 +194,8 @@ export const FounderCard = ({
             justifyContent: "center",
             gap: "6px",
             padding: "10px 20px",
-            background: "#0077B5",
-            border: "1px solid #0077B5",
+            background: "var(--accent-primary, #2563eb)",
+            border: `1px solid var(--accent-primary, #2563eb)`,
             borderRadius: "9999px",
             color: "white",
             fontSize: "12px",
