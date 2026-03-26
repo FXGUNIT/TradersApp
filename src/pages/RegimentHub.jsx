@@ -342,7 +342,6 @@ export default function RegimentHub({
                 alignItems: "flex-start",
                 gap: 20,
                 textAlign: "left",
-                outline: "none",
                 position: "relative",
                 overflow: "hidden",
               }}

@@ -139,7 +139,7 @@ export default function CommandPalette({
               setSelectedIdx(0);
             }}
             onKeyDown={handleKeyDown}
-            style={{
+              style={{
               width: "100%",
               background: "var(--surface-elevated, rgba(15,23,42,0.85))",
               border: `1px solid ${border}`,
@@ -148,7 +148,6 @@ export default function CommandPalette({
               color: textPrimary,
               fontSize: 14,
               fontFamily: "-apple-system, BlinkMacSystemFont, sans-serif",
-              outline: "none",
               transition: "all 0.2s ease",
             }}
           />
