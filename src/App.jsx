@@ -73,9 +73,11 @@ import LazyImage from "./components/LazyImage.jsx";
 
 import "./index.css";
 
-// ═══════════════════════════════════════════════════════════════
-// MATH ENGINE - imported from utils/math-engine.js
-// ═══════════════════════════════════════════════════════════════
+// GPU detection now imported from securityUtils.js
+const _gpuSupport = detectGPUSupport();
+
+// Exponential backoff now imported from securityUtils.js
+
 // calculateVolatilityRatio, getDynamicParameters, calculateThrottledRisk
 // are imported from ./utils/math-engine.js
 
@@ -484,148 +486,27 @@ const detectGPUSupport = () => {
   }
 };
 
-// Initialize GPU detection on app startup
-const _gpuSupport = detectGPUSupport();
+// Exponential backoff now imported from securityUtils.js
+// _withExponentialBackoff, _dbRWithRetry, _dbWWithRetry, _dbMWithRetry are now imported
 
-// ═══════════════════════════════════════════════════════════════════
-// RULE #154, #166: Retry Logic with Exponential Backoff
-// ═══════════════════════════════════════════════════════════════════
-/**
- * Retry a function with exponential backoff
- * @param {Function} fn - Function to execute
- * @param {number} maxRetries - Maximum number of retry attempts (default: 3)
- * @param {number} initialDelay - Initial delay in ms (default: 100)
- * @returns {Promise} Result of function execution
- */
-const _withExponentialBackoff = async (
-  fn,
-  maxRetries = 3,
-  initialDelay = 100,
-) => {
-  let lastError;
+// GPU detection now imported from securityUtils.js
+// detectGPUSupport
 
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      // Attempt the operation
-      return await fn();
-    } catch (error) {
-      lastError = error;
+// Exponential backoff now imported from securityUtils.js
+// _withExponentialBackoff, _dbRWithRetry, _dbWWithRetry, _dbMWithRetry are now imported
 
-      // Don't retry if we've exceeded max retries
-      if (attempt === maxRetries) {
-        console.error(
-          `Operation failed after ${maxRetries + 1} attempts:`,
-          error,
-        );
-        throw error;
-      }
-
-      // Calculate exponential backoff delay: 100ms, 200ms, 400ms, 800ms...
-      const delayMs = initialDelay * Math.pow(2, attempt);
-      console.warn(
-        `Attempt ${attempt + 1} failed, retrying in ${delayMs}ms...`,
-        error.message,
-      );
-
-      // Wait before retrying
-      await new Promise((resolve) => setTimeout(resolve, delayMs));
-    }
-  }
-
-  throw lastError;
-};
-
-/**
- * Firebase read operation with automatic retry
- * @param {string} path - Path in database to read
- * @param {string} authToken - Firebase auth token
- * @returns {Promise<Object|null>} Data from Firebase or null if failed
- */
-const _dbRWithRetry = async (path, authToken) => {
-  return _withExponentialBackoff(async () => {
-    const response = await fetch(
-      `${DATABASE_URL}${path}.json${authToken ? `?auth=${authToken}` : ""}`,
-    );
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
-    return response.json();
-  });
-};
-
-/**
- * Firebase write operation with automatic retry (PUT)
- * @param {string} path - Path in database to write
- * @param {Object} data - Data to write
- * @param {string} authToken - Firebase auth token
- * @returns {Promise<void>}
- */
-const _dbWWithRetry = async (path, data, authToken) => {
-  return _withExponentialBackoff(async () => {
-    const response = await fetch(
-      `${DATABASE_URL}${path}.json?auth=${authToken}`,
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      },
-    );
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: Failed to write data`);
-    }
-  });
-};
-
-/**
- * Firebase update operation with automatic retry (PATCH)
- * @param {string} path - Path in database to update
- * @param {Object} data - Data to merge/update
- * @param {string} authToken - Firebase auth token
- * @returns {Promise<void>}
- */
-const _dbMWithRetry = async (path, data, authToken) => {
-  return _withExponentialBackoff(async () => {
-    const response = await fetch(
-      `${DATABASE_URL}${path}.json?auth=${authToken}`,
-      {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      },
-    );
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: Failed to update data`);
-    }
-  });
-};
-
-// ═══════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
 //  TELEGRAM ALERT ENGINE — SECURITY TRIPWIRES
 //  Wired to: (1) Admin Intrusion Detection
 //            (2) User Registration Success
 //            (3) Session Restoration
-// ═══════════════════════════════════════════════════════════════════
-// ═══════════════════════════════════════════════════════════════════
-// ═══════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
 // SECURITY UTILITY FUNCTIONS - Module 1: Elite Security
-// ═══════════════════════════════════════════════════════════════════
-
-// Password strength calculator (0-3: Weak, Medium, Strong, Very Strong)
-const calculatePasswordStrength = (password) => {
-  if (!password) return 0;
-  let strength = 0;
-
-  // Length check
-  if (password.length >= 8) strength++;
-  if (password.length >= 12) strength++;
-
-  // Character variety checks
-  if (/[a-z]/.test(password) && /[A-Z]/.test(password)) strength++;
-  if (/\d/.test(password)) strength++;
-  if (/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password)) strength++;
-
-  return Math.min(strength, 3); // 0-3 scale
-};
+// ═══════════════════════════════════════════════════════════════
+// Password strength functions now imported from securityUtils.js
+// calculatePasswordStrength, getStrengthLabel, isValidGmailAddress, isPasswordExpired, copyToClipboardSecure
 
 const getStrengthLabel = (strength) => {
   if (strength === 0) return { label: "Weak", color: "#FF453A" };
