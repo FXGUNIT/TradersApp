@@ -155,7 +155,7 @@ const CleanOnboarding = ({ onSignupSuccess, onBackToLogin }) => {
     width: "100%",
     padding: "12px",
     marginBottom: 12,
-    border: "1px solid #E2E8F0",
+    border: "1px solid var(--border-subtle, #E2E8F0)",
     borderRadius: 6,
     fontSize: 14,
     outline: "none",
@@ -200,7 +200,7 @@ const CleanOnboarding = ({ onSignupSuccess, onBackToLogin }) => {
           Join Traders Regiment
         </h2>
         {err && (
-          <div style={{ color: "#EF4444", marginBottom: 12, fontSize: 13 }}>
+          <div style={{ color: "var(--status-danger, #EF4444)", marginBottom: 12, fontSize: 13 }}>
             {err}
           </div>
         )}
@@ -220,8 +220,8 @@ const CleanOnboarding = ({ onSignupSuccess, onBackToLogin }) => {
           style={{
             width: "100%",
             padding: 13,
-            background: "#000",
-            color: "#fff",
+            background: "var(--accent-primary, #2563eb)",
+            color: "var(--accent-text, #ffffff)",
             border: "none",
             borderRadius: 6,
             fontSize: 14,
@@ -238,7 +238,7 @@ const CleanOnboarding = ({ onSignupSuccess, onBackToLogin }) => {
             width: "100%",
             padding: 12,
             background: "transparent",
-            border: "1px solid #E2E8F0",
+            border: "1px solid var(--border-subtle, #E2E8F0)",
             borderRadius: 6,
             cursor: "pointer",
             fontSize: 14,
@@ -255,7 +255,7 @@ const RegimentHub = ({ onNavigate, theme }) => (
   <div
     style={{
       minHeight: "100vh",
-      background: "#FFF",
+      background: "var(--surface-elevated, #FFFFFF)",
       display: "flex",
       flexDirection: "column",
       alignItems: "center",
@@ -277,14 +277,14 @@ const RegimentHub = ({ onNavigate, theme }) => (
         maxWidth: 360,
       }}
     >
-      {[
-        { label: "📊 Trading Terminal", dest: "app", color: "#0A84FF" },
+        {[
+        { label: "📊 Trading Terminal", dest: "app", color: "var(--accent-primary, #2563eb)" },
         {
           label: "🧠 Collective Consciousness",
           dest: "consciousness",
-          color: "#BF5AF2",
+          color: "var(--amd-manipulation, #BF5AF2)",
         },
-      ].map((item) => (
+        ].map((item) => (
         <button
           key={item.dest}
           onClick={() => onNavigate(item.dest)}
