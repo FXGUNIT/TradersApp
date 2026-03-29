@@ -28,9 +28,20 @@ Frontend runtime values:
 - `VITE_FIREBASE_MESSAGING_SENDER_ID`
 - `VITE_FIREBASE_APP_ID`
 - `VITE_FIREBASE_DATABASE_URL`
-- `VITE_DEEPSEEK_KEY` if AI flows are enabled
-- `VITE_TELEGRAM_BOT_TOKEN` and `VITE_TELEGRAM_CHAT_ID` if Telegram alerts are enabled
 - `VITE_BFF_URL` only if you are not using the local Vite proxy
+
+Server-only AI / notification values:
+
+- `AI_GEMINI_PRO_KEY`
+- `AI_GROQ_TURBO_KEY`
+- `AI_OPENROUTER_MIND_ALPHA`
+- `AI_OPENROUTER_MIND_BETA`
+- `AI_CEREBRAS_KEY`
+- `AI_DEEPSEEK_KEY`
+- `AI_SAMBANOVA_KEY`
+- `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` if Telegram alerts are enabled
+
+Do not keep provider secrets under `VITE_*` names. Those are browser-exposed by design.
 
 See `.env.example` for the full key list.
 
@@ -54,15 +65,15 @@ Store the generated hash in Infisical. Do not commit the plain password.
 If you are using Infisical locally:
 
 ```bash
-npm run bff:dev
-npm run dev
+npm run bff:dev:infisical
+npm run dev:local
 ```
 
 If you want to run locally without the Infisical CLI:
 
 ```bash
-npm run bff:dev:local
-npm run dev:local
+npm run bff:dev
+npm run dev
 ```
 
 The BFF now auto-loads `.env` and `.env.local` from the repo root for local development.
