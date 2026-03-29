@@ -9569,26 +9569,6 @@ export default function TradersRegiment() {
                     : "🌙 MIDNIGHT"}
               </button>
               <button
-                onClick={() => setPrivacyModeActive(!privacyModeActive)}
-                title="Toggle Ghost Mode - blur sensitive data"
-                style={{
-                  background: privacyModeActive
-                    ? "rgba(255,69,58,0.3)"
-                    : "rgba(52,199,89,0.3)",
-                  border: `1px solid ${privacyModeActive ? T.red : T.green}`,
-                  color: privacyModeActive ? T.red : T.green,
-                  padding: "8px 12px",
-                  borderRadius: 6,
-                  cursor: "pointer",
-                  fontSize: 12,
-                  fontFamily: T.font,
-                  fontWeight: 600,
-                }}
-                className="btn-glass"
-              >
-                {privacyModeActive ? "👻 GHOST MODE ON" : "👁️ PRIVATE MODE OFF"}
-              </button>
-              <button
                 onClick={() => setScreen("sessions")}
                 title="Manage active sessions"
                 style={{
@@ -9607,32 +9587,21 @@ export default function TradersRegiment() {
                 📱 SESSIONS
               </button>
             </div>
-
-            {/* Apply Privacy Mode blur to entire app */}
-            <div
-              style={{
-                filter: privacyModeActive ? "blur(8px)" : "none",
-                transition: "filter 0.3s ease",
-                pointerEvents: privacyModeActive ? "none" : "auto",
-              }}
-            >
-              <React.Suspense fallback={<LoadingFallback />}>
-                <MainTerminal
-                  auth={auth}
-                  profile={profile}
-                  onLogout={handleLogout}
-                  onSaveJournal={saveJournal}
-                  onSaveAccount={saveAccount}
-                  onSaveFirmRules={saveFirmRules}
-                  showToast={showToast}
-                  onNavigateToConsciousness={() => {
-                    setConsciousnessReturnScreen("app");
-                    setScreen("consciousness");
-                  }}
-                  privacyMode={privacyModeActive}
-                />
-              </React.Suspense>
-            </div>
+            <React.Suspense fallback={<LoadingFallback />}>
+              <MainTerminal
+                auth={auth}
+                profile={profile}
+                onLogout={handleLogout}
+                onSaveJournal={saveJournal}
+                onSaveAccount={saveAccount}
+                onSaveFirmRules={saveFirmRules}
+                showToast={showToast}
+                onNavigateToConsciousness={() => {
+                  setConsciousnessReturnScreen("app");
+                  setScreen("consciousness");
+                }}
+              />
+            </React.Suspense>
           </div>
         );
 
@@ -9651,7 +9620,6 @@ export default function TradersRegiment() {
         theme,
         currentTheme,
         maintenanceMode: maintenanceModeActive,
-        privacyMode: privacyModeActive,
       }}
     >
       <section className={`app-container theme-${currentTheme}`}>
