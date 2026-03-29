@@ -420,12 +420,12 @@ FIREBASE CONFIG (in App.jsx):
 ADMIN CREDENTIALS:
    Email: gunitsingh1994@gmail.com
    UID: N3z04ZYCleZjOApobL3VZepaOwi1
-   Master Password Hash: 0189c7742ecf4542ecab0150b32ecadc9ce7c4390217bfb3914f5b52b14e3cb6
-   (Original: "TR@GODMODE2024" + "TR_SECURITY_SALT_2024_REGIMENT" → SHA-256)
+   Master Password Hash: [ROTATED - DO NOT DOCUMENT]
+   (Use Infisical server-side secrets only)
 
 TELEGRAM ALERTS:
-   Chat ID: 1380983917
-   Bot Token: 7978697496:AAEYF2jlx_aBpuWlqWPSD6Bu2hTIgSb8isc
+   Configuration: intentionally omitted from docs
+   Provision through Infisical only
 
 RATE LIMITING:
    Max: 1 AI request per 5 seconds per user

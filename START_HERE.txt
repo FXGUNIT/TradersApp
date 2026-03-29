@@ -187,17 +187,16 @@ VERIFY IN BROWSER:
 
 ADMIN LOGIN:
    Email: gunitsingh1994@gmail.com
-   Password: TR@GODMODE2024
-   (Read from master password hash in code)
+   Password: [ROTATED - STORE SECURELY OUTSIDE THE REPO]
+   (Server-side only. Do not hardcode in client code or docs.)
 
 FIREBASE:
    Project: traders-regiment
    Database: Real-time DB in Asia-Southeast1
 
 TELEGRAM:
-   Chat: 1380983917
-   Token: 7978697496:AAEYF2jlx_aBpuWlqWPSD6Bu2hTIgSb8isc
-   (Real-time security alerts sent here)
+   Configuration: intentionally omitted from docs
+   (Provision through Infisical only)
 
 ═══════════════════════════════════════════════════════════════════════════════
                     🎯 USAGE SCENARIOS

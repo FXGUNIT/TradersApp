@@ -178,11 +178,11 @@ TO DEBUG ISSUES:
 ADMIN CREDENTIALS (in src/App.jsx):
    Email: gunitsingh1994@gmail.com
    UID: N3z04ZYCleZjOApobL3VZepaOwi1
-   Password Hash: 0189c7742ecf4542ecab0150b32ecadc9ce7c4390217bfb3914f5b52b14e3cb6
+   Password Hash: [ROTATED - SERVER SIDE ONLY]
 
 FIREBASE CONFIG (in src/App.jsx):
    Project ID: traders-regiment
-   API Key: AIzaSyBPN7fIZ-UfVQ5EMti1TzrFPsi4wtUEtKI
+   API Key: [FRONTEND CONFIG - OMITTED FROM DOCS]
    Database: asia-southeast1
    Storage Bucket: traders-regiment.appspot.com
 

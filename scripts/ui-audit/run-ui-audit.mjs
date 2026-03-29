@@ -546,7 +546,7 @@ async function runLoginAudit(page, scenario) {
   await page
     .locator("input[placeholder='Enter Master Admin Password']")
     .first()
-    .fill("TR@GODMODE2024");
+    .fill(process.env.TEST_ADMIN_PASSWORD || "CHANGE_ME");
   const adminPasswordToggle = page
     .locator("input[placeholder='Enter Master Admin Password']")
     .locator("xpath=following-sibling::button")

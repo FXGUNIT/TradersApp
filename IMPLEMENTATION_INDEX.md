@@ -284,7 +284,7 @@ export async function provisionUserRecord(uid, userData) {
 
 #### EMAIL TEMPLATE:
 
-- **Template ID:** template_ssd8w3g (from .env)
+- **Template ID:** configured in env (redacted)
 - **Subject:** "Welcome to the Regiment - Under Review"
 - **Variables:** {{user_email}}, {{user_name}}
 
