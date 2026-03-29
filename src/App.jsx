@@ -74,6 +74,7 @@ import { AppShellProvider } from "./features/shell/AppShellContext.jsx";
 import { SCREEN_IDS } from "./features/shell/screenIds.js";
 import {
   findUserByEmail as findIdentityUserByEmail,
+  getUserStatusByUid as getIdentityUserStatusByUid,
   listUserSessions as listIdentityUserSessions,
   loadLegacyUserProfile,
   provisionUserRecord as provisionIdentityUserRecord,
@@ -2517,33 +2518,25 @@ function ThemePicker({ isOpen, onClose, onSelectTheme, currentTheme }) {
 // ═══════════════════════════════════════════════════════════════════
 //  LOGIN SCREEN — WITH PASSWORD RESET
 // ═══════════════════════════════════════════════════════════════════
-function WaitingRoom({ profile, onRefresh, onLogout, onResendVerification }) {
+function WaitingRoom({
+  profile,
+  auth: sessionAuth,
+  onRefresh,
+  onLogout,
+  onResendVerification,
+}) {
   const [checking, setChecking] = useState(false);
   const [liveStatus, setLiveStatus] = useState(profile?.status || "PENDING");
   const auditData =
     typeof window !== "undefined" ? window.__TRADERS_AUDIT_DATA : null;
-  let auth = null;
-  let db = null;
-
-  try {
-    auth = getAuth();
-  } catch {
-    auth = null;
-  }
-
-  try {
-    db = getDatabase();
-  } catch {
-    db = null;
-  }
 
   const uid =
-    auth?.currentUser?.uid ||
+    sessionAuth?.uid ||
     auditData?.userAuth?.uid ||
     auditData?.adminAuth?.uid ||
     "";
   const email =
-    auth?.currentUser?.email ||
+    sessionAuth?.email ||
     auditData?.userAuth?.email ||
     auditData?.adminAuth?.email ||
     "";
@@ -2554,20 +2547,41 @@ function WaitingRoom({ profile, onRefresh, onLogout, onResendVerification }) {
   }, [profile?.status]);
 
   useEffect(() => {
-    if (!uid || auditData || !db) {
-      return;
+    if (!uid || auditData) {
+      return undefined;
     }
 
-    const statusRef = ref(db, `users/${uid}/status`);
-    const unsubscribe = onValue(statusRef, (snapshot) => {
-      const nextStatus = snapshot.val() || "PENDING";
-      setLiveStatus(nextStatus);
-      if (nextStatus === "ACTIVE") {
-        void onRefresh();
+    let active = true;
+
+    const refreshLiveStatus = async () => {
+      try {
+        const nextStatus =
+          (await getIdentityUserStatusByUid(uid, sessionAuth?.token || "")) ||
+          "PENDING";
+
+        if (!active) {
+          return;
+        }
+
+        setLiveStatus(nextStatus);
+        if (nextStatus === "ACTIVE" && onRefresh) {
+          void onRefresh();
+        }
+      } catch (error) {
+        console.warn("Waiting room status refresh failed:", error);
       }
-    });
-    return () => unsubscribe();
-  }, [uid, db, auditData, onRefresh]);
+    };
+
+    void refreshLiveStatus();
+    const interval = setInterval(() => {
+      void refreshLiveStatus();
+    }, 15000);
+
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [auditData, onRefresh, sessionAuth?.token, uid]);
 
   useEffect(() => {
     if (!onRefresh) {
@@ -9670,6 +9684,7 @@ export default function TradersRegiment() {
         return (
           <WaitingRoom
             profile={profile}
+            auth={auth}
             onRefresh={checkApprovalStatus}
             onResendVerification={handleResendVerificationEmail}
             onLogout={handleLogout}
