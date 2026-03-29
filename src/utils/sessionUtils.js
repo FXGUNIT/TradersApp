@@ -157,7 +157,6 @@ export const createSession = async (uid, token, rememberMe) => {
       const encryptedSession = encryptSessionToken({
         uid,
         sessionId,
-        email: sessionData.email,
         expiresAt: expiresAt.toISOString(),
         token: token,
       });
@@ -173,9 +172,12 @@ export const createSession = async (uid, token, rememberMe) => {
 
 export const logoutOtherDevices = async (uid, currentSessionId, token) => {
   try {
+    let bffRevokeSucceeded = false;
+
     if (hasBff()) {
       try {
         await revokeOtherIdentitySessions(uid, currentSessionId);
+        bffRevokeSucceeded = true;
       } catch (error) {
         console.warn(
           "BFF revoke-other-devices failed, falling back to Firebase:",
@@ -184,7 +186,15 @@ export const logoutOtherDevices = async (uid, currentSessionId, token) => {
       }
     }
 
-    const allSessions = await dbR(`users/${uid}/sessions`, token);
+    let allSessions = null;
+    try {
+      allSessions = await dbR(`users/${uid}/sessions`, token);
+    } catch (error) {
+      if (bffRevokeSucceeded) {
+        return true;
+      }
+      throw error;
+    }
 
     if (!allSessions) return true;
 

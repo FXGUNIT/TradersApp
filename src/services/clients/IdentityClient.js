@@ -7,6 +7,7 @@ import {
   fetchIdentityUserByEmail,
   fetchIdentityUserStatus,
   patchIdentityUserSecurity,
+  provisionIdentityUser,
 } from "../gateways/identityGateway.js";
 import { hasBff } from "../gateways/base.js";
 import {
@@ -27,6 +28,27 @@ function normalizeUserPayload(response) {
 
 function normalizeLegacyEmail(email) {
   return String(email || "").trim().toLowerCase();
+}
+
+function resolveToken(authDataOrToken = "") {
+  if (typeof authDataOrToken === "string") {
+    return authDataOrToken;
+  }
+
+  return authDataOrToken?.token || "";
+}
+
+async function readLegacyUser(uid, token = "") {
+  if (!uid) {
+    return null;
+  }
+
+  try {
+    return await dbR(`users/${uid}`, token);
+  } catch (error) {
+    console.warn("Legacy identity read failed:", error);
+    return null;
+  }
 }
 
 function mergeProfileData(userData, authData = {}, fullData = {}) {
@@ -105,7 +127,7 @@ export async function loadUserProfileByUid(authData = {}) {
   }
 
   if (!userData) {
-    userData = await dbR(`users/${authData.uid}`, authData.token);
+    userData = await readLegacyUser(authData.uid, authData.token);
   }
 
   if (!userData) {
@@ -117,7 +139,7 @@ export async function loadUserProfileByUid(authData = {}) {
     };
   }
 
-  const legacyFullData = await dbR(`users/${authData.uid}`, authData.token);
+  const legacyFullData = await readLegacyUser(authData.uid, authData.token);
   const sessionsFromBff = await listSessionRecords(authData.uid, authData.token);
 
   fullData = {
@@ -144,10 +166,7 @@ export async function updateLoginSecurityCounters(
     return { success: false, error: "User UID is required." };
   }
 
-  const token =
-    typeof authDataOrToken === "string"
-      ? authDataOrToken
-      : authDataOrToken?.token || "";
+  const token = resolveToken(authDataOrToken);
 
   const nextPatch = {
     ...patch,
@@ -171,6 +190,32 @@ export async function updateLoginSecurityCounters(
   return { success: true };
 }
 
+export async function provisionUserRecord(uid, payload = {}, authDataOrToken = "") {
+  if (!uid) {
+    return null;
+  }
+
+  const token = resolveToken(authDataOrToken);
+  let provisionedUser = null;
+
+  if (hasBff()) {
+    try {
+      const response = await provisionIdentityUser(uid, payload);
+      provisionedUser = normalizeUserPayload(response);
+    } catch (error) {
+      console.warn("BFF identity provision failed, falling back to Firebase:", error);
+    }
+  }
+
+  try {
+    await dbM(`users/${uid}`, payload, token);
+  } catch (error) {
+    console.warn("Legacy identity provision failed:", error);
+  }
+
+  return provisionedUser || (await readLegacyUser(uid, token));
+}
+
 export async function listUserSessions(uid, token = "") {
   return normalizeSessionMap(await listSessionRecords(uid, token));
 }
@@ -187,7 +232,7 @@ export async function revokeOtherUserSessions(uid, currentSessionId, token = "")
   return revokeOtherSessions(uid, currentSessionId, token);
 }
 
-export async function getUserStatusByUid(uid) {
+export async function getUserStatusByUid(uid, authDataOrToken = "") {
   if (!uid) {
     return null;
   }
@@ -201,7 +246,7 @@ export async function getUserStatusByUid(uid) {
     }
   }
 
-  const user = await dbR(`users/${uid}`, "");
+  const user = await readLegacyUser(uid, resolveToken(authDataOrToken));
   return user?.status || null;
 }
 
@@ -212,6 +257,7 @@ export default {
   listUserSessions,
   loadLegacyUserProfile,
   loadUserProfileByUid,
+  provisionUserRecord,
   resolveScreenForUser,
   revokeOtherUserSessions,
   revokeUserSession,
