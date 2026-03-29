@@ -73,7 +73,11 @@ import LazyImage from "./components/LazyImage.jsx";
 import { useTheme } from "./hooks/useTheme.jsx";
 import { AppShellProvider } from "./features/shell/AppShellContext.jsx";
 import { SCREEN_IDS } from "./features/shell/screenIds.js";
-import { loadLegacyUserProfile } from "./services/clients/IdentityClient.js";
+import {
+  findUserByEmail as findIdentityUserByEmail,
+  listUserSessions as listIdentityUserSessions,
+  loadLegacyUserProfile,
+} from "./services/clients/IdentityClient.js";
 import { submitApplication as submitOnboardingApplication } from "./services/clients/OnboardingClient.js";
 import * as AdminSecurityClient from "./services/clients/AdminSecurityClient.js";
 import NotificationCenter from "./components/NotificationCenter.jsx";
@@ -7176,33 +7180,73 @@ function SessionsManagementScreen({
   const [logoutLoading, setLogoutLoading] = useState(false);
 
   useEffect(() => {
-    const sessionsDataRaw =
-      profile?.sessions || profile?.fullData?.sessions || {};
-    const sessionsData = Array.isArray(sessionsDataRaw)
-      ? sessionsDataRaw.reduce((acc, session, index) => {
-          const sessionId =
-            session?.sessionId || session?.id || `session_${index}`;
-          acc[sessionId] = session;
-          return acc;
-        }, {})
-      : sessionsDataRaw && typeof sessionsDataRaw === "object"
-        ? sessionsDataRaw
-        : {};
-    const sessionsList = Object.entries(sessionsData).map(
-      ([sessionId, sessionData]) => ({
-        sessionId,
-        ...sessionData,
-        isCurrentSession: sessionId === currentSessionId,
-      }),
-    );
+    let active = true;
 
-    setSessions(
-      sessionsList.sort(
-        (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
-      ),
-    );
-    setLoading(false);
-  }, [currentSessionId, profile]);
+    const loadSessions = async () => {
+      if (!auth || !profile) {
+        if (active) {
+          setSessions([]);
+          setLoading(false);
+        }
+        return;
+      }
+
+      try {
+        const sessionsDataRaw =
+          (await listIdentityUserSessions(auth.uid, auth.token)) ||
+          profile?.sessions ||
+          profile?.fullData?.sessions ||
+          {};
+
+        const sessionsData = Array.isArray(sessionsDataRaw)
+          ? sessionsDataRaw.reduce((acc, session, index) => {
+              const sessionId =
+                session?.sessionId || session?.id || `session_${index}`;
+              acc[sessionId] = session;
+              return acc;
+            }, {})
+          : sessionsDataRaw && typeof sessionsDataRaw === "object"
+            ? sessionsDataRaw
+            : {};
+
+        const sessionsList = Object.entries(sessionsData).map(
+          ([sessionId, sessionData]) => ({
+            sessionId,
+            ...sessionData,
+            isCurrentSession: sessionId === currentSessionId,
+          }),
+        );
+
+        if (!active) {
+          return;
+        }
+
+        setSessions(
+          sessionsList.sort(
+            (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
+          ),
+        );
+      } catch (error) {
+        console.error("Failed to fetch sessions:", error);
+        if (active) {
+          showToast(
+            "Session data not responding. Running recovery sequence..",
+            "error",
+          );
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void loadSessions();
+
+    return () => {
+      active = false;
+    };
+  }, [auth, currentSessionId, profile, showToast]);
 
   const handleLogoutOtherDevices = async () => {
     if (!auth || !currentSessionId) return;
@@ -8251,55 +8295,7 @@ export default function TradersRegiment() {
   }, [checkUserStatus, isAdminAuthenticated]);
 
   const findUserRecordByEmail = useCallback(async (email) => {
-    const normalizedEmail = String(email || "").trim().toLowerCase();
-    if (!normalizedEmail) {
-      return null;
-    }
-
-    if (!firebaseAuth) {
-      return null;
-    }
-
-    const currentUser = firebaseAuth.currentUser;
-    if (currentUser?.email?.toLowerCase() === normalizedEmail) {
-      const token = await currentUser.getIdToken(true).catch(() => null);
-      if (!token) {
-        return {
-          uid: currentUser.uid,
-          userData: null,
-        };
-      }
-
-      const loadedProfile = await loadLegacyUserProfile({
-        uid: currentUser.uid,
-        token,
-        email: currentUser.email,
-        emailVerified: currentUser.emailVerified,
-      });
-
-      return loadedProfile?.userData
-        ? {
-            uid: currentUser.uid,
-            userData: loadedProfile.userData,
-          }
-        : {
-            uid: currentUser.uid,
-            userData: null,
-          };
-    }
-
-    const signInMethods = await fetchSignInMethodsForEmail(
-      firebaseAuth,
-      normalizedEmail,
-    ).catch(() => []);
-    if (!signInMethods.length) {
-      return null;
-    }
-
-    return {
-      uid: null,
-      userData: null,
-    };
+    return findIdentityUserByEmail(email);
   }, []);
 
   const buildPendingProfile = useCallback(
@@ -8458,6 +8454,11 @@ export default function TradersRegiment() {
     }
 
     const existingRecord = await findUserRecordByEmail(sanitizedEmail);
+    if (existingRecord?.userData?.isLocked) {
+      throw new Error(
+        "Account Locked: Too many failed attempts. Contact Master Admin.",
+      );
+    }
 
     try {
       const userCredential = await signInWithEmailAndPassword(
