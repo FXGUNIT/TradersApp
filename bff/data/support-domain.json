@@ -197,24 +197,6 @@
         }
       ],
       "updatedAt": "2026-03-29T02:31:54.686Z"
-    },
-    "support-test-001": {
-      "uid": "support-test-001",
-      "threadId": "support-test-001",
-      "status": "open",
-      "messages": [
-        {
-          "id": "b4b30793-2650-4065-84ce-2d9fde4f4784",
-          "text": "support ping",
-          "sender": "user",
-          "senderName": null,
-          "email": "support.user@gmail.com",
-          "type": "message",
-          "timestamp": 1770000000000,
-          "read": false
-        }
-      ],
-      "updatedAt": "2026-03-29T21:18:54.472Z"
     }
   }
 }
