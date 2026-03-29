@@ -1,8 +1,11 @@
-import React from "react";
-import { getDocumentMeta } from "../services/clients/ContentClient.js";
+import React, { useEffect, useState } from "react";
+import {
+  fetchDocumentMeta,
+  getDocumentMeta,
+} from "../services/clients/ContentClient.js";
 
 export default function TermsOfService({ onClose }) {
-  const meta = getDocumentMeta("tos");
+  const [meta, setMeta] = useState(() => getDocumentMeta("tos"));
   const T = {
     bg: "var(--surface-elevated, #FFFFFF)",
     fg: "var(--text-primary, #111827)",
@@ -10,6 +13,20 @@ export default function TermsOfService({ onClose }) {
     blue: "var(--accent-primary, #2563EB)",
     border: "var(--border-subtle, rgba(0,0,0,0.08))",
   };
+
+  useEffect(() => {
+    let active = true;
+
+    fetchDocumentMeta("tos").then((nextMeta) => {
+      if (active && nextMeta) {
+        setMeta(nextMeta);
+      }
+    });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   return (
     <div

@@ -2,6 +2,12 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { resolve } from "node:path";
+import {
+  getDocumentMeta,
+  getHubContent,
+  listDocumentMeta,
+} from "./domains/contentState.mjs";
+import { createContentRouteHandler } from "./routes/contentRoutes.mjs";
 
 const loadEnvFiles = () => {
   const rootDir = process.cwd();
@@ -456,6 +462,7 @@ const sendTelegramMessage = async (message, parseMode = "HTML") => {
 
 const server = createServer(async (req, res) => {
   const origin = resolveOrigin(req);
+  const url = new URL(req.url || "/", `http://${req.headers.host || `${HOST}:${PORT}`}`);
 
   if (req.method === "OPTIONS") {
     json(res, 204, {}, origin);
@@ -494,6 +501,16 @@ const server = createServer(async (req, res) => {
       },
       origin,
     );
+    return;
+  }
+
+  const handledContentRoute = createContentRouteHandler({
+    getHubContent,
+    getDocumentMeta,
+    listDocumentMeta,
+    json,
+  })(req, res, url, origin);
+  if (handledContentRoute) {
     return;
   }
 
