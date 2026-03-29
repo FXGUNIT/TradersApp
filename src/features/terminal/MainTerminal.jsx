@@ -45,12 +45,11 @@ import {
   writeDraft,
 } from "../../services/draftVault.js";
 import {
+  callTerminalAi,
   extractChoiceText,
   extractIndicatorsWithAi,
   parseFirmRulesWithAi,
   parseJsonChoice,
-  runPremarketAnalysisWithAi,
-  runTradePlanWithAi,
 } from "../../services/clients/TerminalAnalyticsClient.js";
 import { getISTState } from "../../utils/tradingUtils.js";
 
@@ -1434,14 +1433,14 @@ Apply ALL sections including SECTION AMD.`;
       if (p1KeyLevelsChart) content.push({ type: 'image', source: { type: 'base64', media_type: p1KeyLevelsChart.type, data: p1KeyLevelsChart.b64 } });
       content.push({ type: 'text', text: textMsg });
 
-      const data = await callDeepSeekBff({
+      const data = await callTerminalAi({
         maxTokens: 4000,
         messages: [
           { role: 'system', content: PART1_PROMPT },
           { role: 'user', content: JSON.stringify(content) }
         ]
       });
-      const response = data.choices?.[0]?.message?.content || 'No response.';
+      const response = extractChoiceText(data, 'No response.');
       
       setP1Out(response);
       const amdMatch = response.match(/MACRO AMD PHASE:\s*([A-Z]+)/i);
@@ -1503,14 +1502,14 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
       screenshots.forEach(s => content.push({ type: 'image', source: { type: 'base64', media_type: s.type, data: s.b64 } }));
       content.push({ type: 'text', text: textContent });
 
-      const data = await callDeepSeekBff({
+      const data = await callTerminalAi({
         maxTokens: 4000,
         messages: [
           { role: 'system', content: PART2_PROMPT },
           { role: 'user', content: JSON.stringify(content) }
         ]
       });
-      const response = data.choices?.[0]?.message?.content || 'No response.';
+      const response = extractChoiceText(data, 'No response.');
       
       setP2Out(response);
       setP2Jf({ exit: '', result: 'win', pnl: '', balAfter: '', lessons: '', amdPhase: currentAMD });
