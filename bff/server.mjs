@@ -1,5 +1,50 @@
 import { createHash, timingSafeEqual } from "node:crypto";
+import { existsSync, readFileSync } from "node:fs";
 import { createServer } from "node:http";
+import { resolve } from "node:path";
+
+const loadEnvFiles = () => {
+  const rootDir = process.cwd();
+  const files = [".env", ".env.local"];
+  const shellDefined = new Set(Object.keys(process.env));
+  const fileDefined = new Set();
+
+  files.forEach((fileName) => {
+    const filePath = resolve(rootDir, fileName);
+    if (!existsSync(filePath)) {
+      return;
+    }
+
+    const content = readFileSync(filePath, "utf8");
+    content.split(/\r?\n/).forEach((line) => {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) {
+        return;
+      }
+
+      const separatorIndex = trimmed.indexOf("=");
+      if (separatorIndex <= 0) {
+        return;
+      }
+
+      const key = trimmed.slice(0, separatorIndex).trim();
+      let value = trimmed.slice(separatorIndex + 1).trim();
+      if (
+        (value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))
+      ) {
+        value = value.slice(1, -1);
+      }
+
+      if (!shellDefined.has(key) || fileDefined.has(key)) {
+        process.env[key] = value;
+        fileDefined.add(key);
+      }
+    });
+  });
+};
+
+loadEnvFiles();
 
 const PORT = Number(process.env.BFF_PORT || 8788);
 const HOST = process.env.BFF_HOST || "127.0.0.1";

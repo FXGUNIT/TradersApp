@@ -65,6 +65,7 @@ npm run bff:dev:local
 npm run dev:local
 ```
 
+The BFF now auto-loads `.env` and `.env.local` from the repo root for local development.
 The Vite proxy forwards `/api/*` to the BFF, so `VITE_BFF_URL` can stay empty for local development.
 
 ## Health Check
