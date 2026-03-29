@@ -10,7 +10,7 @@
  * Execution: npm run test:social-engineering
  */
 
-import { checkInputForSocialEngineering } from './src/socialEngineeringDetectionModule.js';
+import { checkInputForSocialEngineering } from './src/services/socialEngineeringDetectionModule.js';
 
 // ═══════════════════════════════════════════════════════════════════
 // TEST PAYLOADS - Social Engineering Attacks

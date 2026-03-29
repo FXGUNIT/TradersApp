@@ -9,7 +9,7 @@
  * Execution: npm run test:leakage-prevention
  */
 
-import { checkInputForPrivilegeEscalation } from './src/leakagePreventionModule.js';
+import { checkInputForPrivilegeEscalation } from './src/services/leakagePreventionModule.js';
 
 // ═══════════════════════════════════════════════════════════════════
 // TEST PAYLOADS - Privilege Escalation Attempts
