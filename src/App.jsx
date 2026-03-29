@@ -75,6 +75,7 @@ import { AppShellProvider } from "./features/shell/AppShellContext.jsx";
 import { SCREEN_IDS } from "./features/shell/screenIds.js";
 import { loadLegacyUserProfile } from "./services/clients/IdentityClient.js";
 import { submitApplication as submitOnboardingApplication } from "./services/clients/OnboardingClient.js";
+import * as AdminSecurityClient from "./services/clients/AdminSecurityClient.js";
 import NotificationCenter from "./components/NotificationCenter.jsx";
 import CommandPalette from "./components/CommandPalette.jsx";
 import UserSwitcher from "./components/UserSwitcher.jsx";
@@ -120,6 +121,28 @@ const ADMIN_EMAIL = "gunitsingh1994@gmail.com";
 const ADMIN_UID = "N3z04ZYCleZjOApobL3VZepaOwi1";
 const TELEGRAM_TOKEN = import.meta.env.VITE_TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = import.meta.env.VITE_TELEGRAM_CHAT_ID;
+const resolveAdminClientFn = (...names) => {
+  for (const name of names) {
+    const fn = AdminSecurityClient?.[name];
+    if (typeof fn === "function") {
+      return fn;
+    }
+  }
+  return null;
+};
+const listAdminUsers = resolveAdminClientFn("listUsers", "fetchAdminUsers");
+const approveAdminUser = resolveAdminClientFn("approveUser", "approveAdminUser");
+const blockAdminUser = resolveAdminClientFn("blockUser", "blockAdminUser");
+const fetchMaintenanceState = resolveAdminClientFn(
+  "fetchMaintenanceState",
+  "getMaintenanceState",
+  "loadMaintenanceState",
+);
+const toggleMaintenanceState = resolveAdminClientFn(
+  "toggleMaintenanceState",
+  "setMaintenanceState",
+  "updateMaintenanceMode",
+);
 const DATABASE_URL = firebaseConfig.databaseURL;
 
 if (firebaseAuth) {
@@ -4189,47 +4212,69 @@ function AdminDashboard({
   }, [searchQuery]);
 
   useEffect(() => {
-    // Set up real-time listener for users
     if (!isAdminAuthenticated && !auth?.token) return;
-    if (!firebaseDb) {
+    let active = true;
+    let intervalId = null;
+
+    const applyUsersPayload = (payload) => {
+      const usersData = Array.isArray(payload)
+        ? payload.reduce((acc, user) => {
+            if (user?.uid) {
+              acc[user.uid] = user;
+            }
+            return acc;
+          }, {})
+        : payload && typeof payload === "object"
+          ? payload.users && typeof payload.users === "object"
+            ? payload.users
+            : payload
+          : {};
+
+      if (!active) return;
+      setUsers(usersData);
+      setLoading(false);
+      setDbError("");
+    };
+
+    const loadUsers = async () => {
+      setLoading(true);
+      setDbError("");
+
+      if (listAdminUsers) {
+        try {
+          const response = await listAdminUsers();
+          if (!active) return;
+
+          if (response?.success === false) {
+            throw new Error(response.error || "Failed to load admin users.");
+          }
+
+          applyUsersPayload(response?.users || response?.data || response);
+          return;
+        } catch (error) {
+          if (!active) return;
+          console.warn("Admin client user load failed, falling back:", error);
+        }
+      }
+
+      if (!active) return;
       setUsers({});
       setLoading(false);
-      return;
-    }
+      setDbError("Admin user list unavailable.");
+    };
 
-    setLoading(true);
-    setDbError("");
+    void loadUsers();
+    intervalId = window.setInterval(() => {
+      void loadUsers();
+    }, 10000);
 
-    try {
-      // Optimized users listener with connection pooling & caching
-      firebaseOptimizer.queueUpdate("users", "critical");
-      const unsubscribe = firebaseOptimizer.createOptimizedListener(
-        "users",
-        (result) => {
-          const data = result.isBatched
-            ? result.updates[result.updates.length - 1]
-            : result;
-          const usersData = data && typeof data === "object" ? data : {};
-          setUsers(usersData);
-          setLoading(false);
-          setDbError("");
-        },
-        firebaseDb,
-        ref,
-        onValue,
-      );
-
-      // Clean up listener on unmount
-      return () => unsubscribe();
-    } catch (error) {
-      console.error("Failed to set up listener:", error);
-      setDbError(
-        `Network Error: ${error.message || "Failed to listen for users"}`,
-      );
-      setUsers({});
-      setLoading(false);
-    }
-  }, [isAdminAuthenticated, auth, setUsers, setLoading, setDbError]);
+    return () => {
+      active = false;
+      if (intervalId) {
+        window.clearInterval(intervalId);
+      }
+    };
+  }, [isAdminAuthenticated, auth?.token, setUsers, setLoading, setDbError]);
 
   // RULE #99: Keyboard listener for Command Palette (Ctrl+K)
   useEffect(() => {
@@ -4336,12 +4381,23 @@ function AdminDashboard({
     if (!recordAdminActivity("APPROVE_USER", uid)) return;
 
     try {
-      const targetUser = (await dbR(`users/${uid}`, auth?.token)) || {};
-      await dbM(
-        `users/${uid}`,
-        { status: "ACTIVE", approvedAt: new Date().toISOString() },
-        auth?.token,
-      );
+      const result = approveAdminUser
+        ? await approveAdminUser(uid, auth?.uid)
+        : null;
+      if (result?.success === false) {
+        throw new Error(result.error || "Approval failed.");
+      }
+
+      const targetUser = result?.user || users?.[uid] || {};
+      if (result?.user?.uid) {
+        setUsers((current) => ({
+          ...(current || {}),
+          [result.user.uid]: {
+            ...(current?.[result.user.uid] || {}),
+            ...result.user,
+          },
+        }));
+      }
       setActionMsg(`✓ User ${uid.slice(0, 8)}... APPROVED`);
       if (targetUser.email) {
         void sendApprovalConfirmationEmail(
@@ -4368,11 +4424,21 @@ function AdminDashboard({
 
   const block = async (uid) => {
     try {
-      await dbM(
-        `users/${uid}`,
-        { status: "BLOCKED", blockedAt: new Date().toISOString() },
-        auth?.token,
-      );
+      const result = blockAdminUser
+        ? await blockAdminUser(uid, auth?.uid)
+        : null;
+      if (result?.success === false) {
+        throw new Error(result.error || "Block failed.");
+      }
+      if (result?.user?.uid) {
+        setUsers((current) => ({
+          ...(current || {}),
+          [result.user.uid]: {
+            ...(current?.[result.user.uid] || {}),
+            ...result.user,
+          },
+        }));
+      }
       setActionMsg(`🚫 User ${uid.slice(0, 8)}... BLOCKED`);
       showToast(
         `User ${uid.slice(0, 8)}... removed from active roster. Access revoked.`,
@@ -4393,7 +4459,24 @@ function AdminDashboard({
 
   const openMirror = async (uid) => {
     setMirror(uid);
-    const data = await dbR(`users/${uid}`, auth?.token);
+    let data = users?.[uid] || null;
+    if (!data && listAdminUsers) {
+      try {
+        const response = await listAdminUsers();
+        if (response?.success !== false) {
+          const nextUsers = response?.users || response?.data || response;
+          if (Array.isArray(nextUsers)) {
+            data = nextUsers.find((user) => user?.uid === uid) || null;
+          } else if (nextUsers && typeof nextUsers === "object" && nextUsers.users) {
+            data = nextUsers.users?.[uid] || null;
+          } else if (nextUsers && typeof nextUsers === "object") {
+            data = nextUsers?.[uid] || null;
+          }
+        }
+      } catch (error) {
+        console.warn("Admin mirror refresh failed:", error);
+      }
+    }
     setMirrorData(data);
   };
 
@@ -4795,24 +4878,37 @@ function AdminDashboard({
 
           <button
             onClick={async () => {
-              // Optional: Manual refresh for users who prefer it, though real-time listener handles updates
-              if (!firebaseDb) {
-                setDbError("Firebase unavailable");
+              if (!listAdminUsers) {
+                setDbError("Admin user list client unavailable.");
                 return;
               }
+
               setLoading(true);
               setDbError("");
               try {
-                const usersRef = ref(firebaseDb, "users");
-                const snapshot = await get(usersRef);
-                if (snapshot.exists()) {
-                  setUsers(snapshot.val());
-                } else {
-                  setUsers({});
+                const response = await listAdminUsers();
+                if (response?.success === false) {
+                  throw new Error(response.error || "Failed to refresh users.");
                 }
+                const nextUsers = response?.users || response?.data || response;
+                setUsers(
+                  Array.isArray(nextUsers)
+                    ? nextUsers.reduce((acc, user) => {
+                        if (user?.uid) {
+                          acc[user.uid] = user;
+                        }
+                        return acc;
+                      }, {})
+                    : nextUsers && typeof nextUsers === "object" && nextUsers.users &&
+                        typeof nextUsers.users === "object"
+                      ? nextUsers.users
+                      : nextUsers && typeof nextUsers === "object"
+                        ? nextUsers
+                        : {},
+                );
               } catch (error) {
-                console.error("Failed to refresh users:", error);
-                setDbError(`Network Error: ${error.message}`);
+                console.error("Failed to refresh users via client:", error);
+                setDbError(`Network Error: ${error.message || "Failed to refresh users"}`);
               } finally {
                 setLoading(false);
               }
@@ -5776,30 +5872,43 @@ function AdminDashboard({
               <div style={{ marginBottom: 20, fontSize: 13, lineHeight: 1.6 }}>
                 {dbError}
               </div>
-              <button
-                onClick={async () => {
-                  // Retry: Manual refresh when error occurs
-                  if (!firebaseDb) {
-                    setDbError("Firebase unavailable");
-                    return;
-                  }
-                  setLoading(true);
-                  setDbError("");
-                  try {
-                    const usersRef = ref(firebaseDb, "users");
-                    const snapshot = await get(usersRef);
-                    if (snapshot.exists()) {
-                      setUsers(snapshot.val());
-                    } else {
-                      setUsers({});
+                <button
+                  onClick={async () => {
+                    if (!listAdminUsers) {
+                      setDbError("Admin user list client unavailable.");
+                      return;
                     }
-                  } catch (error) {
-                    console.error("Failed to retry:", error);
-                    setDbError(`Network Error: ${error.message}`);
-                  } finally {
-                    setLoading(false);
-                  }
-                }}
+
+                    setLoading(true);
+                    setDbError("");
+                    try {
+                      const response = await listAdminUsers();
+                      if (response?.success === false) {
+                        throw new Error(response.error || "Failed to retry.");
+                      }
+                      const nextUsers = response?.users || response?.data || response;
+                      setUsers(
+                        Array.isArray(nextUsers)
+                          ? nextUsers.reduce((acc, user) => {
+                              if (user?.uid) {
+                                acc[user.uid] = user;
+                              }
+                              return acc;
+                            }, {})
+                          : nextUsers && typeof nextUsers === "object" && nextUsers.users &&
+                              typeof nextUsers.users === "object"
+                            ? nextUsers.users
+                            : nextUsers && typeof nextUsers === "object"
+                              ? nextUsers
+                              : {},
+                      );
+                    } catch (error) {
+                      console.error("Failed to retry via client:", error);
+                      setDbError(`Network Error: ${error.message || "Failed to retry"}`);
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
                 style={{
                   marginTop: 16,
                   background: "rgba(255,69,58,0.2)",
@@ -7475,17 +7584,83 @@ export default function TradersRegiment() {
   const [currentSessionId, setCurrentSessionId] = useState(null);
   const authBootstrapCompleteRef = useRef(false);
 
-  const [maintenanceModeActive, setMaintenanceModeActive] = useState(() => {
-    try {
-      return localStorage.getItem("TradersApp_MaintenanceMode") === "true";
-    } catch {
-      return false;
-    }
-  });
+  const [maintenanceModeActive, setMaintenanceModeActive] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadMaintenanceState = async () => {
+      if (fetchMaintenanceState) {
+        try {
+          const response = await fetchMaintenanceState();
+          if (!active) return;
+
+          if (response?.success === false) {
+            throw new Error(response.error || "Failed to load maintenance.");
+          }
+
+          if (typeof response?.maintenanceActive === "boolean") {
+            setMaintenanceModeActive(response.maintenanceActive);
+            return;
+          }
+        } catch (error) {
+          console.warn("Maintenance state client load failed, falling back:", error);
+        }
+      }
+
+      try {
+        if (!active) return;
+        const stored = localStorage.getItem("TradersApp_MaintenanceMode");
+        if (stored !== null) {
+          setMaintenanceModeActive(stored === "true");
+        }
+      } catch {
+        // Ignore storage failures; state stays false by default.
+      }
+    };
+
+    void loadMaintenanceState();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // Handler to toggle maintenance mode
-  const handleToggleMaintenanceMode = useCallback(() => {
+  const handleToggleMaintenanceMode = useCallback(async () => {
     const newState = !maintenanceModeActive;
+
+    if (toggleMaintenanceState) {
+      try {
+        const response = await toggleMaintenanceState(newState);
+        if (response?.success === false) {
+          throw new Error(response.error || "Failed to update maintenance.");
+        }
+
+        if (typeof response?.maintenanceActive === "boolean") {
+          setMaintenanceModeActive(response.maintenanceActive);
+        } else {
+          setMaintenanceModeActive(newState);
+        }
+
+        try {
+          localStorage.setItem("TradersApp_MaintenanceMode", newState.toString());
+        } catch {
+          // Local cache is best-effort only.
+        }
+
+        showToast(
+          newState
+            ? 'Maintenance Mode ACTIVATED - Users see "Back Soon" screen'
+            : "Maintenance Mode DEACTIVATED - Normal access restored",
+          newState ? "warning" : "success",
+        );
+        return;
+      } catch (error) {
+        console.warn("Maintenance toggle client update failed, falling back:", error);
+      }
+    }
+
     setMaintenanceModeActive(newState);
     try {
       localStorage.setItem("TradersApp_MaintenanceMode", newState.toString());

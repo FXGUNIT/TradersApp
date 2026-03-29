@@ -14,10 +14,20 @@ import {
   upsertApplication,
 } from "./domains/onboardingState.mjs";
 import {
+  approveAdminUser,
+  blockAdminUser,
+  getMaintenanceState,
+  listAdminUsers,
+  lockAdminUser,
+  recordAdminAuditEvent,
+  toggleMaintenanceState,
+} from "./domains/adminState.mjs";
+import {
   appendSupportMessage,
   getSupportThread,
   listSupportThreads,
 } from "./domains/supportState.mjs";
+import { createAdminRouteHandler } from "./routes/adminRoutes.mjs";
 import { createContentRouteHandler } from "./routes/contentRoutes.mjs";
 import { createOnboardingRouteHandler } from "./routes/onboardingRoutes.mjs";
 import { createSupportRouteHandler } from "./routes/supportRoutes.mjs";
@@ -547,6 +557,21 @@ const server = createServer(async (req, res) => {
     readJsonBody,
   })(req, res, url, origin);
   if (handledSupportRoute) {
+    return;
+  }
+
+  const handledAdminRoute = await createAdminRouteHandler({
+    approveAdminUser,
+    blockAdminUser,
+    getMaintenanceState,
+    listAdminUsers,
+    lockAdminUser,
+    recordAdminAuditEvent,
+    toggleMaintenanceState,
+    json,
+    readJsonBody,
+  })(req, res, url, origin);
+  if (handledAdminRoute) {
     return;
   }
 
