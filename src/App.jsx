@@ -43,7 +43,7 @@ import CollectiveConsciousnessPage from "./pages/CollectiveConsciousness.jsx";
 import {
   quadCoreStatus as aiQuadCoreStatus,
   councilStage as aiCouncilStage,
-  getAIStatuses,
+  getAIStatusesDetailed,
   startAIStatusScheduler,
   stopAIStatusScheduler,
 } from "./services/ai-router.js";
@@ -7307,14 +7307,9 @@ export default function TradersRegiment() {
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [toasts, setToasts] = useState([]);
   const theme = currentTheme;
-  const [aiStatuses, setAiStatuses] = useState([
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-  ]);
+  const [aiStatuses, setAiStatuses] = useState(() => getAIStatusesDetailed());
+  const [consciousnessReturnScreen, setConsciousnessReturnScreen] =
+    useState("hub");
   const [dailyQuote, _setDailyQuote] = useState(getRandomQuote());
 
   useEffect(() => {
@@ -9424,7 +9419,12 @@ export default function TradersRegiment() {
         return (
           <Suspense fallback={<LoadingFallback />}>
             <RegimentHub
-              onNavigate={(dest) => setScreen(dest)}
+              onNavigate={(dest) => {
+                if (dest === "consciousness") {
+                  setConsciousnessReturnScreen("hub");
+                }
+                setScreen(dest);
+              }}
               theme={theme}
               currentTheme={currentTheme}
               onThemeChange={handleThemeChange}
@@ -9435,7 +9435,7 @@ export default function TradersRegiment() {
       case "consciousness":
         return (
           <CollectiveConsciousnessPage
-            onBack={() => setScreen("hub")}
+            onBack={() => setScreen(consciousnessReturnScreen || "hub")}
             theme={theme}
             currentTheme={currentTheme}
             onThemeChange={handleThemeChange}
@@ -9577,6 +9577,10 @@ export default function TradersRegiment() {
                   onSaveAccount={saveAccount}
                   onSaveFirmRules={saveFirmRules}
                   showToast={showToast}
+                  onNavigateToConsciousness={() => {
+                    setConsciousnessReturnScreen("app");
+                    setScreen("consciousness");
+                  }}
                   privacyMode={privacyModeActive}
                 />
               </React.Suspense>
@@ -9699,23 +9703,64 @@ export default function TradersRegiment() {
           >
             AI System Status
           </span>
+          <span
+            style={{
+              fontSize: "0.64rem",
+              fontWeight: 700,
+              color: "#0369A1",
+              background: "rgba(14,165,233,0.12)",
+              border: "1px solid rgba(14,165,233,0.25)",
+              borderRadius: 999,
+              padding: "4px 8px",
+              textTransform: "uppercase",
+              letterSpacing: "0.08em",
+            }}
+          >
+            Watchtower Active
+          </span>
+          {Object.values(aiQuadCoreStatus).every(
+            (mind) => mind.status === "unconfigured",
+          ) && (
+            <span
+              style={{
+                fontSize: "0.64rem",
+                fontWeight: 600,
+                color: "#64748B",
+              }}
+            >
+              Fresh provider keys needed
+            </span>
+          )}
           {Object.entries(aiQuadCoreStatus).map(([key, mind]) => {
             const isReserve = mind.isReserve;
+            const state = mind.status || (mind.online ? "online" : "offline");
             const dotColor = isReserve
               ? "#A855F7"
-              : mind.online
+              : state === "online"
                 ? "#22C55E"
-                : "#EF4444";
+                : state === "unconfigured"
+                  ? "#94A3B8"
+                  : state === "checking"
+                    ? "#38BDF8"
+                    : "#EF4444";
             const textColor = isReserve
               ? "#7E22CE"
-              : mind.online
+              : state === "online"
                 ? "#166534"
-                : "#991B1B";
+                : state === "unconfigured"
+                  ? "#475569"
+                  : state === "checking"
+                    ? "#0C4A6E"
+                    : "#991B1B";
             const glowColor = isReserve
               ? "rgba(168,85,247,0.5)"
-              : mind.online
+              : state === "online"
                 ? "rgba(34,197,94,0.5)"
-                : "rgba(239,68,68,0.5)";
+                : state === "unconfigured"
+                  ? "rgba(148,163,184,0.28)"
+                  : state === "checking"
+                    ? "rgba(56,189,248,0.35)"
+                    : "rgba(239,68,68,0.5)";
             return (
               <div
                 key={key}
@@ -9724,6 +9769,7 @@ export default function TradersRegiment() {
                   alignItems: "center",
                   gap: "6px",
                 }}
+                title={mind.reason || `${mind.name}: ${state}`}
               >
                 <div
                   style={{

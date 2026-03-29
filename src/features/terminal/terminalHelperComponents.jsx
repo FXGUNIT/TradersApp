@@ -335,8 +335,9 @@ export function TrafficLight({ state }) {
 // CountdownBanner Component
 export function CountdownBanner({ ist }) {
   const color = ist.isOpen ? T.green : T.red;
-  const [hh, mm, ss] = ist.countdown.split(':');
-  const urgent = ist.isOpen && parseInt(hh) === 0 && parseInt(mm) < 30;
+  const countdownText = ist.countdownDisplay || ist.countdown || "--:--:--";
+  const urgent =
+    ist.isOpen && Number(ist.secondsUntilBoundary || 0) <= 30 * 60;
   return (
     <div style={{ 
       display: "flex", 
@@ -353,7 +354,7 @@ export function CountdownBanner({ ist }) {
       <LED color={color} size={8} pulse />
       <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
         <span style={{ color: T.muted, fontSize: 11, letterSpacing: 2, fontWeight: 600 }}>{ist.lbl}</span>
-        <span style={{ color, fontSize: 24, fontFamily: T.mono, fontWeight: 700, letterSpacing: 4 }}>{hh}:{mm}:{ss}</span>
+        <span style={{ color, fontSize: 24, fontFamily: T.mono, fontWeight: 700, letterSpacing: 4 }}>{countdownText}</span>
       </div>
       <div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.1)" }} />
       <span style={{ color: T.muted, fontSize: 12, fontWeight: 600 }}>{ist.istStr}</span>

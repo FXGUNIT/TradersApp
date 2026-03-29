@@ -1,48 +1,109 @@
-import React from 'react';
+import React from "react";
 
-const AI_ENGINE_NAMES = ['Gemini', 'Groq', 'OpenRouter', 'Cerebras', 'DeepSeek', 'SambaNova'];
+const AI_ENGINE_NAMES = [
+  "Gemini",
+  "Groq",
+  "OpenRouter",
+  "Cerebras",
+  "DeepSeek",
+  "SambaNova",
+];
 
-const AiEnginesStatus = ({ statuses = [true, true, true, true, true, true] }) => {
-  const normalizedStatuses = statuses.length >= 6 ? statuses : [...statuses, ...Array(6 - statuses.length).fill(true)];
-  
-  const offlineIndices = normalizedStatuses.map((ok, idx) => ok ? -1 : idx).filter(idx => idx >= 0);
-  const liveIndices = normalizedStatuses.map((ok, idx) => ok ? idx : -1).filter(idx => idx >= 0);
-  
-  const offlineCount = offlineIndices.length;
-  
-  const displayOfflineIndicators = offlineCount > 3 ? 1 : Math.min(offlineCount, 3);
-  
+const STATUS_STYLES = {
+  online: {
+    dot: "#22c55e",
+    glow: "0 0 6px rgba(34,197,94,0.55)",
+    label: "Online",
+  },
+  offline: {
+    dot: "#f87171",
+    glow: "0 0 4px rgba(248,113,113,0.2)",
+    label: "Offline",
+  },
+  unconfigured: {
+    dot: "#94a3b8",
+    glow: "0 0 4px rgba(148,163,184,0.18)",
+    label: "Key missing",
+  },
+  checking: {
+    dot: "#38bdf8",
+    glow: "0 0 6px rgba(56,189,248,0.35)",
+    label: "Checking",
+  },
+};
+
+function normalizeStatusEntry(entry, index) {
+  if (typeof entry === "boolean") {
+    return {
+      name: AI_ENGINE_NAMES[index] || `Engine ${index + 1}`,
+      status: entry ? "online" : "offline",
+      reason: entry ? "Provider ready." : "Provider unavailable.",
+    };
+  }
+
+  const state = entry?.status || (entry?.online ? "online" : "offline");
+  return {
+    name: entry?.name || AI_ENGINE_NAMES[index] || `Engine ${index + 1}`,
+    status: STATUS_STYLES[state] ? state : "offline",
+    reason:
+      entry?.reason ||
+      (state === "unconfigured"
+        ? "Fresh provider key required."
+        : state === "online"
+          ? "Provider ready."
+          : "Provider unavailable."),
+  };
+}
+
+const AiEnginesStatus = ({ statuses = [] }) => {
+  const normalizedStatuses = AI_ENGINE_NAMES.map((name, index) =>
+    normalizeStatusEntry(statuses[index], index),
+  );
+
   return (
-    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-      <span style={{ fontSize: 12, color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>AI</span>
-      {liveIndices.map(idx => (
-        <span 
-          key={`live-${idx}`} 
-          title={`${AI_ENGINE_NAMES[idx]}: Online`} 
-          style={{ 
-            width: 10, 
-            height: 10, 
-            borderRadius: 6, 
-            display: 'inline-block', 
-            background: '#22c55e', 
-            boxShadow: '0 0 6px #34d399'
-          }} 
-        />
-      ))}
-      {displayOfflineIndicators > 0 && Array(displayOfflineIndicators).fill(0).map((_, i) => (
-        <span 
-          key={`offline-${i}`} 
-          title={offlineCount > 3 ? `${offlineCount} AI engines offline` : `${AI_ENGINE_NAMES[offlineIndices[i]]}: Offline`}
-          style={{ 
-            width: 10, 
-            height: 10, 
-            borderRadius: 6, 
-            display: 'inline-block', 
-            background: '#f87171', 
-            boxShadow: 'none'
-          }} 
-        />
-      ))}
+    <div style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+      <span
+        style={{
+          fontSize: 12,
+          color: "#64748b",
+          fontWeight: 700,
+          textTransform: "uppercase",
+          letterSpacing: 1,
+        }}
+      >
+        AI
+      </span>
+
+      <span
+        title="AI Watchtower active"
+        style={{
+          width: 10,
+          height: 10,
+          borderRadius: 999,
+          display: "inline-block",
+          background: "#38bdf8",
+          boxShadow: "0 0 6px rgba(56,189,248,0.45)",
+        }}
+      />
+
+      {normalizedStatuses.map((entry) => {
+        const appearance = STATUS_STYLES[entry.status] || STATUS_STYLES.offline;
+
+        return (
+          <span
+            key={entry.name}
+            title={`${entry.name}: ${appearance.label}${entry.reason ? ` - ${entry.reason}` : ""}`}
+            style={{
+              width: 10,
+              height: 10,
+              borderRadius: 999,
+              display: "inline-block",
+              background: appearance.dot,
+              boxShadow: appearance.glow,
+            }}
+          />
+        );
+      })}
     </div>
   );
 };

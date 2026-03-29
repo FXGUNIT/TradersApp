@@ -44,6 +44,7 @@ import {
   readDraft,
   writeDraft,
 } from "../../services/draftVault.js";
+import { getISTState } from "../../utils/tradingUtils.js";
 
 // Default states
 const defaultAccountState = {
@@ -267,49 +268,6 @@ function buildAccountState(accountState) {
   };
 }
 
-function getISTState() {
-  const now = new Date();
-  const utc = now.getTime() + now.getTimezoneOffset() * 60000;
-  const istOffset = 5.5 * 60 * 60 * 1000;
-  const ist = new Date(utc + istOffset);
-  const hour = ist.getHours();
-  const minute = ist.getMinutes();
-  const day = ist.getDay();
-  const isWeekend = day === 0 || day === 6;
-  const isOpen = !isWeekend && hour >= 9 && (hour < 16 || (hour === 16 && minute < 0));
-  
-  let countdown = "";
-  if (!isOpen) {
-    const nextOpen = new Date(ist);
-    if (isWeekend) {
-      nextOpen.setDate(nextOpen.getDate() + (7 - day + 1));
-      nextOpen.setHours(9, 30, 0, 0);
-    } else if (hour >= 16) {
-      nextOpen.setDate(nextOpen.getDate() + 1);
-      nextOpen.setHours(9, 30, 0, 0);
-    } else if (hour < 9 || (hour === 9 && minute < 30)) {
-      nextOpen.setHours(9, 30, 0, 0);
-    }
-    const diff = nextOpen - ist;
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-    countdown = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`;
-  }
-  
-  const lbl = isOpen ? "MARKET CLOSES IN" : "MARKETS OPEN IN";
-  
-  return {
-    hour,
-    minute,
-    day,
-    isWeekend,
-    isOpen,
-    countdown,
-    lbl,
-    istStr: ist.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: false }),
-  };
-}
-
 export default function MainTerminal({
   profile,
   onLogout,
@@ -317,6 +275,7 @@ export default function MainTerminal({
   onSaveAccount,
   onSaveFirmRules,
   showToast,
+  onNavigateToConsciousness,
   auth: _auth,
   privacyMode: _privacyMode,
 }) {
@@ -1910,6 +1869,16 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
           </div>
 
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            {typeof onNavigateToConsciousness === "function" && (
+              <button
+                type="button"
+                onClick={onNavigateToConsciousness}
+                style={glowBtn(T.purple, false)}
+                className="btn-glass"
+              >
+                OPEN COLLECTIVE CONSCIOUSNESS
+              </button>
+            )}
             <button
               type="button"
               onClick={handleUndoLastChange}

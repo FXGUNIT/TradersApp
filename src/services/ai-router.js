@@ -12,55 +12,51 @@ const CEREBRAS_KEY = import.meta.env.VITE_CEREBRAS_KEY || "";
 const DEEPSEEK_KEY = import.meta.env.VITE_DEEPSEEK_KEY || "";
 const SAMBANOVA_KEY = import.meta.env.VITE_SAMBANOVA_KEY || "";
 
+function buildEngineStatus(name, key, checkUrl) {
+  const configured = Boolean(key);
+
+  return {
+    name,
+    key,
+    checkUrl,
+    configured,
+    online: configured,
+    status: configured ? "online" : "unconfigured",
+    reason: configured
+      ? "Provider key loaded from environment."
+      : "Fresh provider key required.",
+    lastPing: null,
+    errors: 0,
+  };
+}
+
 export const aiEngineStatus = {
-  gemini: {
-    name: "Gemini",
-    key: GEMINI_KEY,
-    online: !!GEMINI_KEY,
-    lastPing: null,
-    errors: 0,
-    checkUrl: `https://generativelanguage.googleapis.com/v1/models?key=${GEMINI_KEY}`,
-  },
-  groq: {
-    name: "Groq",
-    key: GROQ_KEY,
-    online: !!GROQ_KEY,
-    lastPing: null,
-    errors: 0,
-    checkUrl: "https://api.groq.com/openai/v1/models",
-  },
-  openrouter: {
-    name: "OpenRouter",
-    key: OPENROUTER_KEY,
-    online: !!OPENROUTER_KEY,
-    lastPing: null,
-    errors: 0,
-    checkUrl: "https://openrouter.ai/api/v1/models",
-  },
-  cerebras: {
-    name: "Cerebras",
-    key: CEREBRAS_KEY,
-    online: !!CEREBRAS_KEY,
-    lastPing: null,
-    errors: 0,
-    checkUrl: "https://api.cerebras.ai/v1/models",
-  },
-  deepseek: {
-    name: "DeepSeek",
-    key: DEEPSEEK_KEY,
-    online: !!DEEPSEEK_KEY,
-    lastPing: null,
-    errors: 0,
-    checkUrl: "https://api.deepseek.com/v1/models",
-  },
-  sambanova: {
-    name: "SambaNova",
-    key: SAMBANOVA_KEY,
-    online: !!SAMBANOVA_KEY,
-    lastPing: null,
-    errors: 0,
-    checkUrl: "https://api.sambanova.ai/v1/models",
-  },
+  gemini: buildEngineStatus(
+    "Gemini",
+    GEMINI_KEY,
+    `https://generativelanguage.googleapis.com/v1/models?key=${GEMINI_KEY}`,
+  ),
+  groq: buildEngineStatus("Groq", GROQ_KEY, "https://api.groq.com/openai/v1/models"),
+  openrouter: buildEngineStatus(
+    "OpenRouter",
+    OPENROUTER_KEY,
+    "https://openrouter.ai/api/v1/models",
+  ),
+  cerebras: buildEngineStatus(
+    "Cerebras",
+    CEREBRAS_KEY,
+    "https://api.cerebras.ai/v1/models",
+  ),
+  deepseek: buildEngineStatus(
+    "DeepSeek",
+    DEEPSEEK_KEY,
+    "https://api.deepseek.com/v1/models",
+  ),
+  sambanova: buildEngineStatus(
+    "SambaNova",
+    SAMBANOVA_KEY,
+    "https://api.sambanova.ai/v1/models",
+  ),
 };
 
 export const AI_ENGINES = Object.keys(aiEngineStatus);
@@ -69,7 +65,21 @@ export const councilStage = { current: "idle", label: "" };
 
 function markOnline(engine) {
   if (aiEngineStatus[engine]) {
+    aiEngineStatus[engine].configured = Boolean(aiEngineStatus[engine].key);
     aiEngineStatus[engine].online = true;
+    aiEngineStatus[engine].status = "online";
+    aiEngineStatus[engine].reason = "Provider key loaded and ready.";
+    aiEngineStatus[engine].lastPing = Date.now();
+    aiEngineStatus[engine].errors = 0;
+  }
+}
+
+function markUnconfigured(engine, reason = "Fresh provider key required.") {
+  if (aiEngineStatus[engine]) {
+    aiEngineStatus[engine].configured = false;
+    aiEngineStatus[engine].online = false;
+    aiEngineStatus[engine].status = "unconfigured";
+    aiEngineStatus[engine].reason = reason;
     aiEngineStatus[engine].lastPing = Date.now();
     aiEngineStatus[engine].errors = 0;
   }
@@ -77,11 +87,23 @@ function markOnline(engine) {
 
 function markOffline(engine, err) {
   if (aiEngineStatus[engine]) {
+    aiEngineStatus[engine].configured = Boolean(aiEngineStatus[engine].key);
     aiEngineStatus[engine].online = false;
+    aiEngineStatus[engine].status = "offline";
+    aiEngineStatus[engine].reason = String(err || "Provider unavailable.");
     aiEngineStatus[engine].errors++;
     aiEngineStatus[engine].lastPing = Date.now();
     console.warn(`⚠️ ${aiEngineStatus[engine].name} offline: ${err}`);
   }
+}
+
+function syncFailureState(engine, err) {
+  const message = String(err || "");
+  if (message.toLowerCase().includes("not configured")) {
+    markUnconfigured(engine);
+    return;
+  }
+  markOffline(engine, message);
 }
 
 export function getAIStatuses() {
@@ -92,6 +114,9 @@ export function getAIStatusesDetailed() {
   return AI_ENGINES.map((engine) => ({
     name: aiEngineStatus[engine].name,
     online: aiEngineStatus[engine].online,
+    configured: aiEngineStatus[engine].configured,
+    status: aiEngineStatus[engine].status,
+    reason: aiEngineStatus[engine].reason,
     lastPing: aiEngineStatus[engine].lastPing,
     errors: aiEngineStatus[engine].errors,
   }));
@@ -130,66 +155,25 @@ export async function checkAllAIStatus() {
   for (const engine of AI_ENGINES) {
     const config = aiEngineStatus[engine];
     if (!config.key) {
-      markOffline(engine, "No API key configured");
-      results.push({ engine, online: false, reason: "No API key" });
+      markUnconfigured(engine);
+      results.push({
+        engine,
+        online: false,
+        configured: false,
+        status: "unconfigured",
+        reason: "Fresh provider key required.",
+      });
       continue;
     }
 
-    try {
-      let response;
-      switch (engine) {
-        case "gemini":
-          response = await fetch(config.checkUrl, {
-            method: "GET",
-          });
-          break;
-        case "groq":
-          response = await fetch(config.checkUrl, {
-            method: "GET",
-            headers: { Authorization: `Bearer ${config.key}` },
-          });
-          break;
-        case "openrouter":
-          response = await fetch(config.checkUrl, {
-            method: "GET",
-            headers: { Authorization: `Bearer ${config.key}` },
-          });
-          break;
-        case "cerebras":
-          response = await fetch(config.checkUrl, {
-            method: "GET",
-            headers: { Authorization: `Bearer ${config.key}` },
-          });
-          break;
-        case "deepseek":
-          response = await fetch(config.checkUrl, {
-            method: "GET",
-            headers: { Authorization: `Bearer ${config.key}` },
-          });
-          break;
-        case "sambanova":
-          response = await fetch(config.checkUrl, {
-            method: "GET",
-            headers: { Authorization: `Bearer ${config.key}` },
-          });
-          break;
-      }
-
-      if (response && response.ok) {
-        markOnline(engine);
-        results.push({ engine, online: true });
-      } else {
-        markOffline(engine, `HTTP ${response?.status}`);
-        results.push({
-          engine,
-          online: false,
-          reason: `HTTP ${response?.status}`,
-        });
-      }
-    } catch (err) {
-      markOffline(engine, err.message);
-      results.push({ engine, online: false, reason: err.message });
-    }
+    markOnline(engine);
+    results.push({
+      engine,
+      online: true,
+      configured: true,
+      status: "online",
+      reason: "Provider key loaded from environment.",
+    });
   }
 
   return results;
@@ -213,7 +197,7 @@ export function startAIStatusScheduler(onStatusChange) {
       } catch (e) {
         console.warn("AI status check failed:", e);
       }
-      if (onStatusChange) onStatusChange(getAIStatuses());
+      if (onStatusChange) onStatusChange(getAIStatusesDetailed());
     }
   };
 
@@ -384,6 +368,7 @@ export async function askOpenRouter(systemPrompt, userPrompt) {
   if (!data.choices?.[0]?.message?.content)
     throw new Error("OpenRouter empty response");
 
+  markOnline("openrouter");
   return data.choices[0].message.content;
 }
 
@@ -521,7 +506,7 @@ export async function runDeliberation(systemPrompt, userPrompt) {
       return response;
     } catch (err) {
       console.warn(`⚠️ ${provider.name} failed: ${err.message}`);
-      markOffline(provider.key, err.message);
+      syncFailureState(provider.key, err.message);
     }
   }
 
