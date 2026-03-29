@@ -44,6 +44,14 @@ import {
   readDraft,
   writeDraft,
 } from "../../services/draftVault.js";
+import {
+  extractChoiceText,
+  extractIndicatorsWithAi,
+  parseFirmRulesWithAi,
+  parseJsonChoice,
+  runPremarketAnalysisWithAi,
+  runTradePlanWithAi,
+} from "../../services/clients/TerminalAnalyticsClient.js";
 import { getISTState } from "../../utils/tradingUtils.js";
 
 // Default states
@@ -138,27 +146,6 @@ const ROTATING_QUOTES = [
   "The goal is to make money, not to be right. - Mark Douglas",
 ];
 const LINKEDIN_URL = "https://www.linkedin.com/in/singhgunit/";
-
-async function callDeepSeekBff({ messages, maxTokens = 2048, model = "deepseek-chat" }) {
-  const response = await fetch("/api/ai/deepseek/chat", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model,
-      maxTokens,
-      messages,
-    }),
-  });
-
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(data?.error || `HTTP ${response.status}`);
-  }
-
-  return data;
-}
 
 function parseRrrMultiple(rrr) {
   const parts = String(rrr || "").split(":");
