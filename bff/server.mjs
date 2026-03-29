@@ -8,6 +8,13 @@ import {
   listDocumentMeta,
 } from "./domains/contentState.mjs";
 import {
+  getWorkspace,
+  patchWorkspaceAccountState,
+  patchWorkspaceFirmRules,
+  patchWorkspaceJournal,
+  upsertWorkspaceRecord,
+} from "./domains/terminalState.mjs";
+import {
   getApplication,
   getApplicationStatus,
   mergeApplicationConsent,
@@ -42,6 +49,7 @@ import {
 import { createAdminRouteHandler } from "./routes/adminRoutes.mjs";
 import { createContentRouteHandler } from "./routes/contentRoutes.mjs";
 import { createIdentityRouteHandler } from "./routes/identityRoutes.mjs";
+import { createTerminalRouteHandler } from "./routes/terminalRoutes.mjs";
 import { createOnboardingRouteHandler } from "./routes/onboardingRoutes.mjs";
 import { createSupportRouteHandler } from "./routes/supportRoutes.mjs";
 
@@ -547,6 +555,19 @@ const server = createServer(async (req, res) => {
     json,
   })(req, res, url, origin);
   if (handledContentRoute) {
+    return;
+  }
+
+  const handledTerminalRoute = await createTerminalRouteHandler({
+    getWorkspace,
+    patchWorkspaceAccountState,
+    patchWorkspaceFirmRules,
+    patchWorkspaceJournal,
+    upsertWorkspaceRecord,
+    readJsonBody,
+    json,
+  })(req, res, url, origin);
+  if (handledTerminalRoute) {
     return;
   }
 
