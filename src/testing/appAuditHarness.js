@@ -148,7 +148,6 @@ export function registerAppAuditHarness({
   setTheme,
   setAccentColor,
   setShowThemePicker,
-  setPrivacyModeActive,
   setMaintenanceModeActive,
 }) {
   if (typeof window === "undefined") return () => {};
@@ -157,7 +156,6 @@ export function registerAppAuditHarness({
 
   const applyBaseState = () => {
     setShowThemePicker(false);
-    setPrivacyModeActive(false);
     setMaintenanceModeActive(false);
     setTheme("lumiere");
     setAccentColor("BLUE");

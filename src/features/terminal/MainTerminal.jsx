@@ -298,7 +298,6 @@ export default function MainTerminal({
   showToast,
   onNavigateToConsciousness,
   auth: _auth,
-  privacyMode: _privacyMode,
 }) {
   const auditScenario =
     typeof window !== "undefined"

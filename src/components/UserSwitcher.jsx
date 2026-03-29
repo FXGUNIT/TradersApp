@@ -4,7 +4,6 @@ export default function UserSwitcher({
   users,
   currentViewAsUser,
   onSwitchUser,
-  ghostMode,
 }) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -24,21 +23,15 @@ export default function UserSwitcher({
         ?.[1]
     : null;
 
-  const activeBg = ghostMode
-    ? "var(--aura-accent-green-glow, rgba(0,255,127,0.15))"
-    : currentViewAsUser
-      ? "var(--accent-glow, rgba(0,122,255,0.15))"
-      : "transparent";
-  const activeBorder = ghostMode
-    ? "rgba(0,255,127,0.4)"
-    : currentViewAsUser
-      ? "var(--accent-primary, #0A84FF)"
-      : "var(--border-subtle, rgba(255,255,255,0.2))";
-  const activeText = ghostMode
-    ? "var(--status-success, #10B981)"
-    : currentViewAsUser
-      ? "var(--accent-primary, #0A84FF)"
-      : "var(--text-secondary, #8E8E93)";
+  const activeBg = currentViewAsUser
+    ? "var(--accent-glow, rgba(0,122,255,0.15))"
+    : "transparent";
+  const activeBorder = currentViewAsUser
+    ? "var(--accent-primary, #0A84FF)"
+    : "var(--border-subtle, rgba(255,255,255,0.2))";
+  const activeText = currentViewAsUser
+    ? "var(--accent-primary, #0A84FF)"
+    : "var(--text-secondary, #8E8E93)";
 
   return (
     <div style={{ position: "relative" }}>
@@ -61,7 +54,7 @@ export default function UserSwitcher({
           gap: 8,
         }}
         onMouseEnter={(event) => {
-          if (!currentViewAsUser && !ghostMode) {
+          if (!currentViewAsUser) {
             event.currentTarget.style.background =
               "var(--surface-glass, rgba(255,255,255,0.05))";
             event.currentTarget.style.borderColor =
@@ -69,7 +62,7 @@ export default function UserSwitcher({
           }
         }}
         onMouseLeave={(event) => {
-          if (!currentViewAsUser && !ghostMode) {
+          if (!currentViewAsUser) {
             event.currentTarget.style.background = "transparent";
             event.currentTarget.style.borderColor =
               "var(--border-subtle, rgba(255,255,255,0.2))";
@@ -81,13 +74,11 @@ export default function UserSwitcher({
             : "Switch to view as another user"
         }
       >
-        <span>{ghostMode ? "Ghost" : currentViewAsUser ? "View" : "Users"}</span>
+        <span>{currentViewAsUser ? "View" : "Users"}</span>
         <span>
-          {ghostMode
-            ? "GHOST"
-            : currentViewAsUser
-              ? `AS: ${currentUser?.fullName?.split(" ")[0].toUpperCase()}`
-              : "SHADOW MODE"}
+          {currentViewAsUser
+            ? `AS: ${currentUser?.fullName?.split(" ")[0].toUpperCase()}`
+            : "VIEW MODE"}
         </span>
       </button>
 

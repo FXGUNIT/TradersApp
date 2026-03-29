@@ -4037,7 +4037,6 @@ function AdminDashboard({
 
   // MODULE 4: Command Center & Navigation (#99, #109, #111)
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false); // Toggle command palette
-  const [ghostMode, setGhostMode] = useState(false); // Invisible navigation mode
   const [currentViewAsUser, setCurrentViewAsUser] = useState(null); // Shadow mode: view as another user
 
   // MODULE 5: Navigation Hierarchy (#91, #92, #94, #95, #105, #108)
@@ -4239,20 +4238,11 @@ function AdminDashboard({
         e.preventDefault();
         setCommandPaletteOpen(!commandPaletteOpen);
       }
-      // Ctrl+Shift+G toggles ghost mode
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "g") {
-        e.preventDefault();
-        setGhostMode(!ghostMode);
-        showToast(
-          `Stealth Protocol ${!ghostMode ? "ACTIVATED" : "DEACTIVATED"}. Shadow mode ${!ghostMode ? "online" : "offline"}.`,
-          !ghostMode ? "success" : "warning",
-        );
-      }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [commandPaletteOpen, ghostMode, showToast]);
+  }, [commandPaletteOpen]);
 
   // ═══════════════════════════════════════════════════════════════════
   // SECURITY SENTINEL: Initialize multi-layer defense system
@@ -4599,8 +4589,6 @@ function AdminDashboard({
           setCommandPaletteOpen(false);
           showToast(`Switched to user: ${uid}`, "info");
         }}
-        onToggleGhostMode={() => setGhostMode(!ghostMode)}
-        ghostMode={ghostMode}
         showToast={showToast}
       />
 
@@ -4861,7 +4849,6 @@ function AdminDashboard({
             users={Array.isArray(users) ? users : Object.values(users || {})}
             currentViewAsUser={currentViewAsUser}
             onSwitchUser={setCurrentViewAsUser}
-            ghostMode={ghostMode}
           />
 
           {/* RULE #94: Mega Menu Tools Button */}
@@ -7481,8 +7468,7 @@ export default function TradersRegiment() {
     };
     setAppTheme(normalized[newTheme] || "lumiere");
   }, [setAppTheme]);
-  // MODULE 1 PHASE 2: PRIVACY & SESSION MANAGEMENT
-  const [privacyModeActive, setPrivacyModeActive] = useState(false); // Rule #27: Ghost Mode
+  // MODULE 1 PHASE 2: SESSION MANAGEMENT
   const [googleUser, setGoogleUser] = useState(() => readPendingGoogleSignup());
   const [, _setActiveSessions] = useState([]);
   const [currentSessionId, setCurrentSessionId] = useState(null);
@@ -7914,7 +7900,6 @@ export default function TradersRegiment() {
           setTheme: setAppTheme,
           setAccentColor,
           setShowThemePicker: () => {},
-          setPrivacyModeActive,
           setMaintenanceModeActive,
         });
       })
@@ -7933,7 +7918,6 @@ export default function TradersRegiment() {
     setIsAdminAuthenticated,
     setMaintenanceModeActive,
     setProfile,
-    setPrivacyModeActive,
     setScreen,
     setAppTheme,
   ]);

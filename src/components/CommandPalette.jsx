@@ -5,8 +5,6 @@ export default function CommandPalette({
   onClose,
   users,
   onJumpToUser,
-  onToggleGhostMode,
-  ghostMode,
   showToast,
 }) {
   const [query, setQuery] = useState("");
@@ -26,12 +24,6 @@ export default function CommandPalette({
   if (!isOpen) return null;
 
   const commands = [
-    {
-      id: "ghost-mode",
-      label: ghostMode ? "Disable Ghost Mode" : "Enable Ghost Mode",
-      category: "Settings",
-      action: () => onToggleGhostMode(),
-    },
     {
       id: "refresh-users",
       label: "Refresh User List",
