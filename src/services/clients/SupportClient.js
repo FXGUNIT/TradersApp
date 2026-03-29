@@ -1,5 +1,10 @@
 import { onValue, push, ref, set } from "firebase/database";
 import { db } from "../firebase.js";
+import { hasBff } from "../gateways/base.js";
+import {
+  createSupportMessage,
+  fetchSupportThread,
+} from "../gateways/supportGateway.js";
 import { notifyAdminOfSupportRequest } from "../telegramService.js";
 
 async function notifyStartWebhook(payload) {
@@ -21,6 +26,10 @@ async function notifyStartWebhook(payload) {
 
 function mapMessages(snapshotValue) {
   if (!snapshotValue?.messages) return [];
+  if (Array.isArray(snapshotValue.messages)) {
+    return snapshotValue.messages;
+  }
+
   return Object.entries(snapshotValue.messages).map(([id, value]) => ({
     id,
     ...value,
@@ -28,7 +37,28 @@ function mapMessages(snapshotValue) {
 }
 
 export async function ensureWelcomeMessage(userId, userEmail) {
-  if (!userId || !db) return { success: false, skipped: true };
+  if (!userId) return { success: false, skipped: true };
+
+  if (hasBff()) {
+    const threadResponse = await fetchSupportThread(userId);
+    const messages = mapMessages(threadResponse?.thread || {});
+    const hasWelcome = messages.some((message) => message.type === "welcome");
+
+    if (hasWelcome) {
+      return { success: true, skipped: true };
+    }
+
+    const response = await createSupportMessage(userId, {
+      text: `Welcome to TradersApp Support. Your account: ${userEmail}\n\nHow can we help you today?`,
+      sender: "admin",
+      email: userEmail,
+      type: "welcome",
+      timestamp: Date.now(),
+    });
+    return { success: Boolean(response?.ok) };
+  }
+
+  if (!db) return { success: false, skipped: true };
 
   const welcomeRef = ref(db, `support_chats/${userId}/messages`);
   await push(welcomeRef, {
@@ -42,7 +72,38 @@ export async function ensureWelcomeMessage(userId, userEmail) {
 }
 
 export function subscribeToSupportThread(userId, handlers) {
-  if (!userId || !db) return () => {};
+  if (!userId) return () => {};
+
+  if (hasBff()) {
+    let active = true;
+
+    const loadThread = async () => {
+      try {
+        const response = await fetchSupportThread(userId);
+        if (!active) {
+          return;
+        }
+
+        if (!response?.thread) {
+          handlers?.onEmpty?.();
+          return;
+        }
+
+        handlers?.onMessages?.(mapMessages(response.thread));
+      } catch (error) {
+        handlers?.onError?.(error);
+      }
+    };
+
+    void loadThread();
+    const intervalId = window.setInterval(loadThread, 3000);
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+    };
+  }
+
+  if (!db) return () => {};
 
   const chatRef = ref(db, `support_chats/${userId}`);
   return onValue(
@@ -62,7 +123,26 @@ export function subscribeToSupportThread(userId, handlers) {
 }
 
 export async function sendSupportMessage({ userId, userEmail, text }) {
-  if (!userId || !text?.trim() || !db) {
+  if (!userId || !text?.trim()) {
+    return { success: false, error: "Missing support message payload" };
+  }
+
+  if (hasBff()) {
+    const response = await createSupportMessage(userId, {
+      text: text.trim(),
+      sender: "user",
+      timestamp: Date.now(),
+      email: userEmail,
+    });
+
+    await notifyAdminOfSupportRequest(userEmail, text.trim()).catch((error) => {
+      console.warn("Telegram notification failed:", error);
+    });
+
+    return { success: Boolean(response?.ok) };
+  }
+
+  if (!db) {
     return { success: false, error: "Missing support message payload" };
   }
 

@@ -13,8 +13,14 @@ import {
   mergeApplicationConsent,
   upsertApplication,
 } from "./domains/onboardingState.mjs";
+import {
+  appendSupportMessage,
+  getSupportThread,
+  listSupportThreads,
+} from "./domains/supportState.mjs";
 import { createContentRouteHandler } from "./routes/contentRoutes.mjs";
 import { createOnboardingRouteHandler } from "./routes/onboardingRoutes.mjs";
+import { createSupportRouteHandler } from "./routes/supportRoutes.mjs";
 
 const loadEnvFiles = () => {
   const rootDir = process.cwd();
@@ -530,6 +536,17 @@ const server = createServer(async (req, res) => {
     json,
   })(req, res, url, origin);
   if (handledOnboardingRoute) {
+    return;
+  }
+
+  const handledSupportRoute = await createSupportRouteHandler({
+    appendSupportMessage,
+    getSupportThread,
+    listSupportThreads,
+    json,
+    readJsonBody,
+  })(req, res, url, origin);
+  if (handledSupportRoute) {
     return;
   }
 
