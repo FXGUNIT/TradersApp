@@ -22,6 +22,7 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   sendEmailVerification,
+  signOut,
 } from "firebase/auth";
 import { getDatabase, ref, onValue, get, set, push } from "firebase/database";
 import {
@@ -7175,41 +7176,33 @@ function SessionsManagementScreen({
   const [logoutLoading, setLogoutLoading] = useState(false);
 
   useEffect(() => {
-    const fetchSessions = async () => {
-      if (!auth || !profile) return;
+    const sessionsDataRaw =
+      profile?.sessions || profile?.fullData?.sessions || {};
+    const sessionsData = Array.isArray(sessionsDataRaw)
+      ? sessionsDataRaw.reduce((acc, session, index) => {
+          const sessionId =
+            session?.sessionId || session?.id || `session_${index}`;
+          acc[sessionId] = session;
+          return acc;
+        }, {})
+      : sessionsDataRaw && typeof sessionsDataRaw === "object"
+        ? sessionsDataRaw
+        : {};
+    const sessionsList = Object.entries(sessionsData).map(
+      ([sessionId, sessionData]) => ({
+        sessionId,
+        ...sessionData,
+        isCurrentSession: sessionId === currentSessionId,
+      }),
+    );
 
-      try {
-        const sessionsData = await dbR(
-          `users/${auth.uid}/sessions`,
-          auth.token,
-        );
-        if (sessionsData) {
-          const sessionsList = Object.entries(sessionsData).map(
-            ([sessionId, sessionData]) => ({
-              sessionId,
-              ...sessionData,
-              isCurrentSession: sessionId === currentSessionId,
-            }),
-          );
-          setSessions(
-            sessionsList.sort(
-              (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
-            ),
-          );
-        }
-      } catch (error) {
-        console.error("Failed to fetch sessions:", error);
-        showToast(
-          "Session data not responding. Running recovery sequence..",
-          "error",
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchSessions();
-  }, [auth, currentSessionId, profile, showToast]);
+    setSessions(
+      sessionsList.sort(
+        (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
+      ),
+    );
+    setLoading(false);
+  }, [currentSessionId, profile]);
 
   const handleLogoutOtherDevices = async () => {
     if (!auth || !currentSessionId) return;
@@ -8263,18 +8256,49 @@ export default function TradersRegiment() {
       return null;
     }
 
-    const allUsers = (await dbR("users", "")) || {};
-    const match = Object.entries(allUsers).find(
-      ([, user]) => user?.email?.toLowerCase() === normalizedEmail,
-    );
+    if (!firebaseAuth) {
+      return null;
+    }
 
-    if (!match) {
+    const currentUser = firebaseAuth.currentUser;
+    if (currentUser?.email?.toLowerCase() === normalizedEmail) {
+      const token = await currentUser.getIdToken(true).catch(() => null);
+      if (!token) {
+        return {
+          uid: currentUser.uid,
+          userData: null,
+        };
+      }
+
+      const loadedProfile = await loadLegacyUserProfile({
+        uid: currentUser.uid,
+        token,
+        email: currentUser.email,
+        emailVerified: currentUser.emailVerified,
+      });
+
+      return loadedProfile?.userData
+        ? {
+            uid: currentUser.uid,
+            userData: loadedProfile.userData,
+          }
+        : {
+            uid: currentUser.uid,
+            userData: null,
+          };
+    }
+
+    const signInMethods = await fetchSignInMethodsForEmail(
+      firebaseAuth,
+      normalizedEmail,
+    ).catch(() => []);
+    if (!signInMethods.length) {
       return null;
     }
 
     return {
-      uid: match[0],
-      userData: match[1],
+      uid: null,
+      userData: null,
     };
   }, []);
 
@@ -8434,11 +8458,6 @@ export default function TradersRegiment() {
     }
 
     const existingRecord = await findUserRecordByEmail(sanitizedEmail);
-    if (existingRecord?.userData?.isLocked) {
-      throw new Error(
-        "Account Locked: Too many failed attempts. Contact Master Admin.",
-      );
-    }
 
     try {
       const userCredential = await signInWithEmailAndPassword(
@@ -8451,10 +8470,27 @@ export default function TradersRegiment() {
       clearLoginFailures(sanitizedEmail);
 
       const token = await signedInUser.getIdToken(true);
+      const signedInRecord = await loadLegacyUserProfile({
+        uid: signedInUser.uid,
+        token,
+        email: signedInUser.email,
+        emailVerified: signedInUser.emailVerified,
+      });
 
-      if (existingRecord?.uid) {
+      if (signedInRecord?.userData?.isLocked) {
+        try {
+          await signOut(firebaseAuth);
+        } catch {
+          // Ignore sign-out failures during locked-account recovery.
+        }
+        throw new Error(
+          "Account Locked: Too many failed attempts. Contact Master Admin.",
+        );
+      }
+
+      if (signedInUser?.uid) {
         await dbM(
-          `users/${existingRecord.uid}`,
+          `users/${signedInUser.uid}`,
           {
             failedAttempts: 0,
             isLocked: false,

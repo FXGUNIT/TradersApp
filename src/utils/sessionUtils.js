@@ -1,4 +1,11 @@
 import { dbW, dbR, dbDel } from "./firebaseDbUtils.js";
+import { hasBff } from "../services/gateways/base.js";
+import {
+  deleteIdentitySession,
+  fetchIdentitySessions,
+  revokeOtherIdentitySessions,
+  upsertIdentitySession,
+} from "../services/gateways/identityGateway.js";
 
 export const encryptSessionToken = (data) => {
   try {
@@ -46,6 +53,84 @@ export const getSessionGeoData = async () => {
   }
 };
 
+export const normalizeSessionMap = (sessions) => {
+  if (!sessions) {
+    return {};
+  }
+
+  if (Array.isArray(sessions)) {
+    return sessions.reduce((acc, session) => {
+      if (session?.sessionId) {
+        acc[session.sessionId] = session;
+      }
+      return acc;
+    }, {});
+  }
+
+  if (typeof sessions === "object") {
+    return sessions;
+  }
+
+  return {};
+};
+
+export const listSessions = async (uid, token) => {
+  if (!uid) {
+    return {};
+  }
+
+  if (hasBff()) {
+    try {
+      const response = await fetchIdentitySessions(uid);
+      const sessions = normalizeSessionMap(
+        response?.sessions || response?.data || response,
+      );
+      if (Object.keys(sessions).length > 0) {
+        return sessions;
+      }
+    } catch (error) {
+      console.warn("BFF session list failed, falling back to Firebase:", error);
+    }
+  }
+
+  const legacySessions = await dbR(`users/${uid}/sessions`, token);
+  return normalizeSessionMap(legacySessions);
+};
+
+export const upsertSession = async (uid, sessionId, sessionData, token) => {
+  if (!uid || !sessionId || !sessionData) {
+    return false;
+  }
+
+  if (hasBff()) {
+    try {
+      await upsertIdentitySession(uid, sessionId, sessionData);
+    } catch (error) {
+      console.warn("BFF session write failed, falling back to Firebase:", error);
+    }
+  }
+
+  await dbW(`users/${uid}/sessions/${sessionId}`, sessionData, token);
+  return true;
+};
+
+export const revokeSession = async (uid, sessionId, token) => {
+  if (!uid || !sessionId) {
+    return false;
+  }
+
+  if (hasBff()) {
+    try {
+      await deleteIdentitySession(uid, sessionId);
+    } catch (error) {
+      console.warn("BFF session delete failed, falling back to Firebase:", error);
+    }
+  }
+
+  await dbDel(`users/${uid}/sessions/${sessionId}`, token);
+  return true;
+};
+
 export const createSession = async (uid, token, rememberMe) => {
   try {
     const sessionId = generateSessionId();
@@ -66,7 +151,7 @@ export const createSession = async (uid, token, rememberMe) => {
       lastActive: new Date().toISOString(),
     };
 
-    await dbW(`users/${uid}/sessions/${sessionId}`, sessionData, token);
+    await upsertSession(uid, sessionId, sessionData, token);
 
     if (rememberMe) {
       const encryptedSession = encryptSessionToken({
@@ -88,16 +173,29 @@ export const createSession = async (uid, token, rememberMe) => {
 
 export const logoutOtherDevices = async (uid, currentSessionId, token) => {
   try {
+    if (hasBff()) {
+      try {
+        await revokeOtherIdentitySessions(uid, currentSessionId);
+      } catch (error) {
+        console.warn(
+          "BFF revoke-other-devices failed, falling back to Firebase:",
+          error,
+        );
+      }
+    }
+
     const allSessions = await dbR(`users/${uid}/sessions`, token);
 
     if (!allSessions) return true;
 
-    const deletePromises = Object.keys(allSessions).map((sessionId) => {
-      if (sessionId !== currentSessionId) {
-        return dbDel(`users/${uid}/sessions/${sessionId}`, token);
-      }
-      return Promise.resolve();
-    });
+    const deletePromises = Object.keys(normalizeSessionMap(allSessions)).map(
+      (sessionId) => {
+        if (sessionId !== currentSessionId) {
+          return revokeSession(uid, sessionId, token);
+        }
+        return Promise.resolve();
+      },
+    );
 
     await Promise.all(deletePromises);
     return true;

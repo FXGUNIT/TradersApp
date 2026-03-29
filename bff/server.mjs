@@ -23,12 +23,24 @@ import {
   toggleMaintenanceState,
 } from "./domains/adminState.mjs";
 import {
+  deleteSession,
+  findUserByEmail,
+  getUserByUid,
+  getUserStatus,
+  listSessions,
+  patchUserAccess,
+  patchUserSecurity,
+  revokeOtherSessions,
+  upsertSession,
+} from "./domains/identityState.mjs";
+import {
   appendSupportMessage,
   getSupportThread,
   listSupportThreads,
 } from "./domains/supportState.mjs";
 import { createAdminRouteHandler } from "./routes/adminRoutes.mjs";
 import { createContentRouteHandler } from "./routes/contentRoutes.mjs";
+import { createIdentityRouteHandler } from "./routes/identityRoutes.mjs";
 import { createOnboardingRouteHandler } from "./routes/onboardingRoutes.mjs";
 import { createSupportRouteHandler } from "./routes/supportRoutes.mjs";
 
@@ -206,7 +218,7 @@ const json = (res, statusCode, payload, origin = "*") => {
   res.writeHead(statusCode, {
     "Content-Type": "application/json; charset=utf-8",
     "Access-Control-Allow-Origin": origin,
-    "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+    "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
     "Cache-Control": "no-store",
   });
@@ -534,6 +546,23 @@ const server = createServer(async (req, res) => {
     json,
   })(req, res, url, origin);
   if (handledContentRoute) {
+    return;
+  }
+
+  const handledIdentityRoute = await createIdentityRouteHandler({
+    deleteSession,
+    findUserByEmail,
+    getUserByUid,
+    getUserStatus,
+    listSessions,
+    patchUserAccess,
+    patchUserSecurity,
+    readJsonBody,
+    revokeOtherSessions,
+    upsertSession,
+    json,
+  })(req, res, url, origin);
+  if (handledIdentityRoute) {
     return;
   }
 
