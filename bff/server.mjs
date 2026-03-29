@@ -7,7 +7,14 @@ import {
   getHubContent,
   listDocumentMeta,
 } from "./domains/contentState.mjs";
+import {
+  getApplication,
+  getApplicationStatus,
+  mergeApplicationConsent,
+  upsertApplication,
+} from "./domains/onboardingState.mjs";
 import { createContentRouteHandler } from "./routes/contentRoutes.mjs";
+import { createOnboardingRouteHandler } from "./routes/onboardingRoutes.mjs";
 
 const loadEnvFiles = () => {
   const rootDir = process.cwd();
@@ -511,6 +518,18 @@ const server = createServer(async (req, res) => {
     json,
   })(req, res, url, origin);
   if (handledContentRoute) {
+    return;
+  }
+
+  const handledOnboardingRoute = await createOnboardingRouteHandler({
+    getApplication,
+    getApplicationStatus,
+    mergeApplicationConsent,
+    readJsonBody,
+    upsertApplication,
+    json,
+  })(req, res, url, origin);
+  if (handledOnboardingRoute) {
     return;
   }
 

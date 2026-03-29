@@ -74,6 +74,7 @@ import { useTheme } from "./hooks/useTheme.jsx";
 import { AppShellProvider } from "./features/shell/AppShellContext.jsx";
 import { SCREEN_IDS } from "./features/shell/screenIds.js";
 import { loadLegacyUserProfile } from "./services/clients/IdentityClient.js";
+import { submitApplication as submitOnboardingApplication } from "./services/clients/OnboardingClient.js";
 import NotificationCenter from "./components/NotificationCenter.jsx";
 import CommandPalette from "./components/CommandPalette.jsx";
 import UserSwitcher from "./components/UserSwitcher.jsx";
@@ -8483,6 +8484,22 @@ export default function TradersRegiment() {
         authProvider,
         emailVerified: authProvider === "google",
       });
+      await submitOnboardingApplication({
+        uid: simulatedUid,
+        fullName,
+        email: cleanEmail,
+        country,
+        city,
+        instagram,
+        linkedin,
+        proficiency,
+        authProvider,
+        emailVerified: profileData.emailVerified,
+        consentState: {
+          termsAccepted: Boolean(formData.agreedToTerms),
+          privacyAccepted: Boolean(formData.agreedToTerms),
+        },
+      });
       await dbW(`users/${simulatedUid}`, profileData, simulatedToken);
       setAuth({
         uid: simulatedUid,
@@ -8575,6 +8592,22 @@ export default function TradersRegiment() {
       emailVerified: activeUser.emailVerified,
     });
 
+    await submitOnboardingApplication({
+      uid: activeUser.uid,
+      fullName,
+      email: cleanEmail,
+      country,
+      city,
+      instagram,
+      linkedin,
+      proficiency,
+      authProvider,
+      emailVerified: activeUser.emailVerified,
+      consentState: {
+        termsAccepted: Boolean(formData.agreedToTerms),
+        privacyAccepted: Boolean(formData.agreedToTerms),
+      },
+    });
     await dbW(`users/${activeUser.uid}`, profileData, authData.token);
     await sendWelcomeEmail(cleanEmail, fullName);
 
