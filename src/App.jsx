@@ -19,8 +19,10 @@ import {
   fetchSignInMethodsForEmail,
   GoogleAuthProvider,
   signInWithPopup,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  sendEmailVerification,
 } from "firebase/auth";
-import GoogleOnboard from "./components/GoogleOnboard.jsx";
 import { getDatabase, ref, onValue, get, set, push } from "firebase/database";
 import {
   getStorage,
@@ -30,8 +32,7 @@ import {
 } from "firebase/storage";
 import emailjs from "@emailjs/browser";
 import { notifyTelegram } from "./utils/telegram.js";
-import { sendInviteEmail, sendWelcomeEmail } from "./utils/email.js";
-import InviteScreen from "./components/InviteScreen.jsx";
+import { sendWelcomeEmail } from "./utils/email.js";
 import { useInvites } from "./hooks/useInvites";
 import AdminInvitesPanel from "./components/AdminInvitesPanel.jsx";
 import FloatingChatWidget from "./components/FloatingChatWidget.jsx";
@@ -51,20 +52,21 @@ import AiEnginesStatus from "./components/AiEnginesStatus.jsx";
 import { setupConsoleInterceptor } from "./services/telemetry.js";
 import { setupNetworkMonitor } from "./services/networkMonitor.js";
 import { setupTTITracker } from "./services/ttiTracker.js";
+import { sendApprovalConfirmationEmail } from "./services/emailService.js";
 import { SecuritySentinel } from "./services/securitySentinel.js";
 import { detectDuplicateIPs as scanDuplicateIPs } from "./services/ipScanner.js";
 import { calculateVolatilityRatio, getDynamicParameters, calculateThrottledRisk } from "./utils/math-engine.js";
-import { formatPhoneNumber, TradersRegimentWatermark, ExchangeFacilityBadge } from "./utils/businessLogicUtils.jsx";
+import { TradersRegimentWatermark, ExchangeFacilityBadge } from "./utils/businessLogicUtils.jsx";
 import { getSession, getTradingDate, parseAndAggregate, buildDataSummary } from "./utils/sessionParser.js";
 import { fuzzySearchScore, highlightMatches, renderHighlightedText } from "./utils/searchUtils.jsx";
-import { dbR, dbW, dbM, dbDel, authPost, fbSignUp, fbSignIn, genOTP } from "./utils/firebaseDbUtils.js";
+import { dbR, dbW, dbM, dbDel, genOTP } from "./utils/firebaseDbUtils.js";
 import { encryptSessionToken, generateSessionId, getDeviceInfo, getSessionGeoData, createSession, logoutOtherDevices, getDevice } from "./utils/sessionUtils.js";
 import { getTimeBasedGreeting, getUserLevelBadge, cacheUserList, getCachedUserList, clearUserListCache, getUserListCacheMetadata } from "./utils/userUtils.js";
 import { calcRoR, getISTState } from "./utils/tradingUtils.js";
 import { gatherForensicData, sendTelegramAlert, sendForensicAlert } from "./utils/securityAlertUtils.js";
 import { triggerConfetti, createCardTiltHandler, ACCENT_COLORS, createTheme } from "./utils/uiUtils.js";
 import { copyToClipboard } from "./utils/searchUtils.jsx";
-import { calculatePasswordStrength, getStrengthLabel, isValidGmailAddress, isPasswordExpired, copyToClipboardSecure, detectGPUSupport, withExponentialBackoff } from "./utils/securityUtils.js";
+import { isValidGmailAddress, isPasswordExpired, detectGPUSupport, withExponentialBackoff } from "./utils/securityUtils.js";
 import LoadingOverlay from "./components/LoadingOverlay.jsx";
 import SkeletonLoader from "./components/SkeletonLoader.jsx";
 import LazyImage from "./components/LazyImage.jsx";
@@ -77,6 +79,8 @@ import CommandPalette from "./components/CommandPalette.jsx";
 import UserSwitcher from "./components/UserSwitcher.jsx";
 import FullScreenToggle from "./components/FullScreenToggle.jsx";
 import MobileBottomNav from "./components/MobileBottomNav.jsx";
+import CleanLoginScreen from "./features/auth/CleanLoginScreen.jsx";
+import { verifyAdminPassword } from "./services/adminAuthService.js";
 
 const hasEmailJsConfig = Boolean(
   import.meta.env.VITE_EMAILJS_SERVICE_ID &&
@@ -111,8 +115,6 @@ const googleProvider = new GoogleAuthProvider();
 const FB_AUTH_URL = "https://identitytoolkit.googleapis.com/v1/accounts";
 const ADMIN_EMAIL = "gunitsingh1994@gmail.com";
 const ADMIN_UID = "N3z04ZYCleZjOApobL3VZepaOwi1";
-const ADMIN_PASS_HASH =
-  "0189c7742ecf4542ecab0150b32ecadc9ce7c4390217bfb3914f5b52b14e3cb6";
 const TELEGRAM_TOKEN = import.meta.env.VITE_TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = import.meta.env.VITE_TELEGRAM_CHAT_ID;
 const DATABASE_URL = firebaseConfig.databaseURL;
@@ -465,21 +467,135 @@ const BackToTopButton = () => {
   );
 };
 
-// RULE #30: Master Security Salt - Hash admin password with unique salt
-const MASTER_SALT = "TR_SECURITY_SALT_2024_REGIMENT";
+const LOGIN_RATE_LIMIT_STORAGE_KEY = "traders-login-rate-limit-v1";
+const PENDING_GOOGLE_SIGNUP_STORAGE_KEY = "traders-pending-google-signup-v1";
+const LOGIN_RATE_LIMIT_MAX_ATTEMPTS = 3;
+const LOGIN_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 
-const hashAdminPasswordWithSalt = async (password) => {
-  const saltedPassword = password + MASTER_SALT;
+const safeStorageGet = (key, fallback = null) => {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch {
+    return fallback;
+  }
+};
 
-  const encoder = new TextEncoder();
-  const data = encoder.encode(saltedPassword);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  const hashHex = hashArray
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
+const safeStorageSet = (key, value) => {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    console.warn(`Failed to persist ${key}`);
+  }
+};
 
-  return hashHex;
+const safeStorageRemove = (key) => {
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    console.warn(`Failed to clear ${key}`);
+  }
+};
+
+const getLoginRateLimitState = () =>
+  safeStorageGet(LOGIN_RATE_LIMIT_STORAGE_KEY, {});
+
+const getLoginRateLimitEntry = (email) => {
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  if (!normalizedEmail) {
+    return null;
+  }
+
+  const state = getLoginRateLimitState();
+  const entry = state[normalizedEmail];
+  if (!entry) {
+    return null;
+  }
+
+  if (Date.now() - entry.firstAttemptAt > LOGIN_RATE_LIMIT_WINDOW_MS) {
+    delete state[normalizedEmail];
+    safeStorageSet(LOGIN_RATE_LIMIT_STORAGE_KEY, state);
+    return null;
+  }
+
+  return entry;
+};
+
+const getLoginRateLimitRemainingMs = (email) => {
+  const entry = getLoginRateLimitEntry(email);
+  if (!entry || entry.attempts < LOGIN_RATE_LIMIT_MAX_ATTEMPTS) {
+    return 0;
+  }
+
+  return Math.max(
+    0,
+    entry.firstAttemptAt + LOGIN_RATE_LIMIT_WINDOW_MS - Date.now(),
+  );
+};
+
+const recordLoginFailure = (email) => {
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  if (!normalizedEmail) {
+    return;
+  }
+
+  const state = getLoginRateLimitState();
+  const existing = state[normalizedEmail];
+  const withinWindow =
+    existing &&
+    Date.now() - existing.firstAttemptAt <= LOGIN_RATE_LIMIT_WINDOW_MS;
+
+  state[normalizedEmail] = withinWindow
+    ? {
+        attempts: Number(existing.attempts || 0) + 1,
+        firstAttemptAt: existing.firstAttemptAt,
+      }
+    : {
+        attempts: 1,
+        firstAttemptAt: Date.now(),
+      };
+
+  safeStorageSet(LOGIN_RATE_LIMIT_STORAGE_KEY, state);
+};
+
+const clearLoginFailures = (email) => {
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  if (!normalizedEmail) {
+    return;
+  }
+
+  const state = getLoginRateLimitState();
+  if (!(normalizedEmail in state)) {
+    return;
+  }
+
+  delete state[normalizedEmail];
+  safeStorageSet(LOGIN_RATE_LIMIT_STORAGE_KEY, state);
+};
+
+const formatCooldown = (remainingMs) => {
+  const totalSeconds = Math.ceil(remainingMs / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (minutes <= 0) {
+    return `${seconds}s`;
+  }
+  return `${minutes}m ${String(seconds).padStart(2, "0")}s`;
+};
+
+const readPendingGoogleSignup = () =>
+  safeStorageGet(PENDING_GOOGLE_SIGNUP_STORAGE_KEY, null);
+
+const persistPendingGoogleSignup = (draft) => {
+  if (!draft?.uid || !draft?.email) {
+    return;
+  }
+
+  safeStorageSet(PENDING_GOOGLE_SIGNUP_STORAGE_KEY, draft);
+};
+
+const clearPendingGoogleSignup = () => {
+  safeStorageRemove(PENDING_GOOGLE_SIGNUP_STORAGE_KEY);
 };
 
 // ═══════════════════════════════════════════════════════════════════
@@ -2349,2090 +2465,9 @@ function ThemePicker({ isOpen, onClose, onSelectTheme, currentTheme }) {
 // ═══════════════════════════════════════════════════════════════════
 //  LOGIN SCREEN — WITH PASSWORD RESET
 // ═══════════════════════════════════════════════════════════════════
-function LoginScreen({
-  onLogin,
-  onSignup,
-  onAdmin,
-  onForgotPassword,
-  onGoogleAuth,
-}) {
-  const [email, setEmail] = useState("");
-  const [pass, setPass] = useState("");
-  const [err, setErr] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [resetMode, setResetMode] = useState(false);
-  const [resetMsg, setResetMsg] = useState("");
-  const [showPwd, setShowPwd] = useState(false);
-  const [stayLoggedIn, setStayLoggedIn] = useState(false);
-  const [auditOtpMode, setAuditOtpMode] = useState(false);
-  const isLoginAudit =
-    typeof window !== "undefined" && window.__TRADERS_AUDIT_DATA?.scenario === "login";
-
-  if (auditOtpMode) {
-    const auditProfile = {
-      uid: "audit-login-user",
-      token: "audit-login-token",
-      email: email.trim().toLowerCase() || "audit.user@example.com",
-    };
-
-    return (
-      <OTPScreen
-        profile={auditProfile}
-        onVerified={() => setAuditOtpMode(false)}
-        onLogout={() => setAuditOtpMode(false)}
-        showToast={() => {}}
-      />
-    );
-  }
-
-  const handleForgotPassword = async () => {
-    const cleanEmail = email.trim().toLowerCase();
-    if (!cleanEmail) {
-      setErr("Please enter your email address.");
-      return;
-    }
-
-    setLoading(true);
-    setErr("");
-    setResetMsg("");
-
-    try {
-      if (
-        !firebaseAuth ||
-        (typeof window !== "undefined" && window.__TRADERS_AUDIT_DATA)
-      ) {
-        setResetMsg("Audit mode: password reset link simulated");
-        setErr("");
-        return;
-      }
-
-      // Wait for Firebase to send the password reset email
-      await sendPasswordResetEmail(firebaseAuth, cleanEmail);
-      // Only show success message after email is sent
-      setResetMsg(
-        "✓ Password reset email sent! Check your inbox and spam folder.",
-      );
-      // Clear error state
-      setErr("");
-    } catch (error) {
-      // Handle specific Firebase error codes
-      const errorCode = error.code;
-      let errorMessage = "Failed to send reset email.";
-
-      if (errorCode === "auth/user-not-found") {
-        errorMessage = "No account found with this email address.";
-      } else if (errorCode === "auth/invalid-email") {
-        errorMessage = "Please enter a valid email address.";
-      } else if (errorCode === "auth/too-many-requests") {
-        errorMessage = "Too many attempts. Please try again later.";
-      } else if (errorCode === "auth/user-disabled") {
-        errorMessage = "This account has been disabled.";
-      } else {
-        errorMessage =
-          "Error: " + (error.message || "Failed to send reset email.");
-      }
-
-      setErr(errorMessage);
-      setResetMsg("");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const submit = async () => {
-    if (!email || !pass) {
-      setErr("Email and password required.");
-      return;
-    }
-    setErr("");
-    setLoading(true);
-    try {
-      await onLogin(email, pass, stayLoggedIn);
-      if (isLoginAudit) {
-        setAuditOtpMode(true);
-      }
-    } catch (e) {
-      setErr(e.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "var(--surface-elevated, #FFFFFF)",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        fontFamily: T.font,
-        padding: 20,
-        gap: 40,
-      }}
-    >
-      <AuthLogo />
-      <div style={authCard} className="glass-panel">
-        {resetMsg && (
-          <div
-            style={{
-              color: T.green,
-              fontSize: 12,
-              marginBottom: 16,
-              padding: "12px 14px",
-              background: "rgba(48,209,88,0.1)",
-              border: `1px solid rgba(48,209,88,0.3)`,
-              borderRadius: 8,
-              fontWeight: 500,
-              lineHeight: 1.5,
-            }}
-          >
-            {resetMsg}
-          </div>
-        )}
-        {err && (
-          <div
-            style={{
-              color: T.red,
-              fontSize: 12,
-              marginBottom: 16,
-              padding: "12px 14px",
-              background: "rgba(255,69,58,0.1)",
-              border: `1px solid rgba(255,69,58,0.3)`,
-              borderRadius: 8,
-              fontWeight: 500,
-            }}
-          >
-            {err}
-          </div>
-        )}
-
-        {resetMode && (
-          <div
-            style={{
-              color: "#111827",
-              fontSize: 16,
-              letterSpacing: "-0.02em",
-              textAlign: "center",
-              marginBottom: 12,
-              fontWeight: 700,
-              lineHeight: 1.3,
-            }}
-          >
-            ACCOUNT RECOVERY
-          </div>
-        )}
-
-        <div>
-          <label style={lbl}>EMAIL</label>
-          <div style={{ position: "relative", width: "100%" }}>
-            <span
-              style={{
-                position: "absolute",
-                left: 12,
-                top: "50%",
-                transform: "translateY(-50%)",
-                fontSize: 14,
-                color: "#64748B",
-                pointerEvents: "none",
-              }}
-            >
-              📡
-            </span>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="your@email.com"
-              autoComplete="email"
-              style={{ ...authInp, paddingLeft: 40, fontFamily: T.font }}
-              className="input-glass"
-            />
-          </div>
-        </div>
-
-        {!resetMode ? (
-          <>
-            <div>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "flex-end",
-                  marginBottom: 6,
-                }}
-              >
-                <label style={{ ...lbl, marginBottom: 0 }}>PASSWORD</label>
-                <span
-                  onClick={() => {
-                    setResetMode(true);
-                    setErr("");
-                    setResetMsg("");
-                  }}
-                  style={{
-                    ...lbl,
-                    color: T.blue,
-                    cursor: "pointer",
-                    textTransform: "none",
-                    marginBottom: 0,
-                  }}
-                >
-                  Forgot Password?
-                </span>
-              </div>
-              <div
-                style={{
-                  position: "relative",
-                  width: "100%",
-                  marginBottom: 15,
-                }}
-              >
-                <span
-                  style={{
-                    position: "absolute",
-                    left: 12,
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                    fontSize: 14,
-                    color: "#64748B",
-                    pointerEvents: "none",
-                  }}
-                >
-                  🔑
-                </span>
-                <input
-                  type={showPwd ? "text" : "password"}
-                  value={pass}
-                  onChange={(e) => setPass(e.target.value)}
-                  style={{
-                    ...authInp,
-                    width: "100%",
-                    marginBottom: 0,
-                    paddingLeft: 40,
-                    fontFamily: T.mono,
-                    letterSpacing: 4,
-                  }}
-                  placeholder="••••••••••••"
-                  onKeyDown={(e) => e.key === "Enter" && submit()}
-                  className="input-glass"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPwd(!showPwd)}
-                  style={{
-                    position: "absolute",
-                    right: "10px",
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                    background: "none",
-                    border: "none",
-                    color: "#888",
-                    cursor: "pointer",
-                    fontSize: "12px",
-                  }}
-                >
-                  {showPwd ? "HIDE" : "SHOW"}
-                </button>
-              </div>
-            </div>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                marginBottom: 16,
-              }}
-            >
-              <input
-                type="checkbox"
-                id="stayLoggedIn"
-                checked={stayLoggedIn}
-                onChange={(e) => setStayLoggedIn(e.target.checked)}
-                style={{ cursor: "pointer" }}
-              />
-              <label
-                htmlFor="stayLoggedIn"
-                style={{
-                  fontSize: 12,
-                  color: T.muted,
-                  cursor: "pointer",
-                  fontFamily: T.font,
-                }}
-              >
-                Stay Logged In
-              </label>
-            </div>
-            <button
-              onClick={submit}
-              disabled={loading}
-              style={authBtn(T.green, loading)}
-              className="btn-glass"
-            >
-              {loading ? "⟳ AUTHENTICATING..." : "⚡ INITIALIZE DEPLOYMENT"}
-            </button>
-
-            <GoogleSignInButton
-              onSuccess={(user) => {
-                setEmail(user.email);
-                onLogin(user.email, user.uid, true);
-              }}
-              onError={(error) => setErr(error)}
-              buttonText="CONTINUE WITH GOOGLE"
-              isLoading={loading}
-            />
-
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                marginTop: 24,
-              }}
-            >
-              <button
-                onClick={onSignup}
-                style={{
-                  background: "transparent",
-                  border: "none",
-                  cursor: "pointer",
-                  color: T.muted,
-                  fontSize: 11,
-                  fontFamily: T.font,
-                  letterSpacing: 1,
-                  fontWeight: 600,
-                }}
-              >
-                NEW RECRUIT → APPLY
-              </button>
-              <button
-                onClick={onAdmin}
-                style={{
-                  background: "transparent",
-                  border: "none",
-                  cursor: "pointer",
-                  color: T.muted,
-                  fontSize: 11,
-                  fontFamily: T.font,
-                  letterSpacing: 1,
-                  fontWeight: 600,
-                }}
-              >
-                ⚙ ADMIN
-              </button>
-            </div>
-          </>
-        ) : (
-          <>
-            <button
-              onClick={handleForgotPassword}
-              disabled={loading || !email}
-              style={authBtn(T.blue, loading || !email)}
-              className="btn-glass"
-            >
-              {loading ? "⟳ TRANSMITTING..." : "✉ SEND RECOVERY LINK"}
-            </button>
-            <button
-              onClick={() => {
-                setResetMode(false);
-                setErr("");
-                setResetMsg("");
-              }}
-              style={{
-                ...authBtn(T.muted, false),
-                background: "transparent",
-                border: "none",
-                marginTop: 12,
-              }}
-              className="btn-glass"
-            >
-              ← BACK TO LOGIN
-            </button>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// COMPONENT: Image Cropper (RULE #21 & #22 - Custom Profile Picture)
-// ═══════════════════════════════════════════════════════════════════
-function ImageCropper({ file, onCrop, onCancel }) {
-  const [scale, setScale] = useState(1);
-  const [rotation, setRotation] = useState(0);
-  const canvasRef = useRef(null);
-
-  const handleCrop = () => {
-    const reader = new FileReader();
-
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = canvasRef.current;
-        const ctx = canvas.getContext("2d");
-        canvas.width = 200;
-        canvas.height = 200;
-
-        ctx.translate(100, 100);
-        ctx.rotate((rotation * Math.PI) / 180);
-        ctx.scale(scale, scale);
-        ctx.translate(-100, -100);
-        ctx.drawImage(img, 0, 0, 200, 200);
-
-        canvas.toBlob(
-          (blob) => {
-            onCrop(blob);
-          },
-          "image/jpeg",
-          0.9,
-        );
-      };
-      img.src = e.target.result;
-    };
-
-    reader.readAsDataURL(file);
-  };
-
-  return (
-    <div
-      style={{
-        background: "rgba(0,0,0,0.8)",
-        padding: 24,
-        borderRadius: 12,
-        marginBottom: 16,
-        border: `1px solid ${T.blue}30`,
-      }}
-    >
-      <div
-        style={{
-          color: T.blue,
-          fontSize: 12,
-          fontWeight: 700,
-          marginBottom: 16,
-        }}
-      >
-        📷 CROP PROFILE PICTURE
-      </div>
-
-      <div style={{ marginBottom: 16 }}>
-        <label
-          style={{
-            color: T.muted,
-            fontSize: 11,
-            display: "block",
-            marginBottom: 8,
-          }}
-        >
-          Zoom
-        </label>
-        <input
-          type="range"
-          min="1"
-          max="2"
-          step="0.1"
-          value={scale}
-          onChange={(e) => setScale(parseFloat(e.target.value))}
-          style={{ width: "100%" }}
-        />
-      </div>
-
-      <div style={{ marginBottom: 16 }}>
-        <label
-          style={{
-            color: T.muted,
-            fontSize: 11,
-            display: "block",
-            marginBottom: 8,
-          }}
-        >
-          Rotate (degrees)
-        </label>
-        <input
-          type="range"
-          min="0"
-          max="360"
-          step="15"
-          value={rotation}
-          onChange={(e) => setRotation(parseInt(e.target.value))}
-          style={{ width: "100%" }}
-        />
-      </div>
-
-      <canvas ref={canvasRef} style={{ display: "none" }} />
-
-      <div style={{ display: "flex", gap: 8 }}>
-        <button
-          onClick={handleCrop}
-          style={{ ...authBtn(T.green, false), flex: 1 }}
-          className="btn-glass"
-        >
-          ✓ CROP & USE
-        </button>
-        <button
-          onClick={onCancel}
-          style={{ ...authBtn(T.red, false), flex: 1 }}
-          className="btn-glass"
-        >
-          ✕ CANCEL
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// COMPONENT: Identity Verification Upload (RULE #24 - KYC Documents)
-// ═══════════════════════════════════════════════════════════════════
-function IdentityVerificationComponent({ uid, onSuccess, onError, showToast }) {
-  const [uploading, setUploading] = useState(false);
-  const [docType, setDocType] = useState("aadhar");
-  const [uploadedDocs, setUploadedDocs] = useState({});
-  const fileInputRef = useRef(null);
-
-  const handleFileSelect = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    setUploading(true);
-    try {
-      const result = await uploadIdentityDoc(file, uid, docType);
-
-      setUploadedDocs((prev) => ({
-        ...prev,
-        [docType]: result,
-      }));
-
-      showToast &&
-        showToast(
-          `${docType.toUpperCase()} ingested into the archive. Scanning complete.`,
-          "success",
-        );
-      onSuccess && onSuccess(result);
-
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
-    } catch (error) {
-      showToast &&
-        showToast(
-          "Data transmission halted. The cloud servers are meditating.",
-          "error",
-        );
-      onError && onError(error);
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  return (
-    <div
-      style={{
-        background: "rgba(52,199,89,0.1)",
-        border: `1px solid ${T.green}50`,
-        padding: 16,
-        borderRadius: 10,
-        marginBottom: 16,
-      }}
-    >
-      <div
-        style={{
-          color: T.green,
-          fontSize: 12,
-          fontWeight: 700,
-          marginBottom: 12,
-        }}
-      >
-        ✓ IDENTITY PROOF (RULE #24)
-      </div>
-
-      <div style={{ marginBottom: 12 }}>
-        <label style={{ ...lbl, marginBottom: 8 }}>Document Type</label>
-        <select
-          value={docType}
-          onChange={(e) => setDocType(e.target.value)}
-          disabled={uploading}
-          style={{
-            ...authInp,
-            width: "100%",
-            background: "rgba(0,0,0,0.4)",
-            color: T.blue,
-            padding: "8px 12px",
-          }}
-        >
-          <option value="aadhar">Aadhar Card</option>
-          <option value="passport">Passport</option>
-          <option value="license">Driving License</option>
-          <option value="pan">PAN Card</option>
-        </select>
-      </div>
-
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".jpg,.jpeg,.pdf"
-        onChange={handleFileSelect}
-        disabled={uploading}
-        style={{ display: "none" }}
-      />
-
-      <button
-        onClick={() => fileInputRef.current?.click()}
-        disabled={uploading}
-        style={{ ...authBtn(T.green, uploading), width: "100%" }}
-        className="btn-glass"
-      >
-        {uploading ? "⏳ UPLOADING..." : "📄 SELECT & UPLOAD"}
-      </button>
-
-      {Object.entries(uploadedDocs).length > 0 && (
-        <div
-          style={{
-            marginTop: 12,
-            paddingTop: 12,
-            borderTop: `1px solid ${T.green}30`,
-          }}
-        >
-          <div
-            style={{
-              color: T.green,
-              fontSize: 11,
-              fontWeight: 600,
-              marginBottom: 8,
-            }}
-          >
-            Uploaded Documents:
-          </div>
-          {Object.entries(uploadedDocs).map(([type, doc]) => (
-            <div
-              key={type}
-              style={{ fontSize: 11, color: T.muted, marginBottom: 4 }}
-            >
-              • {type.toUpperCase()}: {doc.fileName}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// COMPONENT: Google Sign-In Button (RULE #23 - One-Tap Google Login)
-// ═══════════════════════════════════════════════════════════════════
-function GoogleSignInButton({
-  onSuccess,
-  onError,
-  buttonText = "Continue with Google",
-  isLoading = false,
-}) {
-  const handleGoogleSignIn = async () => {
-    try {
-      if (
-        !firebaseAuth ||
-        !FB_KEY ||
-        (typeof window !== "undefined" && window.__TRADERS_AUDIT_DATA)
-      ) {
-        onSuccess?.({
-          email: "audit.google@gmail.com",
-          uid: "audit-google-user",
-        });
-        return;
-      }
-
-      const result = await signInWithPopup(firebaseAuth, googleProvider);
-      const user = result.user;
-
-      // RULE #23: Gmail-only enforcement
-      if (!user.email || !user.email.toLowerCase().endsWith("@gmail.com")) {
-        throw new Error("Only @gmail.com accounts are allowed");
-      }
-
-      onSuccess && onSuccess(user);
-    } catch (error) {
-      const errorMsg = error.message.includes("Only @gmail.com")
-        ? "Only @gmail.com accounts are allowed"
-        : error.message;
-      onError && onError(errorMsg);
-    }
-  };
-
-  return (
-    <button
-      onClick={handleGoogleSignIn}
-      disabled={isLoading}
-      style={{
-        ...authBtn(T.blue, isLoading),
-        width: "100%",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 8,
-        fontSize: 13,
-        fontWeight: 600,
-      }}
-      className="btn-glass"
-    >
-      {isLoading ? "⏳ CONNECTING..." : `🔵 ${buttonText}`}
-    </button>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════════
-//  OTP SCREEN — "UNHACKABLE" EDITION (RATE LIMITS + SANITIZATION)
-// ═══════════════════════════════════════════════════════════════════
-function OTPScreen({ profile, onVerified, onLogout, showToast }) {
-  const [userEmailCode, setUserEmailCode] = useState("");
-  const [step, setStep] = useState(1);
-  const [, setErr] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [msg, setMsg] = useState("");
-  const otpInputRef = useRef(null);
-
-  const EMAILJS_SERVICE_ID =
-    import.meta.env.VITE_EMAILJS_SERVICE_ID || "service_xxx";
-  const EMAILJS_TEMPLATE_ID =
-    import.meta.env.VITE_EMAILJS_TEMPLATE_ID || "template_xxx";
-  const EMAILJS_USER_ID = import.meta.env.VITE_EMAILJS_PUBLIC_KEY || "user_xxx";
-  const deterministicOtpMode =
-    import.meta.env.DEV ||
-    (typeof window !== "undefined" && Boolean(window.__TRADERS_AUDIT_DATA));
-
-  const sendOTPs = async () => {
-    setLoading(true);
-    try {
-      const emailCode = deterministicOtpMode || !hasEmailJsConfig ? "123456" : genOTP();
-      // ═══════════════════════════════════════════════════════════════════
-      // CRITICAL FIX: Send OTP to the actual user's email, not hardcoded admin
-      // ═══════════════════════════════════════════════════════════════════
-      const userEmail = profile.email; // Use actual user email from profile
-
-      if (
-        !hasEmailJsConfig ||
-        deterministicOtpMode
-      ) {
-        console.warn("EmailJS not configured for OTP delivery");
-      } else {
-        await emailjs.send(
-          import.meta.env.VITE_EMAILJS_SERVICE_ID,
-          import.meta.env.VITE_EMAILJS_TEMPLATE_ID,
-          {
-            user_email: userEmail, // SEND TO ACTUAL USER EMAIL
-            otp_code: emailCode, // MATCHES YOUR HTML {{otp_code}}
-            to_email: userEmail, // FOR THE DASHBOARD SETTING
-          },
-          import.meta.env.VITE_EMAILJS_PUBLIC_KEY,
-        );
-      }
-
-      // Save OTP to Firebase with user's email for verification
-      try {
-        await dbW(
-          `otps/${profile.uid}`,
-          {
-            emailCode,
-            email: userEmail, // Store the user's email for verification
-            createdAt: new Date().toISOString(),
-          },
-          profile.token,
-        );
-      } catch (dbErr) {
-        console.warn("Database save failed, but email was sent:", dbErr);
-      }
-
-      setStep(2);
-      setMsg("✓ Check your inbox!");
-    } catch (error) {
-      console.error("OTP Send Error:", error);
-      setMsg(
-        "✗ Error: " + (error?.text || error?.message || "Check configuration"),
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // RULE #11: Smart OTP Paste - Auto-fill on 6-digit paste
-  const handlePaste = (e) => {
-    e.preventDefault();
-    const pastedText = e.clipboardData.getData("text");
-    const digits = pastedText.replace(/[^\d]/g, ""); // Extract only digits
-
-    if (digits.length === 6) {
-      setUserEmailCode(digits);
-      setMsg("✓ OTP auto-filled from clipboard");
-    } else if (digits.length > 0) {
-      setErr(
-        `Please paste a valid 6-digit code (${digits.length} digits detected)`,
-      );
-    }
-  };
-
-  const verifyOTPs = async () => {
-    setLoading(true);
-    try {
-      if (deterministicOtpMode || !firebaseDb) {
-        if (userEmailCode !== "123456") {
-          setMsg("✗ Invalid verification code. Please try again.");
-          return;
-        }
-        setMsg("✓ Identity Verified.");
-        onVerified();
-        return;
-      }
-
-      const storedData = await dbR(`otps/${profile.uid}`, profile.token);
-
-      if (!storedData) {
-        setMsg("✗ No OTP record found. Please send a new code.");
-        setLoading(false);
-        return;
-      }
-
-      // Verify OTP code matches
-      if (storedData.emailCode !== userEmailCode) {
-        setMsg("✗ Invalid verification code. Please try again.");
-        setLoading(false);
-        return;
-      }
-
-      // Verify email matches (security check)
-      if (
-        storedData.email &&
-        storedData.email.toLowerCase() !== profile.email.toLowerCase()
-      ) {
-        console.error("Email mismatch in OTP verification:", {
-          stored: storedData.email,
-          profile: profile.email,
-        });
-        setMsg("✗ Email mismatch. Please logout and try again.");
-        setLoading(false);
-        return;
-      }
-
-      setMsg("✓ Identity Verified.");
-      onVerified();
-    } catch (error) {
-      console.error("OTP Verification Error:", error);
-      setMsg("✗ Verification failed. Try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: T.bg,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontFamily: T.font,
-        padding: "20px",
-      }}
-    >
-      <div style={authCard} className="glass-panel">
-        <AuthLogo />
-        <div
-          style={{
-            color: T.blue,
-            fontSize: "clamp(10px, 3vw, 12px)",
-            letterSpacing: 2,
-            textAlign: "center",
-            marginBottom: 28,
-            fontWeight: 700,
-          }}
-        >
-          EMAIL VERIFICATION
-        </div>
-
-        {msg && (
-          <div
-            style={{
-              color: T.green,
-              fontSize: 13,
-              marginBottom: 24,
-              padding: "14px 18px",
-              background: "rgba(48,209,88,0.1)",
-              border: `1px solid rgba(48,209,88,0.3)`,
-              borderRadius: 10,
-              fontWeight: 500,
-              lineHeight: 1.5,
-              whiteSpace: "pre-line",
-            }}
-          >
-            {msg}
-          </div>
-        )}
-
-        {step === 1 ? (
-          <div style={{ textAlign: "center" }}>
-            <p style={{ color: T.muted, fontSize: 13, marginBottom: 20 }}>
-              To secure your account, we will send a verification code to:
-              <br />
-              <strong style={{ color: T.blue }}>{profile.email}</strong>
-            </p>
-
-            <button
-              onClick={sendOTPs}
-              disabled={loading}
-              style={authBtn(T.blue, loading)}
-              className="btn-glass"
-            >
-              {loading ? "SENDING..." : "✉ DISPATCH EMAIL CODE"}
-            </button>
-          </div>
-        ) : (
-          <div>
-            <label style={lbl}>ENTER 6-DIGIT EMAIL CODE</label>
-            <div
-              style={{
-                fontSize: 10,
-                color: T.muted,
-                marginBottom: 8,
-                fontStyle: "italic",
-              }}
-            >
-              💡 Tip: Paste a 6-digit code and it will auto-fill
-            </div>
-            <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-              <input
-                ref={otpInputRef}
-                type="text"
-                value={userEmailCode}
-                onChange={(e) =>
-                  setUserEmailCode(
-                    e.target.value.replace(/[^\d]/g, "").slice(0, 6),
-                  )
-                }
-                onPaste={handlePaste}
-                style={{
-                  ...authInp,
-                  flex: 1,
-                  letterSpacing: "4px",
-                  textAlign: "center",
-                  fontWeight: "bold",
-                }}
-                placeholder="000000"
-                maxLength="6"
-                inputMode="numeric"
-              />
-              <button
-                onClick={() => copyToClipboardSecure(userEmailCode, showToast)}
-                disabled={!userEmailCode}
-                style={{
-                  ...authBtn(T.blue, !userEmailCode),
-                  padding: "10px 12px",
-                  minWidth: "60px",
-                }}
-                className="btn-glass"
-                title="Copy code & auto-clear clipboard in 60s"
-              >
-                📋 COPY
-              </button>
-            </div>
-
-            <button
-              onClick={verifyOTPs}
-              disabled={loading}
-              style={authBtn(T.green, loading)}
-              className="btn-glass"
-            >
-              {loading ? "VERIFYING..." : "UNLOCK TERMINAL"}
-            </button>
-          </div>
-        )}
-
-        <button
-          onClick={onLogout}
-          style={{
-            background: "transparent",
-            border: "none",
-            cursor: "pointer",
-            color: T.dim,
-            fontSize: 12,
-            fontFamily: T.font,
-            marginTop: 24,
-            display: "block",
-            width: "100%",
-            fontWeight: 600,
-            transition: "color 0.2s",
-          }}
-          onMouseEnter={(e) => (e.target.style.color = T.red)}
-          onMouseLeave={(e) => (e.target.style.color = T.dim)}
-        >
-          ← ABORT LOGIN
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════════
-//  FORCE PASSWORD RESET SCREEN — RULE 18 (120-DAY EXPIRY)
-// ═══════════════════════════════════════════════════════════════════
-function ForcePasswordResetScreen({ onReset, onLogout }) {
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [showPwd, setShowPwd] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
-  const [err, setErr] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [msg, setMsg] = useState("");
-  const [capsLock, setCapsLock] = useState(false);
-  const [passwordStrength, setPasswordStrength] = useState(0);
-
-  const handlePasswordChange = (e) => {
-    const pwd = e.target.value;
-    setNewPassword(pwd);
-    setPasswordStrength(calculatePasswordStrength(pwd));
-  };
-
-  const handleKeyDown = (e) => {
-    setCapsLock(e.getModifierState("CapsLock"));
-  };
-
-  const handleKeyUp = (e) => {
-    setCapsLock(e.getModifierState("CapsLock"));
-  };
-
-  const resetPassword = async () => {
-    setErr("");
-    setMsg("");
-
-    if (!newPassword || !confirmPassword) {
-      setErr("Both password fields are required.");
-      return;
-    }
-
-    if (newPassword.length < 8) {
-      setErr("Password must be at least 8 characters.");
-      return;
-    }
-
-    if (newPassword !== confirmPassword) {
-      setErr("Passwords do not match.");
-      return;
-    }
-
-    if (passwordStrength < 2) {
-      setErr("Password is too weak. Use uppercase, numbers, and symbols.");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      // Call parent handler to update password
-      await onReset(newPassword);
-      setMsg("✓ Password reset successfully. Redirecting...");
-      setTimeout(() => {
-        // Will be handled by parent
-      }, 1500);
-    } catch (error) {
-      setErr(error.message || "Password reset failed. Try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: T.bg,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontFamily: T.font,
-        padding: "20px",
-      }}
-    >
-      <div style={authCard} className="glass-panel">
-        <AuthLogo />
-        <div
-          style={{
-            color: T.red,
-            fontSize: 12,
-            letterSpacing: 2,
-            textAlign: "center",
-            marginBottom: 24,
-            fontWeight: 700,
-          }}
-        >
-          ⏰ MANDATORY PASSWORD RESET
-        </div>
-
-        <div
-          style={{
-            background: "rgba(255,69,58,0.1)",
-            border: `1px solid rgba(255,69,58,0.3)`,
-            borderRadius: 8,
-            padding: 12,
-            marginBottom: 20,
-          }}
-        >
-          <p
-            style={{ color: T.muted, fontSize: 12, margin: 0, lineHeight: 1.6 }}
-          >
-            Your password was last changed <strong>over 120 days ago</strong>.
-            For security compliance, you must reset it before accessing your
-            account.
-          </p>
-        </div>
-
-        {err && (
-          <div
-            style={{
-              color: T.red,
-              fontSize: 12,
-              marginBottom: 16,
-              padding: "10px 14px",
-              background: "rgba(255,69,58,0.1)",
-              border: `1px solid rgba(255,69,58,0.3)`,
-              borderRadius: 6,
-              fontWeight: 500,
-            }}
-          >
-            {err}
-          </div>
-        )}
-        {msg && (
-          <div
-            style={{
-              color: T.green,
-              fontSize: 12,
-              marginBottom: 16,
-              padding: "10px 14px",
-              background: "rgba(48,209,88,0.1)",
-              border: `1px solid rgba(48,209,88,0.3)`,
-              borderRadius: 6,
-              fontWeight: 500,
-            }}
-          >
-            {msg}
-          </div>
-        )}
-
-        <div style={{ marginBottom: 16 }}>
-          <label style={lbl}>NEW PASSWORD *</label>
-          <div style={{ position: "relative", width: "100%", marginBottom: 8 }}>
-            <input
-              type={showPwd ? "text" : "password"}
-              value={newPassword}
-              onChange={handlePasswordChange}
-              onKeyDown={handleKeyDown}
-              onKeyUp={handleKeyUp}
-              placeholder="Min 8 characters"
-              style={{
-                ...authInp,
-                letterSpacing: 2,
-                width: "100%",
-                marginBottom: 0,
-              }}
-              className="input-glass"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPwd(!showPwd)}
-              style={{
-                position: "absolute",
-                right: "10px",
-                top: "50%",
-                transform: "translateY(-50%)",
-                background: "none",
-                border: "none",
-                color: "#888",
-                cursor: "pointer",
-                fontSize: "12px",
-              }}
-            >
-              {showPwd ? "HIDE" : "SHOW"}
-            </button>
-          </div>
-
-          {capsLock && (
-            <div
-              style={{
-                color: T.red,
-                fontSize: 10,
-                marginBottom: 6,
-                padding: "6px 8px",
-                background: "rgba(255,69,58,0.1)",
-                borderRadius: 3,
-              }}
-            >
-              ⚠️ Caps Lock is ON
-            </div>
-          )}
-
-          {newPassword && (
-            <div style={{ marginBottom: 8 }}>
-              <div
-                style={{ display: "flex", gap: 3, height: 3, marginBottom: 4 }}
-              >
-                {[0, 1, 2].map((idx) => (
-                  <div
-                    key={idx}
-                    style={{
-                      flex: 1,
-                      height: "100%",
-                      background:
-                        passwordStrength > idx
-                          ? getStrengthLabel(passwordStrength).color
-                          : "rgba(255,255,255,0.1)",
-                      borderRadius: 2,
-                      transition: "all 0.2s ease",
-                    }}
-                  />
-                ))}
-              </div>
-              <div
-                style={{
-                  fontSize: 9,
-                  color: getStrengthLabel(passwordStrength).color,
-                }}
-              >
-                Strength:{" "}
-                <strong>{getStrengthLabel(passwordStrength).label}</strong>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div style={{ marginBottom: 16 }}>
-          <label style={lbl}>CONFIRM PASSWORD *</label>
-          <div style={{ position: "relative", width: "100%" }}>
-            <input
-              type={showConfirm ? "text" : "password"}
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Re-enter password"
-              style={{
-                ...authInp,
-                letterSpacing: 2,
-                width: "100%",
-                marginBottom: 0,
-              }}
-              className="input-glass"
-            />
-            <button
-              type="button"
-              onClick={() => setShowConfirm(!showConfirm)}
-              style={{
-                position: "absolute",
-                right: "10px",
-                top: "50%",
-                transform: "translateY(-50%)",
-                background: "none",
-                border: "none",
-                color: "#888",
-                cursor: "pointer",
-                fontSize: "12px",
-              }}
-            >
-              {showConfirm ? "HIDE" : "SHOW"}
-            </button>
-          </div>
-        </div>
-
-        <button
-          onClick={resetPassword}
-          disabled={loading || !newPassword || !confirmPassword}
-          style={{
-            ...authBtn(T.green, loading || !newPassword || !confirmPassword),
-            marginBottom: 12,
-          }}
-          className="btn-glass"
-        >
-          {loading ? "RESETTING..." : "🔐 RESET PASSWORD"}
-        </button>
-
-        <button
-          onClick={onLogout}
-          style={{
-            background: "transparent",
-            border: "none",
-            cursor: "pointer",
-            color: T.dim,
-            fontSize: 12,
-            fontFamily: T.font,
-            display: "block",
-            width: "100%",
-            fontWeight: 600,
-            transition: "color 0.2s",
-          }}
-          onMouseEnter={(e) => (e.target.style.color = T.red)}
-          onMouseLeave={(e) => (e.target.style.color = T.dim)}
-        >
-          ← LOGOUT
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════════
-//  SIGNUP SCREEN
-// ═══════════════════════════════════════════════════════════════════
-function SignupScreen({ onBack, onSubmit }) {
-  const [f, setF] = useState({
-    fullName: "",
-    email: "",
-    password: "",
-    mobile: "",
-    address: "",
-    instagram: "",
-    linkedin: "",
-    proficiency: "beginner",
-  });
-  const [device, setDevice] = useState(null);
-  const [geoOk, setGeoOk] = useState(false);
-  const [tncAccepted, setTncAccepted] = useState(false);
-  const [privacyAccepted, setPrivacyAccepted] = useState(false);
-  const [devPermsGranted, setDevPermsGranted] = useState(false);
-  const [err, setErr] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [showTnc, setShowTnc] = useState(false);
-  const [showSignupPwd, setShowSignupPwd] = useState(false);
-  const [stayLoggedIn, setStayLoggedIn] = useState(false);
-  const [capsLockOn, setCapsLockOn] = useState(false);
-  const [passwordStrength, setPasswordStrength] = useState(0);
-  const [profilePicture, setProfilePicture] = useState(null);
-  const [showImageCropper, setShowImageCropper] = useState(false);
-  const [selectedImageFile, setSelectedImageFile] = useState(null);
-
-  const sf = (k) => (v) => setF((p) => ({ ...p, [k]: v }));
-
-  // Check if form can be submitted: valid Gmail email and password >= 8 characters
-  const isFormValid = () => {
-    return isValidGmailAddress(f.email) && f.password.length >= 8;
-  };
-
-  const handlePasswordChange = (e) => {
-    const pwd = e.target.value;
-    sf("password")(pwd);
-    setPasswordStrength(calculatePasswordStrength(pwd));
-  };
-
-  const handlePasswordKeyDown = (e) => {
-    // Detect Caps Lock
-    if (e.getModifierState("CapsLock")) {
-      setCapsLockOn(true);
-    } else {
-      setCapsLockOn(false);
-    }
-  };
-
-  const handlePasswordKeyUp = (e) => {
-    // Re-check on key up
-    setCapsLockOn(e.getModifierState("CapsLock"));
-  };
-
-  const requestPerms = async () => {
-    const d = getDevice();
-    setDevice(d);
-    try {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          setGeoOk(Boolean(pos));
-        },
-        () => setGeoOk(false),
-      );
-      if (Notification.permission === "default") {
-        await Notification.requestPermission();
-      }
-    } catch {
-      // Geolocation or notification permission failed silently
-    }
-    setDevPermsGranted(true);
-  };
-
-  const submit = async () => {
-    if (!f.fullName || !f.email || !f.password || !f.mobile) {
-      setErr("Full Name, Email, Password, and Mobile are required.");
-      return;
-    }
-
-    // RULE 29: Gmail-Only Registration
-    if (!isValidGmailAddress(f.email)) {
-      setErr(
-        "Institutional Rule: Only @gmail.com accounts are permitted for the Regiment.",
-      );
-      return;
-    }
-
-    if (!tncAccepted || !privacyAccepted) {
-      setErr("You must accept Terms & Conditions and the Privacy Notice.");
-      return;
-    }
-    if (!devPermsGranted) {
-      setErr("You must grant device permissions to proceed.");
-      return;
-    }
-
-    setErr("");
-    setLoading(true);
-
-    try {
-      await onSubmit({ ...f, device, geoGranted: geoOk, stayLoggedIn });
-    } catch (e) {
-      setErr(e.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: T.bg,
-        overflowY: "auto",
-        fontFamily: T.font,
-        padding: 20,
-      }}
-    >
-      <div style={{ ...authCard, maxWidth: 560 }} className="glass-panel">
-        <AuthLogo />
-        <div
-          style={{
-            color: T.gold,
-            fontSize: 12,
-            letterSpacing: 2,
-            textAlign: "center",
-            marginBottom: 24,
-            fontWeight: 700,
-          }}
-        >
-          RECRUIT APPLICATION FORM
-        </div>
-
-        {/* RULE #23: Google Sign-In Alternative */}
-        <div style={{ marginBottom: 16 }}>
-          <GoogleSignInButton
-            onSuccess={(user) => {
-              // Pre-fill form with Google data
-              sf("email")(user.email);
-              if (user.displayName) {
-                sf("fullName")(user.displayName);
-              }
-            }}
-            onError={(error) => setErr(error)}
-            buttonText="SIGN UP WITH GOOGLE"
-            isLoading={loading}
-          />
-        </div>
-
-        <div
-          style={{
-            marginBottom: 20,
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-          }}
-        >
-          <div style={{ flex: 1, height: "1px", background: `${T.muted}40` }} />
-          <span style={{ fontSize: 11, color: T.muted }}>OR MANUAL ENTRY</span>
-          <div style={{ flex: 1, height: "1px", background: `${T.muted}40` }} />
-        </div>
-
-        <div
-          style={{
-            color: T.muted,
-            fontSize: 11,
-            letterSpacing: 2,
-            marginBottom: 12,
-            paddingBottom: 8,
-            borderBottom: `1px solid rgba(255,255,255,0.1)`,
-            fontWeight: 600,
-          }}
-        >
-          PERSONAL INFORMATION
-        </div>
-
-        <div>
-          <label style={lbl}>FULL NAME *</label>
-          <input
-            value={f.fullName}
-            onChange={(e) => sf("fullName")(e.target.value)}
-            placeholder="Your full legal name"
-            style={{ ...authInp, fontFamily: T.font }}
-            className="input-glass"
-          />
-        </div>
-
-        <div>
-          <label style={lbl}>EMAIL ADDRESS *</label>
-          <input
-            type="email"
-            value={f.email}
-            onChange={(e) => sf("email")(e.target.value)}
-            placeholder="your@email.com"
-            style={{ ...authInp, fontFamily: T.font }}
-            className="input-glass"
-          />
-        </div>
-
-        {/* LAYER 4 SECURITY: ANTI-SPAM HONEYPOT FIELD - Hidden from humans, visible to bots */}
-        <div
-          style={{
-            display: "none",
-            visibility: "hidden",
-            position: "absolute",
-            left: "-9999px",
-          }}
-        >
-          <input
-            type="text"
-            id="phone_number_verify_alt_opt"
-            name="phone_number_verify_alt_opt"
-            value={f["phone_number_verify_alt_opt"] || ""}
-            onChange={(e) => sf("phone_number_verify_alt_opt")(e.target.value)}
-            placeholder="Do not fill this field"
-            aria-hidden="true"
-            tabIndex="-1"
-            autoComplete="off"
-          />
-        </div>
-
-        {/* RULE #21 & #22: Profile Picture Upload & Cropper */}
-        <div
-          style={{
-            background: "rgba(52,199,89,0.1)",
-            border: `1px solid ${T.green}50`,
-            padding: 16,
-            borderRadius: 10,
-            marginBottom: 16,
-          }}
-        >
-          <div
-            style={{
-              color: T.green,
-              fontSize: 12,
-              fontWeight: 700,
-              marginBottom: 12,
-            }}
-          >
-            📷 PROFESSIONAL HEADSHOT (OPTIONAL)
-          </div>
-
-          {!showImageCropper && !profilePicture ? (
-            <>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => {
-                  const file = e.target.files[0];
-                  if (file) {
-                    setSelectedImageFile(file);
-                    setShowImageCropper(true);
-                  }
-                }}
-                style={{ display: "none" }}
-                id="profileUpload"
-              />
-              <button
-                onClick={() =>
-                  document.getElementById("profileUpload")?.click()
-                }
-                style={{ ...authBtn(T.green, false), width: "100%" }}
-                className="btn-glass"
-              >
-                📤 UPLOAD & CROP PHOTO
-              </button>
-              <div
-                style={{
-                  fontSize: 10,
-                  color: T.muted,
-                  marginTop: 8,
-                  textAlign: "center",
-                }}
-              >
-                If no photo is uploaded, Gravatar will be used as fallback
-              </div>
-            </>
-          ) : showImageCropper && selectedImageFile ? (
-            <ImageCropper
-              file={selectedImageFile}
-              onCrop={(blob) => {
-                setProfilePicture(blob);
-                setShowImageCropper(false);
-              }}
-              onCancel={() => {
-                setShowImageCropper(false);
-                setSelectedImageFile(null);
-              }}
-            />
-          ) : profilePicture ? (
-            <div style={{ textAlign: "center" }}>
-              <div
-                style={{
-                  width: 100,
-                  height: 100,
-                  borderRadius: "50%",
-                  border: `2px solid ${T.green}`,
-                  background: `url(${URL.createObjectURL(profilePicture)}) center / cover`,
-                  margin: "0 auto 12px",
-                }}
-              />
-              <div
-                style={{
-                  color: T.green,
-                  fontSize: 11,
-                  fontWeight: 600,
-                  marginBottom: 8,
-                }}
-              >
-                ✓ Photo ready
-              </div>
-              <button
-                onClick={() => {
-                  setProfilePicture(null);
-                  setSelectedImageFile(null);
-                }}
-                style={{ ...authBtn(T.red, false), width: "100%" }}
-                className="btn-glass"
-              >
-                🔄 CHANGE PHOTO
-              </button>
-            </div>
-          ) : null}
-        </div>
-
-        <div>
-          <label style={lbl}>PASSWORD *</label>
-          <div style={{ position: "relative", width: "100%", marginBottom: 8 }}>
-            <input
-              type={showSignupPwd ? "text" : "password"}
-              value={f.password}
-              onChange={handlePasswordChange}
-              onKeyDown={handlePasswordKeyDown}
-              onKeyUp={handlePasswordKeyUp}
-              placeholder="Min 8 characters"
-              style={{
-                ...authInp,
-                letterSpacing: 4,
-                width: "100%",
-                marginBottom: 0,
-              }}
-              className="input-glass"
-            />
-            <button
-              type="button"
-              onClick={() => setShowSignupPwd(!showSignupPwd)}
-              style={{
-                position: "absolute",
-                right: "10px",
-                top: "50%",
-                transform: "translateY(-50%)",
-                background: "none",
-                border: "none",
-                color: "#888",
-                cursor: "pointer",
-                fontSize: "12px",
-              }}
-            >
-              {showSignupPwd ? "HIDE" : "SHOW"}
-            </button>
-          </div>
-
-          {/* Caps Lock Warning */}
-          {capsLockOn && (
-            <div
-              style={{
-                color: T.red,
-                fontSize: 11,
-                marginBottom: 8,
-                padding: "8px 10px",
-                background: "rgba(255,69,58,0.1)",
-                border: `1px solid rgba(255,69,58,0.3)`,
-                borderRadius: 4,
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-              }}
-            >
-              ⚠️ <strong>Caps Lock is ON</strong>
-            </div>
-          )}
-
-          {/* Password Strength Meter */}
-          {f.password && (
-            <div style={{ marginBottom: 12 }}>
-              <div
-                style={{ display: "flex", gap: 4, height: 4, marginBottom: 6 }}
-              >
-                {[0, 1, 2].map((idx) => (
-                  <div
-                    key={idx}
-                    style={{
-                      flex: 1,
-                      height: "100%",
-                      background:
-                        passwordStrength > idx
-                          ? getStrengthLabel(passwordStrength).color
-                          : "rgba(255,255,255,0.1)",
-                      borderRadius: 2,
-                      transition: "all 0.2s ease",
-                    }}
-                  />
-                ))}
-              </div>
-              <div
-                style={{
-                  fontSize: 10,
-                  color: getStrengthLabel(passwordStrength).color,
-                  fontWeight: 600,
-                }}
-              >
-                Password Strength:{" "}
-                <strong>{getStrengthLabel(passwordStrength).label}</strong>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div>
-          <label style={lbl}>MOBILE NUMBER *</label>
-          <input
-            value={f.mobile}
-            onChange={(e) => sf("mobile")(formatPhoneNumber(e.target.value))}
-            placeholder="10-digit phone number"
-            style={authInp}
-            className="input-glass"
-          />
-        </div>
-
-        <div>
-          <label style={lbl}>ADDRESS</label>
-          <input
-            value={f.address}
-            onChange={(e) => sf("address")(e.target.value)}
-            placeholder="City, State, Country"
-            style={{ ...authInp, fontFamily: T.font }}
-            className="input-glass"
-          />
-        </div>
-
-        {/* RULE #24: Identity Verification */}
-        <IdentityVerificationComponent
-          uid={f.email}
-          token=""
-          onSuccess={() => {}}
-          onError={() => {}}
-          showToast={() => {}}
-        />
-
-        <div
-          style={{
-            color: T.muted,
-            fontSize: 11,
-            letterSpacing: 2,
-            margin: "20px 0 12px",
-            paddingTop: 12,
-            borderTop: `1px solid rgba(255,255,255,0.1)`,
-            fontWeight: 600,
-          }}
-        >
-          SOCIAL PROFILES
-        </div>
-
-        <div>
-          <label style={lbl}>INSTAGRAM ID</label>
-          <input
-            value={f.instagram}
-            onChange={(e) => sf("instagram")(e.target.value)}
-            placeholder="@username"
-            style={{ ...authInp, fontFamily: T.font }}
-            className="input-glass"
-          />
-        </div>
-
-        <div>
-          <label style={lbl}>LINKEDIN ID</label>
-          <input
-            value={f.linkedin}
-            onChange={(e) => sf("linkedin")(e.target.value)}
-            placeholder="linkedin.com/in/username"
-            style={{ ...authInp, fontFamily: T.font }}
-            className="input-glass"
-          />
-        </div>
-
-        <div style={{ marginBottom: 16 }}>
-          <label style={lbl}>TRADING PROFICIENCY</label>
-          <select
-            value={f.proficiency}
-            onChange={(e) => sf("proficiency")(e.target.value)}
-            style={{ ...authInp, marginBottom: 0, fontFamily: T.font }}
-            className="input-glass"
-          >
-            <option value="beginner">Beginner — Under 1 year experience</option>
-            <option value="intermediate">Intermediate — 1-3 years</option>
-            <option value="advanced">Advanced — 3-5 years</option>
-            <option value="expert">Expert — 5+ years, prop funded</option>
-          </select>
-        </div>
-
-        <div
-          style={{
-            padding: "16px 20px",
-            background: "rgba(0,0,0,0.3)",
-            border: `1px solid rgba(255,255,255,0.1)`,
-            borderRadius: 10,
-            marginBottom: 20,
-          }}
-          className="glass-panel"
-        >
-          <div
-            style={{
-              color: T.blue,
-              fontSize: 11,
-              letterSpacing: 2,
-              marginBottom: 10,
-              fontWeight: 700,
-            }}
-          >
-            ⚙ SYSTEM DEVICE ACCESS
-          </div>
-          <div
-            style={{
-                        color: "var(--text-secondary, #A1A1A6)",
-              fontSize: 12,
-              lineHeight: 1.6,
-              marginBottom: 14,
-            }}
-          >
-            For security and session monitoring, this terminal requires access
-            to your device's location and notification services.{" "}
-            <strong style={{ color: T.gold }}>
-              This system is STRICTLY PROHIBITED from accessing your banking
-              details, personal passwords, or financial credentials.
-            </strong>{" "}
-            All data collection is limited to trading activity and session
-            security only.
-          </div>
-          {!devPermsGranted ? (
-            <button
-              onClick={requestPerms}
-              style={{
-                ...authBtn(T.blue, false),
-                padding: "12px 0",
-                fontSize: 12,
-              }}
-              className="btn-glass"
-            >
-              ⊞ GRANT DEVICE ACCESS
-            </button>
-          ) : (
-            <div style={{ color: T.green, fontSize: 12, fontWeight: 600 }}>
-              ✓ Device permissions granted
-              {geoOk ? " · Location OK" : " · Location denied (optional)"}
-            </div>
-          )}
-        </div>
-
-        <div style={{ marginBottom: 20 }}>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "flex-start",
-              gap: 12,
-              marginBottom: 12,
-            }}
-          >
-            <div
-              onClick={() => setTncAccepted((v) => !v)}
-              style={{
-                width: 20,
-                height: 20,
-                border: `2px solid ${tncAccepted ? T.green : T.muted}`,
-                borderRadius: 4,
-                background: tncAccepted ? "rgba(48,209,88,0.2)" : "transparent",
-                cursor: "pointer",
-                flexShrink: 0,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                transition: "all 0.2s ease",
-              }}
-            >
-              {tncAccepted && (
-                <span style={{ color: T.green, fontSize: 14, fontWeight: 800 }}>
-                  ✓
-                </span>
-              )}
-            </div>
-            <div style={{ color: "#A1A1A6", fontSize: 12, lineHeight: 1.6 }}>
-              I accept the{" "}
-              <button
-                onClick={() => setShowTnc((v) => !v)}
-                style={{
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  color: T.blue,
-                  fontFamily: T.font,
-                  fontSize: 12,
-                  padding: 0,
-                  textDecoration: "underline",
-                  fontWeight: 600,
-                }}
-              >
-                Terms & Conditions
-              </button>{" "}
-              of Traders Regiment and understand this is a professional trading
-              system.
-            </div>
-          </div>
-
-          {showTnc && (
-            <div
-              style={{
-                background: "rgba(0,0,0,0.5)",
-                border: `1px solid rgba(255,255,255,0.1)`,
-                borderRadius: 8,
-                padding: 16,
-                marginBottom: 16,
-                maxHeight: 200,
-                overflowY: "auto",
-                color: T.muted,
-                fontSize: 11,
-                lineHeight: 1.8,
-              }}
-              className="glass-panel"
-            >
-              <strong style={{ color: T.gold }}>
-                TRADERS REGIMENT — TERMS & CONDITIONS
-              </strong>
-              <br />
-              <br />
-              1. This terminal is for professional futures trading use only. All
-              trades carry significant financial risk.
-              <br />
-              2. The system may collect device metadata for session security. It
-              does NOT collect banking information or passwords.
-              <br />
-              3. Account access is subject to Admin approval. Traders Regiment
-              reserves the right to revoke access at any time.
-              <br />
-              4. All trading decisions remain the sole responsibility of the
-              user. The system's AI guidance is informational only.
-              <br />
-              5. Your data is stored securely in our encrypted database and
-              never sold to third parties.
-              <br />
-              6. Dual-OTP is required for every session login. No exceptions.
-              <br />
-              7. AMD analysis and trade signals are analytical tools, not
-              guaranteed outcomes.
-            </div>
-          )}
-
-          <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-            <div
-              onClick={() => setPrivacyAccepted((v) => !v)}
-              style={{
-                width: 20,
-                height: 20,
-                border: `2px solid ${privacyAccepted ? T.green : T.muted}`,
-                borderRadius: 4,
-                background: privacyAccepted
-                  ? "rgba(48,209,88,0.2)"
-                  : "transparent",
-                cursor: "pointer",
-                flexShrink: 0,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                transition: "all 0.2s ease",
-              }}
-            >
-              {privacyAccepted && (
-                <span style={{ color: T.green, fontSize: 14, fontWeight: 800 }}>
-                  ✓
-                </span>
-              )}
-            </div>
-            <div style={{ color: "#A1A1A6", fontSize: 12, lineHeight: 1.6 }}>
-              I confirm this system has NO access to my banking details,
-              personal passwords, or financial credentials. I grant only the
-              stated device permissions for security purposes.
-            </div>
-          </div>
-        </div>
-
-        {err && (
-          <div
-            style={{
-              color: T.red,
-              fontSize: 12,
-              marginBottom: 16,
-              padding: "10px 14px",
-              background: "rgba(255,69,58,0.1)",
-              border: `1px solid rgba(255,69,58,0.3)`,
-              borderRadius: 6,
-              fontWeight: 500,
-            }}
-          >
-            {err}
-          </div>
-        )}
-
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            marginBottom: 16,
-          }}
-        >
-          <input
-            type="checkbox"
-            id="signupStayLoggedIn"
-            checked={stayLoggedIn}
-            onChange={(e) => setStayLoggedIn(e.target.checked)}
-            style={{ cursor: "pointer" }}
-          />
-          <label
-            htmlFor="signupStayLoggedIn"
-            style={{
-              fontSize: 12,
-              color: T.muted,
-              cursor: "pointer",
-              fontFamily: T.font,
-            }}
-          >
-            Stay Logged In
-          </label>
-        </div>
-
-        <button
-          onClick={submit}
-          disabled={loading || !isFormValid()}
-          style={authBtn(T.green, loading || !isFormValid())}
-          className="btn-glass"
-        >
-          {loading ? "⟳ SUBMITTING APPLICATION..." : "→ SUBMIT APPLICATION"}
-        </button>
-
-        <button
-          onClick={onBack}
-          style={{
-            ...authBtn(T.muted, false),
-            marginTop: 12,
-            background: "transparent",
-          }}
-          className="btn-glass"
-        >
-          ← BACK TO LOGIN
-        </button>
-      </div>
-    </div>
-  );
-}
-function WaitingRoom({ onRefresh, onLogout }) {
+function WaitingRoom({ profile, onRefresh, onLogout, onResendVerification }) {
   const [checking, setChecking] = useState(false);
+  const [liveStatus, setLiveStatus] = useState(profile?.status || "PENDING");
   const auditData =
     typeof window !== "undefined" ? window.__TRADERS_AUDIT_DATA : null;
   let auth = null;
@@ -4460,6 +2495,11 @@ function WaitingRoom({ onRefresh, onLogout }) {
     auditData?.userAuth?.email ||
     auditData?.adminAuth?.email ||
     "";
+  const emailVerified = profile?.emailVerified !== false;
+
+  useEffect(() => {
+    setLiveStatus(profile?.status || "PENDING");
+  }, [profile?.status]);
 
   useEffect(() => {
     if (!uid || auditData || !db) {
@@ -4467,9 +2507,27 @@ function WaitingRoom({ onRefresh, onLogout }) {
     }
 
     const statusRef = ref(db, `users/${uid}/status`);
-    const unsubscribe = onValue(statusRef, () => {});
+    const unsubscribe = onValue(statusRef, (snapshot) => {
+      const nextStatus = snapshot.val() || "PENDING";
+      setLiveStatus(nextStatus);
+      if (nextStatus === "ACTIVE") {
+        void onRefresh();
+      }
+    });
     return () => unsubscribe();
-  }, [uid, db, auditData]);
+  }, [uid, db, auditData, onRefresh]);
+
+  useEffect(() => {
+    if (!onRefresh) {
+      return undefined;
+    }
+
+    const interval = setInterval(() => {
+      void onRefresh();
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [onRefresh]);
 
   return (
     <div
@@ -4531,7 +2589,7 @@ function WaitingRoom({ onRefresh, onLogout }) {
             fontWeight: 700,
           }}
         >
-          APPLICATION PENDING
+          APPLICATION UNDER REVIEW
         </div>
         <div style={{ color: T.muted, fontSize: 12, marginBottom: 12 }}>
           Account: {email}
@@ -4549,7 +2607,9 @@ function WaitingRoom({ onRefresh, onLogout }) {
             boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.1)",
           }}
         >
-          It will take time to check if you are eligible to use the app or not.
+          {emailVerified
+            ? "Your Traders Regiment account is pending admin approval."
+            : "Verify your Gmail inbox, then wait for admin approval to unlock access."}
         </div>
         <div
           style={{
@@ -4559,9 +2619,47 @@ function WaitingRoom({ onRefresh, onLogout }) {
             marginBottom: 32,
           }}
         >
-          Your application has been received and is under review by our team.
-          You will be notified once your account is authorized. This typically
-          takes 24-48 hours.
+          {emailVerified
+            ? "Your application has been received. You will be notified once your account is authorized. Approval typically takes 24-48 hours."
+            : "We sent a verification link to your Gmail address. After verification, your application remains pending until an admin approves it. Approval typically takes 24-48 hours."}
+        </div>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            gap: 12,
+            flexWrap: "wrap",
+            marginBottom: 24,
+          }}
+        >
+          <div
+            style={{
+              padding: "8px 12px",
+              borderRadius: 999,
+              background: emailVerified
+                ? "rgba(34,197,94,0.12)"
+                : "rgba(217,119,6,0.12)",
+              color: emailVerified ? T.green : "#D97706",
+              fontSize: 11,
+              fontWeight: 700,
+              letterSpacing: 0.6,
+            }}
+          >
+            {emailVerified ? "EMAIL VERIFIED" : "EMAIL VERIFICATION REQUIRED"}
+          </div>
+          <div
+            style={{
+              padding: "8px 12px",
+              borderRadius: 999,
+              background: "rgba(15,23,42,0.06)",
+              color: "var(--text-primary, #111827)",
+              fontSize: 11,
+              fontWeight: 700,
+              letterSpacing: 0.6,
+            }}
+          >
+            STATUS: {liveStatus}
+          </div>
         </div>
         <div style={{ display: "flex", gap: 12, flexDirection: "column" }}>
           <button
@@ -4576,6 +2674,15 @@ function WaitingRoom({ onRefresh, onLogout }) {
           >
             {checking ? "⟳ CHECKING STATUS..." : "↺ CHECK APPROVAL STATUS"}
           </button>
+          {!emailVerified && (
+            <button
+              onClick={onResendVerification}
+              style={authBtn(T.blue, false)}
+              className="btn-glass"
+            >
+              RESEND VERIFICATION EMAIL
+            </button>
+          )}
           <button
             onClick={onLogout}
             aria-label="logout"
@@ -6215,12 +4322,19 @@ function AdminDashboard({
     if (!recordAdminActivity("APPROVE_USER", uid)) return;
 
     try {
+      const targetUser = (await dbR(`users/${uid}`, auth?.token)) || {};
       await dbM(
         `users/${uid}`,
         { status: "ACTIVE", approvedAt: new Date().toISOString() },
         auth?.token,
       );
       setActionMsg(`✓ User ${uid.slice(0, 8)}... APPROVED`);
+      if (targetUser.email) {
+        void sendApprovalConfirmationEmail(
+          targetUser.email,
+          targetUser.fullName,
+        );
+      }
       showToast(
         `Authorization granted. User ${uid.slice(0, 8)}... now have system access.`,
         "success",
@@ -9330,11 +7444,10 @@ export default function TradersRegiment() {
   }, [setAppTheme]);
   // MODULE 1 PHASE 2: PRIVACY & SESSION MANAGEMENT
   const [privacyModeActive, setPrivacyModeActive] = useState(false); // Rule #27: Ghost Mode
-  const [showInviteScreen, setShowInviteScreen] = useState(false);
-  const [showGoogleOnboard, setShowGoogleOnboard] = useState(false);
-  const [googleUser, setGoogleUser] = useState(null);
+  const [googleUser, setGoogleUser] = useState(() => readPendingGoogleSignup());
   const [, _setActiveSessions] = useState([]);
   const [currentSessionId, setCurrentSessionId] = useState(null);
+  const authBootstrapCompleteRef = useRef(false);
 
   const [maintenanceModeActive, setMaintenanceModeActive] = useState(() => {
     try {
@@ -9495,16 +7608,18 @@ export default function TradersRegiment() {
         sendTelegramAlert(
           "🔥 <b>ADMIN TERMINAL RESUMED</b>\nGod Mode session active on this device.",
         );
-      } else {
-        // Not an admin, go to login
-        setScreen("login");
+        setIsInitialLoading(false);
+        authBootstrapCompleteRef.current = true;
+        return;
       }
     } catch (error) {
       console.warn("Failed to restore admin session:", error);
+    }
+
+    if (!firebaseAuth) {
       setScreen("login");
-    } finally {
-      // Done loading, allow the app to render
       setIsInitialLoading(false);
+      authBootstrapCompleteRef.current = true;
     }
   }, []);
 
@@ -9564,43 +7679,6 @@ export default function TradersRegiment() {
     const timer = setTimeout(runDiagnostics, 500);
     return () => clearTimeout(timer);
   }, []);
-
-  // Phase 3: simple invite flow trigger after password reset
-  const triggerInviteFlow = async (email, name) => {
-    try {
-      // send invite email (optional backend interaction)
-      await sendInviteEmail(email, name);
-    } catch {
-      // ignore errors for the demo path
-    }
-    // Show Invite screen for the user flow
-    setShowInviteScreen(true);
-  };
-
-  // Phase 3.3: Forgot password -> trigger invite flow
-  const handleForgotPassword = async (email) => {
-    if (!email) {
-      showToast("Please enter an email address to reset password", "warning");
-      return;
-    }
-    try {
-      if (firebaseAuth) {
-        await sendPasswordResetEmail(firebaseAuth, email);
-      } else {
-        // If Firebase app not initialized, just simulate success for the demo
-        console.warn("simulate password reset email to", email);
-      }
-      showToast(
-        "Password reset email sent. Check Gmail for further steps.",
-        "success",
-      );
-      // Move to invite flow (no name yet)
-      triggerInviteFlow(email, "User");
-    } catch (err) {
-      console.error("Password reset failed:", err);
-      showToast("Failed to send password reset email", "error");
-    }
-  };
 
   useEffect(() => {
     // Track connection status to avoid duplicate toasts
@@ -9829,12 +7907,50 @@ export default function TradersRegiment() {
           await loadLegacyUserProfile(authData);
 
         if (!userData || !nextProfile) {
+          const currentUser = firebaseAuth?.currentUser;
+          const googleDraft =
+            readPendingGoogleSignup() ||
+            (currentUser?.providerData?.some(
+              (provider) => provider?.providerId === "google.com",
+            )
+              ? {
+                  uid: authData.uid,
+                  email: authData.email,
+                  fullName:
+                    currentUser.displayName ||
+                    authData.email?.split("@")[0] ||
+                    "",
+                  authProvider: "google",
+                }
+              : null);
+
+          if (googleDraft?.uid === authData.uid) {
+            persistPendingGoogleSignup(googleDraft);
+            setGoogleUser(googleDraft);
+            setProfile({
+              ...googleDraft,
+              uid: authData.uid,
+              token: authData.token,
+              email: authData.email,
+              emailVerified: authData.emailVerified,
+              status: "DRAFT",
+            });
+            setScreen(SCREEN_IDS.SIGNUP);
+            return;
+          }
+
+          setGoogleUser(null);
           setProfile(null);
           setScreen(SCREEN_IDS.LOGIN);
           return;
         }
 
-        setProfile(nextProfile);
+        clearPendingGoogleSignup();
+        setGoogleUser(null);
+        setProfile({
+          ...nextProfile,
+          emailVerified: authData.emailVerified,
+        });
 
         if (userData.status === "BLOCKED") {
           setScreen(SCREEN_IDS.LOGIN);
@@ -9845,7 +7961,7 @@ export default function TradersRegiment() {
           return;
         }
 
-        if (userData.status === "PENDING") {
+        if (userData.status === "PENDING" || authData.emailVerified === false) {
           setScreen(SCREEN_IDS.WAITING);
           return;
         }
@@ -9876,66 +7992,198 @@ export default function TradersRegiment() {
 
     const unsubscribe = onAuthStateChanged(firebaseAuth, async (user) => {
       try {
-        if (user && user.emailVerified !== false) {
-          // Only proceed if we're not already in admin mode (to avoid double-loading)
+        if (user) {
           if (isAdminAuthenticated) {
-            return; // Admin is authenticated, don't do normal user flow
+            return;
           }
 
-          // For regular users only - get token with refresh if needed
           try {
-            const token = await user.getIdToken(true); // Force refresh to handle F5 properly
-            const authData = { uid: user.uid, token, email: user.email };
+            await user.reload();
+          } catch (reloadError) {
+            console.warn("Auth user reload skipped:", reloadError.message);
+          }
+
+          try {
+            const token = await user.getIdToken(true);
+            const authData = {
+              uid: user.uid,
+              token,
+              refreshToken: user.refreshToken,
+              email: user.email,
+              emailVerified: user.emailVerified,
+            };
             setAuth(authData);
             await checkUserStatus(authData);
           } catch (tokenError) {
-            // Token refresh failed - try to get non-refreshed token
             console.warn(
               "Token refresh failed, trying non-refreshed token:",
               tokenError.message,
             );
             try {
               const token = await user.getIdToken(false);
-              const authData = { uid: user.uid, token, email: user.email };
+              const authData = {
+                uid: user.uid,
+                token,
+                refreshToken: user.refreshToken,
+                email: user.email,
+                emailVerified: user.emailVerified,
+              };
               setAuth(authData);
               await checkUserStatus(authData);
             } catch (fallbackError) {
-              // Both token attempts failed - but user IS logged in Firebase
-              // Keep them on current screen, don't auto-logout
               console.warn(
                 "All token methods failed but user exists in Firebase:",
                 fallbackError.message,
               );
-              // Keep user on current screen - they're authenticated, just having token issues
             }
           }
         } else if (!isAdminAuthenticated) {
-          // No valid user and not in admin mode, but only redirect if we're sure they're not authenticated
-          // Don't redirect immediately - give time for Firebase to initialize
-          setTimeout(() => {
-            if (!auth && screen !== "login" && screen !== "splash") {
-              setScreen("login");
-            }
-          }, 2000);
+          setAuth(null);
+          setProfile(null);
+          setGoogleUser(null);
+          clearPendingGoogleSignup();
+          setScreen("login");
         }
       } catch (error) {
         console.error("Auth state change error:", error);
-        // Don't redirect to login on every error - just log it
+      } finally {
+        if (!authBootstrapCompleteRef.current) {
+          authBootstrapCompleteRef.current = true;
+          setIsInitialLoading(false);
+        }
       }
     });
 
     return () => unsubscribe();
-  }, [isAdminAuthenticated]);
+  }, [checkUserStatus, isAdminAuthenticated]);
+
+  const findUserRecordByEmail = useCallback(async (email) => {
+    const normalizedEmail = String(email || "").trim().toLowerCase();
+    if (!normalizedEmail) {
+      return null;
+    }
+
+    const allUsers = (await dbR("users", "")) || {};
+    const match = Object.entries(allUsers).find(
+      ([, user]) => user?.email?.toLowerCase() === normalizedEmail,
+    );
+
+    if (!match) {
+      return null;
+    }
+
+    return {
+      uid: match[0],
+      userData: match[1],
+    };
+  }, []);
+
+  const buildPendingProfile = useCallback(
+    ({
+      fullName,
+      email,
+      country,
+      city,
+      instagram,
+      linkedin,
+      proficiency,
+      authProvider = "password",
+      emailVerified = false,
+    }) => ({
+      fullName: (fullName || email?.split("@")[0] || "").trim(),
+      email: String(email || "").trim().toLowerCase(),
+      country: String(country || "").trim(),
+      city: String(city || "").trim(),
+      instagram: String(instagram || "").trim(),
+      linkedin: String(linkedin || "").trim(),
+      proficiency: String(proficiency || "").trim(),
+      authProvider,
+      emailVerified: Boolean(emailVerified),
+      status: "PENDING",
+      role: "user",
+      createdAt: new Date().toISOString(),
+      passwordLastChanged: new Date().toISOString(),
+      failedAttempts: 0,
+      isLocked: false,
+    }),
+    [],
+  );
+
+  const syncAuthSessionFromUser = useCallback(
+    async (user, stayLoggedIn = false) => {
+      const token = await user.getIdToken(true);
+      const authData = {
+        uid: user.uid,
+        token,
+        refreshToken: user.refreshToken,
+        email: user.email,
+        emailVerified: user.emailVerified,
+      };
+
+      setAuth(authData);
+
+      const sessionId = await createSession(user.uid, token, stayLoggedIn);
+      if (sessionId) {
+        setCurrentSessionId(sessionId);
+      }
+
+      return authData;
+    },
+    [],
+  );
+
+  const sendVerificationLink = useCallback(async () => {
+    const currentUser = firebaseAuth?.currentUser;
+    if (!currentUser) {
+      throw new Error("Your session expired. Sign in again to resend verification.");
+    }
+
+    await sendEmailVerification(currentUser);
+  }, []);
+
+  const handleLoginPasswordReset = useCallback(async (email) => {
+    const cleanEmail = String(email || "").trim().toLowerCase();
+    if (!cleanEmail) {
+      throw new Error("Please enter your Gmail address.");
+    }
+
+    if (!isValidGmailAddress(cleanEmail)) {
+      throw new Error("Only Gmail addresses are allowed.");
+    }
+
+    if (
+      !firebaseAuth ||
+      (typeof window !== "undefined" && window.__TRADERS_AUDIT_DATA)
+    ) {
+      return "Audit mode: password reset link simulated.";
+    }
+
+    await sendPasswordResetEmail(firebaseAuth, cleanEmail);
+    return "Password reset email sent. Check your Gmail inbox and spam folder.";
+  }, []);
 
   const handleLogin = async (email, password, stayLoggedIn = false) => {
-    // Auto-sanitize email: trim whitespace and convert to lowercase
-    const sanitizedEmail = email.trim().toLowerCase();
-
-    // Permanent ban check
+    const sanitizedEmail = String(email || "").trim().toLowerCase();
     const blockedEmails = ["arkgproductions@gmail.com", "starg.unit@gmail.com"];
+
+    if (!sanitizedEmail || !password) {
+      throw new Error("Email and password are required.");
+    }
+
+    if (!isValidGmailAddress(sanitizedEmail)) {
+      throw new Error("Only Gmail addresses are allowed.");
+    }
+
     if (blockedEmails.includes(sanitizedEmail)) {
       throw new Error(
         "Access Denied: This account has been permanently restricted.",
+      );
+    }
+
+    const remainingCooldownMs = getLoginRateLimitRemainingMs(sanitizedEmail);
+    if (remainingCooldownMs > 0) {
+      throw new Error(
+        `Too many login attempts. Try again in ${formatCooldown(remainingCooldownMs)}.`,
       );
     }
 
@@ -9954,6 +8202,7 @@ export default function TradersRegiment() {
         token: simulatedToken,
         refreshToken: `audit-refresh-${simulatedUid}`,
         email: auditProfile?.email || sanitizedEmail,
+        emailVerified: auditProfile?.emailVerified ?? true,
       };
       setAuth(simulatedAuth);
       setCurrentSessionId("audit-session");
@@ -9962,17 +8211,15 @@ export default function TradersRegiment() {
         uid: simulatedUid,
         token: simulatedToken,
         email: simulatedAuth.email,
+        emailVerified: simulatedAuth.emailVerified,
         status: auditProfile?.status || "ACTIVE",
       });
-      setScreen(auditProfile?.status === "PENDING" ? "waiting" : "otp");
+      setScreen(auditProfile?.status === "PENDING" ? "waiting" : "hub");
       return;
     }
 
-    // Check if another user is already logged in
-    if (
-      firebaseAuth?.currentUser &&
-      firebaseAuth.currentUser.email !== sanitizedEmail
-    ) {
+    const currentEmail = firebaseAuth.currentUser?.email?.toLowerCase();
+    if (currentEmail && currentEmail !== sanitizedEmail) {
       showToast(
         "Session collision detected. Previous timeline still active.",
         "error",
@@ -9980,165 +8227,143 @@ export default function TradersRegiment() {
       return;
     }
 
-    // Enable persistence if "Stay Logged In" is checked
-    if (stayLoggedIn && firebaseAuth) {
-      try {
-        await setPersistence(firebaseAuth, browserLocalPersistence);
-      } catch (error) {
-        console.warn("Failed to set persistence:", error);
-      }
-    }
-
-    // Get user data first to check for lockout
-    let userData;
     try {
-      userData = await dbR(`users/${sanitizedEmail.split("@")[0]}`, ""); // Try to get user
-    } catch (e) {
-      console.warn("Could not fetch user data:", e);
+      await setPersistence(firebaseAuth, browserLocalPersistence);
+    } catch (error) {
+      console.warn("Failed to set persistence:", error);
     }
 
-    // RULE 13: CHECK IF ACCOUNT IS LOCKED
-    if (userData && userData.isLocked) {
+    const existingRecord = await findUserRecordByEmail(sanitizedEmail);
+    if (existingRecord?.userData?.isLocked) {
       throw new Error(
         "Account Locked: Too many failed attempts. Contact Master Admin.",
       );
     }
 
-    // Pass sanitized email to Firebase with breach attempt detection
-    let data;
     try {
-      data = await fbSignIn(sanitizedEmail, password);
+      const userCredential = await signInWithEmailAndPassword(
+        firebaseAuth,
+        sanitizedEmail,
+        password,
+      );
+      const signedInUser = userCredential.user;
 
-      // Login successful - reset failedAttempts counter
-      if (userData) {
-        await dbM(`users/${data.localId}`, { failedAttempts: 0 }, data.idToken);
+      clearLoginFailures(sanitizedEmail);
+
+      const token = await signedInUser.getIdToken(true);
+
+      if (existingRecord?.uid) {
+        await dbM(
+          `users/${existingRecord.uid}`,
+          {
+            failedAttempts: 0,
+            isLocked: false,
+            lastLoginAttempt: new Date().toISOString(),
+            emailVerified: signedInUser.emailVerified,
+          },
+          token,
+        );
       }
     } catch (error) {
-      // Login failed - increment failedAttempts counter
-      let userToUpdate = userData;
+      recordLoginFailure(sanitizedEmail);
 
-      // If we don't have userData yet, try to fetch it using the email
-      if (!userToUpdate) {
-        try {
-          // Try to find user by searching all users (fallback)
-          const allUsers = await dbR("users", "");
-          if (allUsers) {
-            userToUpdate = Object.entries(allUsers).find(
-              (e) => e[1]?.email?.toLowerCase() === sanitizedEmail,
-            )?.[1];
-          }
-        } catch (e) {
-          console.warn("Could not fetch user data on login failure:", e);
-        }
-      }
-
-      if (userToUpdate) {
-        const currentAttempts = (userToUpdate.failedAttempts || 0) + 1;
+      if (existingRecord?.uid) {
+        const currentAttempts =
+          Number(existingRecord.userData?.failedAttempts || 0) + 1;
         const isNowLocked = currentAttempts >= 10;
 
-        // Update failedAttempts in database (if we have user ID)
         try {
-          const userId = Object.entries((await dbR("users", "")) || {}).find(
-            (e) => e[1]?.email?.toLowerCase() === sanitizedEmail,
-          )?.[0];
-
-          if (userId) {
-            await dbM(`users/${userId}`, {
-              failedAttempts: currentAttempts,
-              isLocked: isNowLocked,
-            });
-          }
+          await dbM(`users/${existingRecord.uid}`, {
+            failedAttempts: currentAttempts,
+            isLocked: isNowLocked,
+            lastLoginAttempt: new Date().toISOString(),
+          });
         } catch (dbError) {
           console.warn("Could not update failedAttempts:", dbError);
         }
 
-        // Show appropriate error message
         if (isNowLocked) {
           sendForensicAlert(sanitizedEmail, "ACCOUNT_LOCKOUT");
           throw new Error(
             "Account Locked: Too many failed attempts. Contact Master Admin.",
           );
-        } else {
-          throw new Error(`Login failed. Attempts: ${currentAttempts}/10`);
         }
       }
 
-      // Breach attempt: Someone tried admin email with wrong credentials
       if (sanitizedEmail === ADMIN_EMAIL.toLowerCase()) {
         sendForensicAlert(sanitizedEmail, "UNAUTHORIZED_ACCESS");
       }
+
+      const errorCode = error?.code || "";
+      if (
+        errorCode === "auth/invalid-credential" ||
+        errorCode === "auth/wrong-password" ||
+        errorCode === "auth/user-not-found"
+      ) {
+        throw new Error("Incorrect Gmail address or password.");
+      }
+
+      if (errorCode === "auth/too-many-requests") {
+        throw new Error("Too many attempts. Please try again later.");
+      }
+
+      if (errorCode === "auth/user-disabled") {
+        throw new Error("This account has been disabled.");
+      }
+
       throw error;
     }
 
-    const authData = {
-      uid: data.localId,
-      token: data.idToken,
-      refreshToken: data.refreshToken,
-      email: data.email,
-    };
-    setAuth(authData);
-
-    // RULE #12: Create session for 30-day persistence (Remember Me)
-    const sessionId = await createSession(
-      data.localId,
-      data.idToken,
-      stayLoggedIn,
-    );
-    if (sessionId) {
-      setCurrentSessionId(sessionId);
+    const signedInUser = firebaseAuth.currentUser;
+    if (!signedInUser) {
+      throw new Error("We could not restore your session. Try again.");
     }
 
-    if (data.localId === ADMIN_UID) {
+    const authData = await syncAuthSessionFromUser(signedInUser, stayLoggedIn);
+
+    if (signedInUser.uid === ADMIN_UID) {
       // Admin login successful - send alert
       sendTelegramAlert(
         "🔓 <b>GOD MODE ACTIVATED</b>\nMaster Admin has entered the terminal.",
       );
 
-      const userData = (await dbR(`users/${data.localId}`, data.idToken)) || {};
+      const userData =
+        (await dbR(`users/${signedInUser.uid}`, authData.token)) || {};
       setProfile({
         ...userData,
-        uid: data.localId,
-        token: data.idToken,
-        email: data.email,
+        uid: signedInUser.uid,
+        token: authData.token,
+        email: signedInUser.email,
+        emailVerified: signedInUser.emailVerified,
       });
-      setScreen("otp");
+      setScreen("admin");
       return;
     }
 
-    const userDataFinal = await dbR(`users/${data.localId}`, data.idToken);
+    let userDataFinal = await dbR(`users/${signedInUser.uid}`, authData.token);
     if (!userDataFinal) {
-      const initProfile = {
-        fullName: "",
-        email: data.email,
-        status: "PENDING", // MUST be uppercase
-        role: "user",
-        createdAt: new Date().toISOString(), // ISO format for consistency
-        passwordLastChanged: new Date().toISOString(),
-        failedAttempts: 0,
-        isLocked: false,
-        lastLoginAttempt: new Date().toISOString(),
-      };
-      // CRITICAL: Save under exact Firebase UID (data.localId), never random keys
-      await dbM(`users/${data.localId}`, initProfile, data.idToken);
-      setProfile({
-        uid: data.localId,
-        token: data.idToken,
-        email: data.email,
-        status: "PENDING",
-        mobile: "",
+      const initProfile = buildPendingProfile({
+        fullName: signedInUser.displayName,
+        email: signedInUser.email,
+        country: "",
+        city: "",
+        authProvider: "password",
+        emailVerified: signedInUser.emailVerified,
       });
-      setScreen("waiting");
-      return;
+      await dbM(`users/${signedInUser.uid}`, initProfile, authData.token);
+      userDataFinal = initProfile;
     }
 
-    // RULE 18: CHECK IF PASSWORD IS EXPIRED (>120 days)
-    if (isPasswordExpired(userDataFinal.passwordLastChanged)) {
-      // Store profile and redirect to password reset screen
+    if (
+      userDataFinal.passwordLastChanged &&
+      isPasswordExpired(userDataFinal.passwordLastChanged)
+    ) {
       setProfile({
         ...userDataFinal,
-        uid: data.localId,
-        token: data.idToken,
-        email: data.email,
+        uid: signedInUser.uid,
+        token: authData.token,
+        email: signedInUser.email,
+        emailVerified: signedInUser.emailVerified,
       });
       setScreen("forcePasswordReset");
       return;
@@ -10148,91 +8373,66 @@ export default function TradersRegiment() {
       throw new Error("Account blocked. Contact admin.");
     }
 
-    if (userDataFinal.status === "PENDING") {
-      setProfile({
-        ...userDataFinal,
-        uid: data.localId,
-        token: data.idToken,
-        email: data.email,
-      });
-      setScreen("waiting");
-      return;
-    }
-
-    setProfile({
-      ...userDataFinal,
-      uid: data.localId,
-      token: data.idToken,
-      email: data.email,
-    });
-    setScreen("otp");
+    await checkUserStatus(authData);
   };
 
-  const handleSignup = async (formData) => {
-    // ═══════════════════════════════════════════════════════════════════
-    // LAYER 4 SECURITY: ANTI-SPAM SHIELD - Honeypot field check
-    // ═══════════════════════════════════════════════════════════════════
+  const handleStructuredSignup = async (formData) => {
     const antiSpamShield = new AntiSpamShield(window.sendTelegramAlert);
     if (antiSpamShield.isBotDetected(formData)) {
-      // Silently reject bot (no error message shown)
       await antiSpamShield.silentlyRejectBot(formData.email, formData);
-      // Return success message (to fool bot) but don't actually sign up
-      return { success: true, message: "Check your email for OTP" };
+      return { success: true, message: "Application received." };
     }
 
-    // Auto-sanitize email: trim whitespace and convert to lowercase
-    const sanitizedEmail = formData.email.trim().toLowerCase();
-    const cleanEmail = sanitizedEmail;
-
-    // ═══════════════════════════════════════════════════════════════════
-    // SECURITY CHECK 1: BLOCK ADMIN EMAIL IMPERSONATION ATTEMPTS
-    // ═══════════════════════════════════════════════════════════════════
-    if (cleanEmail === ADMIN_EMAIL.toLowerCase()) {
-      // Send forensic alert in background (non-blocking)
-      sendForensicAlert(cleanEmail, "IMPERSONATION_ATTEMPT");
-      throw new Error(
-        "🔐 SECURITY BLOCK: Admin email cannot be used for registration.",
-      );
-    }
-
-    // ═══════════════════════════════════════════════════════════════════
-    // SECURITY CHECK 2: PERMANENT BAN CHECK
-    // ═══════════════════════════════════════════════════════════════════
+    const authProvider =
+      formData.authProvider === "google" || googleUser?.authProvider === "google"
+        ? "google"
+        : "password";
+    const cleanEmail = String(
+      formData.email || googleUser?.email || firebaseAuth?.currentUser?.email || "",
+    )
+      .trim()
+      .toLowerCase();
+    const fullName = String(
+      formData.fullName ||
+        googleUser?.fullName ||
+        firebaseAuth?.currentUser?.displayName ||
+        cleanEmail.split("@")[0] ||
+        "",
+    ).trim();
+    const country = String(formData.country || "").trim();
+    const city = String(formData.city || "").trim();
+    const instagram = String(formData.instagram || "").trim();
+    const linkedin = String(formData.linkedin || "").trim();
+    const proficiency = String(formData.proficiency || "").trim();
+    const stayLoggedIn = Boolean(formData.stayLoggedIn);
     const blockedEmails = ["arkgproductions@gmail.com", "starg.unit@gmail.com"];
+
+    if (!fullName) {
+      throw new Error("Full name is required.");
+    }
+
+    if (!country || !city) {
+      throw new Error("Country and city are required.");
+    }
+
+    if (!isValidGmailAddress(cleanEmail)) {
+      throw new Error("Only Gmail addresses are allowed.");
+    }
+
+    if (cleanEmail === ADMIN_EMAIL.toLowerCase()) {
+      sendForensicAlert(cleanEmail, "IMPERSONATION_ATTEMPT");
+      throw new Error("Admin email cannot be used for registration.");
+    }
+
     if (blockedEmails.includes(cleanEmail)) {
       throw new Error(
-        "🔐 Access Denied: This account has been permanently restricted.",
+        "Access Denied: This account has been permanently restricted.",
       );
     }
 
-    // ═══════════════════════════════════════════════════════════════════
-    // SECURITY CHECK 3: PRE-CHECK EMAIL EXISTENCE IN FIREBASE AUTH
-    // ═══════════════════════════════════════════════════════════════════
-    try {
-      if (firebaseAuth) {
-        const signInMethods = await fetchSignInMethodsForEmail(
-          firebaseAuth,
-          cleanEmail,
-        );
-        if (signInMethods && signInMethods.length > 0) {
-          // Email already exists in Firebase
-          console.warn("Email already registered in Firebase:", cleanEmail);
-          throw new Error(
-            "This email is already part of the Regiment. Please Login instead.",
-          );
-        }
-      }
-    } catch (checkError) {
-      // If error is about email already existing, pass it through
-      if (checkError.message.includes("already part of the Regiment")) {
-        throw checkError;
-      }
-      // For other errors, log but continue (network issues, etc)
-      console.warn("Could not pre-check email existence:", checkError);
+    if (authProvider !== "google" && String(formData.password || "").length < 8) {
+      throw new Error("Password must be at least 8 characters.");
     }
-
-    const fullName = formData.fullName || cleanEmail.split("@")[0]; // Default: email prefix
-    const stayLoggedIn = formData.stayLoggedIn || false;
 
     if (!firebaseAuth || !FB_KEY) {
       const simulatedUid =
@@ -10241,138 +8441,198 @@ export default function TradersRegiment() {
             window.__TRADERS_AUDIT_DATA?.userProfile?.uid)) ||
         `audit-${Date.now()}`;
       const simulatedToken = `audit-token-${simulatedUid}`;
-      const profileData = {
+      const profileData = buildPendingProfile({
         fullName,
         email: cleanEmail,
-        status: "PENDING",
-        role: "user",
-        createdAt: new Date().toISOString(),
-        passwordLastChanged: new Date().toISOString(),
-        failedAttempts: 0,
-        isLocked: false,
-      };
+        country,
+        city,
+        instagram,
+        linkedin,
+        proficiency,
+        authProvider,
+        emailVerified: authProvider === "google",
+      });
       await dbW(`users/${simulatedUid}`, profileData, simulatedToken);
       setAuth({
         uid: simulatedUid,
         token: simulatedToken,
         refreshToken: `audit-refresh-${simulatedUid}`,
         email: cleanEmail,
+        emailVerified: profileData.emailVerified,
       });
-      setProfile({ ...profileData, uid: simulatedUid, token: simulatedToken });
-      setScreen("otp");
+      setProfile({
+        ...profileData,
+        uid: simulatedUid,
+        token: simulatedToken,
+      });
+      setGoogleUser(null);
+      clearPendingGoogleSignup();
+      setScreen("waiting");
       return;
     }
 
-    // Enable persistence if "Stay Logged In" is checked
-    if (stayLoggedIn && firebaseAuth) {
-      try {
-        await setPersistence(firebaseAuth, browserLocalPersistence);
-      } catch (error) {
-        console.warn("Failed to set persistence:", error);
-      }
-    }
-
-    // ═══════════════════════════════════════════════════════════════════
-    // CREATE ACCOUNT IN FIREBASE
-    // ═══════════════════════════════════════════════════════════════════
-    let data;
     try {
-      data = await fbSignUp(sanitizedEmail, formData.password);
-    } catch (signupError) {
-      // Handle specific Firebase signup errors
-      const errorMsg = signupError.message || "";
-      if (errorMsg.includes("EMAIL_EXISTS")) {
-        throw new Error(
-          "This email is already registered. Please Login instead.",
+      await setPersistence(firebaseAuth, browserLocalPersistence);
+    } catch (error) {
+      console.warn("Failed to set persistence:", error);
+    }
+
+    let activeUser = firebaseAuth.currentUser;
+
+    if (authProvider === "google") {
+      if (!activeUser) {
+        throw new Error("Continue with Google first to finish your application.");
+      }
+      if (activeUser.email?.toLowerCase() !== cleanEmail) {
+        throw new Error("Google session mismatch. Please try again.");
+      }
+    } else {
+      try {
+        const signInMethods = await fetchSignInMethodsForEmail(
+          firebaseAuth,
+          cleanEmail,
         );
-      } else if (errorMsg.includes("INVALID_EMAIL")) {
-        throw new Error("Invalid email format. Please check and try again.");
-      } else if (errorMsg.includes("WEAK_PASSWORD")) {
-        throw new Error(
-          "Password is too weak. Use at least 8 characters with numbers.",
+        if (signInMethods && signInMethods.length > 0) {
+          throw new Error(
+            "This email is already part of the Regiment. Please login instead.",
+          );
+        }
+      } catch (checkError) {
+        if (checkError.message.includes("already part of the Regiment")) {
+          throw checkError;
+        }
+        console.warn("Could not pre-check email existence:", checkError);
+      }
+
+      try {
+        const userCredential = await createUserWithEmailAndPassword(
+          firebaseAuth,
+          cleanEmail,
+          formData.password,
         );
-      } else {
-        throw new Error(`Registration failed: ${errorMsg}`);
+        activeUser = userCredential.user;
+        await sendVerificationLink();
+      } catch (signupError) {
+        const errorCode = signupError?.code || "";
+        if (errorCode === "auth/email-already-in-use") {
+          throw new Error("This email is already registered. Please login instead.");
+        }
+        if (errorCode === "auth/invalid-email") {
+          throw new Error("Invalid Gmail address.");
+        }
+        if (errorCode === "auth/weak-password") {
+          throw new Error("Password is too weak. Use at least 8 characters.");
+        }
+        throw signupError;
       }
     }
 
-    // Standardized profile data with uppercase status and ISO timestamp
-    const profileData = {
+    if (!activeUser) {
+      throw new Error("Unable to create your session. Please try again.");
+    }
+
+    const authData = await syncAuthSessionFromUser(activeUser, stayLoggedIn);
+    const profileData = buildPendingProfile({
       fullName,
       email: cleanEmail,
-      status: "PENDING", // MUST be uppercase
-      role: "user",
-      createdAt: new Date().toISOString(), // ISO format for consistency
-      // RULE 18: Password expiry tracking
-      passwordLastChanged: new Date().toISOString(),
-      // RULE 13: Account lockout system
-      failedAttempts: 0,
-      isLocked: false,
-    };
+      country,
+      city,
+      instagram,
+      linkedin,
+      proficiency,
+      authProvider,
+      emailVerified: activeUser.emailVerified,
+    });
 
-    // CRITICAL: Save under exact Firebase UID (data.localId), never random keys
-    await dbW(`users/${data.localId}`, profileData, data.idToken);
+    await dbW(`users/${activeUser.uid}`, profileData, authData.token);
+    await sendWelcomeEmail(cleanEmail, fullName);
 
-    // New user signup - send alert with professional formatting for tap-to-copy
     sendTelegramAlert(
-      `👤 <b>NEW TRADER APPLICATION</b>\nEmail: <code>${cleanEmail}</code>\nStatus: 🟡 PENDING`,
+      `ðŸ‘¤ <b>NEW TRADER APPLICATION</b>\nEmail: <code>${cleanEmail}</code>\nStatus: ðŸŸ¡ PENDING`,
     );
 
-    const authData = {
-      uid: data.localId,
-      token: data.idToken,
-      refreshToken: data.refreshToken,
-      email: cleanEmail,
-    };
-
-    setAuth(authData);
-    setProfile({ ...profileData, uid: data.localId, token: data.idToken });
-    setScreen("otp");
+    clearPendingGoogleSignup();
+    setGoogleUser(null);
+    setProfile({
+      ...profileData,
+      uid: activeUser.uid,
+      token: authData.token,
+      emailVerified: activeUser.emailVerified,
+    });
+    setScreen("waiting");
   };
 
-  const handleOnboardingGoogleSuccess = async () => {
+  const handleStructuredGoogleAuth = async (
+    applicationData = null,
+    authenticatedUser = null,
+  ) => {
     if (!firebaseAuth || !FB_KEY) {
       throw new Error("Google sign-in is unavailable right now.");
     }
 
-    await signInWithPopup(firebaseAuth, googleProvider);
-  };
+    const user =
+      authenticatedUser ||
+      (await signInWithPopup(firebaseAuth, googleProvider)).user;
+    const email = String(user.email || "").toLowerCase();
 
-  const handleOTPVerified = async () => {
-    if (!auth) return;
+    if (!isValidGmailAddress(email)) {
+      await firebaseAuth.signOut();
+      throw new Error("Only Gmail addresses are allowed.");
+    }
 
-    // RULE #26: Role-Based Routing
-    if (auth.uid === ADMIN_UID) {
-      setScreen("admin");
+    const authData = await syncAuthSessionFromUser(user, true);
+    const userData = await dbR(`users/${user.uid}`, authData.token);
+
+    if (userData) {
+      clearPendingGoogleSignup();
+      setGoogleUser(null);
+      await checkUserStatus(authData);
       return;
     }
 
-    // Load full user data including trading objects
-    const fullData = await dbR(`users/${auth.uid}`, auth.token);
-
-    // Check user role for routing
-    const userRole = fullData?.role || "user";
-
-    setProfile((prev) => ({
-      ...prev,
-      ...(fullData?.profile || {}),
-      uid: auth.uid,
-      token: auth.token,
-      role: userRole,
-      journal: fullData?.journal,
-      firmRules: fullData?.firmRules,
-      accountState: fullData?.accountState,
-    }));
-
-    // Route based on role
-    if (userRole === "admin") {
-      setScreen("admin");
-    } else if (userRole === "user") {
-      setScreen("hub");
-    } else {
-      // Default to hub for unknown roles
-      setScreen("hub");
+    if (applicationData) {
+      await handleStructuredSignup({
+        ...applicationData,
+        email,
+        fullName:
+          applicationData.fullName || user.displayName || email.split("@")[0],
+        authProvider: "google",
+      });
+      return;
     }
+
+    const googleDraft = {
+      uid: user.uid,
+      email,
+      fullName: user.displayName || email.split("@")[0],
+      authProvider: "google",
+    };
+
+    persistPendingGoogleSignup(googleDraft);
+    setGoogleUser(googleDraft);
+    setScreen("signup");
+  };
+
+  const handleBackToLoginFromSignup = async () => {
+    clearPendingGoogleSignup();
+    setGoogleUser(null);
+
+    if (
+      firebaseAuth?.currentUser &&
+      firebaseAuth.currentUser.providerData?.some(
+        (provider) => provider?.providerId === "google.com",
+      )
+    ) {
+      try {
+        await firebaseAuth.signOut();
+      } catch (error) {
+        console.warn("Failed to clear pending Google session:", error);
+      }
+    }
+
+    setAuth(null);
+    setProfile(null);
+    setScreen("login");
   };
 
   // RULE 18: Handle forced password reset
@@ -10407,12 +8667,30 @@ export default function TradersRegiment() {
         passwordLastChanged: new Date().toISOString(),
       }));
 
-      // Redirect to OTP screen
-      setScreen("otp");
+      await checkUserStatus(auth);
     } catch (error) {
       console.error("Password reset error:", error);
       throw new Error(error.message || "Failed to update password. Try again.");
     }
+  };
+
+  const handleResendVerificationEmail = async () => {
+    await sendVerificationLink();
+
+    const refreshedUser = firebaseAuth?.currentUser;
+    if (!refreshedUser) {
+      return;
+    }
+
+    const refreshedAuth = {
+      uid: refreshedUser.uid,
+      token: await refreshedUser.getIdToken(true),
+      refreshToken: refreshedUser.refreshToken,
+      email: refreshedUser.email,
+      emailVerified: refreshedUser.emailVerified,
+    };
+    setAuth(refreshedAuth);
+    showToast("Verification email sent to your Gmail inbox.", "success");
   };
 
   const checkApprovalStatus = async () => {
@@ -10424,6 +8702,26 @@ export default function TradersRegiment() {
     ) {
       return;
     }
+
+    try {
+      if (firebaseAuth?.currentUser) {
+        await firebaseAuth.currentUser.reload();
+        const refreshedUser = firebaseAuth.currentUser;
+        const refreshedAuth = {
+          uid: refreshedUser.uid,
+          token: await refreshedUser.getIdToken(true),
+          refreshToken: refreshedUser.refreshToken,
+          email: refreshedUser.email,
+          emailVerified: refreshedUser.emailVerified,
+        };
+        setAuth(refreshedAuth);
+        await checkUserStatus(refreshedAuth);
+        return;
+      }
+    } catch (error) {
+      console.warn("Approval status refresh failed:", error);
+    }
+
     await checkUserStatus(auth);
   };
 
@@ -10440,6 +8738,8 @@ export default function TradersRegiment() {
     // Clear admin session from localStorage
     localStorage.removeItem("isAdminAuthenticated");
     localStorage.removeItem("admin_session");
+    clearPendingGoogleSignup();
+    setGoogleUser(null);
     setAuth(null);
     setProfile(null);
     setIsAdminAuthenticated(false);
@@ -10613,16 +8913,16 @@ export default function TradersRegiment() {
   };
 
   const handleAdminAccess = async () => {
-    // RULE #30: Hash input password with salt before comparing
-    const hashedInput = await hashAdminPasswordWithSalt(adminPassInput);
-    if (hashedInput !== ADMIN_PASS_HASH) {
+    try {
+      await verifyAdminPassword(adminPassInput);
+    } catch (error) {
       // Log security alert for unauthorized password attempt
       await logSecurityAlert(
         "Master Password Verification Failed",
         adminMasterEmail,
-        "Invalid master password",
+        error.message || "Invalid master password",
       );
-      setAdminPassErr("Invalid admin password.");
+      setAdminPassErr(error.message || "Invalid admin password.");
       showToast("Cipher mismatch. Authorization protocol rejected.", "error");
       return;
     }
@@ -10708,21 +9008,6 @@ export default function TradersRegiment() {
     );
   };
 
-  const maybeInviteScreen = showInviteScreen ? (
-    <InviteScreen
-      onApprove={() => {
-        // dismiss and show a friendly toast
-        setShowInviteScreen(false);
-        try {
-          showToast(
-            "Invite submitted. Chief will review within 48 hours.",
-            "success",
-          );
-        } catch {}
-      }}
-      onClose={() => setShowInviteScreen(false)}
-    />
-  ) : null;
   if (isInitialLoading) {
     return <SplashScreen />;
   }
@@ -10732,11 +9017,12 @@ export default function TradersRegiment() {
       case "login":
         return (
           <>
-            <LoginScreen
+            <CleanLoginScreen
               onLogin={handleLogin}
-              onForgotPassword={handleForgotPassword}
               onSignup={() => setScreen("signup")}
               onAdmin={() => setShowAdminPrompt(true)}
+              onGoogleAuth={handleStructuredGoogleAuth}
+              onForgotPassword={handleLoginPasswordReset}
             />
             {showAdminPrompt && (
               <div
@@ -11095,9 +9381,10 @@ export default function TradersRegiment() {
         return (
           <Suspense fallback={<LoadingFallback />}>
         <CleanOnboarding
-          onSignupSuccess={handleSignup}
-          onGoogleSuccess={handleOnboardingGoogleSuccess}
-          onBackToLogin={() => setScreen("login")}
+          onSignupSuccess={handleStructuredSignup}
+          onGoogleSuccess={handleStructuredGoogleAuth}
+          onBackToLogin={handleBackToLoginFromSignup}
+          googleUser={googleUser}
         />
       </Suspense>
         );
@@ -11105,18 +9392,10 @@ export default function TradersRegiment() {
       case "waiting":
         return (
           <WaitingRoom
-            onRefresh={checkApprovalStatus}
-            onLogout={handleLogout}
-          />
-        );
-
-      case "otp":
-        return (
-          <OTPScreen
             profile={profile}
-            onVerified={handleOTPVerified}
+            onRefresh={checkApprovalStatus}
+            onResendVerification={handleResendVerificationEmail}
             onLogout={handleLogout}
-            showToast={showToast}
           />
         );
 

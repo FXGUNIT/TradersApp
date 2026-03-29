@@ -4,6 +4,10 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "admin:hash": "node scripts/admin/generate-admin-pass-hash.mjs",
+    "bff:dev:local": "node bff/server.mjs",
+    "bff:dev": "infisical run -- node bff/server.mjs",
+    "dev:local": "vite",
     "dev": "infisical run -- vite",
     "build": "vite build",
     "lint": "eslint .",

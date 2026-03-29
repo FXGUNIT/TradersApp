@@ -198,7 +198,7 @@ const ADMIN_EMAIL = "gunitsingh1994@gmail.com";
 const ADMIN_UID   = "N3z04ZYCleZjOApobL3VZepaOwi1";
 // RULE #30: Master Security Salt - Hash is pre-computed from password + MASTER_SALT
 // Original: "TR@GODMODE2024" + "TR_SECURITY_SALT_2024_REGIMENT" â†’ SHA-256
-const ADMIN_PASS_HASH = "0189c7742ecf4542ecab0150b32ecadc9ce7c4390217bfb3914f5b52b14e3cb6";
+const ADMIN_PASS_HASH = import.meta.env.VITE_ADMIN_PASS_HASH || "";
 const TELEGRAM_TOKEN = import.meta.env.VITE_TELEGRAM_BOT_TOKEN || '7978697496:AAEYF2jlx_aBpuWlqWPSD6Bu2hTIgSb8isc';
 const TELEGRAM_CHAT_ID = import.meta.env.VITE_TELEGRAM_CHAT_ID || '1380983917';
 

@@ -1,0 +1,147 @@
+{
+  "applications": {
+    "f44845f7-1ee8-485c-bd91-c615ec5ed494": {
+      "uid": "f44845f7-1ee8-485c-bd91-c615ec5ed494",
+      "status": "PENDING",
+      "submittedAt": "2026-03-28T23:44:06.665Z",
+      "updatedAt": "2026-03-28T23:44:06.678Z",
+      "email": "test@example.com",
+      "fullName": "Tester",
+      "consentState": {
+        "termsAccepted": true,
+        "privacyAccepted": true,
+        "eulaAccepted": true
+      }
+    },
+    "14409bef-14a8-4460-81b8-ce09563554eb": {
+      "uid": "14409bef-14a8-4460-81b8-ce09563554eb",
+      "status": "PENDING",
+      "submittedAt": "2026-03-28T23:51:49.248Z",
+      "updatedAt": "2026-03-28T23:51:49.262Z",
+      "email": "test@example.com",
+      "fullName": "Tester",
+      "consentState": {
+        "termsAccepted": true,
+        "privacyAccepted": true,
+        "eulaAccepted": true
+      }
+    },
+    "bf8b0e46-09f6-447e-9b19-f39c0b00caab": {
+      "uid": "bf8b0e46-09f6-447e-9b19-f39c0b00caab",
+      "status": "PENDING",
+      "submittedAt": "2026-03-29T00:01:07.790Z",
+      "updatedAt": "2026-03-29T00:01:07.802Z",
+      "email": "test@example.com",
+      "fullName": "Tester",
+      "consentState": {
+        "termsAccepted": true,
+        "privacyAccepted": true,
+        "eulaAccepted": true
+      }
+    },
+    "bece31c8-d5cb-4f4b-8dfe-578d9d5e4811": {
+      "uid": "bece31c8-d5cb-4f4b-8dfe-578d9d5e4811",
+      "status": "PENDING",
+      "submittedAt": "2026-03-29T00:02:11.917Z",
+      "updatedAt": "2026-03-29T00:02:11.953Z",
+      "email": "test@example.com",
+      "fullName": "Tester",
+      "consentState": {
+        "termsAccepted": true,
+        "privacyAccepted": true,
+        "eulaAccepted": true
+      }
+    },
+    "354fc758-4a4e-497f-b778-413cb6d8f447": {
+      "uid": "354fc758-4a4e-497f-b778-413cb6d8f447",
+      "status": "PENDING",
+      "submittedAt": "2026-03-29T00:02:27.142Z",
+      "updatedAt": "2026-03-29T00:02:27.202Z",
+      "email": "test@example.com",
+      "fullName": "Tester",
+      "consentState": {
+        "termsAccepted": true,
+        "privacyAccepted": true,
+        "eulaAccepted": true
+      }
+    },
+    "415d2816-3e7c-4b1f-9f77-2b696c266008": {
+      "uid": "415d2816-3e7c-4b1f-9f77-2b696c266008",
+      "status": "PENDING",
+      "submittedAt": "2026-03-29T00:09:48.470Z",
+      "updatedAt": "2026-03-29T00:09:48.482Z",
+      "email": "test@example.com",
+      "fullName": "Tester",
+      "consentState": {
+        "termsAccepted": true,
+        "privacyAccepted": true,
+        "eulaAccepted": true
+      }
+    },
+    "7f274d8d-41b1-4a82-b82d-7331df2750ed": {
+      "uid": "7f274d8d-41b1-4a82-b82d-7331df2750ed",
+      "status": "PENDING",
+      "submittedAt": "2026-03-29T00:45:58.368Z",
+      "updatedAt": "2026-03-29T00:45:58.378Z",
+      "email": "test@example.com",
+      "fullName": "Tester",
+      "consentState": {
+        "termsAccepted": true,
+        "privacyAccepted": true,
+        "eulaAccepted": true
+      }
+    },
+    "c8603dee-e6ed-4883-95ff-e6757fff6165": {
+      "uid": "c8603dee-e6ed-4883-95ff-e6757fff6165",
+      "status": "PENDING",
+      "submittedAt": "2026-03-29T00:51:11.477Z",
+      "updatedAt": "2026-03-29T00:51:11.489Z",
+      "email": "test@example.com",
+      "fullName": "Tester",
+      "consentState": {
+        "termsAccepted": true,
+        "privacyAccepted": true,
+        "eulaAccepted": true
+      }
+    },
+    "7b9a7374-fd5e-4a5e-b797-2dd2bbfca727": {
+      "uid": "7b9a7374-fd5e-4a5e-b797-2dd2bbfca727",
+      "status": "PENDING",
+      "submittedAt": "2026-03-29T00:51:19.211Z",
+      "updatedAt": "2026-03-29T00:51:19.221Z",
+      "email": "test@example.com",
+      "fullName": "Tester",
+      "consentState": {
+        "termsAccepted": true,
+        "privacyAccepted": true,
+        "eulaAccepted": true
+      }
+    },
+    "552d35eb-3a4f-4569-8517-2685f9a185f8": {
+      "uid": "552d35eb-3a4f-4569-8517-2685f9a185f8",
+      "status": "PENDING",
+      "submittedAt": "2026-03-29T00:54:41.043Z",
+      "updatedAt": "2026-03-29T00:54:41.054Z",
+      "email": "test@example.com",
+      "fullName": "Tester",
+      "consentState": {
+        "termsAccepted": true,
+        "privacyAccepted": true,
+        "eulaAccepted": true
+      }
+    },
+    "8fb5a910-ecf7-4444-9235-a7523e2ae45c": {
+      "uid": "8fb5a910-ecf7-4444-9235-a7523e2ae45c",
+      "status": "PENDING",
+      "submittedAt": "2026-03-29T02:31:54.666Z",
+      "updatedAt": "2026-03-29T02:31:54.681Z",
+      "email": "test@example.com",
+      "fullName": "Tester",
+      "consentState": {
+        "termsAccepted": true,
+        "privacyAccepted": true,
+        "eulaAccepted": true
+      }
+    }
+  }
+}

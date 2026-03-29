@@ -34,9 +34,6 @@ export const ADMIN_EMAIL =
   import.meta.env.VITE_ADMIN_EMAIL || "gunitsingh1994@gmail.com";
 export const ADMIN_UID =
   import.meta.env.VITE_ADMIN_UID || "N3z04ZYCleZjOApobL3VZepaOwi1";
-export const ADMIN_PASS_HASH =
-  import.meta.env.VITE_ADMIN_PASS_HASH ||
-  "0189c7742ecf4542ecab0150b32ecadc9ce7c4390217bfb3914f5b52b14e3cb6";
 
 const app = hasRequiredConfig ? initializeApp(firebaseConfig) : null;
 export const auth = app ? getAuth(app) : null;

@@ -37,6 +37,13 @@ import {
   lbl,
 } from "./terminalHelperComponents";
 import { CSS_VARS } from "../../styles/cssVars.js";
+import {
+  clearDraft,
+  formatDraftSavedAt,
+  getDraftStorageKey,
+  readDraft,
+  writeDraft,
+} from "../../services/draftVault.js";
 
 // Default states
 const defaultAccountState = {
@@ -45,6 +52,60 @@ const defaultAccountState = {
   highWaterMark: "",
   dailyStartBalance: "",
 };
+
+const defaultExtractedVals = {
+  adx: null,
+  ci: null,
+  vwap: null,
+  vwapSlope: null,
+  atr: null,
+  currentPrice: null,
+  fiveDayATR: null,
+  twentyDayATR: null,
+};
+
+const buildTradePlannerState = () => ({
+  timeIST: "",
+  instrument: "MNQ",
+  direction: "Long",
+  tradeType: "Trend",
+  accountBalance: "",
+  riskPct: "0.3",
+  entryPrice: "",
+  currentPrice: "",
+  rrr: "1:2",
+  lastTradeResult: "",
+  notes: "",
+});
+
+const buildP2JournalState = () => ({
+  exit: "",
+  result: "win",
+  pnl: "",
+  balAfter: "",
+  lessons: "",
+  amdPhase: "UNCLEAR",
+});
+
+const buildJournalFormState = () => ({
+  date: getISTDateString(),
+  instrument: "MNQ",
+  direction: "Long",
+  tradeType: "Trend",
+  amdPhase: "UNCLEAR",
+  rrr: "1:2",
+  result: "win",
+  entry: "",
+  exit: "",
+  predictedTP1: "",
+  actualExit: "",
+  contracts: "1",
+  pnl: "",
+  session: "Trading Hours",
+  balAfter: "",
+  setup: "",
+  lessons: "",
+});
 
 const defaultFirmRules = {
   parsed: false,
@@ -68,10 +129,27 @@ const defaultFirmRules = {
   parseStatus: "",
 };
 
+const MAX_HISTORY_ENTRIES = 10;
+const ROTATING_QUOTES = [
+  "The trend is your friend until the end when it bends. - Ed Seykota",
+  "Markets can remain irrational longer than you can remain solvent. - John Maynard Keynes",
+  "Risk comes from not knowing what you're doing. - Warren Buffett",
+  "The goal is to make money, not to be right. - Mark Douglas",
+];
+const LINKEDIN_URL = "https://www.linkedin.com/in/singhgunit/";
+
 function parseRrrMultiple(rrr) {
   const parts = String(rrr || "").split(":");
   const parsed = Number.parseFloat(parts[1]);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+}
+
+function parseWorkspaceSnapshot(snapshot) {
+  try {
+    return snapshot ? JSON.parse(snapshot) : null;
+  } catch {
+    return null;
+  }
 }
 
 function buildEquityCurvePath(series, width = 360, height = 100, padding = 14) {
@@ -252,16 +330,7 @@ export default function MainTerminal({
   const [screenshots, setScreenshots] = useState([]);
   const [extracting, setExtracting] = useState(false);
   const [extractStatus, setExtractStatus] = useState("");
-  const [extractedVals, setExtractedVals] = useState({
-    adx: null,
-    ci: null,
-    vwap: null,
-    vwapSlope: null,
-    atr: null,
-    currentPrice: null,
-    fiveDayATR: null,
-    twentyDayATR: null,
-  });
+  const [extractedVals, setExtractedVals] = useState(defaultExtractedVals);
   
   const [activeZone, setActiveZone] = useState(null);
   const [mpChart, setMpChart] = useState(null);
@@ -298,6 +367,13 @@ export default function MainTerminal({
   }, []);
 
   useEffect(() => {
+    const interval = setInterval(() => {
+      setQuoteIndex((current) => (current + 1) % ROTATING_QUOTES.length);
+    }, 15000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
     if (auditScenario === "app") {
       setActiveTab("trade");
       setShowForm(true);
@@ -310,67 +386,347 @@ export default function MainTerminal({
   const [parsed, setParsed] = useState(null);
   const [parseMsg, setParseMsg] = useState("");
   
-  const [f, setF] = useState({
-    timeIST: "",
-    instrument: "MNQ",
-    direction: "Long",
-    tradeType: "Trend",
-    accountBalance: "",
-    riskPct: "0.3",
-    entryPrice: "",
-    currentPrice: "",
-    rrr: "1:2",
-    lastTradeResult: "",
-    notes: "",
-  });
+  const [f, setF] = useState(buildTradePlannerState);
   const sf = (k) => (v) => setF((p) => ({ ...p, [k]: v }));
   
   const [showP2TradeForm, setShowP2TradeForm] = useState(false);
-  const [p2Jf, setP2Jf] = useState({
-    exit: "",
-    result: "win",
-    pnl: "",
-    balAfter: "",
-    lessons: "",
-    amdPhase: "UNCLEAR",
-  });
+  const [p2Jf, setP2Jf] = useState(buildP2JournalState);
   const sp2 = (k) => (v) => setP2Jf((p) => ({ ...p, [k]: v }));
   
-  const [jf, setJf] = useState({
-    date: getISTDateString(),
-    instrument: "MNQ",
-    direction: "Long",
-    tradeType: "Trend",
-    amdPhase: "UNCLEAR",
-    rrr: "1:2",
-    result: "win",
-    entry: "",
-    exit: "",
-    predictedTP1: "",
-    actualExit: "",
-    contracts: "1",
-    pnl: "",
-    session: "Trading Hours",
-    balAfter: "",
-    setup: "",
-    lessons: "",
-  });
+  const [jf, setJf] = useState(buildJournalFormState);
   const sjf = (k) => (v) => setJf((p) => ({ ...p, [k]: v }));
   
   const [showForm, setShowForm] = useState(() => auditScenario === "app");
+  const [quoteIndex, setQuoteIndex] = useState(0);
+  const [workspaceHistory, setWorkspaceHistory] = useState([]);
+  const [resetDialog, setResetDialog] = useState(null);
   
   const p1Ref = useRef(null);
   const p2Ref = useRef(null);
+  const terminalDraftKey = useMemo(
+    () => (profile?.uid ? `terminal-workspace:${profile.uid}` : null),
+    [profile?.uid],
+  );
+  const [draftStatus, setDraftStatus] = useState({
+    hydrated: false,
+    lastSavedAt: null,
+    error: "",
+  });
+  const draftHydratedRef = useRef(false);
+  const skipHistoryRef = useRef(false);
+  const lastSnapshotRef = useRef("");
 
   const journalDidMount = useRef(false);
   const accountDidMount = useRef(false);
   const firmRulesDidMount = useRef(false);
 
+  const applyWorkspaceState = useCallback((nextState) => {
+    setActiveTab(nextState.activeTab);
+    setScreenshots(Array.isArray(nextState.screenshots) ? nextState.screenshots : []);
+    setExtractStatus(nextState.extractStatus || "");
+    setExtractedVals({
+      ...defaultExtractedVals,
+      ...(nextState.extractedVals || {}),
+    });
+    setActiveZone(nextState.activeZone || null);
+    setMpChart(nextState.mpChart || null);
+    setVwapChart(nextState.vwapChart || null);
+    setP1NewsChart(nextState.p1NewsChart || null);
+    setP1PremarketChart(nextState.p1PremarketChart || null);
+    setP1KeyLevelsChart(nextState.p1KeyLevelsChart || null);
+    setJournal(Array.isArray(nextState.journal) ? nextState.journal : []);
+    setAccountState(buildAccountState(nextState.accountState));
+    setFirmRules({
+      ...defaultFirmRules,
+      ...(nextState.firmRules || {}),
+    });
+    setTcFileName(nextState.tcFileName || "");
+    setCurrentAMD(nextState.currentAMD || "UNCLEAR");
+    setP1Out(nextState.p1Out || "");
+    setP2Out(nextState.p2Out || "");
+    setParsed(nextState.parsed || null);
+    setParseMsg(nextState.parseMsg || "");
+    setF({
+      ...buildTradePlannerState(),
+      ...(nextState.f || {}),
+    });
+    setShowP2TradeForm(Boolean(nextState.showP2TradeForm));
+    setP2Jf({
+      ...buildP2JournalState(),
+      ...(nextState.p2Jf || {}),
+    });
+    setJf({
+      ...buildJournalFormState(),
+      ...(nextState.jf || {}),
+    });
+    setShowForm(Boolean(nextState.showForm));
+  }, []);
+
+  const buildBaseWorkspaceState = useCallback(
+    () => ({
+      activeTab: auditScenario === "app" ? "trade" : "premarket",
+      screenshots: [],
+      extractStatus: "",
+      extractedVals: defaultExtractedVals,
+      activeZone: null,
+      mpChart: null,
+      vwapChart: null,
+      p1NewsChart: null,
+      p1PremarketChart: null,
+      p1KeyLevelsChart: null,
+      journal: normalizeJournal(profile?.journal),
+      accountState: buildAccountState(profile?.accountState),
+      firmRules: {
+        ...defaultFirmRules,
+        ...(profile?.firmRules || {}),
+      },
+      tcFileName: "",
+      currentAMD: "UNCLEAR",
+      p1Out: "",
+      p2Out: "",
+      parsed: null,
+      parseMsg: "",
+      f: buildTradePlannerState(),
+      showP2TradeForm: false,
+      p2Jf: buildP2JournalState(),
+      jf: buildJournalFormState(),
+      showForm: auditScenario === "app",
+    }),
+    [auditScenario, profile?.accountState, profile?.firmRules, profile?.journal],
+  );
+
+  const buildCurrentWorkspaceState = useCallback(
+    () => ({
+      activeTab,
+      screenshots,
+      extractStatus,
+      extractedVals,
+      activeZone,
+      mpChart,
+      vwapChart,
+      p1NewsChart,
+      p1PremarketChart,
+      p1KeyLevelsChart,
+      journal,
+      accountState,
+      firmRules,
+      tcFileName,
+      currentAMD,
+      p1Out,
+      p2Out,
+      parsed,
+      parseMsg,
+      f,
+      showP2TradeForm,
+      p2Jf,
+      jf,
+      showForm,
+    }),
+    [
+      activeTab,
+      screenshots,
+      extractStatus,
+      extractedVals,
+      activeZone,
+      mpChart,
+      vwapChart,
+      p1NewsChart,
+      p1PremarketChart,
+      p1KeyLevelsChart,
+      journal,
+      accountState,
+      firmRules,
+      tcFileName,
+      currentAMD,
+      p1Out,
+      p2Out,
+      parsed,
+      parseMsg,
+      f,
+      showP2TradeForm,
+      p2Jf,
+      jf,
+      showForm,
+    ],
+  );
+
+  const mergeWorkspaceState = useCallback(
+    (baseline, persistedDraft) => {
+      if (!persistedDraft) {
+        return baseline;
+      }
+
+      return {
+        ...baseline,
+        ...persistedDraft,
+        extractedVals: {
+          ...defaultExtractedVals,
+          ...(persistedDraft.extractedVals || {}),
+        },
+        accountState: buildAccountState(
+          persistedDraft.accountState || baseline.accountState,
+        ),
+        firmRules: {
+          ...defaultFirmRules,
+          ...(persistedDraft.firmRules || {}),
+        },
+        f: {
+          ...buildTradePlannerState(),
+          ...(persistedDraft.f || {}),
+        },
+        p2Jf: {
+          ...buildP2JournalState(),
+          ...(persistedDraft.p2Jf || {}),
+        },
+        jf: {
+          ...buildJournalFormState(),
+          ...(persistedDraft.jf || {}),
+        },
+        journal: Array.isArray(persistedDraft.journal)
+          ? persistedDraft.journal
+          : baseline.journal,
+        screenshots: Array.isArray(persistedDraft.screenshots)
+          ? persistedDraft.screenshots
+          : [],
+      };
+    },
+    [],
+  );
+
   useEffect(() => {
-    setJournal(normalizeJournal(profile?.journal));
-    setAccountState(buildAccountState(profile?.accountState));
-    setFirmRules(profile?.firmRules || defaultFirmRules);
-  }, [profile?.uid, profile?.journal, profile?.accountState, profile?.firmRules]);
+    let cancelled = false;
+
+    const hydrateWorkspace = async () => {
+      const baseline = buildBaseWorkspaceState();
+
+      if (!terminalDraftKey) {
+        applyWorkspaceState(baseline);
+        draftHydratedRef.current = true;
+        setDraftStatus({
+          hydrated: true,
+          lastSavedAt: null,
+          error: "",
+        });
+        return;
+      }
+
+      const persistedDraft = await readDraft(terminalDraftKey, null);
+      if (cancelled) {
+        return;
+      }
+
+      const mergedState = mergeWorkspaceState(baseline, persistedDraft);
+
+      applyWorkspaceState(mergedState);
+      lastSnapshotRef.current = JSON.stringify(mergedState);
+      setWorkspaceHistory([]);
+      draftHydratedRef.current = true;
+      setDraftStatus({
+        hydrated: true,
+        lastSavedAt: persistedDraft?.savedAt || null,
+        error: "",
+      });
+    };
+
+    draftHydratedRef.current = false;
+    void hydrateWorkspace();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [applyWorkspaceState, buildBaseWorkspaceState, mergeWorkspaceState, terminalDraftKey]);
+
+  useEffect(() => {
+    if (!terminalDraftKey || !draftHydratedRef.current) {
+      return undefined;
+    }
+
+    const snapshot = buildCurrentWorkspaceState();
+    const serialized = JSON.stringify(snapshot);
+
+    if (serialized === lastSnapshotRef.current) {
+      if (skipHistoryRef.current) {
+        skipHistoryRef.current = false;
+      }
+      return undefined;
+    }
+
+    if (skipHistoryRef.current) {
+      skipHistoryRef.current = false;
+    } else {
+      const previousSnapshot = parseWorkspaceSnapshot(lastSnapshotRef.current);
+      if (previousSnapshot) {
+        setWorkspaceHistory((current) => {
+          const nextHistory = [...current, previousSnapshot];
+          return nextHistory.slice(-MAX_HISTORY_ENTRIES);
+        });
+      }
+    }
+
+    lastSnapshotRef.current = serialized;
+
+    const payload = {
+      ...snapshot,
+      savedAt: new Date().toISOString(),
+    };
+
+    const timer = setTimeout(() => {
+      void writeDraft(terminalDraftKey, payload)
+        .then(() => {
+          setDraftStatus((current) => ({
+            ...current,
+            lastSavedAt: payload.savedAt,
+            error: "",
+          }));
+        })
+        .catch((error) => {
+          setDraftStatus((current) => ({
+            ...current,
+            error: error?.message || "Autosave failed.",
+          }));
+        });
+    }, 180);
+
+    return () => clearTimeout(timer);
+  }, [buildCurrentWorkspaceState, terminalDraftKey]);
+
+  useEffect(() => {
+    if (!terminalDraftKey || !draftHydratedRef.current) {
+      return undefined;
+    }
+
+    const storageKey = getDraftStorageKey(terminalDraftKey);
+    const handleStorage = (event) => {
+      if (event.key !== storageKey || !event.newValue) {
+        return;
+      }
+
+      void readDraft(terminalDraftKey, null).then((persistedDraft) => {
+        if (!persistedDraft) {
+          return;
+        }
+
+        const baseline = buildBaseWorkspaceState();
+        const mergedState = mergeWorkspaceState(baseline, persistedDraft);
+        skipHistoryRef.current = true;
+        applyWorkspaceState(mergedState);
+        lastSnapshotRef.current = JSON.stringify(mergedState);
+        setDraftStatus((current) => ({
+          ...current,
+          lastSavedAt: persistedDraft.savedAt || current.lastSavedAt,
+          error: "",
+        }));
+      });
+    };
+
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, [
+    applyWorkspaceState,
+    buildBaseWorkspaceState,
+    mergeWorkspaceState,
+    terminalDraftKey,
+  ]);
 
   useEffect(() => {
     if (activeTab === "journal") {
@@ -424,6 +780,171 @@ export default function MainTerminal({
   const equityCurveView = useMemo(
     () => buildEquityCurvePath(metrics.equityCurve),
     [metrics.equityCurve],
+  );
+  const activeQuote = ROTATING_QUOTES[quoteIndex] || ROTATING_QUOTES[0];
+
+  const restoreWorkspaceState = useCallback(
+    (nextState, shouldClearHistory = false) => {
+      skipHistoryRef.current = true;
+      applyWorkspaceState(nextState);
+      lastSnapshotRef.current = JSON.stringify(nextState);
+      if (shouldClearHistory) {
+        setWorkspaceHistory([]);
+      }
+      setDraftStatus((current) => ({
+        ...current,
+        error: "",
+      }));
+    },
+    [applyWorkspaceState],
+  );
+
+  const handleUndoLastChange = useCallback(() => {
+    if (!workspaceHistory.length) {
+      return;
+    }
+
+    const previousSnapshot = workspaceHistory[workspaceHistory.length - 1];
+    setWorkspaceHistory((current) => current.slice(0, -1));
+    restoreWorkspaceState(previousSnapshot);
+  }, [restoreWorkspaceState, workspaceHistory]);
+
+  const runResetAction = useCallback(
+    async (scope) => {
+      const baseline = buildBaseWorkspaceState();
+      const currentState = buildCurrentWorkspaceState();
+      let nextState = currentState;
+
+      if (scope === "all") {
+        nextState = baseline;
+      } else if (scope === "premarket") {
+        nextState = {
+          ...currentState,
+          activeTab: "premarket",
+          parsed: null,
+          parseMsg: "",
+          p1Out: "",
+          p1NewsChart: null,
+          p1PremarketChart: null,
+          p1KeyLevelsChart: null,
+          currentAMD: baseline.currentAMD,
+        };
+      } else if (scope === "trade") {
+        nextState = {
+          ...currentState,
+          activeTab: "trade",
+          screenshots: [],
+          extractStatus: "",
+          extractedVals: defaultExtractedVals,
+          activeZone: null,
+          mpChart: null,
+          vwapChart: null,
+          p2Out: "",
+          f: buildTradePlannerState(),
+          showP2TradeForm: false,
+          p2Jf: buildP2JournalState(),
+        };
+      } else if (scope === "journalForm") {
+        nextState = {
+          ...currentState,
+          activeTab: "journal",
+          jf: buildJournalFormState(),
+          showForm: true,
+        };
+      } else if (scope === "journalHistory") {
+        nextState = {
+          ...currentState,
+          activeTab: "journal",
+          journal: [],
+          jf: buildJournalFormState(),
+          showForm: true,
+        };
+      } else if (scope === "account") {
+        nextState = {
+          ...currentState,
+          activeTab: "account",
+          accountState: buildAccountState(baseline.accountState),
+          firmRules: {
+            ...defaultFirmRules,
+            ...(baseline.firmRules || {}),
+          },
+          tcFileName: "",
+        };
+      }
+
+      restoreWorkspaceState(nextState, scope === "all");
+
+      if (terminalDraftKey && scope === "all") {
+        await clearDraft(terminalDraftKey);
+      }
+
+      const resetMessages = {
+        all: "Entire workspace cleared.",
+        premarket: "Premarket workspace cleared.",
+        trade: "Trade workspace cleared.",
+        journalForm: "Journal form reset.",
+        journalHistory: "Journal history deleted.",
+        account: "Account page reset.",
+      };
+
+      showToast?.(resetMessages[scope] || "Workspace reset complete.", "success");
+    },
+    [
+      buildBaseWorkspaceState,
+      buildCurrentWorkspaceState,
+      restoreWorkspaceState,
+      showToast,
+      terminalDraftKey,
+    ],
+  );
+
+  const openResetDialog = useCallback(
+    (scope) => {
+      const copy = {
+        premarket: {
+          title: "Reset premarket workspace?",
+          description:
+            "This clears CSV parsing, premarket charts, and the saved Part 1 analysis for this account.",
+          confirmLabel: "Reset premarket",
+        },
+        trade: {
+          title: "Reset trade workspace?",
+          description:
+            "This clears screenshots, extracted values, trade planner fields, and the saved Part 2 output.",
+          confirmLabel: "Reset trade page",
+        },
+        journalForm: {
+          title: "Reset journal form?",
+          description:
+            "This clears the draft journal form only. Existing journal history stays untouched.",
+          confirmLabel: "Reset journal form",
+        },
+        journalHistory: {
+          title: "Delete all journal history?",
+          description:
+            "This permanently clears every saved journal entry for this account after the next sync.",
+          confirmLabel: "Delete journal history",
+        },
+        account: {
+          title: "Reset account page?",
+          description:
+            "This resets account balances and firm-rule inputs back to the last server baseline for this user.",
+          confirmLabel: "Reset account page",
+        },
+        all: {
+          title: "Clear the full workspace?",
+          description:
+            "This wipes all tabs back to their default state and removes the saved local draft for this account.",
+          confirmLabel: "Clear everything",
+        },
+      };
+
+      setResetDialog({
+        scope,
+        ...(copy[scope] || copy.all),
+      });
+    },
+    [],
   );
 
   // Trading calculations
@@ -618,6 +1139,14 @@ export default function MainTerminal({
   const isBlocked = p2Out && /🚫 TRADE BLOCKED/i.test(p2Out);
   const trafficState = (execBlocked || isBlocked) ? 'red' : (isDailyWarning || isDDWarning || hasLevelWarning || throttleActive) ? 'yellow' : p2Out ? 'green' : 'none';
   const journalFormOpen = activeTab === "journal" || showForm;
+  const canUndo = workspaceHistory.length > 0;
+  const resetScopeByTab = {
+    premarket: "premarket",
+    trade: "trade",
+    journal: "journalForm",
+    account: "account",
+  };
+  const tabResetScope = resetScopeByTab[activeTab] || "all";
 
   // Paste handler
   useEffect(() => {
@@ -1250,6 +1779,28 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
 
       <CountdownBanner ist={ist} />
 
+      <div
+        style={{
+          padding: "14px 32px",
+          background: "linear-gradient(90deg, rgba(37,99,235,0.08), rgba(15,23,42,0.02))",
+          borderBottom: "1px solid rgba(148,163,184,0.18)",
+        }}
+      >
+        <div
+          style={{
+            maxWidth: 1440,
+            margin: "0 auto",
+            color: T.blue,
+            fontSize: 12,
+            fontWeight: 700,
+            lineHeight: 1.7,
+            letterSpacing: 0.2,
+          }}
+        >
+          {activeQuote}
+        </div>
+      </div>
+
       {/* Navigation Tabs */}
       <div style={{ 
         background: CSS_VARS.card, 
@@ -1323,6 +1874,79 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
             </div>
           </div>
         )}
+
+        <div
+          style={{
+            marginBottom: 16,
+            padding: "14px 18px",
+            borderRadius: 12,
+            background: CSS_VARS.card,
+            border: "1px solid rgba(148,163,184,0.16)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+            flexWrap: "wrap",
+          }}
+          className="glass-panel"
+        >
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <span
+              style={{
+                color: T.blue,
+                fontSize: 11,
+                fontWeight: 800,
+                letterSpacing: 1.2,
+                textTransform: "uppercase",
+              }}
+            >
+              Autosave Vault
+            </span>
+            <span style={{ color: T.muted, fontSize: 12, lineHeight: 1.5 }}>
+              {draftStatus.error
+                ? `Autosave issue: ${draftStatus.error}`
+                : `Saved at ${formatDraftSavedAt(draftStatus.lastSavedAt)}. Refresh-safe draft sync is active for this account.`}
+            </span>
+          </div>
+
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <button
+              type="button"
+              onClick={handleUndoLastChange}
+              disabled={!canUndo}
+              style={glowBtn(T.blue, !canUndo)}
+              className="btn-glass"
+            >
+              ↺ UNDO LAST CHANGE
+            </button>
+            <button
+              type="button"
+              onClick={() => openResetDialog(tabResetScope)}
+              style={glowBtn(T.red, false)}
+              className="btn-glass"
+            >
+              RESET THIS PAGE
+            </button>
+            {activeTab === "journal" && (
+              <button
+                type="button"
+                onClick={() => openResetDialog("journalHistory")}
+                style={glowBtn(T.red, false)}
+                className="btn-glass"
+              >
+                DELETE JOURNAL HISTORY
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => openResetDialog("all")}
+              style={glowBtn(T.gold, false)}
+              className="btn-glass"
+            >
+              CLEAR FULL WORKSPACE
+            </button>
+          </div>
+        </div>
 
         {/* TAB 1: PREMARKET */}
         {activeTab === 'premarket' && (
@@ -1988,10 +2612,137 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
               >
                 💾 SAVE TO CLOUD
               </button>
+
+              <a
+                href={LINKEDIN_URL}
+                target="_blank"
+                rel="noreferrer"
+                style={{
+                  display: "block",
+                  marginTop: 14,
+                  padding: "16px 18px",
+                  borderRadius: 12,
+                  textDecoration: "none",
+                  background:
+                    "linear-gradient(135deg, rgba(37,99,235,0.14), rgba(14,165,233,0.1))",
+                  border: "1px solid rgba(37,99,235,0.24)",
+                }}
+              >
+                <div
+                  style={{
+                    color: T.blue,
+                    fontSize: 11,
+                    fontWeight: 800,
+                    letterSpacing: 1.2,
+                    textTransform: "uppercase",
+                    marginBottom: 6,
+                  }}
+                >
+                  LinkedIn
+                </div>
+                <div
+                  style={{
+                    color: T.text,
+                    fontSize: 14,
+                    fontWeight: 700,
+                    marginBottom: 4,
+                  }}
+                >
+                  Builder profile and release trail
+                </div>
+                <div style={{ color: T.muted, fontSize: 12, lineHeight: 1.5 }}>
+                  Open the Traders Regiment LinkedIn card for the current build owner.
+                </div>
+              </a>
             </div>
           </div>
         )}
       </div>
+
+      {resetDialog && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(15,23,42,0.5)",
+            backdropFilter: "blur(8px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 20,
+            zIndex: 1200,
+          }}
+        >
+          <div
+            style={{
+              width: "100%",
+              maxWidth: 460,
+              background: CSS_VARS.card,
+              border: "1px solid rgba(148,163,184,0.18)",
+              borderRadius: 20,
+              padding: "24px 22px",
+              boxShadow: "0 30px 80px rgba(15,23,42,0.18)",
+            }}
+            className="glass-panel"
+          >
+            <div
+              style={{
+                color: T.red,
+                fontSize: 12,
+                fontWeight: 800,
+                letterSpacing: 1.4,
+                textTransform: "uppercase",
+                marginBottom: 10,
+              }}
+            >
+              Confirm Reset
+            </div>
+            <div
+              style={{
+                color: T.text,
+                fontSize: 22,
+                fontWeight: 800,
+                lineHeight: 1.2,
+                marginBottom: 12,
+              }}
+            >
+              {resetDialog.title}
+            </div>
+            <div
+              style={{
+                color: T.muted,
+                fontSize: 13,
+                lineHeight: 1.7,
+                marginBottom: 20,
+              }}
+            >
+              {resetDialog.description}
+            </div>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <button
+                type="button"
+                onClick={() => {
+                  const scope = resetDialog.scope;
+                  setResetDialog(null);
+                  void runResetAction(scope);
+                }}
+                style={glowBtn(T.red, false)}
+                className="btn-glass"
+              >
+                {resetDialog.confirmLabel}
+              </button>
+              <button
+                type="button"
+                onClick={() => setResetDialog(null)}
+                style={glowBtn(T.muted, false)}
+                className="btn-glass"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

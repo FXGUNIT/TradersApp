@@ -1,0 +1,103 @@
+{
+  "users": {
+    "demo-user": {
+      "uid": "demo-user",
+      "email": "demo@example.com",
+      "role": "user",
+      "status": "PENDING"
+    },
+    "f44845f7-1ee8-485c-bd91-c615ec5ed494": {
+      "uid": "f44845f7-1ee8-485c-bd91-c615ec5ed494",
+      "email": "f44845f7-1ee8-485c-bd91-c615ec5ed494@example.com",
+      "role": "user",
+      "status": "ACTIVE",
+      "isLocked": false,
+      "approvedBy": "admin-test",
+      "approvedAt": "2026-03-28T23:44:06.711Z",
+      "updatedAt": "2026-03-28T23:44:06.711Z"
+    },
+    "8ba41228-0033-4a94-849c-2271fc071241": {
+      "uid": "8ba41228-0033-4a94-849c-2271fc071241",
+      "email": "identity.tester@gmail.com",
+      "role": "user",
+      "status": "ACTIVE",
+      "isLocked": false,
+      "updatedAt": "2026-03-29T02:31:54.809Z",
+      "displayName": "Identity Verify User",
+      "profileStage": "verified"
+    },
+    "14409bef-14a8-4460-81b8-ce09563554eb": {
+      "uid": "14409bef-14a8-4460-81b8-ce09563554eb",
+      "email": "14409bef-14a8-4460-81b8-ce09563554eb@example.com",
+      "role": "user",
+      "status": "ACTIVE",
+      "isLocked": false,
+      "approvedBy": "admin-test",
+      "approvedAt": "2026-03-28T23:51:49.290Z",
+      "updatedAt": "2026-03-28T23:51:49.290Z"
+    },
+    "bf8b0e46-09f6-447e-9b19-f39c0b00caab": {
+      "uid": "bf8b0e46-09f6-447e-9b19-f39c0b00caab",
+      "email": "bf8b0e46-09f6-447e-9b19-f39c0b00caab@example.com",
+      "role": "user",
+      "status": "ACTIVE",
+      "isLocked": false,
+      "approvedBy": "admin-test",
+      "approvedAt": "2026-03-29T00:01:07.840Z",
+      "updatedAt": "2026-03-29T00:01:07.840Z"
+    },
+    "354fc758-4a4e-497f-b778-413cb6d8f447": {
+      "uid": "354fc758-4a4e-497f-b778-413cb6d8f447",
+      "email": "354fc758-4a4e-497f-b778-413cb6d8f447@example.com",
+      "role": "user",
+      "status": "ACTIVE",
+      "isLocked": false,
+      "approvedBy": "admin-test",
+      "approvedAt": "2026-03-29T00:02:27.238Z",
+      "updatedAt": "2026-03-29T00:02:27.238Z"
+    },
+    "415d2816-3e7c-4b1f-9f77-2b696c266008": {
+      "uid": "415d2816-3e7c-4b1f-9f77-2b696c266008",
+      "email": "415d2816-3e7c-4b1f-9f77-2b696c266008@example.com",
+      "role": "user",
+      "status": "ACTIVE",
+      "isLocked": false,
+      "approvedBy": "admin-test",
+      "approvedAt": "2026-03-29T00:09:48.522Z",
+      "updatedAt": "2026-03-29T00:09:48.523Z"
+    },
+    "7f274d8d-41b1-4a82-b82d-7331df2750ed": {
+      "uid": "7f274d8d-41b1-4a82-b82d-7331df2750ed",
+      "email": "7f274d8d-41b1-4a82-b82d-7331df2750ed@example.com",
+      "role": "user",
+      "status": "ACTIVE",
+      "isLocked": false,
+      "approvedBy": "admin-test",
+      "approvedAt": "2026-03-29T00:45:58.409Z",
+      "updatedAt": "2026-03-29T00:45:58.409Z"
+    },
+    "552d35eb-3a4f-4569-8517-2685f9a185f8": {
+      "uid": "552d35eb-3a4f-4569-8517-2685f9a185f8",
+      "email": "552d35eb-3a4f-4569-8517-2685f9a185f8@example.com",
+      "role": "user",
+      "status": "ACTIVE",
+      "isLocked": false,
+      "approvedBy": "admin-test",
+      "approvedAt": "2026-03-29T00:54:41.088Z",
+      "updatedAt": "2026-03-29T00:54:41.088Z"
+    },
+    "8fb5a910-ecf7-4444-9235-a7523e2ae45c": {
+      "uid": "8fb5a910-ecf7-4444-9235-a7523e2ae45c",
+      "email": "8fb5a910-ecf7-4444-9235-a7523e2ae45c@example.com",
+      "role": "user",
+      "status": "ACTIVE",
+      "isLocked": false,
+      "approvedBy": "admin-test",
+      "approvedAt": "2026-03-29T02:31:54.738Z",
+      "updatedAt": "2026-03-29T02:31:54.738Z"
+    }
+  },
+  "sessions": {
+    "8ba41228-0033-4a94-849c-2271fc071241": []
+  }
+}

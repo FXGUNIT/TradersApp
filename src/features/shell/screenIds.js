@@ -3,7 +3,6 @@ export const SCREEN_IDS = Object.freeze({
   LOGIN: "login",
   SIGNUP: "signup",
   WAITING: "waiting",
-  OTP: "otp",
   FORCE_PASSWORD_RESET: "forcePasswordReset",
   SESSIONS: "sessions",
   HUB: "hub",

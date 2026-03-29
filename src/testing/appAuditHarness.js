@@ -226,15 +226,6 @@ export function registerAppAuditHarness({
         setScreen("waiting");
         break;
 
-      case "otp":
-        setAuditData();
-        setCurrentSessionId("session-current");
-        setAuth(clone(fixtures.userAuth));
-        setProfile(clone(fixtures.userProfile));
-        setIsAdminAuthenticated(false);
-        setScreen("otp");
-        break;
-
       case "forcePasswordReset":
         setAuditData();
         setCurrentSessionId("session-current");
