@@ -361,11 +361,14 @@ function runLeakagePreventionTests() {
   console.log(`  ${colorize('✗ Failed', 'red')}:            ${failed}`);
   console.log(`  Success Rate:          ${((passed / stats.totalTests) * 100).toFixed(1)}%\n`);
 
+  const totalAttackTests = TEST_PAYLOADS.filter((test) => test.type === 'ATTACK').length;
+  const totalSafeTests = TEST_PAYLOADS.filter((test) => test.type === 'SAFE').length;
+
   console.log(`  ${colorize('Attack Prevention:', 'magenta')}`);
-  console.log(`    - Attacks Blocked:     ${stats.attacksBlocked}/12`);
+  console.log(`    - Attacks Blocked:     ${stats.attacksBlocked}/${totalAttackTests}`);
   console.log(`    - False Negatives:     ${stats.falseNegatives}`);
   console.log(`  ${colorize('Safe Input Handling:', 'magenta')}`);
-  console.log(`    - Safe Allowed:        ${stats.safeInputsAllowed}/8`);
+  console.log(`    - Safe Allowed:        ${stats.safeInputsAllowed}/${totalSafeTests}`);
   console.log(`    - False Positives:     ${stats.falsePositives}\n`);
 
   // Print verdict
