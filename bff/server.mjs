@@ -29,6 +29,7 @@ const loadEnvFiles = () => {
 
       const key = trimmed.slice(0, separatorIndex).trim();
       let value = trimmed.slice(separatorIndex + 1).trim();
+
       if (
         (value.startsWith('"') && value.endsWith('"')) ||
         (value.startsWith("'") && value.endsWith("'"))
@@ -61,9 +62,116 @@ const ALLOWED_ORIGINS = String(process.env.BFF_ALLOWED_ORIGINS || "")
   .split(",")
   .map((value) => value.trim())
   .filter(Boolean);
+const TELEGRAM_BOT_TOKEN =
+  process.env.TELEGRAM_BOT_TOKEN ||
+  process.env.BFF_TELEGRAM_BOT_TOKEN ||
+  process.env.VITE_TELEGRAM_BOT_TOKEN ||
+  "";
+const TELEGRAM_CHAT_ID =
+  process.env.TELEGRAM_CHAT_ID ||
+  process.env.BFF_TELEGRAM_CHAT_ID ||
+  process.env.VITE_TELEGRAM_CHAT_ID ||
+  "";
 const ADMIN_ATTEMPT_LIMIT = 3;
 const ADMIN_LOCKOUT_WINDOW_MS = 15 * 60 * 1000;
 const adminAttemptStore = new Map();
+
+const AI_PROVIDER_DEFINITIONS = [
+  {
+    key: "groq",
+    name: "Groq",
+    envNames: ["AI_GROQ_TURBO_KEY", "GROQ_TURBO_KEY", "VITE_GROQ_TURBO_KEY"],
+    model: "llama-3.3-70b-versatile",
+    apiUrl: "https://api.groq.com/openai/v1/chat/completions",
+  },
+  {
+    key: "gemini",
+    name: "Gemini",
+    envNames: ["AI_GEMINI_PRO_KEY", "GEMINI_PRO_KEY", "VITE_GEMINI_PRO_KEY"],
+    model: "gemini-2.0-flash",
+    apiUrl:
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
+  },
+  {
+    key: "openrouter",
+    name: "OpenRouter",
+    envNames: [
+      "AI_OPENROUTER_MIND_ALPHA",
+      "AI_OPENROUTER_MIND_BETA",
+      "OPENROUTER_MIND_ALPHA",
+      "OPENROUTER_MIND_BETA",
+      "VITE_OPENROUTER_MIND_ALPHA",
+      "VITE_OPENROUTER_MIND_BETA",
+    ],
+    model: "openai/gpt-4o-mini",
+    apiUrl: "https://openrouter.ai/api/v1/chat/completions",
+  },
+  {
+    key: "cerebras",
+    name: "Cerebras",
+    envNames: ["AI_CEREBRAS_KEY", "CEREBRAS_KEY", "VITE_CEREBRAS_KEY"],
+    model: "llama-3.3-70b",
+    apiUrl: "https://api.cerebras.ai/v1/chat/completions",
+  },
+  {
+    key: "deepseek",
+    name: "DeepSeek",
+    envNames: ["AI_DEEPSEEK_KEY", "DEEPSEEK_KEY", "VITE_DEEPSEEK_KEY"],
+    model: "deepseek-chat",
+    apiUrl: "https://api.deepseek.com/v1/chat/completions",
+  },
+  {
+    key: "sambanova",
+    name: "SambaNova",
+    envNames: ["AI_SAMBANOVA_KEY", "SAMBANOVA_KEY", "VITE_SAMBANOVA_KEY"],
+    model: "Llama-3.2-90B-Vision",
+    apiUrl: "https://api.sambanova.ai/v1/chat/completions",
+  },
+];
+
+const getSecretValue = (...names) => {
+  for (const name of names) {
+    const value = String(process.env[name] || "").trim();
+    if (value) {
+      return value;
+    }
+  }
+  return "";
+};
+
+const getOriginFallback = () =>
+  ALLOWED_ORIGINS[0] || "http://127.0.0.1:5173";
+
+const getProviderConfig = (providerKey) => {
+  const definition = AI_PROVIDER_DEFINITIONS.find(
+    (entry) => entry.key === providerKey,
+  );
+  if (!definition) {
+    return null;
+  }
+
+  return {
+    ...definition,
+    secret: getSecretValue(...definition.envNames),
+  };
+};
+
+const buildAiStatusPayload = () =>
+  AI_PROVIDER_DEFINITIONS.map((definition) => {
+    const secret = getSecretValue(...definition.envNames);
+    return {
+      key: definition.key,
+      name: definition.name,
+      configured: Boolean(secret),
+      online: Boolean(secret),
+      status: secret ? "online" : "unconfigured",
+      reason: secret
+        ? "Provider key loaded on BFF."
+        : "Fresh provider key required.",
+      lastPing: Date.now(),
+      errors: 0,
+    };
+  });
 
 const json = (res, statusCode, payload, origin = "*") => {
   res.writeHead(statusCode, {
@@ -91,13 +199,13 @@ const resolveOrigin = (req) => {
     : ALLOWED_ORIGINS[0];
 };
 
-const readJsonBody = (req) =>
-  new Promise((resolve, reject) => {
+const readJsonBody = (req, maxBytes = 10_000) =>
+  new Promise((resolveBody, reject) => {
     let raw = "";
 
     req.on("data", (chunk) => {
       raw += chunk;
-      if (raw.length > 10_000) {
+      if (raw.length > maxBytes) {
         reject(new Error("Payload too large."));
         req.destroy();
       }
@@ -105,12 +213,12 @@ const readJsonBody = (req) =>
 
     req.on("end", () => {
       if (!raw) {
-        resolve({});
+        resolveBody({});
         return;
       }
 
       try {
-        resolve(JSON.parse(raw));
+        resolveBody(JSON.parse(raw));
       } catch {
         reject(new Error("Invalid JSON payload."));
       }
@@ -145,18 +253,12 @@ const getClientKey = (req) =>
 const getAttemptState = (clientKey) => {
   const current = adminAttemptStore.get(clientKey);
   if (!current) {
-    return {
-      attempts: 0,
-      lockoutUntil: 0,
-    };
+    return { attempts: 0, lockoutUntil: 0 };
   }
 
   if (current.lockoutUntil && current.lockoutUntil <= Date.now()) {
     adminAttemptStore.delete(clientKey);
-    return {
-      attempts: 0,
-      lockoutUntil: 0,
-    };
+    return { attempts: 0, lockoutUntil: 0 };
   }
 
   return current;
@@ -175,14 +277,181 @@ const registerFailedAttempt = (clientKey) => {
     lockoutUntil,
   });
 
-  return {
-    attempts,
-    lockoutUntil,
-  };
+  return { attempts, lockoutUntil };
 };
 
 const clearFailedAttempts = (clientKey) => {
   adminAttemptStore.delete(clientKey);
+};
+
+const safeErrorMessage = async (response, fallback) => {
+  const text = await response.text().catch(() => "");
+  if (!text) {
+    return fallback;
+  }
+  return `${fallback}: ${text.slice(0, 300)}`;
+};
+
+const invokeGemini = async ({ secret, systemPrompt, userPrompt, model }) => {
+  const prompt = systemPrompt ? `${systemPrompt}\n\n${userPrompt}` : userPrompt;
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${secret}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.3 },
+      }),
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(await safeErrorMessage(response, "Gemini request failed"));
+  }
+
+  const data = await response.json();
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) {
+    throw new Error("Gemini returned an empty response.");
+  }
+  return text;
+};
+
+const invokeOpenAiCompatible = async ({
+  secret,
+  apiUrl: targetUrl,
+  model,
+  systemPrompt,
+  userPrompt,
+  extraHeaders = {},
+}) => {
+  const combined = systemPrompt
+    ? `${systemPrompt}\n\n${userPrompt}`
+    : userPrompt;
+
+  const response = await fetch(targetUrl, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${secret}`,
+      "Content-Type": "application/json",
+      ...extraHeaders,
+    },
+    body: JSON.stringify({
+      model,
+      messages: [{ role: "user", content: combined }],
+      temperature: 0.3,
+      max_tokens: 2048,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(await safeErrorMessage(response, "Provider request failed"));
+  }
+
+  const data = await response.json();
+  const text = data?.choices?.[0]?.message?.content;
+  if (!text) {
+    throw new Error("Provider returned an empty response.");
+  }
+  return text;
+};
+
+const invokeProvider = async (providerKey, systemPrompt, userPrompt) => {
+  const config = getProviderConfig(providerKey);
+  if (!config) {
+    throw new Error("Unknown AI provider.");
+  }
+  if (!config.secret) {
+    throw new Error(`${config.name} key not configured`);
+  }
+
+  if (config.key === "gemini") {
+    return invokeGemini(config);
+  }
+
+  if (config.key === "openrouter") {
+    return invokeOpenAiCompatible({
+      ...config,
+      systemPrompt,
+      userPrompt,
+      extraHeaders: {
+        "HTTP-Referer": getOriginFallback(),
+        "X-Title": "Traders Regiment",
+      },
+    });
+  }
+
+  return invokeOpenAiCompatible({
+    ...config,
+    systemPrompt,
+    userPrompt,
+  });
+};
+
+const invokeDeepSeekChat = async (payload = {}) => {
+  const config = getProviderConfig("deepseek");
+  if (!config?.secret) {
+    throw new Error("DeepSeek key not configured");
+  }
+
+  const messages = Array.isArray(payload.messages) ? payload.messages : [];
+  if (!messages.length) {
+    throw new Error("DeepSeek messages are required.");
+  }
+
+  const response = await fetch(config.apiUrl, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${config.secret}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: payload.model || config.model,
+      max_tokens: Number(payload.maxTokens || payload.max_tokens || 2048),
+      messages,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(await safeErrorMessage(response, "DeepSeek request failed"));
+  }
+
+  return response.json();
+};
+
+const sendTelegramMessage = async (message, parseMode = "HTML") => {
+  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
+    throw new Error("Telegram secret is not configured on the BFF.");
+  }
+
+  const response = await fetch(
+    `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        chat_id: TELEGRAM_CHAT_ID,
+        text: message,
+        parse_mode: parseMode,
+      }),
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(await safeErrorMessage(response, "Telegram request failed"));
+  }
+
+  const data = await response.json();
+  if (!data?.ok) {
+    throw new Error(data?.description || "Telegram API rejected the request.");
+  }
+
+  return data;
 };
 
 const server = createServer(async (req, res) => {
@@ -194,6 +463,7 @@ const server = createServer(async (req, res) => {
   }
 
   if (req.method === "GET" && req.url === "/health") {
+    const aiStatuses = buildAiStatusPayload();
     json(
       res,
       200,
@@ -205,10 +475,200 @@ const server = createServer(async (req, res) => {
           attempts: ADMIN_ATTEMPT_LIMIT,
           windowMs: ADMIN_LOCKOUT_WINDOW_MS,
         },
+        aiProvidersConfigured: aiStatuses.filter((entry) => entry.configured)
+          .length,
+        telegramConfigured: Boolean(TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID),
       },
       origin,
     );
     return;
+  }
+
+  if (req.method === "GET" && req.url === "/ai/status") {
+    json(
+      res,
+      200,
+      {
+        ok: true,
+        engines: buildAiStatusPayload(),
+      },
+      origin,
+    );
+    return;
+  }
+
+  if (req.method === "POST" && req.url === "/ai/provider-chat") {
+    try {
+      const body = await readJsonBody(req, 200_000);
+      const provider = String(body.provider || "").trim().toLowerCase();
+      const systemPrompt = String(body.systemPrompt || "");
+      const userPrompt = String(body.userPrompt || "");
+
+      if (!provider || !userPrompt) {
+        json(
+          res,
+          400,
+          {
+            ok: false,
+            error: "Provider and userPrompt are required.",
+          },
+          origin,
+        );
+        return;
+      }
+
+      const response = await invokeProvider(provider, systemPrompt, userPrompt);
+      json(
+        res,
+        200,
+        {
+          ok: true,
+          provider,
+          response,
+          statuses: buildAiStatusPayload(),
+        },
+        origin,
+      );
+      return;
+    } catch (error) {
+      json(
+        res,
+        400,
+        {
+          ok: false,
+          error: error.message || "AI provider request failed.",
+        },
+        origin,
+      );
+      return;
+    }
+  }
+
+  if (req.method === "POST" && req.url === "/ai/deliberate") {
+    try {
+      const body = await readJsonBody(req, 200_000);
+      const systemPrompt = String(body.systemPrompt || "");
+      const userPrompt = String(body.userPrompt || "");
+
+      if (!userPrompt) {
+        json(
+          res,
+          400,
+          {
+            ok: false,
+            error: "userPrompt is required.",
+          },
+          origin,
+        );
+        return;
+      }
+
+      const providerOrder = ["groq", "gemini", "openrouter", "cerebras", "deepseek", "sambanova"];
+      const failures = [];
+
+      for (const provider of providerOrder) {
+        try {
+          const response = await invokeProvider(provider, systemPrompt, userPrompt);
+          json(
+            res,
+            200,
+            {
+              ok: true,
+              provider,
+              response,
+              statuses: buildAiStatusPayload(),
+            },
+            origin,
+          );
+          return;
+        } catch (error) {
+          failures.push({
+            provider,
+            error: error.message || "Provider failed.",
+          });
+        }
+      }
+
+      json(
+        res,
+        503,
+        {
+          ok: false,
+          error: "All AI models unavailable.",
+          failures,
+          statuses: buildAiStatusPayload(),
+        },
+        origin,
+      );
+      return;
+    } catch (error) {
+      json(
+        res,
+        400,
+        {
+          ok: false,
+          error: error.message || "AI deliberation failed.",
+        },
+        origin,
+      );
+      return;
+    }
+  }
+
+  if (req.method === "POST" && req.url === "/ai/deepseek/chat") {
+    try {
+      const body = await readJsonBody(req, 20_000_000);
+      const data = await invokeDeepSeekChat(body);
+      json(res, 200, data, origin);
+      return;
+    } catch (error) {
+      json(
+        res,
+        400,
+        {
+          ok: false,
+          error: error.message || "DeepSeek request failed.",
+        },
+        origin,
+      );
+      return;
+    }
+  }
+
+  if (req.method === "POST" && req.url === "/notify/telegram") {
+    try {
+      const body = await readJsonBody(req, 200_000);
+      const message = String(body.message || body.text || "");
+      const parseMode = String(body.parseMode || body.parse_mode || "HTML");
+
+      if (!message) {
+        json(
+          res,
+          400,
+          {
+            ok: false,
+            error: "Telegram message is required.",
+          },
+          origin,
+        );
+        return;
+      }
+
+      const data = await sendTelegramMessage(message, parseMode);
+      json(res, 200, { ok: true, data }, origin);
+      return;
+    } catch (error) {
+      json(
+        res,
+        400,
+        {
+          ok: false,
+          error: error.message || "Telegram request failed.",
+        },
+        origin,
+      );
+      return;
+    }
   }
 
   if (req.method === "POST" && req.url === "/admin/verify-password") {
@@ -317,9 +777,11 @@ const server = createServer(async (req, res) => {
 });
 
 server.listen(PORT, HOST, () => {
+  const aiConfigured = buildAiStatusPayload().filter((entry) => entry.configured)
+    .length;
   console.log(
     `[tradersapp-bff] listening on http://${HOST}:${PORT} (adminPasswordConfigured=${Boolean(
       ADMIN_PASS_HASH,
-    )})`,
+    )}, aiProvidersConfigured=${aiConfigured})`,
   );
 });

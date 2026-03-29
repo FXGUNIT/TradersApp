@@ -139,6 +139,27 @@ const ROTATING_QUOTES = [
 ];
 const LINKEDIN_URL = "https://www.linkedin.com/in/singhgunit/";
 
+async function callDeepSeekBff({ messages, maxTokens = 2048, model = "deepseek-chat" }) {
+  const response = await fetch("/api/ai/deepseek/chat", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model,
+      maxTokens,
+      messages,
+    }),
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data?.error || `HTTP ${response.status}`);
+  }
+
+  return data;
+}
+
 function parseRrrMultiple(rrr) {
   const parts = String(rrr || "").split(":");
   const parsed = Number.parseFloat(parts[1]);
@@ -1307,36 +1328,16 @@ export default function MainTerminal({
       }));
 
       try {
-        const DEEPSEEK_KEY = import.meta.env.VITE_DEEPSEEK_KEY || "";
-        if (!DEEPSEEK_KEY) {
-          throw new Error("No DeepSeek API key configured");
-        }
-
-        const res = await fetch("https://api.deepseek.com/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${DEEPSEEK_KEY}`,
-          },
-          body: JSON.stringify({
-            model: "deepseek-chat",
-            max_tokens: 1200,
-            messages: [
-              { role: "system", content: TNC_PARSE_PROMPT },
-              {
-                role: "user",
-                content: `Parse these T&C:\n\n${sourceText.slice(0, 12000)}`,
-              },
-            ],
-          }),
+        const data = await callDeepSeekBff({
+          maxTokens: 1200,
+          messages: [
+            { role: "system", content: TNC_PARSE_PROMPT },
+            {
+              role: "user",
+              content: `Parse these T&C:\n\n${sourceText.slice(0, 12000)}`,
+            },
+          ],
         });
-
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData?.error?.message || `HTTP ${res.status}`);
-        }
-
-        const data = await res.json();
         const raw = data.choices?.[0]?.message?.content || "{}";
         const vals = JSON.parse(raw.replace(/```json|```/g, "").trim());
         const updated = {
@@ -1401,42 +1402,14 @@ export default function MainTerminal({
         type: 'text', 
         text: 'Extract all trading indicator values. Return ONLY JSON.' 
       });
-      
-      const DEEPSEEK_KEY = import.meta.env.VITE_DEEPSEEK_KEY || '';
-      
-      if (!DEEPSEEK_KEY) {
-        setExtractStatus("✗ No DeepSeek API key configured");
-        setExtracting(false);
-        return;
-      }
-      
-      const res = await fetch('https://api.deepseek.com/v1/chat/completions', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${DEEPSEEK_KEY}`
-        },
-        body: JSON.stringify({ 
-          model: 'deepseek-chat', 
-          max_tokens: 800, 
-          messages: [
-            { role: 'system', content: SCREENSHOT_EXTRACT_PROMPT },
-            { role: 'user', content: msgs }
-          ]
-        })
+
+      const data = await callDeepSeekBff({
+        maxTokens: 800,
+        messages: [
+          { role: 'system', content: SCREENSHOT_EXTRACT_PROMPT },
+          { role: 'user', content: msgs }
+        ]
       });
-      
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        if (errData.error?.message?.includes('image') || errData.error?.message?.doesNotSupport || res.status === 400) {
-          setExtractStatus("✗ This model doesn't support images. Use text-based extraction.");
-          setExtracting(false);
-          return;
-        }
-        throw new Error(errData.error?.message || `HTTP ${res.status}`);
-      }
-      
-      const data = await res.json();
       const content = data.choices?.[0]?.message?.content || '{}';
       const vals = JSON.parse(content.replace(/```json|```/g, '').trim());
       
@@ -1485,32 +1458,14 @@ Apply ALL sections including SECTION AMD.`;
       if (p1PremarketChart) content.push({ type: 'image', source: { type: 'base64', media_type: p1PremarketChart.type, data: p1PremarketChart.b64 } });
       if (p1KeyLevelsChart) content.push({ type: 'image', source: { type: 'base64', media_type: p1KeyLevelsChart.type, data: p1KeyLevelsChart.b64 } });
       content.push({ type: 'text', text: textMsg });
-      
-      const DEEPSEEK_KEY = import.meta.env.VITE_DEEPSEEK_KEY || '';
-      
-      if (!DEEPSEEK_KEY) {
-        setErr('No DeepSeek API key configured');
-        setLoading(false);
-        return;
-      }
-      
-      const res = await fetch('https://api.deepseek.com/v1/chat/completions', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${DEEPSEEK_KEY}`
-        },
-        body: JSON.stringify({ 
-          model: 'deepseek-chat', 
-          max_tokens: 4000, 
-          messages: [
-            { role: 'system', content: PART1_PROMPT },
-            { role: 'user', content: JSON.stringify(content) }
-          ]
-        })
+
+      const data = await callDeepSeekBff({
+        maxTokens: 4000,
+        messages: [
+          { role: 'system', content: PART1_PROMPT },
+          { role: 'user', content: JSON.stringify(content) }
+        ]
       });
-      
-      const data = await res.json();
       const response = data.choices?.[0]?.message?.content || 'No response.';
       
       setP1Out(response);
@@ -1573,31 +1528,13 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
       screenshots.forEach(s => content.push({ type: 'image', source: { type: 'base64', media_type: s.type, data: s.b64 } }));
       content.push({ type: 'text', text: textContent });
 
-      const DEEPSEEK_KEY = import.meta.env.VITE_DEEPSEEK_KEY || '';
-      
-      if (!DEEPSEEK_KEY) {
-        setErr('No DeepSeek API key configured');
-        setLoading(false);
-        return;
-      }
-
-      const res = await fetch('https://api.deepseek.com/v1/chat/completions', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${DEEPSEEK_KEY}`
-        },
-        body: JSON.stringify({ 
-          model: 'deepseek-chat', 
-          max_tokens: 4000, 
-          messages: [
-            { role: 'system', content: PART2_PROMPT },
-            { role: 'user', content: JSON.stringify(content) }
-          ]
-        })
+      const data = await callDeepSeekBff({
+        maxTokens: 4000,
+        messages: [
+          { role: 'system', content: PART2_PROMPT },
+          { role: 'user', content: JSON.stringify(content) }
+        ]
       });
-      
-      const data = await res.json();
       const response = data.choices?.[0]?.message?.content || 'No response.';
       
       setP2Out(response);
