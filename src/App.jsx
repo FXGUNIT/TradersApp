@@ -83,6 +83,7 @@ import {
 import { submitApplication as submitOnboardingApplication } from "./services/clients/OnboardingClient.js";
 import * as AdminSecurityClient from "./services/clients/AdminSecurityClient.js";
 import {
+  loadWorkspace as loadTerminalWorkspace,
   saveAccountState as saveTerminalAccountState,
   saveFirmRules as saveTerminalFirmRules,
   saveJournal as saveTerminalJournal,
@@ -8313,6 +8314,66 @@ export default function TradersRegiment() {
 
     return () => unsubscribe();
   }, [checkUserStatus, isAdminAuthenticated]);
+
+  useEffect(() => {
+    if (!auth?.uid || !profile || auth.uid === ADMIN_UID) {
+      return undefined;
+    }
+
+    let active = true;
+
+    const hydrateTerminalWorkspace = async () => {
+      const workspace = await loadTerminalWorkspace(auth.uid, auth.token);
+      if (!active || !workspace) {
+        return;
+      }
+
+      const nextJournal = workspace.journal || {};
+
+      setProfile((prev) => {
+        if (!prev || prev.uid !== auth.uid) {
+          return prev;
+        }
+
+        const nextAccountState = {
+          ...(prev.accountState || {}),
+          ...(workspace.accountState || {}),
+        };
+        const nextFirmRules = {
+          ...(prev.firmRules || {}),
+          ...(workspace.firmRules || {}),
+        };
+
+        const currentJournal = JSON.stringify(prev.journal || {});
+        const currentAccountState = JSON.stringify(prev.accountState || {});
+        const currentFirmRules = JSON.stringify(prev.firmRules || {});
+        const incomingJournal = JSON.stringify(nextJournal);
+        const incomingAccountState = JSON.stringify(nextAccountState);
+        const incomingFirmRules = JSON.stringify(nextFirmRules);
+
+        if (
+          currentJournal === incomingJournal &&
+          currentAccountState === incomingAccountState &&
+          currentFirmRules === incomingFirmRules
+        ) {
+          return prev;
+        }
+
+        return {
+          ...prev,
+          journal: nextJournal,
+          accountState: nextAccountState,
+          firmRules: nextFirmRules,
+        };
+      });
+    };
+
+    void hydrateTerminalWorkspace();
+
+    return () => {
+      active = false;
+    };
+  }, [auth?.token, auth?.uid, profile?.uid, setProfile]);
 
   const findUserRecordByEmail = useCallback(async (email) => {
     return findIdentityUserByEmail(email);
