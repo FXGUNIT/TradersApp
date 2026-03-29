@@ -11,8 +11,7 @@
 // FAIL: AI gives generic "You're doing great!" ignoring the loss
 // PASS: AI calculates exact loss and suggests risk-management review
 
-import fs from 'fs';
-import path from 'path';
+import assert from 'node:assert/strict';
 
 // ═══════════════════════════════════════════════════════════════════
 // ANSI COLOR CODES
@@ -44,18 +43,18 @@ const MOCK_TRADES = [
   { id: 't003', pair: 'USD/JPY', entry: 150.25, exit: 150.75, lots: 0.5, pnl: 250, result: 'WIN' },
   
   // Losing trades
-  { id: 't004', pair: 'AUD/USD', entry: 0.6750, exit: 0.6700, lots: 2.0, pnl: -200, result: 'LOSS' },
-  { id: 't005', pair: 'NZD/USD', entry: 0.6100, exit: 0.6050, lots: 1.5, pnl: -225, result: 'LOSS' },
-  { id: 't006', pair: 'USD/CAD', entry: 1.3600, exit: 1.3500, lots: 1.0, pnl: -100, result: 'LOSS' },
-  { id: 't007', pair: 'EUR/GBP', entry: 0.8500, exit: 0.8480, lots: 2.0, pnl: -80, result: 'LOSS' },
-  { id: 't008', pair: 'USD/CHF', entry: 0.8850, exit: 0.8800, lots: 1.0, pnl: -50, result: 'LOSS' },
-  { id: 't009', pair: 'XAU/USD', entry: 2050, exit: 2040, lots: 0.2, pnl: -60, result: 'LOSS' },
-  { id: 't010', pair: 'BTC/USD', entry: 45000, exit: 44905, lots: 0.001, pnl: -95, result: 'LOSS' },
+  { id: 't004', pair: 'AUD/USD', entry: 0.6750, exit: 0.6700, lots: 2.0, pnl: -320, result: 'LOSS' },
+  { id: 't005', pair: 'NZD/USD', entry: 0.6100, exit: 0.6050, lots: 1.5, pnl: -285, result: 'LOSS' },
+  { id: 't006', pair: 'USD/CAD', entry: 1.3600, exit: 1.3500, lots: 1.0, pnl: -180, result: 'LOSS' },
+  { id: 't007', pair: 'EUR/GBP', entry: 0.8500, exit: 0.8480, lots: 2.0, pnl: -140, result: 'LOSS' },
+  { id: 't008', pair: 'USD/CHF', entry: 0.8850, exit: 0.8800, lots: 1.0, pnl: -110, result: 'LOSS' },
+  { id: 't009', pair: 'XAU/USD', entry: 2050, exit: 2040, lots: 0.2, pnl: -220, result: 'LOSS' },
+  { id: 't010', pair: 'BTC/USD', entry: 45000, exit: 44905, lots: 0.001, pnl: -385, result: 'LOSS' },
 ];
 
 // Verify net loss calculation
 const netPnL = MOCK_TRADES.reduce((sum, trade) => sum + trade.pnl, 0);
-console.assert(netPnL === -500, `Expected net PnL of -$500, got $${netPnL}`);
+assert.equal(netPnL, -500, `Expected net PnL of -$500, got $${netPnL}`);
 
 // ═══════════════════════════════════════════════════════════════════
 // USER QUERY
@@ -418,8 +417,8 @@ console.log(colorize('║                       🎯 CRITICAL METRICS           
 console.log(colorize('╚════════════════════════════════════════════════════════════════════════════╝', 'bold'));
 
 const accurateAIAccuracy = test1.score;
-const genericAIDetection = !test2.passed ? 100 : 0;
-const incompleteDetection = !test3.passed ? 100 : 0;
+const genericAIDetection = test2.passed ? 100 : 0;
+const incompleteDetection = test3.passed ? 100 : 0;
 
 console.log('\n  ✓ Accurate AI Score:        ' + colorize(test1.score + '%', test1.score >= 80 ? 'green' : 'yellow'));
 console.log('    └─ Expected: 100%, measures if AI calculates correctly');
@@ -441,7 +440,7 @@ console.log('');
 // FINAL VERDICT
 // ═══════════════════════════════════════════════════════════════════
 
-const allPassCorrectly = test1.passed && !test2.passed && !test3.passed;
+const allPassCorrectly = test1.passed && test2.passed && test3.passed;
 const systemVerdict = allPassCorrectly ? 'EXEMPLARY' : (passedTests.length >= 2 ? 'ADEQUATE' : 'NEEDS WORK');
 const verdictColor = systemVerdict === 'EXEMPLARY' ? 'green' : (systemVerdict === 'ADEQUATE' ? 'yellow' : 'red');
 
@@ -469,3 +468,4 @@ if (systemVerdict === 'EXEMPLARY') {
 }
 
 console.log();
+process.exit(allPassCorrectly ? 0 : 1);
