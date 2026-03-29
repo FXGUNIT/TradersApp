@@ -14,14 +14,9 @@
 const TELEGRAM_API = import.meta.env.VITE_TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = import.meta.env.VITE_TELEGRAM_CHAT_ID;
 
-// Debug logging to verify environment variables are loaded
+// Keep startup logging free of token hints.
 console.warn("Telegram Service Initialized:", {
-  hasApiKey: !!TELEGRAM_API,
-  hasChatId: !!TELEGRAM_CHAT_ID,
-  apiKeyPrefix: TELEGRAM_API
-    ? TELEGRAM_API.substring(0, 5) + "..."
-    : "undefined",
-  chatId: TELEGRAM_CHAT_ID,
+  configured: Boolean(TELEGRAM_API && TELEGRAM_CHAT_ID),
 });
 
 // ═══════════════════════════════════════════════════════════════════
@@ -140,26 +135,17 @@ export async function sendAdminBroadcast(title, content) {
  * @returns {object} { success: boolean, error?: object }
  */
 async function sendTelegramMessage(text) {
-  console.warn("sendTelegramMessage called with:", {
+  console.warn("sendTelegramMessage called", {
     textLength: text.length,
-    hasApiKey: !!TELEGRAM_API,
-    hasChatId: !!TELEGRAM_CHAT_ID,
-    apiKeyPrefix: TELEGRAM_API
-      ? TELEGRAM_API.substring(0, 5) + "..."
-      : "undefined",
-    chatId: TELEGRAM_CHAT_ID,
+    configured: Boolean(TELEGRAM_API && TELEGRAM_CHAT_ID),
   });
 
   if (!TELEGRAM_API || !TELEGRAM_CHAT_ID) {
-    console.warn("⚠️ Telegram not configured - missing API token or Chat ID", {
-      TELEGRAM_API: TELEGRAM_API ? "[PRESENT]" : "[MISSING]",
-      TELEGRAM_CHAT_ID: TELEGRAM_CHAT_ID ? "[PRESENT]" : "[MISSING]",
-    });
+    console.warn("Telegram not configured");
     return { success: false, error: "Telegram not configured" };
   }
 
   try {
-    console.warn("Attempting to send message to Telegram API");
     const response = await fetch(
       `https://api.telegram.org/bot${TELEGRAM_API}/sendMessage`,
       {
@@ -173,26 +159,17 @@ async function sendTelegramMessage(text) {
       },
     );
 
-    console.warn("Telegram API response received:", {
-      status: response.status,
-      statusText: response.statusText,
-    });
-
     const data = await response.json();
-    console.warn("Telegram API response data:", data);
 
     if (data.ok) {
-      console.warn("✅ Telegram message sent successfully");
+      console.warn("Telegram message sent successfully");
       return { success: true };
     } else {
-      console.warn("❌ Telegram API error:", {
-        description: data.description,
-        errorCode: data.error_code,
-      });
+      console.warn("Telegram API error:", data.description || "Unknown error");
       return { success: false, error: data.description };
     }
   } catch (error) {
-    console.warn("❌ Telegram request failed:", error);
+    console.warn("Telegram request failed:", error);
     return { success: false, error };
   }
 }
