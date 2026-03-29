@@ -1,6 +1,6 @@
 import { bffFetch } from "./base.js";
 
-function normalizeWorkspace(response) {
+function normalizeWorkspaceResponse(response) {
   if (!response) {
     return null;
   }
@@ -16,7 +16,7 @@ export async function fetchTerminalWorkspace(uid) {
   return bffFetch(`/terminal/workspaces/${encodeURIComponent(uid)}`);
 }
 
-export async function saveTerminalWorkspace(uid, workspace = {}) {
+export async function upsertTerminalWorkspace(uid, workspace = {}) {
   if (!uid) {
     return null;
   }
@@ -30,7 +30,7 @@ export async function saveTerminalWorkspace(uid, workspace = {}) {
   });
 }
 
-export async function saveTerminalJournal(uid, journal = {}) {
+export async function putTerminalJournal(uid, journal = {}) {
   if (!uid) {
     return null;
   }
@@ -44,26 +44,29 @@ export async function saveTerminalJournal(uid, journal = {}) {
   });
 }
 
-export async function saveTerminalAccountState(uid, accountState = {}) {
+export async function putTerminalAccountState(uid, accountState = {}) {
   if (!uid) {
     return null;
   }
 
-  return bffFetch(`/terminal/workspaces/${encodeURIComponent(uid)}/accountState`, {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
+  return bffFetch(
+    `/terminal/workspaces/${encodeURIComponent(uid)}/account-state`,
+    {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ accountState }),
     },
-    body: JSON.stringify({ accountState }),
-  });
+  );
 }
 
-export async function saveTerminalFirmRules(uid, firmRules = {}) {
+export async function putTerminalFirmRules(uid, firmRules = {}) {
   if (!uid) {
     return null;
   }
 
-  return bffFetch(`/terminal/workspaces/${encodeURIComponent(uid)}/firmRules`, {
+  return bffFetch(`/terminal/workspaces/${encodeURIComponent(uid)}/firm-rules`, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
@@ -72,13 +75,12 @@ export async function saveTerminalFirmRules(uid, firmRules = {}) {
   });
 }
 
-export { normalizeWorkspace };
+export { normalizeWorkspaceResponse };
 
 export default {
   fetchTerminalWorkspace,
-  normalizeWorkspace,
-  saveTerminalAccountState,
-  saveTerminalFirmRules,
-  saveTerminalJournal,
-  saveTerminalWorkspace,
+  putTerminalAccountState,
+  putTerminalFirmRules,
+  putTerminalJournal,
+  upsertTerminalWorkspace,
 };

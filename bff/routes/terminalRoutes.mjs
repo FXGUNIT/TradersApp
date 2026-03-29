@@ -1,11 +1,11 @@
 export function createTerminalRouteHandler({
   getWorkspace,
-  patchWorkspaceAccountState,
-  patchWorkspaceFirmRules,
-  patchWorkspaceJournal,
-  upsertWorkspaceRecord,
   json,
   readJsonBody,
+  replaceWorkspaceAccountState,
+  replaceWorkspaceFirmRules,
+  replaceWorkspaceJournal,
+  upsertWorkspace,
 }) {
   return async function handleTerminalRoute(req, res, url, origin) {
     const workspaceMatch = url.pathname.match(/^\/terminal\/workspaces\/([^/]+)$/);
@@ -22,6 +22,7 @@ export function createTerminalRouteHandler({
     if (req.method === "GET" && workspaceMatch) {
       const uid = decodeURIComponent(workspaceMatch[1]);
       const workspace = getWorkspace(uid);
+
       if (!workspace) {
         json(
           res,
@@ -49,21 +50,8 @@ export function createTerminalRouteHandler({
 
     if (req.method === "PUT" && workspaceMatch) {
       const uid = decodeURIComponent(workspaceMatch[1]);
-      const body = await readJsonBody(req, 200_000);
-      const workspace = upsertWorkspaceRecord(uid, body || {});
-
-      if (!workspace) {
-        json(
-          res,
-          404,
-          {
-            ok: false,
-            error: "Workspace not found.",
-          },
-          origin,
-        );
-        return true;
-      }
+      const body = await readJsonBody(req, 100_000);
+      const workspace = upsertWorkspace(uid, body || {});
 
       json(
         res,
@@ -79,24 +67,8 @@ export function createTerminalRouteHandler({
 
     if (req.method === "PUT" && journalMatch) {
       const uid = decodeURIComponent(journalMatch[1]);
-      const body = await readJsonBody(req, 200_000);
-      const journal =
-        body && typeof body === "object" && Object.prototype.hasOwnProperty.call(body, "journal")
-          ? body.journal
-          : body;
-      const workspace = patchWorkspaceJournal(uid, journal || {});
-      if (!workspace) {
-        json(
-          res,
-          404,
-          {
-            ok: false,
-            error: "Workspace not found.",
-          },
-          origin,
-        );
-        return true;
-      }
+      const body = await readJsonBody(req, 100_000);
+      const workspace = replaceWorkspaceJournal(uid, body?.journal ?? body ?? {});
 
       json(
         res,
@@ -112,24 +84,11 @@ export function createTerminalRouteHandler({
 
     if (req.method === "PUT" && accountStateMatch) {
       const uid = decodeURIComponent(accountStateMatch[1]);
-      const body = await readJsonBody(req, 200_000);
-      const accountState =
-        body && typeof body === "object" && Object.prototype.hasOwnProperty.call(body, "accountState")
-          ? body.accountState
-          : body;
-      const workspace = patchWorkspaceAccountState(uid, accountState || {});
-      if (!workspace) {
-        json(
-          res,
-          404,
-          {
-            ok: false,
-            error: "Workspace not found.",
-          },
-          origin,
-        );
-        return true;
-      }
+      const body = await readJsonBody(req, 100_000);
+      const workspace = replaceWorkspaceAccountState(
+        uid,
+        body?.accountState ?? body ?? {},
+      );
 
       json(
         res,
@@ -145,24 +104,11 @@ export function createTerminalRouteHandler({
 
     if (req.method === "PUT" && firmRulesMatch) {
       const uid = decodeURIComponent(firmRulesMatch[1]);
-      const body = await readJsonBody(req, 200_000);
-      const firmRules =
-        body && typeof body === "object" && Object.prototype.hasOwnProperty.call(body, "firmRules")
-          ? body.firmRules
-          : body;
-      const workspace = patchWorkspaceFirmRules(uid, firmRules || {});
-      if (!workspace) {
-        json(
-          res,
-          404,
-          {
-            ok: false,
-            error: "Workspace not found.",
-          },
-          origin,
-        );
-        return true;
-      }
+      const body = await readJsonBody(req, 100_000);
+      const workspace = replaceWorkspaceFirmRules(
+        uid,
+        body?.firmRules ?? body ?? {},
+      );
 
       json(
         res,

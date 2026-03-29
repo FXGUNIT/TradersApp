@@ -2,21 +2,15 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const DATA_PATH = resolve(process.cwd(), "bff/data/terminal-domain.json");
-
 const DEFAULT_STATE = {
   workspaces: {},
-  analyticsHistory: {},
 };
 
 function nowIso() {
   return new Date().toISOString();
 }
 
-function clone(value) {
-  return JSON.parse(JSON.stringify(value));
-}
-
-function readStateFile() {
+function readState() {
   if (!existsSync(DATA_PATH)) {
     return { ...DEFAULT_STATE };
   }
@@ -27,151 +21,50 @@ function readStateFile() {
     return {
       ...DEFAULT_STATE,
       ...parsed,
+      workspaces:
+        parsed?.workspaces && typeof parsed.workspaces === "object"
+          ? parsed.workspaces
+          : {},
     };
   } catch {
     return { ...DEFAULT_STATE };
   }
 }
 
-function writeStateFile(state) {
+function writeState(state) {
   writeFileSync(DATA_PATH, `${JSON.stringify(state, null, 2)}\n`, "utf8");
 }
 
-function normalizeJournalEntry(entryId, entry = {}) {
-  return {
-    ...entry,
-    entryId,
-  };
+function clone(value) {
+  return JSON.parse(JSON.stringify(value));
 }
 
 function normalizeJournal(journal = {}) {
   if (Array.isArray(journal)) {
     return journal.reduce((acc, entry, index) => {
-      if (!entry || typeof entry !== "object") {
-        return acc;
-      }
-
-      const entryId =
-        String(entry.entryId || entry.id || `entry_${index}`).trim() ||
-        `entry_${index}`;
-      acc[entryId] = normalizeJournalEntry(entryId, entry);
+      acc[`entry_${index}`] = entry;
       return acc;
     }, {});
   }
 
-  if (!journal || typeof journal !== "object") {
-    return {};
-  }
-
-  if (Array.isArray(journal.entries)) {
-    return normalizeJournal(journal.entries);
-  }
-
-  return Object.fromEntries(
-    Object.entries(journal).map(([entryId, entry]) => [
-      entryId,
-      normalizeJournalEntry(entryId, entry || {}),
-    ]),
-  );
+  return journal && typeof journal === "object" ? journal : {};
 }
 
-function normalizeAccountState(accountState = {}) {
-  return accountState && typeof accountState === "object" ? { ...accountState } : {};
-}
-
-function normalizeFirmRules(firmRules = {}) {
-  return firmRules && typeof firmRules === "object" ? { ...firmRules } : {};
-}
-
-function normalizeWorkspace(uid, workspace = {}) {
-  const {
-    journal,
-    accountState,
-    firmRules,
-    createdAt,
-    updatedAt,
-    ...rest
-  } = workspace && typeof workspace === "object" ? workspace : {};
-
+function normalizeWorkspace(uid, workspace = {}, existing = null) {
   return {
-    ...rest,
     uid,
-    journal: normalizeJournal(journal),
-    accountState: normalizeAccountState(accountState),
-    firmRules: normalizeFirmRules(firmRules),
-    createdAt: createdAt || nowIso(),
-    updatedAt: updatedAt || nowIso(),
-  };
-}
-
-function normalizeState(rawState = {}) {
-  const workspaces =
-    rawState.workspaces && typeof rawState.workspaces === "object"
-      ? rawState.workspaces
-      : {};
-
-  return {
-    ...DEFAULT_STATE,
-    ...rawState,
-    workspaces: Object.fromEntries(
-      Object.entries(workspaces).map(([uid, workspace]) => [
-        uid,
-        normalizeWorkspace(uid, workspace || {}),
-      ]),
-    ),
-  };
-}
-
-function readState() {
-  return normalizeState(readStateFile());
-}
-
-function writeState(state) {
-  const nextState = normalizeState(state);
-  writeStateFile(nextState);
-  return nextState;
-}
-
-function mergeWorkspace(uid, existingWorkspace = {}, patch = {}) {
-  const nextWorkspace = normalizeWorkspace(uid, {
-    ...existingWorkspace,
-    ...patch,
-    uid,
-    journal:
-      patch.journal !== undefined
-        ? patch.journal
-        : existingWorkspace.journal || {},
+    journal: normalizeJournal(workspace.journal ?? existing?.journal ?? {}),
     accountState:
-      patch.accountState !== undefined
-        ? patch.accountState
-        : existingWorkspace.accountState || {},
+      workspace.accountState && typeof workspace.accountState === "object"
+        ? workspace.accountState
+        : existing?.accountState || {},
     firmRules:
-      patch.firmRules !== undefined
-        ? patch.firmRules
-        : existingWorkspace.firmRules || {},
-    createdAt: existingWorkspace.createdAt || patch.createdAt,
-    updatedAt: patch.updatedAt || nowIso(),
-  });
-
-  return nextWorkspace;
-}
-
-function upsertWorkspace(uid, patch = {}) {
-  if (!uid) {
-    return null;
-  }
-
-  const state = readState();
-  const existing = state.workspaces?.[uid] || null;
-  const nextWorkspace = mergeWorkspace(uid, existing || {}, patch);
-
-  state.workspaces = {
-    ...(state.workspaces || {}),
-    [uid]: nextWorkspace,
+      workspace.firmRules && typeof workspace.firmRules === "object"
+        ? workspace.firmRules
+        : existing?.firmRules || {},
+    createdAt: workspace.createdAt || existing?.createdAt || nowIso(),
+    updatedAt: workspace.updatedAt || nowIso(),
   };
-
-  writeState(state);
-  return clone(nextWorkspace);
 }
 
 export function getWorkspace(uid) {
@@ -180,30 +73,46 @@ export function getWorkspace(uid) {
   }
 
   const state = readState();
-  const workspace = state.workspaces?.[uid];
-  return workspace ? clone(workspace) : null;
+  const existing = state.workspaces?.[uid];
+  if (!existing) {
+    return null;
+  }
+
+  return clone(normalizeWorkspace(uid, existing));
 }
 
-export function upsertWorkspaceRecord(uid, patch = {}) {
-  return upsertWorkspace(uid, patch);
+export function upsertWorkspace(uid, patch = {}) {
+  if (!uid) {
+    return null;
+  }
+
+  const state = readState();
+  const existing = state.workspaces?.[uid] || null;
+  const nextWorkspace = normalizeWorkspace(uid, patch, existing);
+  state.workspaces = {
+    ...(state.workspaces || {}),
+    [uid]: nextWorkspace,
+  };
+  writeState(state);
+  return clone(nextWorkspace);
 }
 
-export function patchWorkspaceJournal(uid, journal = {}) {
+export function replaceWorkspaceJournal(uid, journal = {}) {
   return upsertWorkspace(uid, { journal });
 }
 
-export function patchWorkspaceAccountState(uid, accountState = {}) {
+export function replaceWorkspaceAccountState(uid, accountState = {}) {
   return upsertWorkspace(uid, { accountState });
 }
 
-export function patchWorkspaceFirmRules(uid, firmRules = {}) {
+export function replaceWorkspaceFirmRules(uid, firmRules = {}) {
   return upsertWorkspace(uid, { firmRules });
 }
 
 export default {
   getWorkspace,
-  patchWorkspaceAccountState,
-  patchWorkspaceFirmRules,
-  patchWorkspaceJournal,
-  upsertWorkspaceRecord,
+  replaceWorkspaceAccountState,
+  replaceWorkspaceFirmRules,
+  replaceWorkspaceJournal,
+  upsertWorkspace,
 };
