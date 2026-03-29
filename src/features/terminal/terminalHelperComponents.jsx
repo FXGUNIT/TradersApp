@@ -358,7 +358,7 @@ export function CountdownBanner({ ist }) {
       </div>
       <div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.1)" }} />
       <span style={{ color: T.muted, fontSize: 12, fontWeight: 600 }}>{ist.istStr}</span>
-      {!ist.isOpen && <span style={{ marginLeft: "auto", color: T.red, fontSize: 11, letterSpacing: 1, fontWeight: 700 }}>LOCKED · 10:00AM–5:00PM IST ONLY</span>}
+      {!ist.isOpen && <span style={{ marginLeft: "auto", color: T.red, fontSize: 11, letterSpacing: 1, fontWeight: 700 }}>LOCKED · {ist.sessionWindowLabel || "10:00AM-5:00PM IST ONLY"}</span>}
       {urgent && <span style={{ marginLeft: "auto", color: T.gold, fontSize: 11, letterSpacing: 1, fontWeight: 700, animation: "led-pulse 1s infinite" }}>⚠ SESSION ENDING SOON</span>}
     </div>
   );

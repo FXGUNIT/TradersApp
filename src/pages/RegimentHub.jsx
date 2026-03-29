@@ -8,6 +8,7 @@ export default function RegimentHub({
   theme,
   currentTheme,
   onThemeChange,
+  aiStatuses = [],
 }) {
   const normalizedTheme = currentTheme || theme || "lumiere";
   const isDark = normalizedTheme === "midnight" || normalizedTheme === "night";
@@ -256,7 +257,7 @@ export default function RegimentHub({
             flexWrap: "wrap",
           }}
         >
-          <AiEnginesStatus />
+          <AiEnginesStatus statuses={aiStatuses} />
           {currentTheme && onThemeChange && (
             <ThemeSwitcher
               currentTheme={currentTheme}

@@ -227,7 +227,10 @@ export function detectAmdPhase({
     adr20 > 0 && currentRange < adr20 * 0.8 && Boolean(volumeNearLows);
   const manipulation = wick >= 0.4 && wickAtr > 1.5;
   const distribution =
-    adr20 > 0 && currentRange > adr20 * 1.2 && Boolean(higherHighs) && Boolean(lowerLows);
+    adr20 > 0
+    && currentRange > adr20 * 1.2
+    && Boolean(higherHighs || lowerLows)
+    && !Boolean(conflictingSignals);
   const transition = Boolean(conflictingSignals) || Boolean(adxDeclining);
 
   let phase = "UNCLEAR";

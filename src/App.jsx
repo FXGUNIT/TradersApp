@@ -81,6 +81,7 @@ import FullScreenToggle from "./components/FullScreenToggle.jsx";
 import MobileBottomNav from "./components/MobileBottomNav.jsx";
 import FeatureGuard from "./components/FeatureGuard.jsx";
 import CleanLoginScreen from "./features/auth/CleanLoginScreen.jsx";
+import ThemeSwitcher from "./components/ThemeSwitcher.jsx";
 import { verifyAdminPassword } from "./services/adminAuthService.js";
 
 const hasEmailJsConfig = Boolean(
@@ -496,6 +497,27 @@ const safeStorageRemove = (key) => {
   } catch {
     console.warn(`Failed to clear ${key}`);
   }
+};
+
+const RESTORABLE_APP_SCREENS = new Set([
+  SCREEN_IDS.HUB,
+  SCREEN_IDS.APP,
+  SCREEN_IDS.CONSCIOUSNESS,
+  SCREEN_IDS.SESSIONS,
+]);
+
+const getLastScreenStorageKey = (uid) => `TradersApp_LastScreen:${uid}`;
+const getLastReturnScreenStorageKey = (uid) =>
+  `TradersApp_LastConsciousnessReturn:${uid}`;
+
+const resolveRestorableScreen = (uid, fallback = SCREEN_IDS.HUB) => {
+  const saved = safeStorageGet(getLastScreenStorageKey(uid), fallback);
+  return RESTORABLE_APP_SCREENS.has(saved) ? saved : fallback;
+};
+
+const resolveConsciousnessReturnScreen = (uid, fallback = SCREEN_IDS.HUB) => {
+  const saved = safeStorageGet(getLastReturnScreenStorageKey(uid), fallback);
+  return RESTORABLE_APP_SCREENS.has(saved) ? saved : fallback;
 };
 
 const getLoginRateLimitState = () =>
@@ -7319,6 +7341,27 @@ export default function TradersRegiment() {
     return () => stopAIStatusScheduler();
   }, []);
 
+  useEffect(() => {
+    if (!auth?.uid || !RESTORABLE_APP_SCREENS.has(screen)) {
+      return;
+    }
+    safeStorageSet(getLastScreenStorageKey(auth.uid), screen);
+  }, [auth?.uid, screen]);
+
+  useEffect(() => {
+    if (
+      !auth?.uid ||
+      screen !== SCREEN_IDS.CONSCIOUSNESS ||
+      !RESTORABLE_APP_SCREENS.has(consciousnessReturnScreen)
+    ) {
+      return;
+    }
+    safeStorageSet(
+      getLastReturnScreenStorageKey(auth.uid),
+      consciousnessReturnScreen,
+    );
+  }, [auth?.uid, screen, consciousnessReturnScreen]);
+
   // ═══════════════════════════════════════════════════════════════════
   // INITIALIZATION ORDER FIX: playNotificationSound and showToast
   // MUST be defined here, before any code that uses them
@@ -7967,7 +8010,15 @@ export default function TradersRegiment() {
           return;
         }
 
-        setScreen(nextScreen || SCREEN_IDS.HUB);
+        const fallbackScreen = nextScreen || SCREEN_IDS.HUB;
+        const restoredScreen = resolveRestorableScreen(
+          authData.uid,
+          fallbackScreen,
+        );
+        setConsciousnessReturnScreen(
+          resolveConsciousnessReturnScreen(authData.uid, SCREEN_IDS.HUB),
+        );
+        setScreen(restoredScreen);
       } catch (error) {
         console.error("Status check failed", error);
         // Only redirect to login on auth errors, not network/permission issues
@@ -8722,6 +8773,7 @@ export default function TradersRegiment() {
   };
 
   const handleLogout = async () => {
+    const activeUid = auth?.uid;
     try {
       if (firebaseAuth?.signOut) {
         await firebaseAuth.signOut();
@@ -8734,6 +8786,10 @@ export default function TradersRegiment() {
     // Clear admin session from localStorage
     localStorage.removeItem("isAdminAuthenticated");
     localStorage.removeItem("admin_session");
+    if (activeUid) {
+      safeStorageRemove(getLastScreenStorageKey(activeUid));
+      safeStorageRemove(getLastReturnScreenStorageKey(activeUid));
+    }
     clearPendingGoogleSignup();
     setGoogleUser(null);
     setAuth(null);
@@ -9428,6 +9484,7 @@ export default function TradersRegiment() {
               theme={theme}
               currentTheme={currentTheme}
               onThemeChange={handleThemeChange}
+              aiStatuses={aiStatuses}
             />
           </Suspense>
         );
@@ -9440,6 +9497,7 @@ export default function TradersRegiment() {
             currentTheme={currentTheme}
             onThemeChange={handleThemeChange}
             auth={auth}
+            aiStatuses={aiStatuses}
           />
         );
 
@@ -9493,6 +9551,11 @@ export default function TradersRegiment() {
               }}
             >
               <AiEnginesStatus statuses={aiStatuses} />
+              <ThemeSwitcher
+                currentTheme={currentTheme}
+                onThemeChange={handleThemeChange}
+              />
+              {/* Legacy theme toggle retained below only until replaced */}
               <button
                 onClick={() => {
                   const themes = ["lumiere", "amber", "midnight"];
@@ -9502,6 +9565,7 @@ export default function TradersRegiment() {
                 }}
                 title="Toggle Lumiere/Amber/Midnight mode"
                 style={{
+                  display: "none",
                   background: "var(--accent-primary, #3B82F6)",
                   border: "1px solid var(--accent-primary, #3B82F6)",
                   color: "var(--accent-text, #FFFFFF)",
@@ -9607,6 +9671,26 @@ export default function TradersRegiment() {
       }}
     >
       <section className={`app-container theme-${currentTheme}`}>
+      {![
+        SCREEN_IDS.LOADING,
+        SCREEN_IDS.HUB,
+        SCREEN_IDS.CONSCIOUSNESS,
+        SCREEN_IDS.APP,
+      ].includes(screen) && (
+        <div
+          style={{
+            position: "fixed",
+            top: 20,
+            right: 20,
+            zIndex: 180,
+          }}
+        >
+          <ThemeSwitcher
+            currentTheme={currentTheme}
+            onThemeChange={handleThemeChange}
+          />
+        </div>
+      )}
       {/* RULE #295, #296: Maintenance Mode - Show "Back Soon" screen if active, except for Master Admin */}
       {maintenanceModeActive &&
       auth?.uid !== ADMIN_UID &&

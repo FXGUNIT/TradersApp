@@ -2,7 +2,8 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import MessageRenderer from '../components/MessageRenderer.jsx';
 import ThemeSwitcher from '../components/ThemeSwitcher.jsx';
 import AiEnginesStatus from '../components/AiEnginesStatus.jsx';
-import { runDeliberation, councilStage, MASTER_INTELLIGENCE_SYSTEM_PROMPT, quadCoreStatus } from '../services/ai-router.js';
+import { runDeliberation, councilStage, MASTER_INTELLIGENCE_SYSTEM_PROMPT } from '../services/ai-router.js';
+import { getISTState } from '../utils/tradingUtils.js';
 
 const AURA_COLORS = {
   info: 'var(--aura-status-info, #0A84FF)',
@@ -152,7 +153,7 @@ function WarRoomLoader() {
 
 import { useUsers } from '../hooks/useUsers';
 
-export default function CollectiveConsciousness({ onBack, theme, auth, currentTheme, onThemeChange }) {
+export default function CollectiveConsciousness({ onBack, theme, auth, currentTheme, onThemeChange, aiStatuses = [] }) {
   const normalizedTheme = currentTheme || theme || "lumiere";
   const isDark = normalizedTheme === "midnight" || normalizedTheme === "night";
   const { users } = useUsers();
@@ -161,7 +162,7 @@ export default function CollectiveConsciousness({ onBack, theme, auth, currentTh
   const [input, setInput] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const engineMode = (() => {
-    const h = new Date().getHours();
+    const h = getISTState().h;
     return (h >= 8 && h < 17) ? 'fast' : 'full';
   })();
   const chatEndRef = useRef(null);
@@ -169,6 +170,19 @@ export default function CollectiveConsciousness({ onBack, theme, auth, currentTh
 
   const userData = auth?.uid ? users[auth.uid] : null;
   const isFastMode = engineMode === 'fast';
+  const normalizedEngineStatuses = Array.isArray(aiStatuses) ? aiStatuses : [];
+  const configuredEngineCount = normalizedEngineStatuses.filter(
+    (engine) => engine?.configured || engine?.status === "online" || engine?.status === "offline",
+  ).length;
+  const onlineEngineCount = normalizedEngineStatuses.filter(
+    (engine) => engine?.status === "online" || engine?.online,
+  ).length;
+  const engineModeLabel =
+    configuredEngineCount === 0
+      ? 'WATCHTOWER MODE — Provider keys unavailable — add fresh Infisical keys to reactivate the council'
+      : isFastMode
+        ? `FAST MODE — ${onlineEngineCount} AI ${onlineEngineCount === 1 ? 'engine' : 'engines'} ready [8AM - 5PM IST] — quick answers, lower power used`
+        : `FULL POWER MODE — ${onlineEngineCount} AI ${onlineEngineCount === 1 ? 'engine' : 'engines'} ready [5PM - 8AM IST] — deeper consensus active`;
 
   const bgColor = "var(--surface-elevated, #FFFFFF)";
   const textColor = "var(--text-primary, #111827)";
@@ -318,7 +332,7 @@ User Question: ${trimmed}`;
             currentTheme={normalizedTheme}
             onThemeChange={onThemeChange}
           />
-          <AiEnginesStatus statuses={Object.values(quadCoreStatus || {}).map(s => s?.online ?? true)} />
+          <AiEnginesStatus statuses={normalizedEngineStatuses} />
         </div>
       </div>
 
@@ -583,10 +597,7 @@ User Question: ${trimmed}`;
           color: isFastMode ? AURA_COLORS.warning : AURA_COLORS.manipulation,
           animation: isFastMode ? 'cc-fast-pulse 2s ease-in-out infinite' : 'cc-full-glow 3s ease-in-out infinite',
         }}>
-          {isFastMode
-            ? '⚡ FAST MODE — Single AI Active [8AM - 5PM] — Quick Answers, Less Power Used'
-            : '🌌 FULL POWER MODE — All 5 AIs Working Together [5PM - 8AM] — Best Possible Answers'
-          }
+          {engineModeLabel}
         </div>
 
         <style>{`

@@ -41,15 +41,30 @@ function normalizeStatusEntry(entry, index) {
     };
   }
 
-  const state = entry?.status || (entry?.online ? "online" : "offline");
+  if (!entry) {
+    return {
+      name: AI_ENGINE_NAMES[index] || `Engine ${index + 1}`,
+      status: "unconfigured",
+      reason: "Fresh provider key required.",
+    };
+  }
+
+  const inferredState = entry?.status
+    || (entry?.online
+      ? "online"
+      : entry?.configured === false
+        ? "unconfigured"
+        : entry?.configured === true
+          ? "offline"
+          : "unconfigured");
   return {
     name: entry?.name || AI_ENGINE_NAMES[index] || `Engine ${index + 1}`,
-    status: STATUS_STYLES[state] ? state : "offline",
+    status: STATUS_STYLES[inferredState] ? inferredState : "unconfigured",
     reason:
       entry?.reason ||
-      (state === "unconfigured"
+      (inferredState === "unconfigured"
         ? "Fresh provider key required."
-        : state === "online"
+        : inferredState === "online"
           ? "Provider ready."
           : "Provider unavailable."),
   };

@@ -6,7 +6,7 @@ import {
 import {
   calculateVolatilityRatio,
   getDynamicParameters,
-  calculateThrottledRisk,
+  calculateDrawdownThrottle,
   calculatePositionSize,
   calculateLiquiditySweepProbability,
   calculateManipulationWickValidation,
@@ -919,7 +919,14 @@ export default function MainTerminal({
   
   const VR = calculateVolatilityRatio(fiveDayATR, twentyDayATR);
   const { vwapSD1, vwapSD2, trendSLMult, mrSLMult } = getDynamicParameters(VR);
-  const { activeRiskPct, isThrottled } = calculateThrottledRisk(parseFloat(f.riskPct) || 0.3, VR, parseFloat(accountState.currentBalance) || 0, parseFloat(firmRules.maxDrawdown) || 0);
+  const { activeRiskPct, isThrottled } = calculateDrawdownThrottle({
+    currentBalance: parseFloat(accountState.currentBalance) || 0,
+    startingBalance: parseFloat(accountState.startingBalance) || 0,
+    highWaterMark: parseFloat(accountState.highWaterMark) || 0,
+    maxDrawdown: parseFloat(firmRules.maxDrawdown) || 0,
+    drawdownType: firmRules.drawdownType || "trailing",
+    baseRiskPercent: parseFloat(f.riskPct) || 0.3,
+  });
 
   let volatilityRegime = "Normal";
   if (VR < 0.85) volatilityRegime = "Compression"; 
