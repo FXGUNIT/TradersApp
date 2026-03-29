@@ -9,10 +9,10 @@ import {
 } from "./domains/contentState.mjs";
 import {
   getWorkspace,
-  patchWorkspaceAccountState,
-  patchWorkspaceFirmRules,
-  patchWorkspaceJournal,
-  upsertWorkspaceRecord,
+  replaceWorkspaceAccountState,
+  replaceWorkspaceFirmRules,
+  replaceWorkspaceJournal,
+  upsertWorkspace,
 } from "./domains/terminalState.mjs";
 import {
   getApplication,
@@ -560,10 +560,10 @@ const server = createServer(async (req, res) => {
 
   const handledTerminalRoute = await createTerminalRouteHandler({
     getWorkspace,
-    patchWorkspaceAccountState,
-    patchWorkspaceFirmRules,
-    patchWorkspaceJournal,
-    upsertWorkspaceRecord,
+    replaceWorkspaceAccountState,
+    replaceWorkspaceFirmRules,
+    replaceWorkspaceJournal,
+    upsertWorkspace,
     readJsonBody,
     json,
   })(req, res, url, origin);

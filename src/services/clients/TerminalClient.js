@@ -1,10 +1,11 @@
 import { dbM, dbR, dbW } from "../../utils/firebaseDbUtils.js";
 import {
   fetchTerminalWorkspace,
-  saveTerminalAccountState,
-  saveTerminalFirmRules,
-  saveTerminalJournal,
-  saveTerminalWorkspace,
+  normalizeWorkspaceResponse,
+  putTerminalAccountState,
+  putTerminalFirmRules,
+  putTerminalJournal,
+  upsertTerminalWorkspace,
 } from "../gateways/terminalGateway.js";
 import { hasBff } from "../gateways/base.js";
 
@@ -64,7 +65,7 @@ export async function loadWorkspace(uid, token) {
   if (hasBff()) {
     try {
       const remoteWorkspace = normalizeWorkspace(
-        await fetchTerminalWorkspace(uid),
+        normalizeWorkspaceResponse(await fetchTerminalWorkspace(uid)),
       );
       if (remoteWorkspace) {
         return remoteWorkspace;
@@ -102,7 +103,7 @@ export async function saveWorkspace(uid, token, workspace) {
 
   if (hasBff()) {
     try {
-      await saveTerminalWorkspace(uid, payload);
+      await upsertTerminalWorkspace(uid, payload);
     } catch (error) {
       console.warn("BFF terminal workspace save failed, falling back to Firebase:", error);
     }
@@ -122,7 +123,7 @@ export async function saveJournal(uid, token, journal) {
 
   if (hasBff()) {
     try {
-      await saveTerminalJournal(uid, payload);
+      await putTerminalJournal(uid, payload);
     } catch (error) {
       console.warn("BFF terminal journal save failed, falling back to Firebase:", error);
     }
@@ -142,7 +143,7 @@ export async function saveAccountState(uid, token, accountState) {
 
   if (hasBff()) {
     try {
-      await saveTerminalAccountState(uid, payload);
+      await putTerminalAccountState(uid, payload);
     } catch (error) {
       console.warn(
         "BFF terminal account state save failed, falling back to Firebase:",
@@ -165,7 +166,7 @@ export async function saveFirmRules(uid, token, firmRules) {
 
   if (hasBff()) {
     try {
-      await saveTerminalFirmRules(uid, payload);
+      await putTerminalFirmRules(uid, payload);
     } catch (error) {
       console.warn(
         "BFF terminal firm rules save failed, falling back to Firebase:",

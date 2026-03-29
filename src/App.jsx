@@ -82,6 +82,11 @@ import {
 } from "./services/clients/IdentityClient.js";
 import { submitApplication as submitOnboardingApplication } from "./services/clients/OnboardingClient.js";
 import * as AdminSecurityClient from "./services/clients/AdminSecurityClient.js";
+import {
+  saveAccountState as saveTerminalAccountState,
+  saveFirmRules as saveTerminalFirmRules,
+  saveJournal as saveTerminalJournal,
+} from "./services/clients/TerminalClient.js";
 import NotificationCenter from "./components/NotificationCenter.jsx";
 import CommandPalette from "./components/CommandPalette.jsx";
 import UserSwitcher from "./components/UserSwitcher.jsx";
@@ -9245,21 +9250,17 @@ export default function TradersRegiment() {
 
   const saveJournal = async (jData) => {
     if (!auth) return;
-    const obj = {};
-    jData.forEach((t, i) => {
-      obj[`entry_${i}`] = t;
-    });
-    await dbW(`users/${auth.uid}/journal`, obj, auth.token);
+    await saveTerminalJournal(auth.uid, auth.token, jData);
   };
 
   const saveAccount = async (aData) => {
     if (!auth) return;
-    await dbW(`users/${auth.uid}/accountState`, aData, auth.token);
+    await saveTerminalAccountState(auth.uid, auth.token, aData);
   };
 
   const saveFirmRules = async (fData) => {
     if (!auth) return;
-    await dbW(`users/${auth.uid}/firmRules`, fData, auth.token);
+    await saveTerminalFirmRules(auth.uid, auth.token, fData);
   };
   // ─── MAIN ROUTER RENDER ───
   // Phase 3: Invite flow overlay (password reset -> invite screen) - simple hook in UI
