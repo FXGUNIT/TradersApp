@@ -16,7 +16,6 @@ import {
   setPersistence,
   browserLocalPersistence,
   onAuthStateChanged,
-  fetchSignInMethodsForEmail,
   GoogleAuthProvider,
   signInWithPopup,
   signInWithEmailAndPassword,
@@ -77,6 +76,7 @@ import {
   findUserByEmail as findIdentityUserByEmail,
   listUserSessions as listIdentityUserSessions,
   loadLegacyUserProfile,
+  provisionUserRecord as provisionIdentityUserRecord,
   updateLoginSecurityCounters,
 } from "./services/clients/IdentityClient.js";
 import { submitApplication as submitOnboardingApplication } from "./services/clients/OnboardingClient.js";
@@ -8569,8 +8569,8 @@ export default function TradersRegiment() {
         "🔓 <b>GOD MODE ACTIVATED</b>\nMaster Admin has entered the terminal.",
       );
 
-      const userData =
-        (await dbR(`users/${signedInUser.uid}`, authData.token)) || {};
+      const adminRecord = await loadLegacyUserProfile(authData);
+      const userData = adminRecord?.userData || {};
       setProfile({
         ...userData,
         uid: signedInUser.uid,
@@ -8582,7 +8582,8 @@ export default function TradersRegiment() {
       return;
     }
 
-    let userDataFinal = await dbR(`users/${signedInUser.uid}`, authData.token);
+    let userDataFinal =
+      (await loadLegacyUserProfile(authData))?.userData || null;
     if (!userDataFinal) {
       const initProfile = buildPendingProfile({
         fullName: signedInUser.displayName,
@@ -8592,7 +8593,11 @@ export default function TradersRegiment() {
         authProvider: "password",
         emailVerified: signedInUser.emailVerified,
       });
-      await dbM(`users/${signedInUser.uid}`, initProfile, authData.token);
+      await provisionIdentityUserRecord(
+        signedInUser.uid,
+        initProfile,
+        authData.token,
+      );
       userDataFinal = initProfile;
     }
 
@@ -8710,7 +8715,11 @@ export default function TradersRegiment() {
           privacyAccepted: Boolean(formData.agreedToTerms),
         },
       });
-      await dbW(`users/${simulatedUid}`, profileData, simulatedToken);
+      await provisionIdentityUserRecord(
+        simulatedUid,
+        profileData,
+        simulatedToken,
+      );
       setAuth({
         uid: simulatedUid,
         token: simulatedToken,
@@ -8745,21 +8754,11 @@ export default function TradersRegiment() {
         throw new Error("Google session mismatch. Please try again.");
       }
     } else {
-      try {
-        const signInMethods = await fetchSignInMethodsForEmail(
-          firebaseAuth,
-          cleanEmail,
+      const existingRecord = await findUserRecordByEmail(cleanEmail);
+      if (existingRecord?.uid) {
+        throw new Error(
+          "This email is already part of the Regiment. Please login instead.",
         );
-        if (signInMethods && signInMethods.length > 0) {
-          throw new Error(
-            "This email is already part of the Regiment. Please login instead.",
-          );
-        }
-      } catch (checkError) {
-        if (checkError.message.includes("already part of the Regiment")) {
-          throw checkError;
-        }
-        console.warn("Could not pre-check email existence:", checkError);
       }
 
       try {
@@ -8818,7 +8817,7 @@ export default function TradersRegiment() {
         privacyAccepted: Boolean(formData.agreedToTerms),
       },
     });
-    await dbW(`users/${activeUser.uid}`, profileData, authData.token);
+    await provisionIdentityUserRecord(activeUser.uid, profileData, authData.token);
     await sendWelcomeEmail(cleanEmail, fullName);
 
     sendTelegramAlert(
@@ -8855,7 +8854,8 @@ export default function TradersRegiment() {
     }
 
     const authData = await syncAuthSessionFromUser(user, true);
-    const userData = await dbR(`users/${user.uid}`, authData.token);
+    const existingIdentityRecord = await loadLegacyUserProfile(authData);
+    const userData = existingIdentityRecord?.userData || null;
 
     if (userData) {
       clearPendingGoogleSignup();
@@ -8924,16 +8924,14 @@ export default function TradersRegiment() {
         console.warn("Password reset simulated without Firebase auth");
       }
 
-      // Update passwordLastChanged timestamp in database
-      if (firebaseDb) {
-        await dbM(
-          `users/${auth.uid}`,
-          {
-            passwordLastChanged: new Date().toISOString(),
-          },
-          auth.token,
-        );
-      }
+      // Mirror password age into the identity domain while keeping legacy shape intact.
+      await provisionIdentityUserRecord(
+        auth.uid,
+        {
+          passwordLastChanged: new Date().toISOString(),
+        },
+        auth.token,
+      );
 
       // Update local profile
       setProfile((prev) => ({
