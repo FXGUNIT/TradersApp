@@ -1314,18 +1314,11 @@ export default function MainTerminal({
       }));
 
       try {
-        const data = await callDeepSeekBff({
-          maxTokens: 1200,
-          messages: [
-            { role: "system", content: TNC_PARSE_PROMPT },
-            {
-              role: "user",
-              content: `Parse these T&C:\n\n${sourceText.slice(0, 12000)}`,
-            },
-          ],
+        const data = await parseFirmRulesWithAi({
+          prompt: TNC_PARSE_PROMPT,
+          sourceText,
         });
-        const raw = data.choices?.[0]?.message?.content || "{}";
-        const vals = JSON.parse(raw.replace(/```json|```/g, "").trim());
+        const vals = parseJsonChoice(data, {});
         const updated = {
           ...firmRules,
           ...vals,
@@ -1389,15 +1382,11 @@ export default function MainTerminal({
         text: 'Extract all trading indicator values. Return ONLY JSON.' 
       });
 
-      const data = await callDeepSeekBff({
-        maxTokens: 800,
-        messages: [
-          { role: 'system', content: SCREENSHOT_EXTRACT_PROMPT },
-          { role: 'user', content: msgs }
-        ]
+      const data = await extractIndicatorsWithAi({
+        prompt: SCREENSHOT_EXTRACT_PROMPT,
+        screenshots,
       });
-      const content = data.choices?.[0]?.message?.content || '{}';
-      const vals = JSON.parse(content.replace(/```json|```/g, '').trim());
+      const vals = parseJsonChoice(data, {});
       
       setExtractedVals(prev => ({ 
         ...prev, 
