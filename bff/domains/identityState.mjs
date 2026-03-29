@@ -366,6 +366,25 @@ export function ensureUserRecord(uid, patch = {}) {
   return clone(nextUser);
 }
 
+export function provisionUser(uid, patch = {}) {
+  if (!uid) {
+    return null;
+  }
+
+  const state = readState();
+  const nextUser = upsertUser(state, uid, {
+    uid,
+    ...patch,
+    status: patch.status || state.users?.[uid]?.status || "PENDING",
+    updatedAt: patch.updatedAt || nowIso(),
+  });
+  writeState(state);
+  return {
+    user: clone(nextUser),
+    sessions: clone(normalizeSessionBucket(state.sessions?.[uid] || {})),
+  };
+}
+
 export default {
   deleteSession,
   ensureUserRecord,
@@ -375,6 +394,7 @@ export default {
   listSessions,
   patchUserAccess,
   patchUserSecurity,
+  provisionUser,
   revokeOtherSessions,
   upsertSession,
 };

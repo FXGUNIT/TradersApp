@@ -77,6 +77,7 @@ import {
   findUserByEmail as findIdentityUserByEmail,
   listUserSessions as listIdentityUserSessions,
   loadLegacyUserProfile,
+  updateLoginSecurityCounters,
 } from "./services/clients/IdentityClient.js";
 import { submitApplication as submitOnboardingApplication } from "./services/clients/OnboardingClient.js";
 import * as AdminSecurityClient from "./services/clients/AdminSecurityClient.js";
@@ -8490,8 +8491,8 @@ export default function TradersRegiment() {
       }
 
       if (signedInUser?.uid) {
-        await dbM(
-          `users/${signedInUser.uid}`,
+        await updateLoginSecurityCounters(
+          signedInUser.uid,
           {
             failedAttempts: 0,
             isLocked: false,
@@ -8510,11 +8511,15 @@ export default function TradersRegiment() {
         const isNowLocked = currentAttempts >= 10;
 
         try {
-          await dbM(`users/${existingRecord.uid}`, {
-            failedAttempts: currentAttempts,
-            isLocked: isNowLocked,
-            lastLoginAttempt: new Date().toISOString(),
-          });
+          await updateLoginSecurityCounters(
+            existingRecord.uid,
+            {
+              failedAttempts: currentAttempts,
+              isLocked: isNowLocked,
+              lastLoginAttempt: new Date().toISOString(),
+            },
+            "",
+          );
         } catch (dbError) {
           console.warn("Could not update failedAttempts:", dbError);
         }

@@ -30,6 +30,7 @@ import {
   listSessions,
   patchUserAccess,
   patchUserSecurity,
+  provisionUser,
   revokeOtherSessions,
   upsertSession,
 } from "./domains/identityState.mjs";
@@ -558,6 +559,7 @@ const server = createServer(async (req, res) => {
     patchUserAccess,
     patchUserSecurity,
     readJsonBody,
+    provisionUser,
     revokeOtherSessions,
     upsertSession,
     json,

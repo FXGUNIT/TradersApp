@@ -6,6 +6,7 @@ export function createIdentityRouteHandler({
   listSessions,
   patchUserAccess,
   patchUserSecurity,
+  provisionUser,
   revokeOtherSessions,
   upsertSession,
   json,
@@ -17,6 +18,9 @@ export function createIdentityRouteHandler({
     const emailMatch = url.pathname.match(/^\/identity\/users\/by-email\/([^/]+)$/);
     const accessMatch = url.pathname.match(/^\/identity\/users\/([^/]+)\/access$/);
     const securityMatch = url.pathname.match(/^\/identity\/users\/([^/]+)\/security$/);
+    const provisionMatch = url.pathname.match(
+      /^\/identity\/users\/([^/]+)\/provision$/,
+    );
     const sessionsMatch = url.pathname.match(/^\/identity\/users\/([^/]+)\/sessions$/);
     const sessionItemMatch = url.pathname.match(
       /^\/identity\/users\/([^/]+)\/sessions\/([^/]+)$/,
@@ -85,6 +89,37 @@ export function createIdentityRouteHandler({
     if (req.method === "GET" && emailMatch) {
       const email = decodeURIComponent(emailMatch[1]);
       const record = findUserByEmail(email);
+      if (!record) {
+        json(
+          res,
+          404,
+          {
+            ok: false,
+            error: "User not found.",
+          },
+          origin,
+        );
+        return true;
+      }
+
+      json(
+        res,
+        200,
+        {
+          ok: true,
+          user: record.user,
+          sessions: record.sessions,
+        },
+        origin,
+      );
+      return true;
+    }
+
+    if (req.method === "POST" && provisionMatch) {
+      const uid = decodeURIComponent(provisionMatch[1]);
+      const body = await readJsonBody(req, 20_000);
+      const record = provisionUser(uid, body || {});
+
       if (!record) {
         json(
           res,
