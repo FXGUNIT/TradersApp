@@ -79,6 +79,7 @@ import CommandPalette from "./components/CommandPalette.jsx";
 import UserSwitcher from "./components/UserSwitcher.jsx";
 import FullScreenToggle from "./components/FullScreenToggle.jsx";
 import MobileBottomNav from "./components/MobileBottomNav.jsx";
+import FeatureGuard from "./components/FeatureGuard.jsx";
 import CleanLoginScreen from "./features/auth/CleanLoginScreen.jsx";
 import { verifyAdminPassword } from "./services/adminAuthService.js";
 
@@ -9622,7 +9623,9 @@ export default function TradersRegiment() {
         auth={auth}
       />
       <Toast toasts={toasts} onDismiss={handleDismissToast} />
-      <FloatingChatWidget auth={auth} profile={profile} />
+      <FeatureGuard feature="floatingSupportChat">
+        <FloatingChatWidget auth={auth} profile={profile} />
+      </FeatureGuard>
 
       {/* Officers Briefing Footer - Rotating Quotes & Founder Card */}
       <div
