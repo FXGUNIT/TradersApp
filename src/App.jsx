@@ -52,7 +52,6 @@ import AiEnginesStatus from "./components/AiEnginesStatus.jsx";
 import { setupConsoleInterceptor } from "./services/telemetry.js";
 import { setupNetworkMonitor } from "./services/networkMonitor.js";
 import { setupTTITracker } from "./services/ttiTracker.js";
-import { sendApprovalConfirmationEmail } from "./services/emailService.js";
 import { SecuritySentinel } from "./services/securitySentinel.js";
 import { detectDuplicateIPs as scanDuplicateIPs } from "./services/ipScanner.js";
 import { calculateVolatilityRatio, getDynamicParameters, calculateThrottledRisk } from "./utils/math-engine.js";
@@ -4382,13 +4381,12 @@ function AdminDashboard({
 
     try {
       const result = approveAdminUser
-        ? await approveAdminUser(uid, auth?.uid)
+        ? await approveAdminUser(uid, auth?.uid || ADMIN_UID)
         : null;
       if (result?.success === false) {
         throw new Error(result.error || "Approval failed.");
       }
 
-      const targetUser = result?.user || users?.[uid] || {};
       if (result?.user?.uid) {
         setUsers((current) => ({
           ...(current || {}),
@@ -4399,12 +4397,6 @@ function AdminDashboard({
         }));
       }
       setActionMsg(`✓ User ${uid.slice(0, 8)}... APPROVED`);
-      if (targetUser.email) {
-        void sendApprovalConfirmationEmail(
-          targetUser.email,
-          targetUser.fullName,
-        );
-      }
       showToast(
         `Authorization granted. User ${uid.slice(0, 8)}... now have system access.`,
         "success",
@@ -4425,11 +4417,12 @@ function AdminDashboard({
   const block = async (uid) => {
     try {
       const result = blockAdminUser
-        ? await blockAdminUser(uid, auth?.uid)
+        ? await blockAdminUser(uid, auth?.uid || ADMIN_UID)
         : null;
       if (result?.success === false) {
         throw new Error(result.error || "Block failed.");
       }
+
       if (result?.user?.uid) {
         setUsers((current) => ({
           ...(current || {}),

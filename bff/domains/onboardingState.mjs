@@ -57,6 +57,11 @@ export function getApplication(uid) {
   return state.applications?.[uid] || null;
 }
 
+export function listApplications() {
+  const state = readState();
+  return state.applications || {};
+}
+
 export function getApplicationStatus(uid) {
   const record = getApplication(uid);
   if (!record) {
@@ -87,6 +92,7 @@ export function mergeApplicationConsent(uid, consentState = {}) {
 export default {
   getApplication,
   getApplicationStatus,
+  listApplications,
   mergeApplicationConsent,
   upsertApplication,
 };

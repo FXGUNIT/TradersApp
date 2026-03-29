@@ -1,6 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
+import {
+  getApplication,
+  listApplications,
+  upsertApplication,
+} from "./onboardingState.mjs";
 
 const ADMIN_DATA_PATH = resolve(process.cwd(), "bff/data/admin-domain.json");
 const IDENTITY_DATA_PATH = resolve(process.cwd(), "bff/data/identity-domain.json");
@@ -91,15 +96,43 @@ function normalizeUserRecord(uid, user = {}) {
   };
 }
 
+function buildSeedUser(uid, identityUser = null) {
+  if (identityUser) {
+    return identityUser;
+  }
+
+  const application = getApplication(uid);
+  if (!application) {
+    return null;
+  }
+
+  return {
+    uid,
+    email: application.email || null,
+    fullName: application.fullName || application.displayName || uid,
+    status: application.status || "PENDING",
+    role: "user",
+    isLocked: Boolean(application.isLocked),
+    country: application.country || "",
+    city: application.city || "",
+    instagram: application.instagram || "",
+    linkedin: application.linkedin || "",
+    proficiency: application.proficiency || "",
+    authProvider: application.authProvider || "password",
+    submittedAt: application.submittedAt || null,
+    updatedAt: application.updatedAt || nowIso(),
+  };
+}
+
 function syncIdentityUser(uid, patch = {}) {
   const state = readIdentityState();
-  const existing = state.users?.[uid];
-  if (!existing) {
+  const existing = buildSeedUser(uid, state.users?.[uid]);
+  if (!existing && Object.keys(patch || {}).length === 0) {
     return null;
   }
 
   const nextUser = normalizeUserRecord(uid, {
-    ...existing,
+    ...(existing || {}),
     ...patch,
   });
 
@@ -132,12 +165,21 @@ function appendAuditEvent(event = {}) {
 
 function buildUserList() {
   const identityState = readIdentityState();
-  return Object.fromEntries(
-    Object.entries(identityState.users || {}).map(([uid, user]) => [
-      uid,
-      normalizeUserRecord(uid, user),
-    ]),
-  );
+  const applications = listApplications();
+  const users = {};
+
+  Object.entries(applications || {}).forEach(([uid, application]) => {
+    users[uid] = normalizeUserRecord(uid, buildSeedUser(uid, application));
+  });
+
+  Object.entries(identityState.users || {}).forEach(([uid, user]) => {
+    users[uid] = normalizeUserRecord(uid, {
+      ...(users[uid] || {}),
+      ...user,
+    });
+  });
+
+  return users;
 }
 
 export function getMaintenanceState() {
@@ -168,14 +210,13 @@ export function approveAdminUser(uid, adminUid) {
     return { success: false, error: "User UID and Admin UID are required." };
   }
 
-  const identityState = readIdentityState();
-  const user = identityState.users?.[uid];
+  const user = syncIdentityUser(uid);
   if (!user) {
     return { success: false, error: "User not found." };
   }
 
   const updatedAt = nowIso();
-  const nextUser = normalizeUserRecord(uid, {
+  const nextUser = syncIdentityUser(uid, {
     ...user,
     status: "ACTIVE",
     isLocked: false,
@@ -183,12 +224,12 @@ export function approveAdminUser(uid, adminUid) {
     approvedAt: updatedAt,
     updatedAt,
   });
-
-  identityState.users = {
-    ...identityState.users,
-    [uid]: nextUser,
-  };
-  writeIdentityState(identityState);
+  if (getApplication(uid)) {
+    upsertApplication(uid, {
+      status: "ACTIVE",
+      isLocked: false,
+    });
+  }
 
   appendAuditEvent({
     actorUid: adminUid,
@@ -211,14 +252,13 @@ export function blockAdminUser(uid, adminUid) {
     return { success: false, error: "User UID and Admin UID are required." };
   }
 
-  const identityState = readIdentityState();
-  const user = identityState.users?.[uid];
+  const user = syncIdentityUser(uid);
   if (!user) {
     return { success: false, error: "User not found." };
   }
 
   const updatedAt = nowIso();
-  const nextUser = normalizeUserRecord(uid, {
+  const nextUser = syncIdentityUser(uid, {
     ...user,
     status: "BLOCKED",
     isLocked: Boolean(user.isLocked),
@@ -226,12 +266,12 @@ export function blockAdminUser(uid, adminUid) {
     blockedAt: updatedAt,
     updatedAt,
   });
-
-  identityState.users = {
-    ...identityState.users,
-    [uid]: nextUser,
-  };
-  writeIdentityState(identityState);
+  if (getApplication(uid)) {
+    upsertApplication(uid, {
+      status: "BLOCKED",
+      isLocked: Boolean(nextUser?.isLocked),
+    });
+  }
 
   appendAuditEvent({
     actorUid: adminUid,
@@ -254,25 +294,23 @@ export function lockAdminUser(uid, adminUid) {
     return { success: false, error: "User UID and Admin UID are required." };
   }
 
-  const identityState = readIdentityState();
-  const user = identityState.users?.[uid];
+  const user = syncIdentityUser(uid);
   if (!user) {
     return { success: false, error: "User not found." };
   }
 
   const updatedAt = nowIso();
-  const nextUser = normalizeUserRecord(uid, {
+  const nextUser = syncIdentityUser(uid, {
     ...user,
     isLocked: true,
     lockedBy: adminUid,
     updatedAt,
   });
-
-  identityState.users = {
-    ...identityState.users,
-    [uid]: nextUser,
-  };
-  writeIdentityState(identityState);
+  if (getApplication(uid)) {
+    upsertApplication(uid, {
+      isLocked: true,
+    });
+  }
 
   appendAuditEvent({
     actorUid: adminUid,
