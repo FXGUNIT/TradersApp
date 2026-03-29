@@ -54,18 +54,63 @@ import { setupNetworkMonitor } from "./services/networkMonitor.js";
 import { setupTTITracker } from "./services/ttiTracker.js";
 import { SecuritySentinel } from "./services/securitySentinel.js";
 import { detectDuplicateIPs as scanDuplicateIPs } from "./services/ipScanner.js";
-import { calculateVolatilityRatio, getDynamicParameters, calculateThrottledRisk } from "./utils/math-engine.js";
-import { TradersRegimentWatermark, ExchangeFacilityBadge } from "./utils/businessLogicUtils.jsx";
-import { getSession, getTradingDate, parseAndAggregate, buildDataSummary } from "./utils/sessionParser.js";
-import { fuzzySearchScore, highlightMatches, renderHighlightedText } from "./utils/searchUtils.jsx";
+import {
+  calculateVolatilityRatio,
+  getDynamicParameters,
+  calculateThrottledRisk,
+} from "./utils/math-engine.js";
+import {
+  TradersRegimentWatermark,
+  ExchangeFacilityBadge,
+} from "./utils/businessLogicUtils.jsx";
+import {
+  getSession,
+  getTradingDate,
+  parseAndAggregate,
+  buildDataSummary,
+} from "./utils/sessionParser.js";
+import {
+  fuzzySearchScore,
+  highlightMatches,
+  renderHighlightedText,
+} from "./utils/searchUtils.jsx";
 import { dbR, dbW, dbM, dbDel, genOTP } from "./utils/firebaseDbUtils.js";
-import { encryptSessionToken, generateSessionId, getDeviceInfo, getSessionGeoData, createSession, logoutOtherDevices, getDevice } from "./utils/sessionUtils.js";
-import { getTimeBasedGreeting, getUserLevelBadge, cacheUserList, getCachedUserList, clearUserListCache, getUserListCacheMetadata } from "./utils/userUtils.js";
+import {
+  encryptSessionToken,
+  generateSessionId,
+  getDeviceInfo,
+  getSessionGeoData,
+  createSession,
+  logoutOtherDevices,
+  getDevice,
+} from "./utils/sessionUtils.js";
+import {
+  getTimeBasedGreeting,
+  getUserLevelBadge,
+  cacheUserList,
+  getCachedUserList,
+  clearUserListCache,
+  getUserListCacheMetadata,
+} from "./utils/userUtils.js";
 import { calcRoR, getISTState } from "./utils/tradingUtils.js";
-import { gatherForensicData, sendTelegramAlert, sendForensicAlert } from "./utils/securityAlertUtils.js";
-import { triggerConfetti, createCardTiltHandler, ACCENT_COLORS, createTheme } from "./utils/uiUtils.js";
+import {
+  gatherForensicData,
+  sendTelegramAlert,
+  sendForensicAlert,
+} from "./utils/securityAlertUtils.js";
+import {
+  triggerConfetti,
+  createCardTiltHandler,
+  ACCENT_COLORS,
+  createTheme,
+} from "./utils/uiUtils.js";
 import { copyToClipboard } from "./utils/searchUtils.jsx";
-import { isValidGmailAddress, isPasswordExpired, detectGPUSupport, withExponentialBackoff } from "./utils/securityUtils.js";
+import {
+  isValidGmailAddress,
+  isPasswordExpired,
+  detectGPUSupport,
+  withExponentialBackoff,
+} from "./utils/securityUtils.js";
 import LoadingOverlay from "./components/LoadingOverlay.jsx";
 import SkeletonLoader from "./components/SkeletonLoader.jsx";
 import LazyImage from "./components/LazyImage.jsx";
@@ -88,6 +133,7 @@ import {
   saveFirmRules as saveTerminalFirmRules,
   saveJournal as saveTerminalJournal,
 } from "./services/clients/TerminalClient.js";
+import "./styles/global.css";
 import NotificationCenter from "./components/NotificationCenter.jsx";
 import CommandPalette from "./components/CommandPalette.jsx";
 import UserSwitcher from "./components/UserSwitcher.jsx";
@@ -100,8 +146,8 @@ import { verifyAdminPassword } from "./services/adminAuthService.js";
 
 const hasEmailJsConfig = Boolean(
   import.meta.env.VITE_EMAILJS_SERVICE_ID &&
-    import.meta.env.VITE_EMAILJS_TEMPLATE_ID &&
-    import.meta.env.VITE_EMAILJS_PUBLIC_KEY,
+  import.meta.env.VITE_EMAILJS_TEMPLATE_ID &&
+  import.meta.env.VITE_EMAILJS_PUBLIC_KEY,
 );
 
 // math-engine & ai-router are both inlined (files exist but have no exports)
@@ -119,9 +165,9 @@ const firebaseConfig = {
 };
 const hasFirebaseConfig = Boolean(
   firebaseConfig.apiKey &&
-    firebaseConfig.authDomain &&
-    firebaseConfig.projectId &&
-    firebaseConfig.appId,
+  firebaseConfig.authDomain &&
+  firebaseConfig.projectId &&
+  firebaseConfig.appId,
 );
 const firebaseApp = hasFirebaseConfig ? initializeApp(firebaseConfig) : null;
 const firebaseAuth = firebaseApp ? getAuth(firebaseApp) : null;
@@ -143,7 +189,10 @@ const resolveAdminClientFn = (...names) => {
   return null;
 };
 const listAdminUsers = resolveAdminClientFn("listUsers", "fetchAdminUsers");
-const approveAdminUser = resolveAdminClientFn("approveUser", "approveAdminUser");
+const approveAdminUser = resolveAdminClientFn(
+  "approveUser",
+  "approveAdminUser",
+);
 const blockAdminUser = resolveAdminClientFn("blockUser", "blockAdminUser");
 const fetchMaintenanceState = resolveAdminClientFn(
   "fetchMaintenanceState",
@@ -217,8 +266,6 @@ const testTelegramConnectivity = async () => ({
   summary: { status: "ALL_SYSTEMS_OPERATIONAL", passedTests: 3, totalTests: 3 },
 });
 const initTelegramMonitor = () => {};
-
-
 
 // AI Engines Status indicator (imported from component)
 
@@ -560,7 +607,9 @@ const getLoginRateLimitState = () =>
   safeStorageGet(LOGIN_RATE_LIMIT_STORAGE_KEY, {});
 
 const getLoginRateLimitEntry = (email) => {
-  const normalizedEmail = String(email || "").trim().toLowerCase();
+  const normalizedEmail = String(email || "")
+    .trim()
+    .toLowerCase();
   if (!normalizedEmail) {
     return null;
   }
@@ -593,7 +642,9 @@ const getLoginRateLimitRemainingMs = (email) => {
 };
 
 const recordLoginFailure = (email) => {
-  const normalizedEmail = String(email || "").trim().toLowerCase();
+  const normalizedEmail = String(email || "")
+    .trim()
+    .toLowerCase();
   if (!normalizedEmail) {
     return;
   }
@@ -618,7 +669,9 @@ const recordLoginFailure = (email) => {
 };
 
 const clearLoginFailures = (email) => {
-  const normalizedEmail = String(email || "").trim().toLowerCase();
+  const normalizedEmail = String(email || "")
+    .trim()
+    .toLowerCase();
   if (!normalizedEmail) {
     return;
   }
@@ -856,8 +909,6 @@ const useSystemTheme = () => {
 
   return isDarkMode;
 };
-
-
 
 // createTheme now imported from utils/uiUtils.js
 // ACCENT_COLORS also imported from utils/uiUtils.js
@@ -2807,7 +2858,7 @@ function LoadingFallback() {
           borderRadius: "50%",
           overflow: "hidden",
           boxShadow: "0 8px 32px rgba(0, 0, 0, 0.15)",
-            background: "var(--surface-elevated, #FFFFFF)",
+          background: "var(--surface-elevated, #FFFFFF)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -3254,7 +3305,11 @@ function SupportChatModal({
         >
           {messages.length === 0 ? (
             <div
-              style={{ color: "var(--text-secondary, #A1A1A6)", textAlign: "center", marginTop: 20 }}
+              style={{
+                color: "var(--text-secondary, #A1A1A6)",
+                textAlign: "center",
+                marginTop: 20,
+              }}
             >
               No messages yet. Start the conversation.
             </div>
@@ -3330,9 +3385,9 @@ function SupportChatModal({
               }
             }}
             placeholder="Type message..."
-              style={{
-                flex: 1,
-                background: "var(--input-bg, rgba(255,255,255,0.05))",
+            style={{
+              flex: 1,
+              background: "var(--input-bg, rgba(255,255,255,0.05))",
               border: "1px solid rgba(255,255,255,0.1)",
               borderRadius: 8,
               padding: "10px 12px",
@@ -3345,11 +3400,15 @@ function SupportChatModal({
             onClick={handleSendMessage}
             disabled={!input.trim()}
             style={{
-              background: input.trim() ? "var(--accent-primary, #2563eb)" : "rgba(0,122,255,0.3)", 
+              background: input.trim()
+                ? "var(--accent-primary, #2563eb)"
+                : "rgba(0,122,255,0.3)",
               border: "none",
               borderRadius: 8,
               padding: "10px 16px",
-              color: input.trim() ? "var(--text-primary, #000)" : "var(--text-secondary, #A1A1A6)",
+              color: input.trim()
+                ? "var(--text-primary, #000)"
+                : "var(--text-secondary, #A1A1A6)",
               fontSize: 13,
               fontWeight: 700,
               cursor: input.trim() ? "pointer" : "default",
@@ -4486,7 +4545,11 @@ function AdminDashboard({
           const nextUsers = response?.users || response?.data || response;
           if (Array.isArray(nextUsers)) {
             data = nextUsers.find((user) => user?.uid === uid) || null;
-          } else if (nextUsers && typeof nextUsers === "object" && nextUsers.users) {
+          } else if (
+            nextUsers &&
+            typeof nextUsers === "object" &&
+            nextUsers.users
+          ) {
             data = nextUsers.users?.[uid] || null;
           } else if (nextUsers && typeof nextUsers === "object") {
             data = nextUsers?.[uid] || null;
@@ -4918,7 +4981,9 @@ function AdminDashboard({
                         }
                         return acc;
                       }, {})
-                    : nextUsers && typeof nextUsers === "object" && nextUsers.users &&
+                    : nextUsers &&
+                        typeof nextUsers === "object" &&
+                        nextUsers.users &&
                         typeof nextUsers.users === "object"
                       ? nextUsers.users
                       : nextUsers && typeof nextUsers === "object"
@@ -4927,7 +4992,9 @@ function AdminDashboard({
                 );
               } catch (error) {
                 console.error("Failed to refresh users via client:", error);
-                setDbError(`Network Error: ${error.message || "Failed to refresh users"}`);
+                setDbError(
+                  `Network Error: ${error.message || "Failed to refresh users"}`,
+                );
               } finally {
                 setLoading(false);
               }
@@ -5891,43 +5958,48 @@ function AdminDashboard({
               <div style={{ marginBottom: 20, fontSize: 13, lineHeight: 1.6 }}>
                 {dbError}
               </div>
-                <button
-                  onClick={async () => {
-                    if (!listAdminUsers) {
-                      setDbError("Admin user list client unavailable.");
-                      return;
-                    }
+              <button
+                onClick={async () => {
+                  if (!listAdminUsers) {
+                    setDbError("Admin user list client unavailable.");
+                    return;
+                  }
 
-                    setLoading(true);
-                    setDbError("");
-                    try {
-                      const response = await listAdminUsers();
-                      if (response?.success === false) {
-                        throw new Error(response.error || "Failed to retry.");
-                      }
-                      const nextUsers = response?.users || response?.data || response;
-                      setUsers(
-                        Array.isArray(nextUsers)
-                          ? nextUsers.reduce((acc, user) => {
-                              if (user?.uid) {
-                                acc[user.uid] = user;
-                              }
-                              return acc;
-                            }, {})
-                          : nextUsers && typeof nextUsers === "object" && nextUsers.users &&
-                              typeof nextUsers.users === "object"
-                            ? nextUsers.users
-                            : nextUsers && typeof nextUsers === "object"
-                              ? nextUsers
-                              : {},
-                      );
-                    } catch (error) {
-                      console.error("Failed to retry via client:", error);
-                      setDbError(`Network Error: ${error.message || "Failed to retry"}`);
-                    } finally {
-                      setLoading(false);
+                  setLoading(true);
+                  setDbError("");
+                  try {
+                    const response = await listAdminUsers();
+                    if (response?.success === false) {
+                      throw new Error(response.error || "Failed to retry.");
                     }
-                  }}
+                    const nextUsers =
+                      response?.users || response?.data || response;
+                    setUsers(
+                      Array.isArray(nextUsers)
+                        ? nextUsers.reduce((acc, user) => {
+                            if (user?.uid) {
+                              acc[user.uid] = user;
+                            }
+                            return acc;
+                          }, {})
+                        : nextUsers &&
+                            typeof nextUsers === "object" &&
+                            nextUsers.users &&
+                            typeof nextUsers.users === "object"
+                          ? nextUsers.users
+                          : nextUsers && typeof nextUsers === "object"
+                            ? nextUsers
+                            : {},
+                    );
+                  } catch (error) {
+                    console.error("Failed to retry via client:", error);
+                    setDbError(
+                      `Network Error: ${error.message || "Failed to retry"}`,
+                    );
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
                 style={{
                   marginTop: 16,
                   background: "rgba(255,69,58,0.2)",
@@ -7618,17 +7690,20 @@ export default function TradersRegiment() {
       return "BLUE";
     }
   });
-  const handleThemeChange = useCallback((newTheme) => {
-    const normalized = {
-      day: "lumiere",
-      eye: "amber",
-      night: "midnight",
-      lumiere: "lumiere",
-      amber: "amber",
-      midnight: "midnight",
-    };
-    setAppTheme(normalized[newTheme] || "lumiere");
-  }, [setAppTheme]);
+  const handleThemeChange = useCallback(
+    (newTheme) => {
+      const normalized = {
+        day: "lumiere",
+        eye: "amber",
+        night: "midnight",
+        lumiere: "lumiere",
+        amber: "amber",
+        midnight: "midnight",
+      };
+      setAppTheme(normalized[newTheme] || "lumiere");
+    },
+    [setAppTheme],
+  );
   // MODULE 1 PHASE 2: SESSION MANAGEMENT
   const [googleUser, setGoogleUser] = useState(() => readPendingGoogleSignup());
   const [, _setActiveSessions] = useState([]);
@@ -7655,7 +7730,10 @@ export default function TradersRegiment() {
             return;
           }
         } catch (error) {
-          console.warn("Maintenance state client load failed, falling back:", error);
+          console.warn(
+            "Maintenance state client load failed, falling back:",
+            error,
+          );
         }
       }
 
@@ -7695,7 +7773,10 @@ export default function TradersRegiment() {
         }
 
         try {
-          localStorage.setItem("TradersApp_MaintenanceMode", newState.toString());
+          localStorage.setItem(
+            "TradersApp_MaintenanceMode",
+            newState.toString(),
+          );
         } catch {
           // Local cache is best-effort only.
         }
@@ -7708,7 +7789,10 @@ export default function TradersRegiment() {
         );
         return;
       } catch (error) {
-        console.warn("Maintenance toggle client update failed, falling back:", error);
+        console.warn(
+          "Maintenance toggle client update failed, falling back:",
+          error,
+        );
       }
     }
 
@@ -8153,8 +8237,11 @@ export default function TradersRegiment() {
   const checkUserStatus = useCallback(
     async (authData) => {
       try {
-        const { profile: nextProfile, screen: nextScreen, userData } =
-          await loadLegacyUserProfile(authData);
+        const {
+          profile: nextProfile,
+          screen: nextScreen,
+          userData,
+        } = await loadLegacyUserProfile(authData);
 
         if (!userData || !nextProfile) {
           const currentUser = firebaseAuth?.currentUser;
@@ -8233,7 +8320,11 @@ export default function TradersRegiment() {
       } catch (error) {
         console.error("Status check failed", error);
         // Only redirect to login on auth errors, not network/permission issues
-        if (error?.message?.includes("auth") || error?.code?.includes("auth") || error?.message?.includes("permission")) {
+        if (
+          error?.message?.includes("auth") ||
+          error?.code?.includes("auth") ||
+          error?.message?.includes("permission")
+        ) {
           setScreen(SCREEN_IDS.LOGIN);
         }
         // Otherwise keep user on current screen - don't disrupt experience for transient errors
@@ -8392,7 +8483,9 @@ export default function TradersRegiment() {
       emailVerified = false,
     }) => ({
       fullName: (fullName || email?.split("@")[0] || "").trim(),
-      email: String(email || "").trim().toLowerCase(),
+      email: String(email || "")
+        .trim()
+        .toLowerCase(),
       country: String(country || "").trim(),
       city: String(city || "").trim(),
       instagram: String(instagram || "").trim(),
@@ -8436,14 +8529,18 @@ export default function TradersRegiment() {
   const sendVerificationLink = useCallback(async () => {
     const currentUser = firebaseAuth?.currentUser;
     if (!currentUser) {
-      throw new Error("Your session expired. Sign in again to resend verification.");
+      throw new Error(
+        "Your session expired. Sign in again to resend verification.",
+      );
     }
 
     await sendEmailVerification(currentUser);
   }, []);
 
   const handleLoginPasswordReset = useCallback(async (email) => {
-    const cleanEmail = String(email || "").trim().toLowerCase();
+    const cleanEmail = String(email || "")
+      .trim()
+      .toLowerCase();
     if (!cleanEmail) {
       throw new Error("Please enter your Gmail address.");
     }
@@ -8464,7 +8561,9 @@ export default function TradersRegiment() {
   }, []);
 
   const handleLogin = async (email, password, stayLoggedIn = false) => {
-    const sanitizedEmail = String(email || "").trim().toLowerCase();
+    const sanitizedEmail = String(email || "")
+      .trim()
+      .toLowerCase();
     const blockedEmails = ["arkgproductions@gmail.com", "starg.unit@gmail.com"];
 
     if (!sanitizedEmail || !password) {
@@ -8496,7 +8595,8 @@ export default function TradersRegiment() {
             null
           : null;
       const simulatedUid =
-        auditProfile?.uid || `audit-${sanitizedEmail.replace(/[^a-z0-9]/gi, "") || "user"}`;
+        auditProfile?.uid ||
+        `audit-${sanitizedEmail.replace(/[^a-z0-9]/gi, "") || "user"}`;
       const simulatedToken = `audit-token-${simulatedUid}`;
       const simulatedAuth = {
         uid: simulatedUid,
@@ -8711,11 +8811,15 @@ export default function TradersRegiment() {
     }
 
     const authProvider =
-      formData.authProvider === "google" || googleUser?.authProvider === "google"
+      formData.authProvider === "google" ||
+      googleUser?.authProvider === "google"
         ? "google"
         : "password";
     const cleanEmail = String(
-      formData.email || googleUser?.email || firebaseAuth?.currentUser?.email || "",
+      formData.email ||
+        googleUser?.email ||
+        firebaseAuth?.currentUser?.email ||
+        "",
     )
       .trim()
       .toLowerCase();
@@ -8757,7 +8861,10 @@ export default function TradersRegiment() {
       );
     }
 
-    if (authProvider !== "google" && String(formData.password || "").length < 8) {
+    if (
+      authProvider !== "google" &&
+      String(formData.password || "").length < 8
+    ) {
       throw new Error("Password must be at least 8 characters.");
     }
 
@@ -8828,7 +8935,9 @@ export default function TradersRegiment() {
 
     if (authProvider === "google") {
       if (!activeUser) {
-        throw new Error("Continue with Google first to finish your application.");
+        throw new Error(
+          "Continue with Google first to finish your application.",
+        );
       }
       if (activeUser.email?.toLowerCase() !== cleanEmail) {
         throw new Error("Google session mismatch. Please try again.");
@@ -8852,7 +8961,9 @@ export default function TradersRegiment() {
       } catch (signupError) {
         const errorCode = signupError?.code || "";
         if (errorCode === "auth/email-already-in-use") {
-          throw new Error("This email is already registered. Please login instead.");
+          throw new Error(
+            "This email is already registered. Please login instead.",
+          );
         }
         if (errorCode === "auth/invalid-email") {
           throw new Error("Invalid Gmail address.");
@@ -8897,7 +9008,11 @@ export default function TradersRegiment() {
         privacyAccepted: Boolean(formData.agreedToTerms),
       },
     });
-    await provisionIdentityUserRecord(activeUser.uid, profileData, authData.token);
+    await provisionIdentityUserRecord(
+      activeUser.uid,
+      profileData,
+      authData.token,
+    );
     await sendWelcomeEmail(cleanEmail, fullName);
 
     sendTelegramAlert(
@@ -9733,13 +9848,13 @@ export default function TradersRegiment() {
       case "signup":
         return (
           <Suspense fallback={<LoadingFallback />}>
-        <CleanOnboarding
-          onSignupSuccess={handleStructuredSignup}
-          onGoogleSuccess={handleStructuredGoogleAuth}
-          onBackToLogin={handleBackToLoginFromSignup}
-          googleUser={googleUser}
-        />
-      </Suspense>
+            <CleanOnboarding
+              onSignupSuccess={handleStructuredSignup}
+              onGoogleSuccess={handleStructuredGoogleAuth}
+              onBackToLogin={handleBackToLoginFromSignup}
+              googleUser={googleUser}
+            />
+          </Suspense>
         );
 
       case "waiting":
@@ -9941,239 +10056,239 @@ export default function TradersRegiment() {
       }}
     >
       <section className={`app-container theme-${currentTheme}`}>
-      {![
-        SCREEN_IDS.LOADING,
-        SCREEN_IDS.HUB,
-        SCREEN_IDS.CONSCIOUSNESS,
-        SCREEN_IDS.APP,
-      ].includes(screen) && (
-        <div
-          style={{
-            position: "fixed",
-            top: 20,
-            right: 20,
-            zIndex: 180,
-          }}
-        >
-          <ThemeSwitcher
-            currentTheme={currentTheme}
-            onThemeChange={handleThemeChange}
-          />
-        </div>
-      )}
-      {/* RULE #295, #296: Maintenance Mode - Show "Back Soon" screen if active, except for Master Admin */}
-      {maintenanceModeActive &&
-      auth?.uid !== ADMIN_UID &&
-      screen !== "admin" ? (
-        <MaintenanceScreen />
-      ) : (
-        screenContent
-      )}
-
-      {/* Admin Debug Overlay - System Audit Dashboard */}
-      <DebugOverlay
-        logs={debugLogs}
-        latencies={debugLatencies}
-        tti={debugTTI}
-        componentStatus={debugComponentStatus}
-        isOpen={debugOverlayOpen}
-        onToggle={() => setDebugOverlayOpen(!debugOverlayOpen)}
-        auth={auth}
-      />
-      <Toast toasts={toasts} onDismiss={handleDismissToast} />
-      <FeatureGuard feature="floatingSupportChat">
-        <FloatingChatWidget auth={auth} profile={profile} />
-      </FeatureGuard>
-
-      {/* Officers Briefing Footer - Rotating Quotes & Founder Card */}
-      <div
-        style={{
-          marginTop: "auto",
-          backgroundColor: "#FFFFFF",
-          borderTop: "none",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: "32px",
-          padding: "60px 40px 40px 40px",
-          boxShadow:
-            "0 -1px 3px 0 rgba(0, 0, 0, 0.05), 0 -1px 2px 0 rgba(0, 0, 0, 0.04)",
-        }}
-      >
-        {/* Rotating Quote */}
-        <div style={{ textAlign: "center", maxWidth: 600 }}>
+        {![
+          SCREEN_IDS.LOADING,
+          SCREEN_IDS.HUB,
+          SCREEN_IDS.CONSCIOUSNESS,
+          SCREEN_IDS.APP,
+        ].includes(screen) && (
           <div
             style={{
-              color: "#64748B",
-              fontSize: "0.9rem",
-              fontStyle: "italic",
-              lineHeight: 1.8,
-              fontFamily: T.font,
+              position: "fixed",
+              top: 20,
+              right: 20,
+              zIndex: 180,
             }}
           >
-            "{dailyQuote}" 🦅
+            <ThemeSwitcher
+              currentTheme={currentTheme}
+              onThemeChange={handleThemeChange}
+            />
           </div>
-        </div>
+        )}
+        {/* RULE #295, #296: Maintenance Mode - Show "Back Soon" screen if active, except for Master Admin */}
+        {maintenanceModeActive &&
+        auth?.uid !== ADMIN_UID &&
+        screen !== "admin" ? (
+          <MaintenanceScreen />
+        ) : (
+          screenContent
+        )}
 
-        {/* Founder Card */}
+        {/* Admin Debug Overlay - System Audit Dashboard */}
+        <DebugOverlay
+          logs={debugLogs}
+          latencies={debugLatencies}
+          tti={debugTTI}
+          componentStatus={debugComponentStatus}
+          isOpen={debugOverlayOpen}
+          onToggle={() => setDebugOverlayOpen(!debugOverlayOpen)}
+          auth={auth}
+        />
+        <Toast toasts={toasts} onDismiss={handleDismissToast} />
+        <FeatureGuard feature="floatingSupportChat">
+          <FloatingChatWidget auth={auth} profile={profile} />
+        </FeatureGuard>
+
+        {/* Officers Briefing Footer - Rotating Quotes & Founder Card */}
         <div
           style={{
+            marginTop: "auto",
+            backgroundColor: "#FFFFFF",
+            borderTop: "none",
             display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
             flexDirection: "column",
-            textAlign: "center",
-          }}
-        >
-          <FounderCard
-            linkedInUrl="https://www.linkedin.com/in/singhgunit/"
-            theme={theme}
-          />
-        </div>
-
-        {/* AI System Status — Quad-Core Intelligence Network */}
-        <div
-          style={{
-            display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            gap: "16px",
-            padding: "12px 24px",
-            borderRadius: "10px",
-            background: "linear-gradient(135deg, #F8FAFC, #F1F5F9)",
-            border: "1px solid #E2E8F0",
-            flexWrap: "wrap",
+            gap: "32px",
+            padding: "60px 40px 40px 40px",
+            boxShadow:
+              "0 -1px 3px 0 rgba(0, 0, 0, 0.05), 0 -1px 2px 0 rgba(0, 0, 0, 0.04)",
           }}
         >
-          <span
+          {/* Rotating Quote */}
+          <div style={{ textAlign: "center", maxWidth: 600 }}>
+            <div
+              style={{
+                color: "#64748B",
+                fontSize: "0.9rem",
+                fontStyle: "italic",
+                lineHeight: 1.8,
+                fontFamily: T.font,
+              }}
+            >
+              "{dailyQuote}" 🦅
+            </div>
+          </div>
+
+          {/* Founder Card */}
+          <div
             style={{
-              fontSize: "0.7rem",
-              fontWeight: 700,
-              color: "#475569",
-              letterSpacing: "0.1em",
-              textTransform: "uppercase",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexDirection: "column",
+              textAlign: "center",
             }}
           >
-            AI System Status
-          </span>
-          <span
+            <FounderCard
+              linkedInUrl="https://www.linkedin.com/in/singhgunit/"
+              theme={theme}
+            />
+          </div>
+
+          {/* AI System Status — Quad-Core Intelligence Network */}
+          <div
             style={{
-              fontSize: "0.64rem",
-              fontWeight: 700,
-              color: "#0369A1",
-              background: "rgba(14,165,233,0.12)",
-              border: "1px solid rgba(14,165,233,0.25)",
-              borderRadius: 999,
-              padding: "4px 8px",
-              textTransform: "uppercase",
-              letterSpacing: "0.08em",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "16px",
+              padding: "12px 24px",
+              borderRadius: "10px",
+              background: "linear-gradient(135deg, #F8FAFC, #F1F5F9)",
+              border: "1px solid #E2E8F0",
+              flexWrap: "wrap",
             }}
           >
-            Watchtower Active
-          </span>
-          {Object.values(aiQuadCoreStatus).every(
-            (mind) => mind.status === "unconfigured",
-          ) && (
+            <span
+              style={{
+                fontSize: "0.7rem",
+                fontWeight: 700,
+                color: "#475569",
+                letterSpacing: "0.1em",
+                textTransform: "uppercase",
+              }}
+            >
+              AI System Status
+            </span>
             <span
               style={{
                 fontSize: "0.64rem",
-                fontWeight: 600,
-                color: "#64748B",
+                fontWeight: 700,
+                color: "#0369A1",
+                background: "rgba(14,165,233,0.12)",
+                border: "1px solid rgba(14,165,233,0.25)",
+                borderRadius: 999,
+                padding: "4px 8px",
+                textTransform: "uppercase",
+                letterSpacing: "0.08em",
               }}
             >
-              Fresh provider keys needed
+              Watchtower Active
             </span>
-          )}
-          {Object.entries(aiQuadCoreStatus).map(([key, mind]) => {
-            const isReserve = mind.isReserve;
-            const state = mind.status || (mind.online ? "online" : "offline");
-            const dotColor = isReserve
-              ? "#A855F7"
-              : state === "online"
-                ? "#22C55E"
-                : state === "unconfigured"
-                  ? "#94A3B8"
-                  : state === "checking"
-                    ? "#38BDF8"
-                    : "#EF4444";
-            const textColor = isReserve
-              ? "#7E22CE"
-              : state === "online"
-                ? "#166534"
-                : state === "unconfigured"
-                  ? "#475569"
-                  : state === "checking"
-                    ? "#0C4A6E"
-                    : "#991B1B";
-            const glowColor = isReserve
-              ? "rgba(168,85,247,0.5)"
-              : state === "online"
-                ? "rgba(34,197,94,0.5)"
-                : state === "unconfigured"
-                  ? "rgba(148,163,184,0.28)"
-                  : state === "checking"
-                    ? "rgba(56,189,248,0.35)"
-                    : "rgba(239,68,68,0.5)";
-            return (
-              <div
-                key={key}
+            {Object.values(aiQuadCoreStatus).every(
+              (mind) => mind.status === "unconfigured",
+            ) && (
+              <span
                 style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "6px",
+                  fontSize: "0.64rem",
+                  fontWeight: 600,
+                  color: "#64748B",
                 }}
-                title={mind.reason || `${mind.name}: ${state}`}
               >
+                Fresh provider keys needed
+              </span>
+            )}
+            {Object.entries(aiQuadCoreStatus).map(([key, mind]) => {
+              const isReserve = mind.isReserve;
+              const state = mind.status || (mind.online ? "online" : "offline");
+              const dotColor = isReserve
+                ? "#A855F7"
+                : state === "online"
+                  ? "#22C55E"
+                  : state === "unconfigured"
+                    ? "#94A3B8"
+                    : state === "checking"
+                      ? "#38BDF8"
+                      : "#EF4444";
+              const textColor = isReserve
+                ? "#7E22CE"
+                : state === "online"
+                  ? "#166534"
+                  : state === "unconfigured"
+                    ? "#475569"
+                    : state === "checking"
+                      ? "#0C4A6E"
+                      : "#991B1B";
+              const glowColor = isReserve
+                ? "rgba(168,85,247,0.5)"
+                : state === "online"
+                  ? "rgba(34,197,94,0.5)"
+                  : state === "unconfigured"
+                    ? "rgba(148,163,184,0.28)"
+                    : state === "checking"
+                      ? "rgba(56,189,248,0.35)"
+                      : "rgba(239,68,68,0.5)";
+              return (
                 <div
+                  key={key}
                   style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: "50%",
-                    background: dotColor,
-                    boxShadow: `0 0 6px ${glowColor}`,
-                    animation: "led-pulse 2s ease-in-out infinite",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
                   }}
-                />
-                <span
-                  style={{
-                    fontSize: "0.68rem",
-                    fontWeight: 600,
-                    color: textColor,
-                    fontFamily: "ui-monospace, monospace",
-                  }}
+                  title={mind.reason || `${mind.name}: ${state}`}
                 >
-                  {mind.name}
-                </span>
-              </div>
-            );
-          })}
-        </div>
+                  <div
+                    style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: "50%",
+                      background: dotColor,
+                      boxShadow: `0 0 6px ${glowColor}`,
+                      animation: "led-pulse 2s ease-in-out infinite",
+                    }}
+                  />
+                  <span
+                    style={{
+                      fontSize: "0.68rem",
+                      fontWeight: 600,
+                      color: textColor,
+                      fontFamily: "ui-monospace, monospace",
+                    }}
+                  >
+                    {mind.name}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
 
-        {/* Security Protocol */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            flexDirection: "column",
-            textAlign: "center",
-          }}
-        >
+          {/* Security Protocol */}
           <div
             style={{
-              color: "#94A3B8",
-              fontSize: "0.75rem",
-              letterSpacing: "0.1em",
-              fontWeight: 500,
-              marginBottom: 0,
-              textTransform: "uppercase",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexDirection: "column",
+              textAlign: "center",
             }}
           >
-            WELCOME TO THE REGIMENT
+            <div
+              style={{
+                color: "#94A3B8",
+                fontSize: "0.75rem",
+                letterSpacing: "0.1em",
+                fontWeight: 500,
+                marginBottom: 0,
+                textTransform: "uppercase",
+              }}
+            >
+              WELCOME TO THE REGIMENT
+            </div>
           </div>
         </div>
-      </div>
       </section>
     </AppShellProvider>
   );
