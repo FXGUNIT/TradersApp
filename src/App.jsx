@@ -18,7 +18,6 @@ import {
   signInWithPopup,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  sendEmailVerification,
   signOut,
 } from "firebase/auth";
 import { getDatabase, ref, onValue } from "firebase/database";
@@ -74,7 +73,6 @@ import {
   generateSessionId,
   getDeviceInfo,
   getSessionGeoData,
-  createSession,
   getDevice,
 } from "./utils/sessionUtils.js";
 import {
@@ -125,6 +123,11 @@ import {
   resolveConsciousnessReturnScreen,
   resolveRestorableScreen,
 } from "./features/identity/authFlowStorage.js";
+import {
+  buildPendingProfile,
+  createSyncedAuthSession,
+  sendVerificationLinkForUser,
+} from "./features/identity/authSessionUtils.js";
 import {
   findUserByEmail as findIdentityUserByEmail,
   loadLegacyUserProfile,
@@ -2024,57 +2027,13 @@ export default function TradersRegiment() {
     };
   }, [auth?.token, auth?.uid, profile?.uid, setProfile]);
 
-  const findUserRecordByEmail = useCallback(async (email) => {
-    return findIdentityUserByEmail(email);
-  }, []);
-
-  const buildPendingProfile = useCallback(
-    ({
-      fullName,
-      email,
-      country,
-      city,
-      instagram,
-      linkedin,
-      proficiency,
-      authProvider = "password",
-      emailVerified = false,
-    }) => ({
-      fullName: (fullName || email?.split("@")[0] || "").trim(),
-      email: String(email || "")
-        .trim()
-        .toLowerCase(),
-      country: String(country || "").trim(),
-      city: String(city || "").trim(),
-      instagram: String(instagram || "").trim(),
-      linkedin: String(linkedin || "").trim(),
-      proficiency: String(proficiency || "").trim(),
-      authProvider,
-      emailVerified: Boolean(emailVerified),
-      status: "PENDING",
-      role: "user",
-      createdAt: new Date().toISOString(),
-      passwordLastChanged: new Date().toISOString(),
-      failedAttempts: 0,
-      isLocked: false,
-    }),
-    [],
-  );
-
   const syncAuthSessionFromUser = useCallback(
     async (user, stayLoggedIn = false) => {
-      const token = await user.getIdToken(true);
-      const authData = {
-        uid: user.uid,
-        token,
-        refreshToken: user.refreshToken,
-        email: user.email,
-        emailVerified: user.emailVerified,
-      };
-
+      const { authData, sessionId } = await createSyncedAuthSession(
+        user,
+        stayLoggedIn,
+      );
       setAuth(authData);
-
-      const sessionId = await createSession(user.uid, token, stayLoggedIn);
       if (sessionId) {
         setCurrentSessionId(sessionId);
       }
@@ -2085,14 +2044,7 @@ export default function TradersRegiment() {
   );
 
   const sendVerificationLink = useCallback(async () => {
-    const currentUser = firebaseAuth?.currentUser;
-    if (!currentUser) {
-      throw new Error(
-        "Your session expired. Sign in again to resend verification.",
-      );
-    }
-
-    await sendEmailVerification(currentUser);
+    await sendVerificationLinkForUser(firebaseAuth?.currentUser);
   }, []);
 
   const handleLoginPasswordReset = useCallback(async (email) => {
@@ -2192,7 +2144,7 @@ export default function TradersRegiment() {
       console.warn("Failed to set persistence:", error);
     }
 
-    const existingRecord = await findUserRecordByEmail(sanitizedEmail);
+    const existingRecord = await findIdentityUserByEmail(sanitizedEmail);
     if (existingRecord?.userData?.isLocked) {
       throw new Error(
         "Account Locked: Too many failed attempts. Contact Master Admin.",
@@ -2501,7 +2453,7 @@ export default function TradersRegiment() {
         throw new Error("Google session mismatch. Please try again.");
       }
     } else {
-      const existingRecord = await findUserRecordByEmail(cleanEmail);
+      const existingRecord = await findIdentityUserByEmail(cleanEmail);
       if (existingRecord?.uid) {
         throw new Error(
           "This email is already part of the Regiment. Please login instead.",
