@@ -1,5 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { computeJournalMetrics } from "./journalMetrics";
+import {
+  computeJournalMetrics,
+  EMPTY_JOURNAL_METRICS,
+} from "./journalMetrics";
 import {
   makeImgHandler,
 } from "./terminalUploadUtils";
@@ -389,6 +392,10 @@ export default function MainTerminal({
   const firmRulesDidMount = useRef(false);
   const csvParserWorkerRef = useRef(null);
   const csvParseRequestIdRef = useRef(0);
+  const journalMetricsWorkerRef = useRef(null);
+  const journalMetricsRequestIdRef = useRef(0);
+  const [metrics, setMetrics] = useState(EMPTY_JOURNAL_METRICS);
+  const [isJournalMetricsPending, setIsJournalMetricsPending] = useState(false);
 
   const applyCsvParseResult = useCallback((requestId, result) => {
     if (requestId !== csvParseRequestIdRef.current) {

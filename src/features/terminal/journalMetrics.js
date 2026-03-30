@@ -158,6 +158,8 @@ export function computeJournalMetrics(journal = []) {
   };
 }
 
+export const EMPTY_JOURNAL_METRICS = computeJournalMetrics([]);
+
 export function formatMetricNumber(value, digits = 2) {
   if (!Number.isFinite(value)) return "∞";
   return value.toFixed(digits);
