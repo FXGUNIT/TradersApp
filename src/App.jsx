@@ -117,6 +117,7 @@ import LazyImage from "./components/LazyImage.jsx";
 import { useTheme } from "./hooks/useTheme.jsx";
 import { AppShellProvider } from "./features/shell/AppShellContext.jsx";
 import LoadingFallback from "./features/shell/LoadingFallback.jsx";
+import SplashScreen from "./features/shell/SplashScreen.jsx";
 import { SCREEN_IDS } from "./features/shell/screenIds.js";
 import {
   findUserByEmail as findIdentityUserByEmail,
@@ -2158,59 +2159,6 @@ const AuthLogo = () => (
     </div>
   </div>
 );
-
-function SplashScreen() {
-  return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "var(--surface-elevated, #FFFFFF)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontFamily: T.font,
-      }}
-    >
-      <div style={{ textAlign: "center" }}>
-        <AuthLogo />
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "center",
-            gap: 5,
-            alignItems: "flex-end",
-            height: 30,
-            marginTop: 24,
-          }}
-        >
-          {[10, 18, 12, 24, 15, 20, 11].map((h, i) => (
-            <div
-              key={i}
-              style={{
-                width: 5,
-                height: h,
-                background: "#10B981",
-                borderRadius: 3,
-                animation: `bar 0.85s ${i * 0.1}s ease-in-out infinite alternate`,
-              }}
-            />
-          ))}
-        </div>
-        <div
-          style={{
-            color: "var(--text-secondary, #64748B)",
-            fontSize: 11,
-            letterSpacing: 4,
-            marginTop: 16,
-            fontWeight: 600,
-          }}
-        >
-          INITIALIZING...
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ═══════════════════════════════════════════════════════════════════
 //  TOAST NOTIFICATION SYSTEM
