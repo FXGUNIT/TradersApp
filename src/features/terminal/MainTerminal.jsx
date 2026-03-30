@@ -3,6 +3,7 @@ import { computeJournalMetrics } from "./journalMetrics";
 import {
   makeImgHandler,
 } from "./terminalUploadUtils";
+import { parseTerminalCsvText } from "./terminalCsvParser.js";
 import {
   calculateVolatilityRatio,
   getDynamicParameters,
@@ -351,6 +352,7 @@ export default function MainTerminal({
   
   const [parsed, setParsed] = useState(null);
   const [parseMsg, setParseMsg] = useState("");
+  const [isCsvParsing, setIsCsvParsing] = useState(false);
   
   const [f, setF] = useState(buildTradePlannerState);
   const sf = (k) => (v) => setF((p) => ({ ...p, [k]: v }));
@@ -385,6 +387,58 @@ export default function MainTerminal({
   const journalDidMount = useRef(false);
   const accountDidMount = useRef(false);
   const firmRulesDidMount = useRef(false);
+  const csvParserWorkerRef = useRef(null);
+  const csvParseRequestIdRef = useRef(0);
+
+  const applyCsvParseResult = useCallback((requestId, result) => {
+    if (requestId !== csvParseRequestIdRef.current) {
+      return;
+    }
+
+    setIsCsvParsing(false);
+    setParsed(result?.parsed || null);
+    setParseMsg(result?.parseMsg || "⚠ CSV parse failed");
+  }, []);
+
+  useEffect(() => {
+    if (typeof Worker === "undefined") {
+      return undefined;
+    }
+
+    const worker = new Worker(new URL("./terminalCsv.worker.js", import.meta.url), {
+      type: "module",
+    });
+
+    const handleMessage = (event) => {
+      const { requestId, ...result } = event.data || {};
+      applyCsvParseResult(requestId, result);
+    };
+
+    const handleError = () => {
+      const requestId = csvParseRequestIdRef.current;
+      if (!requestId) {
+        return;
+      }
+      applyCsvParseResult(requestId, {
+        ok: false,
+        parsed: null,
+        parseMsg: "⚠ CSV parse failed",
+      });
+    };
+
+    worker.addEventListener("message", handleMessage);
+    worker.addEventListener("error", handleError);
+    csvParserWorkerRef.current = worker;
+
+    return () => {
+      worker.removeEventListener("message", handleMessage);
+      worker.removeEventListener("error", handleError);
+      worker.terminate();
+      if (csvParserWorkerRef.current === worker) {
+        csvParserWorkerRef.current = null;
+      }
+    };
+  }, [applyCsvParseResult]);
 
   const applyWorkspaceState = useCallback((nextState) => {
     setActiveTab(nextState.activeTab);
@@ -1113,6 +1167,12 @@ export default function MainTerminal({
   const trafficState = (execBlocked || isBlocked) ? 'red' : (isDailyWarning || isDDWarning || hasLevelWarning || throttleActive) ? 'yellow' : p2Out ? 'green' : 'none';
   const journalFormOpen = activeTab === "journal" || showForm;
   const canUndo = workspaceHistory.length > 0;
+  const hasParsedCsv = parseMsg.startsWith("✓");
+  const csvStatusText = isCsvParsing
+    ? "Parsing CSV..."
+    : parseMsg || "Drop NinjaTrader .txt / .csv — or click to browse";
+  const csvStatusColor = hasParsedCsv ? T.green : isCsvParsing ? T.blue : "#6B7280";
+  const csvBorderColor = hasParsedCsv ? T.green : isCsvParsing ? T.blue : "#E5E7EB";
   const resetScopeByTab = {
     premarket: "premarket",
     trade: "trade",
@@ -1169,10 +1229,46 @@ export default function MainTerminal({
   }, [activeZone]);
 
   // CSV handler
-  const handleCsvDrop = useCallback((e) => {
+  const handleCsvDrop = useCallback(async (e) => {
     e.preventDefault();
     const file = e.dataTransfer?.files[0] || e.target.files?.[0];
     if (!file) return;
+
+    const requestId = csvParseRequestIdRef.current + 1;
+    csvParseRequestIdRef.current = requestId;
+    setErr("");
+    setParsed(null);
+    setParseMsg("");
+    setIsCsvParsing(true);
+    let handledAsync = false;
+
+    try {
+      const text = await file.text();
+      const worker = csvParserWorkerRef.current;
+
+      if (worker) {
+        worker.postMessage({ requestId, text });
+        handledAsync = true;
+      }
+      if (!worker) {
+        const result = parseTerminalCsvText(text);
+        applyCsvParseResult(requestId, result);
+        handledAsync = true;
+      }
+    } catch (error) {
+      applyCsvParseResult(requestId, {
+        ok: false,
+        parsed: null,
+        parseMsg: `⚠ ${error?.message || "Unable to read CSV export"}`,
+      });
+      handledAsync = true;
+    } finally {
+      if (!csvParserWorkerRef.current) {
+        setIsCsvParsing(false);
+      }
+    }
+
+    if (handledAsync) return;
     
     const r = new FileReader();
     r.onload = ev => {
@@ -1261,7 +1357,7 @@ export default function MainTerminal({
       setParseMsg(`✓ ${totalBars.toLocaleString()} bars → ${days.length} days`);
     };
     r.readAsText(file);
-  }, []);
+  }, [applyCsvParseResult]);
 
   const handleScreenshotDrop = useCallback(async (event) => {
     event.preventDefault();
@@ -1836,19 +1932,20 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
               <div 
                 onDrop={handleCsvDrop} 
                 onDragOver={e=>e.preventDefault()} 
-                onClick={()=>document.getElementById('csvIn').click()} 
+                onClick={()=>!isCsvParsing && document.getElementById('csvIn').click()} 
                 style={{
-                  border:`2px dashed ${parseMsg.startsWith('✓')?T.green:"#E5E7EB"}`,
+                  border:`2px dashed ${csvBorderColor}`,
                   borderRadius:8,
                   padding:"24px",
                   textAlign:"center",
-                  cursor:"pointer",
+                  cursor:isCsvParsing?"progress":"pointer",
+                  opacity:isCsvParsing?0.82:1,
                   background:"#F9FAFB"
                 }}
               >
-                <input id="csvIn" type="file" accept=".txt,.csv" style={{display:"none"}} onChange={handleCsvDrop}/>
+                <input id="csvIn" type="file" accept=".txt,.csv" style={{display:"none"}} onChange={handleCsvDrop} disabled={isCsvParsing}/>
                 <div style={{fontSize:24,marginBottom:6,opacity:0.25}}>⊞</div>
-                <div style={{color:parseMsg.startsWith('✓')?T.green:"#6B7280",fontSize:12,fontWeight:600}}>{parseMsg||"Drop NinjaTrader .txt / .csv — or click to browse"}</div>
+                <div style={{color:csvStatusColor,fontSize:12,fontWeight:600}}>{csvStatusText}</div>
                 {parsed && <div style={{color:"#9CA3AF",fontSize:11,marginTop:4}}>Latest: {parsed.days[parsed.days.length - 1]?.date} · ATR(14) = <span style={{color:T.green,fontWeight:700}}>{parsed.tradingHoursAtr14} pts</span></div>}
               </div>
             </div>
@@ -1888,7 +1985,7 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
             </div>
 
             {err && <div style={{color:T.red,fontSize:12,marginBottom:12,fontWeight:600}}>⚠ {err}</div>}
-            <button onClick={runPart1} disabled={loading||!parsed||parsed.totalDays<5} style={glowBtn(T.green,loading||!parsed||parsed.totalDays<5)} className="btn-glass">
+            <button onClick={runPart1} disabled={loading||isCsvParsing||!parsed||parsed.totalDays<5} style={glowBtn(T.green,loading||isCsvParsing||!parsed||parsed.totalDays<5)} className="btn-glass">
               ▶ RUN AMD PREMARKET ANALYSIS
             </button>
 
