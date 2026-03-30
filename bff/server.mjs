@@ -9,10 +9,10 @@ import {
 } from "./domains/contentState.mjs";
 import {
   getWorkspace,
-  patchWorkspaceAccountState,
-  patchWorkspaceFirmRules,
-  patchWorkspaceJournal,
-  upsertWorkspaceRecord,
+  replaceWorkspaceAccountState,
+  replaceWorkspaceFirmRules,
+  replaceWorkspaceJournal,
+  upsertWorkspace,
 } from "./domains/terminalState.mjs";
 import {
   getApplication,
@@ -49,6 +49,7 @@ import {
 import { createAdminRouteHandler } from "./routes/adminRoutes.mjs";
 import { createContentRouteHandler } from "./routes/contentRoutes.mjs";
 import { createIdentityRouteHandler } from "./routes/identityRoutes.mjs";
+import { createTerminalAnalyticsRouteHandler } from "./routes/terminalAnalyticsRoutes.mjs";
 import { createTerminalRouteHandler } from "./routes/terminalRoutes.mjs";
 import { createOnboardingRouteHandler } from "./routes/onboardingRoutes.mjs";
 import { createSupportRouteHandler } from "./routes/supportRoutes.mjs";
@@ -560,14 +561,23 @@ const server = createServer(async (req, res) => {
 
   const handledTerminalRoute = await createTerminalRouteHandler({
     getWorkspace,
-    patchWorkspaceAccountState,
-    patchWorkspaceFirmRules,
-    patchWorkspaceJournal,
-    upsertWorkspaceRecord,
+    replaceWorkspaceAccountState,
+    replaceWorkspaceFirmRules,
+    replaceWorkspaceJournal,
+    upsertWorkspace,
     readJsonBody,
     json,
   })(req, res, url, origin);
   if (handledTerminalRoute) {
+    return;
+  }
+
+  const handledTerminalAnalyticsRoute = await createTerminalAnalyticsRouteHandler({
+    invokeDeepSeekChat,
+    json,
+    readJsonBody,
+  })(req, res, url, origin);
+  if (handledTerminalAnalyticsRoute) {
     return;
   }
 

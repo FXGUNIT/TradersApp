@@ -2,21 +2,13 @@ function stripMarkdownJsonFences(text = "") {
   return String(text).replace(/```json|```/g, "").trim();
 }
 
-export async function callTerminalAi({
-  messages,
-  maxTokens = 2048,
-  model = "deepseek-chat",
-}) {
-  const response = await fetch("/api/ai/deepseek/chat", {
+async function postTerminalAnalytics(route, payload = {}) {
+  const response = await fetch(`/api/terminal/analytics/${route}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      model,
-      maxTokens,
-      messages,
-    }),
+    body: JSON.stringify(payload),
   });
 
   const data = await response.json().catch(() => ({}));
@@ -25,6 +17,18 @@ export async function callTerminalAi({
   }
 
   return data;
+}
+
+export async function callTerminalAi({
+  messages,
+  maxTokens = 2048,
+  model = "deepseek-chat",
+}) {
+  return postTerminalAnalytics("chat", {
+    model,
+    maxTokens,
+    messages,
+  });
 }
 
 export function extractChoiceText(response, fallback = "") {
@@ -40,7 +44,8 @@ export function parseJsonChoice(response, fallback = {}) {
 }
 
 export async function parseFirmRulesWithAi({ prompt, sourceText, maxTokens = 1200 }) {
-  return callTerminalAi({
+  return postTerminalAnalytics("tc-parse", {
+    model: "deepseek-chat",
     maxTokens,
     messages: [
       { role: "system", content: prompt },
@@ -67,7 +72,8 @@ export async function extractIndicatorsWithAi({
     text: "Extract all trading indicator values. Return ONLY JSON.",
   });
 
-  return callTerminalAi({
+  return postTerminalAnalytics("screenshot-extract", {
+    model: "deepseek-chat",
     maxTokens,
     messages: [
       { role: "system", content: prompt },
@@ -120,7 +126,8 @@ Apply ALL sections including SECTION AMD.`;
   }
   content.push({ type: "text", text: textMsg });
 
-  return callTerminalAi({
+  return postTerminalAnalytics("premarket-analysis", {
+    model: "deepseek-chat",
     maxTokens,
     messages: [
       { role: "system", content: prompt },
@@ -191,7 +198,8 @@ Current Balance: $${curBal || "?"} | HWM: $${hwmVal || "?"}`;
   });
   content.push({ type: "text", text: textContent });
 
-  return callTerminalAi({
+  return postTerminalAnalytics("trade-plan", {
+    model: "deepseek-chat",
     maxTokens,
     messages: [
       { role: "system", content: prompt },

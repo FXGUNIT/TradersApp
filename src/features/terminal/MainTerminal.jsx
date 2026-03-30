@@ -45,11 +45,12 @@ import {
   writeDraft,
 } from "../../services/draftVault.js";
 import {
-  callTerminalAi,
   extractChoiceText,
   extractIndicatorsWithAi,
   parseFirmRulesWithAi,
   parseJsonChoice,
+  runPremarketAnalysisWithAi,
+  runTradePlanWithAi,
 } from "../../services/clients/TerminalAnalyticsClient.js";
 import { getISTState } from "../../utils/tradingUtils.js";
 
@@ -1372,15 +1373,6 @@ export default function MainTerminal({
     setExtractStatus("Reading...");
     
     try {
-      const msgs = screenshots.map(s => ({ 
-        type: 'image', 
-        source: { type: 'base64', media_type: s.type, data: s.b64 } 
-      }));
-      msgs.push({ 
-        type: 'text', 
-        text: 'Extract all trading indicator values. Return ONLY JSON.' 
-      });
-
       const data = await extractIndicatorsWithAi({
         prompt: SCREENSHOT_EXTRACT_PROMPT,
         screenshots,
