@@ -4,18 +4,6 @@ function stripMarkdownJsonFences(text = "") {
   return String(text).replace(/```json|```/g, "").trim();
 }
 
-export async function callTerminalAi({
-  messages,
-  maxTokens = 2048,
-  model = "deepseek-chat",
-}) {
-  return postTerminalAnalytics("chat", {
-    model,
-    maxTokens,
-    messages,
-  });
-}
-
 export function extractChoiceText(response, fallback = "") {
   return response?.choices?.[0]?.message?.content || fallback;
 }
@@ -212,7 +200,6 @@ Current Balance: $${curBal || "?"} | HWM: $${hwmVal || "?"}`;
 }
 
 export default {
-  callTerminalAi,
   extractChoiceText,
   extractIndicatorsWithAi,
   parseFirmRulesWithAi,

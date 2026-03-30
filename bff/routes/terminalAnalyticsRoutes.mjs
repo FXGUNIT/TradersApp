@@ -7,7 +7,7 @@ const TERMINAL_ANALYTICS_ROUTES = new Set([
 ]);
 
 export function createTerminalAnalyticsRouteHandler({
-  invokeDeepSeekChat,
+  invokeTerminalAnalyticsChat,
   json,
   readJsonBody,
 }) {
@@ -18,7 +18,7 @@ export function createTerminalAnalyticsRouteHandler({
 
     try {
       const body = await readJsonBody(req, 20_000_000);
-      const data = await invokeDeepSeekChat(body || {});
+      const data = await invokeTerminalAnalyticsChat(body || {});
       json(res, 200, data, origin);
       return true;
     } catch (error) {

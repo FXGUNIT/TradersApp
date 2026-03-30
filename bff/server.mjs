@@ -53,6 +53,7 @@ import { createTerminalAnalyticsRouteHandler } from "./routes/terminalAnalyticsR
 import { createTerminalRouteHandler } from "./routes/terminalRoutes.mjs";
 import { createOnboardingRouteHandler } from "./routes/onboardingRoutes.mjs";
 import { createSupportRouteHandler } from "./routes/supportRoutes.mjs";
+import { createTerminalAnalyticsService } from "./services/terminalAnalyticsService.mjs";
 
 const loadEnvFiles = () => {
   const rootDir = process.cwd();
@@ -442,36 +443,10 @@ const invokeProvider = async (providerKey, systemPrompt, userPrompt) => {
   });
 };
 
-const invokeDeepSeekChat = async (payload = {}) => {
-  const config = getProviderConfig("deepseek");
-  if (!config?.secret) {
-    throw new Error("DeepSeek key not configured");
-  }
-
-  const messages = Array.isArray(payload.messages) ? payload.messages : [];
-  if (!messages.length) {
-    throw new Error("DeepSeek messages are required.");
-  }
-
-  const response = await fetch(config.apiUrl, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${config.secret}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: payload.model || config.model,
-      max_tokens: Number(payload.maxTokens || payload.max_tokens || 2048),
-      messages,
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error(await safeErrorMessage(response, "DeepSeek request failed"));
-  }
-
-  return response.json();
-};
+const { invokeTerminalAnalyticsChat } = createTerminalAnalyticsService({
+  getProviderConfig,
+  safeErrorMessage,
+});
 
 const sendTelegramMessage = async (message, parseMode = "HTML") => {
   if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
@@ -573,7 +548,7 @@ const server = createServer(async (req, res) => {
   }
 
   const handledTerminalAnalyticsRoute = await createTerminalAnalyticsRouteHandler({
-    invokeDeepSeekChat,
+    invokeTerminalAnalyticsChat,
     json,
     readJsonBody,
   })(req, res, url, origin);
@@ -748,26 +723,6 @@ const server = createServer(async (req, res) => {
         {
           ok: false,
           error: error.message || "AI deliberation failed.",
-        },
-        origin,
-      );
-      return;
-    }
-  }
-
-  if (req.method === "POST" && req.url === "/ai/deepseek/chat") {
-    try {
-      const body = await readJsonBody(req, 20_000_000);
-      const data = await invokeDeepSeekChat(body);
-      json(res, 200, data, origin);
-      return;
-    } catch (error) {
-      json(
-        res,
-        400,
-        {
-          ok: false,
-          error: error.message || "DeepSeek request failed.",
         },
         origin,
       );
