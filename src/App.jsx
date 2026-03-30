@@ -129,6 +129,11 @@ import {
   sendVerificationLinkForUser,
 } from "./features/identity/authSessionUtils.js";
 import {
+  executePasswordReset,
+  executeResendVerificationEmail,
+  executeApprovalStatusCheck,
+} from "./features/identity/authActionHandlers.js";
+import {
   findUserByEmail as findIdentityUserByEmail,
   loadLegacyUserProfile,
   provisionUserRecord as provisionIdentityUserRecord,
@@ -2616,90 +2621,35 @@ export default function TradersRegiment() {
 
   // RULE 18: Handle forced password reset
   const handlePasswordReset = async (newPassword) => {
-    if (!auth || !profile) {
-      throw new Error("Session expired. Please login again.");
-    }
-
-    try {
-      // Update Firebase Auth password
-      const user = firebaseAuth?.currentUser;
-      if (user?.updatePassword) {
-        await user.updatePassword(newPassword);
-      } else {
-        console.warn("Password reset simulated without Firebase auth");
-      }
-
-      // Mirror password age into the identity domain while keeping legacy shape intact.
-      await provisionIdentityUserRecord(
-        auth.uid,
-        {
-          passwordLastChanged: new Date().toISOString(),
-        },
-        auth.token,
-      );
-
-      // Update local profile
-      setProfile((prev) => ({
-        ...prev,
-        passwordLastChanged: new Date().toISOString(),
-      }));
-
-      await checkUserStatus(auth);
-    } catch (error) {
-      console.error("Password reset error:", error);
-      throw new Error(error.message || "Failed to update password. Try again.");
-    }
+    return executePasswordReset({
+      newPassword,
+      auth,
+      profile,
+      firebaseAuth,
+      provisionIdentityUserRecord,
+      setProfile,
+      checkUserStatus,
+      showToast,
+    });
   };
 
   const handleResendVerificationEmail = async () => {
-    await sendVerificationLink();
-
-    const refreshedUser = firebaseAuth?.currentUser;
-    if (!refreshedUser) {
-      return;
-    }
-
-    const refreshedAuth = {
-      uid: refreshedUser.uid,
-      token: await refreshedUser.getIdToken(true),
-      refreshToken: refreshedUser.refreshToken,
-      email: refreshedUser.email,
-      emailVerified: refreshedUser.emailVerified,
-    };
-    setAuth(refreshedAuth);
-    showToast("Verification email sent to your Gmail inbox.", "success");
+    return executeResendVerificationEmail({
+      auth,
+      firebaseAuth,
+      sendVerificationLink,
+      setAuth,
+      showToast,
+    });
   };
 
   const checkApprovalStatus = async () => {
-    if (!auth) return;
-    if (
-      typeof window !== "undefined" &&
-      window.__TRADERS_AUDIT_DATA &&
-      profile?.status === "PENDING"
-    ) {
-      return;
-    }
-
-    try {
-      if (firebaseAuth?.currentUser) {
-        await firebaseAuth.currentUser.reload();
-        const refreshedUser = firebaseAuth.currentUser;
-        const refreshedAuth = {
-          uid: refreshedUser.uid,
-          token: await refreshedUser.getIdToken(true),
-          refreshToken: refreshedUser.refreshToken,
-          email: refreshedUser.email,
-          emailVerified: refreshedUser.emailVerified,
-        };
-        setAuth(refreshedAuth);
-        await checkUserStatus(refreshedAuth);
-        return;
-      }
-    } catch (error) {
-      console.warn("Approval status refresh failed:", error);
-    }
-
-    await checkUserStatus(auth);
+    return executeApprovalStatusCheck({
+      auth,
+      profile,
+      firebaseAuth,
+      checkUserStatus,
+    });
   };
 
   const handleLogout = async () => {
