@@ -119,7 +119,6 @@ import { AppShellProvider } from "./features/shell/AppShellContext.jsx";
 import { SCREEN_IDS } from "./features/shell/screenIds.js";
 import {
   findUserByEmail as findIdentityUserByEmail,
-  getUserStatusByUid as getIdentityUserStatusByUid,
   listUserSessions as listIdentityUserSessions,
   loadLegacyUserProfile,
   provisionUserRecord as provisionIdentityUserRecord,
@@ -141,6 +140,7 @@ import FullScreenToggle from "./components/FullScreenToggle.jsx";
 import MobileBottomNav from "./components/MobileBottomNav.jsx";
 import FeatureGuard from "./components/FeatureGuard.jsx";
 import CleanLoginScreen from "./features/auth/CleanLoginScreen.jsx";
+import WaitingRoomScreen from "./features/identity/WaitingRoomScreen.jsx";
 import ThemeSwitcher from "./components/ThemeSwitcher.jsx";
 import { verifyAdminPassword } from "./services/adminAuthService.js";
 
@@ -2575,251 +2575,6 @@ function ThemePicker({ isOpen, onClose, onSelectTheme, currentTheme }) {
 // ═══════════════════════════════════════════════════════════════════
 //  LOGIN SCREEN — WITH PASSWORD RESET
 // ═══════════════════════════════════════════════════════════════════
-function WaitingRoom({
-  profile,
-  auth: sessionAuth,
-  onRefresh,
-  onLogout,
-  onResendVerification,
-}) {
-  const [checking, setChecking] = useState(false);
-  const [liveStatus, setLiveStatus] = useState(profile?.status || "PENDING");
-  const auditData =
-    typeof window !== "undefined" ? window.__TRADERS_AUDIT_DATA : null;
-
-  const uid =
-    sessionAuth?.uid ||
-    auditData?.userAuth?.uid ||
-    auditData?.adminAuth?.uid ||
-    "";
-  const email =
-    sessionAuth?.email ||
-    auditData?.userAuth?.email ||
-    auditData?.adminAuth?.email ||
-    "";
-  const emailVerified = profile?.emailVerified !== false;
-
-  useEffect(() => {
-    setLiveStatus(profile?.status || "PENDING");
-  }, [profile?.status]);
-
-  useEffect(() => {
-    if (!uid || auditData) {
-      return undefined;
-    }
-
-    let active = true;
-
-    const refreshLiveStatus = async () => {
-      try {
-        const nextStatus =
-          (await getIdentityUserStatusByUid(uid, sessionAuth?.token || "")) ||
-          "PENDING";
-
-        if (!active) {
-          return;
-        }
-
-        setLiveStatus(nextStatus);
-        if (nextStatus === "ACTIVE" && onRefresh) {
-          void onRefresh();
-        }
-      } catch (error) {
-        console.warn("Waiting room status refresh failed:", error);
-      }
-    };
-
-    void refreshLiveStatus();
-    const interval = setInterval(() => {
-      void refreshLiveStatus();
-    }, 15000);
-
-    return () => {
-      active = false;
-      clearInterval(interval);
-    };
-  }, [auditData, onRefresh, sessionAuth?.token, uid]);
-
-  useEffect(() => {
-    if (!onRefresh) {
-      return undefined;
-    }
-
-    const interval = setInterval(() => {
-      void onRefresh();
-    }, 30000);
-
-    return () => clearInterval(interval);
-  }, [onRefresh]);
-
-  return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "#F9FAFB",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontFamily: T.font,
-        padding: 20,
-      }}
-    >
-      <div
-        style={{ ...authCard, maxWidth: 540, textAlign: "center" }}
-        className="glass-panel"
-      >
-        <AuthLogo />
-        <div
-          style={{
-            width: 120,
-            height: 120,
-            borderRadius: "50%",
-            overflow: "hidden",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            margin: "0 auto 24px",
-            boxShadow: "0 8px 32px rgba(0, 0, 0, 0.15)",
-          }}
-        >
-          <video
-            src="/logo.mp4"
-            autoPlay
-            loop
-            muted
-            style={{
-              width: "100%",
-              height: "100%",
-              objectFit: "cover",
-            }}
-            onError={(e) => {
-              // Fallback if video fails
-              e.target.parentElement.innerHTML = "⏳";
-              e.target.parentElement.style.fontSize = "48px";
-              e.target.parentElement.style.display = "flex";
-              e.target.parentElement.style.alignItems = "center";
-              e.target.parentElement.style.justifyContent = "center";
-              e.target.parentElement.style.color = "#D97706";
-            }}
-          />
-        </div>
-        <div
-          style={{
-            color: "#D97706",
-            fontSize: 16,
-            letterSpacing: 3,
-            marginBottom: 20,
-            fontWeight: 700,
-          }}
-        >
-          APPLICATION UNDER REVIEW
-        </div>
-        <div style={{ color: T.muted, fontSize: 12, marginBottom: 12 }}>
-          Account: {email}
-        </div>
-        <div
-          style={{
-            color: "var(--text-primary, #374151)",
-            fontSize: 14,
-            lineHeight: 1.8,
-            marginBottom: 28,
-            padding: "20px 24px",
-            background: "var(--surface-elevated, #FFFFFF)",
-            border: `1px solid var(--border-subtle, rgba(0,0,0,0.05))`,
-            borderRadius: 12,
-            boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.1)",
-          }}
-        >
-          {emailVerified
-            ? "Your Traders Regiment account is pending admin approval."
-            : "Verify your Gmail inbox, then wait for admin approval to unlock access."}
-        </div>
-        <div
-          style={{
-            color: "var(--text-secondary, #6B7280)",
-            fontSize: 12,
-            lineHeight: 1.9,
-            marginBottom: 32,
-          }}
-        >
-          {emailVerified
-            ? "Your application has been received. You will be notified once your account is authorized. Approval typically takes 24-48 hours."
-            : "We sent a verification link to your Gmail address. After verification, your application remains pending until an admin approves it. Approval typically takes 24-48 hours."}
-        </div>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "center",
-            gap: 12,
-            flexWrap: "wrap",
-            marginBottom: 24,
-          }}
-        >
-          <div
-            style={{
-              padding: "8px 12px",
-              borderRadius: 999,
-              background: emailVerified
-                ? "rgba(34,197,94,0.12)"
-                : "rgba(217,119,6,0.12)",
-              color: emailVerified ? T.green : "#D97706",
-              fontSize: 11,
-              fontWeight: 700,
-              letterSpacing: 0.6,
-            }}
-          >
-            {emailVerified ? "EMAIL VERIFIED" : "EMAIL VERIFICATION REQUIRED"}
-          </div>
-          <div
-            style={{
-              padding: "8px 12px",
-              borderRadius: 999,
-              background: "rgba(15,23,42,0.06)",
-              color: "var(--text-primary, #111827)",
-              fontSize: 11,
-              fontWeight: 700,
-              letterSpacing: 0.6,
-            }}
-          >
-            STATUS: {liveStatus}
-          </div>
-        </div>
-        <div style={{ display: "flex", gap: 12, flexDirection: "column" }}>
-          <button
-            onClick={async () => {
-              setChecking(true);
-              await onRefresh();
-              setChecking(false);
-            }}
-            disabled={checking}
-            style={authBtn("#000000", checking)}
-            className="btn-glass"
-          >
-            {checking ? "⟳ CHECKING STATUS..." : "↺ CHECK APPROVAL STATUS"}
-          </button>
-          {!emailVerified && (
-            <button
-              onClick={onResendVerification}
-              style={authBtn(T.blue, false)}
-              className="btn-glass"
-            >
-              RESEND VERIFICATION EMAIL
-            </button>
-          )}
-          <button
-            onClick={onLogout}
-            aria-label="logout"
-            style={{ ...authBtn("#999999", false), background: "transparent" }}
-            className="btn-glass"
-          >
-            LOGOUT
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ═══════════════════════════════════════════════════════════════════
 // CODE SPLITTING & PERFORMANCE - SUSPENSE BOUNDARIES (RULE #157, #161)
 // ═══════════════════════════════════════════════════════════════════
@@ -9859,7 +9614,7 @@ export default function TradersRegiment() {
 
       case "waiting":
         return (
-          <WaitingRoom
+          <WaitingRoomScreen
             profile={profile}
             auth={auth}
             onRefresh={checkApprovalStatus}
