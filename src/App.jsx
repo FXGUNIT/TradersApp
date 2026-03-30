@@ -134,6 +134,9 @@ import {
   executeApprovalStatusCheck,
 } from "./features/identity/authActionHandlers.js";
 import {
+  executeLoginPasswordReset,
+} from "./features/identity/authCredentialHandlers.js";
+import {
   findUserByEmail as findIdentityUserByEmail,
   loadLegacyUserProfile,
   provisionUserRecord as provisionIdentityUserRecord,
@@ -2053,26 +2056,11 @@ export default function TradersRegiment() {
   }, []);
 
   const handleLoginPasswordReset = useCallback(async (email) => {
-    const cleanEmail = String(email || "")
-      .trim()
-      .toLowerCase();
-    if (!cleanEmail) {
-      throw new Error("Please enter your Gmail address.");
-    }
-
-    if (!isValidGmailAddress(cleanEmail)) {
-      throw new Error("Only Gmail addresses are allowed.");
-    }
-
-    if (
-      !firebaseAuth ||
-      (typeof window !== "undefined" && window.__TRADERS_AUDIT_DATA)
-    ) {
-      return "Audit mode: password reset link simulated.";
-    }
-
-    await sendPasswordResetEmail(firebaseAuth, cleanEmail);
-    return "Password reset email sent. Check your Gmail inbox and spam folder.";
+    return executeLoginPasswordReset({
+      email,
+      firebaseAuth,
+      isValidGmailAddress,
+    });
   }, []);
 
   const handleLogin = async (email, password, stayLoggedIn = false) => {
