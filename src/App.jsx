@@ -139,6 +139,12 @@ import {
   executeStructuredSignup,
 } from "./features/identity/authCredentialHandlers.js";
 import {
+  executeSendAdminOTPs,
+  executeVerifyAdminOTPs,
+  executeHandleAdminAccess,
+  executeHandleAdminVerifyCodes,
+} from "./features/identity/adminAccessHandlers.js";
+import {
   findUserByEmail as findIdentityUserByEmail,
   loadLegacyUserProfile,
   provisionUserRecord as provisionIdentityUserRecord,
@@ -2303,162 +2309,51 @@ export default function TradersRegiment() {
   };
 
   const sendAdminOTPs = async () => {
-    // Master Email verification
-    const masterAdminEmail = "gunitsingh1994@gmail.com";
-    if (
-      adminMasterEmail.toLowerCase().trim() !== masterAdminEmail.toLowerCase()
-    ) {
-      // Log security alert for unauthorized email attempt
-      await logSecurityAlert(
-        "Master Email Verification Failed",
-        adminMasterEmail,
-        "Unauthorized email address",
-      );
-
-      // Send intrusion alert to Telegram with full forensic signature
-      sendForensicAlert(adminMasterEmail, "SECURITY_BREACH");
-
-      setAdminOtpErr("Access Denied: Unauthorized Admin Identity");
-      return;
-    }
-
-    try {
-      const auditMode =
-        typeof window !== "undefined" && window.__TRADERS_AUDIT_DATA;
-      const otp1 = auditMode ? "111111" : genOTP();
-      const otp2 = auditMode ? "222222" : genOTP();
-      const otp3 = auditMode ? "333333" : genOTP();
-
-      const emails = [
-        "gunitsingh1994@gmail.com",
-        "arkgproductions@gmail.com",
-        "starg.unit@gmail.com",
-      ];
-
-      // Send OTPs to all three emails simultaneously
-      const otpPromises = emails.map(async (email, index) => {
-        const otpCode = [otp1, otp2, otp3][index];
-        if (!hasEmailJsConfig) {
-          console.warn("EmailJS not configured for OTP batch delivery");
-          return Promise.resolve();
-        }
-
-        return emailjs.send(
-          import.meta.env.VITE_EMAILJS_SERVICE_ID,
-          import.meta.env.VITE_EMAILJS_TEMPLATE_ID,
-          {
-            user_email: email,
-            otp_code: otpCode,
-            to_email: email,
-          },
-          import.meta.env.VITE_EMAILJS_PUBLIC_KEY,
-        );
-      });
-
-      await Promise.all(otpPromises);
-
-      // Store OTPs temporarily (in a real app, you'd store hashed versions securely)
-      sessionStorage.setItem(
-        "adminOtps",
-        JSON.stringify({ otp1, otp2, otp3, timestamp: Date.now() }),
-      );
-
-      setAdminMasterEmailVerified(true);
-      setAdminOtpStep(true);
-      setAdminOtpsVerified(false);
-      setAdminOtpErr("");
-    } catch (error) {
-      console.error("Failed to send admin OTPs:", error);
-      setAdminOtpErr("Failed to send verification codes. Please try again.");
-    }
+    return executeSendAdminOTPs({
+      adminMasterEmail,
+      hasEmailJsConfig,
+      sendForensicAlert,
+      logSecurityAlert,
+      setAdminMasterEmailVerified,
+      setAdminOtpStep,
+      setAdminOtpsVerified,
+      setAdminOtpErr,
+    });
   };
 
   const verifyAdminOTPs = () => {
-    const auditMode =
-      typeof window !== "undefined" && window.__TRADERS_AUDIT_DATA?.active;
-    if (
-      auditMode &&
-      adminOtps.otp1 === "111111" &&
-      adminOtps.otp2 === "222222" &&
-      adminOtps.otp3 === "333333"
-    ) {
-      sessionStorage.removeItem("adminOtps");
+    const result = executeVerifyAdminOTPs({ adminOtps });
+    if (result.success) {
       setAdminOtpStep(false);
       setAdminOtpsVerified(true);
       setAdminOtpErr("");
       return true;
     }
-
-    const stored = sessionStorage.getItem("adminOtps");
-    if (!stored) {
-      setAdminOtpErr("OTP session expired. Please request new codes.");
-      return false;
-    }
-
-    const { otp1, otp2, otp3, timestamp } = JSON.parse(stored);
-
-    // Check if OTPs are expired (5 minutes)
-    if (Date.now() - timestamp > 5 * 60 * 1000) {
-      setAdminOtpErr("OTP codes expired. Please request new codes.");
-      sessionStorage.removeItem("adminOtps");
-      return false;
-    }
-
-    if (
-      adminOtps.otp1 !== otp1 ||
-      adminOtps.otp2 !== otp2 ||
-      adminOtps.otp3 !== otp3
-    ) {
-      setAdminOtpErr("Invalid verification codes. Please check and try again.");
-      return false;
-    }
-
-    // Clear stored OTPs after successful verification
-    sessionStorage.removeItem("adminOtps");
-    setAdminOtpStep(false);
-    setAdminOtpsVerified(true);
-    setAdminOtpErr("");
-    return true;
+    setAdminOtpErr(result.error);
+    return false;
   };
 
   const handleAdminAccess = async () => {
-    try {
-      await verifyAdminPassword(adminPassInput);
-    } catch (error) {
-      // Log security alert for unauthorized password attempt
-      await logSecurityAlert(
-        "Master Password Verification Failed",
-        adminMasterEmail,
-        error.message || "Invalid master password",
-      );
-      setAdminPassErr(error.message || "Invalid admin password.");
-      showToast("Cipher mismatch. Authorization protocol rejected.", "error");
-      return;
-    }
-
-    if (!adminOtpsVerified) {
-      setAdminPassErr("Please verify the OTP codes first.");
-      showToast(
-        "OTP verification pending. Authenticate to proceed.",
-        "warning",
-      );
-      return;
-    }
-
-    // Admin already verified by Master Email + Triple OTP verification
-    // Save admin session to localStorage for persistence
-    localStorage.setItem("isAdminAuthenticated", "true");
-
-    setShowAdminPrompt(false);
-    setAdminPassInput("");
-    setAdminPassErr("");
-    setAdminOtpsVerified(false);
-    setAdminOtpStep(false);
-    setAdminOtps({ otp1: "", otp2: "", otp3: "" });
-    setAdminMasterEmail("");
-    setAdminMasterEmailVerified(false);
-    setIsAdminAuthenticated(true);
-    setScreen("admin");
+    return executeHandleAdminAccess({
+      adminPassInput,
+      adminOtpsVerified,
+      verifyAdminPassword,
+      logSecurityAlert,
+      sendForensicAlert,
+      adminMasterEmail,
+      showToast,
+      setAdminPassErr,
+      setShowAdminPrompt,
+      setAdminPassInput,
+      setAdminOtpsVerified,
+      setAdminOtpStep,
+      setAdminOtps,
+      setAdminMasterEmail,
+      setAdminMasterEmailVerified,
+      setIsAdminAuthenticated,
+      setScreen,
+      setAdminOtpErr,
+    });
   };
 
   const resetAdminPromptState = useCallback(
@@ -2480,10 +2375,12 @@ export default function TradersRegiment() {
   );
 
   const handleAdminVerifyCodes = useCallback(() => {
-    if (verifyAdminOTPs()) {
-      setAdminOtpStep(false);
-    }
-  }, [verifyAdminOTPs]);
+    return executeHandleAdminVerifyCodes({
+      adminOtps,
+      setAdminOtpStep,
+      setAdminOtpErr,
+    });
+  }, [adminOtps]);
 
   const handleAdminRequestNewCodes = useCallback(() => {
     resetAdminPromptState();
