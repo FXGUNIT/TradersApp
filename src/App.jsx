@@ -21,7 +21,7 @@ import {
   sendEmailVerification,
   signOut,
 } from "firebase/auth";
-import { getDatabase, ref, onValue, get, set, push } from "firebase/database";
+import { getDatabase, ref, onValue } from "firebase/database";
 import {
   getStorage,
   ref as storageRef,
@@ -29,10 +29,7 @@ import {
   getDownloadURL,
 } from "firebase/storage";
 import emailjs from "@emailjs/browser";
-import { notifyTelegram } from "./utils/telegram.js";
 import { sendWelcomeEmail } from "./utils/email.js";
-import { useInvites } from "./hooks/useInvites";
-import AdminInvitesPanel from "./components/AdminInvitesPanel.jsx";
 import FloatingChatWidget from "./components/FloatingChatWidget.jsx";
 import ChatHelpline from "./components/ChatHelpline.jsx";
 import FounderCard from "./components/FounderCard.jsx";
@@ -140,6 +137,7 @@ import FeatureGuard from "./components/FeatureGuard.jsx";
 import CleanLoginScreen from "./features/auth/CleanLoginScreen.jsx";
 import AdminUnlockModal from "./features/admin-security/AdminUnlockModal.jsx";
 import AdminDashboardScreen from "./features/admin-security/AdminDashboardScreen.jsx";
+import AdminInvitesView from "./features/admin-security/AdminInvitesView.jsx";
 import DebugOverlay from "./features/admin-security/DebugOverlay.jsx";
 import ErrorBoundaryAdmin from "./features/admin-security/ErrorBoundaryAdmin.jsx";
 import {
@@ -147,7 +145,9 @@ import {
   useUserList,
 } from "./features/admin-security/UserListContext.jsx";
 import SessionsManagementScreen from "./features/identity/SessionsManagementScreen.jsx";
+import ForcePasswordResetScreen from "./features/identity/ForcePasswordResetScreen.jsx";
 import WaitingRoomScreen from "./features/identity/WaitingRoomScreen.jsx";
+import SupportChatModal from "./features/support/SupportChatModal.jsx";
 import {
   BackToTopButton,
   Breadcrumbs,
@@ -2124,302 +2124,6 @@ function detectDuplicateIPs(users) {
 }
 
 // Component: Real-time Direct Support Chat Modal (RULE #209: Typing Indicator)
-function SupportChatModal({
-  isOpen,
-  userId,
-  userName,
-  onClose,
-  auth,
-  showToast,
-}) {
-  const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState("");
-  const [_isTyping, _setIsTyping] = useState(false);
-  const [otherUserTyping, setOtherUserTyping] = useState(false);
-  const messagesEndRef = useRef(null);
-  const typingTimeoutRef = useRef(null);
-  const canUseDb = !!firebaseDb;
-
-  // Firebase path for chat - matches user's FloatingChatWidget path
-  const chatPath = `support_chats/${userId}`;
-
-  // Scroll to bottom of messages
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
-  // Set up real-time message listener
-  useEffect(() => {
-    if (!isOpen || !userId || !canUseDb) return;
-
-    // Listen to messages subcollection - matches FloatingChatWidget path
-    const messagesRef = ref(firebaseDb, `${chatPath}/messages`);
-    const unsubscribe = onValue(messagesRef, (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        const msgs = Object.entries(data)
-          .map(([, msg]) => msg)
-          .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
-        setMessages(msgs);
-      } else {
-        setMessages([]);
-      }
-    });
-
-    return () => {
-      unsubscribe();
-    };
-  }, [isOpen, userId, chatPath, canUseDb]);
-
-  // Send message handler
-  const handleSendMessage = async () => {
-    if (!input.trim() || !canUseDb) return;
-
-    try {
-      const messagesRef = ref(firebaseDb, `${chatPath}/messages`);
-      const newMessageRef = push(messagesRef);
-      await set(newMessageRef, {
-        sender: "admin",
-        senderName: auth?.displayName || "Admin",
-        text: input.trim(),
-        timestamp: Date.now(),
-        read: false,
-      });
-
-      setInput("");
-      _setIsTyping(false);
-    } catch {
-      showToast("Failed to send message. Connection issue.", "error");
-    }
-  };
-
-  // Typing indicator handler
-  const handleTyping = (text) => {
-    setInput(text);
-
-    if (!auth?.uid || !canUseDb) return;
-
-    clearTimeout(typingTimeoutRef.current);
-    _setIsTyping(true);
-    set(ref(firebaseDb, `${chatPath}/typing_${auth.uid}`), true);
-
-    typingTimeoutRef.current = setTimeout(() => {
-      set(ref(firebaseDb, `${chatPath}/typing_${auth.uid}`), null);
-      _setIsTyping(false);
-    }, 3000);
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <div
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: "rgba(0,0,0,0.7)",
-        backdropFilter: "blur(8px)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 10001,
-      }}
-    >
-      <div
-        style={{
-          background: "rgba(20,20,25,0.95)",
-          border: "1px solid rgba(255,255,255,0.1)",
-          borderRadius: 16,
-          width: "90%",
-          maxWidth: 500,
-          height: 600,
-          display: "flex",
-          flexDirection: "column",
-          backdropFilter: "blur(30px)",
-        }}
-        className="restored-modal"
-      >
-        {/* Header */}
-        <div
-          style={{
-            padding: "16px 20px",
-            borderBottom: "1px solid rgba(255,255,255,0.1)",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}
-        >
-          <div>
-            <div style={{ color: "#F2F2F7", fontSize: 14, fontWeight: 600 }}>
-              {userName}
-            </div>
-            {otherUserTyping && (
-              <div style={{ color: "#0A84FF", fontSize: 11, marginTop: 4 }}>
-                ✎ typing...
-              </div>
-            )}
-          </div>
-          <button
-            onClick={onClose}
-            style={{
-              background: "transparent",
-              border: "none",
-              color: "#A1A1A6",
-              fontSize: 24,
-              cursor: "pointer",
-            }}
-          >
-            ✕
-          </button>
-        </div>
-
-        {/* Messages */}
-        <div
-          style={{
-            flex: 1,
-            overflowY: "auto",
-            padding: "16px 20px",
-            display: "flex",
-            flexDirection: "column",
-            gap: 12,
-          }}
-        >
-          {messages.length === 0 ? (
-            <div
-              style={{
-                color: "var(--text-secondary, #A1A1A6)",
-                textAlign: "center",
-                marginTop: 20,
-              }}
-            >
-              No messages yet. Start the conversation.
-            </div>
-          ) : (
-            messages.map((msg) => {
-              const isAdmin = msg.sender === "admin";
-              return (
-                <div
-                  key={`msg_${msg.timestamp}`}
-                  style={{
-                    display: "flex",
-                    justifyContent: isAdmin ? "flex-end" : "flex-start",
-                    marginBottom: 8,
-                  }}
-                >
-                  <div
-                    style={{
-                      background: isAdmin
-                        ? "rgba(0,122,255,0.3)"
-                        : "rgba(255,255,255,0.1)",
-                      border: `1px solid ${isAdmin ? "rgba(0,122,255,0.5)" : "rgba(255,255,255,0.2)"}`,
-                      borderRadius: 12,
-                      padding: "10px 14px",
-                      maxWidth: "80%",
-                      wordWrap: "break-word",
-                    }}
-                  >
-                    {!isAdmin && (
-                      <div
-                        style={{
-                          color: "#A1A1A6",
-                          fontSize: 10,
-                          marginBottom: 4,
-                        }}
-                      >
-                        {msg.senderName || msg.email || "User"}
-                      </div>
-                    )}
-                    <div
-                      style={{
-                        color: "var(--text-primary, #F2F2F7)",
-                        fontSize: 13,
-                        lineHeight: 1.4,
-                      }}
-                    >
-                      {msg.text}
-                    </div>
-                  </div>
-                </div>
-              );
-            })
-          )}
-          <div ref={messagesEndRef} />
-        </div>
-
-        {/* Message Input */}
-        <div
-          style={{
-            padding: "16px 20px",
-            borderTop: "1px solid rgba(255,255,255,0.1)",
-            display: "flex",
-            gap: 12,
-          }}
-        >
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => handleTyping(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                handleSendMessage();
-              }
-            }}
-            placeholder="Type message..."
-            style={{
-              flex: 1,
-              background: "var(--input-bg, rgba(255,255,255,0.05))",
-              border: "1px solid rgba(255,255,255,0.1)",
-              borderRadius: 8,
-              padding: "10px 12px",
-              color: "#F2F2F7",
-              fontSize: 13,
-              fontFamily: "Consolas, monospace",
-            }}
-          />
-          <button
-            onClick={handleSendMessage}
-            disabled={!input.trim()}
-            style={{
-              background: input.trim()
-                ? "var(--accent-primary, #2563eb)"
-                : "rgba(0,122,255,0.3)",
-              border: "none",
-              borderRadius: 8,
-              padding: "10px 16px",
-              color: input.trim()
-                ? "var(--text-primary, #000)"
-                : "var(--text-secondary, #A1A1A6)",
-              fontSize: 13,
-              fontWeight: 700,
-              cursor: input.trim() ? "pointer" : "default",
-              transition: "all 0.2s",
-            }}
-            onMouseEnter={(e) => {
-              if (input.trim()) {
-                e.currentTarget.style.boxShadow =
-                  "0 0 12px rgba(0,122,255,0.5)";
-                e.currentTarget.style.transform = "scale(1.05)";
-              }
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.boxShadow = "none";
-              e.currentTarget.style.transform = "scale(1)";
-            }}
-          >
-            SEND
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ═══════════════════════════════════════════════════════════════════
 //  RULE #295, #296: MAINTENANCE MODE - 'BACK SOON' SCREEN
@@ -4380,39 +4084,6 @@ export default function TradersRegiment() {
   // Phase 3: Invite flow overlay (password reset -> invite screen) - simple hook in UI
   // The InviteScreen is shown when user has initiated an invite flow (password reset leading here)
   // The actual flow is wired in future patches; this is a safe default to present the screen when requested
-
-  // Render InviteScreen overlay if requested
-  const AdminInvitesView = () => {
-    const { invites, addInvite, approveInvite, resetInvites } = useInvites();
-    // Attach callbacks to pass to AdminInvitesPanel
-    const onApproveInvite = (id, email, name) => {
-      approveInvite(id);
-      sendWelcomeEmail(email, name);
-      showToast("Welcome email sent", "success");
-      if (typeof notifyTelegram === "function") {
-        notifyTelegram("invite_approved", { id, email, name });
-      }
-    };
-    const onAddDemoInvite = () => {
-      const invite = addInvite("demo recruit@example.com", "Demo Recruit");
-      if (typeof notifyTelegram === "function") {
-        notifyTelegram("invite_requested", {
-          id: invite?.id,
-          email: invite?.email,
-          name: invite?.name,
-        });
-      }
-    };
-    return (
-      <AdminInvitesPanel
-        invites={invites}
-        onApproveInvite={onApproveInvite}
-        onAddDemoInvite={onAddDemoInvite}
-        onResetInvites={resetInvites}
-        showToast={showToast}
-      />
-    );
-  };
 
   if (isInitialLoading) {
     return <SplashScreen />;

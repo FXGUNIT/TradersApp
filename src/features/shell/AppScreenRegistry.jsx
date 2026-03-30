@@ -161,6 +161,7 @@ export default function AppScreenRegistry({
           profile={profile}
           onReset={handlePasswordReset}
           onLogout={handleLogout}
+          theme={T}
         />
       );
 
@@ -245,7 +246,7 @@ export default function AppScreenRegistry({
                 EmptyStateCard={EmptyStateCard}
                 SupportChatModal={SupportChatModal}
               />
-              <AdminInvitesView />
+              <AdminInvitesView showToast={showToast} />
             </UserListProvider>
           </Suspense>
         </ErrorBoundaryAdmin>
