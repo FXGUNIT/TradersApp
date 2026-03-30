@@ -1,22 +1,7 @@
+import { postTerminalAnalytics } from "../gateways/terminalAnalyticsGateway.js";
+
 function stripMarkdownJsonFences(text = "") {
   return String(text).replace(/```json|```/g, "").trim();
-}
-
-async function postTerminalAnalytics(route, payload = {}) {
-  const response = await fetch(`/api/terminal/analytics/${route}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
-
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(data?.error || `HTTP ${response.status}`);
-  }
-
-  return data;
 }
 
 export async function callTerminalAi({
