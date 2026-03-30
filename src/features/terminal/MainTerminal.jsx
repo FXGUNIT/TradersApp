@@ -45,6 +45,7 @@ import {
   writeDraft,
 } from "../../services/draftVault.js";
 import {
+  callTerminalAi,
   extractChoiceText,
   extractIndicatorsWithAi,
   parseFirmRulesWithAi,
