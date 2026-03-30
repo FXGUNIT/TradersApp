@@ -111,6 +111,7 @@ import SkeletonLoader from "./components/SkeletonLoader.jsx";
 import LazyImage from "./components/LazyImage.jsx";
 import { useTheme } from "./hooks/useTheme.jsx";
 import { AppShellProvider } from "./features/shell/AppShellContext.jsx";
+import AppScreenRegistry from "./features/shell/AppScreenRegistry.jsx";
 import LoadingFallback from "./features/shell/LoadingFallback.jsx";
 import MaintenanceScreen from "./features/shell/MaintenanceScreen.jsx";
 import SplashScreen from "./features/shell/SplashScreen.jsx";
@@ -4417,265 +4418,92 @@ export default function TradersRegiment() {
     return <SplashScreen />;
   }
 
-  const screenContent = (() => {
-    switch (screen) {
-      case "login":
-        return (
-          <>
-            <CleanLoginScreen
-              onLogin={handleLogin}
-              onSignup={() => setScreen("signup")}
-              onAdmin={() => setShowAdminPrompt(true)}
-              onGoogleAuth={handleStructuredGoogleAuth}
-              onForgotPassword={handleLoginPasswordReset}
-            />
-            <AdminUnlockModal
-              authButton={authBtn}
-              authCardStyle={authCard}
-              labelStyle={lbl}
-              onCancel={() => resetAdminPromptState({ closePrompt: true })}
-              onMasterEmailChange={setAdminMasterEmail}
-              onPasswordChange={setAdminPassInput}
-              onOtpChange={(field, value) =>
-                setAdminOtps((prev) => ({
-                  ...prev,
-                  [field]: value,
-                }))
-              }
-              onProceedToCodeEntry={() => setAdminOtpStep(true)}
-              onRequestNew={handleAdminRequestNewCodes}
-              onSendVerificationCodes={sendAdminOTPs}
-              onTogglePasswordVisibility={() => setShowAdminPwd(!showAdminPwd)}
-              onUnlockAdmin={handleAdminAccess}
-              onVerifyCodes={handleAdminVerifyCodes}
-              passwordError={adminPassErr}
-              passwordValue={adminPassInput}
-              show={showAdminPrompt}
-              showPassword={showAdminPwd}
-              theme={T}
-              verificationError={adminOtpErr}
-              verificationState={{
-                masterEmail: adminMasterEmail,
-                masterEmailVerified: adminMasterEmailVerified,
-                otpStep: adminOtpStep,
-                otps: adminOtps,
-                otpsVerified: adminOtpsVerified,
-              }}
-            />
-          </>
-        );
-
-      case "signup":
-        return (
-          <Suspense fallback={<LoadingFallback />}>
-            <CleanOnboarding
-              onSignupSuccess={handleStructuredSignup}
-              onGoogleSuccess={handleStructuredGoogleAuth}
-              onBackToLogin={handleBackToLoginFromSignup}
-              googleUser={googleUser}
-            />
-          </Suspense>
-        );
-
-      case "waiting":
-        return (
-          <WaitingRoomScreen
-            profile={profile}
-            auth={auth}
-            onRefresh={checkApprovalStatus}
-            onResendVerification={handleResendVerificationEmail}
-            onLogout={handleLogout}
-          />
-        );
-
-      case "forcePasswordReset":
-        return (
-          <ForcePasswordResetScreen
-            profile={profile}
-            onReset={handlePasswordReset}
-            onLogout={handleLogout}
-          />
-        );
-
-      case "sessions":
-        return (
-          <SessionsManagementScreen
-            profile={profile}
-            auth={auth}
-            currentSessionId={currentSessionId}
-            onBack={() => setScreen("hub")}
-            showToast={showToast}
-          />
-        );
-
-      case "hub":
-        return (
-          <Suspense fallback={<LoadingFallback />}>
-            <RegimentHub
-              onNavigate={(dest) => {
-                if (dest === "consciousness") {
-                  setConsciousnessReturnScreen("hub");
-                }
-                setScreen(dest);
-              }}
-              theme={theme}
-              currentTheme={currentTheme}
-              onThemeChange={handleThemeChange}
-              aiStatuses={aiStatuses}
-            />
-          </Suspense>
-        );
-
-      case "consciousness":
-        return (
-          <CollectiveConsciousnessPage
-            onBack={() => setScreen(consciousnessReturnScreen || "hub")}
-            theme={theme}
-            currentTheme={currentTheme}
-            onThemeChange={handleThemeChange}
-            auth={auth}
-            aiStatuses={aiStatuses}
-          />
-        );
-
-      case "admin":
-        return isAdminAuthenticated ? (
-          <ErrorBoundaryAdmin>
-            <React.Suspense fallback={<LoadingFallback />}>
-              <UserListProvider>
-                <div
-                  style={{
-                    position: "absolute",
-                    top: 10,
-                    right: 10,
-                    zIndex: 100,
-                    display: "flex",
-                    gap: 8,
-                    alignItems: "center",
-                  }}
-                >
-                  <AiEnginesStatus statuses={aiStatuses} />
-                </div>
-                <AdminDashboardScreen
-                  auth={auth}
-                  onLogout={handleLogout}
-                  isAdminAuthenticated={isAdminAuthenticated}
-                  showToast={showToast}
-                  maintenanceModeActive={maintenanceModeActive}
-                  handleToggleMaintenanceMode={handleToggleMaintenanceMode}
-                  T={T}
-                  authBtn={authBtn}
-                  ADMIN_UID={ADMIN_UID}
-                  ADMIN_EMAIL={ADMIN_EMAIL}
-                  firebaseDb={firebaseDb}
-                  listAdminUsers={listAdminUsers}
-                  approveAdminUser={approveAdminUser}
-                  blockAdminUser={blockAdminUser}
-                  AMD_PHASES={AMD_PHASES}
-                  LED={LED}
-                  SHead={SHead}
-                  TableSkeletonLoader={TableSkeletonLoader}
-                  EmptyStateCard={EmptyStateCard}
-                  SupportChatModal={SupportChatModal}
-                />
-                <AdminInvitesView />
-              </UserListProvider>
-            </React.Suspense>
-          </ErrorBoundaryAdmin>
-        ) : (
-          <SplashScreen />
-        );
-
-      case "app":
-        return (
-          <div style={{ position: "relative" }}>
-            {/* RULE #27: Privacy Mode Header */}
-            <div
-              style={{
-                position: "absolute",
-                top: 10,
-                right: 10,
-                zIndex: 100,
-                display: "flex",
-                gap: 8,
-                alignItems: "center",
-              }}
-            >
-              <AiEnginesStatus statuses={aiStatuses} />
-              <ThemeSwitcher
-                currentTheme={currentTheme}
-                onThemeChange={handleThemeChange}
-              />
-              {/* Legacy theme toggle retained below only until replaced */}
-              <button
-                onClick={() => {
-                  const themes = ["lumiere", "amber", "midnight"];
-                  const idx = themes.indexOf(currentTheme);
-                  const nextTheme = themes[(idx + 1) % themes.length];
-                  handleThemeChange(nextTheme);
-                }}
-                title="Toggle Lumiere/Amber/Midnight mode"
-                style={{
-                  display: "none",
-                  background: "var(--accent-primary, #3B82F6)",
-                  border: "1px solid var(--accent-primary, #3B82F6)",
-                  color: "var(--accent-text, #FFFFFF)",
-                  padding: "8px 12px",
-                  borderRadius: 6,
-                  cursor: "pointer",
-                  fontSize: 12,
-                  fontFamily: T.font,
-                  fontWeight: 600,
-                }}
-                className="btn-glass"
-              >
-                {currentTheme === "lumiere"
-                  ? "☀️ LUMIERE"
-                  : currentTheme === "amber"
-                    ? "🟠 AMBER"
-                    : "🌙 MIDNIGHT"}
-              </button>
-              <button
-                onClick={() => setScreen("sessions")}
-                title="Manage active sessions"
-                style={{
-                  background: "rgba(52,144,220,0.3)",
-                  border: `1px solid ${T.blue}`,
-                  color: T.blue,
-                  padding: "8px 12px",
-                  borderRadius: 6,
-                  cursor: "pointer",
-                  fontSize: 12,
-                  fontFamily: T.font,
-                  fontWeight: 600,
-                }}
-                className="btn-glass"
-              >
-                📱 SESSIONS
-              </button>
-            </div>
-            <React.Suspense fallback={<LoadingFallback />}>
-              <MainTerminal
-                auth={auth}
-                profile={profile}
-                onLogout={handleLogout}
-                onSaveJournal={saveJournal}
-                onSaveAccount={saveAccount}
-                onSaveFirmRules={saveFirmRules}
-                showToast={showToast}
-                onNavigateToConsciousness={() => {
-                  setConsciousnessReturnScreen("app");
-                  setScreen("consciousness");
-                }}
-              />
-            </React.Suspense>
-          </div>
-        );
-
-      default:
-        return <SplashScreen />;
-    }
-  })();
+  const screenContent = (
+    <AppScreenRegistry
+      screen={screen}
+      CleanLoginScreen={CleanLoginScreen}
+      AdminUnlockModal={AdminUnlockModal}
+      CleanOnboarding={CleanOnboarding}
+      WaitingRoomScreen={WaitingRoomScreen}
+      ForcePasswordResetScreen={ForcePasswordResetScreen}
+      SessionsManagementScreen={SessionsManagementScreen}
+      RegimentHub={RegimentHub}
+      CollectiveConsciousnessPage={CollectiveConsciousnessPage}
+      ErrorBoundaryAdmin={ErrorBoundaryAdmin}
+      LoadingFallback={LoadingFallback}
+      UserListProvider={UserListProvider}
+      AiEnginesStatus={AiEnginesStatus}
+      AdminDashboardScreen={AdminDashboardScreen}
+      AdminInvitesView={AdminInvitesView}
+      SplashScreen={SplashScreen}
+      MainTerminal={MainTerminal}
+      ThemeSwitcher={ThemeSwitcher}
+      auth={auth}
+      profile={profile}
+      googleUser={googleUser}
+      currentSessionId={currentSessionId}
+      currentTheme={currentTheme}
+      theme={theme}
+      aiStatuses={aiStatuses}
+      consciousnessReturnScreen={consciousnessReturnScreen}
+      isAdminAuthenticated={isAdminAuthenticated}
+      maintenanceModeActive={maintenanceModeActive}
+      T={T}
+      authBtn={authBtn}
+      authCard={authCard}
+      lbl={lbl}
+      ADMIN_UID={ADMIN_UID}
+      ADMIN_EMAIL={ADMIN_EMAIL}
+      firebaseDb={firebaseDb}
+      listAdminUsers={listAdminUsers}
+      approveAdminUser={approveAdminUser}
+      blockAdminUser={blockAdminUser}
+      AMD_PHASES={AMD_PHASES}
+      LED={LED}
+      SHead={SHead}
+      TableSkeletonLoader={TableSkeletonLoader}
+      EmptyStateCard={EmptyStateCard}
+      SupportChatModal={SupportChatModal}
+      showAdminPrompt={showAdminPrompt}
+      showAdminPwd={showAdminPwd}
+      adminMasterEmail={adminMasterEmail}
+      adminMasterEmailVerified={adminMasterEmailVerified}
+      adminOtpStep={adminOtpStep}
+      adminOtps={adminOtps}
+      adminOtpsVerified={adminOtpsVerified}
+      adminPassErr={adminPassErr}
+      adminPassInput={adminPassInput}
+      adminOtpErr={adminOtpErr}
+      showToast={showToast}
+      handleLogin={handleLogin}
+      handleStructuredGoogleAuth={handleStructuredGoogleAuth}
+      handleLoginPasswordReset={handleLoginPasswordReset}
+      resetAdminPromptState={resetAdminPromptState}
+      setShowAdminPrompt={setShowAdminPrompt}
+      setAdminMasterEmail={setAdminMasterEmail}
+      setAdminPassInput={setAdminPassInput}
+      setAdminOtps={setAdminOtps}
+      setAdminOtpStep={setAdminOtpStep}
+      handleAdminRequestNewCodes={handleAdminRequestNewCodes}
+      sendAdminOTPs={sendAdminOTPs}
+      setShowAdminPwd={setShowAdminPwd}
+      handleAdminAccess={handleAdminAccess}
+      handleAdminVerifyCodes={handleAdminVerifyCodes}
+      handleStructuredSignup={handleStructuredSignup}
+      handleBackToLoginFromSignup={handleBackToLoginFromSignup}
+      checkApprovalStatus={checkApprovalStatus}
+      handleResendVerificationEmail={handleResendVerificationEmail}
+      handleLogout={handleLogout}
+      handlePasswordReset={handlePasswordReset}
+      setScreen={setScreen}
+      setConsciousnessReturnScreen={setConsciousnessReturnScreen}
+      handleThemeChange={handleThemeChange}
+      handleToggleMaintenanceMode={handleToggleMaintenanceMode}
+      saveJournal={saveJournal}
+      saveAccount={saveAccount}
+      saveFirmRules={saveFirmRules}
+    />
+  );
 
   return (
     <AppShellProvider
