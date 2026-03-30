@@ -116,6 +116,7 @@ import SkeletonLoader from "./components/SkeletonLoader.jsx";
 import LazyImage from "./components/LazyImage.jsx";
 import { useTheme } from "./hooks/useTheme.jsx";
 import { AppShellProvider } from "./features/shell/AppShellContext.jsx";
+import LoadingFallback from "./features/shell/LoadingFallback.jsx";
 import { SCREEN_IDS } from "./features/shell/screenIds.js";
 import {
   findUserByEmail as findIdentityUserByEmail,
@@ -2578,118 +2579,6 @@ function ThemePicker({ isOpen, onClose, onSelectTheme, currentTheme }) {
 // ═══════════════════════════════════════════════════════════════════
 // CODE SPLITTING & PERFORMANCE - SUSPENSE BOUNDARIES (RULE #157, #161)
 // ═══════════════════════════════════════════════════════════════════
-/**
- * Suspense fallback component for lazy-loaded dashboards
- * Displays loading state while code is being downloaded and parsed
- */
-function LoadingFallback() {
-  const [dots, setDots] = React.useState(0);
-
-  React.useEffect(() => {
-    const interval = setInterval(() => {
-      setDots((d) => (d + 1) % 4);
-    }, 500);
-    return () => clearInterval(interval);
-  }, []);
-
-  return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "#F9FAFB",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontFamily: '"Inter", "Helvetica", sans-serif',
-        flexDirection: "column",
-        gap: 24,
-      }}
-    >
-      {/* Premium Video Loading Indicator */}
-      <div
-        style={{
-          width: 120,
-          height: 120,
-          borderRadius: "50%",
-          overflow: "hidden",
-          boxShadow: "0 8px 32px rgba(0, 0, 0, 0.15)",
-          background: "var(--surface-elevated, #FFFFFF)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <video
-          src="/logo.mp4"
-          autoPlay
-          loop
-          muted
-          style={{
-            width: "100%",
-            height: "100%",
-            objectFit: "cover",
-          }}
-          onError={(e) => {
-            // Fallback spinner
-            e.target.parentElement.innerHTML = "⟳";
-            e.target.parentElement.style.fontSize = "48px";
-            e.target.parentElement.style.display = "flex";
-            e.target.parentElement.style.alignItems = "center";
-            e.target.parentElement.style.justifyContent = "center";
-            e.target.parentElement.style.animation = "spin 1s linear infinite";
-          }}
-        />
-      </div>
-
-      <div style={{ textAlign: "center" }}>
-        <div
-          style={{
-            color: "#111827",
-            fontSize: 14,
-            fontWeight: 600,
-            letterSpacing: 2,
-            marginBottom: 8,
-          }}
-        >
-          {"LOADING".split("").map((char, i) => (
-            <span
-              key={i}
-              style={{
-                display: "inline-block",
-                animation: `wave 0.6s ease-in-out ${i * 0.1}s infinite`,
-                transformOrigin: "center bottom",
-              }}
-            >
-              {char}
-            </span>
-          ))}
-          {"...".padStart(1 + (dots || 0), ".")}
-        </div>
-        <div
-          style={{
-            color: "var(--text-secondary, #6B7280)",
-            fontSize: 12,
-            letterSpacing: 1,
-            marginTop: 12,
-          }}
-        >
-          Initializing dashboard · Compiling modules
-        </div>
-      </div>
-
-      <style>{`
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-        @keyframes wave {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-8px); }
-        }
-      `}</style>
-    </div>
-  );
-}
-
 // ═══════════════════════════════════════════════════════════════════
 // ERROR BOUNDARIES - Graceful Error Handling (RULE #166)
 // ═══════════════════════════════════════════════════════════════════
