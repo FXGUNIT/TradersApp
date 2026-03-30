@@ -111,6 +111,21 @@ import MaintenanceScreen from "./features/shell/MaintenanceScreen.jsx";
 import SplashScreen from "./features/shell/SplashScreen.jsx";
 import { SCREEN_IDS } from "./features/shell/screenIds.js";
 import {
+  clearConsciousnessReturnScreen,
+  clearLastScreen,
+  clearLoginFailures,
+  clearPendingGoogleSignup,
+  formatCooldown,
+  getLoginRateLimitRemainingMs,
+  persistConsciousnessReturnScreen,
+  persistLastScreen,
+  persistPendingGoogleSignup,
+  readPendingGoogleSignup,
+  recordLoginFailure,
+  resolveConsciousnessReturnScreen,
+  resolveRestorableScreen,
+} from "./features/identity/authFlowStorage.js";
+import {
   findUserByEmail as findIdentityUserByEmail,
   loadLegacyUserProfile,
   provisionUserRecord as provisionIdentityUserRecord,
@@ -297,164 +312,6 @@ const SafeAreaWrapper = ({ children, style = {} }) => {
       {children}
     </div>
   );
-};
-
-const LOGIN_RATE_LIMIT_STORAGE_KEY = "traders-login-rate-limit-v1";
-const PENDING_GOOGLE_SIGNUP_STORAGE_KEY = "traders-pending-google-signup-v1";
-const LOGIN_RATE_LIMIT_MAX_ATTEMPTS = 3;
-const LOGIN_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
-
-const safeStorageGet = (key, fallback = null) => {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : fallback;
-  } catch {
-    return fallback;
-  }
-};
-
-const safeStorageSet = (key, value) => {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    console.warn(`Failed to persist ${key}`);
-  }
-};
-
-const safeStorageRemove = (key) => {
-  try {
-    localStorage.removeItem(key);
-  } catch {
-    console.warn(`Failed to clear ${key}`);
-  }
-};
-
-const RESTORABLE_APP_SCREENS = new Set([
-  SCREEN_IDS.HUB,
-  SCREEN_IDS.APP,
-  SCREEN_IDS.CONSCIOUSNESS,
-  SCREEN_IDS.SESSIONS,
-]);
-
-const getLastScreenStorageKey = (uid) => `TradersApp_LastScreen:${uid}`;
-const getLastReturnScreenStorageKey = (uid) =>
-  `TradersApp_LastConsciousnessReturn:${uid}`;
-
-const resolveRestorableScreen = (uid, fallback = SCREEN_IDS.HUB) => {
-  const saved = safeStorageGet(getLastScreenStorageKey(uid), fallback);
-  return RESTORABLE_APP_SCREENS.has(saved) ? saved : fallback;
-};
-
-const resolveConsciousnessReturnScreen = (uid, fallback = SCREEN_IDS.HUB) => {
-  const saved = safeStorageGet(getLastReturnScreenStorageKey(uid), fallback);
-  return RESTORABLE_APP_SCREENS.has(saved) ? saved : fallback;
-};
-
-const getLoginRateLimitState = () =>
-  safeStorageGet(LOGIN_RATE_LIMIT_STORAGE_KEY, {});
-
-const getLoginRateLimitEntry = (email) => {
-  const normalizedEmail = String(email || "")
-    .trim()
-    .toLowerCase();
-  if (!normalizedEmail) {
-    return null;
-  }
-
-  const state = getLoginRateLimitState();
-  const entry = state[normalizedEmail];
-  if (!entry) {
-    return null;
-  }
-
-  if (Date.now() - entry.firstAttemptAt > LOGIN_RATE_LIMIT_WINDOW_MS) {
-    delete state[normalizedEmail];
-    safeStorageSet(LOGIN_RATE_LIMIT_STORAGE_KEY, state);
-    return null;
-  }
-
-  return entry;
-};
-
-const getLoginRateLimitRemainingMs = (email) => {
-  const entry = getLoginRateLimitEntry(email);
-  if (!entry || entry.attempts < LOGIN_RATE_LIMIT_MAX_ATTEMPTS) {
-    return 0;
-  }
-
-  return Math.max(
-    0,
-    entry.firstAttemptAt + LOGIN_RATE_LIMIT_WINDOW_MS - Date.now(),
-  );
-};
-
-const recordLoginFailure = (email) => {
-  const normalizedEmail = String(email || "")
-    .trim()
-    .toLowerCase();
-  if (!normalizedEmail) {
-    return;
-  }
-
-  const state = getLoginRateLimitState();
-  const existing = state[normalizedEmail];
-  const withinWindow =
-    existing &&
-    Date.now() - existing.firstAttemptAt <= LOGIN_RATE_LIMIT_WINDOW_MS;
-
-  state[normalizedEmail] = withinWindow
-    ? {
-        attempts: Number(existing.attempts || 0) + 1,
-        firstAttemptAt: existing.firstAttemptAt,
-      }
-    : {
-        attempts: 1,
-        firstAttemptAt: Date.now(),
-      };
-
-  safeStorageSet(LOGIN_RATE_LIMIT_STORAGE_KEY, state);
-};
-
-const clearLoginFailures = (email) => {
-  const normalizedEmail = String(email || "")
-    .trim()
-    .toLowerCase();
-  if (!normalizedEmail) {
-    return;
-  }
-
-  const state = getLoginRateLimitState();
-  if (!(normalizedEmail in state)) {
-    return;
-  }
-
-  delete state[normalizedEmail];
-  safeStorageSet(LOGIN_RATE_LIMIT_STORAGE_KEY, state);
-};
-
-const formatCooldown = (remainingMs) => {
-  const totalSeconds = Math.ceil(remainingMs / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  if (minutes <= 0) {
-    return `${seconds}s`;
-  }
-  return `${minutes}m ${String(seconds).padStart(2, "0")}s`;
-};
-
-const readPendingGoogleSignup = () =>
-  safeStorageGet(PENDING_GOOGLE_SIGNUP_STORAGE_KEY, null);
-
-const persistPendingGoogleSignup = (draft) => {
-  if (!draft?.uid || !draft?.email) {
-    return;
-  }
-
-  safeStorageSet(PENDING_GOOGLE_SIGNUP_STORAGE_KEY, draft);
-};
-
-const clearPendingGoogleSignup = () => {
-  safeStorageRemove(PENDING_GOOGLE_SIGNUP_STORAGE_KEY);
 };
 
 // ═══════════════════════════════════════════════════════════════════
@@ -1269,7 +1126,7 @@ export default function TradersRegiment() {
     if (!auth?.uid || !RESTORABLE_APP_SCREENS.has(screen)) {
       return;
     }
-    safeStorageSet(getLastScreenStorageKey(auth.uid), screen);
+    persistLastScreen(auth.uid, screen);
   }, [auth?.uid, screen]);
 
   useEffect(() => {
@@ -1280,10 +1137,7 @@ export default function TradersRegiment() {
     ) {
       return;
     }
-    safeStorageSet(
-      getLastReturnScreenStorageKey(auth.uid),
-      consciousnessReturnScreen,
-    );
+    persistConsciousnessReturnScreen(auth.uid, consciousnessReturnScreen);
   }, [auth?.uid, screen, consciousnessReturnScreen]);
 
   // ═══════════════════════════════════════════════════════════════════
@@ -2911,8 +2765,8 @@ export default function TradersRegiment() {
     localStorage.removeItem("isAdminAuthenticated");
     localStorage.removeItem("admin_session");
     if (activeUid) {
-      safeStorageRemove(getLastScreenStorageKey(activeUid));
-      safeStorageRemove(getLastReturnScreenStorageKey(activeUid));
+      clearLastScreen(activeUid);
+      clearConsciousnessReturnScreen(activeUid);
     }
     clearPendingGoogleSignup();
     setGoogleUser(null);
