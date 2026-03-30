@@ -89,8 +89,17 @@ export async function runPremarketAnalysisWithAi({
   p1NewsChart,
   p1PremarketChart,
   p1KeyLevelsChart,
+  messages,
   maxTokens = 4000,
 }) {
+  if (Array.isArray(messages) && messages.length > 0) {
+    return postTerminalAnalytics("premarket-analysis", {
+      model: "deepseek-chat",
+      maxTokens,
+      messages,
+    });
+  }
+
   const textMsg = `Run full Premarket Analysis. Today: ${parsed?.days?.[parsed.days.length - 1]?.date} | ${istStr}
 Trading Hours ATR(14): ${parsed?.tradingHoursAtr14} pts
 
@@ -155,8 +164,17 @@ export async function runTradePlanWithAi({
   mpChart,
   vwapChart,
   screenshots = [],
+  messages,
   maxTokens = 4000,
 }) {
+  if (Array.isArray(messages) && messages.length > 0) {
+    return postTerminalAnalytics("trade-plan", {
+      model: "deepseek-chat",
+      maxTokens,
+      messages,
+    });
+  }
+
   const textContent = `PRE-ENTRY ANALYSIS + TRADE PLAN
 === PART 1 AMD CONTEXT ===
 ${p1Out ? p1Out.slice(0, 2500) + (p1Out.length > 2500 ? "\n[truncated]" : "") : "No morning analysis."}

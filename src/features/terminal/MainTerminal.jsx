@@ -45,7 +45,6 @@ import {
   writeDraft,
 } from "../../services/draftVault.js";
 import {
-  callTerminalAi,
   extractChoiceText,
   extractIndicatorsWithAi,
   parseFirmRulesWithAi,
@@ -1426,7 +1425,7 @@ Apply ALL sections including SECTION AMD.`;
       if (p1KeyLevelsChart) content.push({ type: 'image', source: { type: 'base64', media_type: p1KeyLevelsChart.type, data: p1KeyLevelsChart.b64 } });
       content.push({ type: 'text', text: textMsg });
 
-      const data = await callTerminalAi({
+      const data = await runPremarketAnalysisWithAi({
         maxTokens: 4000,
         messages: [
           { role: 'system', content: PART1_PROMPT },
@@ -1495,7 +1494,7 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
       screenshots.forEach(s => content.push({ type: 'image', source: { type: 'base64', media_type: s.type, data: s.b64 } }));
       content.push({ type: 'text', text: textContent });
 
-      const data = await callTerminalAi({
+      const data = await runTradePlanWithAi({
         maxTokens: 4000,
         messages: [
           { role: 'system', content: PART2_PROMPT },
