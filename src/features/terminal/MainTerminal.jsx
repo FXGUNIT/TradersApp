@@ -8,14 +8,13 @@ import {
 } from "./terminalUploadUtils";
 import { parseTerminalCsvText } from "./terminalCsvParser.js";
 import {
-  calculateVolatilityRatio,
-  getDynamicParameters,
-  calculateDrawdownThrottle,
-  calculatePositionSize,
-  calculateLiquiditySweepProbability,
   calculateManipulationWickValidation,
   detectAmdPhase,
 } from "../../utils/math-engine.js";
+import {
+  computeTerminalDerivedState,
+  EMPTY_TERMINAL_DERIVED_STATE,
+} from "./terminalDerivedState.js";
 import {
   T,
   AMD_PHASES,
@@ -196,7 +195,7 @@ function getISTDateString(date = new Date()) {
   }).format(date);
 }
 
-function deriveLiveAmdContext(parsed, extractedVals) {
+function _deriveLiveAmdContext(parsed, extractedVals) {
   const days = Array.isArray(parsed?.days) ? parsed.days : [];
   const latestDay = days.length ? days[days.length - 1] : null;
   const latestSession = latestDay?.trading || latestDay?.full || null;
@@ -397,6 +396,19 @@ export default function MainTerminal({
   const latestJournalRef = useRef([]);
   const [metrics, setMetrics] = useState(EMPTY_JOURNAL_METRICS);
   const [isJournalMetricsPending, setIsJournalMetricsPending] = useState(false);
+  const terminalDerivedWorkerRef = useRef(null);
+  const terminalDerivedRequestIdRef = useRef(0);
+  const latestTerminalDerivedInputRef = useRef(null);
+  const [terminalDerivedState, setTerminalDerivedState] = useState(() =>
+    computeTerminalDerivedState({
+      parsed: null,
+      extractedVals,
+      accountState,
+      firmRules,
+      tradeForm: f,
+    }),
+  );
+  const [isTerminalDerivedPending, setIsTerminalDerivedPending] = useState(false);
 
   const applyCsvParseResult = useCallback((requestId, result) => {
     if (requestId !== csvParseRequestIdRef.current) {
@@ -522,6 +534,91 @@ export default function MainTerminal({
 
     applyJournalMetricsResult(requestId, computeJournalMetrics(journal));
   }, [applyJournalMetricsResult, journal]);
+
+  const terminalDerivedInput = useMemo(
+    () => ({
+      parsed,
+      extractedVals,
+      accountState,
+      firmRules,
+      tradeForm: f,
+    }),
+    [accountState, extractedVals, f, firmRules, parsed],
+  );
+
+  const applyTerminalDerivedResult = useCallback((requestId, nextDerivedState) => {
+    if (requestId !== terminalDerivedRequestIdRef.current) {
+      return;
+    }
+
+    setTerminalDerivedState(nextDerivedState || EMPTY_TERMINAL_DERIVED_STATE);
+    setIsTerminalDerivedPending(false);
+  }, []);
+
+  useEffect(() => {
+    latestTerminalDerivedInputRef.current = terminalDerivedInput;
+  }, [terminalDerivedInput]);
+
+  useEffect(() => {
+    if (typeof Worker === "undefined") {
+      return undefined;
+    }
+
+    const worker = new Worker(new URL("./terminalDerived.worker.js", import.meta.url), {
+      type: "module",
+    });
+
+    const handleMessage = (event) => {
+      const { requestId, ok, derivedState } = event.data || {};
+      applyTerminalDerivedResult(
+        requestId,
+        ok
+          ? derivedState
+          : computeTerminalDerivedState(latestTerminalDerivedInputRef.current),
+      );
+    };
+
+    const handleError = () => {
+      const requestId = terminalDerivedRequestIdRef.current;
+      if (!requestId) {
+        return;
+      }
+      applyTerminalDerivedResult(
+        requestId,
+        computeTerminalDerivedState(latestTerminalDerivedInputRef.current),
+      );
+    };
+
+    worker.addEventListener("message", handleMessage);
+    worker.addEventListener("error", handleError);
+    terminalDerivedWorkerRef.current = worker;
+
+    return () => {
+      worker.removeEventListener("message", handleMessage);
+      worker.removeEventListener("error", handleError);
+      worker.terminate();
+      if (terminalDerivedWorkerRef.current === worker) {
+        terminalDerivedWorkerRef.current = null;
+      }
+    };
+  }, [applyTerminalDerivedResult]);
+
+  useEffect(() => {
+    const requestId = terminalDerivedRequestIdRef.current + 1;
+    terminalDerivedRequestIdRef.current = requestId;
+    setIsTerminalDerivedPending(true);
+
+    const worker = terminalDerivedWorkerRef.current;
+    if (worker) {
+      worker.postMessage({ requestId, payload: terminalDerivedInput });
+      return;
+    }
+
+    applyTerminalDerivedResult(
+      requestId,
+      computeTerminalDerivedState(terminalDerivedInput),
+    );
+  }, [applyTerminalDerivedResult, terminalDerivedInput]);
 
   const applyWorkspaceState = useCallback((nextState) => {
     setActiveTab(nextState.activeTab);
@@ -1050,108 +1147,23 @@ export default function MainTerminal({
   );
 
   // Trading calculations
-  const maxRiskUSD = f.accountBalance && f.riskPct 
-    ? Math.round(parseFloat(f.accountBalance) * parseFloat(f.riskPct) / 100 * 100) / 100 
-    : null;
-
-  const latestParsedDay = parsed?.days?.length ? parsed.days[parsed.days.length - 1] : null;
-  const fiveDayFallback = latestParsedDay?.fiveDayATR || latestParsedDay?.atr14 || 0;
-  const twentyDayFallback = latestParsedDay?.twentyDayATR || parsed?.tradingHoursAtr14 || 0;
-  const fiveDayATR = extractedVals.fiveDayATR || fiveDayFallback || 0;
-  const twentyDayATR = extractedVals.twentyDayATR || twentyDayFallback || 0;
-  
-  const VR = calculateVolatilityRatio(fiveDayATR, twentyDayATR);
-  const { vwapSD1, vwapSD2, trendSLMult, mrSLMult } = getDynamicParameters(VR);
-  const { activeRiskPct, isThrottled } = calculateDrawdownThrottle({
-    currentBalance: parseFloat(accountState.currentBalance) || 0,
-    startingBalance: parseFloat(accountState.startingBalance) || 0,
-    highWaterMark: parseFloat(accountState.highWaterMark) || 0,
-    maxDrawdown: parseFloat(firmRules.maxDrawdown) || 0,
-    drawdownType: firmRules.drawdownType || "trailing",
-    baseRiskPercent: parseFloat(f.riskPct) || 0.3,
-  });
-
-  let volatilityRegime = "Normal";
-  if (VR < 0.85) volatilityRegime = "Compression"; 
-  else if (VR > 1.15) volatilityRegime = "Expansion";
-
-  const atrVal =
-    parseFloat(extractedVals.atr) ||
-    parseFloat(latestParsedDay?.tradingHoursAtr14) ||
-    parseFloat(parsed?.tradingHoursAtr14) ||
-    0;
-  const slMult = f.tradeType === 'Trend' ? trendSLMult : mrSLMult;
-  const slPts = atrVal * slMult;
-  const ptVal = f.instrument === 'MNQ' ? 2 : f.instrument === 'MES' ? 5 : f.instrument === 'US100' ? 1 : 10;
-  
-  const contracts = maxRiskUSD && slPts && ptVal
-    ? Math.max(
-        1,
-        calculatePositionSize({
-          accountBalance: f.accountBalance,
-          riskPct: f.riskPct,
-          stopLossPoints: slPts,
-          dollarsPerPoint: ptVal,
-          throttleMultiplier: isThrottled ? 0.5 : 1,
-        }),
-      )
-    : 1;
-    
-  const proposedSLDollars = contracts * slPts * ptVal;
-  const vwapPrice = extractedVals.vwap ? parseFloat(extractedVals.vwap) : null;
-  
-  const sd1Target = vwapPrice && vwapSD1 
-    ? (f.direction === 'Long' ? vwapPrice + vwapSD1 : vwapPrice - vwapSD1) 
-    : null;
-    
-  const sd2Target = vwapPrice && vwapSD2 
-    ? (f.direction === 'Long' ? vwapPrice + vwapSD2 : vwapPrice - vwapSD2) 
-    : null;
-
+  const {
+    maxRiskUSD,
+    activeRiskPct,
+    isThrottled,
+    VR,
+    volatilityRegime,
+    atrVal,
+    slPts,
+    ptVal,
+    contracts,
+    proposedSLDollars,
+    sd1Target,
+    sd2Target,
+    sweepEstimate,
+    liveAmdContext,
+  } = terminalDerivedState;
   const tradeEntryPrice = Number.parseFloat(f.entryPrice || extractedVals.currentPrice || "");
-  const sweepEstimate = useMemo(() => {
-    const keyLevels = parsed?.keyLevels || {};
-    const candidates = [
-      ["PDH", keyLevels.pdh],
-      ["PDL", keyLevels.pdl],
-      ["PWH", keyLevels.pwh],
-      ["PWL", keyLevels.pwl],
-    ]
-      .map(([label, value]) => ({ label, value: Number.parseFloat(value) }))
-      .filter((item) => Number.isFinite(item.value));
-
-    if (!Number.isFinite(tradeEntryPrice) || !candidates.length) return null;
-
-    const nearest = candidates.reduce((best, item) => {
-      if (!best) return item;
-      const bestDistance = Math.abs(tradeEntryPrice - best.value);
-      const itemDistance = Math.abs(tradeEntryPrice - item.value);
-      return itemDistance < bestDistance ? item : best;
-    }, null);
-
-    const estimatedMinutesSinceTest = Math.min(
-      180,
-      Math.max(30, Math.round((parsed?.totalBars || 180) / Math.max(1, parsed?.totalDays || 1) / 2)),
-    );
-
-    return {
-      ...calculateLiquiditySweepProbability({
-        distanceToLevel: Math.abs(tradeEntryPrice - nearest.value),
-        atr: atrVal || parsed?.tradingHoursAtr14 || 0,
-        timeSinceLastTestMins: estimatedMinutesSinceTest,
-        volumeProfileScore: nearest.label === "PDH" || nearest.label === "PWH" ? 0.35 : 0.65,
-      }),
-      levelName: nearest.label,
-      levelValue: nearest.value,
-      price: tradeEntryPrice,
-      estimatedMinutesSinceTest,
-    };
-  }, [parsed, tradeEntryPrice, atrVal]);
-
-  const liveAmdContext = useMemo(
-    () => deriveLiveAmdContext(parsed, extractedVals),
-    [parsed, extractedVals],
-  );
 
   const predictedP2TP1 = Number.isFinite(tradeEntryPrice)
     ? tradeEntryPrice +
@@ -2310,8 +2322,8 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
               </div>
             )}
 
-            <button onClick={runPart2} disabled={loading || execBlocked} style={glowBtn(T.orange, loading || execBlocked)} className="btn-glass">
-              {execBlocked ? `🚫 LOCKED` : "⚡ CAPTURE ENGINE"}
+            <button onClick={runPart2} disabled={loading || isTerminalDerivedPending || execBlocked} style={glowBtn(T.orange, loading || isTerminalDerivedPending || execBlocked)} className="btn-glass">
+              {isTerminalDerivedPending ? "SYNCING ENGINE..." : execBlocked ? `🚫 LOCKED` : "⚡ CAPTURE ENGINE"}
             </button>
 
             <div ref={p2Ref} style={{ marginTop: 24 }}>
