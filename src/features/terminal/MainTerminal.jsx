@@ -15,6 +15,7 @@ import {
   computeTerminalDerivedState,
   EMPTY_TERMINAL_DERIVED_STATE,
 } from "./terminalDerivedState.js";
+import TerminalJournalOverview from "./TerminalJournalOverview.jsx";
 import {
   T,
   AMD_PHASES,
