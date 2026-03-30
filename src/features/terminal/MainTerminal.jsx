@@ -394,6 +394,7 @@ export default function MainTerminal({
   const csvParseRequestIdRef = useRef(0);
   const journalMetricsWorkerRef = useRef(null);
   const journalMetricsRequestIdRef = useRef(0);
+  const latestJournalRef = useRef([]);
   const [metrics, setMetrics] = useState(EMPTY_JOURNAL_METRICS);
   const [isJournalMetricsPending, setIsJournalMetricsPending] = useState(false);
 
@@ -446,6 +447,81 @@ export default function MainTerminal({
       }
     };
   }, [applyCsvParseResult]);
+
+  const applyJournalMetricsResult = useCallback((requestId, nextMetrics) => {
+    if (requestId !== journalMetricsRequestIdRef.current) {
+      return;
+    }
+
+    setMetrics(nextMetrics || EMPTY_JOURNAL_METRICS);
+    setIsJournalMetricsPending(false);
+  }, []);
+
+  useEffect(() => {
+    latestJournalRef.current = journal;
+  }, [journal]);
+
+  useEffect(() => {
+    if (typeof Worker === "undefined") {
+      return undefined;
+    }
+
+    const worker = new Worker(new URL("./journalMetrics.worker.js", import.meta.url), {
+      type: "module",
+    });
+
+    const handleMessage = (event) => {
+      const { requestId, ok, metrics: nextMetrics } = event.data || {};
+      applyJournalMetricsResult(
+        requestId,
+        ok ? nextMetrics : computeJournalMetrics(latestJournalRef.current),
+      );
+    };
+
+    const handleError = () => {
+      const requestId = journalMetricsRequestIdRef.current;
+      if (!requestId) {
+        return;
+      }
+      applyJournalMetricsResult(
+        requestId,
+        computeJournalMetrics(latestJournalRef.current),
+      );
+    };
+
+    worker.addEventListener("message", handleMessage);
+    worker.addEventListener("error", handleError);
+    journalMetricsWorkerRef.current = worker;
+
+    return () => {
+      worker.removeEventListener("message", handleMessage);
+      worker.removeEventListener("error", handleError);
+      worker.terminate();
+      if (journalMetricsWorkerRef.current === worker) {
+        journalMetricsWorkerRef.current = null;
+      }
+    };
+  }, [applyJournalMetricsResult]);
+
+  useEffect(() => {
+    const requestId = journalMetricsRequestIdRef.current + 1;
+    journalMetricsRequestIdRef.current = requestId;
+
+    if (!Array.isArray(journal) || journal.length === 0) {
+      applyJournalMetricsResult(requestId, EMPTY_JOURNAL_METRICS);
+      return;
+    }
+
+    setIsJournalMetricsPending(true);
+
+    const worker = journalMetricsWorkerRef.current;
+    if (worker) {
+      worker.postMessage({ requestId, journal });
+      return;
+    }
+
+    applyJournalMetricsResult(requestId, computeJournalMetrics(journal));
+  }, [applyJournalMetricsResult, journal]);
 
   const applyWorkspaceState = useCallback((nextState) => {
     setActiveTab(nextState.activeTab);
@@ -803,7 +879,6 @@ export default function MainTerminal({
     }
   }, [firmRules, onSaveFirmRules]);
 
-  const metrics = useMemo(() => computeJournalMetrics(journal), [journal]);
   const equityCurveView = useMemo(
     () => buildEquityCurvePath(metrics.equityCurve),
     [metrics.equityCurve],
@@ -2292,6 +2367,11 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
         {/* TAB 3: JOURNAL */}
         {activeTab === 'journal' && (
           <div>
+            {isJournalMetricsPending && (
+              <div style={{ color: T.blue, fontSize: 11, marginBottom: 10 }}>
+                Updating journal metrics...
+              </div>
+            )}
             {/* Performance Dashboard */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16, marginBottom: 20 }}>
               {[
