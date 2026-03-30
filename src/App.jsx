@@ -141,6 +141,7 @@ import FullScreenToggle from "./components/FullScreenToggle.jsx";
 import MobileBottomNav from "./components/MobileBottomNav.jsx";
 import FeatureGuard from "./components/FeatureGuard.jsx";
 import CleanLoginScreen from "./features/auth/CleanLoginScreen.jsx";
+import AdminUnlockModal from "./features/admin-security/AdminUnlockModal.jsx";
 import SessionsManagementScreen from "./features/identity/SessionsManagementScreen.jsx";
 import WaitingRoomScreen from "./features/identity/WaitingRoomScreen.jsx";
 import ThemeSwitcher from "./components/ThemeSwitcher.jsx";
@@ -8523,6 +8524,34 @@ export default function TradersRegiment() {
     setScreen("admin");
   };
 
+  const resetAdminPromptState = useCallback(
+    ({ closePrompt = false } = {}) => {
+      if (closePrompt) {
+        setShowAdminPrompt(false);
+      }
+      setAdminMasterEmail("");
+      setAdminMasterEmailVerified(false);
+      setAdminOtpStep(false);
+      setAdminOtpsVerified(false);
+      setAdminOtps({ otp1: "", otp2: "", otp3: "" });
+      setAdminOtpErr("");
+      setAdminPassErr("");
+      setAdminPassInput("");
+      sessionStorage.removeItem("adminOtps");
+    },
+    [],
+  );
+
+  const handleAdminVerifyCodes = useCallback(() => {
+    if (verifyAdminOTPs()) {
+      setAdminOtpStep(false);
+    }
+  }, [verifyAdminOTPs]);
+
+  const handleAdminRequestNewCodes = useCallback(() => {
+    resetAdminPromptState();
+  }, [resetAdminPromptState]);
+
   const saveJournal = async (jData) => {
     if (!auth) return;
     await saveTerminalJournal(auth.uid, auth.token, jData);
@@ -8591,356 +8620,39 @@ export default function TradersRegiment() {
               onGoogleAuth={handleStructuredGoogleAuth}
               onForgotPassword={handleLoginPasswordReset}
             />
-            {showAdminPrompt && (
-              <div
-                style={{
-                  position: "fixed",
-                  inset: 0,
-                  background: "rgba(0,0,0,0.85)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  zIndex: 1000,
-                  backdropFilter: "blur(10px)",
-                }}
-              >
-                <div style={authCard} className="glass-panel">
-                  <SHead
-                    icon="🛡️"
-                    title="ADMIN AUTHENTICATION"
-                    color={T.purple}
-                  />
-
-                  {!adminMasterEmailVerified ? (
-                    // Step 1: Master Email Verification
-                    <div style={{ marginBottom: 20 }}>
-                      <div
-                        style={{
-                          color: T.red,
-                          fontWeight: 700,
-                          fontSize: 12,
-                          marginBottom: 16,
-                          padding: "12px 14px",
-                          background: "rgba(255,69,58,0.1)",
-                          border: `1px solid rgba(255,69,58,0.3)`,
-                          borderRadius: 8,
-                          textAlign: "center",
-                        }}
-                      >
-                        🛑 WARNING: RESTRICTED AREA. Unauthorized entry attempts
-                        are actively tracked. Any attempt to breach this panel
-                        will result in your IP address, device footprint, and
-                        network data being permanently logged and reported.
-                      </div>
-                      <div style={{ marginBottom: 16 }}>
-                        <label style={lbl}>MASTER ADMIN EMAIL</label>
-                        <input
-                          type="email"
-                          value={adminMasterEmail}
-                          onChange={(e) => setAdminMasterEmail(e.target.value)}
-                          style={{
-                            width: "100%",
-                            padding: "10px",
-                            background: "rgba(0,0,0,0.5)",
-                            border: "1px solid #333",
-                            color: "#fff",
-                            borderRadius: "6px",
-                            fontFamily: T.font,
-                          }}
-                          placeholder="Enter Master ID"
-                        />
-                      </div>
-                      {adminOtpErr && (
-                        <div
-                          style={{
-                            color: T.red,
-                            fontSize: 11,
-                            marginBottom: 12,
-                            fontWeight: 600,
-                          }}
-                        >
-                          {adminOtpErr}
-                        </div>
-                      )}
-                      <button
-                        onClick={sendAdminOTPs}
-                        style={authBtn(T.purple, false)}
-                        className="btn-glass"
-                      >
-                        📧 SEND VERIFICATION CODES
-                      </button>
-                    </div>
-                  ) : !adminOtpStep ? (
-                    // Step 1b: Request OTPs (after master email verified)
-                    <div style={{ marginBottom: 20 }}>
-                      <div
-                        style={{
-                          color: T.muted,
-                          fontSize: 12,
-                          marginBottom: 16,
-                          textAlign: "center",
-                        }}
-                      >
-                        Master identity verified. OTP codes are being sent to
-                        three secure endpoints.
-                        <br />
-                        Click below to proceed to code entry.
-                      </div>
-                      <button
-                        onClick={() => setAdminOtpStep(true)}
-                        style={authBtn(T.green, false)}
-                        className="btn-glass"
-                      >
-                        ✓ PROCEED TO CODE ENTRY
-                      </button>
-                    </div>
-                  ) : (
-                    // Step 2: Enter OTPs
-                    <div style={{ marginBottom: 20 }}>
-                      <div
-                        style={{
-                          color: T.muted,
-                          fontSize: 12,
-                          marginBottom: 16,
-                          textAlign: "center",
-                        }}
-                      >
-                        Enter the 6-digit codes sent to the three verification
-                        endpoints:
-                      </div>
-
-                      <div
-                        style={{
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: 12,
-                          marginBottom: 16,
-                        }}
-                      >
-                        <div>
-                          <label style={{ ...lbl, fontSize: 11 }}>
-                            gunitsingh1994@gmail.com
-                          </label>
-                          <input
-                            type="text"
-                            value={adminOtps.otp1}
-                            onChange={(e) =>
-                              setAdminOtps((prev) => ({
-                                ...prev,
-                                otp1: e.target.value,
-                              }))
-                            }
-                            style={{
-                              width: "100%",
-                              padding: "10px",
-                              background: "rgba(0,0,0,0.5)",
-                              border: "1px solid #333",
-                              color: "#fff",
-                              borderRadius: "6px",
-                              fontFamily: "monospace",
-                              textAlign: "center",
-                              letterSpacing: "2px",
-                            }}
-                            placeholder="000000"
-                            maxLength="6"
-                          />
-                        </div>
-
-                        <div>
-                          <label style={{ ...lbl, fontSize: 11 }}>
-                            arkgproductions@gmail.com
-                          </label>
-                          <input
-                            type="text"
-                            value={adminOtps.otp2}
-                            onChange={(e) =>
-                              setAdminOtps((prev) => ({
-                                ...prev,
-                                otp2: e.target.value,
-                              }))
-                            }
-                            style={{
-                              width: "100%",
-                              padding: "10px",
-                              background: "rgba(0,0,0,0.5)",
-                              border: "1px solid #333",
-                              color: "#fff",
-                              borderRadius: "6px",
-                              fontFamily: "monospace",
-                              textAlign: "center",
-                              letterSpacing: "2px",
-                            }}
-                            placeholder="000000"
-                            maxLength="6"
-                          />
-                        </div>
-
-                        <div>
-                          <label style={{ ...lbl, fontSize: 11 }}>
-                            starg.unit@gmail.com
-                          </label>
-                          <input
-                            type="text"
-                            value={adminOtps.otp3}
-                            onChange={(e) =>
-                              setAdminOtps((prev) => ({
-                                ...prev,
-                                otp3: e.target.value,
-                              }))
-                            }
-                            style={{
-                              width: "100%",
-                              padding: "10px",
-                              background: "rgba(0,0,0,0.5)",
-                              border: "1px solid #333",
-                              color: "#fff",
-                              borderRadius: "6px",
-                              fontFamily: "monospace",
-                              textAlign: "center",
-                              letterSpacing: "2px",
-                            }}
-                            placeholder="000000"
-                            maxLength="6"
-                          />
-                        </div>
-                      </div>
-
-                      {adminOtpErr && (
-                        <div
-                          style={{
-                            color: T.red,
-                            fontSize: 11,
-                            marginBottom: 12,
-                            fontWeight: 600,
-                          }}
-                        >
-                          {adminOtpErr}
-                        </div>
-                      )}
-
-                      <div
-                        style={{ display: "flex", gap: 8, marginBottom: 16 }}
-                      >
-                        <button
-                          onClick={() => {
-                            if (verifyAdminOTPs()) setAdminOtpStep(false);
-                          }}
-                          style={authBtn(T.green, false)}
-                          className="btn-glass"
-                        >
-                          ✓ VERIFY CODES
-                        </button>
-                        <button
-                          onClick={() => {
-                            setAdminOtpStep(false);
-                            setAdminMasterEmailVerified(false);
-                            setAdminOtpsVerified(false);
-                            setAdminOtps({ otp1: "", otp2: "", otp3: "" });
-                            setAdminMasterEmail("");
-                            setAdminOtpErr("");
-                            sessionStorage.removeItem("adminOtps");
-                          }}
-                          style={{
-                            ...authBtn(T.muted, false),
-                            background: "transparent",
-                          }}
-                          className="btn-glass"
-                        >
-                          ↺ REQUEST NEW
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Master Admin Password - Only shown after OTP verification */}
-                  {adminOtpsVerified && (
-                    <div style={{ marginBottom: 20 }}>
-                      <label style={lbl}>MASTER ADMIN PASSWORD</label>
-                      <div style={{ position: "relative", width: "100%" }}>
-                        <input
-                          type={showAdminPwd ? "text" : "password"}
-                          value={adminPassInput}
-                          onChange={(e) => setAdminPassInput(e.target.value)}
-                          style={{
-                            width: "100%",
-                            padding: "12px",
-                            background: "rgba(0,0,0,0.5)",
-                            border: "1px solid #333",
-                            color: "#fff",
-                            borderRadius: "8px",
-                          }}
-                          placeholder="Enter Master Admin Password"
-                          onKeyDown={(e) =>
-                            e.key === "Enter" && handleAdminAccess()
-                          }
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowAdminPwd(!showAdminPwd)}
-                          style={{
-                            position: "absolute",
-                            right: "10px",
-                            top: "50%",
-                            transform: "translateY(-50%)",
-                            background: "none",
-                            border: "none",
-                            color: "#888",
-                            cursor: "pointer",
-                            fontSize: "12px",
-                          }}
-                        >
-                          {showAdminPwd ? "HIDE" : "SHOW"}
-                        </button>
-                      </div>
-                      {adminPassErr && (
-                        <div
-                          style={{
-                            color: T.red,
-                            fontSize: 11,
-                            marginTop: 8,
-                            fontWeight: 600,
-                          }}
-                        >
-                          {adminPassErr}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  <div style={{ display: "flex", gap: 12 }}>
-                    {adminOtpsVerified && (
-                      <button
-                        onClick={handleAdminAccess}
-                        style={authBtn(T.purple, false)}
-                        className="btn-glass"
-                      >
-                        UNLOCK ADMIN
-                      </button>
-                    )}
-                    <button
-                      onClick={() => {
-                        setShowAdminPrompt(false);
-                        setAdminMasterEmail("");
-                        setAdminMasterEmailVerified(false);
-                        setAdminOtpStep(false);
-                        setAdminOtpsVerified(false);
-                        setAdminOtps({ otp1: "", otp2: "", otp3: "" });
-                        setAdminOtpErr("");
-                        setAdminPassErr("");
-                        sessionStorage.removeItem("adminOtps");
-                      }}
-                      style={{
-                        ...authBtn(T.muted, false),
-                        background: "transparent",
-                      }}
-                      className="btn-glass"
-                    >
-                      CANCEL
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
+            <AdminUnlockModal
+              authButton={authBtn}
+              authCardStyle={authCard}
+              labelStyle={lbl}
+              onCancel={() => resetAdminPromptState({ closePrompt: true })}
+              onMasterEmailChange={setAdminMasterEmail}
+              onPasswordChange={setAdminPassInput}
+              onOtpChange={(field, value) =>
+                setAdminOtps((prev) => ({
+                  ...prev,
+                  [field]: value,
+                }))
+              }
+              onProceedToCodeEntry={() => setAdminOtpStep(true)}
+              onRequestNew={handleAdminRequestNewCodes}
+              onSendVerificationCodes={sendAdminOTPs}
+              onTogglePasswordVisibility={() => setShowAdminPwd(!showAdminPwd)}
+              onUnlockAdmin={handleAdminAccess}
+              onVerifyCodes={handleAdminVerifyCodes}
+              passwordError={adminPassErr}
+              passwordValue={adminPassInput}
+              show={showAdminPrompt}
+              showPassword={showAdminPwd}
+              theme={T}
+              verificationError={adminOtpErr}
+              verificationState={{
+                masterEmail: adminMasterEmail,
+                masterEmailVerified: adminMasterEmailVerified,
+                otpStep: adminOtpStep,
+                otps: adminOtps,
+                otpsVerified: adminOtpsVerified,
+              }}
+            />
           </>
         );
 
@@ -10373,3 +10085,4 @@ styleSheet.innerText = `
   }
 `;
 document.head.appendChild(styleSheet);
+
