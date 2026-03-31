@@ -147,12 +147,6 @@ import {
   executeStructuredSignup,
   executeStructuredGoogleAuth,
 } from "./features/identity/authCredentialHandlers.js";
-import {
-  executeSendAdminOTPs,
-  executeVerifyAdminOTPs,
-  executeHandleAdminAccess,
-  executeHandleAdminVerifyCodes,
-} from "./features/identity/adminAccessHandlers.js";
 import { executeCheckUserStatus } from "./features/identity/authRoutingHandlers.js";
 import {
   findUserByEmail as findIdentityUserByEmail,
@@ -183,6 +177,7 @@ import AdminDashboardScreen from "./features/admin-security/AdminDashboardScreen
 import AdminInvitesView from "./features/admin-security/AdminInvitesView.jsx";
 import DebugOverlay from "./features/admin-security/DebugOverlay.jsx";
 import ErrorBoundaryAdmin from "./features/admin-security/ErrorBoundaryAdmin.jsx";
+import { useAdminAccessHandlers } from "./features/admin-security/useAdminAccessHandlers.js";
 import {
   UserListProvider,
   useUserList,
@@ -190,7 +185,6 @@ import {
 import SessionsManagementScreen from "./features/identity/SessionsManagementScreen.jsx";
 import ForcePasswordResetScreen from "./features/identity/ForcePasswordResetScreen.jsx";
 import WaitingRoomScreen from "./features/identity/WaitingRoomScreen.jsx";
-import { executeLogSecurityAlert } from "./features/admin-security/securityForensicsHandlers.js";
 import SupportChatModal from "./features/support/SupportChatModal.jsx";
 import {
   executeSaveJournal,
@@ -966,103 +960,38 @@ export default function TradersRegiment() {
     setProfile,
   });
 
-  const logSecurityAlert = async (
-    attemptType,
-    attemptedEmail,
-    failureReason,
-  ) => {
-    await executeLogSecurityAlert({
-      attemptType,
-      attemptedEmail,
-      failureReason,
-      hasEmailJsConfig,
-      emailjs,
-      serviceId: import.meta.env.VITE_EMAILJS_SERVICE_ID,
-      templateId: import.meta.env.VITE_EMAILJS_TEMPLATE_ID,
-      publicKey: import.meta.env.VITE_EMAILJS_PUBLIC_KEY,
-    });
-  };
-
-  const sendAdminOTPs = async () => {
-    return executeSendAdminOTPs({
-      adminMasterEmail,
-      hasEmailJsConfig,
-      sendForensicAlert,
-      logSecurityAlert,
-      setAdminMasterEmailVerified,
-      setAdminOtpStep,
-      setAdminOtpsVerified,
-      setAdminOtpErr,
-    });
-  };
-
-  const verifyAdminOTPs = () => {
-    const result = executeVerifyAdminOTPs({ adminOtps });
-    if (result.success) {
-      setAdminOtpStep(false);
-      setAdminOtpsVerified(true);
-      setAdminOtpErr("");
-      return true;
-    }
-    setAdminOtpErr(result.error);
-    return false;
-  };
-
-  const handleAdminAccess = async () => {
-    return executeHandleAdminAccess({
-      adminPassInput,
-      adminOtpsVerified,
-      verifyAdminPassword,
-      logSecurityAlert,
-      adminMasterEmail,
-      showToast,
-      setAdminPassErr,
-      setShowAdminPrompt,
-      setAdminPassInput,
-      setAdminOtpsVerified,
-      setAdminOtpStep,
-      setAdminOtps,
-      setAdminMasterEmail,
-      setAdminMasterEmailVerified,
-      setIsAdminAuthenticated,
-      setScreen,
-    });
-  };
-
-  const resetAdminPromptState = useCallback(
-    ({ closePrompt = false } = {}) => {
-      if (closePrompt) {
-        setShowAdminPrompt(false);
-      }
-      setAdminMasterEmail("");
-      setAdminMasterEmailVerified(false);
-      setAdminOtpStep(false);
-      setAdminOtpsVerified(false);
-      setAdminOtps({ otp1: "", otp2: "", otp3: "" });
-      setAdminOtpErr("");
-      setAdminPassErr("");
-      setAdminPassInput("");
-      sessionStorage.removeItem("adminOtps");
-    },
-    [],
-  );
-
-  const handleAdminVerifyCodes = useCallback(() => {
-    const verified = executeHandleAdminVerifyCodes({
-      adminOtps,
-      setAdminOtpStep,
-      setAdminOtpErr,
-    });
-    if (verified) {
-      setAdminOtpsVerified(true);
-      setAdminOtpErr("");
-    }
-    return verified;
-  }, [adminOtps]);
-
-  const handleAdminRequestNewCodes = useCallback(() => {
-    resetAdminPromptState();
-  }, [resetAdminPromptState]);
+  const {
+    sendAdminOTPs,
+    handleAdminAccess,
+    resetAdminPromptState,
+    handleAdminVerifyCodes,
+    handleAdminRequestNewCodes,
+  } = useAdminAccessHandlers({
+    adminMasterEmail,
+    adminOtps,
+    adminOtpsVerified,
+    adminPassInput,
+    hasEmailJsConfig,
+    emailjs,
+    serviceId: import.meta.env.VITE_EMAILJS_SERVICE_ID,
+    templateId: import.meta.env.VITE_EMAILJS_TEMPLATE_ID,
+    publicKey: import.meta.env.VITE_EMAILJS_PUBLIC_KEY,
+    sendForensicAlert,
+    verifyAdminPassword,
+    showToast,
+    setShowAdminPrompt,
+    setAdminMasterEmail,
+    setAdminMasterEmailVerified,
+    setAdminOtpStep,
+    setAdminOtpsVerified,
+    setAdminOtps,
+    setAdminPassInput,
+    setAdminPassErr,
+    setAdminOtpErr,
+    setIsAdminAuthenticated,
+    setScreen,
+    setShowAdminPwd,
+  });
 
   const saveJournal = async (jData) => {
     await executeSaveJournal({
