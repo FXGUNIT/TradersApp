@@ -64,14 +64,6 @@ function writeLocalMaintenanceState(enabled) {
 }
 
 export async function approveUser(uid, adminUid) {
-  const legacyResult = await approveLegacyUser(uid, adminUid);
-  if (legacyResult?.success) {
-    if (hasBff()) {
-      void approveAdminUserGateway(uid, adminUid);
-    }
-    return legacyResult;
-  }
-
   if (hasBff()) {
     const response = await approveAdminUserGateway(uid, adminUid);
     const normalized = normalizeResponse(response, {
@@ -95,18 +87,15 @@ export async function approveUser(uid, adminUid) {
     }
   }
 
+  const legacyResult = await approveLegacyUser(uid, adminUid);
+  if (legacyResult?.success) {
+    return legacyResult;
+  }
+
   return legacyResult;
 }
 
 export async function blockUser(uid, adminUid) {
-  const legacyResult = await blockLegacyUser(uid, adminUid);
-  if (legacyResult?.success) {
-    if (hasBff()) {
-      void blockAdminUserGateway(uid, adminUid);
-    }
-    return legacyResult;
-  }
-
   if (hasBff()) {
     const response = await blockAdminUserGateway(uid, adminUid);
     const normalized = normalizeResponse(response, {
@@ -117,18 +106,15 @@ export async function blockUser(uid, adminUid) {
     }
   }
 
+  const legacyResult = await blockLegacyUser(uid, adminUid);
+  if (legacyResult?.success) {
+    return legacyResult;
+  }
+
   return legacyResult;
 }
 
 export async function lockUser(uid, adminUid) {
-  const legacyResult = await lockLegacyUser(uid, adminUid);
-  if (legacyResult?.success) {
-    if (hasBff()) {
-      void lockAdminUserGateway(uid, adminUid);
-    }
-    return legacyResult;
-  }
-
   if (hasBff()) {
     const response = await lockAdminUserGateway(uid, adminUid);
     const normalized = normalizeResponse(response, {
@@ -139,16 +125,15 @@ export async function lockUser(uid, adminUid) {
     }
   }
 
+  const legacyResult = await lockLegacyUser(uid, adminUid);
+  if (legacyResult?.success) {
+    return legacyResult;
+  }
+
   return legacyResult;
 }
 
 export async function listUsers() {
-  const legacy = await listLegacyUsers();
-  if (legacy?.success && legacy?.users) {
-    legacy.users = normalizeUsers(legacy.users);
-    return legacy;
-  }
-
   if (hasBff()) {
     const response = await fetchAdminUsersGateway();
     const normalized = normalizeResponse(response, {
@@ -160,6 +145,12 @@ export async function listUsers() {
       normalized.users = normalizeUsers(normalized.users);
       return normalized;
     }
+  }
+
+  const legacy = await listLegacyUsers();
+  if (legacy?.success && legacy?.users) {
+    legacy.users = normalizeUsers(legacy.users);
+    return legacy;
   }
 
   if (legacy?.users) {

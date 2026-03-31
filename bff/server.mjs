@@ -23,10 +23,13 @@ import {
 import {
   approveAdminUser,
   blockAdminUser,
+  clearAdminPasswordFailedAttempts,
+  getAdminPasswordAttemptState,
   getMaintenanceState,
   listAdminUsers,
   lockAdminUser,
   recordAdminAuditEvent,
+  registerAdminPasswordFailedAttempt,
   toggleMaintenanceState,
 } from "./domains/adminState.mjs";
 import {
@@ -126,7 +129,6 @@ const TELEGRAM_CHAT_ID =
   "";
 const ADMIN_ATTEMPT_LIMIT = 3;
 const ADMIN_LOCKOUT_WINDOW_MS = 15 * 60 * 1000;
-const adminAttemptStore = new Map();
 
 const AI_PROVIDER_DEFINITIONS = [
   {
@@ -301,40 +303,6 @@ const getClientKey = (req) =>
   )
     .split(",")[0]
     .trim();
-
-const getAttemptState = (clientKey) => {
-  const current = adminAttemptStore.get(clientKey);
-  if (!current) {
-    return { attempts: 0, lockoutUntil: 0 };
-  }
-
-  if (current.lockoutUntil && current.lockoutUntil <= Date.now()) {
-    adminAttemptStore.delete(clientKey);
-    return { attempts: 0, lockoutUntil: 0 };
-  }
-
-  return current;
-};
-
-const registerFailedAttempt = (clientKey) => {
-  const current = getAttemptState(clientKey);
-  const attempts = Number(current.attempts || 0) + 1;
-  const lockoutUntil =
-    attempts >= ADMIN_ATTEMPT_LIMIT
-      ? Date.now() + ADMIN_LOCKOUT_WINDOW_MS
-      : 0;
-
-  adminAttemptStore.set(clientKey, {
-    attempts,
-    lockoutUntil,
-  });
-
-  return { attempts, lockoutUntil };
-};
-
-const clearFailedAttempts = (clientKey) => {
-  adminAttemptStore.delete(clientKey);
-};
 
 const safeErrorMessage = async (response, fallback) => {
   const text = await response.text().catch(() => "");
@@ -768,7 +736,7 @@ const server = createServer(async (req, res) => {
 
   if (req.method === "POST" && req.url === "/admin/verify-password") {
     const clientKey = getClientKey(req);
-    const attemptState = getAttemptState(clientKey);
+    const attemptState = getAdminPasswordAttemptState(clientKey);
 
     if (attemptState.lockoutUntil && attemptState.lockoutUntil > Date.now()) {
       json(
@@ -820,7 +788,11 @@ const server = createServer(async (req, res) => {
       const isValid = constantTimeMatch(hashPassword(password), ADMIN_PASS_HASH);
 
       if (!isValid) {
-        const nextAttemptState = registerFailedAttempt(clientKey);
+        const nextAttemptState = registerAdminPasswordFailedAttempt(
+          clientKey,
+          ADMIN_ATTEMPT_LIMIT,
+          ADMIN_LOCKOUT_WINDOW_MS,
+        );
         json(
           res,
           401,
@@ -842,7 +814,7 @@ const server = createServer(async (req, res) => {
         return;
       }
 
-      clearFailedAttempts(clientKey);
+      clearAdminPasswordFailedAttempts(clientKey);
       json(res, 200, { ok: true, verified: true }, origin);
       return;
     } catch (error) {

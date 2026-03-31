@@ -75,18 +75,16 @@ export async function findUserByEmail(email, token = "") {
   }
 
   if (hasBff()) {
-    try {
-      const response = await fetchIdentityUserByEmail(normalizedEmail);
-      const userData = normalizeUserPayload(response);
-      if (userData?.uid) {
-        return {
-          uid: userData.uid,
-          userData,
-        };
-      }
-    } catch (error) {
-      console.warn("BFF email lookup failed, falling back to Firebase:", error);
+    const response = await fetchIdentityUserByEmail(normalizedEmail);
+    const userData = normalizeUserPayload(response);
+    if (!userData?.uid) {
+      return null;
     }
+
+    return {
+      uid: userData.uid,
+      userData,
+    };
   }
 
   const allUsers = (await dbR("users", token)) || {};
@@ -118,18 +116,30 @@ export async function loadUserProfileByUid(authData = {}) {
   let fullData = null;
 
   if (hasBff()) {
-    try {
-      const response = await fetchIdentityUser(authData.uid);
-      userData = normalizeUserPayload(response);
-    } catch (error) {
-      console.warn("BFF identity load failed, falling back to Firebase:", error);
+    const response = await fetchIdentityUser(authData.uid);
+    userData = normalizeUserPayload(response);
+    if (!userData) {
+      return {
+        profile: null,
+        screen: SCREEN_IDS.LOGIN,
+        userData: null,
+        fullData: null,
+      };
     }
+
+    const sessionsFromBff = normalizeSessionMap(
+      await listSessionRecords(authData.uid, authData.token),
+    );
+
+    fullData = {
+      ...(userData || {}),
+      sessions: sessionsFromBff || userData?.sessions || {},
+    };
+
+    return mergeProfileData(userData, authData, fullData);
   }
 
-  if (!userData) {
-    userData = await readLegacyUser(authData.uid, authData.token);
-  }
-
+  userData = await readLegacyUser(authData.uid, authData.token);
   if (!userData) {
     return {
       profile: null,
@@ -140,13 +150,11 @@ export async function loadUserProfileByUid(authData = {}) {
   }
 
   const legacyFullData = await readLegacyUser(authData.uid, authData.token);
-  const sessionsFromBff = await listSessionRecords(authData.uid, authData.token);
-
   fullData = {
     ...(legacyFullData || {}),
     ...(userData || {}),
     sessions: normalizeSessionMap(
-      sessionsFromBff || legacyFullData?.sessions || userData?.sessions,
+      legacyFullData?.sessions || userData?.sessions || {},
     ),
   };
 
@@ -167,17 +175,15 @@ export async function updateLoginSecurityCounters(
   }
 
   const token = resolveToken(authDataOrToken);
-
   const nextPatch = {
     ...patch,
     updatedAt: new Date().toISOString(),
   };
 
   if (hasBff()) {
-    try {
-      await patchIdentityUserSecurity(uid, nextPatch);
-    } catch (error) {
-      console.warn("BFF security update failed, falling back to Firebase:", error);
+    const response = await patchIdentityUserSecurity(uid, nextPatch);
+    if (response) {
+      return { success: true };
     }
   }
 
@@ -196,14 +202,12 @@ export async function provisionUserRecord(uid, payload = {}, authDataOrToken = "
   }
 
   const token = resolveToken(authDataOrToken);
-  let provisionedUser = null;
 
   if (hasBff()) {
-    try {
-      const response = await provisionIdentityUser(uid, payload);
-      provisionedUser = normalizeUserPayload(response);
-    } catch (error) {
-      console.warn("BFF identity provision failed, falling back to Firebase:", error);
+    const response = await provisionIdentityUser(uid, payload);
+    const provisionedUser = normalizeUserPayload(response);
+    if (provisionedUser) {
+      return provisionedUser;
     }
   }
 
@@ -213,7 +217,7 @@ export async function provisionUserRecord(uid, payload = {}, authDataOrToken = "
     console.warn("Legacy identity provision failed:", error);
   }
 
-  return provisionedUser || (await readLegacyUser(uid, token));
+  return await readLegacyUser(uid, token);
 }
 
 export async function listUserSessions(uid, token = "") {
@@ -238,12 +242,8 @@ export async function getUserStatusByUid(uid, authDataOrToken = "") {
   }
 
   if (hasBff()) {
-    try {
-      const response = await fetchIdentityUserStatus(uid);
-      return response?.status || response?.data?.status || response || null;
-    } catch (error) {
-      console.warn("BFF status lookup failed, falling back to Firebase:", error);
-    }
+    const response = await fetchIdentityUserStatus(uid);
+    return response?.status || response?.data?.status || response || null;
   }
 
   const user = await readLegacyUser(uid, resolveToken(authDataOrToken));

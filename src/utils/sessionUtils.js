@@ -80,17 +80,8 @@ export const listSessions = async (uid, token) => {
   }
 
   if (hasBff()) {
-    try {
-      const response = await fetchIdentitySessions(uid);
-      const sessions = normalizeSessionMap(
-        response?.sessions || response?.data || response,
-      );
-      if (Object.keys(sessions).length > 0) {
-        return sessions;
-      }
-    } catch (error) {
-      console.warn("BFF session list failed, falling back to Firebase:", error);
-    }
+    const response = await fetchIdentitySessions(uid);
+    return normalizeSessionMap(response?.sessions || response?.data || response);
   }
 
   const legacySessions = await dbR(`users/${uid}/sessions`, token);
@@ -103,11 +94,8 @@ export const upsertSession = async (uid, sessionId, sessionData, token) => {
   }
 
   if (hasBff()) {
-    try {
-      await upsertIdentitySession(uid, sessionId, sessionData);
-    } catch (error) {
-      console.warn("BFF session write failed, falling back to Firebase:", error);
-    }
+    const response = await upsertIdentitySession(uid, sessionId, sessionData);
+    return Boolean(response);
   }
 
   await dbW(`users/${uid}/sessions/${sessionId}`, sessionData, token);
@@ -120,11 +108,8 @@ export const revokeSession = async (uid, sessionId, token) => {
   }
 
   if (hasBff()) {
-    try {
-      await deleteIdentitySession(uid, sessionId);
-    } catch (error) {
-      console.warn("BFF session delete failed, falling back to Firebase:", error);
-    }
+    const response = await deleteIdentitySession(uid, sessionId);
+    return Boolean(response);
   }
 
   await dbDel(`users/${uid}/sessions/${sessionId}`, token);
@@ -172,30 +157,12 @@ export const createSession = async (uid, token, rememberMe) => {
 
 export const logoutOtherDevices = async (uid, currentSessionId, token) => {
   try {
-    let bffRevokeSucceeded = false;
-
     if (hasBff()) {
-      try {
-        await revokeOtherIdentitySessions(uid, currentSessionId);
-        bffRevokeSucceeded = true;
-      } catch (error) {
-        console.warn(
-          "BFF revoke-other-devices failed, falling back to Firebase:",
-          error,
-        );
-      }
+      const response = await revokeOtherIdentitySessions(uid, currentSessionId);
+      return Boolean(response);
     }
 
-    let allSessions = null;
-    try {
-      allSessions = await dbR(`users/${uid}/sessions`, token);
-    } catch (error) {
-      if (bffRevokeSucceeded) {
-        return true;
-      }
-      throw error;
-    }
-
+    const allSessions = await dbR(`users/${uid}/sessions`, token);
     if (!allSessions) return true;
 
     const deletePromises = Object.keys(normalizeSessionMap(allSessions)).map(

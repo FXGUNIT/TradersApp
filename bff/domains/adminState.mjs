@@ -14,6 +14,7 @@ const DEFAULT_ADMIN_STATE = {
   maintenanceActive: false,
   auditEvents: [],
   adminOtpChallenge: null,
+  passwordAttempts: {},
 };
 
 const DEFAULT_IDENTITY_STATE = {
@@ -52,6 +53,10 @@ function readAdminState() {
     ...DEFAULT_ADMIN_STATE,
     ...state,
     auditEvents: Array.isArray(state.auditEvents) ? state.auditEvents : [],
+    passwordAttempts:
+      state.passwordAttempts && typeof state.passwordAttempts === "object"
+        ? state.passwordAttempts
+        : {},
   };
 }
 
@@ -161,6 +166,65 @@ function appendAuditEvent(event = {}) {
   state.auditEvents = [...state.auditEvents, record];
   writeAdminState(state);
   return record;
+}
+
+function normalizeAttemptRecord(record = {}) {
+  return {
+    attempts: Number(record.attempts || 0),
+    lockoutUntil: Number(record.lockoutUntil || 0),
+    updatedAt: record.updatedAt || nowIso(),
+  };
+}
+
+function getPasswordAttemptState(clientKey) {
+  const state = readAdminState();
+  const record = state.passwordAttempts?.[clientKey];
+  if (!record) {
+    return { attempts: 0, lockoutUntil: 0 };
+  }
+
+  const normalized = normalizeAttemptRecord(record);
+  if (normalized.lockoutUntil && normalized.lockoutUntil <= Date.now()) {
+    delete state.passwordAttempts[clientKey];
+    writeAdminState(state);
+    return { attempts: 0, lockoutUntil: 0 };
+  }
+
+  return {
+    attempts: normalized.attempts,
+    lockoutUntil: normalized.lockoutUntil,
+  };
+}
+
+function registerPasswordFailedAttempt(clientKey, attemptLimit, lockoutWindowMs) {
+  const state = readAdminState();
+  const current = getPasswordAttemptState(clientKey);
+  const attempts = Number(current.attempts || 0) + 1;
+  const lockoutUntil =
+    attempts >= attemptLimit ? Date.now() + lockoutWindowMs : 0;
+
+  state.passwordAttempts = {
+    ...(state.passwordAttempts || {}),
+    [clientKey]: normalizeAttemptRecord({
+      attempts,
+      lockoutUntil,
+    }),
+  };
+
+  writeAdminState(state);
+  return { attempts, lockoutUntil };
+}
+
+function clearPasswordFailedAttempts(clientKey) {
+  const state = readAdminState();
+  if (!state.passwordAttempts?.[clientKey]) {
+    return;
+  }
+
+  const nextAttempts = { ...(state.passwordAttempts || {}) };
+  delete nextAttempts[clientKey];
+  state.passwordAttempts = nextAttempts;
+  writeAdminState(state);
 }
 
 function buildUserList() {
@@ -337,6 +401,38 @@ export function recordAdminAuditEvent(event = {}) {
   return appendAuditEvent(event);
 }
 
+export function getAdminPasswordAttemptState(clientKey) {
+  if (!clientKey) {
+    return { attempts: 0, lockoutUntil: 0 };
+  }
+
+  return getPasswordAttemptState(clientKey);
+}
+
+export function registerAdminPasswordFailedAttempt(
+  clientKey,
+  attemptLimit,
+  lockoutWindowMs,
+) {
+  if (!clientKey) {
+    return { attempts: 0, lockoutUntil: 0 };
+  }
+
+  return registerPasswordFailedAttempt(
+    clientKey,
+    Number(attemptLimit || 0),
+    Number(lockoutWindowMs || 0),
+  );
+}
+
+export function clearAdminPasswordFailedAttempts(clientKey) {
+  if (!clientKey) {
+    return;
+  }
+
+  clearPasswordFailedAttempts(clientKey);
+}
+
 export function getMaintenanceAndUsersSnapshot() {
   return {
     maintenanceActive: getMaintenanceState(),
@@ -350,8 +446,11 @@ export default {
   getAdminAuditEvents,
   getMaintenanceAndUsersSnapshot,
   getMaintenanceState,
+  getAdminPasswordAttemptState,
   listAdminUsers,
   lockAdminUser,
   recordAdminAuditEvent,
+  registerAdminPasswordFailedAttempt,
+  clearAdminPasswordFailedAttempts,
   toggleMaintenanceState,
 };

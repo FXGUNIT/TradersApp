@@ -1,5 +1,7 @@
 /* eslint-disable no-unused-vars */
 import { Suspense } from "react";
+import ThemeSwitcher from "../../components/ThemeSwitcher.jsx";
+import { createShellChrome } from "./appShellChrome.jsx";
 
 export default function AppScreenRegistry({
   screen,
@@ -19,7 +21,6 @@ export default function AppScreenRegistry({
   AdminInvitesView,
   SplashScreen,
   MainTerminal,
-  ThemeSwitcher,
   auth,
   profile,
   googleUser,
@@ -30,19 +31,11 @@ export default function AppScreenRegistry({
   consciousnessReturnScreen,
   isAdminAuthenticated,
   maintenanceModeActive,
-  T,
-  authBtn,
-  authCard,
-  lbl,
   ADMIN_UID,
   ADMIN_EMAIL,
   listAdminUsers,
   approveAdminUser,
   blockAdminUser,
-  AMD_PHASES,
-  LED,
-  SHead,
-  TableSkeletonLoader,
   EmptyStateCard,
   SupportChatModal,
   showAdminPrompt,
@@ -84,6 +77,10 @@ export default function AppScreenRegistry({
   saveAccount,
   saveFirmRules,
 }) {
+  const T = theme;
+  const { authBtn, authCard, lbl, AMD_PHASES, LED, SHead, TableSkeletonLoader } =
+    createShellChrome(T);
+
   switch (screen) {
     case "login":
       return (
