@@ -1,7 +1,34 @@
+// ─── Commission constants (per round turn: entry + exit) ─────────────────────
+export const COMMISSION_PER_SIDE = {
+  MNQ: 0.31,   // $0.31 per side × 2 sides = $0.62 per round turn
+  MES: 0.42,   // $0.42 per side × 2 sides = $0.85 per round turn
+  default: 0.31,
+};
+const DEFAULT_CONTRACT = 1;
+
+function getCommission(instrument = "MNQ", contracts = DEFAULT_CONTRACT) {
+  const rate = COMMISSION_PER_SIDE[instrument] ?? COMMISSION_PER_SIDE.default;
+  return rate * 2 * Math.max(1, contracts); // entry + exit = round turn
+}
+
 function toNumber(value) {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   const parsed = Number.parseFloat(String(value ?? "").replace(/[^0-9.-]/g, ""));
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function toHour(dateStr = "", timeStr = "") {
+  // Parse hour from "HH:MM" time string or "YYYY-MM-DD HH:MM" full string
+  const raw = (timeStr || "").split(":")[0] || "";
+  const h = parseInt(raw, 10);
+  if (Number.isFinite(h)) return h;
+  // Fallback: parse from date string
+  const parts = (dateStr || "").split(/[-T ]/);
+  if (parts.length >= 3) {
+    const hh = parseInt(parts[3] || "0", 10);
+    return Number.isFinite(hh) ? hh : -1;
+  }
+  return -1;
 }
 
 function normalizeAmdPhase(value) {
@@ -102,12 +129,26 @@ export function computeJournalMetrics(journal = []) {
   );
 
   const equityCurve = [];
+  const hourlyProfitMap = {}; // hour 9-16 → { pnl, wins, losses, count }
   let runningPnl = 0;
+  let runningNetPnl = 0;
+  let runningHwm = 0;
+  let totalCommission = 0;
+
+  // Initialise hourly buckets for trading hours 9am–4pm
+  for (let h = 9; h <= 16; h++) {
+    hourlyProfitMap[h] = { pnl: 0, wins: 0, losses: 0, count: 0 };
+  }
 
   entries.forEach((entry, index) => {
     const phase = normalizeAmdPhase(entry?.amdPhase);
     const pnl = toNumber(entry?.pnl);
     const result = String(entry?.result || "").toLowerCase();
+    const contracts = Math.max(1, parseInt(entry?.contracts, 10) || 1);
+    const commission = getCommission(entry?.instrument, contracts);
+    const netPnl = pnl - commission;
+
+    totalCommission += commission;
 
     const bucket = amdBreakdownMap[phase] || amdBreakdownMap.UNCLEAR;
     bucket.trades += 1;
@@ -116,11 +157,28 @@ export function computeJournalMetrics(journal = []) {
     if (result === "loss") bucket.losses += 1;
 
     runningPnl += pnl;
+    runningNetPnl += netPnl;
+    runningHwm = Math.max(runningHwm, runningNetPnl); // trailing high-water mark
+
+    // Hour aggregation
+    const hour = toHour(entry?.date || "", entry?.time || "");
+    if (hour >= 9 && hour <= 16) {
+      const hb = hourlyProfitMap[hour];
+      hb.pnl += netPnl;
+      hb.count += 1;
+      if (result === "win") hb.wins += 1;
+      if (result === "loss") hb.losses += 1;
+    }
+
     equityCurve.push({
       index,
       tradeLabel: entry?.date ? String(entry.date) : `Trade ${index + 1}`,
       pnl,
+      commission,
+      netPnl,
       cumulativePnl: runningPnl,
+      cumulativeNetPnl: runningNetPnl,
+      hwm: runningHwm, // HWM at THIS trade's point
       result: result === "win" ? "win" : result === "loss" ? "loss" : "breakeven",
     });
   });
@@ -140,10 +198,25 @@ export function computeJournalMetrics(journal = []) {
     .filter((bucket) => bucket.trades > 0)
     .sort((a, b) => b.wr - a.wr || b.pnl - a.pnl)[0] || null;
 
+  // Net P&L = gross minus all commissions
+  const netPnlTotal = runningNetPnl;
+
+  // Commissions broken down by instrument
+  const commissionByInstrument = {};
+  entries.forEach((entry) => {
+    const inst = entry?.instrument || "MNQ";
+    const contracts = Math.max(1, parseInt(entry?.contracts, 10) || 1);
+    if (!commissionByInstrument[inst]) commissionByInstrument[inst] = 0;
+    commissionByInstrument[inst] += getCommission(inst, contracts);
+  });
+
   return {
     wins,
     losses,
     pnlTotal,
+    netPnlTotal,
+    totalCommission,
+    commissionByInstrument,
     wr,
     avgWin,
     avgLoss,
@@ -155,10 +228,16 @@ export function computeJournalMetrics(journal = []) {
     amdBreakdown,
     bestAmdPhase,
     equityCurve,
+    hourlyProfitMap,
   };
 }
 
 export const EMPTY_JOURNAL_METRICS = computeJournalMetrics([]);
+
+// Seed hourly buckets for the empty state
+EMPTY_JOURNAL_METRICS.hourlyProfitMap = Object.fromEntries(
+  Array.from({ length: 8 }, (_, i) => [9 + i, { pnl: 0, wins: 0, losses: 0, count: 0 }])
+);
 
 export function formatMetricNumber(value, digits = 2) {
   if (!Number.isFinite(value)) return "∞";

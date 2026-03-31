@@ -27,6 +27,9 @@ export default function TerminalJournalOverview({
             l: "TOTAL P&L",
             v: `${metrics.pnlTotal >= 0 ? "+" : ""}$${metrics.pnlTotal.toFixed(2)}`,
             c: metrics.pnlTotal >= 0 ? T.green : T.red,
+            sub: metrics.totalCommission > 0
+              ? `Net (inc. routing): ${metrics.netPnlTotal >= 0 ? "+" : ""}$${metrics.netPnlTotal.toFixed(2)} · −$${metrics.totalCommission.toFixed(2)} fees`
+              : null,
           },
           {
             l: "WIN RATE",
@@ -90,6 +93,7 @@ export default function TerminalJournalOverview({
                   fontSize: 10,
                   marginTop: 8,
                   lineHeight: 1.4,
+                  fontWeight: 500,
                 }}
               >
                 {stat.sub}
@@ -221,6 +225,11 @@ export default function TerminalJournalOverview({
                     <stop offset="0%" stopColor={T.blue} stopOpacity="0.28" />
                     <stop offset="100%" stopColor={T.blue} stopOpacity="0.02" />
                   </linearGradient>
+                  {/* Gradient for the gap fill between equity and HWM */}
+                  <linearGradient id="hwmGapFill" x1="0" x2="0" y1="0" y2="1">
+                    <stop offset="0%" stopColor={T.red} stopOpacity="0.12" />
+                    <stop offset="100%" stopColor={T.red} stopOpacity="0.03" />
+                  </linearGradient>
                 </defs>
                 <rect
                   x="0"
@@ -230,6 +239,30 @@ export default function TerminalJournalOverview({
                   rx="12"
                   fill="rgba(0,0,0,0.03)"
                 />
+
+                {/* Ghost HWM area fill (the drawdown gap) */}
+                {equityCurveView.hwmPath && (
+                  <>
+                    {/* Fill gap from equity line down to HWM */}
+                    <path
+                      d={`${equityCurveView.path} L ${equityCurveView.hwmDots[equityCurveView.hwmDots.length - 1]?.x.toFixed(2)} ${equityCurveView.hwmDots[equityCurveView.hwmDots.length - 1]?.y.toFixed(2)} L ${equityCurveView.hwmDots[0]?.x.toFixed(2)} ${equityCurveView.hwmDots[0]?.y.toFixed(2)} Z`}
+                      fill="url(#hwmGapFill)"
+                      opacity="0.6"
+                    />
+                    {/* Ghost HWM line — barely visible (opacity 0.18) */}
+                    <path
+                      d={equityCurveView.hwmPath}
+                      fill="none"
+                      stroke={T.red}
+                      strokeWidth="1.5"
+                      strokeLinejoin="round"
+                      strokeLinecap="round"
+                      opacity="0.2"
+                      strokeDasharray="4 3"
+                    />
+                  </>
+                )}
+
                 <path
                   d={`${equityCurveView.path} L 346 86 L 14 86 Z`}
                   fill="url(#equityFill)"
@@ -278,9 +311,25 @@ export default function TerminalJournalOverview({
                     : `Low -$${Math.abs(equityCurveView.min).toFixed(0)}`}
                 </span>
                 <span>
-                  End {metrics.pnlTotal >= 0 ? "+" : ""}${metrics.pnlTotal.toFixed(0)}
+                  End {metrics.netPnlTotal >= 0 ? "+" : ""}${metrics.netPnlTotal.toFixed(0)}
+                  {metrics.totalCommission > 0 && (
+                    <span style={{ opacity: 0.6 }}> net</span>
+                  )}
                 </span>
               </div>
+              {/* HWM ghost legend */}
+              {equityCurveView.hwmPath && (
+                <div style={{ display: "flex", justifyContent: "center", gap: 16, marginTop: 4 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <div style={{ width: 16, height: 1.5, background: `${T.red}35`, borderTop: `1.5px dashed ${T.red}50`, opacity: 0.5 }} />
+                    <span style={{ color: `${T.red}80`, fontSize: 9, letterSpacing: 1 }}>HWM (Ghost)</span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <div style={{ width: 10, height: 10, background: `${T.red}15`, border: `1px solid ${T.red}30`, borderRadius: 2 }} />
+                    <span style={{ color: `${T.red}80`, fontSize: 9, letterSpacing: 1 }}>Drawdown zone</span>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

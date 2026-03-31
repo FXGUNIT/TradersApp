@@ -9,6 +9,7 @@ import {
 } from "./terminalHelperComponents";
 import { CSS_VARS } from "../../styles/cssVars.js";
 import TerminalJournalOverview from "./TerminalJournalOverview.jsx";
+import TimeOfDayHeatmap from "./TimeOfDayHeatmap.jsx";
 
 const dangerTint = "var(--status-danger-soft, rgba(255,69,58,0.1))";
 const surfaceMuted = CSS_VARS.baseLayer;
@@ -35,6 +36,11 @@ export default function JournalTab({
         isJournalMetricsPending={isJournalMetricsPending}
         metrics={metrics}
       />
+
+      {/* Time-of-Day P&L Heatmap */}
+      {metrics?.hourlyProfitMap && (
+        <TimeOfDayHeatmap hourlyProfitMap={metrics.hourlyProfitMap} />
+      )}
 
       <div
         style={{

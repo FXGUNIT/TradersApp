@@ -18,6 +18,7 @@ import TerminalTradeReadinessPanel from "./TerminalTradeReadinessPanel.jsx";
 import { useTerminalOcr, OCR_STATES } from "./useTerminalOcr.js";
 import { RiskSlider } from "./RiskSlider.jsx";
 import { useDebounce } from "./useDebounce.js";
+import VerdictRadar, { deriveVerdictScores } from "./VerdictRadar.jsx";
 
 const warningTint = "var(--status-warning-soft, rgba(255,214,10,0.12))";
 const dangerTint = "var(--status-danger-soft, rgba(255,69,58,0.1))";
@@ -109,9 +110,25 @@ export default function TradeTab({
   const isOcrBusy = ocrState === OCR_STATES.LOADING || ocrState === OCR_STATES.SCANNING;
 
   // Debounced risk save — fires 800ms after the slider's onCommit (mouseUp)
+  // Debounced risk save — fires 800ms after the slider's onCommit (mouseUp)
   const debouncedSaveRisk = useDebounce((riskPct) => {
     sf("riskPct")(riskPct);
   }, 800);
+
+  // ── Verdict radar — derive 5 scores from readiness panel signals ───────
+  // All inputs come from terminalDerivedState (already computed by the worker)
+  const verdictScores = useMemo(
+    () =>
+      deriveVerdictScores({
+        extractedVals,
+        volatilityRegime,
+        vr,
+        displayedAmdPhase,
+        tradeFormRRR: f.rrr,
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [extractedVals, volatilityRegime, vr, displayedAmdPhase, f.rrr],
+  );
 
   return (
     <div>
@@ -673,6 +690,26 @@ export default function TradeTab({
             <div style={cardS({ borderLeft: `4px solid ${T.orange}` })} className="glass-panel card-tilt">
               <RenderOut text={p2Out} />
             </div>
+
+            {/* ── Supreme Verdict Synthesis Radar ─────────────────── */}
+            {verdictScores && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 20,
+                  padding: "16px 20px",
+                  background: CSS_VARS.card,
+                  border: `1px solid ${CSS_VARS.borderSubtle}`,
+                  borderRadius: 12,
+                  boxShadow: `0 1px 3px 0 ${CSS_VARS.borderSubtle}`,
+                }}
+                className="glass-panel"
+              >
+                <SHead icon="◈" title="VERDICT SYNTHESIS" color={T.purple} />
+                <VerdictRadar scores={verdictScores} size={180} animated />
+              </div>
+            )}
           </div>
         )}
       </div>
