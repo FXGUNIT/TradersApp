@@ -30,7 +30,6 @@ import emailjs from "@emailjs/browser";
 import { sendWelcomeEmail } from "./utils/email.js";
 import FloatingChatWidget from "./components/FloatingChatWidget.jsx";
 import ChatHelpline from "./components/ChatHelpline.jsx";
-import FounderCard from "./components/FounderCard.jsx";
 import MainTerminal from "./features/terminal/MainTerminal.jsx";
 import CollectiveConsciousnessPage from "./pages/CollectiveConsciousness.jsx";
 import {
@@ -105,6 +104,8 @@ import AppScreenRegistry from "./features/shell/AppScreenRegistry.jsx";
 import LoadingFallback from "./features/shell/LoadingFallback.jsx";
 import MaintenanceScreen from "./features/shell/MaintenanceScreen.jsx";
 import SplashScreen from "./features/shell/SplashScreen.jsx";
+import ShellThemeOverlay from "./features/shell/ShellThemeOverlay.jsx";
+import OfficersBriefingFooter from "./features/shell/OfficersBriefingFooter.jsx";
 import { useMaintenanceMode } from "./features/shell/useMaintenanceMode.js";
 import { useToastNotifications } from "./features/shell/useToastNotifications.js";
 import { SCREEN_IDS } from "./features/shell/screenIds.js";
@@ -2211,26 +2212,11 @@ export default function TradersRegiment() {
       }}
     >
       <section className={`app-container theme-${currentTheme}`}>
-        {![
-          SCREEN_IDS.LOADING,
-          SCREEN_IDS.HUB,
-          SCREEN_IDS.CONSCIOUSNESS,
-          SCREEN_IDS.APP,
-        ].includes(screen) && (
-          <div
-            style={{
-              position: "fixed",
-              top: 20,
-              right: 20,
-              zIndex: 180,
-            }}
-          >
-            <ThemeSwitcher
-              currentTheme={currentTheme}
-              onThemeChange={handleThemeChange}
-            />
-          </div>
-        )}
+        <ShellThemeOverlay
+          screen={screen}
+          currentTheme={currentTheme}
+          onThemeChange={handleThemeChange}
+        />
         {/* RULE #295, #296: Maintenance Mode - Show "Back Soon" screen if active, except for Master Admin */}
         {maintenanceModeActive &&
         auth?.uid !== ADMIN_UID &&
@@ -2271,195 +2257,11 @@ export default function TradersRegiment() {
           <FloatingChatWidget auth={auth} profile={profile} />
         </FeatureGuard>
 
-        {/* Officers Briefing Footer - Rotating Quotes & Founder Card */}
-        <div
-          style={{
-            marginTop: "auto",
-            backgroundColor: "#FFFFFF",
-            borderTop: "none",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: "32px",
-            padding: "60px 40px 40px 40px",
-            boxShadow:
-              "0 -1px 3px 0 rgba(0, 0, 0, 0.05), 0 -1px 2px 0 rgba(0, 0, 0, 0.04)",
-          }}
-        >
-          {/* Rotating Quote */}
-          <div style={{ textAlign: "center", maxWidth: 600 }}>
-            <div
-              style={{
-                color: "#64748B",
-                fontSize: "0.9rem",
-                fontStyle: "italic",
-                lineHeight: 1.8,
-                fontFamily: T.font,
-              }}
-            >
-              "{dailyQuote}" 🦅
-            </div>
-          </div>
-
-          {/* Founder Card */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              flexDirection: "column",
-              textAlign: "center",
-            }}
-          >
-            <FounderCard
-              linkedInUrl="https://www.linkedin.com/in/singhgunit/"
-              theme={theme}
-            />
-          </div>
-
-          {/* AI System Status — Quad-Core Intelligence Network */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "16px",
-              padding: "12px 24px",
-              borderRadius: "10px",
-              background: "linear-gradient(135deg, #F8FAFC, #F1F5F9)",
-              border: "1px solid #E2E8F0",
-              flexWrap: "wrap",
-            }}
-          >
-            <span
-              style={{
-                fontSize: "0.7rem",
-                fontWeight: 700,
-                color: "#475569",
-                letterSpacing: "0.1em",
-                textTransform: "uppercase",
-              }}
-            >
-              AI System Status
-            </span>
-            <span
-              style={{
-                fontSize: "0.64rem",
-                fontWeight: 700,
-                color: "#0369A1",
-                background: "rgba(14,165,233,0.12)",
-                border: "1px solid rgba(14,165,233,0.25)",
-                borderRadius: 999,
-                padding: "4px 8px",
-                textTransform: "uppercase",
-                letterSpacing: "0.08em",
-              }}
-            >
-              Watchtower Active
-            </span>
-            {Object.values(aiQuadCoreStatus).every(
-              (mind) => mind.status === "unconfigured",
-            ) && (
-              <span
-                style={{
-                  fontSize: "0.64rem",
-                  fontWeight: 600,
-                  color: "#64748B",
-                }}
-              >
-                Fresh provider keys needed
-              </span>
-            )}
-            {Object.entries(aiQuadCoreStatus).map(([key, mind]) => {
-              const isReserve = mind.isReserve;
-              const state = mind.status || (mind.online ? "online" : "offline");
-              const dotColor = isReserve
-                ? "#A855F7"
-                : state === "online"
-                  ? "#22C55E"
-                  : state === "unconfigured"
-                    ? "#94A3B8"
-                    : state === "checking"
-                      ? "#38BDF8"
-                      : "#EF4444";
-              const textColor = isReserve
-                ? "#7E22CE"
-                : state === "online"
-                  ? "#166534"
-                  : state === "unconfigured"
-                    ? "#475569"
-                    : state === "checking"
-                      ? "#0C4A6E"
-                      : "#991B1B";
-              const glowColor = isReserve
-                ? "rgba(168,85,247,0.5)"
-                : state === "online"
-                  ? "rgba(34,197,94,0.5)"
-                  : state === "unconfigured"
-                    ? "rgba(148,163,184,0.28)"
-                    : state === "checking"
-                      ? "rgba(56,189,248,0.35)"
-                      : "rgba(239,68,68,0.5)";
-              return (
-                <div
-                  key={key}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "6px",
-                  }}
-                  title={mind.reason || `${mind.name}: ${state}`}
-                >
-                  <div
-                    style={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: "50%",
-                      background: dotColor,
-                      boxShadow: `0 0 6px ${glowColor}`,
-                      animation: "led-pulse 2s ease-in-out infinite",
-                    }}
-                  />
-                  <span
-                    style={{
-                      fontSize: "0.68rem",
-                      fontWeight: 600,
-                      color: textColor,
-                      fontFamily: "ui-monospace, monospace",
-                    }}
-                  >
-                    {mind.name}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Security Protocol */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              flexDirection: "column",
-              textAlign: "center",
-            }}
-          >
-            <div
-              style={{
-                color: "#94A3B8",
-                fontSize: "0.75rem",
-                letterSpacing: "0.1em",
-                fontWeight: 500,
-                marginBottom: 0,
-                textTransform: "uppercase",
-              }}
-            >
-              WELCOME TO THE REGIMENT
-            </div>
-          </div>
-        </div>
+        <OfficersBriefingFooter
+          dailyQuote={dailyQuote}
+          theme={theme}
+          quadCoreStatus={aiQuadCoreStatus}
+        />
       </section>
     </AppShellProvider>
   );
