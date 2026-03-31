@@ -1267,8 +1267,8 @@ export default function MainTerminal({
   const csvStatusText = isCsvParsing
     ? "Parsing CSV..."
     : parseMsg || "Drop NinjaTrader .txt / .csv — or click to browse";
-  const csvStatusColor = hasParsedCsv ? T.green : isCsvParsing ? T.blue : "#6B7280";
-  const csvBorderColor = hasParsedCsv ? T.green : isCsvParsing ? T.blue : "#E5E7EB";
+  const csvStatusColor = hasParsedCsv ? T.green : isCsvParsing ? T.blue : CSS_VARS.textSecondary;
+  const csvBorderColor = hasParsedCsv ? T.green : isCsvParsing ? T.blue : CSS_VARS.borderSubtle;
   const resetScopeByTab = {
     premarket: "premarket",
     trade: "trade",
@@ -1785,7 +1785,7 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
       {/* Header */}
       <div style={{ 
         background: CSS_VARS.card, 
-        borderBottom: `1px solid #E5E7EB`, 
+        borderBottom: `1px solid ${CSS_VARS.borderSubtle}`, 
         padding: "16px 32px", 
         display: "flex", 
         alignItems: "center", 

@@ -1,4 +1,4 @@
-import { dbM, dbR, dbW } from "../../utils/firebaseDbUtils.js";
+import { dbR, dbW } from "../../utils/firebaseDbUtils.js";
 import {
   fetchTerminalWorkspace,
   normalizeWorkspaceResponse,
@@ -37,24 +37,16 @@ function normalizeJournalPayload(journal) {
   return {};
 }
 
-async function mirrorLegacyWorkspace(uid, token, workspace) {
-  const legacyPayload = {};
-
-  if (workspace?.journal !== undefined) {
-    legacyPayload.journal = normalizeJournalPayload(workspace.journal);
+function readLegacyWorkspace(legacy = null) {
+  if (!legacy || typeof legacy !== "object") {
+    return null;
   }
 
-  if (workspace?.accountState !== undefined) {
-    legacyPayload.accountState = workspace.accountState || {};
-  }
-
-  if (workspace?.firmRules !== undefined) {
-    legacyPayload.firmRules = workspace.firmRules || {};
-  }
-
-  if (Object.keys(legacyPayload).length > 0) {
-    await dbM(`users/${uid}`, legacyPayload, token);
-  }
+  return normalizeWorkspace({
+    journal: legacy.journal || {},
+    accountState: legacy.accountState || {},
+    firmRules: legacy.firmRules || {},
+  });
 }
 
 export async function loadWorkspace(uid, token) {
@@ -81,13 +73,7 @@ export async function loadWorkspace(uid, token) {
   }
 
   const legacy = await dbR(`users/${uid}`, token);
-  if (!legacy) return null;
-
-  return normalizeWorkspace({
-    journal: legacy.journal || {},
-    accountState: legacy.accountState || {},
-    firmRules: legacy.firmRules || {},
-  });
+  return readLegacyWorkspace(legacy);
 }
 
 export async function saveWorkspace(uid, token, workspace) {
@@ -104,13 +90,13 @@ export async function saveWorkspace(uid, token, workspace) {
   if (hasBff()) {
     try {
       await upsertTerminalWorkspace(uid, payload);
+      return payload;
     } catch (error) {
       console.warn("BFF terminal workspace save failed, falling back to Firebase:", error);
     }
   }
 
   await dbW(`terminal/workspaces/${uid}`, payload, token);
-  await mirrorLegacyWorkspace(uid, token, payload);
   return payload;
 }
 
@@ -124,13 +110,13 @@ export async function saveJournal(uid, token, journal) {
   if (hasBff()) {
     try {
       await putTerminalJournal(uid, payload);
+      return payload;
     } catch (error) {
       console.warn("BFF terminal journal save failed, falling back to Firebase:", error);
     }
   }
 
-  await dbM(`terminal/workspaces/${uid}`, { journal: payload }, token);
-  await dbW(`users/${uid}/journal`, payload, token);
+  await dbW(`terminal/workspaces/${uid}/journal`, payload, token);
   return payload;
 }
 
@@ -144,6 +130,7 @@ export async function saveAccountState(uid, token, accountState) {
   if (hasBff()) {
     try {
       await putTerminalAccountState(uid, payload);
+      return payload;
     } catch (error) {
       console.warn(
         "BFF terminal account state save failed, falling back to Firebase:",
@@ -152,8 +139,7 @@ export async function saveAccountState(uid, token, accountState) {
     }
   }
 
-  await dbM(`terminal/workspaces/${uid}`, { accountState: payload }, token);
-  await dbW(`users/${uid}/accountState`, payload, token);
+  await dbW(`terminal/workspaces/${uid}/accountState`, payload, token);
   return payload;
 }
 
@@ -167,6 +153,7 @@ export async function saveFirmRules(uid, token, firmRules) {
   if (hasBff()) {
     try {
       await putTerminalFirmRules(uid, payload);
+      return payload;
     } catch (error) {
       console.warn(
         "BFF terminal firm rules save failed, falling back to Firebase:",
@@ -175,8 +162,7 @@ export async function saveFirmRules(uid, token, firmRules) {
     }
   }
 
-  await dbM(`terminal/workspaces/${uid}`, { firmRules: payload }, token);
-  await dbW(`users/${uid}/firmRules`, payload, token);
+  await dbW(`terminal/workspaces/${uid}/firmRules`, payload, token);
   return payload;
 }
 

@@ -4,34 +4,34 @@
 import { CSS_VARS } from "../../styles/cssVars.js";
 
 const getCSSVar = (varName, fallback) => {
-  if (typeof document === 'undefined') return fallback;
+  if (typeof document === "undefined") return fallback;
   return getComputedStyle(document.documentElement).getPropertyValue(varName).trim() || fallback;
 };
 
 export const getThemeColors = () => ({
-  text: getCSSVar('--aura-text-primary', '#111827'),
-  muted: getCSSVar('--aura-text-secondary', '#6B7280'),
-  bg: getCSSVar('--aura-base-layer', '#F9FAFB'),
-  card: getCSSVar('--aura-surface-elevated', '#FFFFFF'),
-  border: getCSSVar('--aura-border-subtle', 'rgba(0,0,0,0.08)'),
-  accent: getCSSVar('--aura-accent-primary', '#3B82F6'),
+  text: getCSSVar("--aura-text-primary", CSS_VARS.textPrimary),
+  muted: getCSSVar("--aura-text-secondary", CSS_VARS.textSecondary),
+  bg: getCSSVar("--aura-base-layer", CSS_VARS.baseLayer),
+  card: getCSSVar("--aura-surface-elevated", CSS_VARS.surfaceElevated),
+  border: getCSSVar("--aura-border-subtle", CSS_VARS.borderSubtle),
+  accent: getCSSVar("--aura-accent-primary", CSS_VARS.accentPrimary),
 });
 
 export const T = {
-  text: "#111827",
-  muted: "#6B7280",
-  dim: "rgba(0,0,0,0.25)",
-  blue: "#3B82F6",
-  orange: "#F97316",
-  purple: "#A855F7",
-  green: "#22C55E",
-  red: "#EF4444",
-  gold: "#FBBF24",
-  cyan: "#06B6D4",
-  amdA: "#10B981",
-  amdM: "#F97316",
-  amdD: "#EF4444",
-  amdT: "#8B5CF6",
+  text: CSS_VARS.textPrimary,
+  muted: CSS_VARS.textSecondary,
+  dim: CSS_VARS.textTertiary,
+  blue: CSS_VARS.statusInfo,
+  orange: CSS_VARS.statusWarning,
+  purple: CSS_VARS.amdManipulation,
+  green: CSS_VARS.statusSuccess,
+  red: CSS_VARS.statusDanger,
+  gold: CSS_VARS.statusWarning,
+  cyan: CSS_VARS.statusInfo,
+  amdA: CSS_VARS.amdAccumulation,
+  amdM: CSS_VARS.amdManipulation,
+  amdD: CSS_VARS.amdDistribution,
+  amdT: CSS_VARS.amdTransition,
   font: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif",
   mono: "'SF Mono', 'Menlo', 'Monaco', 'Courier New', monospace",
 };
@@ -77,8 +77,8 @@ export const getInputStyle = () => {
 };
 
 export const inp = { 
-  background: "#F9FAFB", 
-  border: `1px solid rgba(0,0,0,0.08)`, 
+  background: CSS_VARS.baseLayer,
+  border: `1px solid ${CSS_VARS.borderSubtle}`,
   borderRadius: 8, 
   padding: "12px 14px", 
   color: T.text, 
@@ -106,12 +106,12 @@ export const cardS = (e = {}) => {
 };
 
 export const glowBtn = (color, disabled) => ({ 
-  background: disabled ? "#f3f4f6" : "var(--aura-surface-elevated, #1a1a1a)", 
-  border: disabled ? "1px solid #e5e7eb" : "1px solid var(--aura-border-subtle, #1a1a1a)", 
+  background: disabled ? CSS_VARS.baseLayer : CSS_VARS.surfaceElevated,
+  border: `1px solid ${CSS_VARS.borderSubtle}`,
   borderRadius: 6, 
   padding: "12px 24px", 
   cursor: disabled ? "not-allowed" : "pointer", 
-  color: disabled ? "#9ca3af" : "var(--aura-text-primary, #ffffff)", 
+  color: disabled ? CSS_VARS.textTertiary : CSS_VARS.textPrimary, 
   fontFamily: T.font, 
   fontSize: 12, 
   fontWeight: 700, 
@@ -121,7 +121,7 @@ export const glowBtn = (color, disabled) => ({
 });
 
 export const lbl = { 
-  color: "var(--aura-text-secondary, #64748B)", 
+  color: CSS_VARS.textSecondary, 
   fontSize: 11, 
   letterSpacing: 1.5, 
   marginBottom: 6, 
@@ -198,7 +198,7 @@ export function Field({ label, type = "text", value, onChange, placeholder, opti
           disabled={disabled} 
           style={{ 
             ...inp, 
-            borderColor: highlight ? T.green : "rgba(255,255,255,0.12)", 
+            borderColor: highlight ? T.green : CSS_VARS.borderSubtle, 
             opacity: disabled ? 0.5 : 1, 
             fontFamily: T.font 
           }} 
@@ -215,7 +215,7 @@ export function Field({ label, type = "text", value, onChange, placeholder, opti
           disabled={disabled} 
           style={{ 
             ...inp, 
-            borderColor: highlight ? T.green : "rgba(255,255,255,0.12)", 
+            borderColor: highlight ? T.green : CSS_VARS.borderSubtle, 
             opacity: disabled ? 0.5 : 1, 
             fontFamily: mono ? T.mono : T.font 
           }} 
