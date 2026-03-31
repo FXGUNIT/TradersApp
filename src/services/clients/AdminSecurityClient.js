@@ -1,9 +1,3 @@
-import {
-  approveUser as approveLegacyUser,
-  blockUser as blockLegacyUser,
-  listUsers as listLegacyUsers,
-  lockUser as lockLegacyUser,
-} from "../adminService.js";
 import { sendApprovalConfirmationEmail } from "../emailService.js";
 import {
   approveAdminUser as approveAdminUserGateway,
@@ -13,10 +7,8 @@ import {
   lockAdminUser as lockAdminUserGateway,
   toggleMaintenanceState as toggleMaintenanceStateGateway,
 } from "../gateways/adminGateway.js";
-import { hasBff } from "../gateways/base.js";
+import { createBffUnavailableResult, hasBff } from "../gateways/base.js";
 import { sendSecurityAlert } from "../telegramService.js";
-
-const MAINTENANCE_STORAGE_KEY = "TradersApp_MaintenanceMode";
 
 function normalizeUsers(users) {
   if (!users) {
@@ -47,160 +39,149 @@ function normalizeResponse(result, fallback = {}) {
   };
 }
 
-function readLocalMaintenanceState() {
-  try {
-    return localStorage.getItem(MAINTENANCE_STORAGE_KEY) === "true";
-  } catch {
-    return false;
-  }
-}
-
-function writeLocalMaintenanceState(enabled) {
-  try {
-    localStorage.setItem(MAINTENANCE_STORAGE_KEY, String(Boolean(enabled)));
-  } catch {
-    // localStorage is a best-effort compatibility cache.
-  }
-}
-
 export async function approveUser(uid, adminUid) {
-  if (hasBff()) {
-    const response = await approveAdminUserGateway(uid, adminUid);
-    const normalized = normalizeResponse(response, {
-      user: response?.user || { uid, approvedBy: adminUid },
+  if (!hasBff()) {
+    return createBffUnavailableResult("approveUser", {
+      user: null,
+      uid,
+      approvedBy: adminUid,
     });
-    if (normalized) {
-      if (normalized.user?.email) {
-        void sendApprovalConfirmationEmail(
-          normalized.user.email,
-          normalized.user.fullName,
-        );
-      }
-      if (normalized.user?.email) {
-        void sendSecurityAlert("USER_APPROVED", {
-          uid,
-          email: normalized.user.email,
-          approvedBy: adminUid,
-        });
-      }
-      return normalized;
-    }
   }
 
-  const legacyResult = await approveLegacyUser(uid, adminUid);
-  if (legacyResult?.success) {
-    return legacyResult;
+  const response = await approveAdminUserGateway(uid, adminUid);
+  const normalized = normalizeResponse(response, {
+    user: response?.user || { uid, approvedBy: adminUid },
+  });
+  if (normalized?.user?.email) {
+    void sendApprovalConfirmationEmail(
+      normalized.user.email,
+      normalized.user.fullName,
+    );
+    void sendSecurityAlert("USER_APPROVED", {
+      uid,
+      email: normalized.user.email,
+      approvedBy: adminUid,
+    });
   }
 
-  return legacyResult;
+  return normalized || createBffUnavailableResult("approveUser", {
+    user: null,
+    uid,
+    approvedBy: adminUid,
+  });
 }
 
 export async function blockUser(uid, adminUid) {
-  if (hasBff()) {
-    const response = await blockAdminUserGateway(uid, adminUid);
-    const normalized = normalizeResponse(response, {
-      user: response?.user || { uid, blockedBy: adminUid },
+  if (!hasBff()) {
+    return createBffUnavailableResult("blockUser", {
+      user: null,
+      uid,
+      blockedBy: adminUid,
     });
-    if (normalized) {
-      return normalized;
-    }
   }
 
-  const legacyResult = await blockLegacyUser(uid, adminUid);
-  if (legacyResult?.success) {
-    return legacyResult;
-  }
-
-  return legacyResult;
+  const response = await blockAdminUserGateway(uid, adminUid);
+  return (
+    normalizeResponse(response, {
+      user: response?.user || { uid, blockedBy: adminUid },
+    }) ||
+    createBffUnavailableResult("blockUser", {
+      user: null,
+      uid,
+      blockedBy: adminUid,
+    })
+  );
 }
 
 export async function lockUser(uid, adminUid) {
-  if (hasBff()) {
-    const response = await lockAdminUserGateway(uid, adminUid);
-    const normalized = normalizeResponse(response, {
-      user: response?.user || { uid, lockedBy: adminUid },
+  if (!hasBff()) {
+    return createBffUnavailableResult("lockUser", {
+      user: null,
+      uid,
+      lockedBy: adminUid,
     });
-    if (normalized) {
-      return normalized;
-    }
   }
 
-  const legacyResult = await lockLegacyUser(uid, adminUid);
-  if (legacyResult?.success) {
-    return legacyResult;
-  }
-
-  return legacyResult;
+  const response = await lockAdminUserGateway(uid, adminUid);
+  return (
+    normalizeResponse(response, {
+      user: response?.user || { uid, lockedBy: adminUid },
+    }) ||
+    createBffUnavailableResult("lockUser", {
+      user: null,
+      uid,
+      lockedBy: adminUid,
+    })
+  );
 }
 
 export async function listUsers() {
-  if (hasBff()) {
-    const response = await fetchAdminUsersGateway();
-    const normalized = normalizeResponse(response, {
-      users: normalizeUsers(
-        response?.users || response?.list || response?.data?.users,
-      ),
-    });
-    if (normalized) {
-      normalized.users = normalizeUsers(normalized.users);
-      return normalized;
-    }
+  if (!hasBff()) {
+    return createBffUnavailableResult("listUsers", { users: {} });
   }
 
-  const legacy = await listLegacyUsers();
-  if (legacy?.success && legacy?.users) {
-    legacy.users = normalizeUsers(legacy.users);
-    return legacy;
+  const response = await fetchAdminUsersGateway();
+  const normalized = normalizeResponse(response, {
+    users: normalizeUsers(
+      response?.users || response?.list || response?.data?.users,
+    ),
+  });
+  if (normalized) {
+    normalized.users = normalizeUsers(normalized.users);
+    return normalized;
   }
 
-  if (legacy?.users) {
-    legacy.users = normalizeUsers(legacy.users);
-  }
-  return legacy;
+  return createBffUnavailableResult("listUsers", { users: {} });
 }
 
 export async function fetchMaintenanceState() {
-  if (hasBff()) {
-    const response = await fetchMaintenanceStateGateway();
-    const normalized = normalizeResponse(response, {
-      maintenanceActive: Boolean(
-        response?.maintenanceActive ?? response?.enabled ?? response?.active,
-      ),
+  if (!hasBff()) {
+    return createBffUnavailableResult("fetchMaintenanceState", {
+      maintenanceActive: false,
     });
-    if (normalized) {
-      normalized.maintenanceActive = Boolean(
-        normalized.maintenanceActive ?? normalized.enabled ?? normalized.active,
-      );
-      writeLocalMaintenanceState(normalized.maintenanceActive);
-      return normalized;
-    }
   }
 
-  return { success: true, maintenanceActive: readLocalMaintenanceState() };
+  const response = await fetchMaintenanceStateGateway();
+  const normalized = normalizeResponse(response, {
+    maintenanceActive: Boolean(
+      response?.maintenanceActive ?? response?.enabled ?? response?.active,
+    ),
+  });
+  if (normalized) {
+    normalized.maintenanceActive = Boolean(
+      normalized.maintenanceActive ?? normalized.enabled ?? normalized.active,
+    );
+    return normalized;
+  }
+
+  return createBffUnavailableResult("fetchMaintenanceState", {
+    maintenanceActive: false,
+  });
 }
 
 export async function toggleMaintenanceState(enabled) {
-  if (hasBff()) {
-    const response = await toggleMaintenanceStateGateway(enabled);
-    const normalized = normalizeResponse(response, {
-      maintenanceActive: Boolean(
-        response?.maintenanceActive ?? response?.enabled ?? enabled,
-      ),
+  if (!hasBff()) {
+    return createBffUnavailableResult("toggleMaintenanceState", {
+      maintenanceActive: Boolean(enabled),
     });
-    if (normalized) {
-      normalized.maintenanceActive = Boolean(
-        normalized.maintenanceActive ?? normalized.enabled ?? enabled,
-      );
-      writeLocalMaintenanceState(normalized.maintenanceActive);
-      return normalized;
-    }
   }
 
-  writeLocalMaintenanceState(enabled);
-  return {
-    success: true,
+  const response = await toggleMaintenanceStateGateway(enabled);
+  const normalized = normalizeResponse(response, {
+    maintenanceActive: Boolean(
+      response?.maintenanceActive ?? response?.enabled ?? enabled,
+    ),
+  });
+  if (normalized) {
+    normalized.maintenanceActive = Boolean(
+      normalized.maintenanceActive ?? normalized.enabled ?? enabled,
+    );
+    return normalized;
+  }
+
+  return createBffUnavailableResult("toggleMaintenanceState", {
     maintenanceActive: Boolean(enabled),
-  };
+  });
 }
 
 export default {

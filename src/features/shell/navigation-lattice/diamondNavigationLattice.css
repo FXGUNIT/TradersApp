@@ -3,6 +3,36 @@
   inset: 0;
   pointer-events: none;
   z-index: 9999;
+  --aura-lattice-surface-start: color-mix(
+    in srgb,
+    var(--aura-surface-elevated, #ffffff) 94%,
+    var(--aura-base-layer, #fbfbfc)
+  );
+  --aura-lattice-surface-end: color-mix(
+    in srgb,
+    var(--aura-base-layer, #fbfbfc) 90%,
+    var(--aura-accent-primary, #2563eb) 4%
+  );
+  --aura-lattice-glow: color-mix(
+    in srgb,
+    var(--aura-gem-glow, rgba(37, 99, 235, 0.35)) 72%,
+    transparent
+  );
+  --aura-lattice-light-catch: color-mix(
+    in srgb,
+    var(--aura-text-primary, #121212) 28%,
+    transparent
+  );
+  --aura-lattice-shadow: 0 4px 15px color-mix(
+      in srgb,
+      var(--aura-text-primary, #000000) 20%,
+      transparent
+    ),
+    inset 0 1px 1px color-mix(
+      in srgb,
+      var(--aura-surface-elevated, #ffffff) 28%,
+      transparent
+    );
 }
 
 .aura-smart-arrow {
@@ -19,14 +49,16 @@
   color: var(--aura-text-primary, #121212);
   background: linear-gradient(
     135deg,
-    var(--aura-surface-elevated, #ffffff) 0%,
-    var(--aura-base-layer, #fbfbfc) 100%
+    var(--aura-lattice-surface-start) 0%,
+    var(--aura-lattice-surface-end) 100%
   );
-  box-shadow:
-    0 4px 15px rgba(0, 0, 0, 0.2),
-    inset 0 1px 1px rgba(255, 255, 255, 0.3);
-  border-left: 1px solid rgba(255, 255, 255, 0.4);
-  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: var(--aura-lattice-shadow);
+  border-left: 1px solid var(--aura-lattice-light-catch);
+  border-top: 1px solid color-mix(
+    in srgb,
+    var(--aura-lattice-light-catch) 58%,
+    transparent
+  );
   border-right: 1px solid var(--aura-border-subtle, rgba(0, 0, 0, 0.08));
   border-bottom: 1px solid var(--aura-border-subtle, rgba(0, 0, 0, 0.08));
   transition:
@@ -62,8 +94,12 @@
 .aura-smart-arrow:hover {
   transform: scale(1.15);
   box-shadow:
-    0 0 20px var(--aura-gem-glow, rgba(37, 99, 235, 0.35)),
-    0 10px 20px rgba(0, 0, 0, 0.2);
+    0 0 20px var(--aura-lattice-glow),
+    0 10px 20px color-mix(
+      in srgb,
+      var(--aura-text-primary, #000000) 18%,
+      transparent
+    );
 }
 
 .aura-smart-arrow:active {
@@ -73,7 +109,11 @@
 .aura-smart-arrow--restricted {
   animation: auraArrowRestrictedShake 200ms ease-in-out;
   box-shadow:
-    0 0 16px var(--aura-status-danger, #ef4444),
+    0 0 16px color-mix(
+      in srgb,
+      var(--aura-status-danger, #ef4444) 86%,
+      transparent
+    ),
     0 0 2px var(--aura-status-danger, #ef4444);
 }
 
@@ -92,7 +132,11 @@
   top: 7px;
   right: 7px;
   background: var(--aura-accent-primary, #2563eb);
-  box-shadow: 0 0 8px var(--aura-accent-primary, #2563eb);
+  box-shadow: 0 0 8px color-mix(
+    in srgb,
+    var(--aura-accent-primary, #2563eb) 85%,
+    transparent
+  );
   animation: auraArrowBling 10s ease-in-out infinite;
   z-index: 3;
 }
@@ -101,7 +145,11 @@
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  border: 1px solid color-mix(in srgb, var(--aura-accent-primary, #2563eb) 45%, transparent);
+  border: 1px solid color-mix(
+    in srgb,
+    var(--aura-accent-primary, #2563eb) 45%,
+    transparent
+  );
   opacity: 0;
   z-index: 1;
 }
@@ -165,21 +213,53 @@
 }
 
 :root[data-aura-theme="amber"] .aura-smart-arrow {
-  color: color-mix(in srgb, var(--aura-text-primary, #3d2b1f) 88%, #2d1e14);
+  color: color-mix(
+    in srgb,
+    var(--aura-text-primary, #3d2b1f) 88%,
+    var(--aura-base-layer, #2d1e14)
+  );
   background: linear-gradient(
     135deg,
-    color-mix(in srgb, var(--aura-surface-elevated, #fdf6e3) 88%, #c67a2a) 0%,
-    color-mix(in srgb, var(--aura-base-layer, #f4ebd0) 82%, #9a5b1d) 100%
+    color-mix(
+      in srgb,
+      var(--aura-surface-elevated, #fdf6e3) 88%,
+      var(--aura-accent-primary, #c67a2a)
+    ) 0%,
+    color-mix(
+      in srgb,
+      var(--aura-base-layer, #f4ebd0) 82%,
+      var(--aura-border-subtle, #9a5b1d)
+    ) 100%
   );
 }
 
 :root[data-aura-theme="midnight"] .aura-smart-arrow {
   color: var(--aura-text-primary, #e1e1e1);
-  background: linear-gradient(135deg, #1a1a1b 0%, #05070a 100%);
-  border-left: 1px solid rgba(255, 255, 255, 0.4);
-  border-top: 1px solid rgba(255, 255, 255, 0.2);
-  border-right: 1px solid rgba(255, 255, 255, 0.06);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--aura-base-layer, #1a1a1b) 98%, #05070a) 0%,
+    color-mix(in srgb, #05070a 90%, var(--aura-base-layer, #1a1a1b)) 100%
+  );
+  border-left: 1px solid color-mix(
+    in srgb,
+    var(--aura-text-primary, #ffffff) 40%,
+    transparent
+  );
+  border-top: 1px solid color-mix(
+    in srgb,
+    var(--aura-text-primary, #ffffff) 20%,
+    transparent
+  );
+  border-right: 1px solid color-mix(
+    in srgb,
+    var(--aura-text-primary, #ffffff) 6%,
+    transparent
+  );
+  border-bottom: 1px solid color-mix(
+    in srgb,
+    var(--aura-text-primary, #ffffff) 6%,
+    transparent
+  );
 }
 
 @media (max-width: 768px) {

@@ -1,6 +1,4 @@
-import { onValue, push, ref, set } from "firebase/database";
-import { db } from "../firebase.js";
-import { hasBff } from "../gateways/base.js";
+import { createBffUnavailableResult, hasBff } from "../gateways/base.js";
 import {
   createSupportMessage,
   fetchSupportThread,
@@ -39,87 +37,67 @@ function mapMessages(snapshotValue) {
 export async function ensureWelcomeMessage(userId, userEmail) {
   if (!userId) return { success: false, skipped: true };
 
-  if (hasBff()) {
-    const threadResponse = await fetchSupportThread(userId);
-    const messages = mapMessages(threadResponse?.thread || {});
-    const hasWelcome = messages.some((message) => message.type === "welcome");
-
-    if (hasWelcome) {
-      return { success: true, skipped: true };
-    }
-
-    const response = await createSupportMessage(userId, {
-      text: `Welcome to TradersApp Support. Your account: ${userEmail}\n\nHow can we help you today?`,
-      sender: "admin",
-      email: userEmail,
-      type: "welcome",
-      timestamp: Date.now(),
+  if (!hasBff()) {
+    return createBffUnavailableResult("ensureWelcomeMessage", {
+      skipped: true,
     });
-    return { success: Boolean(response?.ok) };
   }
 
-  if (!db) return { success: false, skipped: true };
+  const threadResponse = await fetchSupportThread(userId);
+  const messages = mapMessages(threadResponse?.thread || {});
+  const hasWelcome = messages.some((message) => message.type === "welcome");
 
-  const welcomeRef = ref(db, `support_chats/${userId}/messages`);
-  await push(welcomeRef, {
+  if (hasWelcome) {
+    return { success: true, skipped: true };
+  }
+
+  const response = await createSupportMessage(userId, {
     text: `Welcome to TradersApp Support. Your account: ${userEmail}\n\nHow can we help you today?`,
     sender: "admin",
-    timestamp: Date.now(),
+    email: userEmail,
     type: "welcome",
+    timestamp: Date.now(),
   });
-
-  return { success: true };
+  return response?.ok
+    ? { success: true }
+    : createBffUnavailableResult("ensureWelcomeMessage", {
+        skipped: true,
+      });
 }
 
 export function subscribeToSupportThread(userId, handlers) {
   if (!userId) return () => {};
 
-  if (hasBff()) {
-    let active = true;
-
-    const loadThread = async () => {
-      try {
-        const response = await fetchSupportThread(userId);
-        if (!active) {
-          return;
-        }
-
-        if (!response?.thread) {
-          handlers?.onEmpty?.();
-          return;
-        }
-
-        handlers?.onMessages?.(mapMessages(response.thread));
-      } catch (error) {
-        handlers?.onError?.(error);
-      }
-    };
-
-    void loadThread();
-    const intervalId = window.setInterval(loadThread, 3000);
-    return () => {
-      active = false;
-      window.clearInterval(intervalId);
-    };
+  if (!hasBff()) {
+    return () => {};
   }
 
-  if (!db) return () => {};
+  let active = true;
 
-  const chatRef = ref(db, `support_chats/${userId}`);
-  return onValue(
-    chatRef,
-    async (snapshot) => {
-      const data = snapshot.val();
-      if (data === null) {
+  const loadThread = async () => {
+    try {
+      const response = await fetchSupportThread(userId);
+      if (!active) {
+        return;
+      }
+
+      if (!response?.thread) {
         handlers?.onEmpty?.();
         return;
       }
-      handlers?.onMessages?.(mapMessages(data));
-    },
-    (error) => {
+
+      handlers?.onMessages?.(mapMessages(response.thread));
+    } catch (error) {
       handlers?.onError?.(error);
-    },
-  );
+    }
+  };
+
+  void loadThread();
+  const intervalId = window.setInterval(loadThread, 3000);
+  return () => {
+    active = false;
+    window.clearInterval(intervalId);
+  };
 }
 
 export async function sendSupportMessage({ userId, userEmail, text }) {
@@ -127,29 +105,11 @@ export async function sendSupportMessage({ userId, userEmail, text }) {
     return { success: false, error: "Missing support message payload" };
   }
 
-  if (hasBff()) {
-    const response = await createSupportMessage(userId, {
-      text: text.trim(),
-      sender: "user",
-      timestamp: Date.now(),
-      email: userEmail,
-    });
-
-    await notifyAdminOfSupportRequest(userEmail, text.trim()).catch((error) => {
-      console.warn("Telegram notification failed:", error);
-    });
-
-    return { success: Boolean(response?.ok) };
+  if (!hasBff()) {
+    return createBffUnavailableResult("sendSupportMessage");
   }
 
-  if (!db) {
-    return { success: false, error: "Missing support message payload" };
-  }
-
-  const messagesRef = ref(db, `support_chats/${userId}/messages`);
-  const newMessageRef = push(messagesRef);
-
-  await set(newMessageRef, {
+  const response = await createSupportMessage(userId, {
     text: text.trim(),
     sender: "user",
     timestamp: Date.now(),
@@ -160,7 +120,9 @@ export async function sendSupportMessage({ userId, userEmail, text }) {
     console.warn("Telegram notification failed:", error);
   });
 
-  return { success: true };
+  return response?.ok
+    ? { success: true }
+    : createBffUnavailableResult("sendSupportMessage");
 }
 
 export default {

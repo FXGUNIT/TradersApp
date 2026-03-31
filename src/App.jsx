@@ -18,7 +18,7 @@ import {
   createUserWithEmailAndPassword,
   signOut,
 } from "firebase/auth";
-import { getDatabase, ref, onValue } from "firebase/database";
+import { getDatabase } from "firebase/database";
 import emailjs from "@emailjs/browser";
 import { sendWelcomeEmail } from "./utils/email.js";
 import FloatingChatWidget from "./components/FloatingChatWidget.jsx";
@@ -33,22 +33,12 @@ import {
   startAIStatusScheduler,
   stopAIStatusScheduler,
 } from "./services/ai-router.js";
-import { firebaseOptimizer } from "./services/firebase.js";
 import AiEnginesStatus from "./components/AiEnginesStatus.jsx";
-import { setupConsoleInterceptor } from "./services/telemetry.js";
-import { setupNetworkMonitor } from "./services/networkMonitor.js";
-import { setupTTITracker } from "./services/ttiTracker.js";
 import {
   calculateVolatilityRatio,
   getDynamicParameters,
   calculateThrottledRisk,
 } from "./utils/math-engine.js";
-import { exposePerformanceTestToWindow } from "./services/performanceTestRunner.js";
-import { exposeSecurityAPIToWindow } from "./services/securityMonitor.js";
-import { initLeakagePrevention } from "./services/leakagePreventionModule.js";
-import { initSocialEngineeringDetection } from "./services/socialEngineeringDetectionModule.js";
-import { testTelegramConnectivity } from "./services/telegramDiagnostics.js";
-import { initTelegramMonitor } from "./services/telegramMonitor.js";
 import {
   TradersRegimentWatermark,
   ExchangeFacilityBadge,
@@ -86,7 +76,6 @@ import {
 } from "./utils/securityAlertUtils.js";
 import {
   triggerConfetti,
-  createCardTiltHandler,
 } from "./utils/uiUtils.js";
 import { copyToClipboard } from "./utils/searchUtils.jsx";
 import {
@@ -110,6 +99,14 @@ import OfficersBriefingFooter from "./features/shell/OfficersBriefingFooter.jsx"
 import { useMaintenanceMode } from "./features/shell/useMaintenanceMode.js";
 import { useToastNotifications } from "./features/shell/useToastNotifications.js";
 import { useTerminalWorkspaceHydration } from "./features/shell/useTerminalWorkspaceHydration.js";
+import { useAdminDiagnosticsEffects } from "./features/shell/useAdminDiagnosticsEffects.js";
+import { useTelegramDiagnosticsAuditEffect } from "./features/shell/useTelegramDiagnosticsAuditEffect.js";
+import { useAdminSessionRestoreEffect } from "./features/shell/useAdminSessionRestoreEffect.js";
+import { useDashboardMotionEffect } from "./features/shell/useDashboardMotionEffect.js";
+import { useConnectionStatusEffect } from "./features/shell/useConnectionStatusEffect.js";
+import { useResizeOptimizationEffect } from "./features/shell/useResizeOptimizationEffect.js";
+import { useFirebaseHeartbeatEffect } from "./features/shell/useFirebaseHeartbeatEffect.js";
+import { useDevAuditHarnessEffect } from "./features/shell/useDevAuditHarnessEffect.js";
 import { useAuthSessionHandlers } from "./features/identity/useAuthSessionHandlers.js";
 import { SCREEN_IDS } from "./features/shell/screenIds.js";
 import DiamondNavigationLattice from "./features/shell/navigation-lattice/DiamondNavigationLattice.jsx";
@@ -289,7 +286,6 @@ const _gpuSupport = detectGPUSupport();
 // are imported from ./utils/math-engine.js
 
 // ai-router is now imported from ./services/ai-router.js
-// firebaseOptimizer is imported from ./services/firebase.js
 
 // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 //  TOAST NOTIFICATION SYSTEM
@@ -426,392 +422,63 @@ export default function TradersRegiment() {
   const [debugComponentStatus] = useState({});
   const [debugOverlayOpen, setDebugOverlayOpen] = useState(false);
 
-  // Intercept console logs using modular telemetry service
-  useEffect(() => {
-    if (!isAdminAuthenticated) return;
-    const restoreConsole = setupConsoleInterceptor(setDebugLogs);
-    const restoreNetwork = setupNetworkMonitor(setDebugLatencies);
-    return () => {
-      restoreConsole();
-      restoreNetwork();
-    };
-  }, [isAdminAuthenticated]);
+  useAdminDiagnosticsEffects({
+    isAdminAuthenticated,
+    setDebugLogs,
+    setDebugLatencies,
+    setDebugTTI,
+    showToast,
+    telegramToken: TELEGRAM_TOKEN,
+    telegramChatId: TELEGRAM_CHAT_ID,
+  });
 
-  // Measure Time-to-Interactive (TTI) using modular tracker
-  useEffect(() => {
-    if (!isAdminAuthenticated) return;
-    const restoreTTI = setupTTITracker(setDebugTTI);
-    return restoreTTI;
-  }, [isAdminAuthenticated]);
+  useTelegramDiagnosticsAuditEffect({
+    enableTelegramDiagnostics,
+    telegramToken: TELEGRAM_TOKEN,
+    telegramChatId: TELEGRAM_CHAT_ID,
+  });
 
-  // Initialize Performance Tests for institutional benchmarking
-  useEffect(() => {
-    if (isAdminAuthenticated) {
-      try {
-        /* eslint-disable no-console */
-        exposePerformanceTestToWindow();
-        console.log(
-          "âœ… Performance tests initialized - accessible via window.__performanceTest",
-        );
+  useAdminSessionRestoreEffect({
+    firebaseAuth,
+    setIsAdminAuthenticated,
+    setScreen,
+    setIsInitialLoading,
+    authBootstrapCompleteRef,
+  });
 
-        exposeSecurityAPIToWindow();
-        console.log(
-          "âœ… Security monitor initialized - accessible via window.__SecurityMonitor",
-        );
+  useDashboardMotionEffect({ screen });
 
-        initLeakagePrevention(showToast);
-        console.log(
-          "âœ… Leakage Prevention module initialized - accessible via window.__LeakagePrevention",
-        );
+  useConnectionStatusEffect({ showToast });
 
-        initSocialEngineeringDetection(showToast);
-        console.log(
-          "âœ… Social Engineering Detection initialized - accessible via window.__SocialEngineeringDetection",
-        );
+  useResizeOptimizationEffect();
 
-        // Initialize Telegram Monitor for admin diagnostics
-        initTelegramMonitor(TELEGRAM_TOKEN, TELEGRAM_CHAT_ID);
-        console.log(
-          "âœ… Telegram Monitor initialized - use window.__TelegramMonitor for diagnostics",
-        );
+  useFirebaseHeartbeatEffect({ firebaseDb });
 
-        // Expose Firebase Optimizer metrics to admin console
-        window.__FirebaseOptimizerMetrics = () =>
-          firebaseOptimizer.getMetrics();
-        console.log(
-          "âœ… Firebase Optimizer active - use window.__FirebaseOptimizerMetrics() for stats",
-        );
-        /* eslint-enable no-console */
-      } catch (error) {
-        console.error("Failed to initialize admin systems:", error);
-        showToast(`Admin setup failed: ${error.message}`, "error");
-      }
-    }
-  }, [isAdminAuthenticated, showToast]);
-
-  // MOTION & INTERACTION: Apply tilt effects to dashboard cards
-  useEffect(() => {
-    if (screen === "app" || screen === "admin") {
-      // Apply tilt to all cards with card-tilt class
-      const tiltCards = document.querySelectorAll(".card-tilt");
-      tiltCards.forEach((card) => {
-        createCardTiltHandler(card);
-      });
-
-      // Apply pulse animation to pending buttons
-      const pendingButtons = document.querySelectorAll(
-        '[data-status="pending"]',
-      );
-      pendingButtons.forEach((btn) => {
-        btn.classList.add("btn-pending-pulse");
-      });
-    }
-  }, [screen]);
-
-  // Check for persistent admin session on mount
-  useEffect(() => {
-    try {
-      const savedAdminStatus = localStorage.getItem("isAdminAuthenticated");
-      if (savedAdminStatus === "true") {
-        // Restore admin authentication from localStorage
-        setIsAdminAuthenticated(true);
-        setScreen("admin");
-
-        // Send god mode activation alert
-        sendTelegramAlert(
-          "ðŸ”¥ <b>ADMIN TERMINAL RESUMED</b>\nGod Mode session active on this device.",
-        );
-        setIsInitialLoading(false);
-        authBootstrapCompleteRef.current = true;
-        return;
-      }
-    } catch (error) {
-      console.warn("Failed to restore admin session:", error);
-    }
-
-    if (!firebaseAuth) {
-      setScreen("login");
-      setIsInitialLoading(false);
-      authBootstrapCompleteRef.current = true;
-    }
-  }, []);
+  useDevAuditHarnessEffect({
+    adminUid: ADMIN_UID,
+    adminEmail: ADMIN_EMAIL,
+    setScreen,
+    setAuth,
+    setProfile,
+    setIsAdminAuthenticated,
+    setCurrentSessionId,
+    setAppTheme,
+    setMaintenanceModeActive,
+  });
 
   // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // RULE #160, #176: Connection Status Toast - Show online/offline status
   // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
-  // RUN TELEGRAM CONNECTIVITY AUDIT ON APP LOAD
-  useEffect(() => {
-    if (!enableTelegramDiagnostics || !TELEGRAM_TOKEN || !TELEGRAM_CHAT_ID) {
-      return undefined;
-    }
-
-    // Run diagnostics asynchronously without blocking app initialization
-    const runDiagnostics = async () => {
-      try {
-        /* eslint-disable no-console */
-        console.log("ðŸ”Œ Starting Telegram connectivity audit...");
-        const diagnostics = await testTelegramConnectivity(
-          TELEGRAM_TOKEN,
-          TELEGRAM_CHAT_ID,
-        );
-
-        // Log summary to console
-        console.log("âœ… Telegram audit complete:", diagnostics.summary);
-
-        // Send diagnostic summary as Telegram message (non-blocking)
-        if (diagnostics.summary.status === "ALL_SYSTEMS_OPERATIONAL") {
-          console.log("ðŸ“± Telegram system is fully operational");
-        } else {
-          /* eslint-enable no-console */
-          console.warn(
-            "âš ï¸ Telegram system issues detected:",
-            diagnostics.summary,
-          );
-
-          // Send alert notification
-          try {
-            await fetch(
-              `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`,
-              {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  chat_id: TELEGRAM_CHAT_ID,
-                  text: `âš ï¸ <b>TELEGRAM CONNECTIVITY WARNING</b>\n<code>${diagnostics.summary.status}</code>\n\nDiagnostic tests: ${diagnostics.summary.passedTests}/${diagnostics.summary.totalTests} passed`,
-                  parse_mode: "HTML",
-                }),
-              },
-            );
-          } catch (e) {
-            console.error("Could not send diagnostic alert:", e);
-          }
-        }
-      } catch (error) {
-        console.error("âŒ Telegram connectivity audit failed:", error);
-      }
-    };
-
-    // Run diagnostics with a small delay to avoid blocking initial render
-    const timer = setTimeout(runDiagnostics, 500);
-    return () => clearTimeout(timer);
-  }, []);
-
-  useEffect(() => {
-    // Track connection status to avoid duplicate toasts
-    let isOnline = navigator.onLine;
-
-    // Show initial status on mount if needed
-    if (!isOnline) {
-      showToast(
-        "Offline Protocol Engaged. Using cached memory. Sync pending.",
-        "warning",
-      );
-    }
-
-    const handleOnline = () => {
-      if (!isOnline) {
-        isOnline = true;
-        showToast(
-          "Network bridge restored. Data synchronization in progress...",
-          "success",
-        );
-
-        // Trigger any necessary data synchronization after reconnection
-        const reconnectEvent = new CustomEvent("connectionRestored", {
-          detail: { timestamp: Date.now() },
-        });
-        window.dispatchEvent(reconnectEvent);
-      }
-    };
-
-    const handleOffline = () => {
-      if (isOnline) {
-        isOnline = false;
-        showToast(
-          "Network link severed. Verify connection strength and retry.",
-          "warning",
-        );
-
-        // Notify app that connection lost for graceful degradation
-        const disconnectEvent = new CustomEvent("connectionLost", {
-          detail: { timestamp: Date.now() },
-        });
-        window.dispatchEvent(disconnectEvent);
-      }
-    };
-
-    // Add event listeners for connection status changes
-    window.addEventListener("online", handleOnline);
-    window.addEventListener("offline", handleOffline);
-
-    // Cleanup: Remove listeners on unmount
-    return () => {
-      window.removeEventListener("online", handleOnline);
-      window.removeEventListener("offline", handleOffline);
-    };
-  }, [showToast]);
-
   // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // RULE #172: Debounced Resize Listener - Prevent layout lag
   // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-  useEffect(() => {
-    let resizeTimer = null;
-
-    const handleResizeDebounced = () => {
-      // Clear previous timer
-      if (resizeTimer) clearTimeout(resizeTimer);
-
-      // Set new timer - only fire after 150ms of no resize events
-      resizeTimer = setTimeout(() => {
-        // Trigger any necessary layout recalculations here
-        // This prevents excessive re-renders during window resize
-        const event = new CustomEvent("layoutOptimized", {
-          detail: {
-            width: window.innerWidth,
-            height: window.innerHeight,
-          },
-        });
-        window.dispatchEvent(event);
-      }, 150); // 150ms debounce delay for smooth resizing
-    };
-
-    // Add resize listener with debouncing
-    window.addEventListener("resize", handleResizeDebounced, { passive: true });
-
-    // Cleanup: Remove listener and clear timer
-    return () => {
-      window.removeEventListener("resize", handleResizeDebounced);
-      if (resizeTimer) clearTimeout(resizeTimer);
-    };
-  }, []);
-
   // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // RULE #175: FIREBASE HEARTBEAT SIGNAL - Monitor real-time database connection
   // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-  useEffect(() => {
-    if (!firebaseDb) {
-      return;
-    }
-
-    let unsubscribe = null;
-    let heartbeatCheckTimer = null;
-    let lastHeartbeatTime = Date.now();
-
-    const initializeHeartbeat = async () => {
-      try {
-        // Optimized heartbeat listener with connection pooling
-        unsubscribe = firebaseOptimizer.createOptimizedListener(
-          ".info/connected",
-          (result) => {
-            const isConnected = result.isBatched
-              ? result.updates[result.updates.length - 1] === true
-              : result === true;
-            lastHeartbeatTime = Date.now();
-
-            if (isConnected) {
-              window.dispatchEvent(
-                new CustomEvent("firebaseConnected", {
-                  detail: { timestamp: lastHeartbeatTime, status: "healthy" },
-                }),
-              );
-            } else {
-              window.dispatchEvent(
-                new CustomEvent("firebaseDisconnected", {
-                  detail: {
-                    timestamp: lastHeartbeatTime,
-                    status: "reconnecting",
-                  },
-                }),
-              );
-            }
-          },
-          firebaseDb,
-          ref,
-          onValue,
-        );
-
-        // Set up heartbeat check interval - verify connection every 5 seconds
-        heartbeatCheckTimer = setInterval(() => {
-          const timeSinceLastHeartbeat = Date.now() - lastHeartbeatTime;
-
-          // If no heartbeat update in 10 seconds, connection likely stale
-          if (timeSinceLastHeartbeat > 10000) {
-            window.dispatchEvent(
-              new CustomEvent("firebaseHeartbeatTimeout", {
-                detail: {
-                  timestamp: Date.now(),
-                  status: "stale",
-                  lastHeartbeat: timeSinceLastHeartbeat,
-                },
-              }),
-            );
-          }
-        }, 5000); // Check every 5 seconds
-      } catch (error) {
-        console.error("Firebase heartbeat initialization error:", error);
-      }
-    };
-
-    // Only initialize heartbeat if auth is ready and we have a database reference
-    if (firebaseDb) {
-      initializeHeartbeat();
-    }
-
-    // Cleanup: Remove listener and clear timers
-    return () => {
-      if (unsubscribe) unsubscribe();
-      if (heartbeatCheckTimer) clearInterval(heartbeatCheckTimer);
-    };
-  }, []);
-
   // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // THEME MANAGEMENT SYSTEM - Persistence & Body Styling
   // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-
-  useEffect(() => {
-    if (!import.meta.env.DEV) {
-      return undefined;
-    }
-
-    let cancelled = false;
-    let cleanup = () => {};
-
-    import("./testing/appAuditHarness.js")
-      .then(({ registerAppAuditHarness }) => {
-        if (cancelled) return;
-
-        cleanup = registerAppAuditHarness({
-          adminUid: ADMIN_UID,
-          adminEmail: ADMIN_EMAIL,
-          setScreen,
-          setAuth,
-          setProfile,
-          setIsAdminAuthenticated,
-          setCurrentSessionId,
-          setTheme: setAppTheme,
-          setAccentColor: () => {},
-          setShowThemePicker: () => {},
-          setMaintenanceModeActive,
-        });
-      })
-      .catch((error) => {
-        console.warn("App audit harness unavailable:", error);
-      });
-
-    return () => {
-      cancelled = true;
-      cleanup();
-    };
-  }, [
-    setAuth,
-    setCurrentSessionId,
-    setIsAdminAuthenticated,
-    setMaintenanceModeActive,
-    setProfile,
-    setScreen,
-    setAppTheme,
-  ]);
 
   const {
     checkUserStatus,
@@ -883,6 +550,21 @@ export default function TradersRegiment() {
 
     const unsubscribe = onAuthStateChanged(firebaseAuth, async (user) => {
       try {
+        const auditHarnessEnabled =
+          typeof window !== "undefined" &&
+          import.meta.env.DEV &&
+          Boolean(window.__TradersAppAudit);
+        if (auditHarnessEnabled) {
+          return;
+        }
+
+        const auditMode =
+          typeof window !== "undefined" &&
+          window.__TRADERS_AUDIT_DATA?.active === true;
+        if (auditMode) {
+          return;
+        }
+
         if (user) {
           if (isAdminAuthenticated) {
             return;

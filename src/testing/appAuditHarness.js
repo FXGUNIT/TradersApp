@@ -236,6 +236,10 @@ export function registerAppAuditHarness({
         );
         setIsAdminAuthenticated(false);
         setScreen("forcePasswordReset");
+        // Re-assert the screen for a short window so auth listeners that race
+        // during dev bootstrap cannot bounce this scenario back to login.
+        window.setTimeout(() => setScreen("forcePasswordReset"), 80);
+        window.setTimeout(() => setScreen("forcePasswordReset"), 320);
         break;
 
       case "hub":

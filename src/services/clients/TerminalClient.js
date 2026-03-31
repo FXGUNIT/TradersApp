@@ -1,4 +1,3 @@
-import { dbR, dbW } from "../../utils/firebaseDbUtils.js";
 import {
   fetchTerminalWorkspace,
   normalizeWorkspaceResponse,
@@ -7,7 +6,10 @@ import {
   putTerminalJournal,
   upsertTerminalWorkspace,
 } from "../gateways/terminalGateway.js";
-import { hasBff } from "../gateways/base.js";
+import {
+  createBffUnavailableResult,
+  hasBff,
+} from "../gateways/base.js";
 
 function normalizeWorkspace(workspace) {
   if (!workspace || typeof workspace !== "object") {
@@ -42,24 +44,29 @@ export async function loadWorkspace(uid, token) {
     return null;
   }
 
-  if (hasBff()) {
-    try {
-      const remoteWorkspace = normalizeWorkspace(
-        normalizeWorkspaceResponse(await fetchTerminalWorkspace(uid)),
-      );
-      if (remoteWorkspace) {
-        return remoteWorkspace;
-      }
-    } catch (error) {
-      console.warn("BFF terminal workspace load failed, falling back to Firebase:", error);
-    }
+  if (!hasBff()) {
+    return null;
   }
 
-  const workspace = normalizeWorkspace(await dbR(`terminal/workspaces/${uid}`, token));
-  if (workspace) {
-    return workspace;
+  try {
+    const remoteWorkspace = normalizeWorkspace(
+      normalizeWorkspaceResponse(await fetchTerminalWorkspace(uid)),
+    );
+    if (remoteWorkspace) {
+      return remoteWorkspace;
+    }
+  } catch (error) {
+    console.warn("BFF terminal workspace load failed:", error);
   }
+
   return null;
+}
+
+function unavailableWriteResult(operation, extra = {}) {
+  return createBffUnavailableResult(operation, {
+    workspace: null,
+    ...extra,
+  });
 }
 
 export async function saveWorkspace(uid, token, workspace) {
@@ -73,17 +80,17 @@ export async function saveWorkspace(uid, token, workspace) {
     firmRules: {},
   };
 
-  if (hasBff()) {
-    try {
-      await upsertTerminalWorkspace(uid, payload);
-      return payload;
-    } catch (error) {
-      console.warn("BFF terminal workspace save failed, falling back to Firebase:", error);
-    }
+  if (!hasBff()) {
+    return unavailableWriteResult("saveWorkspace", { workspace: payload });
   }
 
-  await dbW(`terminal/workspaces/${uid}`, payload, token);
-  return payload;
+  try {
+    await upsertTerminalWorkspace(uid, payload);
+    return payload;
+  } catch (error) {
+    console.warn("BFF terminal workspace save failed:", error);
+    return unavailableWriteResult("saveWorkspace", { workspace: payload });
+  }
 }
 
 export async function saveJournal(uid, token, journal) {
@@ -93,17 +100,17 @@ export async function saveJournal(uid, token, journal) {
 
   const payload = normalizeJournalPayload(journal);
 
-  if (hasBff()) {
-    try {
-      await putTerminalJournal(uid, payload);
-      return payload;
-    } catch (error) {
-      console.warn("BFF terminal journal save failed, falling back to Firebase:", error);
-    }
+  if (!hasBff()) {
+    return unavailableWriteResult("saveJournal", { journal: payload });
   }
 
-  await dbW(`terminal/workspaces/${uid}/journal`, payload, token);
-  return payload;
+  try {
+    await putTerminalJournal(uid, payload);
+    return payload;
+  } catch (error) {
+    console.warn("BFF terminal journal save failed:", error);
+    return unavailableWriteResult("saveJournal", { journal: payload });
+  }
 }
 
 export async function saveAccountState(uid, token, accountState) {
@@ -113,20 +120,21 @@ export async function saveAccountState(uid, token, accountState) {
 
   const payload = accountState || {};
 
-  if (hasBff()) {
-    try {
-      await putTerminalAccountState(uid, payload);
-      return payload;
-    } catch (error) {
-      console.warn(
-        "BFF terminal account state save failed, falling back to Firebase:",
-        error,
-      );
-    }
+  if (!hasBff()) {
+    return unavailableWriteResult("saveAccountState", {
+      accountState: payload,
+    });
   }
 
-  await dbW(`terminal/workspaces/${uid}/accountState`, payload, token);
-  return payload;
+  try {
+    await putTerminalAccountState(uid, payload);
+    return payload;
+  } catch (error) {
+    console.warn("BFF terminal account state save failed:", error);
+    return unavailableWriteResult("saveAccountState", {
+      accountState: payload,
+    });
+  }
 }
 
 export async function saveFirmRules(uid, token, firmRules) {
@@ -136,20 +144,17 @@ export async function saveFirmRules(uid, token, firmRules) {
 
   const payload = firmRules || {};
 
-  if (hasBff()) {
-    try {
-      await putTerminalFirmRules(uid, payload);
-      return payload;
-    } catch (error) {
-      console.warn(
-        "BFF terminal firm rules save failed, falling back to Firebase:",
-        error,
-      );
-    }
+  if (!hasBff()) {
+    return unavailableWriteResult("saveFirmRules", { firmRules: payload });
   }
 
-  await dbW(`terminal/workspaces/${uid}/firmRules`, payload, token);
-  return payload;
+  try {
+    await putTerminalFirmRules(uid, payload);
+    return payload;
+  } catch (error) {
+    console.warn("BFF terminal firm rules save failed:", error);
+    return unavailableWriteResult("saveFirmRules", { firmRules: payload });
+  }
 }
 
 export default {

@@ -53,7 +53,7 @@ function AuthLogo() {
               fontWeight: 700,
             }}
           >
-            TRADERS&apos; REGIMENT Territory.
+            TRADERS REGIMENT Territory.
           </div>
         </div>
       </div>

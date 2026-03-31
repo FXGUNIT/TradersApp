@@ -4,6 +4,14 @@ export function hasBff() {
   return Boolean(BFF_BASE_URL);
 }
 
+export function createBffUnavailableResult(operation, extra = {}) {
+  return {
+    success: false,
+    error: `BFF unavailable for ${operation}.`,
+    ...extra,
+  };
+}
+
 function buildUrl(path) {
   if (!BFF_BASE_URL) {
     return path;
@@ -34,5 +42,6 @@ export async function bffFetch(path, options = {}) {
 
 export default {
   bffFetch,
+  createBffUnavailableResult,
   hasBff,
 };

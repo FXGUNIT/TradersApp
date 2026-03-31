@@ -16,6 +16,53 @@ export const executeCheckUserStatus = async ({
   SCREEN_IDS,
 }) => {
   try {
+    const auditData =
+      typeof window !== "undefined" ? window.__TRADERS_AUDIT_DATA : null;
+    if (auditData?.active) {
+      const auditProfile = auditData.userProfile || auditData.adminProfile || null;
+
+      if (!auditProfile) {
+        setGoogleUser(null);
+        setProfile(null);
+        setScreen(SCREEN_IDS.LOGIN);
+        return;
+      }
+
+      clearPendingGoogleSignup();
+      setGoogleUser(null);
+      setProfile({
+        ...auditProfile,
+        uid: authData?.uid || auditProfile.uid,
+        token: authData?.token || auditProfile.token,
+        email: authData?.email || auditProfile.email,
+        emailVerified: authData?.emailVerified ?? true,
+      });
+
+      const normalizedStatus = String(auditProfile.status || "ACTIVE").toUpperCase();
+      if (authData?.uid === ADMIN_UID || auditProfile.role === "admin") {
+        setScreen(SCREEN_IDS.ADMIN);
+        return;
+      }
+
+      if (normalizedStatus === "BLOCKED") {
+        setScreen(SCREEN_IDS.LOGIN);
+        return;
+      }
+
+      if (normalizedStatus === "PENDING" || authData?.emailVerified === false) {
+        setScreen(SCREEN_IDS.WAITING);
+        return;
+      }
+
+      const restoreUid = authData?.uid || auditProfile.uid;
+      const restoredScreen = resolveRestorableScreen(restoreUid, SCREEN_IDS.HUB);
+      setConsciousnessReturnScreen(
+        resolveConsciousnessReturnScreen(restoreUid, SCREEN_IDS.HUB),
+      );
+      setScreen(restoredScreen);
+      return;
+    }
+
     const {
       profile: nextProfile,
       screen: nextScreen,
