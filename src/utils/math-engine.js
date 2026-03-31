@@ -230,7 +230,7 @@ export function detectAmdPhase({
     adr20 > 0
     && currentRange > adr20 * 1.2
     && Boolean(higherHighs || lowerLows)
-    && !Boolean(conflictingSignals);
+    && !conflictingSignals;
   const transition = Boolean(conflictingSignals) || Boolean(adxDeclining);
 
   let phase = "UNCLEAR";

@@ -426,17 +426,13 @@ export async function callAIWithLatencyTracking(
   showToast,
 ) {
   const start = performance.now();
-  try {
-    const response = await aiFunction(systemPrompt, userPrompt);
-    const latency = performance.now() - start;
-    return {
-      response,
-      latency: latency.toFixed(0),
-      timestamp: new Date().toISOString(),
-    };
-  } catch (error) {
-    throw error;
-  }
+  const response = await aiFunction(systemPrompt, userPrompt);
+  const latency = performance.now() - start;
+  return {
+    response,
+    latency: latency.toFixed(0),
+    timestamp: new Date().toISOString(),
+  };
 }
 
 export const AIRateLimiter = class {
