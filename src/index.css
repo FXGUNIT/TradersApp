@@ -1401,3 +1401,32 @@ svg.feather {
 .ocr-success-flash {
   animation: ocrSuccessFlash 0.7s ease-out forwards;
 }
+
+/* ── Glass Skeleton shimmer loader ────────────────────────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position:  400px 0; }
+}
+
+/* Individual skeleton bar — shimmer sweeps across */
+.skeleton-bar {
+  height: 10px;
+  border-radius: 5px;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.03) 0%,
+    rgba(255, 255, 255, 0.10) 40%,
+    rgba(255, 255, 255, 0.17) 50%,
+    rgba(255, 255, 255, 0.10) 60%,
+    rgba(255, 255, 255, 0.03) 100%
+  );
+  background-size: 800px 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+  margin-bottom: 10px;
+}
+
+/* Progress bar that fills as worker reports progress */
+@keyframes skeletonFill {
+  0%   { width: 0%; }
+  100% { width: var(--skeleton-pct, 0%); }
+}

@@ -255,6 +255,7 @@ export default function MainTerminal({
   const firmRulesDidMount = useRef(false);
   const csvParserWorkerRef = useRef(null);
   const csvParseRequestIdRef = useRef(0);
+  const [csvProgress, setCsvProgress] = useState(0);
   const journalMetricsWorkerRef = useRef(null);
   const journalMetricsRequestIdRef = useRef(0);
   const latestJournalRef = useRef([]);
@@ -280,6 +281,7 @@ export default function MainTerminal({
     }
 
     setIsCsvParsing(false);
+    setCsvProgress(0);
     setParsed(result?.parsed || null);
     setParseMsg(result?.parseMsg || "⚠ CSV parse failed");
   }, []);
@@ -294,7 +296,17 @@ export default function MainTerminal({
     });
 
     const handleMessage = (event) => {
-      const { requestId, ...result } = event.data || {};
+      const { requestId, progress, ...result } = event.data || {};
+
+      // Worker reports incremental progress — update the skeleton loader %
+      if (progress !== undefined) {
+        const currentId = csvParseRequestIdRef.current;
+        if (requestId === currentId) {
+          setCsvProgress(progress);
+        }
+        return;
+      }
+
       applyCsvParseResult(requestId, result);
     };
 
@@ -1166,6 +1178,7 @@ export default function MainTerminal({
     setParsed(null);
     setParseMsg("");
     setIsCsvParsing(true);
+    setCsvProgress(0);
     let handledAsync = false;
 
     try {
@@ -1861,6 +1874,7 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
             p1NewsChart={p1NewsChart}
             p1PremarketChart={p1PremarketChart}
             p1KeyLevelsChart={p1KeyLevelsChart}
+            csvProgress={csvProgress}
             activeZone={activeZone}
             setActiveZone={setActiveZone}
             handleCsvDrop={handleCsvDrop}

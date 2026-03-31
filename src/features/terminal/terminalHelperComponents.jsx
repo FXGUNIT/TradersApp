@@ -268,6 +268,103 @@ export function Loader({ color, label }) {
   );
 }
 
+/**
+ * GlassSkeletonLoader — shimmering placeholder shown inside a zone while a
+ * Web Worker processes data off the main thread.
+ *
+ * The rest of the app remains fully interactive during the wait.
+ *
+ * @param {number}   progress  0-100 from the worker; drives the fill bar
+ * @param {string}   color     tint for the shimmer (defaults to blue)
+ * @param {string}   label     short status text shown below the skeleton
+ * @param {string}   title     optional header text (e.g. "NINJATRADER 1-MIN DATA")
+ */
+export function GlassSkeletonLoader({ progress = 0, color = T.blue, label = "Processing…", title = "" }) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 16,
+        padding: "20px 16px",
+      }}
+    >
+      {/* Header */}
+      {title && (
+        <div
+          style={{
+            color: color,
+            fontSize: 11,
+            fontWeight: 700,
+            letterSpacing: 1.5,
+            alignSelf: "flex-start",
+            opacity: 0.8,
+          }}
+        >
+          {title}
+        </div>
+      )}
+
+      {/* Shimmer skeleton bars — mimics what parsed data looks like */}
+      <div
+        className="skeleton-bar"
+        style={{ width: "100%", maxWidth: 200 }}
+      />
+      <div
+        className="skeleton-bar"
+        style={{ width: "80%", maxWidth: 160 }}
+      />
+      <div
+        className="skeleton-bar"
+        style={{ width: "60%", maxWidth: 120 }}
+      />
+      <div
+        className="skeleton-bar"
+        style={{ width: "90%", maxWidth: 180 }}
+      />
+
+      {/* Progress fill bar */}
+      <div
+        style={{
+          width: "100%",
+          height: 4,
+          background: `${color}20`,
+          borderRadius: 4,
+          overflow: "hidden",
+        }}
+      >
+        <div
+          style={{
+            height: "100%",
+            width: `${progress}%`,
+            background: color,
+            borderRadius: 4,
+            transition: "width 0.25s ease-out",
+            opacity: 0.85,
+          }}
+        />
+      </div>
+
+      {/* Label */}
+      <div
+        style={{
+          color: color,
+          fontSize: 11,
+          fontWeight: 700,
+          letterSpacing: 1.5,
+          textAlign: "center",
+          opacity: 0.9,
+        }}
+      >
+        {label}
+        {progress > 0 && ` · ${progress}%`}
+      </div>
+    </div>
+  );
+}
+
 // RenderOut Component - AI Output Renderer
 export function RenderOut({ text }) {
   if (!text) return null;

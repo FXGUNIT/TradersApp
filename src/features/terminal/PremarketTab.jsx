@@ -8,6 +8,7 @@ import {
   RenderOut,
   AMDPhaseTag,
   PasteZone,
+  GlassSkeletonLoader,
   cardS,
   glowBtn,
   inp,
@@ -44,53 +45,74 @@ export default function PremarketTab({
   setErr,
   err,
   flashingZoneId,
+  csvProgress,
 }) {
   return (
     <div>
       {/* CSV Upload */}
       <div style={cardS()}>
         <SHead icon="⊞" title="LOAD NINJATRADER 1-MIN DATA" color={T.blue} />
-        <div
-          onDrop={handleCsvDrop}
-          onDragOver={(e) => e.preventDefault()}
-          onClick={() => !isCsvParsing && document.getElementById("csvIn").click()}
-          style={{
-            border: `2px dashed ${csvBorderColor}`,
-            borderRadius: 8,
-            padding: "24px",
-            textAlign: "center",
-            cursor: isCsvParsing ? "progress" : "pointer",
-            opacity: isCsvParsing ? 0.82 : 1,
-            background: surfaceMuted,
-          }}
-        >
-          <input
-            id="csvIn"
-            type="file"
-            accept=".txt,.csv"
-            style={{ display: "none" }}
-            onChange={handleCsvDrop}
-            disabled={isCsvParsing}
-          />
-          <div style={{ fontSize: 24, marginBottom: 6, opacity: 0.25 }}>⊞</div>
-          <div style={{ color: csvStatusColor, fontSize: 12, fontWeight: 600 }}>
-            {csvStatusText}
+
+        {/* ── Glass Skeleton during parsing ── */}
+        {isCsvParsing ? (
+          <div
+            style={{
+              border: `2px dashed ${T.blue}50`,
+              borderRadius: 8,
+              padding: "8px",
+              background: surfaceMuted,
+            }}
+            className="glass-panel"
+          >
+            <GlassSkeletonLoader
+              progress={csvProgress}
+              color={T.blue}
+              label="Parsing NinjaTrader data"
+              title="NINJATRADER 1-MIN DATA"
+            />
           </div>
-          {parsed && (
-            <div
-              style={{
-                color: CSS_VARS.textTertiary,
-                fontSize: 11,
-                marginTop: 4,
-              }}
-            >
-              Latest: {parsed.days[parsed.days.length - 1]?.date} · ATR(14) ={" "}
-              <span style={{ color: T.green, fontWeight: 700 }}>
-                {parsed.tradingHoursAtr14} pts
-              </span>
+        ) : (
+          /* ── Normal drop zone ── */
+          <div
+            onDrop={handleCsvDrop}
+            onDragOver={(e) => e.preventDefault()}
+            onClick={() => document.getElementById("csvIn").click()}
+            style={{
+              border: `2px dashed ${csvBorderColor}`,
+              borderRadius: 8,
+              padding: "24px",
+              textAlign: "center",
+              cursor: "pointer",
+              background: surfaceMuted,
+            }}
+          >
+            <input
+              id="csvIn"
+              type="file"
+              accept=".txt,.csv"
+              style={{ display: "none" }}
+              onChange={handleCsvDrop}
+            />
+            <div style={{ fontSize: 24, marginBottom: 6, opacity: 0.25 }}>⊞</div>
+            <div style={{ color: csvStatusColor, fontSize: 12, fontWeight: 600 }}>
+              {csvStatusText}
             </div>
-          )}
-        </div>
+            {parsed && (
+              <div
+                style={{
+                  color: CSS_VARS.textTertiary,
+                  fontSize: 11,
+                  marginTop: 4,
+                }}
+              >
+                Latest: {parsed.days[parsed.days.length - 1]?.date} · ATR(14) ={" "}
+                <span style={{ color: T.green, fontWeight: 700 }}>
+                  {parsed.tradingHoursAtr14} pts
+                </span>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Screenshot Paste Zones */}

@@ -42,7 +42,7 @@ function createEmptyResult(parseMsg) {
   };
 }
 
-export function parseTerminalCsvText(rawText = "") {
+export function parseTerminalCsvText(rawText = "", onProgress) {
   const lines = normalizeLines(rawText);
   if (!lines.length) {
     return createEmptyResult("⚠ CSV export is empty");
@@ -50,6 +50,8 @@ export function parseTerminalCsvText(rawText = "") {
 
   const days = [];
   let totalBars = 0;
+  let lastProgressReport = 0;
+  const totalLines = lines.length;
 
   for (const line of lines) {
     const separator = line.includes(";") && !line.includes(",") ? ";" : ",";
@@ -113,6 +115,12 @@ export function parseTerminalCsvText(rawText = "") {
     }
 
     totalBars += 1;
+
+    // Report progress every ~2% of total lines (throttled to avoid message spam)
+    if (onProgress && totalBars - lastProgressReport >= Math.max(1, Math.floor(totalLines / 50))) {
+      lastProgressReport = totalBars;
+      onProgress(Math.round((totalBars / totalLines) * 80)); // rows = 80% of work
+    }
   }
 
   if (!totalBars || !days.length) {
@@ -123,7 +131,10 @@ export function parseTerminalCsvText(rawText = "") {
     getSortValue(left.date).localeCompare(getSortValue(right.date)),
   );
 
+  if (onProgress) onProgress(85); // sorting done
+
   if (days.length >= 5) {
+    const totalDays = days.length;
     for (let index = 0; index < days.length; index += 1) {
       const fiveDaySlice = days.slice(Math.max(0, index - 4), index + 1);
       const fiveDaySum = fiveDaySlice.reduce((sum, day) => sum + (day.atr14 || 0), 0);
@@ -135,6 +146,11 @@ export function parseTerminalCsvText(rawText = "") {
         0,
       );
       days[index].twentyDayATR = twentyDaySum / twentyDaySlice.length;
+
+      // ATR rolling window = 20% of remaining work
+      if (onProgress && index % Math.max(1, Math.floor(totalDays / 20)) === 0) {
+        onProgress(85 + Math.round((index / totalDays) * 15));
+      }
     }
   }
 
