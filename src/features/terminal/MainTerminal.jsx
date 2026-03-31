@@ -275,6 +275,28 @@ export default function MainTerminal({
   );
   const [isTerminalDerivedPending, setIsTerminalDerivedPending] = useState(false);
 
+  // ── Consecutive Loss Circuit Breaker ─────────────────────────────────────────
+  const CIRCUIT_BREAKER_KEY = "tilt_circuit_until";
+  const CIRCUIT_COOLDOWN_MS = 15 * 60 * 1000; // 15 minutes
+  const MAX_CONSECUTIVE_LOSSES = 3;
+
+  const getCircuitUntil = () => {
+    try {
+      const v = localStorage.getItem(CIRCUIT_BREAKER_KEY);
+      return v ? parseInt(v, 10) : 0;
+    } catch { return 0; }
+  };
+  const setCircuitUntil = (ts) => {
+    try { localStorage.setItem(CIRCUIT_BREAKER_KEY, String(ts)); } catch { /* best-effort */ }
+  };
+
+  // Derive isCircuitBreakerActive from localStorage timestamp
+  const isCircuitBreakerActive =
+    Date.now() < getCircuitUntil();
+
+  // Countdown ref for display (updated without React state)
+  const circuitCountdownRef = useRef(null);
+
   const applyCsvParseResult = useCallback((requestId, result) => {
     if (requestId !== csvParseRequestIdRef.current) {
       return;
@@ -1108,7 +1130,8 @@ export default function MainTerminal({
   const isDeadZone = (extractedVals.adx !== null && extractedVals.adx < 20) || (extractedVals.ci !== null && extractedVals.ci > 61.8);
   const execBlocked = auditScenario === "app"
     ? false
-    : !ist.isOpen || isDeadZone || complianceBlocked || slBreachesDailyLimit || slBreachesDrawdown;
+    : !ist.isOpen || isDeadZone || complianceBlocked || slBreachesDailyLimit || slBreachesDrawdown
+    || isCircuitBreakerActive;
   
   let execBlockReason = '';
   if (!ist.isOpen) {
@@ -1578,8 +1601,24 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
       id: `trade-${Date.now()}`
     };
     
-    setJournal(prev => [...prev, entry]);
-    
+    setJournal((prev) => {
+      const updated = [...prev, entry];
+      // Count consecutive losses from the end of the journal
+      let streak = 0;
+      const journalWithNew = [...prev, entry];
+      for (let i = journalWithNew.length - 1; i >= 0; i--) {
+        if (journalWithNew[i].result === "loss") streak++;
+        else break;
+      }
+      if (streak >= MAX_CONSECUTIVE_LOSSES) {
+        const until = Date.now() + CIRCUIT_COOLDOWN_MS;
+        setCircuitUntil(until);
+        window.dispatchEvent(new Event("tilt-lock"));
+        showToast?.("Circuit breaker: 3+ consecutive losses. Execution locked for 15 minutes.", "circuit");
+      }
+      return updated;
+    });
+
     if (p2Jf.balAfter) { 
       const upd = { ...accountState, currentBalance: p2Jf.balAfter }; 
       setAccountState(upd); 
@@ -1969,6 +2008,8 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
             isJournalMetricsPending={isJournalMetricsPending}
             equityCurveView={equityCurveView}
             addJournalEntry={addJournalEntry}
+            firmRules={firmRules}
+            accountState={accountState}
           />
         )}
 

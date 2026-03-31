@@ -1341,6 +1341,64 @@ svg.feather {
   }
 }
 
+/* ── Session fatigue amber crossfade (120 min) ─────────────────────────── */
+/*
+ * useSessionFatigue.js sets --fatigue-intensity (0→1) over 60 seconds starting
+ * at 119 minutes. These CSS vars use calc() to blend normal → amber.
+ *
+ * Surfaces shift from cold-dark blue to warm-dark amber.
+ * Accent shifts from blue (59,130,246) to warm gold (255,180,10).
+ * Text shifts slightly warmer.
+ *
+ * CSS transitions on these vars make the 60-second crossfade imperceptible.
+ */
+:root,
+[data-theme] {
+  --fatigue-intensity: 0;
+
+  /* Amber surface: interpolate from base-layer to warm dark amber */
+  --fatigue-bg-blend: rgb(
+    calc(15  + (22  - 15)  * var(--fatigue-intensity)),
+    calc(23  + (30  - 23)  * var(--fatigue-intensity)),
+    calc(42  + (18  - 42)  * var(--fatigue-intensity))
+  );
+
+  /* Amber accent: blue (59,130,246) → warm gold (255,180,10) */
+  --fatigue-accent-blend: rgb(
+    calc(59  + (255 - 59)  * var(--fatigue-intensity)),
+    calc(130 + (180 - 130) * var(--fatigue-intensity)),
+    calc(246 + ( 10 - 246)  * var(--fatigue-intensity))
+  );
+
+  /* Amber glow */
+  --fatigue-glow-blend: rgba(
+    calc(59  + (255 - 59)  * var(--fatigue-intensity)),
+    calc(130 + (180 - 130) * var(--fatigue-intensity)),
+    calc(246 + ( 10 - 246)  * var(--fatigue-intensity)),
+    calc(0.4 + (0.3 - 0.4) * var(--fatigue-intensity))
+  );
+
+  /* Amber text: slight warm tint */
+  --fatigue-text-blend: rgba(
+    calc(226 + (240 - 226) * var(--fatigue-intensity)),
+    calc(231 + (215 - 231) * var(--fatigue-intensity)),
+    calc(242 + (180 - 242) * var(--fatigue-intensity)),
+    calc(0.90 + (0.85 - 0.90) * var(--fatigue-intensity))
+  );
+
+  /* Smooth 60-second crossfade on the accent */
+  --fatigue-accent-primary: var(--fatigue-accent-blend);
+  --fatigue-accent-glow:    var(--fatigue-glow-blend);
+  --fatigue-bg:             var(--fatigue-bg-blend);
+  --fatigue-text:          var(--fatigue-text-blend);
+
+  transition:
+    --fatigue-accent-primary 60s linear,
+    --fatigue-accent-glow    60s linear,
+    --fatigue-bg             60s linear,
+    --fatigue-text           60s linear;
+}
+
 /* Paste zone flash — triggered when a screenshot is pasted into a zone */
 @keyframes pasteFlash {
   0% {

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   T,
   AMD_PHASES,
@@ -116,6 +116,35 @@ export default function TradeTab({
   }, 800);
 
   // ── Verdict radar — derive 5 scores from readiness panel signals ───────
+  // ── Circuit breaker countdown (reads localStorage every second) ──────────
+  const CIRCUIT_KEY = "tilt_circuit_until";
+  const getCircuitSecs = () => {
+    try {
+      const v = localStorage.getItem(CIRCUIT_KEY);
+      if (!v) return 0;
+      const remaining = Math.max(0, Math.ceil((parseInt(v, 10) - Date.now()) / 1000));
+      return remaining;
+    } catch { return 0; }
+  };
+  const [circuitSecs, setCircuitSecs] = useState(getCircuitSecs);
+  const circuitTimerRef = useRef(null);
+
+  useEffect(() => {
+    if (!execBlocked) {
+      if (circuitTimerRef.current) { clearInterval(circuitTimerRef.current); circuitTimerRef.current = null; }
+      return;
+    }
+    // Poll every second
+    circuitTimerRef.current = setInterval(() => {
+      const secs = getCircuitSecs();
+      setCircuitSecs(secs);
+      if (secs <= 0 && circuitTimerRef.current) {
+        clearInterval(circuitTimerRef.current);
+        circuitTimerRef.current = null;
+      }
+    }, 1000);
+    return () => { if (circuitTimerRef.current) clearInterval(circuitTimerRef.current); };
+  }, [execBlocked]);
   // All inputs come from terminalDerivedState (already computed by the worker)
   const verdictScores = useMemo(
     () =>
@@ -540,7 +569,9 @@ export default function TradeTab({
         {isTerminalDerivedPending
           ? "SYNCING ENGINE..."
           : execBlocked
-            ? "🚫 LOCKED"
+            ? circuitSecs > 0
+              ? `⏸ CIRCUIT LOCKED ${Math.floor(circuitSecs / 60)}:${String(circuitSecs % 60).padStart(2, "0")}`
+              : "🚫 LOCKED"
             : "⚡ CAPTURE ENGINE"}
       </button>
 

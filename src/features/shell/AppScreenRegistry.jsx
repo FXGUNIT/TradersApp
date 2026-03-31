@@ -1,7 +1,9 @@
 /* eslint-disable no-unused-vars */
-import { Suspense } from "react";
+import { Suspense, useState, useEffect } from "react";
 import ThemeSwitcher from "../../components/ThemeSwitcher.jsx";
 import { createShellChrome } from "./appShellChrome.jsx";
+import { useOfflineStatus } from "../../hooks/useOfflineStatus.js";
+import TiltLockout, { isTiltLocked } from "../../features/terminal/TiltLockout.jsx";
 
 export default function AppScreenRegistry({
   screen,
@@ -31,6 +33,8 @@ export default function AppScreenRegistry({
   consciousnessReturnScreen,
   isAdminAuthenticated,
   maintenanceModeActive,
+  isAudioMuted,
+  setIsAudioMuted,
   ADMIN_UID,
   ADMIN_EMAIL,
   listAdminUsers,
@@ -249,9 +253,57 @@ export default function AppScreenRegistry({
         <SplashScreen />
       );
 
-    case "app":
+    case "app": {
+      const [tiltLocked, setTiltLocked] = useState(isTiltLocked);
+      const { isOnline, isSyncing } = useOfflineStatus();
+
+      // Listen for tilt lock triggers from child components (e.g. MainTerminal)
+      useEffect(() => {
+        const handler = () => setTiltLocked(true);
+        window.addEventListener("tilt-lock", handler);
+        return () => window.removeEventListener("tilt-lock", handler);
+      }, []);
+
       return (
-        <div style={{ position: "relative" }}>
+        <>
+          {/* ── Tilt Lockout modal — rendered OUTSIDE the pointer-events:none area ── */}
+          {tiltLocked && (
+            <TiltLockout onUnlocked={() => setTiltLocked(false)} />
+          )}
+
+          {/* ── Main app wrapper — pointer-events:none when locked ── */}
+          <div
+            style={{
+              position: "relative",
+              borderTop: isOnline ? "none" : "2px solid #d4a520",
+              transition: "border-color 0.4s ease",
+              pointerEvents: tiltLocked ? "none" : "auto",
+            }}
+          >
+          {/* ── Offline status bar ── */}
+          {!isOnline && (
+            <div
+              style={{
+                position: "fixed",
+                bottom: 0,
+                left: 0,
+                right: 0,
+                background: "rgba(212, 165, 32, 0.12)",
+                borderTop: "1px solid rgba(212, 165, 32, 0.4)",
+                padding: "6px 20px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+                zIndex: 9999,
+              }}
+            >
+              <span style={{ color: "#d4a520", fontSize: 11, fontWeight: 800, letterSpacing: 2 }}>
+                {isSyncing ? "↻ SYNCING TO LOCAL VAULT…" : "OFFLINE — REQUESTS QUEUED"}
+              </span>
+            </div>
+          )}
+
           <div
             style={{
               position: "absolute",
@@ -264,6 +316,31 @@ export default function AppScreenRegistry({
             }}
           >
             <AiEnginesStatus statuses={aiStatuses} />
+            {/* ── Audio mute toggle ── */}
+            <button
+              onClick={() => setIsAudioMuted((v) => !v)}
+              title={isAudioMuted ? "Unmute audio cues" : "Mute audio cues"}
+              style={{
+                background: isAudioMuted ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.10)",
+                border: isAudioMuted
+                  ? "1px solid rgba(255,255,255,0.12)"
+                  : "1px solid rgba(255,255,255,0.20)",
+                borderRadius: 8,
+                cursor: "pointer",
+                color: isAudioMuted ? "rgba(255,255,255,0.30)" : "rgba(255,255,255,0.70)",
+                padding: "5px 10px",
+                fontSize: 13,
+                fontWeight: 700,
+                letterSpacing: 1,
+                minWidth: 32,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                transition: "all 0.2s ease",
+              }}
+            >
+              {isAudioMuted ? "🔇" : "🔊"}
+            </button>
             <ThemeSwitcher
               currentTheme={currentTheme}
               onThemeChange={handleThemeChange}
@@ -330,8 +407,12 @@ export default function AppScreenRegistry({
               }}
             />
           </Suspense>
+          {/* Expose tilt lock trigger to child components */}
+          <div id="tilt-lock-trigger" data-locked={tiltLocked} style={{ display: "none" }} />
         </div>
+        </>
       );
+    }
 
     default:
       return <SplashScreen />;

@@ -10,6 +10,7 @@ import {
 import { CSS_VARS } from "../../styles/cssVars.js";
 import TerminalJournalOverview from "./TerminalJournalOverview.jsx";
 import TimeOfDayHeatmap from "./TimeOfDayHeatmap.jsx";
+import { computePayoutTrajectory } from "./journalMetrics.js";
 
 const dangerTint = "var(--status-danger-soft, rgba(255,69,58,0.1))";
 const surfaceMuted = CSS_VARS.baseLayer;
@@ -28,7 +29,13 @@ export default function JournalTab({
   equityCurveView,
   // Handlers
   addJournalEntry,
+  // Payout projection
+  firmRules = {},
+  accountState = {},
 }) {
+  // Payout trajectory — derived from journal + firmRules (no new computation, pure math)
+  const payout = computePayoutTrajectory(journal, firmRules);
+
   return (
     <div>
       <TerminalJournalOverview
@@ -40,6 +47,90 @@ export default function JournalTab({
       {/* Time-of-Day P&L Heatmap */}
       {metrics?.hourlyProfitMap && (
         <TimeOfDayHeatmap hourlyProfitMap={metrics.hourlyProfitMap} />
+      )}
+
+      {/* Payout Trajectory Projection */}
+      {payout && payout.eligible && payout.pctToTarget > 0 && (
+        <div
+          style={{
+            padding: "12px 20px",
+            background: "rgba(0,0,0,0.06)",
+            border: "1px solid rgba(255,255,255,0.06)",
+            borderRadius: 10,
+            marginBottom: 16,
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: 8,
+            }}
+          >
+            <span
+              style={{
+                color: T.muted,
+                fontSize: 10,
+                letterSpacing: 2,
+                fontWeight: 700,
+              }}
+            >
+              PAYOUT TRAJECTORY
+            </span>
+            <span
+              style={{
+                color: T.gold,
+                fontSize: 10,
+                fontWeight: 800,
+                letterSpacing: 1,
+              }}
+            >
+              {payout.pctToTarget >= 100
+                ? "✓ TARGET REACHED"
+                : payout.projectedDay
+                  ? `Targeting Day ${payout.projectedDay}`
+                  : "Projecting…"}
+            </span>
+          </div>
+          {/* Progress bar */}
+          <div
+            style={{
+              height: 4,
+              background: "rgba(255,255,255,0.06)",
+              borderRadius: 2,
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                height: "100%",
+                width: `${Math.min(100, payout.pctToTarget)}%`,
+                background: payout.pctToTarget >= 100 ? T.green : T.gold,
+                borderRadius: 2,
+                transition: "width 0.5s ease",
+                opacity: 0.8,
+              }}
+            />
+          </div>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              marginTop: 6,
+            }}
+          >
+            <span style={{ color: T.muted, fontSize: 9, fontWeight: 600, letterSpacing: 1 }}>
+              Day {payout.currentDay}
+            </span>
+            <span style={{ color: T.gold, fontSize: 9, fontWeight: 700, letterSpacing: 1 }}>
+              {payout.totalNet >= 0 ? "+" : ""}${payout.totalNet?.toFixed(0)} net · avg ${payout.avgDailyNet?.toFixed(1)}/day
+            </span>
+            <span style={{ color: T.muted, fontSize: 9, fontWeight: 600, letterSpacing: 1 }}>
+              ${payout.targetDays} day target
+            </span>
+          </div>
+        </div>
       )}
 
       <div

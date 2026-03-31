@@ -83,7 +83,8 @@ import SplashScreen from "./features/shell/SplashScreen.jsx";
 import ShellThemeOverlay from "./features/shell/ShellThemeOverlay.jsx";
 import OfficersBriefingFooter from "./features/shell/OfficersBriefingFooter.jsx";
 import { useMaintenanceMode } from "./features/shell/useMaintenanceMode.js";
-import { useToastNotifications } from "./features/shell/useToastNotifications.js";
+import { useToastNotifications, setAudioMuted } from "./features/shell/useToastNotifications.js";
+import { useSessionFatigue } from "./features/shell/useSessionFatigue.js";
 import { useTerminalWorkspaceHydration } from "./features/shell/useTerminalWorkspaceHydration.js";
 import { useAdminDiagnosticsEffects } from "./features/shell/useAdminDiagnosticsEffects.js";
 import { useTelegramDiagnosticsAuditEffect } from "./features/shell/useTelegramDiagnosticsAuditEffect.js";
@@ -304,7 +305,25 @@ export default function TradersRegiment() {
   const [showAdminPwd, setShowAdminPwd] = useState(false);
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [isAudioMuted, setIsAudioMuted] = useState(() => {
+    try { return localStorage.getItem("audio_muted") === "true"; } catch { return false; }
+  });
   const { toasts, showToast, dismissToast } = useToastNotifications();
+
+  // Sync mute state to the audio singleton
+  useEffect(() => {
+    setAudioMuted(isAudioMuted);
+    try { localStorage.setItem("audio_muted", String(isAudioMuted)); } catch { /* best-effort */ }
+  }, [isAudioMuted]);
+
+  // Session fatigue: start rAF timer on mount, stop on logout
+  const { start: startFatigue, stop: stopFatigue } = useSessionFatigue();
+
+  // Start fatigue timer once authenticated; reset on re-login
+  useEffect(() => {
+    if (auth?.uid) startFatigue();
+    return () => stopFatigue();
+  }, [auth?.uid]);
   const [aiStatuses, setAiStatuses] = useState(() => getAIStatusesDetailed());
   const [consciousnessReturnScreen, setConsciousnessReturnScreen] =
     useState("hub");
@@ -587,6 +606,8 @@ export default function TradersRegiment() {
       aiStatuses={aiStatuses}
       consciousnessReturnScreen={consciousnessReturnScreen}
       isAdminAuthenticated={isAdminAuthenticated}
+      isAudioMuted={isAudioMuted}
+      setIsAudioMuted={setIsAudioMuted}
       maintenanceModeActive={maintenanceModeActive}
       ADMIN_UID={ADMIN_UID}
       ADMIN_EMAIL={ADMIN_EMAIL}

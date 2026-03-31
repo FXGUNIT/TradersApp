@@ -243,3 +243,101 @@ export function formatMetricNumber(value, digits = 2) {
   if (!Number.isFinite(value)) return "∞";
   return value.toFixed(digits);
 }
+
+// ─── Payout Trajectory Projection ───────────────────────────────────────────────
+
+/**
+ * computePayoutTrajectory — projects days remaining to reach payout eligibility.
+ *
+ * Uses rolling average of daily net P&L and the firm's consistency rule.
+ * NEVER assumes 100% win rate. Uses a weighted rolling average that degrades
+ * toward the recent average to avoid false hope.
+ *
+ * @param {object[]} journal   - journal entries (each with date, pnl, result)
+ * @param {object}  firmRules - { profitTarget, consistencyMaxDayPct, minimumTradingDays }
+ *
+ * @returns {object} payout projection
+ */
+export function computePayoutTrajectory(journal = [], firmRules = {}) {
+  const profitTarget = parseFloat(firmRules.profitTarget || 0);
+  const consistencyCap = parseFloat(firmRules.consistencyMaxDayPct || 0);
+  const minTradingDays = parseInt(firmRules.minimumTradingDays || "0", 10) || 0;
+
+  if (!profitTarget || profitTarget <= 0) {
+    return { eligible: false, reason: "No payout target set" };
+  }
+
+  // Aggregate daily P&L from journal entries
+  const dailyNet = {};
+  for (const entry of journal) {
+    const d = entry.date || "";
+    if (!d) continue;
+    dailyNet[d] = (dailyNet[d] || 0) + toNumber(entry.pnl);
+  }
+
+  const tradingDays = Object.keys(dailyNet).sort();
+  if (tradingDays.length < 1) {
+    return {
+      eligible: true,
+      currentDay: 0,
+      targetDays: minTradingDays || 14,
+      avgDailyNet: 0,
+      projectedDay: null,
+      pctToTarget: 0,
+      totalNet: 0,
+      reason: "No trades yet",
+    };
+  }
+
+  // Use all-time rolling average (conservative — not just wins)
+  const totalNet = Object.values(dailyNet).reduce((s, v) => s + v, 0);
+  const avgDailyNet = totalNet / tradingDays.length;
+
+  // Consistency check: if any single day's net > consistencyCap% of profitTarget, it's suspicious
+  const hasConsistencyViolation = Object.values(dailyNet).some(
+    (v) => profitTarget > 0 && Math.abs(v) / profitTarget > consistencyCap,
+  );
+
+  if (hasConsistencyViolation) {
+    return {
+      eligible: false,
+      reason: "Consistency rule may be breached — review daily P&L",
+    };
+  }
+
+  // Progress toward payout
+  const pctToTarget = profitTarget > 0 ? Math.min(100, (totalNet / profitTarget) * 100) : 0;
+
+  // Days projected to reach payout (only if avgDailyNet > 0)
+  // Conservative: use weighted rolling average (recent trades weighted more)
+  const weightedAvg = computeWeightedDailyAvg(dailyNet, tradingDays);
+  const projectedDay = weightedAvg > 0
+    ? Math.ceil(profitTarget / weightedAvg)
+    : null;
+
+  return {
+    eligible: true,
+    currentDay: tradingDays.length,
+    targetDays: minTradingDays || 14,
+    avgDailyNet: weightedAvg,
+    projectedDay,
+    pctToTarget,
+    totalNet,
+    reason: null,
+  };
+}
+
+function computeWeightedDailyAvg(dailyNet, tradingDays) {
+  if (!tradingDays.length) return 0;
+  // Weight recent days more: linear decay over last 14 days
+  const n = tradingDays.length;
+  let weightedSum = 0;
+  let weightTotal = 0;
+  for (let i = 0; i < n; i++) {
+    // i=0 is oldest, i=n-1 is newest
+    const weight = i + 1; // newer = higher weight
+    weightedSum += (dailyNet[tradingDays[i]] || 0) * weight;
+    weightTotal += weight;
+  }
+  return weightTotal > 0 ? weightedSum / weightTotal : 0;
+}
