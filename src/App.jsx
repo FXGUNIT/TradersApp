@@ -118,6 +118,7 @@ import {
   persistConsciousnessReturnScreen,
   persistLastScreen,
   persistPendingGoogleSignup,
+  isRestorableScreen,
   readPendingGoogleSignup,
   recordLoginFailure,
   resolveConsciousnessReturnScreen,
@@ -165,6 +166,7 @@ import UserSwitcher from "./components/UserSwitcher.jsx";
 import FullScreenToggle from "./components/FullScreenToggle.jsx";
 import MobileBottomNav from "./components/MobileBottomNav.jsx";
 import FeatureGuard from "./components/FeatureGuard.jsx";
+import EmptyStateCard from "./components/EmptyStateCard.jsx";
 import CleanLoginScreen from "./features/auth/CleanLoginScreen.jsx";
 import AdminUnlockModal from "./features/admin-security/AdminUnlockModal.jsx";
 import AdminDashboardScreen from "./features/admin-security/AdminDashboardScreen.jsx";
@@ -1142,7 +1144,7 @@ export default function TradersRegiment() {
   }, []);
 
   useEffect(() => {
-    if (!auth?.uid || !RESTORABLE_APP_SCREENS.has(screen)) {
+    if (!auth?.uid || !isRestorableScreen(screen)) {
       return;
     }
     persistLastScreen(auth.uid, screen);
@@ -1152,7 +1154,7 @@ export default function TradersRegiment() {
     if (
       !auth?.uid ||
       screen !== SCREEN_IDS.CONSCIOUSNESS ||
-      !RESTORABLE_APP_SCREENS.has(consciousnessReturnScreen)
+      !isRestorableScreen(consciousnessReturnScreen)
     ) {
       return;
     }
@@ -2374,11 +2376,16 @@ export default function TradersRegiment() {
   );
 
   const handleAdminVerifyCodes = useCallback(() => {
-    return executeHandleAdminVerifyCodes({
+    const verified = executeHandleAdminVerifyCodes({
       adminOtps,
       setAdminOtpStep,
       setAdminOtpErr,
     });
+    if (verified) {
+      setAdminOtpsVerified(true);
+      setAdminOtpErr("");
+    }
+    return verified;
   }, [adminOtps]);
 
   const handleAdminRequestNewCodes = useCallback(() => {

@@ -12,6 +12,9 @@ const RESTORABLE_APP_SCREENS = new Set([
   SCREEN_IDS.SESSIONS,
 ]);
 
+export const isRestorableScreen = (screen) =>
+  RESTORABLE_APP_SCREENS.has(screen);
+
 const safeStorageGet = (key, fallback = null) => {
   try {
     const raw = localStorage.getItem(key);
