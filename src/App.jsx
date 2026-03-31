@@ -24,6 +24,7 @@ import { sendWelcomeEmail } from "./utils/email.js";
 import FloatingChatWidget from "./components/FloatingChatWidget.jsx";
 import ChatHelpline from "./components/ChatHelpline.jsx";
 import MainTerminal from "./features/terminal/MainTerminal.jsx";
+import { useTerminalPersistenceHandlers } from "./features/terminal/useTerminalPersistenceHandlers.js";
 import CollectiveConsciousnessPage from "./pages/CollectiveConsciousness.jsx";
 import {
   quadCoreStatus as aiQuadCoreStatus,
@@ -186,11 +187,6 @@ import SessionsManagementScreen from "./features/identity/SessionsManagementScre
 import ForcePasswordResetScreen from "./features/identity/ForcePasswordResetScreen.jsx";
 import WaitingRoomScreen from "./features/identity/WaitingRoomScreen.jsx";
 import SupportChatModal from "./features/support/SupportChatModal.jsx";
-import {
-  executeSaveJournal,
-  executeSaveAccount,
-  executeSaveFirmRules,
-} from "./features/terminal/terminalPersistenceHandlers.js";
 import {
   BackToTopButton,
   Breadcrumbs,
@@ -993,29 +989,13 @@ export default function TradersRegiment() {
     setShowAdminPwd,
   });
 
-  const saveJournal = async (jData) => {
-    await executeSaveJournal({
+  const { saveJournal, saveAccount, saveFirmRules } =
+    useTerminalPersistenceHandlers({
       auth,
-      journalData: jData,
       saveTerminalJournal,
-    });
-  };
-
-  const saveAccount = async (aData) => {
-    await executeSaveAccount({
-      auth,
-      accountData: aData,
       saveTerminalAccountState,
-    });
-  };
-
-  const saveFirmRules = async (fData) => {
-    await executeSaveFirmRules({
-      auth,
-      firmRulesData: fData,
       saveTerminalFirmRules,
     });
-  };
   // â”€â”€â”€ MAIN ROUTER RENDER â”€â”€â”€
   // Phase 3: Invite flow overlay (password reset -> invite screen) - simple hook in UI
   // The InviteScreen is shown when user has initiated an invite flow (password reset leading here)
