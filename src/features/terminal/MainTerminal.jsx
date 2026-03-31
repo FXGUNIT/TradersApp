@@ -59,6 +59,14 @@ import {
 } from "../../services/clients/TerminalAnalyticsClient.js";
 import { getISTState } from "../../utils/tradingUtils.js";
 
+const warningTint = "var(--status-warning-soft, rgba(255,214,10,0.12))";
+const dangerTint = "var(--status-danger-soft, rgba(255,69,58,0.1))";
+const infoTint = "var(--status-info-soft, rgba(59,130,246,0.08))";
+const overlayTint = "var(--surface-overlay, rgba(15,23,42,0.5))";
+const modalShadow = "var(--shadow-deep, 0 30px 80px rgba(15,23,42,0.18))";
+const surfaceMuted = CSS_VARS.baseLayer;
+const surfaceStrong = CSS_VARS.surfaceElevated;
+
 // Default states
 const defaultAccountState = {
   startingBalance: "",
@@ -1785,14 +1793,14 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
       {/* Header */}
       <div style={{ 
         background: CSS_VARS.card, 
-        borderBottom: `1px solid ${CSS_VARS.borderSubtle}`, 
+        borderBottom: `1px solid ${CSS_VARS.borderSubtle}`,
         padding: "16px 32px", 
         display: "flex", 
         alignItems: "center", 
         justifyContent: "space-between", 
         flexWrap: "wrap", 
         gap: 16,
-        boxShadow: "0 1px 2px 0 rgba(0, 0, 0, 0.05)"
+        boxShadow: `0 1px 2px 0 ${CSS_VARS.borderSubtle}`
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
           <div style={{ display: "flex", gap: 4, alignItems: "flex-end" }}>
@@ -1843,8 +1851,8 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
       <div
         style={{
           padding: "14px 32px",
-          background: "linear-gradient(90deg, rgba(37,99,235,0.08), rgba(15,23,42,0.02))",
-          borderBottom: "1px solid rgba(148,163,184,0.18)",
+          background: `linear-gradient(90deg, ${CSS_VARS.accentGlow}, transparent)`,
+          borderBottom: `1px solid ${CSS_VARS.borderSubtle}`,
         }}
       >
         <div
@@ -1863,11 +1871,11 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
       </div>
 
       {/* Navigation Tabs */}
-      <div style={{ 
-        background: CSS_VARS.card, 
-        borderBottom: `1px solid #E5E7EB`, 
-        padding: "0 32px", 
-        display: "flex", 
+      <div style={{
+        background: CSS_VARS.card,
+        borderBottom: `1px solid ${CSS_VARS.borderSubtle}`,
+        padding: "0 32px",
+        display: "flex",
         gap: 0,
         overflowX: "auto",
         boxShadow: "none"
@@ -1920,7 +1928,7 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
         {throttleActive && (
           <div style={{
             padding: "14px 20px",
-            background: "rgba(255,214,10,0.12)",
+            background: warningTint,
             border: `2px solid ${T.gold}`,
             borderRadius: 8,
             marginBottom: 16,
@@ -1931,7 +1939,7 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
             <span style={{ fontSize: 20 }}>⚠</span>
             <div>
               <div style={{ color: T.gold, fontSize: 13, fontWeight: 800, letterSpacing: 1 }}>DRAWDOWN THROTTLE ACTIVE: RISK HALVED TO PROTECT CAPITAL</div>
-              <div style={{ color: "#A0781A", fontSize: 11, marginTop: 3 }}>Distance to liquidation within 25% of max drawdown. Size reduced to {activeRiskPct}%.</div>
+              <div style={{ color: CSS_VARS.statusWarning, fontSize: 11, marginTop: 3 }}>Distance to liquidation within 25% of max drawdown. Size reduced to {activeRiskPct}%.</div>
             </div>
           </div>
         )}
@@ -1942,7 +1950,7 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
             padding: "14px 18px",
             borderRadius: 12,
             background: CSS_VARS.card,
-            border: "1px solid rgba(148,163,184,0.16)",
+            border: `1px solid ${CSS_VARS.borderSubtle}`,
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
@@ -2036,13 +2044,13 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
                   textAlign:"center",
                   cursor:isCsvParsing?"progress":"pointer",
                   opacity:isCsvParsing?0.82:1,
-                  background:"#F9FAFB"
+                  background: surfaceMuted
                 }}
               >
                 <input id="csvIn" type="file" accept=".txt,.csv" style={{display:"none"}} onChange={handleCsvDrop} disabled={isCsvParsing}/>
                 <div style={{fontSize:24,marginBottom:6,opacity:0.25}}>⊞</div>
                 <div style={{color:csvStatusColor,fontSize:12,fontWeight:600}}>{csvStatusText}</div>
-                {parsed && <div style={{color:"#9CA3AF",fontSize:11,marginTop:4}}>Latest: {parsed.days[parsed.days.length - 1]?.date} · ATR(14) = <span style={{color:T.green,fontWeight:700}}>{parsed.tradingHoursAtr14} pts</span></div>}
+                {parsed && <div style={{color:CSS_VARS.textTertiary,fontSize:11,marginTop:4}}>Latest: {parsed.days[parsed.days.length - 1]?.date} · ATR(14) = <span style={{color:T.green,fontWeight:700}}>{parsed.tradingHoursAtr14} pts</span></div>}
               </div>
             </div>
 
@@ -2061,19 +2069,19 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
                       onDragOver={e=>e.preventDefault()} 
                       onClick={e=>{e.stopPropagation();document.getElementById(zone.inputId).click();}} 
                       style={{
-                        border:`2px dashed ${zone.state?zone.color:"#E5E7EB"}`,
+                        border:`2px dashed ${zone.state?zone.color:CSS_VARS.borderSubtle}`,
                         borderRadius:6,
                         padding:"12px",
                         textAlign:"center",
                         cursor:"pointer",
-                        background:"#F9FAFB",
+                        background: surfaceMuted,
                         minHeight:64
                       }}
                     >
                       <input id={zone.inputId} type="file" accept="image/*" style={{display:"none"}} onChange={makeImgHandler(zone.setter)}/>
                       {zone.state
-                        ?<div><img src={`data:${zone.state.type};base64,${zone.state.b64}`} style={{maxWidth:"100%",maxHeight:56,borderRadius:3,objectFit:"contain",marginBottom:4}}/><button onClick={e=>{e.stopPropagation();zone.setter(null);}} style={{background:"rgba(255,69,58,0.1)",border:`1px solid rgba(255,69,58,0.4)`,borderRadius:4,padding:"2px 8px",cursor:"pointer",color:T.red,fontSize:9,fontFamily:T.font}}>✕ Remove</button></div>
-                        :<div><div style={{color:"#9CA3AF",fontSize:11,marginBottom:2}}>Click → Ctrl+V or drag</div><div style={{color:"#D1D5DB",fontSize:9}}>{zone.hint}</div></div>}
+                        ?<div><img src={`data:${zone.state.type};base64,${zone.state.b64}`} style={{maxWidth:"100%",maxHeight:56,borderRadius:3,objectFit:"contain",marginBottom:4}}/><button onClick={e=>{e.stopPropagation();zone.setter(null);}} style={{background:dangerTint,border:`1px solid ${CSS_VARS.statusDanger}`,borderRadius:4,padding:"2px 8px",cursor:"pointer",color:T.red,fontSize:9,fontFamily:T.font}}>✕ Remove</button></div>
+                        :<div><div style={{color:CSS_VARS.textTertiary,fontSize:11,marginBottom:2}}>Click → Ctrl+V or drag</div><div style={{color:CSS_VARS.textSecondary,fontSize:9}}>{zone.hint}</div></div>}
                     </div>
                   </div>
                 </PasteZone>
@@ -2093,7 +2101,7 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
                     <div style={{display:"flex",gap:8,alignItems:"center"}}><Tag label="ANALYSIS COMPLETE" color={T.green}/><AMDPhaseTag phase={displayedAmdPhase}/></div>
                     <div style={{display:"flex",gap:8}}>
                       <button onClick={()=>{setActiveTab('trade');setErr('');}} style={glowBtn(T.orange,false)} className="btn-glass">→ TRADE ENTRY</button>
-                      <button onClick={()=>navigator.clipboard?.writeText(p1Out)} style={{background:"transparent",border:`1px solid #E5E7EB`,borderRadius:6,padding:"8px 12px",cursor:"pointer",color:"#6B7280",fontSize:10,fontFamily:T.font}}>⎘ COPY</button>
+                      <button onClick={()=>navigator.clipboard?.writeText(p1Out)} style={{background:"transparent",border:`1px solid ${CSS_VARS.borderSubtle}`,borderRadius:6,padding:"8px 12px",cursor:"pointer",color:CSS_VARS.textSecondary,fontSize:10,fontFamily:T.font}}>⎘ COPY</button>
                     </div>
                   </div>
                   <div style={cardS({borderLeft:`4px solid ${T.blue}`})} className="glass-panel"><RenderOut text={p1Out}/></div>
@@ -2146,7 +2154,7 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
               </div>
               
               {isThrottled && (
-                <div style={{ marginTop: 12, padding: "10px 16px", background: "rgba(255,214,10,0.1)", border: `1px solid rgba(255,214,10,0.3)`, borderRadius: 6, color: T.gold, fontSize: 12, fontWeight: 600 }}>
+                <div style={{ marginTop: 12, padding: "10px 16px", background: warningTint, border: `1px solid ${CSS_VARS.statusWarning}`, borderRadius: 6, color: T.gold, fontSize: 12, fontWeight: 600 }}>
                   ⚠ Drawdown throttle active: risk halved to {activeRiskPct}%
                 </div>
               )}
@@ -2182,12 +2190,12 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
                         onDrop={handleScreenshotDrop} 
                         onDragOver={e => e.preventDefault()} 
                         style={{ 
-                          border: `2px dashed ${screenshots.length ? T.purple : "rgba(255,255,255,0.15)"}`, 
+                          border: `2px dashed ${screenshots.length ? T.purple : CSS_VARS.borderSubtle}`,
                           borderRadius: 8, 
                           padding: "16px", 
                           textAlign: "center", 
                           cursor: "copy", 
-                          background: "rgba(0,0,0,0.3)" 
+                          background: CSS_VARS.surfaceGlass
                         }} 
                         className="glass-panel"
                       >
@@ -2202,7 +2210,7 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
                                   <img src={`data:${s.type};base64,${s.b64}`} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                                   <button 
                                     onClick={e => { e.stopPropagation(); setScreenshots(p => p.filter((_, idx) => idx !== i)); }} 
-                                    style={{ position: "absolute", top: 0, right: 0, background: "rgba(0,0,0,0.8)", border: "none", width: 16, height: 16, cursor: "pointer", color: "#fff", fontSize: 10, padding: 0 }}
+                                    style={{ position: "absolute", top: 0, right: 0, background: CSS_VARS.surfaceGlass, border: "none", width: 16, height: 16, cursor: "pointer", color: CSS_VARS.textPrimary, fontSize: 10, padding: 0 }}
                                   >
                                     ✕
                                   </button>
@@ -2223,12 +2231,12 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
                         onDragOver={e => e.preventDefault()} 
                         onClick={e => { e.stopPropagation(); document.getElementById(zone.inputId).click(); }} 
                         style={{ 
-                          border: `2px dashed ${zone.state ? zone.color : "rgba(255,255,255,0.15)"}`, 
+                          border: `2px dashed ${zone.state ? zone.color : CSS_VARS.borderSubtle}`,
                           borderRadius: 8, 
                           padding: "16px", 
                           textAlign: "center", 
                           cursor: "pointer", 
-                          background: "rgba(0,0,0,0.3)" 
+                          background: CSS_VARS.surfaceGlass
                         }} 
                         className="glass-panel"
                       >
@@ -2238,7 +2246,7 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
                             <img src={`data:${zone.state.type};base64,${zone.state.b64}`} style={{ maxWidth: "100%", maxHeight: 60, borderRadius: 4, objectFit: "contain", marginBottom: 8, cursor: "crosshair" }} />
                             <button 
                               onClick={e => { e.stopPropagation(); zone.setter(null); }} 
-                              style={{ display: "block", margin: "0 auto", background: "rgba(255,69,58,0.1)", border: `1px solid rgba(255,69,58,0.4)`, borderRadius: 4, padding: "4px 12px", cursor: "pointer", color: T.red, fontSize: 10, fontFamily: T.font, fontWeight: 700 }}
+                              style={{ display: "block", margin: "0 auto", background: dangerTint, border: `1px solid ${CSS_VARS.statusDanger}`, borderRadius: 4, padding: "4px 12px", cursor: "pointer", color: T.red, fontSize: 10, fontFamily: T.font, fontWeight: 700 }}
                             >
                               ✕
                             </button>
@@ -2256,7 +2264,7 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
             </div>
 
             {/* AI Extract Button */}
-            <div style={{ display: "flex", alignItems: "center", gap: 16, margin: "16px 0", padding: "12px 20px", background: CSS_VARS.card, border: `1px solid var(--border-subtle, rgba(0,0,0,0.05))`, borderRadius: 8, boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.1)" }} className="glass-panel">
+            <div style={{ display: "flex", alignItems: "center", gap: 16, margin: "16px 0", padding: "12px 20px", background: CSS_VARS.card, border: `1px solid ${CSS_VARS.borderSubtle}`, borderRadius: 8, boxShadow: `0 1px 3px 0 ${CSS_VARS.borderSubtle}` }} className="glass-panel">
               <button onClick={extractFromScreenshots} disabled={extracting || screenshots.length === 0} style={glowBtn(T.purple, extracting || !screenshots.length)} className="btn-glass">
                 {extracting ? "⟳ READING..." : "◉ EXTRACT INDICATORS"}
               </button>
@@ -2275,7 +2283,7 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
             </div>
 
             {err && (
-              <div style={{ color: T.red, fontSize: 13, marginBottom: 16, fontWeight: 600, padding: "12px 16px", background: "rgba(255,69,58,0.1)", borderRadius: 8 }}>
+              <div style={{ color: T.red, fontSize: 13, marginBottom: 16, fontWeight: 600, padding: "12px 16px", background: dangerTint, borderRadius: 8 }}>
                 ⚠ {err}
               </div>
             )}
@@ -2307,7 +2315,7 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
                   </div>
                   
               {showP2TradeForm && (
-                    <div style={{ background: CSS_VARS.card, border: `1px solid var(--border-subtle, rgba(0,0,0,0.05))`, borderRadius: 12, padding: "20px 24px", marginBottom: 20, boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)" }} className="glass-panel">
+                    <div style={{ background: CSS_VARS.card, border: `1px solid ${CSS_VARS.borderSubtle}`, borderRadius: 12, padding: "20px 24px", marginBottom: 20, boxShadow: `0 1px 3px 0 ${CSS_VARS.borderSubtle}, 0 1px 2px 0 ${CSS_VARS.borderSubtle}` }} className="glass-panel">
                       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16, marginBottom: 16 }}>
                         <Field label="EXIT PRICE" value={p2Jf.exit} onChange={sp2('exit')} type="number" mono />
                         <Field label="RESULT" value={p2Jf.result} onChange={sp2('result')} options={[{ v: 'win', l: '✓ Win' }, { v: 'loss', l: '✗ Loss' }, { v: 'breakeven', l: '◎ BE' }]} />
@@ -2349,7 +2357,7 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
             </div>
             
             {journalFormOpen && (
-              <div style={{background:"#F9FAFB",border:`1px solid #E5E7EB`,borderRadius:10,padding:"18px 20px",marginBottom:14}}>
+              <div style={{background: surfaceMuted,border:`1px solid ${CSS_VARS.borderSubtle}`,borderRadius:10,padding:"18px 20px",marginBottom:14}}>
                 <div style={{ color: T.purple, fontSize: 11, letterSpacing: 1.5, fontWeight: 800, marginBottom: 10, textTransform: "uppercase" }}>
                   Add Journal Entry
                 </div>
@@ -2402,17 +2410,17 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
             )}
 
             {journal.length === 0 ? (
-              <div style={{ background: CSS_VARS.card, border: `1px solid var(--border-subtle, rgba(0,0,0,0.05))`, borderRadius: 12, padding: "60px", textAlign: "center", color: CSS_VARS.textSecondary, fontSize: 14, fontWeight: 600, boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.1)" }} className="glass-panel">
+              <div style={{ background: CSS_VARS.card, border: `1px solid ${CSS_VARS.borderSubtle}`, borderRadius: 12, padding: "60px", textAlign: "center", color: CSS_VARS.textSecondary, fontSize: 14, fontWeight: 600, boxShadow: `0 1px 3px 0 ${CSS_VARS.borderSubtle}` }} className="glass-panel">
                 No trades logged yet
               </div>
             ) : (
-            <div style={{ background: CSS_VARS.card, border: `1px solid var(--border-subtle, rgba(0,0,0,0.05))`, borderRadius: 12, overflow: "hidden", boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.1)" }} className="glass-panel">
+            <div style={{ background: CSS_VARS.card, border: `1px solid ${CSS_VARS.borderSubtle}`, borderRadius: 12, overflow: "hidden", boxShadow: `0 1px 3px 0 ${CSS_VARS.borderSubtle}` }} className="glass-panel">
                 <div style={{ overflowX: "auto" }}>
                   <table style={{ width: "100%", borderCollapse: "collapse" }}>
                     <thead>
-                      <tr style={{ borderBottom: `1px solid #E5E7EB` }}>
+                      <tr style={{ borderBottom: `1px solid ${CSS_VARS.borderSubtle}` }}>
                         {["DATE", "INST", "DIR", "TYPE", "AMD", "ENTRY", "EXIT", "P&L", "RESULT", ""].map((h, i) => (
-                          <th key={i} style={{ padding: "14px 16px", textAlign: "left", color: "#6B7280", fontSize: 10, letterSpacing: 1.5, fontFamily: T.font, fontWeight: 700, whiteSpace: "nowrap", background: "#F9FAFB" }}>{h}</th>
+                          <th key={i} style={{ padding: "14px 16px", textAlign: "left", color: CSS_VARS.textSecondary, fontSize: 10, letterSpacing: 1.5, fontFamily: T.font, fontWeight: 700, whiteSpace: "nowrap", background: surfaceMuted }}>{h}</th>
                         ))}
                       </tr>
                     </thead>
@@ -2422,32 +2430,32 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
                         const isW = t.result === 'win';
                         const isL = t.result === 'loss';
                         return (
-                          <tr key={i} style={{ borderBottom: `1px solid #E5E7EB`, background: i % 2 === 0 ? "#F9FAFB" : "#FFFFFF" }}>
-                            <td style={{ padding: "12px 16px", color: "#6B7280", fontSize: 11, whiteSpace: "nowrap", fontFamily: T.mono }}>{t.date}</td>
-                            <td style={{ padding: "12px 16px", color: "#111827", fontSize: 12, fontWeight: 700 }}>{t.instrument}</td>
+                          <tr key={i} style={{ borderBottom: `1px solid ${CSS_VARS.borderSubtle}`, background: i % 2 === 0 ? surfaceMuted : surfaceStrong }}>
+                            <td style={{ padding: "12px 16px", color: CSS_VARS.textSecondary, fontSize: 11, whiteSpace: "nowrap", fontFamily: T.mono }}>{t.date}</td>
+                            <td style={{ padding: "12px 16px", color: CSS_VARS.textPrimary, fontSize: 12, fontWeight: 700 }}>{t.instrument}</td>
                             <td style={{ padding: "12px 16px" }}>
-                              <span style={{ color: t.direction === 'Long' ? "#10B981" : "#EF4444", fontSize: 11, fontWeight: 600 }}>
+                              <span style={{ color: t.direction === 'Long' ? T.green : T.red, fontSize: 11, fontWeight: 600 }}>
                                 {t.direction === 'Long' ? 'BUY' : 'SELL'}
                               </span>
                             </td>
-                            <td style={{ padding: "12px 16px", color: "#0EA5E9", fontSize: 11, fontWeight: 500 }}>{t.tradeType}</td>
+                            <td style={{ padding: "12px 16px", color: T.blue, fontSize: 11, fontWeight: 500 }}>{t.tradeType}</td>
                             <td style={{ padding: "12px 16px" }}>
-                              <span style={{ color: "#D97706", fontSize: 10, fontWeight: 600 }}>{t.amdPhase?.slice(0, 10)}</span>
+                              <span style={{ color: T.gold, fontSize: 10, fontWeight: 600 }}>{t.amdPhase?.slice(0, 10)}</span>
                             </td>
-                            <td style={{ padding: "12px 16px", color: "#A1A1A6", fontSize: 11, fontFamily: T.mono }}>{t.entry || "—"}</td>
-                            <td style={{ padding: "12px 16px", color: "#A1A1A6", fontSize: 11, fontFamily: T.mono }}>{t.exit || "—"}</td>
-                            <td style={{ padding: "12px 16px", color: pv >= 0 ? "#10B981" : "#EF4444", fontSize: 13, fontWeight: 800, fontFamily: T.mono }}>
+                            <td style={{ padding: "12px 16px", color: CSS_VARS.textTertiary, fontSize: 11, fontFamily: T.mono }}>{t.entry || "—"}</td>
+                            <td style={{ padding: "12px 16px", color: CSS_VARS.textTertiary, fontSize: 11, fontFamily: T.mono }}>{t.exit || "—"}</td>
+                            <td style={{ padding: "12px 16px", color: pv >= 0 ? T.green : T.red, fontSize: 13, fontWeight: 800, fontFamily: T.mono }}>
                               {pv >= 0 ? "+" : ""}${pv.toFixed(0)}
                             </td>
                             <td style={{ padding: "12px 16px" }}>
-                              <span style={{ color: isW ? "#10B981" : isL ? "#EF4444" : "#6B7280", fontSize: 11, fontWeight: 800 }}>
+                              <span style={{ color: isW ? T.green : isL ? T.red : CSS_VARS.textSecondary, fontSize: 11, fontWeight: 800 }}>
                                 {isW ? "WIN" : isL ? "LOSS" : "BE"}
                               </span>
                             </td>
                             <td style={{ padding: "12px 16px" }}>
                               <button 
                                 onClick={() => setJournal(prev => prev.filter((_, idx) => idx !== journal.length - 1 - i))} 
-                                style={{ background: "rgba(255,69,58,0.1)", border: "1px solid rgba(255,69,58,0.3)", borderRadius: 4, cursor: "pointer", color: T.red, fontSize: 10, padding: "4px 8px", fontWeight: 700 }}
+                                style={{ background: dangerTint, border: `1px solid ${CSS_VARS.statusDanger}`, borderRadius: 4, cursor: "pointer", color: T.red, fontSize: 10, padding: "4px 8px", fontWeight: 700 }}
                               >
                                 ✕
                               </button>
@@ -2473,12 +2481,12 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
                 onDragOver={(e) => e.preventDefault()}
                 onClick={() => document.getElementById("tcIn")?.click()}
                 style={{
-                  border: `2px dashed ${firmRules.parsed ? T.green : "rgba(255,255,255,0.15)"}`,
+                  border: `2px dashed ${firmRules.parsed ? T.green : CSS_VARS.borderSubtle}`,
                   borderRadius: 10,
                   padding: "32px",
                   textAlign: "center",
                   cursor: "pointer",
-                  background: "rgba(0,0,0,0.3)",
+                  background: CSS_VARS.surfaceGlass,
                   marginBottom: 16,
                   position: "relative",
                   overflow: "hidden",
@@ -2520,7 +2528,7 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
               {firmRules.parsed && Array.isArray(firmRules.keyRules) && firmRules.keyRules.length > 0 && (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 12 }}>
                   {firmRules.keyRules.slice(0, 10).map((rule, idx) => (
-                    <div key={idx} style={{ padding: "10px 14px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, color: T.muted, fontSize: 12 }}>
+                    <div key={idx} style={{ padding: "10px 14px", background: CSS_VARS.surfaceGlass, border: `1px solid ${CSS_VARS.borderSubtle}`, borderRadius: 8, color: T.muted, fontSize: 12 }}>
                       • {rule}
                     </div>
                   ))}
@@ -2568,9 +2576,8 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
                   padding: "16px 18px",
                   borderRadius: 12,
                   textDecoration: "none",
-                  background:
-                    "linear-gradient(135deg, rgba(37,99,235,0.14), rgba(14,165,233,0.1))",
-                  border: "1px solid rgba(37,99,235,0.24)",
+                  background: `linear-gradient(135deg, ${CSS_VARS.accentGlow}, ${infoTint})`,
+                  border: `1px solid ${CSS_VARS.accentPrimary}`,
                 }}
               >
                 <div
@@ -2609,7 +2616,7 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
           style={{
             position: "fixed",
             inset: 0,
-            background: "rgba(15,23,42,0.5)",
+            background: overlayTint,
             backdropFilter: "blur(8px)",
             display: "flex",
             alignItems: "center",
@@ -2623,10 +2630,10 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
               width: "100%",
               maxWidth: 460,
               background: CSS_VARS.card,
-              border: "1px solid rgba(148,163,184,0.18)",
+              border: `1px solid ${CSS_VARS.borderSubtle}`,
               borderRadius: 20,
               padding: "24px 22px",
-              boxShadow: "0 30px 80px rgba(15,23,42,0.18)",
+              boxShadow: modalShadow,
             }}
             className="glass-panel"
           >

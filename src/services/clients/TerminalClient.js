@@ -37,18 +37,6 @@ function normalizeJournalPayload(journal) {
   return {};
 }
 
-function readLegacyWorkspace(legacy = null) {
-  if (!legacy || typeof legacy !== "object") {
-    return null;
-  }
-
-  return normalizeWorkspace({
-    journal: legacy.journal || {},
-    accountState: legacy.accountState || {},
-    firmRules: legacy.firmRules || {},
-  });
-}
-
 export async function loadWorkspace(uid, token) {
   if (!uid) {
     return null;
@@ -71,9 +59,7 @@ export async function loadWorkspace(uid, token) {
   if (workspace) {
     return workspace;
   }
-
-  const legacy = await dbR(`users/${uid}`, token);
-  return readLegacyWorkspace(legacy);
+  return null;
 }
 
 export async function saveWorkspace(uid, token, workspace) {
