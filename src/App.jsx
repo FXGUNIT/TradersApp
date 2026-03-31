@@ -15,7 +15,6 @@ import {
   browserLocalPersistence,
   onAuthStateChanged,
   GoogleAuthProvider,
-  signInWithPopup,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
@@ -46,7 +45,6 @@ import AiEnginesStatus from "./components/AiEnginesStatus.jsx";
 import { setupConsoleInterceptor } from "./services/telemetry.js";
 import { setupNetworkMonitor } from "./services/networkMonitor.js";
 import { setupTTITracker } from "./services/ttiTracker.js";
-import { SecuritySentinel } from "./services/securitySentinel.js";
 import {
   calculateVolatilityRatio,
   getDynamicParameters,
@@ -140,6 +138,7 @@ import {
   executeLoginPasswordReset,
   executeLogin,
   executeStructuredSignup,
+  executeStructuredGoogleAuth,
 } from "./features/identity/authCredentialHandlers.js";
 import {
   executeSendAdminOTPs,
@@ -147,6 +146,7 @@ import {
   executeHandleAdminAccess,
   executeHandleAdminVerifyCodes,
 } from "./features/identity/adminAccessHandlers.js";
+import { executeCheckUserStatus } from "./features/identity/authRoutingHandlers.js";
 import {
   findUserByEmail as findIdentityUserByEmail,
   loadLegacyUserProfile,
@@ -1623,99 +1623,23 @@ export default function TradersRegiment() {
   // Check user status and route to appropriate screen
   const checkUserStatus = useCallback(
     async (authData) => {
-      try {
-        const {
-          profile: nextProfile,
-          screen: nextScreen,
-          userData,
-        } = await loadLegacyUserProfile(authData);
-
-        if (!userData || !nextProfile) {
-          const currentUser = firebaseAuth?.currentUser;
-          const googleDraft =
-            readPendingGoogleSignup() ||
-            (currentUser?.providerData?.some(
-              (provider) => provider?.providerId === "google.com",
-            )
-              ? {
-                  uid: authData.uid,
-                  email: authData.email,
-                  fullName:
-                    currentUser.displayName ||
-                    authData.email?.split("@")[0] ||
-                    "",
-                  authProvider: "google",
-                }
-              : null);
-
-          if (googleDraft?.uid === authData.uid) {
-            persistPendingGoogleSignup(googleDraft);
-            setGoogleUser(googleDraft);
-            setProfile({
-              ...googleDraft,
-              uid: authData.uid,
-              token: authData.token,
-              email: authData.email,
-              emailVerified: authData.emailVerified,
-              status: "DRAFT",
-            });
-            setScreen(SCREEN_IDS.SIGNUP);
-            return;
-          }
-
-          setGoogleUser(null);
-          setProfile(null);
-          setScreen(SCREEN_IDS.LOGIN);
-          return;
-        }
-
-        clearPendingGoogleSignup();
-        setGoogleUser(null);
-        setProfile({
-          ...nextProfile,
-          emailVerified: authData.emailVerified,
-        });
-
-        if (userData.status === "BLOCKED") {
-          setScreen(SCREEN_IDS.LOGIN);
-          showToast(
-            "Account entered stasis mode. Contact the digital guardians.",
-            "error",
-          );
-          return;
-        }
-
-        if (userData.status === "PENDING" || authData.emailVerified === false) {
-          setScreen(SCREEN_IDS.WAITING);
-          return;
-        }
-
-        if (authData.uid === ADMIN_UID) {
-          setScreen(SCREEN_IDS.ADMIN);
-          return;
-        }
-
-        const fallbackScreen = nextScreen || SCREEN_IDS.HUB;
-        const restoredScreen = resolveRestorableScreen(
-          authData.uid,
-          fallbackScreen,
-        );
-        setConsciousnessReturnScreen(
-          resolveConsciousnessReturnScreen(authData.uid, SCREEN_IDS.HUB),
-        );
-        setScreen(restoredScreen);
-      } catch (error) {
-        console.error("Status check failed", error);
-        // Only redirect to login on auth errors, not network/permission issues
-        if (
-          error?.message?.includes("auth") ||
-          error?.code?.includes("auth") ||
-          error?.message?.includes("permission")
-        ) {
-          setScreen(SCREEN_IDS.LOGIN);
-        }
-        // Otherwise keep user on current screen - don't disrupt experience for transient errors
-      }
+      await executeCheckUserStatus({
+        authData,
+        loadLegacyUserProfile,
+        firebaseAuth,
+        readPendingGoogleSignup,
+        persistPendingGoogleSignup,
+        setGoogleUser,
+        setProfile,
+        setScreen,
+        showToast,
+        ADMIN_UID,
+        resolveRestorableScreen,
+        resolveConsciousnessReturnScreen,
+        setConsciousnessReturnScreen,
+        clearPendingGoogleSignup,
+        SCREEN_IDS,
+      });
     },
     [showToast],
   );
@@ -1942,52 +1866,22 @@ export default function TradersRegiment() {
     applicationData = null,
     authenticatedUser = null,
   ) => {
-    if (!firebaseAuth || !FB_KEY) {
-      throw new Error("Google sign-in is unavailable right now.");
-    }
-
-    const user =
-      authenticatedUser ||
-      (await signInWithPopup(firebaseAuth, googleProvider)).user;
-    const email = String(user.email || "").toLowerCase();
-
-    if (!isValidGmailAddress(email)) {
-      await firebaseAuth.signOut();
-      throw new Error("Only Gmail addresses are allowed.");
-    }
-
-    const authData = await syncAuthSessionFromUser(user, true);
-    const existingIdentityRecord = await loadLegacyUserProfile(authData);
-    const userData = existingIdentityRecord?.userData || null;
-
-    if (userData) {
-      clearPendingGoogleSignup();
-      setGoogleUser(null);
-      await checkUserStatus(authData);
-      return;
-    }
-
-    if (applicationData) {
-      await handleStructuredSignup({
-        ...applicationData,
-        email,
-        fullName:
-          applicationData.fullName || user.displayName || email.split("@")[0],
-        authProvider: "google",
-      });
-      return;
-    }
-
-    const googleDraft = {
-      uid: user.uid,
-      email,
-      fullName: user.displayName || email.split("@")[0],
-      authProvider: "google",
-    };
-
-    persistPendingGoogleSignup(googleDraft);
-    setGoogleUser(googleDraft);
-    setScreen("signup");
+    return executeStructuredGoogleAuth({
+      applicationData,
+      authenticatedUser,
+      firebaseAuth,
+      FB_KEY,
+      googleProvider,
+      isValidGmailAddress,
+      syncAuthSessionFromUser,
+      loadLegacyUserProfile,
+      handleStructuredSignup,
+      persistPendingGoogleSignup,
+      setGoogleUser,
+      clearPendingGoogleSignup,
+      setScreen,
+      checkUserStatus,
+    });
   };
 
   const handleBackToLoginFromSignup = async () => {

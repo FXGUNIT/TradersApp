@@ -15,9 +15,8 @@ import {
   fuzzySearchScore,
   renderHighlightedText,
 } from "../../utils/searchUtils.jsx";
-import { SecuritySentinel } from "../../services/securitySentinel.js";
 import { detectDuplicateIPs as scanDuplicateIPs } from "../../services/ipScanner.js";
-import { db as firebaseDb } from "../../services/firebase.js";
+import useAdminSecuritySentinel from "./useAdminSecuritySentinel.js";
 
 export default function AdminDashboardScreen({
   auth,
@@ -144,6 +143,12 @@ export default function AdminDashboardScreen({
 
   // RULE #310: Scroll-spy for menu items - track which section user is viewing
   const [activeSection, setActiveSection] = useState("users");
+  const { recordAdminActivity } = useAdminSecuritySentinel({
+    auth,
+    isAdminAuthenticated,
+    adminUid: ADMIN_UID,
+    showToast,
+  });
 
   // ═══════════════════════════════════════════════════════════════════
   // SCROLL-SPY: Highlight menu item matching current view
@@ -308,47 +313,6 @@ export default function AdminDashboardScreen({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [commandPaletteOpen]);
 
-  // ═══════════════════════════════════════════════════════════════════
-  // SECURITY SENTINEL: Initialize multi-layer defense system
-  // ═══════════════════════════════════════════════════════════════════
-  useEffect(() => {
-    if (auth && auth.uid && firebaseDb) {
-      try {
-        const securitySentinel = new SecuritySentinel(
-          firebaseDb,
-          auth.uid,
-          ADMIN_UID,
-          showToast,
-          window.sendTelegramAlert,
-        );
-
-        // Activate only honeypot layer on load (other layers activated per action)
-        securitySentinel.activate();
-        showToast(
-          "Atomic Sentinel Online: 4-Layer Perimeter Secure",
-          "success",
-        );
-
-        // Expose for admin debugging
-        window.securitySentinel = securitySentinel;
-
-        console.warn("Security Sentinel activated for user:", auth.uid);
-      } catch (error) {
-        console.error(
-          "🛡️ CRASH POINT - Security Sentinel Initialization Failed:",
-          error,
-        );
-        console.error("Details:", {
-          auth_uid: auth?.uid,
-          firebaseDb_exists: !!firebaseDb,
-          admin_uid: ADMIN_UID,
-          showToast_exists: !!showToast,
-          sendTelegramAlert_exists: !!window.sendTelegramAlert,
-        });
-      }
-    }
-  }, [auth, showToast]);
-
   // RULE #244, #246, #247, #266, #270: Detect duplicate IPs for fraud detection
   useEffect(() => {
     if (users && typeof users === "object") {
@@ -364,36 +328,6 @@ export default function AdminDashboardScreen({
    * Record admin action for click speed detection
    * If clicks exceed 5/second, auto-lock admin panel
    */
-  const recordAdminActivity = (action, target = null) => {
-    if (isAdminAuthenticated && window.securitySentinel) {
-      const result = window.securitySentinel.antiHacker.recordAdminActivity(
-        action,
-        target,
-      );
-
-      // If admin panel is locked, show error
-      if (result && result.blocked) {
-        showToast(
-          "🔒 Admin panel is LOCKED. Detected bot activity. OTP required to unlock.",
-          "error",
-        );
-        return false;
-      }
-
-      // If suspicious activity detected (>2.5 clicks/sec), warn
-      if (result && result.isSuspicious) {
-        console.warn(
-          "⚠️ Unusual click speed detected:",
-          result.clicksPerSecond,
-          "clicks/sec",
-        );
-      }
-
-      return true;
-    }
-    return true;
-  };
-
   const approve = async (uid) => {
     // Record admin activity
     if (!recordAdminActivity("APPROVE_USER", uid)) return;

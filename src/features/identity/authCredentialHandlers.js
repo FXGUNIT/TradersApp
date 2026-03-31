@@ -559,6 +559,7 @@ export const executeStructuredGoogleAuth = async ({
   authenticatedUser,
   firebaseAuth,
   FB_KEY,
+  googleProvider,
   isValidGmailAddress,
   syncAuthSessionFromUser,
   loadLegacyUserProfile,
@@ -573,10 +574,10 @@ export const executeStructuredGoogleAuth = async ({
     throw new Error("Google sign-in is unavailable right now.");
   }
 
-  const googleProvider = new GoogleAuthProvider();
+  const provider = googleProvider || new GoogleAuthProvider();
   const user =
     authenticatedUser ||
-    (await signInWithPopup(firebaseAuth, googleProvider)).user;
+    (await signInWithPopup(firebaseAuth, provider)).user;
   const email = String(user.email || "").toLowerCase();
 
   if (!isValidGmailAddress(email)) {
