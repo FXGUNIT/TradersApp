@@ -6,7 +6,6 @@ export const executePasswordReset = async ({
   provisionIdentityUserRecord,
   setProfile,
   checkUserStatus,
-  showToast,
 }) => {
   if (!auth || !profile) {
     throw new Error("Session expired. Please login again.");
@@ -41,7 +40,6 @@ export const executePasswordReset = async ({
 };
 
 export const executeResendVerificationEmail = async ({
-  auth,
   firebaseAuth,
   sendVerificationLink,
   setAuth,
@@ -70,6 +68,7 @@ export const executeApprovalStatusCheck = async ({
   profile,
   firebaseAuth,
   checkUserStatus,
+  setAuth,
 }) => {
   if (!auth) return;
   if (

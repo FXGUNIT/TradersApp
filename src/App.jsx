@@ -2232,6 +2232,7 @@ export default function TradersRegiment() {
       profile,
       firebaseAuth,
       checkUserStatus,
+      setAuth,
     });
   };
 
@@ -2339,7 +2340,6 @@ export default function TradersRegiment() {
       adminOtpsVerified,
       verifyAdminPassword,
       logSecurityAlert,
-      sendForensicAlert,
       adminMasterEmail,
       showToast,
       setAdminPassErr,
@@ -2352,7 +2352,6 @@ export default function TradersRegiment() {
       setAdminMasterEmailVerified,
       setIsAdminAuthenticated,
       setScreen,
-      setAdminOtpErr,
     });
   };
 

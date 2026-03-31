@@ -120,7 +120,6 @@ export const executeHandleAdminAccess = async ({
   adminOtpsVerified,
   verifyAdminPassword,
   logSecurityAlert,
-  sendForensicAlert,
   adminMasterEmail,
   showToast,
   setAdminPassErr,
@@ -133,7 +132,6 @@ export const executeHandleAdminAccess = async ({
   setAdminMasterEmailVerified,
   setIsAdminAuthenticated,
   setScreen,
-  setAdminOtpErr,
 }) => {
   try {
     await verifyAdminPassword(adminPassInput);

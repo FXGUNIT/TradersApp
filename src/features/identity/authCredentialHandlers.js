@@ -326,8 +326,6 @@ export const executeStructuredSignup = async ({
   setGoogleUser,
   clearPendingGoogleSignup,
   setScreen,
-  showToast,
-  checkUserStatus,
   ADMIN_EMAIL,
   sendForensicAlert,
 }) => {
@@ -564,7 +562,6 @@ export const executeStructuredGoogleAuth = async ({
   isValidGmailAddress,
   syncAuthSessionFromUser,
   loadLegacyUserProfile,
-  findIdentityUserByEmail,
   handleStructuredSignup,
   persistPendingGoogleSignup,
   setGoogleUser,
@@ -626,9 +623,9 @@ class AntiSpamShield {
     this.telegramAlert = telegramAlert;
   }
 
-  isBotDetected(formData) {
+  isBotDetected(_formData) {
     return false;
   }
 
-  async silentlyRejectBot(email, formData) {}
+  async silentlyRejectBot(_email, _formData) {}
 }
