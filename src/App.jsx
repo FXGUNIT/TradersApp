@@ -127,8 +127,11 @@ import {
 import {
   buildPendingProfile,
   createSyncedAuthSession,
-  sendVerificationLinkForUser,
 } from "./features/identity/authSessionUtils.js";
+import {
+  executeSyncAuthSessionFromUser,
+  executeSendVerificationLink,
+} from "./features/identity/authSessionHandlers.js";
 import {
   executePasswordReset,
   executeResendVerificationEmail,
@@ -182,7 +185,13 @@ import {
 import SessionsManagementScreen from "./features/identity/SessionsManagementScreen.jsx";
 import ForcePasswordResetScreen from "./features/identity/ForcePasswordResetScreen.jsx";
 import WaitingRoomScreen from "./features/identity/WaitingRoomScreen.jsx";
+import { executeLogSecurityAlert } from "./features/admin-security/securityForensicsHandlers.js";
 import SupportChatModal from "./features/support/SupportChatModal.jsx";
+import {
+  executeSaveJournal,
+  executeSaveAccount,
+  executeSaveFirmRules,
+} from "./features/terminal/terminalPersistenceHandlers.js";
 import {
   BackToTopButton,
   Breadcrumbs,
@@ -1779,22 +1788,19 @@ export default function TradersRegiment() {
 
   const syncAuthSessionFromUser = useCallback(
     async (user, stayLoggedIn = false) => {
-      const { authData, sessionId } = await createSyncedAuthSession(
+      return executeSyncAuthSessionFromUser({
         user,
         stayLoggedIn,
-      );
-      setAuth(authData);
-      if (sessionId) {
-        setCurrentSessionId(sessionId);
-      }
-
-      return authData;
+        createSyncedAuthSession,
+        setAuth,
+        setCurrentSessionId,
+      });
     },
     [],
   );
 
   const sendVerificationLink = useCallback(async () => {
-    await sendVerificationLinkForUser(firebaseAuth?.currentUser);
+    await executeSendVerificationLink({ firebaseAuth });
   }, []);
 
   const handleLoginPasswordReset = useCallback(async (email) => {
@@ -1980,37 +1986,16 @@ export default function TradersRegiment() {
     attemptedEmail,
     failureReason,
   ) => {
-    try {
-      // Collect telemetry
-      const ipResponse = await fetch("https://api.ipify.org?format=json");
-      const ipData = await ipResponse.json();
-      const ipAddress = ipData.ip || "Unknown";
-
-      const userAgent = navigator.userAgent;
-      const timestamp = new Date().toISOString();
-
-      // Send alert email
-      if (hasEmailJsConfig) {
-        await emailjs.send(
-          import.meta.env.VITE_EMAILJS_SERVICE_ID,
-          import.meta.env.VITE_EMAILJS_TEMPLATE_ID,
-          {
-            user_email: "gunitsingh1994@gmail.com",
-            to_email: "gunitsingh1994@gmail.com",
-            otp_code: `🚨 SECURITY ALERT: Unauthorized God Mode Access Attempt\n\nAttempt Type: ${attemptType}\nAttempted Email: ${attemptedEmail}\nFailure Reason: ${failureReason}\nIP Address: ${ipAddress}\nDevice Info: ${userAgent}\nTimestamp: ${timestamp}`,
-          },
-          import.meta.env.VITE_EMAILJS_PUBLIC_KEY,
-        );
-      } else {
-        console.warn("EmailJS not configured for forensic alerts");
-      }
-
-      console.warn(
-        `[IDS ALERT] ${attemptType} from IP ${ipAddress} at ${timestamp}`,
-      );
-    } catch (error) {
-      console.error("Failed to log security alert:", error);
-    }
+    await executeLogSecurityAlert({
+      attemptType,
+      attemptedEmail,
+      failureReason,
+      hasEmailJsConfig,
+      emailjs,
+      serviceId: import.meta.env.VITE_EMAILJS_SERVICE_ID,
+      templateId: import.meta.env.VITE_EMAILJS_TEMPLATE_ID,
+      publicKey: import.meta.env.VITE_EMAILJS_PUBLIC_KEY,
+    });
   };
 
   const sendAdminOTPs = async () => {
@@ -2095,18 +2080,27 @@ export default function TradersRegiment() {
   }, [resetAdminPromptState]);
 
   const saveJournal = async (jData) => {
-    if (!auth) return;
-    await saveTerminalJournal(auth.uid, auth.token, jData);
+    await executeSaveJournal({
+      auth,
+      journalData: jData,
+      saveTerminalJournal,
+    });
   };
 
   const saveAccount = async (aData) => {
-    if (!auth) return;
-    await saveTerminalAccountState(auth.uid, auth.token, aData);
+    await executeSaveAccount({
+      auth,
+      accountData: aData,
+      saveTerminalAccountState,
+    });
   };
 
   const saveFirmRules = async (fData) => {
-    if (!auth) return;
-    await saveTerminalFirmRules(auth.uid, auth.token, fData);
+    await executeSaveFirmRules({
+      auth,
+      firmRulesData: fData,
+      saveTerminalFirmRules,
+    });
   };
   // ─── MAIN ROUTER RENDER ───
   // Phase 3: Invite flow overlay (password reset -> invite screen) - simple hook in UI
