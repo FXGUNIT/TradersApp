@@ -19,8 +19,11 @@ import {
   parseRrrMultiple,
   parseWorkspaceSnapshot,
 } from "./terminalStateHelpers.js";
-import TerminalJournalOverview from "./TerminalJournalOverview.jsx";
 import TerminalTradeReadinessPanel from "./TerminalTradeReadinessPanel.jsx";
+import PremarketTab from "./PremarketTab.jsx";
+import TradeTab from "./TradeTab.jsx";
+import JournalTab from "./JournalTab.jsx";
+import AccountTab from "./AccountTab.jsx";
 import {
   T,
   AMD_PHASES,
@@ -29,21 +32,10 @@ import {
   TNC_PARSE_PROMPT,
   PART1_PROMPT,
   PART2_PROMPT,
-  LED,
   Tag,
-  SHead,
-  Field,
-  Loader,
-  RenderOut,
   AMDPhaseTag,
-  TrafficLight,
   CountdownBanner,
-  PasteZone,
-  HourlyHeatmap,
-  cardS,
   glowBtn,
-  inp,
-  lbl,
 } from "./terminalHelperComponents";
 import { CSS_VARS } from "../../styles/cssVars.js";
 import {
@@ -64,12 +56,8 @@ import {
 import { getISTState } from "../../utils/tradingUtils.js";
 
 const warningTint = "var(--status-warning-soft, rgba(255,214,10,0.12))";
-const dangerTint = "var(--status-danger-soft, rgba(255,69,58,0.1))";
-const infoTint = "var(--status-info-soft, rgba(59,130,246,0.08))";
 const overlayTint = "var(--surface-overlay, rgba(15,23,42,0.5))";
 const modalShadow = "var(--shadow-deep, 0 30px 80px rgba(15,23,42,0.18))";
-const surfaceMuted = CSS_VARS.baseLayer;
-const surfaceStrong = CSS_VARS.surfaceElevated;
 
 const defaultExtractedVals = {
   adx: null,
@@ -1893,586 +1881,117 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
         </div>
 
         {/* TAB 1: PREMARKET */}
-        {activeTab === 'premarket' && (
-          <div>
-            {/* CSV Upload */}
-            <div style={cardS()}>
-              <SHead icon="⊞" title="LOAD NINJATRADER 1-MIN DATA" color={T.blue}/>
-              <div 
-                onDrop={handleCsvDrop} 
-                onDragOver={e=>e.preventDefault()} 
-                onClick={()=>!isCsvParsing && document.getElementById('csvIn').click()} 
-                style={{
-                  border:`2px dashed ${csvBorderColor}`,
-                  borderRadius:8,
-                  padding:"24px",
-                  textAlign:"center",
-                  cursor:isCsvParsing?"progress":"pointer",
-                  opacity:isCsvParsing?0.82:1,
-                  background: surfaceMuted
-                }}
-              >
-                <input id="csvIn" type="file" accept=".txt,.csv" style={{display:"none"}} onChange={handleCsvDrop} disabled={isCsvParsing}/>
-                <div style={{fontSize:24,marginBottom:6,opacity:0.25}}>⊞</div>
-                <div style={{color:csvStatusColor,fontSize:12,fontWeight:600}}>{csvStatusText}</div>
-                {parsed && <div style={{color:CSS_VARS.textTertiary,fontSize:11,marginTop:4}}>Latest: {parsed.days[parsed.days.length - 1]?.date} · ATR(14) = <span style={{color:T.green,fontWeight:700}}>{parsed.tradingHoursAtr14} pts</span></div>}
-              </div>
-            </div>
-
-            {/* Screenshot Paste Zones */}
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:14,marginBottom:14}}>
-              {[
-                {zid:'p1news',icon:'📅',title:'ECONOMIC CALENDAR',color:T.red,hint:'★★★ events only',state:p1NewsChart,setter:setP1NewsChart,inputId:'p1newsIn'},
-                {zid:'p1prem',icon:'🌅',title:'PREMARKET CHART',color:T.orange,hint:'open type + prev week H/L',state:p1PremarketChart,setter:setP1PremarketChart,inputId:'p1premIn'},
-                {zid:'p1lvl',icon:'◈',title:'KEY LEVELS CHART',color:T.gold,hint:'PDH/PDL/POC/VAH/VAL/VWAP',state:p1KeyLevelsChart,setter:setP1KeyLevelsChart,inputId:'p1lvlIn'}
-              ].map(zone=>(
-                <PasteZone key={zone.zid} zoneId={zone.zid} activeZone={activeZone} setActiveZone={setActiveZone}>
-                  <div style={cardS({margin:0,borderLeft:`4px solid ${zone.color}`})} className="glass-panel">
-                    <SHead icon={zone.icon} title={zone.title} color={zone.color}/>
-                    <div 
-                      onDrop={makeImgHandler(zone.setter)} 
-                      onDragOver={e=>e.preventDefault()} 
-                      onClick={e=>{e.stopPropagation();document.getElementById(zone.inputId).click();}} 
-                      style={{
-                        border:`2px dashed ${zone.state?zone.color:CSS_VARS.borderSubtle}`,
-                        borderRadius:6,
-                        padding:"12px",
-                        textAlign:"center",
-                        cursor:"pointer",
-                        background: surfaceMuted,
-                        minHeight:64
-                      }}
-                    >
-                      <input id={zone.inputId} type="file" accept="image/*" style={{display:"none"}} onChange={makeImgHandler(zone.setter)}/>
-                      {zone.state
-                        ?<div><img src={`data:${zone.state.type};base64,${zone.state.b64}`} style={{maxWidth:"100%",maxHeight:56,borderRadius:3,objectFit:"contain",marginBottom:4}}/><button onClick={e=>{e.stopPropagation();zone.setter(null);}} style={{background:dangerTint,border:`1px solid ${CSS_VARS.statusDanger}`,borderRadius:4,padding:"2px 8px",cursor:"pointer",color:T.red,fontSize:9,fontFamily:T.font}}>✕ Remove</button></div>
-                        :<div><div style={{color:CSS_VARS.textTertiary,fontSize:11,marginBottom:2}}>Click → Ctrl+V or drag</div><div style={{color:CSS_VARS.textSecondary,fontSize:9}}>{zone.hint}</div></div>}
-                    </div>
-                  </div>
-                </PasteZone>
-              ))}
-            </div>
-
-            {err && <div style={{color:T.red,fontSize:12,marginBottom:12,fontWeight:600}}>⚠ {err}</div>}
-            <button onClick={runPart1} disabled={loading||isCsvParsing||!parsed||parsed.totalDays<5} style={glowBtn(T.green,loading||isCsvParsing||!parsed||parsed.totalDays<5)} className="btn-glass">
-              ▶ RUN AMD PREMARKET ANALYSIS
-            </button>
-
-            <div ref={p1Ref} style={{marginTop:20}}>
-              {loading && <Loader color={T.green} label="COLLECTIVE BRAIN PROCESSING AMD PHASES..."/>}
-              {!loading && p1Out && (
-                <div>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-                    <div style={{display:"flex",gap:8,alignItems:"center"}}><Tag label="ANALYSIS COMPLETE" color={T.green}/><AMDPhaseTag phase={displayedAmdPhase}/></div>
-                    <div style={{display:"flex",gap:8}}>
-                      <button onClick={()=>{setActiveTab('trade');setErr('');}} style={glowBtn(T.orange,false)} className="btn-glass">→ TRADE ENTRY</button>
-                      <button onClick={()=>navigator.clipboard?.writeText(p1Out)} style={{background:"transparent",border:`1px solid ${CSS_VARS.borderSubtle}`,borderRadius:6,padding:"8px 12px",cursor:"pointer",color:CSS_VARS.textSecondary,fontSize:10,fontFamily:T.font}}>⎘ COPY</button>
-                    </div>
-                  </div>
-                  <div style={cardS({borderLeft:`4px solid ${T.blue}`})} className="glass-panel"><RenderOut text={p1Out}/></div>
-                </div>
-              )}
-            </div>
-          </div>
+        {activeTab === "premarket" && (
+          <PremarketTab
+            parsed={parsed}
+            isCsvParsing={isCsvParsing}
+            parseMsg={parseMsg}
+            csvBorderColor={csvBorderColor}
+            csvStatusColor={csvStatusColor}
+            csvStatusText={csvStatusText}
+            p1NewsChart={p1NewsChart}
+            p1PremarketChart={p1PremarketChart}
+            p1KeyLevelsChart={p1KeyLevelsChart}
+            activeZone={activeZone}
+            setActiveZone={setActiveZone}
+            handleCsvDrop={handleCsvDrop}
+            loading={loading}
+            p1Out={p1Out}
+            displayedAmdPhase={displayedAmdPhase}
+            runPart1={runPart1}
+            setActiveTab={setActiveTab}
+            setErr={setErr}
+            err={err}
+          />
         )}
 
         {/* TAB 2: TRADE ENTRY */}
-        {activeTab === 'trade' && (
-          <div>
-            <TerminalTradeReadinessPanel
-              complianceColor={complianceColor}
-              curBal={curBal}
-              dailyLossUsed={dailyLossUsed}
-              displayedAmdPhase={displayedAmdPhase}
-              extractedVals={extractedVals}
-              hasFirmRules={Boolean(fr.parsed)}
-              isDDBreached={isDDBreached}
-              isDDWarning={isDDWarning}
-              isDailyBreached={isDailyBreached}
-              isDailyWarning={isDailyWarning}
-              liqLevel={liqLevel}
-              liveAmdContext={liveAmdContext}
-              liveAmdPhase={liveAmdPhase}
-              marketOpen={ist.isOpen}
-              maxDD={maxDD}
-              maxDL={maxDL}
-              sd1Target={sd1Target}
-              sd2Target={sd2Target}
-              sweepEstimate={sweepEstimate}
-              throttleActive={throttleActive}
-              trafficState={trafficState}
-              volatilityRegime={volatilityRegime}
-              vr={VR}
-            />
-
-            {/* Trade Setup */}
-            <div style={cardS({ borderLeft: `4px solid ${T.orange}` })} className="glass-panel card-tilt">
-              <SHead icon="⚡" title="TRADE SETUP" color={T.orange} />
-              
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }}>
-                <Field label="TIME (IST)" value={f.timeIST} onChange={sf('timeIST')} options={TIME_OPTIONS} />
-                <Field label="INSTRUMENT" value={f.instrument} onChange={sf('instrument')} options={[{ v: 'MNQ', l: 'MNQ · $2/pt' }, { v: 'MES', l: 'MES · $5/pt' }]} />
-                <Field label="DIRECTION" value={f.direction} onChange={sf('direction')} options={[{ v: 'Long', l: '↑ Long' }, { v: 'Short', l: '↓ Short' }]} />
-                <Field label="TRADE TYPE" value={f.tradeType} onChange={sf('tradeType')} options={[{ v: 'Trend', l: 'Trend' }, { v: 'MR', l: 'Mean Reversion' }]} />
-                <Field label="ACCOUNT BALANCE ($)" value={f.accountBalance} onChange={sf('accountBalance')} type="number" mono />
-                <Field label="RISK %" value={f.riskPct} onChange={sf('riskPct')} options={[{ v: '0.2', l: '0.2%' }, { v: '0.3', l: '0.3%' }, { v: '0.4', l: '0.4%' }]} />
-              </div>
-              
-              {isThrottled && (
-                <div style={{ marginTop: 12, padding: "10px 16px", background: warningTint, border: `1px solid ${CSS_VARS.statusWarning}`, borderRadius: 6, color: T.gold, fontSize: 12, fontWeight: 600 }}>
-                  ⚠ Drawdown throttle active: risk halved to {activeRiskPct}%
-                </div>
-              )}
-            </div>
-
-            {/* Entry Price */}
-            <div style={cardS()}>
-              <label style={lbl}>ENTRY PRICE</label>
-              <input 
-                type="number" 
-                value={f.entryPrice} 
-                onChange={e => sf('entryPrice')(e.target.value)} 
-                placeholder="exact entry level" 
-                style={inp} 
-                className="input-glass" 
-              />
-            </div>
-
-            {/* Image Upload Zones */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16, marginBottom: 12 }}>
-              {[
-                { zid: 'ss', icon: '📊', title: 'INDICATORS', color: T.purple, isMulti: true }, 
-                { zid: 'vwap', icon: '〰', title: 'VWAP CHART', color: T.blue, state: vwapChart, setter: setVwapChart, inputId: 'vwapIn' }, 
-                { zid: 'mp', icon: '◈', title: '30-MIN MP CHART', color: T.gold, state: mpChart, setter: setMpChart, inputId: 'mpIn' }
-              ].map(zone => (
-                <PasteZone key={zone.zid} zoneId={zone.zid} activeZone={activeZone} setActiveZone={setActiveZone}>
-                  <div data-pastezone="true" style={cardS({ margin: 0, borderLeft: `4px solid ${zone.color}` })} className="glass-panel">
-                    <SHead icon={zone.icon} title={zone.title} color={zone.color} />
-                    
-                    {zone.isMulti ? (
-                      <div 
-                        data-testid="terminal-screenshot-dropzone"
-                        onDrop={handleScreenshotDrop} 
-                        onDragOver={e => e.preventDefault()} 
-                        style={{ 
-                          border: `2px dashed ${screenshots.length ? T.purple : CSS_VARS.borderSubtle}`,
-                          borderRadius: 8, 
-                          padding: "16px", 
-                          textAlign: "center", 
-                          cursor: "copy", 
-                          background: CSS_VARS.surfaceGlass
-                        }} 
-                        className="glass-panel"
-                      >
-                        <div data-testid="terminal-screenshot-count" style={{ color: T.muted, fontSize: 11, fontWeight: 700, letterSpacing: 1.2, marginBottom: 8 }}>
-                          SCREENSHOTS {Math.min(screenshots.length, 4)}/4
-                        </div>
-                        {screenshots.length > 0 ? (
-                          <div>
-                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center", marginBottom: 8 }}>
-                              {screenshots.map((s, i) => (
-                                <div key={i} style={{ position: "relative", width: 60, height: 40, borderRadius: 4, overflow: "hidden", border: `1px solid ${T.purple}60` }}>
-                                  <img src={`data:${s.type};base64,${s.b64}`} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                                  <button 
-                                    onClick={e => { e.stopPropagation(); setScreenshots(p => p.filter((_, idx) => idx !== i)); }} 
-                                    style={{ position: "absolute", top: 0, right: 0, background: CSS_VARS.surfaceGlass, border: "none", width: 16, height: 16, cursor: "pointer", color: CSS_VARS.textPrimary, fontSize: 10, padding: 0 }}
-                                  >
-                                    ✕
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        ) : (
-                          <div>
-                            <div style={{ color: T.muted, fontSize: 12, marginBottom: 4, fontWeight: 600 }}>Paste or drag screenshots here</div>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div 
-                        data-testid={zone.zid === "vwap" ? "terminal-vwap-dropzone" : "terminal-mp-dropzone"}
-                        onDrop={makeImgHandler(zone.setter)} 
-                        onDragOver={e => e.preventDefault()} 
-                        onClick={e => { e.stopPropagation(); document.getElementById(zone.inputId).click(); }} 
-                        style={{ 
-                          border: `2px dashed ${zone.state ? zone.color : CSS_VARS.borderSubtle}`,
-                          borderRadius: 8, 
-                          padding: "16px", 
-                          textAlign: "center", 
-                          cursor: "pointer", 
-                          background: CSS_VARS.surfaceGlass
-                        }} 
-                        className="glass-panel"
-                      >
-                        <input id={zone.inputId} type="file" accept="image/*" style={{ display: "none" }} onChange={makeImgHandler(zone.setter)} />
-                        {zone.state ? (
-                          <div>
-                            <img src={`data:${zone.state.type};base64,${zone.state.b64}`} style={{ maxWidth: "100%", maxHeight: 60, borderRadius: 4, objectFit: "contain", marginBottom: 8, cursor: "crosshair" }} />
-                            <button 
-                              onClick={e => { e.stopPropagation(); zone.setter(null); }} 
-                              style={{ display: "block", margin: "0 auto", background: dangerTint, border: `1px solid ${CSS_VARS.statusDanger}`, borderRadius: 4, padding: "4px 12px", cursor: "pointer", color: T.red, fontSize: 10, fontFamily: T.font, fontWeight: 700 }}
-                            >
-                              ✕
-                            </button>
-                          </div>
-                        ) : (
-                          <div>
-                            <div style={{ color: T.muted, fontSize: 12, marginBottom: 4, fontWeight: 600 }}>Click → Ctrl+V or drag</div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </PasteZone>
-              ))}
-            </div>
-
-            {/* AI Extract Button */}
-            <div style={{ display: "flex", alignItems: "center", gap: 16, margin: "16px 0", padding: "12px 20px", background: CSS_VARS.card, border: `1px solid ${CSS_VARS.borderSubtle}`, borderRadius: 8, boxShadow: `0 1px 3px 0 ${CSS_VARS.borderSubtle}` }} className="glass-panel">
-              <button onClick={extractFromScreenshots} disabled={extracting || screenshots.length === 0} style={glowBtn(T.purple, extracting || !screenshots.length)} className="btn-glass">
-                {extracting ? "⟳ READING..." : "◉ EXTRACT INDICATORS"}
-              </button>
-              <span style={{color:T.muted,fontSize:10,flex:1,fontWeight:500}}>{extractStatus || "Extracts ADX · CI · ATR for Dead Zone check"}</span>
-            </div>
-
-            {/* Notes */}
-            <div style={cardS()}>
-              <label style={lbl}>NOTES</label>
-              <textarea 
-                value={f.notes} 
-                onChange={e => sf('notes')(e.target.value)} 
-                style={{ ...inp, minHeight: 60, resize: "vertical" }} 
-                className="input-glass" 
-              />
-            </div>
-
-            {err && (
-              <div style={{ color: T.red, fontSize: 13, marginBottom: 16, fontWeight: 600, padding: "12px 16px", background: dangerTint, borderRadius: 8 }}>
-                ⚠ {err}
-              </div>
-            )}
-
-            <button onClick={runPart2} disabled={loading || isTerminalDerivedPending || execBlocked} style={glowBtn(T.orange, loading || isTerminalDerivedPending || execBlocked)} className="btn-glass">
-              {isTerminalDerivedPending ? "SYNCING ENGINE..." : execBlocked ? `🚫 LOCKED` : "⚡ CAPTURE ENGINE"}
-            </button>
-
-            <div ref={p2Ref} style={{ marginTop: 24 }}>
-              {loading && (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 240, gap: 16 }}>
-                  <div style={{ display: 'flex', gap: 4, alignItems: 'flex-end', height: 28 }}>
-                    {[8, 15, 10, 20, 12, 17, 9].map((h, i) => (
-                      <div key={i} style={{ width: 4, height: h, background: T.orange, borderRadius: 2, animation: `bar ${0.85 + i * 0.05}s ${i * 0.1}s ease-in-out infinite alternate` }} />
-                    ))}
-                  </div>
-                  <span style={{ color: T.muted, fontSize: 12, letterSpacing: 2, fontWeight: 600 }}>RECURSIVE CONSENSUS ENGINE</span>
-                </div>
-              )}
-              {!loading && p2Out && (
-                <div>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                    <Tag label="EXECUTION PLAN READY" color={T.orange} />
-                    <div style={{ display: "flex", gap: 10 }}>
-                      <button onClick={() => setShowP2TradeForm(v => !v)} style={glowBtn(T.purple, false)} className="btn-glass">
-                        {showP2TradeForm ? "✕ CANCEL" : "+ LOG TRADE"}
-                      </button>
-                    </div>
-                  </div>
-                  
-              {showP2TradeForm && (
-                    <div style={{ background: CSS_VARS.card, border: `1px solid ${CSS_VARS.borderSubtle}`, borderRadius: 12, padding: "20px 24px", marginBottom: 20, boxShadow: `0 1px 3px 0 ${CSS_VARS.borderSubtle}, 0 1px 2px 0 ${CSS_VARS.borderSubtle}` }} className="glass-panel">
-                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16, marginBottom: 16 }}>
-                        <Field label="EXIT PRICE" value={p2Jf.exit} onChange={sp2('exit')} type="number" mono />
-                        <Field label="RESULT" value={p2Jf.result} onChange={sp2('result')} options={[{ v: 'win', l: '✓ Win' }, { v: 'loss', l: '✗ Loss' }, { v: 'breakeven', l: '◎ BE' }]} />
-                        <Field label="AMD PHASE AT TRADE" value={p2Jf.amdPhase} onChange={sp2('amdPhase')} options={Object.keys(AMD_PHASES).map(k => ({ v: k, l: AMD_PHASES[k].label }))} />
-                        <Field label="P&L ($)" value={p2Jf.pnl} onChange={sp2('pnl')} type="number" mono />
-                        <Field label="BALANCE AFTER ($)" value={p2Jf.balAfter} onChange={sp2('balAfter')} type="number" mono />
-                      </div>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 16 }}>
-                        <Tag label={`Pred TP1: ${Number.isFinite(predictedP2TP1) ? predictedP2TP1.toFixed(2) : "—"}`} color={T.green} />
-                        <Tag label={`Pred SL: ${Number.isFinite(predictedP2SL) ? predictedP2SL.toFixed(2) : "—"}`} color={T.red} />
-                      </div>
-                      <button onClick={addP2Trade} style={glowBtn(T.purple, false)} className="btn-glass">+ ADD TO JOURNAL</button>
-                    </div>
-                  )}
-                  
-                  <TrafficLight state={trafficState} />
-                  
-                  <div style={cardS({ borderLeft: `4px solid ${T.orange}` })} className="glass-panel card-tilt">
-                    <RenderOut text={p2Out} />
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
+        {activeTab === "trade" && (
+          <TradeTab
+            complianceColor={complianceColor}
+            curBal={curBal}
+            dailyLossUsed={dailyLossUsed}
+            displayedAmdPhase={displayedAmdPhase}
+            extractedVals={extractedVals}
+            hasFirmRules={Boolean(fr.parsed)}
+            isDDBreached={isDDBreached}
+            isDDWarning={isDDWarning}
+            isDailyBreached={isDailyBreached}
+            isDailyWarning={isDailyWarning}
+            liqLevel={liqLevel}
+            liveAmdContext={liveAmdContext}
+            liveAmdPhase={liveAmdPhase}
+            marketOpen={ist.isOpen}
+            maxDD={maxDD}
+            maxDL={maxDL}
+            sd1Target={sd1Target}
+            sd2Target={sd2Target}
+            sweepEstimate={sweepEstimate}
+            throttleActive={throttleActive}
+            trafficState={trafficState}
+            volatilityRegime={volatilityRegime}
+            vr={VR}
+            f={f}
+            sf={sf}
+            screenshots={screenshots}
+            setScreenshots={setScreenshots}
+            mpChart={mpChart}
+            setMpChart={setMpChart}
+            vwapChart={vwapChart}
+            setVwapChart={setVwapChart}
+            activeZone={activeZone}
+            setActiveZone={setActiveZone}
+            extracting={extracting}
+            extractStatus={extractStatus}
+            p2Jf={p2Jf}
+            sp2={sp2}
+            showP2TradeForm={showP2TradeForm}
+            setShowP2TradeForm={setShowP2TradeForm}
+            p2Out={p2Out}
+            p2Ref={p2Ref}
+            predictedP2TP1={predictedP2TP1}
+            predictedP2SL={predictedP2SL}
+            err={err}
+            setErr={setErr}
+            loading={loading}
+            isTerminalDerivedPending={isTerminalDerivedPending}
+            execBlocked={execBlocked}
+            runPart2={runPart2}
+            addP2Trade={addP2Trade}
+            makeImgHandler={makeImgHandler}
+            handleScreenshotDrop={handleScreenshotDrop}
+            extractFromScreenshots={extractFromScreenshots}
+          />
         )}
 
         {/* TAB 3: JOURNAL */}
         {activeTab === 'journal' && (
-          <div>
-            <TerminalJournalOverview
-              equityCurveView={equityCurveView}
-              isJournalMetricsPending={isJournalMetricsPending}
-              metrics={metrics}
-            />
-
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <span style={{ color: T.muted, fontSize: 11, letterSpacing: 1.5, fontWeight: 700 }}>TRADE HISTORY — {journal.length} ENTRIES</span>
-              <button onClick={()=>setShowForm(f=>!f)} style={glowBtn(journalFormOpen?T.muted:T.green,false)} className="btn-glass">{journalFormOpen?"✕ CANCEL":"+ LOG TRADE"}</button>
-            </div>
-            
-            {journalFormOpen && (
-              <div style={{background: surfaceMuted,border:`1px solid ${CSS_VARS.borderSubtle}`,borderRadius:10,padding:"18px 20px",marginBottom:14}}>
-                <div style={{ color: T.purple, fontSize: 11, letterSpacing: 1.5, fontWeight: 800, marginBottom: 10, textTransform: "uppercase" }}>
-                  Add Journal Entry
-                </div>
-                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10,marginBottom:10}}>
-                  <div><label style={lbl}>DATE</label><input type="date" value={jf.date} onChange={e=>sjf('date')(e.target.value)} style={inp}/></div>
-                  <div>
-                    <label style={lbl}>Instrument</label>
-                    <input
-                      type="text"
-                      placeholder="Instrument"
-                      value={jf.instrument}
-                      onChange={e=>sjf('instrument')(e.target.value)}
-                      style={inp}
-                      className="input-glass"
-                    />
-                  </div>
-                  <Field label="DIRECTION" value={jf.direction} onChange={sjf('direction')} options={[{v:'Long',l:'↑ Long'},{v:'Short',l:'↓ Short'}]}/>
-                  <Field label="TYPE" value={jf.tradeType} onChange={sjf('tradeType')} options={[{v:'Trend',l:'Trend'},{v:'MR',l:'Mean Reversion'}]}/>
-                  <Field label="AMD PHASE" value={jf.amdPhase} onChange={sjf('amdPhase')} options={Object.keys(AMD_PHASES).map(k=>({v:k,l:AMD_PHASES[k].label}))}/>
-                  <Field label="RRR" value={jf.rrr} onChange={sjf('rrr')} options={[{v:'1:1',l:'1:1'},{v:'1:1.2',l:'1:1.2'},{v:'1:2',l:'1:2'},{v:'1:2.2',l:'1:2.2'}]}/>
-                  <Field label="RESULT" value={jf.result} onChange={sjf('result')} options={[{v:'win',l:'✓ Win'},{v:'loss',l:'✗ Loss'},{v:'breakeven',l:'◎ BE'}]}/>
-                  <Field label="ENTRY" placeholder="Entry price" value={jf.entry} onChange={sjf('entry')} type="number" mono/>
-                  <Field label="PRED TP1" placeholder="Predicted TP1" value={jf.predictedTP1} onChange={sjf('predictedTP1')} type="number" mono/>
-                  <Field label="ACTUAL EXIT" placeholder="Exit price" value={jf.exit} onChange={sjf('exit')} type="number" mono/>
-                  <Field label="P&L ($)" placeholder="P&L" value={jf.pnl} onChange={sjf('pnl')} type="number" mono/>
-                  <Field label="BAL AFTER ($)" value={jf.balAfter} onChange={sjf('balAfter')} type="number" mono/>
-                </div>
-                <div style={{ marginBottom: 10 }}>
-                  <label style={lbl}>NOTES</label>
-                  <textarea
-                    value={jf.lessons}
-                    onChange={e => sjf('lessons')(e.target.value)}
-                    placeholder="Audit journal entry."
-                    style={{ ...inp, minHeight: 88, resize: "vertical" }}
-                    className="input-glass"
-                  />
-                </div>
-                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                  <button onClick={()=>{addJournalEntry();setShowForm(false);}} style={glowBtn(T.green,false)} className="btn-glass">SAVE ENTRY</button>
-                  <button
-                    onClick={() => setJournal(prev => prev.slice(0, -1))}
-                    style={glowBtn(T.red, journal.length === 0)}
-                    className="btn-glass"
-                    disabled={journal.length === 0}
-                  >
-                    Remove
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {journal.length === 0 ? (
-              <div style={{ background: CSS_VARS.card, border: `1px solid ${CSS_VARS.borderSubtle}`, borderRadius: 12, padding: "60px", textAlign: "center", color: CSS_VARS.textSecondary, fontSize: 14, fontWeight: 600, boxShadow: `0 1px 3px 0 ${CSS_VARS.borderSubtle}` }} className="glass-panel">
-                No trades logged yet
-              </div>
-            ) : (
-            <div style={{ background: CSS_VARS.card, border: `1px solid ${CSS_VARS.borderSubtle}`, borderRadius: 12, overflow: "hidden", boxShadow: `0 1px 3px 0 ${CSS_VARS.borderSubtle}` }} className="glass-panel">
-                <div style={{ overflowX: "auto" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                    <thead>
-                      <tr style={{ borderBottom: `1px solid ${CSS_VARS.borderSubtle}` }}>
-                        {["DATE", "INST", "DIR", "TYPE", "AMD", "ENTRY", "EXIT", "P&L", "RESULT", ""].map((h, i) => (
-                          <th key={i} style={{ padding: "14px 16px", textAlign: "left", color: CSS_VARS.textSecondary, fontSize: 10, letterSpacing: 1.5, fontFamily: T.font, fontWeight: 700, whiteSpace: "nowrap", background: surfaceMuted }}>{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {[...journal].reverse().map((t, i) => { 
-                        const pv = parseFloat(t.pnl || 0);
-                        const isW = t.result === 'win';
-                        const isL = t.result === 'loss';
-                        return (
-                          <tr key={i} style={{ borderBottom: `1px solid ${CSS_VARS.borderSubtle}`, background: i % 2 === 0 ? surfaceMuted : surfaceStrong }}>
-                            <td style={{ padding: "12px 16px", color: CSS_VARS.textSecondary, fontSize: 11, whiteSpace: "nowrap", fontFamily: T.mono }}>{t.date}</td>
-                            <td style={{ padding: "12px 16px", color: CSS_VARS.textPrimary, fontSize: 12, fontWeight: 700 }}>{t.instrument}</td>
-                            <td style={{ padding: "12px 16px" }}>
-                              <span style={{ color: t.direction === 'Long' ? T.green : T.red, fontSize: 11, fontWeight: 600 }}>
-                                {t.direction === 'Long' ? 'BUY' : 'SELL'}
-                              </span>
-                            </td>
-                            <td style={{ padding: "12px 16px", color: T.blue, fontSize: 11, fontWeight: 500 }}>{t.tradeType}</td>
-                            <td style={{ padding: "12px 16px" }}>
-                              <span style={{ color: T.gold, fontSize: 10, fontWeight: 600 }}>{t.amdPhase?.slice(0, 10)}</span>
-                            </td>
-                            <td style={{ padding: "12px 16px", color: CSS_VARS.textTertiary, fontSize: 11, fontFamily: T.mono }}>{t.entry || "—"}</td>
-                            <td style={{ padding: "12px 16px", color: CSS_VARS.textTertiary, fontSize: 11, fontFamily: T.mono }}>{t.exit || "—"}</td>
-                            <td style={{ padding: "12px 16px", color: pv >= 0 ? T.green : T.red, fontSize: 13, fontWeight: 800, fontFamily: T.mono }}>
-                              {pv >= 0 ? "+" : ""}${pv.toFixed(0)}
-                            </td>
-                            <td style={{ padding: "12px 16px" }}>
-                              <span style={{ color: isW ? T.green : isL ? T.red : CSS_VARS.textSecondary, fontSize: 11, fontWeight: 800 }}>
-                                {isW ? "WIN" : isL ? "LOSS" : "BE"}
-                              </span>
-                            </td>
-                            <td style={{ padding: "12px 16px" }}>
-                              <button 
-                                onClick={() => setJournal(prev => prev.filter((_, idx) => idx !== journal.length - 1 - i))} 
-                                style={{ background: dangerTint, border: `1px solid ${CSS_VARS.statusDanger}`, borderRadius: 4, cursor: "pointer", color: T.red, fontSize: 10, padding: "4px 8px", fontWeight: 700 }}
-                              >
-                                ✕
-                              </button>
-                            </td>
-                          </tr>
-                        ); 
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-          </div>
+          <JournalTab
+            journal={journal}
+            setJournal={setJournal}
+            jf={jf}
+            sjf={sjf}
+            showForm={journalFormOpen}
+            setShowForm={setJournalFormOpen}
+            metrics={metrics}
+            isJournalMetricsPending={isJournalMetricsPending}
+            equityCurveView={equityCurveView}
+            addJournalEntry={addJournalEntry}
+          />
         )}
 
         {/* TAB 4: ACCOUNT */}
         {activeTab === 'account' && (
-          <div>
-            <div style={cardS({ borderLeft: `4px solid ${T.green}` })} className="glass-panel card-tilt">
-              <SHead icon="📋" title="PROP FIRM TERMS & CONDITIONS" color={T.green} />
-              <div
-                onDrop={handleFirmRulesDrop}
-                onDragOver={(e) => e.preventDefault()}
-                onClick={() => document.getElementById("tcIn")?.click()}
-                style={{
-                  border: `2px dashed ${firmRules.parsed ? T.green : CSS_VARS.borderSubtle}`,
-                  borderRadius: 10,
-                  padding: "32px",
-                  textAlign: "center",
-                  cursor: "pointer",
-                  background: CSS_VARS.surfaceGlass,
-                  marginBottom: 16,
-                  position: "relative",
-                  overflow: "hidden",
-                }}
-                className="glass-panel"
-              >
-                <input id="tcIn" type="file" accept=".pdf,.txt,.doc,.docx" style={{ display: "none" }} onChange={handleFirmRulesDrop} />
-                <div style={{ fontSize: 32, marginBottom: 12, opacity: firmRules.parsed ? 1 : 0.2 }}>
-                  {firmRules.parsed ? "✓" : "📋"}
-                </div>
-                <div style={{ color: firmRules.parsed ? T.green : T.muted, fontSize: 13, marginBottom: 6, fontWeight: 600 }}>
-                  {firmRules.parsed ? `T&C Loaded: ${firmRules.firmName || "Firm Rules"}` : "Drop T&C document or click to browse"}
-                </div>
-                <div style={{ color: T.muted, fontSize: 11 }}>
-                  Best results with text-extractable files. {tcFileName ? `Last file: ${tcFileName}` : ""}
-                </div>
-              </div>
-              {tcParsing && (
-                <div style={{ color: T.blue, fontSize: 12, textAlign: "center", fontWeight: 600, marginBottom: 8 }}>
-                  ⟳ AI ANALYZING COMPLIANCE RULES...
-                </div>
-              )}
-              {firmRules.parseStatus && (
-                <div style={{ color: String(firmRules.parseStatus).startsWith("✓") ? T.green : T.red, fontSize: 12, textAlign: "center", marginBottom: 12 }}>
-                  {firmRules.parseStatus}
-                </div>
-              )}
-              {firmRules.parsed && (
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center", marginBottom: 12 }}>
-                  <Tag label={`News: ${firmRules.newsTrading ? "Allowed" : "Blocked"}`} color={firmRules.newsTrading ? T.green : T.red} />
-                  <Tag label={`Overnight: ${firmRules.overnightHoldingAllowed ? "Allowed" : "Blocked"}`} color={firmRules.overnightHoldingAllowed ? T.green : T.red} />
-                  <Tag label={`Weekend: ${firmRules.weekendTrading ? "Allowed" : "Blocked"}`} color={firmRules.weekendTrading ? T.green : T.red} />
-                  <Tag label={`Copy: ${firmRules.copyTradingAllowed ? "Allowed" : "Blocked"}`} color={firmRules.copyTradingAllowed ? T.green : T.red} />
-                  <Tag label={`Hedging: ${firmRules.hedgingAllowed ? "Allowed" : "Blocked"}`} color={firmRules.hedgingAllowed ? T.green : T.red} />
-                  <Tag label={`Min Days: ${firmRules.minimumTradingDays || "0"}`} color={T.blue} />
-                  <Tag label={`EOD Flat: ${firmRules.eodFlatRequired ? "Required" : "Optional"}`} color={firmRules.eodFlatRequired ? T.gold : T.muted} />
-                </div>
-              )}
-              {firmRules.parsed && Array.isArray(firmRules.keyRules) && firmRules.keyRules.length > 0 && (
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 12 }}>
-                  {firmRules.keyRules.slice(0, 10).map((rule, idx) => (
-                    <div key={idx} style={{ padding: "10px 14px", background: CSS_VARS.surfaceGlass, border: `1px solid ${CSS_VARS.borderSubtle}`, borderRadius: 8, color: T.muted, fontSize: 12 }}>
-                      • {rule}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div style={cardS({ borderLeft: `4px solid ${T.blue}` })} className="glass-panel card-tilt">
-              <SHead icon="💰" title="LIVE ACCOUNT STATE" color={T.blue} />
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, color: T.green, fontSize: 11, fontWeight: 800, letterSpacing: 1.5, textTransform: "uppercase" }}>
-                <span style={{ width: 8, height: 8, borderRadius: "50%", background: T.green, display: "inline-block" }} />
-                Sync Status
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16, marginBottom: 16 }}>
-                <Field label="STARTING BALANCE ($)" value={accountState.startingBalance} onChange={v => setAccountState(p => ({...p, startingBalance: v}))} type="number" mono />
-                <Field label="CURRENT BALANCE ($)" value={accountState.currentBalance} onChange={v => setAccountState(p => ({...p, currentBalance: v}))} type="number" mono />
-                <Field label="HIGH-WATER MARK ($)" value={accountState.highWaterMark} onChange={v => setAccountState(p => ({...p, highWaterMark: v}))} type="number" mono />
-                <Field label="TODAY START BALANCE ($)" value={accountState.dailyStartBalance} onChange={v => setAccountState(p => ({...p, dailyStartBalance: v}))} type="number" mono />
-              </div>
-              <button 
-                onClick={() => { 
-                  if (onSaveAccount) onSaveAccount(accountState); 
-                  showToast?.('Capture engine complete.', 'success'); 
-                }} 
-                style={glowBtn(T.orange, false)} 
-                className="btn-glass"
-              >
-                CAPTURE ENGINE
-              </button>
-              <button 
-                onClick={() => { if (onSaveAccount) onSaveAccount(accountState); showToast('Account state persisted to distributed ledger.', 'success'); }} 
-                style={glowBtn(T.blue, false)} 
-                className="btn-glass"
-              >
-                💾 SAVE TO CLOUD
-              </button>
-
-              <a
-                href={LINKEDIN_URL}
-                target="_blank"
-                rel="noreferrer"
-                style={{
-                  display: "block",
-                  marginTop: 14,
-                  padding: "16px 18px",
-                  borderRadius: 12,
-                  textDecoration: "none",
-                  background: `linear-gradient(135deg, ${CSS_VARS.accentGlow}, ${infoTint})`,
-                  border: `1px solid ${CSS_VARS.accentPrimary}`,
-                }}
-              >
-                <div
-                  style={{
-                    color: T.blue,
-                    fontSize: 11,
-                    fontWeight: 800,
-                    letterSpacing: 1.2,
-                    textTransform: "uppercase",
-                    marginBottom: 6,
-                  }}
-                >
-                  LinkedIn
-                </div>
-                <div
-                  style={{
-                    color: T.text,
-                    fontSize: 14,
-                    fontWeight: 700,
-                    marginBottom: 4,
-                  }}
-                >
-                  Builder profile and release trail
-                </div>
-                <div style={{ color: T.muted, fontSize: 12, lineHeight: 1.5 }}>
-                  Open the Traders Regiment LinkedIn card for the current build owner.
-                </div>
-              </a>
-            </div>
-          </div>
+          <AccountTab
+            accountState={accountState}
+            setAccountState={setAccountState}
+            firmRules={firmRules}
+            tcFileName={tcFileName}
+            tcParsing={tcParsing}
+            handleFirmRulesDrop={handleFirmRulesDrop}
+            onSaveAccount={onSaveAccount}
+            showToast={showToast}
+          />
         )}
       </div>
 
