@@ -42,6 +42,12 @@ import {
   getDynamicParameters,
   calculateThrottledRisk,
 } from "./utils/math-engine.js";
+import { exposePerformanceTestToWindow } from "./services/performanceTestRunner.js";
+import { exposeSecurityAPIToWindow } from "./services/securityMonitor.js";
+import { initLeakagePrevention } from "./services/leakagePreventionModule.js";
+import { initSocialEngineeringDetection } from "./services/socialEngineeringDetectionModule.js";
+import { testTelegramConnectivity } from "./services/telegramDiagnostics.js";
+import { initTelegramMonitor } from "./services/telegramMonitor.js";
 import {
   TradersRegimentWatermark,
   ExchangeFacilityBadge,
@@ -231,6 +237,8 @@ const ADMIN_EMAIL = "gunitsingh1994@gmail.com";
 const ADMIN_UID = "N3z04ZYCleZjOApobL3VZepaOwi1";
 const TELEGRAM_TOKEN = import.meta.env.VITE_TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = import.meta.env.VITE_TELEGRAM_CHAT_ID;
+const enableTelegramDiagnostics =
+  import.meta.env.VITE_ENABLE_TELEGRAM_DIAGNOSTICS === "true";
 const resolveAdminClientFn = (...names) => {
   for (const name of names) {
     const fn = AdminSecurityClient?.[name];
@@ -542,6 +550,10 @@ export default function TradersRegiment() {
 
   // RUN TELEGRAM CONNECTIVITY AUDIT ON APP LOAD
   useEffect(() => {
+    if (!enableTelegramDiagnostics || !TELEGRAM_TOKEN || !TELEGRAM_CHAT_ID) {
+      return undefined;
+    }
+
     // Run diagnostics asynchronously without blocking app initialization
     const runDiagnostics = async () => {
       try {
