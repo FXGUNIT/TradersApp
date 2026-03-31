@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { CSS_VARS } from "../../styles/cssVars.js";
 
 export default function MaintenanceScreen() {
   const [timeLeft, setTimeLeft] = useState("");
@@ -30,7 +31,7 @@ export default function MaintenanceScreen() {
     <div
       style={{
         minHeight: "100vh",
-        background: "var(--surface-base, #F9FAFB)",
+        background: CSS_VARS.baseLayer,
         backdropFilter: "none",
         display: "flex",
         alignItems: "center",
@@ -47,8 +48,8 @@ export default function MaintenanceScreen() {
           left: 0,
           right: 0,
           bottom: 0,
-          background: `radial-gradient(circle at 20% 50%, rgba(0,122,255,0.05) 0%, transparent 50%),
-                     radial-gradient(circle at 80% 80%, rgba(48,209,88,0.05) 0%, transparent 50%)`,
+          background: `radial-gradient(circle at 20% 50%, var(--accent-glow, rgba(0,122,255,0.05)) 0%, transparent 50%),
+                     radial-gradient(circle at 80% 80%, var(--status-success-soft, rgba(48,209,88,0.05)) 0%, transparent 50%)`,
           animation: "shell-maintenance-fade 4s ease-in-out infinite",
           pointerEvents: "none",
         }}
@@ -74,13 +75,13 @@ export default function MaintenanceScreen() {
 
         <h1
           style={{
-            color: "var(--text-primary, #F2F2F7)",
+            color: CSS_VARS.textPrimary,
             fontSize: 48,
             fontWeight: 800,
             marginBottom: 16,
             letterSpacing: 2,
             textTransform: "uppercase",
-            background: "linear-gradient(135deg, #0A84FF 0%, #30D158 100%)",
+            background: `linear-gradient(135deg, ${CSS_VARS.statusInfo} 0%, ${CSS_VARS.statusSuccess} 100%)`,
             backgroundClip: "text",
             WebkitBackgroundClip: "text",
             WebkitTextFillColor: "transparent",
@@ -91,7 +92,7 @@ export default function MaintenanceScreen() {
 
         <div
           style={{
-            color: "var(--text-secondary, #A1A1A6)",
+            color: CSS_VARS.textSecondary,
             fontSize: 16,
             fontWeight: 600,
             marginBottom: 32,
@@ -107,8 +108,8 @@ export default function MaintenanceScreen() {
 
         <div
           style={{
-            background: "rgba(0,122,255,0.1)",
-            border: "1px solid rgba(0,122,255,0.3)",
+            background: "var(--accent-glow, rgba(0,122,255,0.1))",
+            border: `1px solid ${CSS_VARS.accentPrimary}`,
             borderRadius: 12,
             padding: 24,
             marginBottom: 32,
@@ -117,7 +118,7 @@ export default function MaintenanceScreen() {
         >
           <div
             style={{
-              color: "var(--text-secondary, #A1A1A6)",
+              color: CSS_VARS.textSecondary,
               fontSize: 13,
               fontWeight: 600,
               marginBottom: 12,
@@ -128,7 +129,7 @@ export default function MaintenanceScreen() {
           </div>
           <div
             style={{
-              color: "var(--accent-primary, #2563eb)",
+              color: CSS_VARS.accentPrimary,
               fontSize: 28,
               fontWeight: 800,
               fontFamily: "Consolas, monospace",
@@ -142,8 +143,8 @@ export default function MaintenanceScreen() {
         <div
           style={{
             textAlign: "left",
-            background: "rgba(255,255,255,0.03)",
-            border: "1px solid rgba(255,255,255,0.1)",
+            background: "var(--surface-ghost, rgba(255,255,255,0.03))",
+            border: `1px solid ${CSS_VARS.borderStrong}`,
             borderRadius: 8,
             padding: 20,
             marginBottom: 32,
@@ -151,7 +152,7 @@ export default function MaintenanceScreen() {
         >
           <div
             style={{
-              color: "#F2F2F7",
+              color: CSS_VARS.textPrimary,
               fontSize: 12,
               fontWeight: 700,
               marginBottom: 16,
@@ -179,7 +180,7 @@ export default function MaintenanceScreen() {
               <li
                 key={item}
                 style={{
-                  color: "#A1A1A6",
+                  color: CSS_VARS.textSecondary,
                   fontSize: 12,
                   display: "flex",
                   alignItems: "center",
@@ -188,7 +189,7 @@ export default function MaintenanceScreen() {
               >
                 <span
                   style={{
-                    color: "#30D158",
+                    color: CSS_VARS.statusSuccess,
                     fontWeight: 800,
                   }}
                 >
@@ -202,7 +203,7 @@ export default function MaintenanceScreen() {
 
         <div
           style={{
-            color: "#5A5A5F",
+            color: CSS_VARS.textTertiary,
             fontSize: 12,
             fontWeight: 500,
             letterSpacing: "0.5px",
@@ -212,7 +213,7 @@ export default function MaintenanceScreen() {
           <br />
           <span style={{ marginTop: 8, display: "block" }}>
             Need immediate support?{" "}
-            <span style={{ color: "#0A84FF" }}>contact@tradersapp.io</span>
+            <span style={{ color: CSS_VARS.statusInfo }}>contact@tradersapp.io</span>
           </span>
         </div>
       </div>

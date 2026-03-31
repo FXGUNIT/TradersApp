@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { CSS_VARS } from "../../styles/cssVars.js";
 
 export default function LoadingFallback() {
   const [dots, setDots] = useState(0);
@@ -16,7 +17,7 @@ export default function LoadingFallback() {
     <div
       style={{
         minHeight: "100vh",
-        background: "var(--surface-base, #F9FAFB)",
+        background: CSS_VARS.baseLayer,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -31,12 +32,12 @@ export default function LoadingFallback() {
           height: 120,
           borderRadius: "50%",
           overflow: "hidden",
-          boxShadow: "0 8px 32px rgba(0, 0, 0, 0.15)",
-          background: "var(--surface-elevated, #FFFFFF)",
+          boxShadow: `0 8px 32px ${CSS_VARS.borderStrong}`,
+          background: CSS_VARS.surfaceElevated,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          color: "var(--accent-warning, #D97706)",
+          color: CSS_VARS.statusWarning,
           fontSize: 48,
           fontWeight: 700,
           animation: showVideoFallback ? "shell-loading-spin 1s linear infinite" : "none",
@@ -65,7 +66,7 @@ export default function LoadingFallback() {
       <div style={{ textAlign: "center" }}>
         <div
           style={{
-            color: "var(--text-primary, #111827)",
+            color: CSS_VARS.textPrimary,
             fontSize: 14,
             fontWeight: 600,
             letterSpacing: 2,
@@ -88,7 +89,7 @@ export default function LoadingFallback() {
         </div>
         <div
           style={{
-            color: "var(--text-secondary, #6B7280)",
+            color: CSS_VARS.textSecondary,
             fontSize: 12,
             letterSpacing: 1,
             marginTop: 12,

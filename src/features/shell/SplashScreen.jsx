@@ -1,4 +1,5 @@
 import React from "react";
+import { CSS_VARS } from "../../styles/cssVars.js";
 
 function SplashLogo() {
   return (
@@ -31,7 +32,7 @@ function SplashLogo() {
         <div style={{ textAlign: "left" }}>
           <div
             style={{
-              color: "var(--text-primary, #111827)",
+              color: CSS_VARS.textPrimary,
               fontSize: "clamp(16px, 3vw, 18px)",
               letterSpacing: 1.5,
               fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif",
@@ -51,7 +52,7 @@ export default function SplashScreen() {
     <div
       style={{
         minHeight: "100vh",
-        background: "var(--surface-elevated, #FFFFFF)",
+        background: CSS_VARS.surfaceElevated,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -76,7 +77,7 @@ export default function SplashScreen() {
               style={{
                 width: 5,
                 height,
-                background: "var(--accent-success, #10B981)",
+                background: CSS_VARS.statusSuccess,
                 borderRadius: 3,
                 animation: `shell-splash-bar 0.85s ${index * 0.1}s ease-in-out infinite alternate`,
               }}
@@ -85,7 +86,7 @@ export default function SplashScreen() {
         </div>
         <div
           style={{
-            color: "var(--text-secondary, #64748B)",
+            color: CSS_VARS.textSecondary,
             fontSize: 11,
             letterSpacing: 4,
             marginTop: 16,

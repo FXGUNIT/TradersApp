@@ -300,7 +300,7 @@ export default function AppScreenRegistry({
               onClick={() => setScreen("sessions")}
               title="Manage active sessions"
               style={{
-                background: "rgba(52,144,220,0.3)",
+                background: "var(--accent-glow, rgba(52,144,220,0.3))",
                 border: `1px solid ${T.blue}`,
                 color: T.blue,
                 padding: "8px 12px",

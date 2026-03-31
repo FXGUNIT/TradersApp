@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { CSS_VARS } from "../../styles/cssVars.js";
 
 export function Breadcrumbs({ items, onNavigate, theme }) {
   return (
@@ -8,8 +9,8 @@ export function Breadcrumbs({ items, onNavigate, theme }) {
         alignItems: "center",
         gap: 8,
         padding: "12px 32px",
-        borderBottom: "1px solid rgba(255,255,255,0.1)",
-        background: "var(--surface-glass, rgba(0,0,0,0.3))",
+        borderBottom: `1px solid ${CSS_VARS.borderStrong}`,
+        background: CSS_VARS.surfaceGlass,
         overflowX: "auto",
       }}
     >
@@ -18,7 +19,7 @@ export function Breadcrumbs({ items, onNavigate, theme }) {
           <button
             onClick={() => item.onNavigate && onNavigate(item.path)}
             style={{
-              background: item.active ? "rgba(0,122,255,0.2)" : "transparent",
+              background: item.active ? "var(--accent-glow, rgba(0,122,255,0.2))" : "transparent",
               border: "none",
               color: item.active ? theme.blue : theme.muted,
               cursor: item.onNavigate ? "pointer" : "default",
@@ -33,7 +34,7 @@ export function Breadcrumbs({ items, onNavigate, theme }) {
             }}
             onMouseEnter={(event) => {
               if (item.onNavigate && !item.active) {
-                event.currentTarget.style.background = "rgba(0,122,255,0.1)";
+                event.currentTarget.style.background = "var(--accent-glow, rgba(0,122,255,0.1))";
                 event.currentTarget.style.color = theme.blue;
               }
             }}
@@ -103,8 +104,8 @@ export function MegaMenu({ isOpen, onClose, theme }) {
         top: "var(--header-height, 60px)",
         left: 0,
         right: 0,
-        background: "rgba(0,0,0,0.95)",
-        borderBottom: "1px solid rgba(0,122,255,0.3)",
+        background: "var(--surface-overlay-strong, rgba(0,0,0,0.95))",
+        borderBottom: `1px solid ${CSS_VARS.accentPrimary}`,
         backdropFilter: "blur(10px)",
         zIndex: 999,
         padding: "24px 32px",
@@ -131,7 +132,7 @@ export function MegaMenu({ isOpen, onClose, theme }) {
                 gap: 8,
                 marginBottom: 12,
                 paddingBottom: 8,
-                borderBottom: "1px solid rgba(0,122,255,0.3)",
+                borderBottom: `1px solid ${CSS_VARS.accentPrimary}`,
               }}
             >
               <span style={{ fontSize: 16 }}>{category.icon}</span>
@@ -172,7 +173,7 @@ export function MegaMenu({ isOpen, onClose, theme }) {
                   textAlign: "left",
                 }}
                 onMouseEnter={(event) => {
-                  event.currentTarget.style.background = "rgba(0,122,255,0.15)";
+                  event.currentTarget.style.background = "var(--accent-glow, rgba(0,122,255,0.15))";
                   event.currentTarget.style.color = theme.blue;
                   event.currentTarget.style.transform = "translateX(4px)";
                 }}
@@ -234,16 +235,16 @@ export function BackToTopButton({ theme }) {
         fontWeight: 700,
         zIndex: 900,
         transition: "all 0.3s ease-in-out",
-        boxShadow: `0 8px 24px rgba(0,0,0,0.4), 0 0 20px ${theme.purple}40`,
+        boxShadow: `0 8px 24px ${CSS_VARS.borderStrong}, 0 0 20px ${theme.purple}40`,
         animation: "float 3s ease-in-out infinite",
       }}
       onMouseEnter={(event) => {
         event.currentTarget.style.transform = "scale(1.1)";
-        event.currentTarget.style.boxShadow = `0 12px 32px rgba(0,0,0,0.6), 0 0 30px ${theme.purple}60`;
+        event.currentTarget.style.boxShadow = `0 12px 32px ${CSS_VARS.borderStrong}, 0 0 30px ${theme.purple}60`;
       }}
       onMouseLeave={(event) => {
         event.currentTarget.style.transform = "scale(1)";
-        event.currentTarget.style.boxShadow = `0 8px 24px rgba(0,0,0,0.4), 0 0 20px ${theme.purple}40`;
+        event.currentTarget.style.boxShadow = `0 8px 24px ${CSS_VARS.borderStrong}, 0 0 20px ${theme.purple}40`;
       }}
       title="Back to Top"
     >

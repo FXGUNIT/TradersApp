@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { createTheme } from "../../utils/uiUtils.js";
+import { CSS_VARS } from "../../styles/cssVars.js";
 
 export const APP_FONT_FAMILY =
   "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif";
@@ -336,9 +337,9 @@ OVERALL: [GREEN/YELLOW/RED] | RECOMMENDED ACTION: [specific 1-2 sentence instruc
 
 export const createShellChrome = (theme = createTheme(false, "BLUE")) => ({
   authCard: {
-    background: "var(--surface-elevated, #FFFFFF)",
+    background: CSS_VARS.surfaceElevated,
     backgroundImage:
-      "linear-gradient(rgba(255,255,255,0.97), rgba(255,255,255,0.97)), url('/wallpaper.png')",
+      `linear-gradient(var(--surface-overlay, rgba(255,255,255,0.97)), var(--surface-overlay, rgba(255,255,255,0.97))), url('/wallpaper.png')`,
     backgroundSize: "cover",
     backgroundPosition: "center",
     backgroundBlendMode: "lighten",
@@ -352,15 +353,15 @@ export const createShellChrome = (theme = createTheme(false, "BLUE")) => ({
     backdropFilter: "blur(20px)",
     WebkitBackdropFilter: "blur(20px)",
     boxShadow:
-      "0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
+      "var(--shadow-card, 0 20px 25px -5px rgba(0, 0, 0, 0.05)), var(--shadow-card-soft, 0 10px 10px -5px rgba(0, 0, 0, 0.04))",
     position: "relative",
   },
   authInp: {
-    background: "var(--surface-elevated, #FFFFFF)",
-    border: `1px solid var(--border-subtle, rgba(0,0,0,0.05))`,
+    background: CSS_VARS.surfaceElevated,
+    border: `1px solid ${CSS_VARS.borderSubtle}`,
     borderRadius: 6,
     padding: "12px 40px 12px 40px",
-    color: "#0F172A",
+    color: CSS_VARS.textPrimary,
     fontSize: 14,
     width: "100%",
     boxSizing: "border-box",
@@ -372,7 +373,9 @@ export const createShellChrome = (theme = createTheme(false, "BLUE")) => ({
     height: 44,
   },
   authBtn: (color, disabled) => ({
-    background: disabled ? "rgba(0,0,0,0.3)" : "#000000",
+    background: disabled
+      ? "var(--surface-overlay, rgba(0,0,0,0.3))"
+      : CSS_VARS.accentPrimary,
     border: `none`,
     borderRadius: 6,
     height: 44,
@@ -380,7 +383,7 @@ export const createShellChrome = (theme = createTheme(false, "BLUE")) => ({
     alignItems: "center",
     justifyContent: "center",
     cursor: disabled ? "not-allowed" : "pointer",
-    color: disabled ? "rgba(255,255,255,0.6)" : "#FFFFFF",
+    color: disabled ? "var(--text-tertiary, rgba(255,255,255,0.6))" : "var(--accent-text, #FFFFFF)",
     fontFamily: APP_FONT_FAMILY,
     fontSize: 14,
     fontWeight: 600,
@@ -390,10 +393,10 @@ export const createShellChrome = (theme = createTheme(false, "BLUE")) => ({
     opacity: disabled ? 0.6 : 1,
     backdropFilter: "none",
     WebkitBackdropFilter: "none",
-    boxShadow: disabled ? "none" : "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
+    boxShadow: disabled ? "none" : "var(--shadow-card, 0 4px 6px -1px rgba(0, 0, 0, 0.1))",
   }),
   lbl: {
-    color: "var(--text-secondary, #64748B)",
+    color: CSS_VARS.textSecondary,
     fontSize: 11,
     letterSpacing: 1.5,
     marginBottom: 6,
@@ -403,8 +406,8 @@ export const createShellChrome = (theme = createTheme(false, "BLUE")) => ({
     fontFamily: APP_FONT_FAMILY,
   },
   inp: {
-    background: "var(--surface-elevated, #F9FAFB)",
-    border: `1px solid rgba(0,0,0,0.08)`,
+    background: CSS_VARS.surfaceElevated,
+    border: `1px solid ${CSS_VARS.borderSubtle}`,
     borderRadius: 8,
     padding: "12px 14px",
     color: theme.text,
@@ -418,22 +421,22 @@ export const createShellChrome = (theme = createTheme(false, "BLUE")) => ({
     WebkitBackdropFilter: "none",
   },
   cardS: (e = {}) => ({
-    background: "var(--surface-elevated, #FFFFFF)",
+    background: CSS_VARS.surfaceElevated,
     border: "none",
     borderRadius: 12,
     padding: "24px 32px",
     marginBottom: 16,
     boxShadow:
-      "0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)",
+      "var(--shadow-card, 0 4px 6px -1px rgba(0, 0, 0, 0.05)), var(--shadow-card-soft, 0 2px 4px -1px rgba(0, 0, 0, 0.03))",
     ...e,
   }),
   glowBtn: (color, disabled) => ({
-    background: disabled ? "rgba(0,0,0,0.05)" : `${color}08`,
-    border: `1px solid ${disabled ? "rgba(0,0,0,0.1)" : `${color}30`}`,
+    background: disabled ? "var(--surface-ghost, rgba(0,0,0,0.05))" : `${color}08`,
+    border: `1px solid ${disabled ? "var(--border-subtle, rgba(0,0,0,0.1))" : `${color}30`}`,
     borderRadius: 8,
     padding: "14px 28px",
     cursor: disabled ? "not-allowed" : "pointer",
-    color: disabled ? "#9CA3AF" : color,
+    color: disabled ? CSS_VARS.textTertiary : color,
     fontFamily: APP_FONT_FAMILY,
     fontSize: 13,
     fontWeight: 600,
@@ -537,7 +540,7 @@ export const createShellChrome = (theme = createTheme(false, "BLUE")) => ({
         key={i}
         style={{
           padding: "14px 20px",
-          borderBottom: `1px solid rgba(255,255,255,0.1)`,
+          borderBottom: `1px solid ${CSS_VARS.borderStrong}`,
           display: "grid",
           gridTemplateColumns: "2fr 2fr 1.5fr 1.2fr 1fr",
           gap: 16,
@@ -548,7 +551,7 @@ export const createShellChrome = (theme = createTheme(false, "BLUE")) => ({
           <div
             style={{
               height: 12,
-              background: "rgba(255,255,255,0.06)",
+              background: "var(--surface-ghost, rgba(255,255,255,0.06))",
               borderRadius: 4,
               marginBottom: 6,
               animation: "pulse 1.5s ease-in-out infinite",
@@ -558,7 +561,7 @@ export const createShellChrome = (theme = createTheme(false, "BLUE")) => ({
           <div
             style={{
               height: 10,
-              background: "rgba(255,255,255,0.04)",
+              background: "var(--surface-ghost, rgba(255,255,255,0.04))",
               borderRadius: 4,
               width: "50%",
               animation: "pulse 1.5s ease-in-out infinite",
@@ -569,7 +572,7 @@ export const createShellChrome = (theme = createTheme(false, "BLUE")) => ({
         <div
           style={{
             height: 11,
-            background: "rgba(255,255,255,0.06)",
+            background: "var(--surface-ghost, rgba(255,255,255,0.06))",
             borderRadius: 4,
             animation: "pulse 1.5s ease-in-out infinite",
             animationDelay: "0.2s",
@@ -579,7 +582,7 @@ export const createShellChrome = (theme = createTheme(false, "BLUE")) => ({
         <div
           style={{
             height: 11,
-            background: "rgba(255,255,255,0.06)",
+            background: "var(--surface-ghost, rgba(255,255,255,0.06))",
             borderRadius: 4,
             animation: "pulse 1.5s ease-in-out infinite",
             animationDelay: "0.3s",
@@ -589,7 +592,7 @@ export const createShellChrome = (theme = createTheme(false, "BLUE")) => ({
         <div
           style={{
             height: 24,
-            background: "rgba(255,255,255,0.06)",
+            background: "var(--surface-ghost, rgba(255,255,255,0.06))",
             borderRadius: 20,
             animation: "pulse 1.5s ease-in-out infinite",
             animationDelay: "0.4s",
@@ -607,7 +610,7 @@ export const createShellChrome = (theme = createTheme(false, "BLUE")) => ({
             style={{
               height: 24,
               width: 70,
-              background: "rgba(255,255,255,0.06)",
+              background: "var(--surface-ghost, rgba(255,255,255,0.06))",
               borderRadius: 4,
               animation: "pulse 1.5s ease-in-out infinite",
               animationDelay: "0.5s",

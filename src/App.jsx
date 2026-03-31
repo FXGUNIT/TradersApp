@@ -109,6 +109,7 @@ import OfficersBriefingFooter from "./features/shell/OfficersBriefingFooter.jsx"
 import { useMaintenanceMode } from "./features/shell/useMaintenanceMode.js";
 import { useToastNotifications } from "./features/shell/useToastNotifications.js";
 import { useTerminalWorkspaceHydration } from "./features/shell/useTerminalWorkspaceHydration.js";
+import { useAuthSessionHandlers } from "./features/identity/useAuthSessionHandlers.js";
 import { SCREEN_IDS } from "./features/shell/screenIds.js";
 import DiamondNavigationLattice from "./features/shell/navigation-lattice/DiamondNavigationLattice.jsx";
 import {
@@ -822,29 +823,67 @@ export default function TradersRegiment() {
     setAppTheme,
   ]);
 
-  // Check user status and route to appropriate screen
-  const checkUserStatus = useCallback(
-    async (authData) => {
-      await executeCheckUserStatus({
-        authData,
-        loadLegacyUserProfile,
-        firebaseAuth,
-        readPendingGoogleSignup,
-        persistPendingGoogleSignup,
-        setGoogleUser,
-        setProfile,
-        setScreen,
-        showToast,
-        ADMIN_UID,
-        resolveRestorableScreen,
-        resolveConsciousnessReturnScreen,
-        setConsciousnessReturnScreen,
-        clearPendingGoogleSignup,
-        SCREEN_IDS,
-      });
-    },
-    [showToast],
-  );
+  const {
+    checkUserStatus,
+    syncAuthSessionFromUser,
+    sendVerificationLink,
+    handleLoginPasswordReset,
+    handleLogin,
+    handleStructuredSignup,
+    handleStructuredGoogleAuth,
+    handleBackToLoginFromSignup,
+    handlePasswordReset,
+    handleResendVerificationEmail,
+    checkApprovalStatus,
+    handleLogout,
+  } = useAuthSessionHandlers({
+    auth,
+    profile,
+    firebaseAuth,
+    FB_KEY,
+    googleProvider,
+    isValidGmailAddress,
+    getLoginRateLimitRemainingMs,
+    formatCooldown,
+    findIdentityUserByEmail,
+    clearLoginFailures,
+    recordLoginFailure,
+    loadLegacyUserProfile,
+    updateLoginSecurityCounters,
+    sendForensicAlert,
+    isPasswordExpired,
+    setAuth,
+    setCurrentSessionId,
+    setProfile,
+    setScreen,
+    showToast,
+    googleUser,
+    ADMIN_UID,
+    ADMIN_EMAIL,
+    readPendingGoogleSignup,
+    persistPendingGoogleSignup,
+    clearPendingGoogleSignup,
+    resolveRestorableScreen,
+    resolveConsciousnessReturnScreen,
+    setConsciousnessReturnScreen,
+    SCREEN_IDS,
+    setGoogleUser,
+    submitOnboardingApplication,
+    provisionIdentityUserRecord,
+    buildPendingProfile,
+    sendWelcomeEmail,
+    sendTelegramAlert,
+    setIsAdminAuthenticated,
+    setShowAdminPrompt,
+    setAdminMasterEmail,
+    setAdminMasterEmailVerified,
+    setAdminOtpStep,
+    setAdminOtpsVerified,
+    setAdminOtps,
+    setAdminPassInput,
+    setAdminPassErr,
+    setAdminOtpErr,
+  });
 
   // Auth state listener for persistent login
   useEffect(() => {
@@ -926,201 +965,6 @@ export default function TradersRegiment() {
     loadTerminalWorkspace,
     setProfile,
   });
-
-  const syncAuthSessionFromUser = useCallback(
-    async (user, stayLoggedIn = false) => {
-      return executeSyncAuthSessionFromUser({
-        user,
-        stayLoggedIn,
-        createSyncedAuthSession,
-        setAuth,
-        setCurrentSessionId,
-      });
-    },
-    [],
-  );
-
-  const sendVerificationLink = useCallback(async () => {
-    await executeSendVerificationLink({ firebaseAuth });
-  }, []);
-
-  const handleLoginPasswordReset = useCallback(async (email) => {
-    return executeLoginPasswordReset({
-      email,
-      firebaseAuth,
-      isValidGmailAddress,
-    });
-  }, []);
-
-  const handleLogin = async (email, password, stayLoggedIn = false) => {
-    return executeLogin({
-      email,
-      password,
-      stayLoggedIn,
-      firebaseAuth,
-      FB_KEY,
-      isValidGmailAddress,
-      getLoginRateLimitRemainingMs,
-      formatCooldown,
-      findIdentityUserByEmail,
-      clearLoginFailures,
-      recordLoginFailure,
-      loadLegacyUserProfile,
-      updateLoginSecurityCounters,
-      sendForensicAlert,
-      isPasswordExpired,
-      syncAuthSessionFromUser,
-      setAuth,
-      setCurrentSessionId,
-      setProfile,
-      setScreen,
-      showToast,
-      checkUserStatus,
-      provisionIdentityUserRecord,
-      ADMIN_UID,
-      sendTelegramAlert,
-    });
-  };
-
-  const handleStructuredSignup = async (formData) => {
-    return executeStructuredSignup({
-      formData,
-      googleUser,
-      firebaseAuth,
-      FB_KEY,
-      isValidGmailAddress,
-      findIdentityUserByEmail,
-      sendVerificationLink,
-      syncAuthSessionFromUser,
-      buildPendingProfile,
-      submitOnboardingApplication,
-      provisionIdentityUserRecord,
-      sendWelcomeEmail,
-      sendTelegramAlert,
-      setAuth,
-      setProfile,
-      setGoogleUser,
-      clearPendingGoogleSignup,
-      setScreen,
-      showToast,
-      checkUserStatus,
-      ADMIN_EMAIL,
-      sendForensicAlert,
-    });
-  };
-
-  const handleStructuredGoogleAuth = async (
-    applicationData = null,
-    authenticatedUser = null,
-  ) => {
-    return executeStructuredGoogleAuth({
-      applicationData,
-      authenticatedUser,
-      firebaseAuth,
-      FB_KEY,
-      googleProvider,
-      isValidGmailAddress,
-      syncAuthSessionFromUser,
-      loadLegacyUserProfile,
-      handleStructuredSignup,
-      persistPendingGoogleSignup,
-      setGoogleUser,
-      clearPendingGoogleSignup,
-      setScreen,
-      checkUserStatus,
-    });
-  };
-
-  const handleBackToLoginFromSignup = async () => {
-    clearPendingGoogleSignup();
-    setGoogleUser(null);
-
-    if (
-      firebaseAuth?.currentUser &&
-      firebaseAuth.currentUser.providerData?.some(
-        (provider) => provider?.providerId === "google.com",
-      )
-    ) {
-      try {
-        await firebaseAuth.signOut();
-      } catch (error) {
-        console.warn("Failed to clear pending Google session:", error);
-      }
-    }
-
-    setAuth(null);
-    setProfile(null);
-    setScreen("login");
-  };
-
-  // RULE 18: Handle forced password reset
-  const handlePasswordReset = async (newPassword) => {
-    return executePasswordReset({
-      newPassword,
-      auth,
-      profile,
-      firebaseAuth,
-      provisionIdentityUserRecord,
-      setProfile,
-      checkUserStatus,
-      showToast,
-    });
-  };
-
-  const handleResendVerificationEmail = async () => {
-    return executeResendVerificationEmail({
-      auth,
-      firebaseAuth,
-      sendVerificationLink,
-      setAuth,
-      showToast,
-    });
-  };
-
-  const checkApprovalStatus = async () => {
-    return executeApprovalStatusCheck({
-      auth,
-      profile,
-      firebaseAuth,
-      checkUserStatus,
-      setAuth,
-    });
-  };
-
-  const handleLogout = async () => {
-    const activeUid = auth?.uid;
-    try {
-      if (firebaseAuth?.signOut) {
-        await firebaseAuth.signOut();
-      }
-    } catch (error) {
-      console.warn("Error signing out:", error);
-    }
-    // RULE #165: Clear cache persistence on logout
-    clearUserListCache();
-    // Clear admin session from localStorage
-    localStorage.removeItem("isAdminAuthenticated");
-    localStorage.removeItem("admin_session");
-    if (activeUid) {
-      clearLastScreen(activeUid);
-      clearConsciousnessReturnScreen(activeUid);
-    }
-    clearPendingGoogleSignup();
-    setGoogleUser(null);
-    setAuth(null);
-    setProfile(null);
-    setIsAdminAuthenticated(false);
-    setShowAdminPrompt(false);
-    setAdminMasterEmail("");
-    setAdminMasterEmailVerified(false);
-    setAdminOtpStep(false);
-    setAdminOtpsVerified(false);
-    setAdminOtps({ otp1: "", otp2: "", otp3: "" });
-    setAdminPassInput("");
-    setAdminPassErr("");
-    setAdminOtpErr("");
-    setScreen("login");
-  };
 
   const logSecurityAlert = async (
     attemptType,

@@ -1,34 +1,35 @@
 import { useState } from "react";
+import { CSS_VARS } from "../../styles/cssVars.js";
 
 const TOAST_COLORS = {
   success: {
-    border: "#30D158",
-    bg: "rgba(48, 209, 88, 0.1)",
-    text: "#30D158",
+    border: CSS_VARS.statusSuccess,
+    bg: "var(--status-success-soft, rgba(48, 209, 88, 0.1))",
+    text: CSS_VARS.statusSuccess,
     icon: "\u2713",
   },
   error: {
-    border: "#FF453A",
-    bg: "rgba(255, 69, 58, 0.1)",
-    text: "#FF453A",
+    border: CSS_VARS.statusDanger,
+    bg: "var(--status-danger-soft, rgba(255, 69, 58, 0.1))",
+    text: CSS_VARS.statusDanger,
     icon: "\u2715",
   },
   warning: {
-    border: "#FFD60A",
-    bg: "rgba(255, 214, 10, 0.1)",
-    text: "#FFD60A",
+    border: CSS_VARS.statusWarning,
+    bg: "var(--status-warning-soft, rgba(255, 214, 10, 0.1))",
+    text: CSS_VARS.statusWarning,
     icon: "\u26A0",
   },
   info: {
-    border: "#0A84FF",
-    bg: "rgba(10, 132, 255, 0.1)",
-    text: "#0A84FF",
+    border: CSS_VARS.statusInfo,
+    bg: "var(--status-info-soft, rgba(10, 132, 255, 0.1))",
+    text: CSS_VARS.statusInfo,
     icon: "\u2139",
   },
   critical: {
-    border: "#FF3B30",
-    bg: "rgba(255, 59, 48, 0.15)",
-    text: "#FF3B30",
+    border: CSS_VARS.statusDanger,
+    bg: "var(--status-danger-soft-strong, rgba(255, 59, 48, 0.15))",
+    text: CSS_VARS.statusDanger,
     icon: "\uD83D\uDEA8",
   },
 };
@@ -88,9 +89,7 @@ export default function Toast({ toasts, onDismiss, fontFamily = "inherit" }) {
             onTouchEnd={() => handleTouchEnd(toast.id)}
             style={{
               background: color.bg,
-              border: color.border.startsWith("#")
-                ? `1px solid ${color.border}30`
-                : "1px solid rgba(10,132,255,0.3)",
+              border: `1px solid ${CSS_VARS.borderSubtle}`,
               borderLeft: `4px solid ${color.border}`,
               borderRadius: 8,
               padding: "14px 16px ",
@@ -103,7 +102,7 @@ export default function Toast({ toasts, onDismiss, fontFamily = "inherit" }) {
               color: color.text,
               fontWeight: 600,
               animation: "slideInToast-gpu 0.3s ease-out",
-              boxShadow: "0 0 20px rgba(0,0,0,0.4)",
+              boxShadow: `0 0 20px ${CSS_VARS.borderStrong}`,
               pointerEvents: "auto",
               cursor: isMobile ? "grab" : "default",
               userSelect: "none",
