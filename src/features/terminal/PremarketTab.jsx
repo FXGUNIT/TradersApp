@@ -43,6 +43,7 @@ export default function PremarketTab({
   setActiveTab,
   setErr,
   err,
+  flashingZoneId,
 }) {
   return (
     <div>
@@ -138,6 +139,7 @@ export default function PremarketTab({
             zoneId={zone.zid}
             activeZone={activeZone}
             setActiveZone={setActiveZone}
+            flashingZoneId={flashingZoneId}
           >
             <div
               style={cardS({ margin: 0, borderLeft: `4px solid ${zone.color}` })}

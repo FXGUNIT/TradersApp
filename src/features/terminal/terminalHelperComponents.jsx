@@ -384,8 +384,9 @@ export function CountdownBanner({ ist }) {
 }
 
 // PasteZone Component
-export function PasteZone({ zoneId, activeZone, setActiveZone, children, style }) {
+export function PasteZone({ zoneId, activeZone, setActiveZone, children, style, flashingZoneId }) {
   const isActive = activeZone === zoneId;
+  const isFlashing = flashingZoneId === zoneId;
   return (
     <div
       onClick={() => setActiveZone(zoneId)}
@@ -397,7 +398,7 @@ export function PasteZone({ zoneId, activeZone, setActiveZone, children, style }
         borderRadius: 12,
         transition: "all 0.2s ease"
       }}
-      className="glass-panel"
+      className={`glass-panel${isFlashing ? " paste-zone-flash" : ""}`}
     >
       {children}
       <div style={{

@@ -1340,3 +1340,23 @@ svg.feather {
     opacity: 0.6;
   }
 }
+
+/* Paste zone flash — triggered when a screenshot is pasted into a zone */
+@keyframes pasteFlash {
+  0% {
+    box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.6);
+    border-color: rgba(37, 99, 235, 0.8);
+  }
+  30% {
+    box-shadow: 0 0 0 8px rgba(37, 99, 235, 0.15);
+    border-color: rgba(37, 99, 235, 0.9);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(37, 99, 235, 0);
+    border-color: rgba(37, 99, 235, 0.15);
+  }
+}
+
+.paste-zone-flash {
+  animation: pasteFlash 0.5s ease-out forwards;
+}

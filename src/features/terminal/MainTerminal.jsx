@@ -54,6 +54,7 @@ import {
   runTradePlanWithAi,
 } from "../../services/clients/TerminalAnalyticsClient.js";
 import { getISTState } from "../../utils/tradingUtils.js";
+import { usePasteListener } from "./terminalPasteListener.js";
 
 const warningTint = "var(--status-warning-soft, rgba(255,214,10,0.12))";
 const overlayTint = "var(--surface-overlay, rgba(15,23,42,0.5))";
@@ -1138,52 +1139,20 @@ export default function MainTerminal({
   };
   const tabResetScope = resetScopeByTab[activeTab] || "all";
 
-  // Paste handler
-  useEffect(() => {
-    const handler = (e) => {
-      if (!activeZone) return;
-      
-      const items = Array.from(e.clipboardData?.items || []);
-      const img = items.find(i => i.type.startsWith('image/'));
-      
-      if (!img) return; 
-      e.preventDefault();
-      
-      const file = img.getAsFile(); 
-      if (!file) return;
-      
-      const reader = new FileReader();
-      reader.onload = ev => {
-        const b64 = ev.target.result.split(',')[1];
-        const imgObj = { name: 'pasted.png', b64, type: 'image/png' };
-        
-        switch (activeZone) {
-          case 'ss': 
-            setScreenshots(prev => prev.length >= 4 ? prev : [...prev, imgObj]); 
-            break;
-          case 'vwap': 
-            setVwapChart(imgObj); 
-            break;
-          case 'mp': 
-            setMpChart(imgObj); 
-            break;
-          case 'p1news': 
-            setP1NewsChart(imgObj); 
-            break;
-          case 'p1prem': 
-            setP1PremarketChart(imgObj); 
-            break;
-          case 'p1lvl': 
-            setP1KeyLevelsChart(imgObj); 
-            break;
-        }
-      };
-      reader.readAsDataURL(file);
-    };
-    
-    document.addEventListener('paste', handler);
-    return () => document.removeEventListener('paste', handler);
-  }, [activeZone]);
+  // Paste handler — owned by usePasteListener BFF hook
+  const { flashingZoneId, triggerFlash } = usePasteListener({
+    activeZone,
+    handlers: {
+      ss: setScreenshots,
+      vwap: setVwapChart,
+      mp: setMpChart,
+      p1news: setP1NewsChart,
+      p1prem: setP1PremarketChart,
+      p1lvl: setP1KeyLevelsChart,
+    },
+    showToast,
+    screenshotsLength: screenshots.length,
+  });
 
   // CSV handler
   const handleCsvDrop = useCallback(async (e) => {
@@ -1902,6 +1871,7 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
             setActiveTab={setActiveTab}
             setErr={setErr}
             err={err}
+            flashingZoneId={flashingZoneId}
           />
         )}
 
@@ -1961,6 +1931,7 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
             makeImgHandler={makeImgHandler}
             handleScreenshotDrop={handleScreenshotDrop}
             extractFromScreenshots={extractFromScreenshots}
+            flashingZoneId={flashingZoneId}
           />
         )}
 

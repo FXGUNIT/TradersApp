@@ -83,6 +83,7 @@ export default function TradeTab({
   // Settings
   makeImgHandler,
   handleScreenshotDrop,
+  flashingZoneId,
 }) {
   return (
     <div>
@@ -233,6 +234,7 @@ export default function TradeTab({
             zoneId={zone.zid}
             activeZone={activeZone}
             setActiveZone={setActiveZone}
+            flashingZoneId={flashingZoneId}
           >
             <div
               data-pastezone="true"
