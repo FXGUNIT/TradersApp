@@ -16,6 +16,8 @@ import {
 import { CSS_VARS } from "../../styles/cssVars.js";
 import TerminalTradeReadinessPanel from "./TerminalTradeReadinessPanel.jsx";
 import { useTerminalOcr, OCR_STATES } from "./useTerminalOcr.js";
+import { RiskSlider } from "./RiskSlider.jsx";
+import { useDebounce } from "./useDebounce.js";
 
 const warningTint = "var(--status-warning-soft, rgba(255,214,10,0.12))";
 const dangerTint = "var(--status-danger-soft, rgba(255,69,58,0.1))";
@@ -81,6 +83,11 @@ export default function TradeTab({
   // Handlers
   runPart2,
   addP2Trade,
+  // Risk slider
+  slPts,
+  ptVal,
+  accountState,
+  drawdownType,
   // Settings
   makeImgHandler,
   handleScreenshotDrop,
@@ -100,6 +107,11 @@ export default function TradeTab({
   });
 
   const isOcrBusy = ocrState === OCR_STATES.LOADING || ocrState === OCR_STATES.SCANNING;
+
+  // Debounced risk save — fires 800ms after the slider's onCommit (mouseUp)
+  const debouncedSaveRisk = useDebounce((riskPct) => {
+    sf("riskPct")(riskPct);
+  }, 800);
 
   return (
     <div>
@@ -176,11 +188,18 @@ export default function TradeTab({
             type="number"
             mono
           />
-          <Field
-            label="RISK %"
-            value={f.riskPct}
+          <RiskSlider
+            value={f.riskPct ?? "0.3"}
             onChange={sf("riskPct")}
-            options={[{ v: "0.2", l: "0.2%" }, { v: "0.3", l: "0.3%" }, { v: "0.4", l: "0.4%" }]}
+            onCommit={debouncedSaveRisk}
+            currentBalance={accountState?.currentBalance}
+            startingBalance={accountState?.startingBalance}
+            highWaterMark={accountState?.highWaterMark}
+            maxDrawdown={maxDrawdown ?? 0}
+            drawdownType={drawdownType ?? "trailing"}
+            slPts={slPts ?? 0}
+            ptVal={ptVal ?? 1}
+            throttleActive={throttleActive ?? false}
           />
         </div>
 

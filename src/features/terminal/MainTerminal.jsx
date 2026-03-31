@@ -1935,6 +1935,11 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
             p2Ref={p2Ref}
             predictedP2TP1={predictedP2TP1}
             predictedP2SL={predictedP2SL}
+            slPts={terminalDerivedState.slPts}
+            ptVal={terminalDerivedState.ptVal}
+            accountState={accountState}
+            maxDrawdown={firmRules.maxDrawdown}
+            drawdownType={firmRules.drawdownType}
             err={err}
             setErr={setErr}
             loading={loading}
