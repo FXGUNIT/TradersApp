@@ -108,6 +108,7 @@ import SplashScreen from "./features/shell/SplashScreen.jsx";
 import { useMaintenanceMode } from "./features/shell/useMaintenanceMode.js";
 import { useToastNotifications } from "./features/shell/useToastNotifications.js";
 import { SCREEN_IDS } from "./features/shell/screenIds.js";
+import DiamondNavigationLattice from "./features/shell/navigation-lattice/DiamondNavigationLattice.jsx";
 import {
   clearConsciousnessReturnScreen,
   clearLastScreen,
@@ -2238,6 +2239,22 @@ export default function TradersRegiment() {
         ) : (
           screenContent
         )}
+        <DiamondNavigationLattice
+          screen={screen}
+          setScreen={setScreen}
+          auth={auth}
+          disabled={
+            maintenanceModeActive &&
+            auth?.uid !== ADMIN_UID &&
+            screen !== SCREEN_IDS.ADMIN
+          }
+          onRestrictedBack={() =>
+            showToast(
+              "Back navigation is restricted after logout. Sign in again to continue.",
+              "error",
+            )
+          }
+        />
 
         {/* Admin Debug Overlay - System Audit Dashboard */}
         <DebugOverlay

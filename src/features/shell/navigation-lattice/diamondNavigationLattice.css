@@ -1,0 +1,199 @@
+.aura-smart-lattice {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+.aura-smart-arrow {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  position: fixed;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  cursor: pointer;
+  color: var(--aura-text-primary, #121212);
+  background: linear-gradient(
+    135deg,
+    var(--aura-surface-elevated, #ffffff) 0%,
+    var(--aura-base-layer, #fbfbfc) 100%
+  );
+  box-shadow:
+    0 4px 15px rgba(0, 0, 0, 0.2),
+    inset 0 1px 1px rgba(255, 255, 255, 0.3);
+  border-left: 1px solid rgba(255, 255, 255, 0.4);
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  border-right: 1px solid var(--aura-border-subtle, rgba(0, 0, 0, 0.08));
+  border-bottom: 1px solid var(--aura-border-subtle, rgba(0, 0, 0, 0.08));
+  transition:
+    transform 0.5s cubic-bezier(0.19, 1, 0.22, 1),
+    opacity 0.5s cubic-bezier(0.19, 1, 0.22, 1),
+    box-shadow 0.35s ease;
+  isolation: isolate;
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+
+.aura-smart-arrow--top-left {
+  top: 20px;
+  left: 18px;
+}
+
+.aura-smart-arrow--top-right {
+  top: 20px;
+  right: 18px;
+}
+
+.aura-smart-arrow--bottom-right {
+  right: 18px;
+  bottom: 20px;
+}
+
+.aura-smart-arrow--bottom-center {
+  left: 50%;
+  bottom: 20px;
+  margin-left: -16px;
+}
+
+.aura-smart-arrow:hover {
+  transform: scale(1.15);
+  box-shadow:
+    0 0 20px var(--aura-gem-glow, rgba(37, 99, 235, 0.35)),
+    0 10px 20px rgba(0, 0, 0, 0.2);
+}
+
+.aura-smart-arrow:active {
+  animation: auraArrowMicroSquish 180ms ease-out;
+}
+
+.aura-smart-arrow--restricted {
+  animation: auraArrowRestrictedShake 200ms ease-in-out;
+  box-shadow:
+    0 0 16px var(--aura-status-danger, #ef4444),
+    0 0 2px var(--aura-status-danger, #ef4444);
+}
+
+.aura-smart-arrow__glyph {
+  width: 16px;
+  height: 16px;
+  position: relative;
+  z-index: 2;
+}
+
+.aura-smart-arrow__spark {
+  width: 2px;
+  height: 2px;
+  border-radius: 999px;
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  background: var(--aura-accent-primary, #2563eb);
+  box-shadow: 0 0 8px var(--aura-accent-primary, #2563eb);
+  animation: auraArrowBling 10s ease-in-out infinite;
+  z-index: 3;
+}
+
+.aura-smart-arrow__ripple {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 1px solid color-mix(in srgb, var(--aura-accent-primary, #2563eb) 45%, transparent);
+  opacity: 0;
+  z-index: 1;
+}
+
+.aura-smart-arrow:active .aura-smart-arrow__ripple {
+  animation: auraArrowRipple 260ms ease-out;
+}
+
+@keyframes auraArrowBling {
+  0%,
+  93%,
+  100% {
+    opacity: 0.25;
+    transform: scale(1);
+  }
+  95% {
+    opacity: 1;
+    transform: scale(1.75);
+  }
+}
+
+@keyframes auraArrowMicroSquish {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(0.9);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes auraArrowRestrictedShake {
+  0% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-2px);
+  }
+  50% {
+    transform: translateX(2px);
+  }
+  75% {
+    transform: translateX(-1px);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+@keyframes auraArrowRipple {
+  0% {
+    opacity: 0.5;
+    transform: scale(0.88);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.2);
+  }
+}
+
+:root[data-aura-theme="amber"] .aura-smart-arrow {
+  color: color-mix(in srgb, var(--aura-text-primary, #3d2b1f) 88%, #2d1e14);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--aura-surface-elevated, #fdf6e3) 88%, #c67a2a) 0%,
+    color-mix(in srgb, var(--aura-base-layer, #f4ebd0) 82%, #9a5b1d) 100%
+  );
+}
+
+:root[data-aura-theme="midnight"] .aura-smart-arrow {
+  color: var(--aura-text-primary, #e1e1e1);
+  background: linear-gradient(135deg, #1a1a1b 0%, #05070a 100%);
+  border-left: 1px solid rgba(255, 255, 255, 0.4);
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+@media (max-width: 768px) {
+  .aura-smart-arrow--top-right,
+  .aura-smart-arrow--bottom-right {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aura-smart-arrow,
+  .aura-smart-arrow__spark,
+  .aura-smart-arrow__ripple {
+    animation: none !important;
+    transition: none !important;
+  }
+}
