@@ -6,19 +6,6 @@ import React, {
   useEffect,
   Suspense,
 } from "react";
-import { initializeApp } from "firebase/app";
-import {
-  getAuth,
-  sendPasswordResetEmail,
-  setPersistence,
-  browserLocalPersistence,
-  onAuthStateChanged,
-  GoogleAuthProvider,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  signOut,
-} from "firebase/auth";
-import { getDatabase } from "firebase/database";
 import emailjs from "@emailjs/browser";
 import { sendWelcomeEmail } from "./utils/email.js";
 import FloatingChatWidget from "./components/FloatingChatWidget.jsx";
@@ -54,7 +41,6 @@ import {
   highlightMatches,
   renderHighlightedText,
 } from "./utils/searchUtils.jsx";
-import { dbR, dbW, dbM, dbDel, genOTP } from "./utils/firebaseDbUtils.js";
 import {
   encryptSessionToken,
   generateSessionId,
@@ -108,6 +94,7 @@ import { useResizeOptimizationEffect } from "./features/shell/useResizeOptimizat
 import { useFirebaseHeartbeatEffect } from "./features/shell/useFirebaseHeartbeatEffect.js";
 import { useDevAuditHarnessEffect } from "./features/shell/useDevAuditHarnessEffect.js";
 import { useAuthSessionHandlers } from "./features/identity/useAuthSessionHandlers.js";
+import { useAuthBootstrap } from "./features/identity/useAuthBootstrap.js";
 import { SCREEN_IDS } from "./features/shell/screenIds.js";
 import DiamondNavigationLattice from "./features/shell/navigation-lattice/DiamondNavigationLattice.jsx";
 import {
@@ -148,7 +135,7 @@ import {
 import { executeCheckUserStatus } from "./features/identity/authRoutingHandlers.js";
 import {
   findUserByEmail as findIdentityUserByEmail,
-  loadLegacyUserProfile,
+  loadUserProfile as loadIdentityUserProfile,
   provisionUserRecord as provisionIdentityUserRecord,
   updateLoginSecurityCounters,
 } from "./services/clients/IdentityClient.js";
@@ -160,6 +147,10 @@ import {
   saveFirmRules as saveTerminalFirmRules,
   saveJournal as saveTerminalJournal,
 } from "./services/clients/TerminalClient.js";
+import {
+  ADMIN_EMAIL,
+  ADMIN_UID,
+} from "./services/firebase.js";
 import "./features/shell/registerLegacyRuntimeStyles.js";
 import "./styles/global.css";
 import NotificationCenter from "./components/NotificationCenter.jsx";
@@ -201,29 +192,6 @@ const hasEmailJsConfig = Boolean(
 // math-engine & ai-router are both inlined (files exist but have no exports)
 // Swap to real imports once those files are complete
 
-const FB_KEY = import.meta.env.VITE_FIREBASE_API_KEY;
-const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL,
-};
-const hasFirebaseConfig = Boolean(
-  firebaseConfig.apiKey &&
-  firebaseConfig.authDomain &&
-  firebaseConfig.projectId &&
-  firebaseConfig.appId,
-);
-const firebaseApp = hasFirebaseConfig ? initializeApp(firebaseConfig) : null;
-const firebaseAuth = firebaseApp ? getAuth(firebaseApp) : null;
-const firebaseDb = firebaseApp ? getDatabase(firebaseApp) : null;
-const googleProvider = new GoogleAuthProvider();
-const FB_AUTH_URL = "https://identitytoolkit.googleapis.com/v1/accounts";
-const ADMIN_EMAIL = "gunitsingh1994@gmail.com";
-const ADMIN_UID = "N3z04ZYCleZjOApobL3VZepaOwi1";
 const TELEGRAM_TOKEN = import.meta.env.VITE_TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = import.meta.env.VITE_TELEGRAM_CHAT_ID;
 const enableTelegramDiagnostics =
@@ -253,20 +221,6 @@ const toggleMaintenanceState = resolveAdminClientFn(
   "setMaintenanceState",
   "updateMaintenanceMode",
 );
-const DATABASE_URL = firebaseConfig.databaseURL;
-
-if (firebaseAuth) {
-  googleProvider.setCustomParameters({
-    hd: "gmail.com",
-    prompt: "select_account",
-  });
-
-  try {
-    setPersistence(firebaseAuth, browserLocalPersistence);
-  } catch {
-    console.warn("Failed to set auth persistence");
-  }
-}
 
 import "./index.css";
 
@@ -439,7 +393,6 @@ export default function TradersRegiment() {
   });
 
   useAdminSessionRestoreEffect({
-    firebaseAuth,
     setIsAdminAuthenticated,
     setScreen,
     setIsInitialLoading,
@@ -452,7 +405,7 @@ export default function TradersRegiment() {
 
   useResizeOptimizationEffect();
 
-  useFirebaseHeartbeatEffect({ firebaseDb });
+  useFirebaseHeartbeatEffect();
 
   useDevAuditHarnessEffect({
     adminUid: ADMIN_UID,
@@ -496,16 +449,13 @@ export default function TradersRegiment() {
   } = useAuthSessionHandlers({
     auth,
     profile,
-    firebaseAuth,
-    FB_KEY,
-    googleProvider,
     isValidGmailAddress,
     getLoginRateLimitRemainingMs,
     formatCooldown,
     findIdentityUserByEmail,
     clearLoginFailures,
     recordLoginFailure,
-    loadLegacyUserProfile,
+    loadUserProfile: loadIdentityUserProfile,
     updateLoginSecurityCounters,
     sendForensicAlert,
     isPasswordExpired,
@@ -542,93 +492,15 @@ export default function TradersRegiment() {
     setAdminOtpErr,
   });
 
-  // Auth state listener for persistent login
-  useEffect(() => {
-    if (!firebaseAuth) {
-      return () => {};
-    }
-
-    const unsubscribe = onAuthStateChanged(firebaseAuth, async (user) => {
-      try {
-        const auditHarnessEnabled =
-          typeof window !== "undefined" &&
-          import.meta.env.DEV &&
-          Boolean(window.__TradersAppAudit);
-        if (auditHarnessEnabled) {
-          return;
-        }
-
-        const auditMode =
-          typeof window !== "undefined" &&
-          window.__TRADERS_AUDIT_DATA?.active === true;
-        if (auditMode) {
-          return;
-        }
-
-        if (user) {
-          if (isAdminAuthenticated) {
-            return;
-          }
-
-          try {
-            await user.reload();
-          } catch (reloadError) {
-            console.warn("Auth user reload skipped:", reloadError.message);
-          }
-
-          try {
-            const token = await user.getIdToken(true);
-            const authData = {
-              uid: user.uid,
-              token,
-              refreshToken: user.refreshToken,
-              email: user.email,
-              emailVerified: user.emailVerified,
-            };
-            setAuth(authData);
-            await checkUserStatus(authData);
-          } catch (tokenError) {
-            console.warn(
-              "Token refresh failed, trying non-refreshed token:",
-              tokenError.message,
-            );
-            try {
-              const token = await user.getIdToken(false);
-              const authData = {
-                uid: user.uid,
-                token,
-                refreshToken: user.refreshToken,
-                email: user.email,
-                emailVerified: user.emailVerified,
-              };
-              setAuth(authData);
-              await checkUserStatus(authData);
-            } catch (fallbackError) {
-              console.warn(
-                "All token methods failed but user exists in Firebase:",
-                fallbackError.message,
-              );
-            }
-          }
-        } else if (!isAdminAuthenticated) {
-          setAuth(null);
-          setProfile(null);
-          setGoogleUser(null);
-          clearPendingGoogleSignup();
-          setScreen("login");
-        }
-      } catch (error) {
-        console.error("Auth state change error:", error);
-      } finally {
-        if (!authBootstrapCompleteRef.current) {
-          authBootstrapCompleteRef.current = true;
-          setIsInitialLoading(false);
-        }
-      }
-    });
-
-    return () => unsubscribe();
-  }, [checkUserStatus, isAdminAuthenticated]);
+  useAuthBootstrap({
+    checkUserStatus,
+    isAdminAuthenticated,
+    setAuth,
+    setProfile,
+    setGoogleUser,
+    setScreen,
+    setIsInitialLoading,
+  });
 
   useTerminalWorkspaceHydration({
     auth,

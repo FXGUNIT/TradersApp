@@ -1,4 +1,5 @@
 import { sendVerificationLinkForUser } from "./authSessionUtils.js";
+import { auth as firebaseAuth } from "../../services/firebase.js";
 
 export const executeSyncAuthSessionFromUser = async ({
   user,
@@ -18,7 +19,7 @@ export const executeSyncAuthSessionFromUser = async ({
   return authData;
 };
 
-export const executeSendVerificationLink = async ({ firebaseAuth }) => {
+export const executeSendVerificationLink = async () => {
   await sendVerificationLinkForUser(firebaseAuth?.currentUser);
 };
 

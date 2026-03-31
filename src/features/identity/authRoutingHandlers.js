@@ -1,7 +1,8 @@
+import { auth as firebaseAuth } from "../../services/firebase.js";
+
 export const executeCheckUserStatus = async ({
   authData,
-  loadLegacyUserProfile,
-  firebaseAuth,
+  loadUserProfile: suppliedLoadUserProfile,
   readPendingGoogleSignup,
   persistPendingGoogleSignup,
   setGoogleUser,
@@ -15,6 +16,8 @@ export const executeCheckUserStatus = async ({
   clearPendingGoogleSignup,
   SCREEN_IDS,
 }) => {
+  const loadUserProfile = suppliedLoadUserProfile;
+
   try {
     const auditData =
       typeof window !== "undefined" ? window.__TRADERS_AUDIT_DATA : null;
@@ -67,7 +70,7 @@ export const executeCheckUserStatus = async ({
       profile: nextProfile,
       screen: nextScreen,
       userData,
-    } = await loadLegacyUserProfile(authData);
+    } = await loadUserProfile(authData);
 
     if (!userData || !nextProfile) {
       const currentUser = firebaseAuth?.currentUser;

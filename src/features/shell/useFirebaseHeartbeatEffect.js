@@ -1,9 +1,8 @@
 import { useEffect } from "react";
 import { onValue, ref } from "firebase/database";
+import { firebaseOptimizer, db as firebaseDb } from "../../services/firebase.js";
 
-import { firebaseOptimizer } from "../../services/firebase.js";
-
-export function useFirebaseHeartbeatEffect({ firebaseDb }) {
+export function useFirebaseHeartbeatEffect() {
   useEffect(() => {
     if (!firebaseDb) {
       return undefined;
@@ -71,7 +70,7 @@ export function useFirebaseHeartbeatEffect({ firebaseDb }) {
       if (unsubscribe) unsubscribe();
       if (heartbeatCheckTimer) clearInterval(heartbeatCheckTimer);
     };
-  }, [firebaseDb]);
+  }, []);
 }
 
 export default useFirebaseHeartbeatEffect;

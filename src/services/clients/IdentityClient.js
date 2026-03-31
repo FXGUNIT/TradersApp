@@ -119,19 +119,19 @@ export async function findUserByEmail(email, token = "") {
   };
 }
 
-export async function loadUserProfileByUid(authData = {}) {
+export async function loadUserProfile(authData = {}) {
   if (!authData?.uid) {
-    return createUnavailableProfileResponse("loadUserProfileByUid", authData);
+    return createUnavailableProfileResponse("loadUserProfile", authData);
   }
 
   if (!hasBff()) {
-    return createUnavailableProfileResponse("loadUserProfileByUid", authData);
+    return createUnavailableProfileResponse("loadUserProfile", authData);
   }
 
   const response = await fetchIdentityUser(authData.uid);
   const userData = normalizeUserPayload(response);
   if (!userData) {
-    return createUnavailableProfileResponse("loadUserProfileByUid", authData);
+    return createUnavailableProfileResponse("loadUserProfile", authData);
   }
 
   const sessionsResponse = await fetchIdentitySessions(authData.uid);
@@ -150,8 +150,15 @@ export async function loadUserProfileByUid(authData = {}) {
   return mergeProfileData(userData, authData, fullData);
 }
 
+export async function loadUserProfileByUid(authData = {}) {
+  return loadUserProfile(authData);
+}
+
+/**
+ * @deprecated Use loadUserProfile instead.
+ */
 export async function loadLegacyUserProfile(authData) {
-  return loadUserProfileByUid(authData);
+  return loadUserProfile(authData);
 }
 
 export async function updateLoginSecurityCounters(
@@ -297,6 +304,7 @@ export default {
   findUserByEmail,
   getUserStatusByUid,
   listUserSessions,
+  loadUserProfile,
   loadLegacyUserProfile,
   loadUserProfileByUid,
   provisionUserRecord,

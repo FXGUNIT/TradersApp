@@ -1,9 +1,8 @@
 import { useEffect } from "react";
-
+import { auth } from "../../services/firebase.js";
 import { sendTelegramAlert } from "../../utils/securityAlertUtils.js";
 
 export function useAdminSessionRestoreEffect({
-  firebaseAuth,
   setIsAdminAuthenticated,
   setScreen,
   setIsInitialLoading,
@@ -26,14 +25,13 @@ export function useAdminSessionRestoreEffect({
       console.warn("Failed to restore admin session:", error);
     }
 
-    if (!firebaseAuth) {
+    if (!auth) {
       setScreen("login");
       setIsInitialLoading(false);
       authBootstrapCompleteRef.current = true;
     }
   }, [
     authBootstrapCompleteRef,
-    firebaseAuth,
     setIsAdminAuthenticated,
     setIsInitialLoading,
     setScreen,

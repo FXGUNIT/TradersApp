@@ -1,8 +1,9 @@
+import { auth as firebaseAuth } from "../../services/firebase.js";
+
 export const executePasswordReset = async ({
   newPassword,
   auth,
   profile,
-  firebaseAuth,
   provisionIdentityUserRecord,
   setProfile,
   checkUserStatus,
@@ -40,7 +41,6 @@ export const executePasswordReset = async ({
 };
 
 export const executeResendVerificationEmail = async ({
-  firebaseAuth,
   sendVerificationLink,
   setAuth,
   showToast,
@@ -66,7 +66,6 @@ export const executeResendVerificationEmail = async ({
 export const executeApprovalStatusCheck = async ({
   auth,
   profile,
-  firebaseAuth,
   checkUserStatus,
   setAuth,
 }) => {

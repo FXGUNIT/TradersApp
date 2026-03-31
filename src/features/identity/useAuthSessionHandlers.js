@@ -1,4 +1,5 @@
 import { useCallback } from "react";
+import { auth as firebaseAuth } from "../../services/firebase.js";
 import { clearLastScreen, clearConsciousnessReturnScreen } from "./authFlowStorage.js";
 import { executeCheckUserStatus } from "./authRoutingHandlers.js";
 import {
@@ -22,16 +23,13 @@ import { clearUserListCache } from "../../utils/userUtils.js";
 export function useAuthSessionHandlers({
   auth,
   profile,
-  firebaseAuth,
-  FB_KEY,
-  googleProvider,
   isValidGmailAddress,
   getLoginRateLimitRemainingMs,
   formatCooldown,
   findIdentityUserByEmail,
   clearLoginFailures,
   recordLoginFailure,
-  loadLegacyUserProfile,
+  loadUserProfile,
   updateLoginSecurityCounters,
   sendForensicAlert,
   isPasswordExpired,
@@ -67,12 +65,12 @@ export function useAuthSessionHandlers({
   setAdminPassErr,
   setAdminOtpErr,
 }) {
+
   const checkUserStatus = useCallback(
     async (authData) => {
       await executeCheckUserStatus({
         authData,
-        loadLegacyUserProfile,
-        firebaseAuth,
+        loadUserProfile,
         readPendingGoogleSignup,
         persistPendingGoogleSignup,
         setGoogleUser,
@@ -91,8 +89,7 @@ export function useAuthSessionHandlers({
       ADMIN_UID,
       SCREEN_IDS,
       clearPendingGoogleSignup,
-      firebaseAuth,
-      loadLegacyUserProfile,
+      loadUserProfile,
       persistPendingGoogleSignup,
       readPendingGoogleSignup,
       resolveConsciousnessReturnScreen,
@@ -118,18 +115,17 @@ export function useAuthSessionHandlers({
   );
 
   const sendVerificationLink = useCallback(
-    async () => executeSendVerificationLink({ firebaseAuth }),
-    [firebaseAuth],
+    async () => executeSendVerificationLink(),
+    [],
   );
 
   const handleLoginPasswordReset = useCallback(
     async (email) =>
       executeLoginPasswordReset({
         email,
-        firebaseAuth,
         isValidGmailAddress,
       }),
-    [firebaseAuth, isValidGmailAddress],
+    [isValidGmailAddress],
   );
 
   const handleLogin = useCallback(
@@ -138,15 +134,13 @@ export function useAuthSessionHandlers({
         email,
         password,
         stayLoggedIn,
-        firebaseAuth,
-        FB_KEY,
         isValidGmailAddress,
         getLoginRateLimitRemainingMs,
         formatCooldown,
         findIdentityUserByEmail,
         clearLoginFailures,
         recordLoginFailure,
-        loadLegacyUserProfile,
+        loadUserProfile,
         updateLoginSecurityCounters,
         sendForensicAlert,
         isPasswordExpired,
@@ -163,16 +157,14 @@ export function useAuthSessionHandlers({
       }),
     [
       ADMIN_UID,
-      FB_KEY,
       checkUserStatus,
       clearLoginFailures,
-      firebaseAuth,
       findIdentityUserByEmail,
       formatCooldown,
       getLoginRateLimitRemainingMs,
       isPasswordExpired,
       isValidGmailAddress,
-      loadLegacyUserProfile,
+      loadUserProfile,
       provisionIdentityUserRecord,
       recordLoginFailure,
       sendForensicAlert,
@@ -192,8 +184,6 @@ export function useAuthSessionHandlers({
       executeStructuredSignup({
         formData,
         googleUser,
-        firebaseAuth,
-        FB_KEY,
         isValidGmailAddress,
         findIdentityUserByEmail,
         sendVerificationLink,
@@ -215,11 +205,9 @@ export function useAuthSessionHandlers({
       }),
     [
       ADMIN_EMAIL,
-      FB_KEY,
       buildPendingProfile,
       checkUserStatus,
       clearPendingGoogleSignup,
-      firebaseAuth,
       findIdentityUserByEmail,
       isValidGmailAddress,
       provisionIdentityUserRecord,
@@ -243,12 +231,9 @@ export function useAuthSessionHandlers({
       executeStructuredGoogleAuth({
         applicationData,
         authenticatedUser,
-        firebaseAuth,
-        FB_KEY,
-        googleProvider,
         isValidGmailAddress,
         syncAuthSessionFromUser,
-        loadLegacyUserProfile,
+        loadUserProfile,
         handleStructuredSignup,
         persistPendingGoogleSignup,
         setGoogleUser,
@@ -257,14 +242,11 @@ export function useAuthSessionHandlers({
         checkUserStatus,
       }),
     [
-      FB_KEY,
       checkUserStatus,
       clearPendingGoogleSignup,
-      firebaseAuth,
-      googleProvider,
       handleStructuredSignup,
       isValidGmailAddress,
-      loadLegacyUserProfile,
+      loadUserProfile,
       persistPendingGoogleSignup,
       setGoogleUser,
       setScreen,
@@ -279,7 +261,7 @@ export function useAuthSessionHandlers({
     if (
       firebaseAuth?.currentUser &&
       firebaseAuth.currentUser.providerData?.some(
-        (provider) => provider?.providerId === "google.com",
+        (p) => p?.providerId === "google.com",
       )
     ) {
       try {
@@ -294,7 +276,6 @@ export function useAuthSessionHandlers({
     setScreen("login");
   }, [
     clearPendingGoogleSignup,
-    firebaseAuth,
     setAuth,
     setGoogleUser,
     setProfile,
@@ -307,7 +288,6 @@ export function useAuthSessionHandlers({
         newPassword,
         auth,
         profile,
-        firebaseAuth,
         provisionIdentityUserRecord,
         setProfile,
         checkUserStatus,
@@ -316,7 +296,6 @@ export function useAuthSessionHandlers({
     [
       auth,
       checkUserStatus,
-      firebaseAuth,
       profile,
       provisionIdentityUserRecord,
       setProfile,
@@ -327,12 +306,11 @@ export function useAuthSessionHandlers({
   const handleResendVerificationEmail = useCallback(
     async () =>
       executeResendVerificationEmail({
-        firebaseAuth,
         sendVerificationLink,
         setAuth,
         showToast,
       }),
-    [firebaseAuth, sendVerificationLink, setAuth, showToast],
+    [sendVerificationLink, setAuth, showToast],
   );
 
   const checkApprovalStatus = useCallback(
@@ -340,11 +318,10 @@ export function useAuthSessionHandlers({
       executeApprovalStatusCheck({
         auth,
         profile,
-        firebaseAuth,
         checkUserStatus,
         setAuth,
       }),
-    [auth, checkUserStatus, firebaseAuth, profile, setAuth],
+    [auth, checkUserStatus, profile, setAuth],
   );
 
   const handleLogout = useCallback(async () => {
@@ -384,7 +361,6 @@ export function useAuthSessionHandlers({
     clearConsciousnessReturnScreen,
     clearLastScreen,
     clearPendingGoogleSignup,
-    firebaseAuth,
     setAdminMasterEmail,
     setAdminMasterEmailVerified,
     setAdminOtpErr,

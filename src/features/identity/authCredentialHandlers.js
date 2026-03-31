@@ -8,13 +8,13 @@ import {
   signInWithPopup,
   GoogleAuthProvider,
 } from "firebase/auth";
+import { auth as firebaseAuth, googleProvider, FB_KEY } from "../../services/firebase.js";
 import { buildPendingProfile } from "./authSessionUtils.js";
 
 const ADMIN_EMAIL = "master@tradersregiment.com";
 
 export const executeLoginPasswordReset = async ({
   email,
-  firebaseAuth,
   isValidGmailAddress,
 }) => {
   const cleanEmail = String(email || "")
@@ -43,15 +43,13 @@ export const executeLogin = async ({
   email,
   password,
   stayLoggedIn,
-  firebaseAuth,
-  FB_KEY,
   isValidGmailAddress,
   getLoginRateLimitRemainingMs,
   formatCooldown,
   findIdentityUserByEmail,
   clearLoginFailures,
   recordLoginFailure,
-  loadLegacyUserProfile,
+  loadUserProfile: suppliedLoadUserProfile,
   updateLoginSecurityCounters,
   sendForensicAlert,
   isPasswordExpired,
@@ -66,6 +64,8 @@ export const executeLogin = async ({
   ADMIN_UID,
   sendTelegramAlert,
 }) => {
+  const loadUserProfile = suppliedLoadUserProfile;
+
   const sanitizedEmail = String(email || "")
     .trim()
     .toLowerCase();
@@ -157,7 +157,7 @@ export const executeLogin = async ({
     clearLoginFailures(sanitizedEmail);
 
     const token = await signedInUser.getIdToken(true);
-    const signedInRecord = await loadLegacyUserProfile({
+    const signedInRecord = await loadUserProfile({
       uid: signedInUser.uid,
       token,
       email: signedInUser.email,
@@ -253,7 +253,7 @@ export const executeLogin = async ({
       "🔓 <b>GOD MODE ACTIVATED</b>\nMaster Admin has entered the terminal.",
     );
 
-    const adminRecord = await loadLegacyUserProfile(authData);
+    const adminRecord = await loadUserProfile(authData);
     const userData = adminRecord?.userData || {};
     setProfile({
       ...userData,
@@ -267,7 +267,7 @@ export const executeLogin = async ({
   }
 
   let userDataFinal =
-    (await loadLegacyUserProfile(authData))?.userData || null;
+    (await loadUserProfile(authData))?.userData || null;
   if (!userDataFinal) {
     const initProfile = buildPendingProfile({
       fullName: signedInUser.displayName,
@@ -310,8 +310,6 @@ export const executeLogin = async ({
 export const executeStructuredSignup = async ({
   formData,
   googleUser,
-  firebaseAuth,
-  FB_KEY,
   isValidGmailAddress,
   findIdentityUserByEmail,
   sendVerificationLink,
@@ -557,12 +555,9 @@ export const executeStructuredSignup = async ({
 export const executeStructuredGoogleAuth = async ({
   applicationData,
   authenticatedUser,
-  firebaseAuth,
-  FB_KEY,
-  googleProvider,
   isValidGmailAddress,
   syncAuthSessionFromUser,
-  loadLegacyUserProfile,
+  loadUserProfile: suppliedLoadUserProfile,
   handleStructuredSignup,
   persistPendingGoogleSignup,
   setGoogleUser,
@@ -570,14 +565,15 @@ export const executeStructuredGoogleAuth = async ({
   setScreen,
   checkUserStatus,
 }) => {
+  const loadUserProfile = suppliedLoadUserProfile;
+
   if (!firebaseAuth || !FB_KEY) {
     throw new Error("Google sign-in is unavailable right now.");
   }
 
-  const provider = googleProvider || new GoogleAuthProvider();
   const user =
     authenticatedUser ||
-    (await signInWithPopup(firebaseAuth, provider)).user;
+    (await signInWithPopup(firebaseAuth, googleProvider)).user;
   const email = String(user.email || "").toLowerCase();
 
   if (!isValidGmailAddress(email)) {
@@ -586,7 +582,7 @@ export const executeStructuredGoogleAuth = async ({
   }
 
   const authData = await syncAuthSessionFromUser(user, true);
-  const existingIdentityRecord = await loadLegacyUserProfile(authData);
+  const existingIdentityRecord = await loadUserProfile(authData);
   const userData = existingIdentityRecord?.userData || null;
 
   if (userData) {
