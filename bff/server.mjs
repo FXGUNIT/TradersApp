@@ -492,17 +492,18 @@ const server = createServer(async (req, res) => {
     return;
   }
 
-  const handledContentRoute = createContentRouteHandler({
+  const contentRouteHandler = createContentRouteHandler({
     getHubContent,
     getDocumentMeta,
     listDocumentMeta,
     json,
-  })(req, res, url, origin);
+  });
+  const handledContentRoute = contentRouteHandler(req, res, url, origin);
   if (handledContentRoute) {
     return;
   }
 
-  const handledTerminalRoute = await createTerminalRouteHandler({
+  const terminalRouteHandler = createTerminalRouteHandler({
     getWorkspace,
     replaceWorkspaceAccountState,
     replaceWorkspaceFirmRules,
@@ -510,21 +511,28 @@ const server = createServer(async (req, res) => {
     upsertWorkspace,
     readJsonBody,
     json,
-  })(req, res, url, origin);
+  });
+  const handledTerminalRoute = await terminalRouteHandler(req, res, url, origin);
   if (handledTerminalRoute) {
     return;
   }
 
-  const handledTerminalAnalyticsRoute = await createTerminalAnalyticsRouteHandler({
+  const terminalAnalyticsRouteHandler = createTerminalAnalyticsRouteHandler({
     invokeTerminalAnalyticsChat,
     json,
     readJsonBody,
-  })(req, res, url, origin);
+  });
+  const handledTerminalAnalyticsRoute = await terminalAnalyticsRouteHandler(
+    req,
+    res,
+    url,
+    origin,
+  );
   if (handledTerminalAnalyticsRoute) {
     return;
   }
 
-  const handledIdentityRoute = await createIdentityRouteHandler({
+  const identityRouteHandler = createIdentityRouteHandler({
     deleteSession,
     findUserByEmail,
     getUserByUid,
@@ -537,35 +545,38 @@ const server = createServer(async (req, res) => {
     revokeOtherSessions,
     upsertSession,
     json,
-  })(req, res, url, origin);
+  });
+  const handledIdentityRoute = await identityRouteHandler(req, res, url, origin);
   if (handledIdentityRoute) {
     return;
   }
 
-  const handledOnboardingRoute = await createOnboardingRouteHandler({
+  const onboardingRouteHandler = createOnboardingRouteHandler({
     getApplication,
     getApplicationStatus,
     mergeApplicationConsent,
     readJsonBody,
     upsertApplication,
     json,
-  })(req, res, url, origin);
+  });
+  const handledOnboardingRoute = await onboardingRouteHandler(req, res, url, origin);
   if (handledOnboardingRoute) {
     return;
   }
 
-  const handledSupportRoute = await createSupportRouteHandler({
+  const supportRouteHandler = createSupportRouteHandler({
     appendSupportMessage,
     getSupportThread,
     listSupportThreads,
     json,
     readJsonBody,
-  })(req, res, url, origin);
+  });
+  const handledSupportRoute = await supportRouteHandler(req, res, url, origin);
   if (handledSupportRoute) {
     return;
   }
 
-  const handledAdminRoute = await createAdminRouteHandler({
+  const adminRouteHandler = createAdminRouteHandler({
     approveAdminUser,
     blockAdminUser,
     getMaintenanceState,
@@ -575,7 +586,8 @@ const server = createServer(async (req, res) => {
     toggleMaintenanceState,
     json,
     readJsonBody,
-  })(req, res, url, origin);
+  });
+  const handledAdminRoute = await adminRouteHandler(req, res, url, origin);
   if (handledAdminRoute) {
     return;
   }
