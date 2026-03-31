@@ -15,6 +15,7 @@ import {
 } from "./terminalHelperComponents";
 import { CSS_VARS } from "../../styles/cssVars.js";
 import TerminalTradeReadinessPanel from "./TerminalTradeReadinessPanel.jsx";
+import { useTerminalOcr, OCR_STATES } from "./useTerminalOcr.js";
 
 const warningTint = "var(--status-warning-soft, rgba(255,214,10,0.12))";
 const dangerTint = "var(--status-danger-soft, rgba(255,69,58,0.1))";
@@ -84,7 +85,22 @@ export default function TradeTab({
   makeImgHandler,
   handleScreenshotDrop,
   flashingZoneId,
+  // OCR state writers
+  setExtractedVals,
+  showToast,
 }) {
+  // ── OCR hook (BFF seam — owns Tesseract.js state and execution) ────────────
+  const { ocrState, ocrProgress, runOcr, ocrStatus } = useTerminalOcr({
+    screenshots,
+    showToast,
+    onResult: (ocrValues) => {
+      // Merge OCR results into extractedVals — OCR values complement AI values
+      setExtractedVals((prev) => ({ ...prev, ...ocrValues }));
+    },
+  });
+
+  const isOcrBusy = ocrState === OCR_STATES.LOADING || ocrState === OCR_STATES.SCANNING;
+
   return (
     <div>
       <TerminalTradeReadinessPanel
@@ -235,6 +251,8 @@ export default function TradeTab({
             activeZone={activeZone}
             setActiveZone={setActiveZone}
             flashingZoneId={flashingZoneId}
+            scanningZoneId={isOcrBusy ? zone.zid : null}
+            ocrSuccessZoneId={ocrState === OCR_STATES.SUCCESS ? zone.zid : null}
           >
             <div
               data-pastezone="true"
@@ -413,8 +431,9 @@ export default function TradeTab({
       <div
         style={{
           display: "flex",
+          flexWrap: "wrap",
           alignItems: "center",
-          gap: 16,
+          gap: 12,
           margin: "16px 0",
           padding: "12px 20px",
           background: CSS_VARS.card,
@@ -424,16 +443,28 @@ export default function TradeTab({
         }}
         className="glass-panel"
       >
+        {/* ① Native OCR — local, no API call */}
+        <button
+          onClick={runOcr}
+          disabled={isOcrBusy || screenshots.length === 0}
+          style={glowBtn(T.green, isOcrBusy || screenshots.length === 0)}
+          className="btn-glass"
+        >
+          {isOcrBusy ? `⟳ ${ocrStatus}` : `① ${ocrStatus}`}
+        </button>
+
+        {/* ② AI Extract — cloud-powered, broader understanding */}
         <button
           onClick={extractFromScreenshots}
           disabled={extracting || screenshots.length === 0}
           style={glowBtn(T.purple, extracting || !screenshots.length)}
           className="btn-glass"
         >
-          {extracting ? "⟳ READING..." : "◉ EXTRACT INDICATORS"}
+          {extracting ? "⟳ READING..." : "② EXTRACT INDICATORS"}
         </button>
+
         <span style={{ color: T.muted, fontSize: 10, flex: 1, fontWeight: 500 }}>
-          {extractStatus || "Extracts ADX · CI · ATR for Dead Zone check"}
+          {extractStatus || "① local OCR (no login) · ② AI extract (needs model)"}
         </span>
       </div>
 

@@ -384,9 +384,12 @@ export function CountdownBanner({ ist }) {
 }
 
 // PasteZone Component
-export function PasteZone({ zoneId, activeZone, setActiveZone, children, style, flashingZoneId }) {
-  const isActive = activeZone === zoneId;
-  const isFlashing = flashingZoneId === zoneId;
+export function PasteZone({ zoneId, activeZone, setActiveZone, children, style, flashingZoneId, scanningZoneId, ocrSuccessZoneId }) {
+  const isActive    = activeZone === zoneId;
+  const isFlashing  = flashingZoneId === zoneId;
+  const isScanning  = scanningZoneId === zoneId;
+  const isOcrSuccess = ocrSuccessZoneId === zoneId;
+
   return (
     <div
       onClick={() => setActiveZone(zoneId)}
@@ -398,8 +401,11 @@ export function PasteZone({ zoneId, activeZone, setActiveZone, children, style, 
         borderRadius: 12,
         transition: "all 0.2s ease"
       }}
-      className={`glass-panel${isFlashing ? " paste-zone-flash" : ""}`}
+      className={`glass-panel${isFlashing || isOcrSuccess ? " paste-zone-flash" : ""}${isOcrSuccess ? " ocr-success-flash" : ""}`}
     >
+      {/* OCR scanning line overlay */}
+      {isScanning && <div className="ocr-scan-line" />}
+
       {children}
       <div style={{
         position: "absolute",

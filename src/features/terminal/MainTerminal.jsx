@@ -1932,6 +1932,8 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
             handleScreenshotDrop={handleScreenshotDrop}
             extractFromScreenshots={extractFromScreenshots}
             flashingZoneId={flashingZoneId}
+            setExtractedVals={setExtractedVals}
+            showToast={showToast}
           />
         )}
 
