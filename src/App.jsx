@@ -107,6 +107,8 @@ import AppScreenRegistry from "./features/shell/AppScreenRegistry.jsx";
 import LoadingFallback from "./features/shell/LoadingFallback.jsx";
 import MaintenanceScreen from "./features/shell/MaintenanceScreen.jsx";
 import SplashScreen from "./features/shell/SplashScreen.jsx";
+import { useMaintenanceMode } from "./features/shell/useMaintenanceMode.js";
+import { useToastNotifications } from "./features/shell/useToastNotifications.js";
 import { SCREEN_IDS } from "./features/shell/screenIds.js";
 import {
   clearConsciousnessReturnScreen,
@@ -1129,7 +1131,7 @@ export default function TradersRegiment() {
   const [showAdminPwd, setShowAdminPwd] = useState(false);
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
-  const [toasts, setToasts] = useState([]);
+  const { toasts, showToast, dismissToast } = useToastNotifications();
   const theme = currentTheme;
   const [aiStatuses, setAiStatuses] = useState(() => getAIStatusesDetailed());
   const [consciousnessReturnScreen, setConsciousnessReturnScreen] =
@@ -1162,104 +1164,7 @@ export default function TradersRegiment() {
   }, [auth?.uid, screen, consciousnessReturnScreen]);
 
   // ═══════════════════════════════════════════════════════════════════
-  // INITIALIZATION ORDER FIX: playNotificationSound and showToast
-  // MUST be defined here, before any code that uses them
   // ═══════════════════════════════════════════════════════════════════
-  const playNotificationSound = useCallback((type = "success") => {
-    try {
-      const audioContext = new (
-        window.AudioContext || window.webkitAudioContext
-      )();
-
-      if (type === "success" || type === "info") {
-        // Notification sound: Pleasant ascending tone (0.5s)
-        const now = audioContext.currentTime;
-
-        // Oscillator 1: Main ascending tone
-        const osc1 = audioContext.createOscillator();
-        const gain1 = audioContext.createGain();
-        osc1.connect(gain1);
-        gain1.connect(audioContext.destination);
-
-        osc1.type = "sine";
-        osc1.frequency.setValueAtTime(800, now);
-        osc1.frequency.exponentialRampToValueAtTime(1200, now + 0.15);
-        osc1.frequency.exponentialRampToValueAtTime(1600, now + 0.3);
-
-        gain1.gain.setValueAtTime(0.3, now);
-        gain1.gain.exponentialRampToValueAtTime(0.1, now + 0.5);
-
-        osc1.start(now);
-        osc1.stop(now + 0.5);
-      } else if (type === "error" || type === "warning") {
-        // Low Alert sound: Descending warning tone (0.4s)
-        const now = audioContext.currentTime;
-
-        // Oscillator: Descending tone
-        const osc = audioContext.createOscillator();
-        const gain = audioContext.createGain();
-        osc.connect(gain);
-        gain.connect(audioContext.destination);
-
-        osc.type = "sine";
-        osc.frequency.setValueAtTime(600, now);
-        osc.frequency.exponentialRampToValueAtTime(300, now + 0.4);
-
-        gain.gain.setValueAtTime(0.25, now);
-        gain.gain.exponentialRampToValueAtTime(0.05, now + 0.4);
-
-        osc.start(now);
-        osc.stop(now + 0.4);
-      }
-    } catch {
-      // Silently fail if Audio API not available
-    }
-  }, []);
-
-  const showToast = useCallback(
-    (message, type = "info", duration = 3000) => {
-      const id = `toast-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      const newToast = {
-        id,
-        message,
-        type,
-        duration,
-        time_remaining: duration,
-        createdAt: Date.now(),
-      };
-      setToasts((prev) => [...prev, newToast]);
-
-      // RULE #189: Play institutional notification sound
-      playNotificationSound(type);
-
-      // Track time remaining for progress bar
-      const startTime = Date.now();
-      const intervalId = setInterval(() => {
-        const elapsed = Date.now() - startTime;
-        const remaining = Math.max(0, duration - elapsed);
-        setToasts((prev) =>
-          prev.map((t) =>
-            t.id === id ? { ...t, time_remaining: remaining } : t,
-          ),
-        );
-      }, 50);
-
-      // Auto-remove toast after duration
-      const timer = setTimeout(() => {
-        clearInterval(intervalId);
-        setToasts((prev) => prev.filter((t) => t.id !== id));
-      }, duration);
-
-      // Return function to manually dismiss
-      return () => {
-        clearTimeout(timer);
-        clearInterval(intervalId);
-        setToasts((prev) => prev.filter((t) => t.id !== id));
-      };
-    },
-    [playNotificationSound],
-  );
-
   // MODULE 5: VISUAL POLISH - SYSTEM THEME SYNC & ACCENT COLORS
   const systemIsDark = useSystemTheme(); // Auto-detect OS dark/light mode
   const [accentColor, setAccentColor] = useState(() => {
@@ -1288,106 +1193,16 @@ export default function TradersRegiment() {
   const [, _setActiveSessions] = useState([]);
   const [currentSessionId, setCurrentSessionId] = useState(null);
   const authBootstrapCompleteRef = useRef(false);
-
-  const [maintenanceModeActive, setMaintenanceModeActive] = useState(false);
-
-  useEffect(() => {
-    let active = true;
-
-    const loadMaintenanceState = async () => {
-      if (fetchMaintenanceState) {
-        try {
-          const response = await fetchMaintenanceState();
-          if (!active) return;
-
-          if (response?.success === false) {
-            throw new Error(response.error || "Failed to load maintenance.");
-          }
-
-          if (typeof response?.maintenanceActive === "boolean") {
-            setMaintenanceModeActive(response.maintenanceActive);
-            return;
-          }
-        } catch (error) {
-          console.warn(
-            "Maintenance state client load failed, falling back:",
-            error,
-          );
-        }
-      }
-
-      try {
-        if (!active) return;
-        const stored = localStorage.getItem("TradersApp_MaintenanceMode");
-        if (stored !== null) {
-          setMaintenanceModeActive(stored === "true");
-        }
-      } catch {
-        // Ignore storage failures; state stays false by default.
-      }
-    };
-
-    void loadMaintenanceState();
-
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  // Handler to toggle maintenance mode
-  const handleToggleMaintenanceMode = useCallback(async () => {
-    const newState = !maintenanceModeActive;
-
-    if (toggleMaintenanceState) {
-      try {
-        const response = await toggleMaintenanceState(newState);
-        if (response?.success === false) {
-          throw new Error(response.error || "Failed to update maintenance.");
-        }
-
-        if (typeof response?.maintenanceActive === "boolean") {
-          setMaintenanceModeActive(response.maintenanceActive);
-        } else {
-          setMaintenanceModeActive(newState);
-        }
-
-        try {
-          localStorage.setItem(
-            "TradersApp_MaintenanceMode",
-            newState.toString(),
-          );
-        } catch {
-          // Local cache is best-effort only.
-        }
-
-        showToast(
-          newState
-            ? 'Maintenance Mode ACTIVATED - Users see "Back Soon" screen'
-            : "Maintenance Mode DEACTIVATED - Normal access restored",
-          newState ? "warning" : "success",
-        );
-        return;
-      } catch (error) {
-        console.warn(
-          "Maintenance toggle client update failed, falling back:",
-          error,
-        );
-      }
-    }
-
-    setMaintenanceModeActive(newState);
-    try {
-      localStorage.setItem("TradersApp_MaintenanceMode", newState.toString());
-      showToast(
-        newState
-          ? 'Maintenance Mode ACTIVATED - Users see "Back Soon" screen'
-          : "Maintenance Mode DEACTIVATED - Normal access restored",
-        newState ? "warning" : "success",
-      );
-    } catch {
-      showToast("Failed to save maintenance mode setting", "error");
-    }
-  }, [maintenanceModeActive, showToast]);
+  const {
+    maintenanceModeActive,
+    handleToggleMaintenanceMode,
+    setMaintenanceModeActive,
+  } =
+    useMaintenanceMode({
+      fetchMaintenanceState,
+      toggleMaintenanceState,
+      showToast,
+    });
 
   // ═══════════════════════════════════════════════════════════════════
   // RULE #315: ADMIN DEBUG OVERLAY - System Audit & Monitoring State
@@ -1460,13 +1275,6 @@ export default function TradersRegiment() {
       }
     }
   }, [isAdminAuthenticated, showToast]);
-
-  // RULE #181-185: Enhanced Toast notification function with configurable duration & stacking
-  // RULE #189: Institutional Sound System - High-end notification alerts
-  // Handler to dismiss toast manually (swipe or button click)
-  const handleDismissToast = useCallback((toastId) => {
-    setToasts((prev) => prev.filter((t) => t.id !== toastId));
-  }, []);
 
   // CREATE DYNAMIC THEME BASED ON SYSTEM DARK MODE, ACCENT COLOR & USER THEME
   const _THEME = useMemo(() => {
@@ -2451,7 +2259,6 @@ export default function TradersRegiment() {
       lbl={lbl}
       ADMIN_UID={ADMIN_UID}
       ADMIN_EMAIL={ADMIN_EMAIL}
-      firebaseDb={firebaseDb}
       listAdminUsers={listAdminUsers}
       approveAdminUser={approveAdminUser}
       blockAdminUser={blockAdminUser}
@@ -2554,7 +2361,7 @@ export default function TradersRegiment() {
           onToggle={() => setDebugOverlayOpen(!debugOverlayOpen)}
           auth={auth}
         />
-        <Toast toasts={toasts} onDismiss={handleDismissToast} fontFamily={T.font} />
+        <Toast toasts={toasts} onDismiss={dismissToast} fontFamily={T.font} />
         <FeatureGuard feature="floatingSupportChat">
           <FloatingChatWidget auth={auth} profile={profile} />
         </FeatureGuard>

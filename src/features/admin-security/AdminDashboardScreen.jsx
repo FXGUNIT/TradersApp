@@ -17,6 +17,7 @@ import {
 } from "../../utils/searchUtils.jsx";
 import { SecuritySentinel } from "../../services/securitySentinel.js";
 import { detectDuplicateIPs as scanDuplicateIPs } from "../../services/ipScanner.js";
+import { db as firebaseDb } from "../../services/firebase.js";
 
 export default function AdminDashboardScreen({
   auth,
@@ -29,7 +30,6 @@ export default function AdminDashboardScreen({
   authBtn,
   ADMIN_UID,
   ADMIN_EMAIL,
-  firebaseDb,
   listAdminUsers,
   approveAdminUser,
   blockAdminUser,

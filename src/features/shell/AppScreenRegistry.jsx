@@ -36,7 +36,6 @@ export default function AppScreenRegistry({
   lbl,
   ADMIN_UID,
   ADMIN_EMAIL,
-  firebaseDb,
   listAdminUsers,
   approveAdminUser,
   blockAdminUser,
@@ -235,7 +234,6 @@ export default function AppScreenRegistry({
                 authBtn={authBtn}
                 ADMIN_UID={ADMIN_UID}
                 ADMIN_EMAIL={ADMIN_EMAIL}
-                firebaseDb={firebaseDb}
                 listAdminUsers={listAdminUsers}
                 approveAdminUser={approveAdminUser}
                 blockAdminUser={blockAdminUser}
