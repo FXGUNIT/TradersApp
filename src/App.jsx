@@ -4,7 +4,6 @@ import React, {
   useRef,
   useCallback,
   useEffect,
-  useMemo,
   Suspense,
 } from "react";
 import { initializeApp } from "firebase/app";
@@ -20,8 +19,6 @@ import {
   signOut,
 } from "firebase/auth";
 import { getDatabase, ref, onValue } from "firebase/database";
-import {
-} from "firebase/storage";
 import emailjs from "@emailjs/browser";
 import { sendWelcomeEmail } from "./utils/email.js";
 import FloatingChatWidget from "./components/FloatingChatWidget.jsx";
@@ -95,6 +92,7 @@ import LoadingOverlay from "./components/LoadingOverlay.jsx";
 import SkeletonLoader from "./components/SkeletonLoader.jsx";
 import LazyImage from "./components/LazyImage.jsx";
 import { useTheme } from "./hooks/useTheme.jsx";
+import { getRandomQuote } from "./features/shell/appShellChrome.jsx";
 import { AppShellProvider } from "./features/shell/AppShellContext.jsx";
 import AppScreenRegistry from "./features/shell/AppScreenRegistry.jsx";
 import LoadingFallback from "./features/shell/LoadingFallback.jsx";
@@ -197,7 +195,6 @@ import {
   MegaMenu,
 } from "./features/shell/ShellPrimitives.jsx";
 import Toast from "./features/shell/Toast.jsx";
-import ThemeSwitcher from "./components/ThemeSwitcher.jsx";
 import { verifyAdminPassword } from "./services/adminAuthService.js";
 
 const hasEmailJsConfig = Boolean(
@@ -228,7 +225,6 @@ const hasFirebaseConfig = Boolean(
 const firebaseApp = hasFirebaseConfig ? initializeApp(firebaseConfig) : null;
 const firebaseAuth = firebaseApp ? getAuth(firebaseApp) : null;
 const firebaseDb = firebaseApp ? getDatabase(firebaseApp) : null;
-const firebaseStorage = firebaseApp ? getStorage(firebaseApp) : null;
 const googleProvider = new GoogleAuthProvider();
 const FB_AUTH_URL = "https://identitytoolkit.googleapis.com/v1/accounts";
 const ADMIN_EMAIL = "gunitsingh1994@gmail.com";
@@ -341,6 +337,7 @@ const _gpuSupport = detectGPUSupport();
 // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 export default function TradersRegiment() {
   const { currentTheme, setTheme: setAppTheme, theme } = useTheme();
+  const T = theme;
   const [screen, setScreen] = useState(SCREEN_IDS.LOADING);
   const [auth, setAuth] = useState(null);
   const [profile, setProfile] = useState(null);
@@ -491,29 +488,6 @@ export default function TradersRegiment() {
       }
     }
   }, [isAdminAuthenticated, showToast]);
-
-  // CREATE DYNAMIC THEME BASED ON SYSTEM DARK MODE, ACCENT COLOR & USER THEME
-  const _THEME = useMemo(() => {
-    if (currentTheme === "lumiere") {
-      return createTheme(false, "BLUE");
-    } else if (currentTheme === "midnight") {
-      return createTheme(true, "BLUE");
-    } else if (currentTheme === "amber") {
-      // Eye Comfort: warmer accents (Gold) to reduce blue light
-      return createTheme(false, "GOLD");
-    }
-    // Fallback to system/theme combo
-    return createTheme(systemIsDark, accentColor);
-  }, [systemIsDark, accentColor, currentTheme]);
-
-  // Shadow outer T with dynamic theme for use throughout component
-  const T = _THEME;
-
-  // Apply theme to document body
-  useEffect(() => {
-    document.body.style.backgroundColor = "var(--base-layer)";
-    document.body.style.color = "var(--text-primary)";
-  }, [currentTheme]);
 
   // MOTION & INTERACTION: Apply tilt effects to dashboard cards
   useEffect(() => {
@@ -812,7 +786,7 @@ export default function TradersRegiment() {
           setIsAdminAuthenticated,
           setCurrentSessionId,
           setTheme: setAppTheme,
-          setAccentColor,
+          setAccentColor: () => {},
           setShowThemePicker: () => {},
           setMaintenanceModeActive,
         });
@@ -826,7 +800,6 @@ export default function TradersRegiment() {
       cleanup();
     };
   }, [
-    setAccentColor,
     setAuth,
     setCurrentSessionId,
     setIsAdminAuthenticated,
@@ -1337,7 +1310,6 @@ export default function TradersRegiment() {
       AdminInvitesView={AdminInvitesView}
       SplashScreen={SplashScreen}
       MainTerminal={MainTerminal}
-      ThemeSwitcher={ThemeSwitcher}
       auth={auth}
       profile={profile}
       googleUser={googleUser}
@@ -1348,19 +1320,11 @@ export default function TradersRegiment() {
       consciousnessReturnScreen={consciousnessReturnScreen}
       isAdminAuthenticated={isAdminAuthenticated}
       maintenanceModeActive={maintenanceModeActive}
-      T={T}
-      authBtn={authBtn}
-      authCard={authCard}
-      lbl={lbl}
       ADMIN_UID={ADMIN_UID}
       ADMIN_EMAIL={ADMIN_EMAIL}
       listAdminUsers={listAdminUsers}
       approveAdminUser={approveAdminUser}
       blockAdminUser={blockAdminUser}
-      AMD_PHASES={AMD_PHASES}
-      LED={LED}
-      SHead={SHead}
-      TableSkeletonLoader={TableSkeletonLoader}
       EmptyStateCard={EmptyStateCard}
       SupportChatModal={SupportChatModal}
       showAdminPrompt={showAdminPrompt}
@@ -1457,7 +1421,7 @@ export default function TradersRegiment() {
           onToggle={() => setDebugOverlayOpen(!debugOverlayOpen)}
           auth={auth}
         />
-        <Toast toasts={toasts} onDismiss={dismissToast} fontFamily={T.font} />
+        <Toast toasts={toasts} onDismiss={dismissToast} fontFamily={theme.font} />
         <FeatureGuard feature="floatingSupportChat">
           <FloatingChatWidget auth={auth} profile={profile} />
         </FeatureGuard>

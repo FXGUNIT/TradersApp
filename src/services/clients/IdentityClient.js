@@ -1,6 +1,5 @@
 import { ADMIN_UID } from "../firebase.js";
 import { dbM, dbR } from "../../utils/firebaseDbUtils.js";
-import { assembleLegacyProfile } from "../../features/shell/profileAssembler.js";
 import { SCREEN_IDS } from "../../features/shell/screenIds.js";
 import {
   fetchIdentityUser,
@@ -52,10 +51,36 @@ async function readLegacyUser(uid, token = "") {
 }
 
 function mergeProfileData(userData, authData = {}, fullData = {}) {
+  const sessions = normalizeSessionMap(
+    fullData?.sessions || userData?.sessions || {},
+  );
+
+  const profile = {
+    uid: authData.uid ?? userData?.uid ?? null,
+    token: authData.token ?? null,
+    email: authData.email ?? userData?.email ?? null,
+    fullName:
+      userData?.fullName || userData?.displayName || userData?.email || null,
+    status: userData?.status || "PENDING",
+    role: userData?.role || "user",
+    isLocked: Boolean(userData?.isLocked),
+    country: userData?.country || "",
+    city: userData?.city || "",
+    instagram: userData?.instagram || "",
+    linkedin: userData?.linkedin || "",
+    proficiency: userData?.proficiency || "",
+    authProvider: userData?.authProvider || "password",
+    consentState: userData?.consentState || {},
+    accountState: fullData?.accountState || {},
+    firmRules: fullData?.firmRules || {},
+    journal: fullData?.journal || {},
+    sessions,
+  };
+
   return {
     userData,
     fullData,
-    profile: assembleLegacyProfile(userData, authData, fullData),
+    profile,
     screen: resolveScreenForUser(userData, authData),
   };
 }
