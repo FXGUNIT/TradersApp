@@ -52,6 +52,7 @@ import {
 import { createAdminRouteHandler } from "./routes/adminRoutes.mjs";
 import { createContentRouteHandler } from "./routes/contentRoutes.mjs";
 import { createConsensusRouteHandler } from "./routes/consensusRoutes.mjs";
+import { createNewsRouteHandler } from "./routes/newsRoutes.mjs";
 import { createIdentityRouteHandler } from "./routes/identityRoutes.mjs";
 import { createTerminalAnalyticsRouteHandler } from "./routes/terminalAnalyticsRoutes.mjs";
 import { createTerminalRouteHandler } from "./routes/terminalRoutes.mjs";
@@ -583,6 +584,12 @@ const server = createServer(async (req, res) => {
   });
   const handledConsensusRoute = await consensusRouteHandler(req, res, url, origin);
   if (handledConsensusRoute) {
+    return;
+  }
+
+  const newsRouteHandler = createNewsRouteHandler({ json });
+  const handledNewsRoute = await newsRouteHandler(req, res, url, origin);
+  if (handledNewsRoute) {
     return;
   }
 
