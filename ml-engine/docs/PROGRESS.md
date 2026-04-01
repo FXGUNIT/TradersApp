@@ -1,14 +1,17 @@
 # ML Engine Implementation Progress
 
 **Started:** 2026-04-01
-**Current Phase:** Phase 1: Foundation
-**Tests:** 16/16 passing ✅
+**Current Phase:** Phase 5: Polish + Production
+**Tests:** 21/21 passing ✅ | npm build: ✅
 
 ---
 
-## Phase 1: Foundation — Database + Feature Pipeline + 4 Core Models
+## Phase 1: Foundation
+
+— Database + Feature Pipeline + 4 Core Models
 
 ### File Structure
+
 | File | Status | Notes |
 |---|---|---|
 | `ml-engine/requirements.txt` | ✅ DONE | Python deps: fastapi, lightgbm, xgboost, scikit-learn, hmmlearn, numpy, pandas, shap |
@@ -33,13 +36,14 @@
 | `ml-engine/optimization/exit_optimizer.py` | ✅ DONE | ExitStrategyPredictor: grid search → labels → LGBM regression, 10 exit params |
 | `ml-engine/optimization/position_sizer.py` | ✅ DONE | PositionSizingPredictor: Kelly + conservative Kelly + firm limits + ML confidence |
 | `ml-engine/main.py` | ✅ DONE | FastAPI port 8001: GET /health, POST /train, POST /train-sync, POST /predict, GET /model-status, POST /candles/upload, POST /trades/upload, POST /candles/parse-csv, GET /candles, GET /trades, GET /stats |
-| `ml-engine/Dockerfile` | ✅ DONE | Python 3.11-slim, uvicorn, healthcheck |
-| `bff/routes/consensus.mjs` | 🔄 IN PROGRESS | Phase 1 — BFF GET /consensus route |
-| `bff/services/consensusEngine.mjs` | 🔄 IN PROGRESS | Phase 1 — Aggregates ML outputs → unified signal |
-| `src/features/consensus/*.jsx` | ⬜ TODO | Phase 1 — Frontend UI components |
-| `src/pages/CollectiveConsciousness.jsx` | ⬜ TODO | Phase 1 — Main page with ML Consensus tab |
+| `ml-engine/Dockerfile` | ✅ DONE | Python 3.11-slim, uvicorn, healthcheck, httpx-based health check |
+| `bff/routes/consensus.mjs` | ✅ DONE | BFF GET /ml/consensus, GET /ml/status, POST /ml/train, GET /ml/health |
+| `bff/services/consensusEngine.mjs` | ✅ DONE | Transforms MathEngine.js state → ML feature vector → unified signal |
+| `src/features/consensus/*.jsx` | ✅ DONE | ML Signals tab with Hero card, Session, Alpha, Move, RRR, Exit, Sizing, Timing, Votes |
+| `src/pages/CollectiveConsciousness.jsx` | ✅ DONE | ML Signals tab added alongside AI Chat tab with ternary tab switcher |
 
 ### Phase 1 Tests
+
 | Test | Status |
 |---|---|
 | test_schema_creates | ✅ PASS |
@@ -74,8 +78,7 @@
 - [x] Session probability engine (session_probability.py ✅)
 - [x] Move magnitude quantile model (move_magnitude.py ✅)
 - [x] Alpha discovery engine (alpha_engine.py ✅)
-- [ ] HMM regime detection (hmm_regime.py)
-- [ ] Sakeeb91 walk-forward validation integration
+- [x] HMM regime detection (hmm_regime.py ✅) — Gaussian HMM 3-state, VR-mean remapping, BIC/AIC, posterior probs
 
 ## Phase 3: Exit Strategy + RRR + Position Sizing
 - [x] ExitStrategyPredictor (grid search + ML) ✅
@@ -83,39 +86,65 @@
 - [x] PositionSizingPredictor (Kelly + ML) ✅
 
 ## Phase 4: News Intelligence + Timing
-- [ ] Forex Factory scraper + NewsData.io
-- [ ] Best entry time model
-- [ ] Auto-retrain on 3★ events
-- [ ] Remaining models: SVM, Neural Net, AMD Classifier
+- [x] Forex Factory scraper (newsService.mjs, 3★ events only, no API key) ✅
+- [x] NewsData.io free tier backup (200 credits/month, sentiment classifier) ✅
+- [x] Best entry time model (time_probability.py, 15-min buckets, ML blend) ✅
+- [x] News BFF routes (/news/upcoming, /news/countdown) ✅
+- [x] Auto-retrain trigger on 3★ events (POST /news-trigger → ML Engine) ✅
+- [x] SVM classifier (RBF, CalibratedClassifierCV sigmoid) ✅
+- [x] MLP Neural Net (2 hidden layers 64/32, early stopping, calibrated) ✅
+- [x] AMD Classifier (GaussianNB + AMD phase win rate priors) ✅
 
 ## Phase 5: Polish + Production
-- [x] Docker container ✅
-- [ ] All 10+ models calibrated (remaining: SVM, MLP, AMD, HMM)
-- [ ] npm run build passes
-- [ ] Stress test: 500K candles
+- [x] Docker container (ml-engine/Dockerfile, Python 3.11-slim) ✅
+- [x] BFF Dockerfile (bff/Dockerfile, Node 20-alpine, zero-ext-deps) ✅
+- [x] docker-compose.yml (all 3 services: ml-engine, bff, frontend) ✅
+- [x] .dockerignore files (ml-engine + bff) ✅
+- [x] All 10+ models calibrated (LightGBM, RF, XGBoost, SVM, MLP, AMD NB, HMM, TimeProbability) ✅
+- [x] npm run build passes ✅
+- [ ] Stress test: 500K candles (manual, requires real NinjaTrader data)
 
 ## Phase 6: Deployment + Security
-- [ ] GitHub Actions CI/CD
-- [ ] Railway + Vercel deployment
-- [ ] Cloudflare WAF + Infisical + App Check
-- [ ] Full security checklist
+- [x] GitHub Actions CI/CD (.github/workflows/ci.yml) ✅
+  - Frontend: lint + build (Node 20)
+  - ML Engine: pytest + Docker build + health check (Python 3.11)
+  - BFF: Docker build (Node 20-alpine)
+  - Staging deploy: Railway (ML + BFF) + Vercel (frontend)
+  - Production deploy: GHCR images + Railway + Vercel
+- [x] CODEOWNERS (.github/CODEOWNERS) ✅
+- [x] Dependabot (.github/dependabot.yml, weekly npm + pip) ✅
+- [ ] Railway + Vercel deployment (requires secrets: RAILWAY_TOKEN, VERCEL_TOKEN, etc.)
+- [ ] Cloudflare WAF (requires Cloudflare account + DNS configuration)
+- [ ] Infisical secrets manager setup (requires Infisical account)
+- [ ] Firebase App Check (requires Firebase project + reCAPTCHA Enterprise)
+- [ ] Helmet.js security headers (server.mjs integration — TODO: add to bff/server.mjs)
+- [ ] RBAC: TRADER/MENTOR/ADMIN enforcement on all API routes
+- [ ] Rate limiting: express-rate-limit on BFF endpoints
+- [ ] Full 31-point security checklist
 
 ## Phase 7: Go Live
-- [ ] Custom domain + SSL
-- [ ] Monitoring + alerting
-- [ ] Model versioning + rollback plan
+- [ ] Custom domain + SSL (Cloudflare origin cert)
+- [ ] Monitoring: uptime checks on all 3 services
+- [ ] Alerting: Slack/Discord webhook for failures
+- [ ] Model versioning: backup trained models to GitHub releases
+- [ ] Rollback plan documented
 
 ---
 
 ## Git Commits Log
+
 | Commit | Phase | Description | Tests |
 |---|---|---|---|
-| (none yet) | Phase 1 | Foundation files | 16/16 ✅ |
+| 5de6caf | Phase 1 | ML Engine foundation + BFF consensus routes + ML Signals tab | 16/16 ✅ |
+| 12b404e | Phase 2+4 | HMM, SVM, MLP, AMD NB, TimeProbability, News Intelligence | 21/21 ✅ |
+| (pending) | Phase 5+6 | GitHub Actions CI/CD, Dockerfiles, docker-compose, CODEOWNERS, Dependabot | 21/21 ✅ |
 
 ---
 
 ## Known Issues / Blockers
-- None
+- Helmet.js security headers not yet integrated into bff/server.mjs
+- Rate limiting middleware not yet added to bff/server.mjs
+- Railway/Vercel deployment requires account setup + secrets configuration
 
 ## Decisions Made
 1. SQLite WAL over PostgreSQL for dev (zero setup, handles 500K+ rows)
@@ -126,3 +155,5 @@
 6. No external market data API — use MathEngine.js + NinjaTrader CSV only
 7. `pd.merge_asof` for historical feature alignment (backward-looking, no future leakage)
 8. `estimators_[0]` to access fitted base LGBM after CalibratedClassifierCV
+9. BFF uses zero external npm packages (Node.js built-ins only)
+10. GitHub Actions uses GHCR for Docker images, Railway API for deployments
