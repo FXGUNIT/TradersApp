@@ -6,6 +6,7 @@ import {
   readDraftSync,
   writeDraftSync,
 } from "../services/draftVault.js";
+import { CSS_VARS } from "../styles/cssVars.js";
 
 const SIGNUP_DRAFT_KEY = "traders-auth-signup-draft-v2";
 
@@ -228,7 +229,7 @@ export default function CleanOnboarding({
 
   const surface = {
     background:
-      "radial-gradient(circle at top, rgba(37,99,235,0.08), transparent 38%), linear-gradient(180deg, #F8FAFC 0%, #EEF2FF 100%)",
+      "linear-gradient(180deg, var(--base-layer, #F8FAFC) 0%, var(--surface-glass, #EEF2FF) 100%)",
     minHeight: "100vh",
     padding: "48px 20px 64px",
     display: "flex",
@@ -239,8 +240,8 @@ export default function CleanOnboarding({
   const card = {
     width: "100%",
     maxWidth: 520,
-    background: "rgba(255,255,255,0.92)",
-    border: "1px solid rgba(148,163,184,0.22)",
+    background: CSS_VARS.surfaceElevated,
+    border: `1px solid ${CSS_VARS.borderSubtle}`,
     borderRadius: 28,
     boxShadow: "0 30px 80px rgba(15,23,42,0.12)",
     backdropFilter: "blur(18px)",
@@ -250,7 +251,7 @@ export default function CleanOnboarding({
   const label = {
     display: "block",
     marginBottom: 8,
-    color: "#0F172A",
+    color: CSS_VARS.textPrimary,
     fontSize: 12,
     fontWeight: 700,
     letterSpacing: "0.04em",
@@ -260,10 +261,10 @@ export default function CleanOnboarding({
     width: "100%",
     height: 48,
     borderRadius: 16,
-    border: "1px solid rgba(148,163,184,0.32)",
-    background: "rgba(255,255,255,0.92)",
+    border: `1px solid ${CSS_VARS.borderSubtle}`,
+    background: CSS_VARS.surfaceElevated,
     padding: "0 14px",
-    color: "#0F172A",
+    color: CSS_VARS.textPrimary,
     fontSize: 14,
     outline: "none",
     boxSizing: "border-box",
@@ -274,7 +275,7 @@ export default function CleanOnboarding({
     height: 48,
     borderRadius: 16,
     border: "none",
-    background: disabled ? "#CBD5E1" : "#111827",
+    background: disabled ? CSS_VARS.borderSubtle : CSS_VARS.accentPrimary,
     color: "#FFFFFF",
     fontSize: 14,
     fontWeight: 700,
@@ -285,9 +286,9 @@ export default function CleanOnboarding({
     width: "100%",
     height: 48,
     borderRadius: 16,
-    border: "1px solid rgba(148,163,184,0.26)",
-    background: disabled ? "#F1F5F9" : "#FFFFFF",
-    color: "#0F172A",
+    border: `1px solid ${CSS_VARS.borderSubtle}`,
+    background: disabled ? CSS_VARS.baseLayer : CSS_VARS.surfaceElevated,
+    color: CSS_VARS.textPrimary,
     fontSize: 14,
     fontWeight: 700,
     cursor: disabled ? "not-allowed" : "pointer",
@@ -304,8 +305,8 @@ export default function CleanOnboarding({
               gap: 8,
               padding: "8px 12px",
               borderRadius: 999,
-              background: "rgba(37,99,235,0.08)",
-              color: "#1D4ED8",
+              background: CSS_VARS.accentGlow,
+              color: CSS_VARS.accentPrimary,
               fontSize: 12,
               fontWeight: 700,
               marginBottom: 18,
@@ -316,7 +317,7 @@ export default function CleanOnboarding({
           <h1
             style={{
               margin: 0,
-              color: "#0F172A",
+              color: CSS_VARS.textPrimary,
               fontSize: 30,
               fontWeight: 800,
               lineHeight: 1.1,
@@ -327,7 +328,7 @@ export default function CleanOnboarding({
           <p
             style={{
               margin: "12px 0 0",
-              color: "#475569",
+              color: CSS_VARS.textSecondary,
               fontSize: 14,
               lineHeight: 1.65,
             }}
@@ -351,7 +352,7 @@ export default function CleanOnboarding({
               style={{
                 height: 8,
                 borderRadius: 999,
-                background: step >= stepId ? "#111827" : "#E2E8F0",
+                background: step >= stepId ? CSS_VARS.accentPrimary : CSS_VARS.borderSubtle,
                 transition: "background 0.18s ease",
               }}
             />
@@ -376,11 +377,11 @@ export default function CleanOnboarding({
                 marginBottom: 20,
               }}
             >
-              <div style={{ flex: 1, height: 1, background: "#E2E8F0" }} />
-              <span style={{ color: "#64748B", fontSize: 11, fontWeight: 700 }}>
+              <div style={{ flex: 1, height: 1, background: CSS_VARS.borderSubtle }} />
+              <span style={{ color: CSS_VARS.textSecondary, fontSize: 11, fontWeight: 700 }}>
                 OR APPLY WITH GMAIL + PASSWORD
               </span>
-              <div style={{ flex: 1, height: 1, background: "#E2E8F0" }} />
+              <div style={{ flex: 1, height: 1, background: CSS_VARS.borderSubtle }} />
             </div>
           </>
         )}
@@ -391,9 +392,9 @@ export default function CleanOnboarding({
               marginBottom: 18,
               padding: "14px 16px",
               borderRadius: 18,
-              background: "rgba(34,197,94,0.1)",
-              border: "1px solid rgba(34,197,94,0.2)",
-              color: "#166534",
+              background: "var(--status-success-soft, rgba(34,197,94,0.1))",
+              border: "1px solid var(--status-success-border-soft, rgba(34,197,94,0.2))",
+              color: "var(--status-success, #166534)",
               fontSize: 13,
               lineHeight: 1.6,
             }}
@@ -550,7 +551,7 @@ export default function CleanOnboarding({
                 gap: 12,
                 alignItems: "flex-start",
                 marginBottom: 18,
-                color: "#334155",
+                color: CSS_VARS.textSecondary,
                 fontSize: 13,
                 lineHeight: 1.7,
               }}
@@ -570,7 +571,7 @@ export default function CleanOnboarding({
                   style={{
                     border: "none",
                     background: "transparent",
-                    color: "#2563EB",
+                    color: CSS_VARS.accentPrimary,
                     cursor: "pointer",
                     padding: 0,
                     fontWeight: 700,
@@ -585,7 +586,7 @@ export default function CleanOnboarding({
                   style={{
                     border: "none",
                     background: "transparent",
-                    color: "#2563EB",
+                    color: CSS_VARS.accentPrimary,
                     cursor: "pointer",
                     padding: 0,
                     fontWeight: 700,
@@ -604,14 +605,14 @@ export default function CleanOnboarding({
                 marginBottom: 16,
                 padding: "14px 16px",
                 borderRadius: 18,
-                background: "rgba(37,99,235,0.08)",
-                border: "1px solid rgba(37,99,235,0.16)",
-                color: "#475569",
+                background: CSS_VARS.accentGlow,
+                border: "1px solid var(--accent-glow, rgba(37,99,235,0.16))",
+                color: CSS_VARS.textSecondary,
                 fontSize: 13,
                 lineHeight: 1.7,
               }}
             >
-              <strong style={{ color: "#1D4ED8" }}>
+              <strong style={{ color: CSS_VARS.accentPrimary }}>
                 Improve your approval chances
               </strong>
               <br />
@@ -660,11 +661,11 @@ export default function CleanOnboarding({
                 style={input}
                 disabled={loading}
               >
-                <option value="">Select if you want</option>
-                <option value="beginner">Beginner - under 1 year</option>
-                <option value="intermediate">Intermediate - 1 to 3 years</option>
-                <option value="advanced">Advanced - 3 to 5 years</option>
-                <option value="expert">Expert - 5+ years, prop funded</option>
+                <option value="">Select trading experience</option>
+                <option value="beginner">Beginner — New to trading, under 1 year</option>
+                <option value="intermediate">Intermediate — Active trader, 1 to 3 years</option>
+                <option value="advanced">Advanced — Experienced, 3 to 5 years</option>
+                <option value="expert">Expert — 5+ years or prop firm trader</option>
               </select>
             </div>
           </>
@@ -676,9 +677,9 @@ export default function CleanOnboarding({
               marginBottom: 16,
               padding: "12px 14px",
               borderRadius: 16,
-              background: "rgba(239,68,68,0.08)",
-              border: "1px solid rgba(239,68,68,0.18)",
-              color: "#B91C1C",
+              background: "var(--status-danger-soft, rgba(239,68,68,0.08))",
+              border: "1px solid var(--status-danger-border-soft, rgba(239,68,68,0.18))",
+              color: "var(--status-danger, #B91C1C)",
               fontSize: 13,
               lineHeight: 1.6,
             }}
@@ -730,7 +731,7 @@ export default function CleanOnboarding({
         <button
           onClick={onBackToLogin}
           type="button"
-          style={{ ...secondaryButton(false), color: "#475569" }}
+          style={{ ...secondaryButton(false), color: CSS_VARS.textSecondary }}
           disabled={loading}
         >
           Back to login

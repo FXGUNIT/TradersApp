@@ -1755,10 +1755,10 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
         boxShadow: "none"
       }}>
         {[
-          { id: 'premarket', label: 'PREMARKET', sub: 'AMD · Macro · Fuel', color: T.blue }, 
-          { id: 'trade', label: 'TRADE ENTRY', sub: 'AMD-Exec · Compliance', color: T.orange }, 
-          { id: 'journal', label: 'JOURNAL', sub: 'AMD Stats · P&L', color: T.purple }, 
-          { id: 'account', label: 'ACCOUNT', sub: 'T&C · Drawdown · Rules', color: T.green }
+          { id: 'premarket', label: 'MORNING BRIEFING', sub: 'AMD · Macro · Fuel', color: T.blue },
+          { id: 'trade', label: 'TRADE EXECUTION', sub: 'AMD-Exec · Compliance', color: T.orange },
+          { id: 'journal', label: 'TRADE JOURNAL', sub: 'AMD Stats · P&L', color: T.purple },
+          { id: 'account', label: 'MY ACCOUNT', sub: 'T&C · Drawdown · Rules', color: T.green }
         ].map(p => (
           <button 
             key={p.id} 

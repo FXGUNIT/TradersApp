@@ -1,5 +1,19 @@
 import { useEffect, useState } from "react";
 import { CSS_VARS } from "../../styles/cssVars.js";
+import {
+  BarChart2,        // Analytics
+  LayoutDashboard,  // Dashboard
+  Zap,              // Performance
+  FileText,         // Reports
+  Settings,         // Settings / Management
+  Users,            // Users
+  Lock,              // Permissions / Encryption
+  Shield,           // Access Control
+  Database,         // Data / Backup
+  Download,         // Exports
+  Upload,           // Imports
+  ClipboardList,    // Audit Log
+} from "lucide-react";
 
 export function Breadcrumbs({ items, onNavigate, theme }) {
   return (
@@ -58,38 +72,38 @@ export function Breadcrumbs({ items, onNavigate, theme }) {
 const TOOLS_CATEGORIES = [
   {
     name: "Analytics",
-    icon: "\uD83D\uDCCA",
+    Icon: BarChart2,
     items: [
-      { label: "Dashboard", icon: "\uD83D\uDCC8", action: () => void 0 },
-      { label: "Performance", icon: "\u26A1", action: () => void 0 },
-      { label: "Reports", icon: "\uD83D\uDCCB", action: () => void 0 },
+      { label: "Dashboard", Icon: LayoutDashboard, action: () => void 0 },
+      { label: "Performance", Icon: Zap, action: () => void 0 },
+      { label: "Reports", Icon: FileText, action: () => void 0 },
     ],
   },
   {
     name: "Management",
-    icon: "\u2699\uFE0F",
+    Icon: Settings,
     items: [
-      { label: "Users", icon: "\uD83D\uDC65", action: () => void 0 },
-      { label: "Permissions", icon: "\uD83D\uDD10", action: () => void 0 },
-      { label: "Settings", icon: "\uD83D\uDEE0\uFE0F", action: () => void 0 },
+      { label: "Users", Icon: Users, action: () => void 0 },
+      { label: "Permissions", Icon: Lock, action: () => void 0 },
+      { label: "Settings", Icon: Settings, action: () => void 0 },
     ],
   },
   {
     name: "Data",
-    icon: "\uD83D\uDCBE",
+    Icon: Database,
     items: [
-      { label: "Backup", icon: "\uD83D\uDCBF", action: () => void 0 },
-      { label: "Exports", icon: "\uD83D\uDCE4", action: () => void 0 },
-      { label: "Imports", icon: "\uD83D\uDCE5", action: () => void 0 },
+      { label: "Backup", Icon: Database, action: () => void 0 },
+      { label: "Exports", Icon: Download, action: () => void 0 },
+      { label: "Imports", Icon: Upload, action: () => void 0 },
     ],
   },
   {
     name: "Security",
-    icon: "\uD83D\uDD12",
+    Icon: Shield,
     items: [
-      { label: "Audit Log", icon: "\uD83D\uDCDD", action: () => void 0 },
-      { label: "Encryption", icon: "\uD83D\uDD10", action: () => void 0 },
-      { label: "Access Control", icon: "\uD83D\uDEE1\uFE0F", action: () => void 0 },
+      { label: "Audit Log", Icon: ClipboardList, action: () => void 0 },
+      { label: "Encryption", Icon: Lock, action: () => void 0 },
+      { label: "Access Control", Icon: Shield, action: () => void 0 },
     ],
   },
 ];
@@ -135,7 +149,7 @@ export function MegaMenu({ isOpen, onClose, theme }) {
                 borderBottom: `1px solid ${CSS_VARS.accentPrimary}`,
               }}
             >
-              <span style={{ fontSize: 16 }}>{category.icon}</span>
+              {category.Icon && <category.Icon size={16} color={theme.blue} />}
               <div
                 style={{
                   color: theme.blue,
@@ -183,7 +197,7 @@ export function MegaMenu({ isOpen, onClose, theme }) {
                   event.currentTarget.style.transform = "translateX(0)";
                 }}
               >
-                <span style={{ fontSize: 14, minWidth: 20 }}>{item.icon}</span>
+                {item.Icon && (() => { const ItemIcon = item.Icon; return <ItemIcon size={14} color={theme.muted} />; })()}
                 <span>{item.label}</span>
               </button>
             ))}

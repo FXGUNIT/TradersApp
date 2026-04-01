@@ -4,6 +4,19 @@ import {
   readDraftSync,
   writeDraftSync,
 } from "../../services/draftVault.js";
+import { CSS_VARS } from "../../styles/cssVars.js";
+
+// Google "G" SVG logo — official brand mark
+function GoogleLogo() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M20.64 11.224C20.64 10.416 20.576 9.824 20.432 9.2H10.88V12.944H16.304C16.064 14.192 15.424 15.152 14.432 15.776V17.744H17.792C19.696 16.048 20.64 13.648 20.64 11.224Z" fill="#4285F4"/>
+      <path d="M10.88 20.288C13.536 20.288 15.744 19.296 17.792 17.744L14.432 15.776C13.536 16.352 12.384 16.736 10.88 16.736C8.128 16.736 5.856 14.976 4.992 12.48H2.48V14.544C4.224 17.888 7.648 20.288 10.88 20.288Z" fill="#34A853"/>
+      <path d="M4.992 12.48C4.688 11.68 4.528 10.816 4.528 9.92C4.528 9.024 4.688 8.16 4.992 7.36V5.296H2.48C1.696 6.848 1.28 8.608 1.28 10.464C1.28 12.32 1.696 14.08 2.48 15.632L4.992 12.48Z" fill="#FBBC05"/>
+      <path d="M10.88 4.104C12.384 4.096 13.76 4.64 14.88 5.76L17.888 2.752C15.744 0.96 12.976 0 10.88 0C7.648 0 4.224 2.4 2.48 5.696L4.992 7.36C5.856 4.864 8.128 4.104 10.88 4.104Z" fill="#EA4335"/>
+    </svg>
+  );
+}
 
 const LOGIN_DRAFT_KEY = "traders-auth-login-draft-v2";
 
@@ -49,8 +62,8 @@ export default function CleanLoginScreen({
     height: 48,
     borderRadius: 16,
     border: "none",
-    background: disabled ? "#CBD5E1" : "#111827",
-    color: "#FFFFFF",
+    background: disabled ? CSS_VARS.borderSubtle : CSS_VARS.accentPrimary,
+    color: CSS_VARS.text,
     fontSize: 14,
     fontWeight: 700,
     cursor: disabled ? "not-allowed" : "pointer",
@@ -62,9 +75,9 @@ export default function CleanLoginScreen({
     width: "100%",
     height: 48,
     borderRadius: 16,
-    border: "1px solid rgba(148,163,184,0.26)",
-    background: disabled ? "#F1F5F9" : "#FFFFFF",
-    color: "#0F172A",
+    border: `1px solid ${CSS_VARS.borderSubtle}`,
+    background: disabled ? CSS_VARS.baseLayer : CSS_VARS.surfaceElevated,
+    color: CSS_VARS.textPrimary,
     fontSize: 14,
     fontWeight: 700,
     cursor: disabled ? "not-allowed" : "pointer",
@@ -73,7 +86,7 @@ export default function CleanLoginScreen({
   const label = {
     display: "block",
     marginBottom: 8,
-    color: "#0F172A",
+    color: CSS_VARS.textPrimary,
     fontSize: 12,
     fontWeight: 700,
     letterSpacing: "0.04em",
@@ -83,10 +96,10 @@ export default function CleanLoginScreen({
     width: "100%",
     height: 48,
     borderRadius: 16,
-    border: "1px solid rgba(148,163,184,0.32)",
-    background: "rgba(255,255,255,0.94)",
+    border: `1px solid ${CSS_VARS.borderSubtle}`,
+    background: CSS_VARS.surfaceElevated,
     padding: "0 14px",
-    color: "#0F172A",
+    color: CSS_VARS.textPrimary,
     fontSize: 14,
     outline: "none",
     boxSizing: "border-box",
@@ -171,7 +184,7 @@ export default function CleanLoginScreen({
       style={{
         minHeight: "100vh",
         background:
-          "radial-gradient(circle at top, rgba(37,99,235,0.08), transparent 34%), linear-gradient(180deg, #F8FAFC 0%, #EEF2FF 100%)",
+          "linear-gradient(180deg, var(--base-layer, #F8FAFC) 0%, var(--surface-glass, #EEF2FF) 100%)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -183,8 +196,8 @@ export default function CleanLoginScreen({
         style={{
           width: "100%",
           maxWidth: 520,
-          background: "rgba(255,255,255,0.92)",
-          border: "1px solid rgba(148,163,184,0.22)",
+          background: CSS_VARS.surfaceElevated,
+          border: `1px solid ${CSS_VARS.borderSubtle}`,
           borderRadius: 28,
           boxShadow: "0 30px 80px rgba(15,23,42,0.12)",
           backdropFilter: "blur(18px)",
@@ -199,8 +212,8 @@ export default function CleanLoginScreen({
               gap: 8,
               padding: "8px 12px",
               borderRadius: 999,
-              background: "rgba(37,99,235,0.08)",
-              color: "#1D4ED8",
+              background: CSS_VARS.accentGlow,
+              color: CSS_VARS.accentPrimary,
               fontSize: 12,
               fontWeight: 700,
               marginBottom: 18,
@@ -211,7 +224,7 @@ export default function CleanLoginScreen({
           <h1
             style={{
               margin: 0,
-              color: "#0F172A",
+              color: CSS_VARS.textPrimary,
               fontSize: 30,
               fontWeight: 800,
               lineHeight: 1.1,
@@ -222,13 +235,13 @@ export default function CleanLoginScreen({
           <p
             style={{
               margin: "12px 0 0",
-              color: "#475569",
+              color: CSS_VARS.textSecondary,
               fontSize: 14,
               lineHeight: 1.65,
             }}
           >
             {resetMode
-              ? "Enter your Gmail address and we’ll send a recovery link."
+              ? "Enter your Gmail address and we'll send a recovery link."
               : "Sign in with Google or continue with your Gmail and password. New users stay in review until admin approval."}
           </p>
         </div>
@@ -239,9 +252,9 @@ export default function CleanLoginScreen({
               marginBottom: 16,
               padding: "12px 14px",
               borderRadius: 16,
-              background: "rgba(34,197,94,0.08)",
-              border: "1px solid rgba(34,197,94,0.18)",
-              color: "#166534",
+              background: "var(--status-success-soft, rgba(34,197,94,0.08))",
+              border: "1px solid var(--status-success-border-soft, rgba(34,197,94,0.18))",
+              color: "var(--status-success, #166534)",
               fontSize: 13,
               lineHeight: 1.6,
             }}
@@ -256,9 +269,9 @@ export default function CleanLoginScreen({
               marginBottom: 16,
               padding: "12px 14px",
               borderRadius: 16,
-              background: "rgba(239,68,68,0.08)",
-              border: "1px solid rgba(239,68,68,0.18)",
-              color: "#B91C1C",
+              background: "var(--status-danger-soft, rgba(239,68,68,0.08))",
+              border: "1px solid var(--status-danger-border-soft, rgba(239,68,68,0.18))",
+              color: "var(--status-danger, #B91C1C)",
               fontSize: 13,
               lineHeight: 1.6,
             }}
@@ -302,7 +315,7 @@ export default function CleanLoginScreen({
                   style={{
                     border: "none",
                     background: "transparent",
-                    color: "#2563EB",
+                    color: CSS_VARS.accentPrimary,
                     cursor: "pointer",
                     padding: 0,
                     fontSize: 12,
@@ -334,7 +347,7 @@ export default function CleanLoginScreen({
                     transform: "translateY(-50%)",
                     border: "none",
                     background: "transparent",
-                    color: "#475569",
+                    color: CSS_VARS.textSecondary,
                     fontSize: 11,
                     fontWeight: 700,
                     cursor: "pointer",
@@ -351,7 +364,7 @@ export default function CleanLoginScreen({
                 alignItems: "center",
                 gap: 10,
                 marginBottom: 18,
-                color: "#475569",
+                color: CSS_VARS.textSecondary,
                 fontSize: 13,
                 cursor: "pointer",
               }}
@@ -390,23 +403,7 @@ export default function CleanLoginScreen({
                 gap: 10,
               }}
             >
-              <span
-                style={{
-                  width: 22,
-                  height: 22,
-                  borderRadius: "50%",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  background: "#FFFFFF",
-                  color: "#2563EB",
-                  fontSize: 12,
-                  fontWeight: 800,
-                  border: "1px solid rgba(148,163,184,0.2)",
-                }}
-              >
-                G
-              </span>
+              <GoogleLogo />
               {loading ? "Connecting..." : "Continue with Google"}
             </button>
 
@@ -431,8 +428,9 @@ export default function CleanLoginScreen({
                 type="button"
                 style={{ ...secondaryButton(false), flex: 1, minWidth: 180 }}
                 disabled={loading}
+                title="Clear saved email from this device"
               >
-                Clear saved draft
+                Clear saved email
               </button>
             </div>
 
@@ -442,7 +440,7 @@ export default function CleanLoginScreen({
                 justifyContent: "space-between",
                 alignItems: "center",
                 gap: 12,
-                color: "#64748B",
+                color: CSS_VARS.textSecondary,
                 fontSize: 12,
               }}
             >
@@ -453,7 +451,7 @@ export default function CleanLoginScreen({
                 style={{
                   border: "none",
                   background: "transparent",
-                  color: "#475569",
+                  color: CSS_VARS.textSecondary,
                   cursor: "pointer",
                   padding: 0,
                   fontSize: 12,

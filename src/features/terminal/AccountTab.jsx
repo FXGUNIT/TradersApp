@@ -8,6 +8,7 @@ import {
   cardS,
 } from "./terminalHelperComponents";
 import { CSS_VARS } from "../../styles/cssVars.js";
+import { FileText } from "lucide-react";
 
 const LINKEDIN_URL = "https://www.linkedin.com/in/singhgunit/";
 const infoTint = "var(--status-info-soft, rgba(59,130,246,0.08))";
@@ -29,7 +30,7 @@ export default function AccountTab({
     <div>
       {/* T&C Upload */}
       <div style={cardS({ borderLeft: `4px solid ${T.green}` })} className="glass-panel card-tilt">
-        <SHead icon="📋" title="PROP FIRM TERMS & CONDITIONS" color={T.green} />
+        <SHead icon={FileText} title="PROP FIRM TERMS & CONDITIONS" color={T.green} />
         <div
           onDrop={handleFirmRulesDrop}
           onDragOver={(e) => e.preventDefault()}

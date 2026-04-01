@@ -19,6 +19,12 @@ import { useTerminalOcr, OCR_STATES } from "./useTerminalOcr.js";
 import { RiskSlider } from "./RiskSlider.jsx";
 import { useDebounce } from "./useDebounce.js";
 import VerdictRadar, { deriveVerdictScores } from "./VerdictRadar.jsx";
+import {
+  Zap,              // Trade Setup section
+  BarChart2,        // INDICATORS zone
+  Activity,         // VWAP CHART zone
+  LayoutGrid,      // 30-MIN MP CHART zone
+} from "lucide-react";
 
 const warningTint = "var(--status-warning-soft, rgba(255,214,10,0.12))";
 const dangerTint = "var(--status-danger-soft, rgba(255,69,58,0.1))";
@@ -189,7 +195,7 @@ export default function TradeTab({
 
       {/* Trade Setup */}
       <div style={cardS({ borderLeft: `4px solid ${T.orange}` })} className="glass-panel card-tilt">
-        <SHead icon="⚡" title="TRADE SETUP" color={T.orange} />
+        <SHead icon={Zap} title="TRADE SETUP" color={T.orange} />
 
         <div
           style={{
@@ -290,10 +296,10 @@ export default function TradeTab({
         }}
       >
         {[
-          { zid: "ss", icon: "📊", title: "INDICATORS", color: T.purple, isMulti: true },
+          { zid: "ss", icon: BarChart2, title: "INDICATORS", color: T.purple, isMulti: true },
           {
             zid: "vwap",
-            icon: "〰",
+            icon: Activity,
             title: "VWAP CHART",
             color: T.blue,
             state: vwapChart,
@@ -302,7 +308,7 @@ export default function TradeTab({
           },
           {
             zid: "mp",
-            icon: "◈",
+            icon: LayoutGrid,
             title: "30-MIN MP CHART",
             color: T.gold,
             state: mpChart,

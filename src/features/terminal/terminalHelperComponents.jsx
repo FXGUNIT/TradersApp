@@ -2,6 +2,17 @@
 // These components replicate the exact styling from App.jsx.bak
 // Theme-aware using CSS variables from index.css
 import { CSS_VARS } from "../../styles/cssVars.js";
+import {
+  Crosshair,        // Accumulation AMD phase
+  Zap,              // Manipulation AMD phase
+  TrendingUp,       // Distribution AMD phase
+  RefreshCw,        // Transition AMD phase
+  HelpCircle,       // Unclear AMD phase
+  BarChart2,        // SHead indicators zone
+  FileSpreadsheet,  // SHead CSV/NinjaTrader zone
+  AlertTriangle,    // Warning indicator
+  CheckCircle2,     // Success indicator
+} from "lucide-react";
 
 const getCSSVar = (varName, fallback) => {
   if (typeof document === "undefined") return fallback;
@@ -70,11 +81,11 @@ export const TIME_OPTIONS = (() => {
 })();
 
 export const AMD_PHASES = {
-  ACCUMULATION: { color: T.amdA, icon: "◎", label: "Accumulation (Mean Reversion)", desc: "Smart money building long positions" },
-  MANIPULATION: { color: T.amdM, icon: "⚡", label: "Manipulation (Reversal)", desc: "Stop hunt / false breakout" },
-  DISTRIBUTION: { color: T.amdD, icon: "◈", label: "Distribution (Trend)", desc: "Smart money offloading into strength" },
-  TRANSITION: { color: T.amdT, icon: "⟳", label: "Transition (No Trade)", desc: "Phase shifting — stay flat" },
-  UNCLEAR: { color: T.muted, icon: "?", label: "Phase Unclear", desc: "No clear institutional signature" },
+  ACCUMULATION: { color: T.amdA, Icon: Crosshair,    iconSize: 16, label: "Accumulation (Mean Reversion)", desc: "Smart money building long positions" },
+  MANIPULATION: { color: T.amdM, Icon: Zap,          iconSize: 16, label: "Manipulation (Reversal)", desc: "Stop hunt / false breakout" },
+  DISTRIBUTION: { color: T.amdD, Icon: TrendingUp,   iconSize: 16, label: "Distribution (Trend)", desc: "Smart money offloading into strength" },
+  TRANSITION:   { color: T.amdT, Icon: RefreshCw,    iconSize: 16, label: "Transition (No Trade)", desc: "Phase shifting — stay flat" },
+  UNCLEAR:      { color: T.muted, Icon: HelpCircle,  iconSize: 16, label: "Phase Unclear", desc: "No clear institutional signature" },
 };
 
 // Style constants matching backup exactly
@@ -185,7 +196,9 @@ export function Tag({ label, color }) {
 }
 
 // SHead Component - Section Header
+// `icon` prop accepts either a string (fallback) or a Lucide icon component with `size` prop
 export function SHead({ icon, title, color, sub, right }) {
+  const IconComp = typeof icon === "function" ? icon : null;
   return (
     <div style={{
       display: "flex",
@@ -195,7 +208,11 @@ export function SHead({ icon, title, color, sub, right }) {
       paddingBottom: 12,
       borderBottom: `1px solid ${color}20`
     }}>
-      <span style={{ color, fontSize: 18 }}>{icon}</span>
+      {IconComp ? (
+        <IconComp size={18} color={color} />
+      ) : (
+        <span style={{ color, fontSize: 18 }}>{icon}</span>
+      )}
       <div style={{ flex: 1 }}>
         <div style={{ color, fontSize: 13, letterSpacing: 1.5, fontWeight: 700 }}>{title}</div>
         {sub && <div style={{ color: T.muted, fontSize: 11, marginTop: 4, fontWeight: 400 }}>{sub}</div>}
@@ -374,9 +391,9 @@ export function RenderOut({ text }) {
         const t = line.trim();
         if (t.startsWith('## ')) return <h2 key={i} style={{ color: T.gold, fontSize: 15, margin: "24px 0 10px", borderBottom: `1px solid ${SOFT.divider}`, paddingBottom: 8, letterSpacing: 1, fontWeight: 700 }}>{t.slice(3)}</h2>;
         if (t.startsWith('### ')) return <h3 key={i} style={{ color: T.blue, fontSize: 13, margin: "14px 0 6px", letterSpacing: 0.5, fontWeight: 600 }}>{t.slice(4)}</h3>;
-        if (t.includes('🚫')) return <div key={i} style={{ background: SOFT.dangerBg, border: `1px solid ${SOFT.dangerBorder}`, borderRadius: 6, padding: "12px 16px", margin: "8px 0", color: T.red, fontSize: 13, fontWeight: 600 }}>{t}</div>;
-        if (t.includes('✅')) return <div key={i} style={{ background: SOFT.successBg, border: `1px solid ${SOFT.successBorder}`, borderRadius: 6, padding: "12px 16px", margin: "8px 0", color: T.green, fontSize: 13, fontWeight: 600 }}>{t}</div>;
-        if (t.includes('⚠️') || t.includes('⚠')) return <div key={i} style={{ background: SOFT.warningBg, border: `1px solid ${SOFT.warningBorder}`, borderRadius: 6, padding: "12px 16px", margin: "8px 0", color: T.gold, fontSize: 13, fontWeight: 600 }}>{t}</div>;
+        if (t.includes('🚫')) return <div key={i} style={{ background: SOFT.dangerBg, border: `1px solid ${SOFT.dangerBorder}`, borderRadius: 6, padding: "12px 16px", margin: "8px 0", color: T.red, fontSize: 13, fontWeight: 600, display: "flex", alignItems: "flex-start", gap: 8 }}><AlertTriangle size={16} color={T.red} style={{ flexShrink: 0, marginTop: 2 }} />{t.replace(/🚫/, '')}</div>;
+        if (t.includes('✅')) return <div key={i} style={{ background: SOFT.successBg, border: `1px solid ${SOFT.successBorder}`, borderRadius: 6, padding: "12px 16px", margin: "8px 0", color: T.green, fontSize: 13, fontWeight: 600, display: "flex", alignItems: "flex-start", gap: 8 }}><CheckCircle2 size={16} color={T.green} style={{ flexShrink: 0, marginTop: 2 }} />{t.replace(/✅/, '')}</div>;
+        if (t.includes('⚠️') || t.includes('⚠')) return <div key={i} style={{ background: SOFT.warningBg, border: `1px solid ${SOFT.warningBorder}`, borderRadius: 6, padding: "12px 16px", margin: "8px 0", color: T.gold, fontSize: 13, fontWeight: 600, display: "flex", alignItems: "flex-start", gap: 8 }}><AlertTriangle size={16} color={T.gold} style={{ flexShrink: 0, marginTop: 2 }} />{t.replace(/⚠️|⚠/, '')}</div>;
         if (t.includes('**')) { const parts = t.split(/(\*\*[^*]+\*\*)/g); return <p key={i} style={{ color: T.dim, margin: "4px 0" }}>{parts.map((p2, j) => p2.startsWith('**') ? <strong key={j} style={{ color: T.text, fontWeight: 600 }}>{p2.replace(/\*\*/g, '')}</strong> : p2)}</p>; }
         if (!t) return <div key={i} style={{ height: 6 }} />;
         return <p key={i} style={{ color: t.startsWith('→') || t.startsWith('AMD') ? T.cyan : T.dim, margin: "3px 0" }}>{line}</p>;
@@ -388,6 +405,7 @@ export function RenderOut({ text }) {
 // AMDPhaseTag Component
 export function AMDPhaseTag({ phase }) {
   const cfg = AMD_PHASES[phase] || AMD_PHASES.UNCLEAR;
+  const PhaseIcon = cfg.Icon || HelpCircle;
   return (
     <div style={{
       display: "flex",
@@ -402,7 +420,10 @@ export function AMDPhaseTag({ phase }) {
     >
       <LED color={cfg.color} size={10} pulse={phase !== 'UNCLEAR'} />
       <div>
-        <div style={{ color: cfg.color, fontSize: 12, fontWeight: 700, letterSpacing: 1 }}>{cfg.icon} {cfg.label}</div>
+        <div style={{ color: cfg.color, fontSize: 12, fontWeight: 700, letterSpacing: 1, display: "flex", alignItems: "center", gap: 6 }}>
+          <PhaseIcon size={cfg.iconSize || 14} color={cfg.color} />
+          {cfg.label}
+        </div>
         <div style={{ color: T.muted, fontSize: 11, marginTop: 2 }}>{cfg.desc}</div>
       </div>
     </div>
@@ -475,7 +496,12 @@ export function CountdownBanner({ ist }) {
       <div style={{ width: 1, height: 20, background: SOFT.divider }} />
       <span style={{ color: T.muted, fontSize: 12, fontWeight: 600 }}>{ist.istStr}</span>
       {!ist.isOpen && <span style={{ marginLeft: "auto", color: T.red, fontSize: 11, letterSpacing: 1, fontWeight: 700 }}>LOCKED · {ist.sessionWindowLabel || "10:00AM-5:00PM IST ONLY"}</span>}
-      {urgent && <span style={{ marginLeft: "auto", color: T.gold, fontSize: 11, letterSpacing: 1, fontWeight: 700, animation: "led-pulse 1s infinite" }}>⚠ SESSION ENDING SOON</span>}
+      {urgent && (
+        <span style={{ marginLeft: "auto", color: T.gold, fontSize: 11, letterSpacing: 1, fontWeight: 700, animation: "led-pulse 1s infinite", display: "flex", alignItems: "center", gap: 6 }}>
+          <AlertTriangle size={12} color={T.gold} />
+          SESSION ENDING SOON
+        </span>
+      )}
     </div>
   );
 }

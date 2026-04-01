@@ -4,6 +4,14 @@ import ThemeSwitcher from '../components/ThemeSwitcher.jsx';
 import AiEnginesStatus from '../components/AiEnginesStatus.jsx';
 import { runDeliberation, councilStage, MASTER_INTELLIGENCE_SYSTEM_PROMPT } from '../services/ai-router.js';
 import { getISTState } from '../utils/tradingUtils.js';
+import {
+  Brain,           // 🧠 Collective Consciousness header
+  Radio,           // Phase 1: Alpha, Beta, Groq deployed
+  Scale,           // Phase 2: Gemini synthesizing
+  Search,          // Phase 3: Cross-Examination
+  Landmark,        // Phase 4: Qwen assembling briefing
+  Trophy,          // Phase 5: Gemini rendering verdict
+} from 'lucide-react';
 
 const AURA_COLORS = {
   info: 'var(--aura-status-info, #0A84FF)',
@@ -16,11 +24,11 @@ const AURA_COLORS = {
 };
 
 const PHASE_DEFINITIONS = [
-  { key: 'stage1', label: 'Phase 1: Alpha, Beta, & Groq deployed', icon: '📡' },
-  { key: 'stage2', label: 'Phase 2: Gemini synthesizing preliminary intel', icon: '⚖️' },
-  { key: 'stage3', label: 'Phase 3: Cross-Examination in progress', icon: '🔍' },
-  { key: 'stage4', label: 'Phase 4: Qwen 397B assembling Intelligence Briefing', icon: '🏛️' },
-  { key: 'stage5', label: 'Phase 5: Gemini rendering Supreme Verdict', icon: '🏆' },
+  { key: 'stage1', label: 'Phase 1: Alpha, Beta, & Groq deployed', Icon: Radio,    iconColor: AURA_COLORS.info },
+  { key: 'stage2', label: 'Phase 2: Gemini synthesizing preliminary intel', Icon: Scale,   iconColor: AURA_COLORS.success },
+  { key: 'stage3', label: 'Phase 3: Cross-Examination in progress', Icon: Search,    iconColor: AURA_COLORS.manipulation },
+  { key: 'stage4', label: 'Phase 4: Qwen 397B assembling Intelligence Briefing', Icon: Landmark, iconColor: AURA_COLORS.warning },
+  { key: 'stage5', label: 'Phase 5: Gemini rendering Supreme Verdict', Icon: Trophy,   iconColor: AURA_COLORS.info },
 ];
 
 const STAGE_ORDER = ['stage1', 'stage2', 'stage3', 'stage4', 'stage5', 'complete'];
@@ -101,7 +109,7 @@ function WarRoomLoader() {
               border: `1.5px solid ${isDone ? AURA_COLORS.success : isActive ? AURA_COLORS.info : 'var(--text-tertiary, #3A3A3C)'}`,
               animation: isActive ? 'cc-pulse 1.5s ease-in-out infinite' : 'none',
             }}>
-              {isDone ? '✓' : phase.icon}
+              {isDone ? '✓' : (() => { const PhaseIcon = phase.Icon; return <PhaseIcon size={14} color={phase.iconColor} />; })()}
             </div>
 
             {/* Label */}
@@ -179,10 +187,10 @@ export default function CollectiveConsciousness({ onBack, theme, auth, currentTh
   ).length;
   const engineModeLabel =
     configuredEngineCount === 0
-      ? 'WATCHTOWER MODE — Provider keys unavailable — add fresh Infisical keys to reactivate the council'
+      ? 'Council offline — contact your administrator'
       : isFastMode
-        ? `FAST MODE — ${onlineEngineCount} AI ${onlineEngineCount === 1 ? 'engine' : 'engines'} ready [8AM - 5PM IST] — quick answers, lower power used`
-        : `FULL POWER MODE — ${onlineEngineCount} AI ${onlineEngineCount === 1 ? 'engine' : 'engines'} ready [5PM - 8AM IST] — deeper consensus active`;
+        ? `Quick Mode — ${onlineEngineCount} AI ${onlineEngineCount === 1 ? 'engine' : 'engines'} active (8AM-5PM IST)`
+        : `Full Consensus — All ${onlineEngineCount} engines deployed (5PM-8AM IST)`;
 
   const bgColor = "var(--surface-elevated, #FFFFFF)";
   const textColor = "var(--text-primary, #111827)";
@@ -354,7 +362,7 @@ User Question: ${trimmed}`;
               textAlign: 'center',
               gap: 16,
             }}>
-              <div style={{ fontSize: 48, opacity: 0.3 }}>🧠</div>
+              <div style={{ opacity: 0.3, color: AURA_COLORS.manipulation, display: "flex", alignItems: "center", justifyContent: "center" }}><Brain size={48} /></div>
               <h2 style={{
                 fontSize: 22,
                 fontWeight: 700,
@@ -576,7 +584,7 @@ User Question: ${trimmed}`;
           color: isDark ? 'var(--text-tertiary, #3A3A3C)' : AURA_COLORS.mutedSoft,
           letterSpacing: 0.5,
         }}>
-          5-Phase RCE · Groq · LLaMA 3.3 · Claude 3.5 · Qwen 397B · Gemini Pro
+          Powered by Multi-Model AI Consensus
         </div>
 
         {/* Engine Mode Status Bar */}

@@ -22,7 +22,15 @@ export function useAuthBootstrap({
 
   useEffect(() => {
     if (!auth) {
-      return () => {};
+      // Firebase not configured — proceed to login screen after a brief moment
+      const timer = setTimeout(() => {
+        if (!authBootstrapCompleteRef.current) {
+          authBootstrapCompleteRef.current = true;
+          setScreen("login");
+          setIsInitialLoading(false);
+        }
+      }, 3000);
+      return () => clearTimeout(timer);
     }
 
     const unsubscribe = onAuthStateChanged(auth, async (user) => {

@@ -15,6 +15,7 @@ import {
   lbl,
 } from "./terminalHelperComponents";
 import { CSS_VARS } from "../../styles/cssVars.js";
+import { FileSpreadsheet, Newspaper, TrendingUp, BarChart2, Calendar, Sun, Target } from "lucide-react";
 
 const warningTint = "var(--status-warning-soft, rgba(255,214,10,0.12))";
 const surfaceMuted = CSS_VARS.baseLayer;
@@ -51,7 +52,7 @@ export default function PremarketTab({
     <div>
       {/* CSV Upload */}
       <div style={cardS()}>
-        <SHead icon="⊞" title="LOAD NINJATRADER 1-MIN DATA" color={T.blue} />
+        <SHead icon={FileSpreadsheet} title="LOAD NINJATRADER 1-MIN DATA" color={T.blue} />
 
         {/* ── Glass Skeleton during parsing ── */}
         {isCsvParsing ? (
@@ -127,7 +128,7 @@ export default function PremarketTab({
         {[
           {
             zid: "p1news",
-            icon: "📅",
+            icon: Calendar,
             title: "ECONOMIC CALENDAR",
             color: T.red,
             hint: "★★★ events only",
@@ -137,7 +138,7 @@ export default function PremarketTab({
           },
           {
             zid: "p1prem",
-            icon: "🌅",
+            icon: Sun,
             title: "PREMARKET CHART",
             color: T.orange,
             hint: "open type + prev week H/L",
@@ -147,7 +148,7 @@ export default function PremarketTab({
           },
           {
             zid: "p1lvl",
-            icon: "◈",
+            icon: Target,
             title: "KEY LEVELS CHART",
             color: T.gold,
             hint: "PDH/PDL/POC/VAH/VAL/VWAP",

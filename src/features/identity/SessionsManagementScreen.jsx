@@ -7,10 +7,10 @@ const COLORS = {
   text: "var(--text-primary, #111827)",
   muted: "var(--text-secondary, #6B7280)",
   dim: "var(--text-tertiary, #94A3B8)",
-  gold: "var(--accent-warning, #D97706)",
-  blue: "var(--accent-primary, #3B82F6)",
-  green: "var(--accent-success, #10B981)",
-  red: "var(--accent-danger, #EF4444)",
+  gold: "var(--status-warning, #D97706)",
+  blue: "var(--status-info, #3B82F6)",
+  green: "var(--status-success, #10B981)",
+  red: "var(--status-danger, #EF4444)",
   font: "Inter, -apple-system, BlinkMacSystemFont, sans-serif",
 };
 
