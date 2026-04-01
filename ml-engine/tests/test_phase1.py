@@ -515,6 +515,112 @@ def test_time_probability_model(sample_trade_log):
 
 
 # -------------------------------------------------------------------------
+# Phase 8: Physics-Based Regime Models (FP-FK + Tsallis q-Gaussians + Anomalous Diffusion)
+# -------------------------------------------------------------------------
+
+def test_fp_fk_regime_detector(sample_candles):
+    """Verify FP-FK regime detector trains, estimates q, and produces deleverage signals."""
+    from models.regime.fp_fk_regime import FPFKRegimeDetector
+
+    feat_df = engineer_features(
+        sample_candles,
+        math_engine_snapshot={"amdPhase": "ACCUMULATION", "vr": 1.0, "adx": 25, "ci": 50},
+    )
+    feat_df = feat_df.dropna()
+    if len(feat_df) < 100:
+        pytest.skip("Not enough samples for FP-FK detector")
+
+    fp = FPFKRegimeDetector()
+
+    # train() returns metrics about estimated parameters
+    metrics = fp.train(feat_df, verbose=False)
+    assert metrics["model"] == "fp_fk_regime"
+    assert "q_parameter" in metrics
+    assert 0.5 <= metrics["q_parameter"] <= 3.0
+    assert "criticality_index" in metrics
+    assert "fk_wave_speed" in metrics
+
+    # advance() / predict_current() returns full regime signal
+    result = fp.advance(feat_df)
+    assert "regime" in result
+    assert result["regime"] in ["COMPRESSION", "NORMAL", "EXPANSION", "CRISIS"]
+    assert "q_parameter" in result
+    assert "deleverage_signal" in result
+    assert 0.0 <= result["deleverage_signal"] <= 1.0
+    assert "criticality_index" in result
+    assert 0.0 <= result["criticality_index"] <= 1.0
+    assert "fk_wave_speed" in result
+    assert "confidence" in result
+    assert 0.0 <= result["confidence"] <= 1.0
+
+
+def test_anomalous_diffusion_model(sample_candles):
+    """Verify Anomalous Diffusion model estimates Hurst exponent correctly."""
+    from models.regime.anomalous_diffusion import AnomalousDiffusionModel
+
+    feat_df = engineer_features(
+        sample_candles,
+        math_engine_snapshot={"amdPhase": "ACCUMULATION", "vr": 1.0, "adx": 25, "ci": 50},
+    )
+    feat_df = feat_df.dropna()
+    if len(feat_df) < 50:
+        pytest.skip("Not enough samples for anomalous diffusion")
+
+    ad = AnomalousDiffusionModel(window_size=min(100, len(feat_df)))
+    metrics = ad.train(feat_df, verbose=False)
+
+    assert metrics["model"] == "anomalous_diffusion"
+    assert "H_final" in metrics
+    assert 0.1 <= metrics["H_final"] <= 0.9
+    assert "diffusion_type" in metrics
+    assert metrics["diffusion_type"] in ["SUB_DIFFUSION", "NORMAL", "SUPER_DIFFUSION"]
+    assert "multifractality" in metrics
+    assert metrics["multifractality"] in ["MONOFRACTAL", "MILD_MULTIFRACTAL", "STRONG_MULTIFRACTAL"]
+
+    # Advance per candle
+    result = ad.advance(feat_df)
+    assert "hurst_H" in result
+    assert "vol_clustering" in result
+    assert "position_adjustment" in result
+    assert isinstance(result["position_adjustment"], float)
+
+
+def test_regime_ensemble(sample_candles):
+    """Verify RegimeEnsemble combines HMM + FP-FK + Anomalous Diffusion."""
+    from models.regime.regime_ensemble import RegimeEnsemble
+
+    feat_df = engineer_features(
+        sample_candles,
+        math_engine_snapshot={"amdPhase": "ACCUMULATION", "vr": 1.0, "adx": 25, "ci": 50},
+    )
+    feat_df = feat_df.dropna()
+    if len(feat_df) < 100:
+        pytest.skip("Not enough samples for RegimeEnsemble")
+
+    ens = RegimeEnsemble(random_state=42)
+    result = ens.advance(feat_df)
+
+    assert "regime" in result
+    assert result["regime"] in ["COMPRESSION", "NORMAL", "EXPANSION", "CRISIS"]
+    assert "regime_confidence" in result
+    assert 0.0 <= result["regime_confidence"] <= 1.0
+    assert "deleverage_signal" in result
+    assert 0.0 <= result["deleverage_signal"] <= 1.0
+    assert "stop_multiplier" in result
+    assert 0.5 <= result["stop_multiplier"] <= 2.5
+    assert "position_adjustment" in result
+    assert isinstance(result["position_adjustment"], float)
+
+    # Components present
+    assert "fp_fk" in result
+    assert "anomalous_diffusion" in result
+    assert "hmm" in result
+    assert "model_weights" in result  # ensemble weights
+    assert "explanation" in result
+    assert len(result["explanation"]) > 0
+
+
+# -------------------------------------------------------------------------
 # Test 13: Config values
 # -------------------------------------------------------------------------
 
