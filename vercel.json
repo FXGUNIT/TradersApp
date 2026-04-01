@@ -1,0 +1,48 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "installCommand": "npm ci",
+  "framework": "vite",
+  "regions": ["iad1"],
+  "routes": [
+    { "handle": "filesystem" },
+    { "src": "/(.*)", "dest": "/index.html" }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options", "value": "DENY" },
+        { "key": "X-XSS-Protection", "value": "1; mode=block" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=()" },
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.gstatic.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https: blob:; connect-src 'self' https://*.traders.app wss://*.traders.app https://identitytoolkit.googleapis.com https://firestore.googleapis.com https://*.firebaseio.com https://*.googleapis.com https://generativelanguage.googleapis.com https://api.groq.com https://openrouter.ai https://api.cerebras.ai https://api.deepseek.com https://api.sambanova.cloud; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+        }
+      ]
+    },
+    {
+      "source": "/assets/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+      ]
+    }
+  ],
+  "env": {
+    "VITE_BFF_URL": "@bff-url",
+    "VITE_FIREBASE_API_KEY": "@firebase-api-key",
+    "VITE_FIREBASE_AUTH_DOMAIN": "@firebase-auth-domain",
+    "VITE_FIREBASE_PROJECT_ID": "@firebase-project-id",
+    "VITE_FIREBASE_STORAGE_BUCKET": "@firebase-storage-bucket",
+    "VITE_FIREBASE_MESSAGING_SENDER_ID": "@firebase-messaging-sender-id",
+    "VITE_FIREBASE_APP_ID": "@firebase-app-id"
+  },
+  "github": {
+    "silent": true,
+    "autoAlias": true,
+    "autoJobCancellation": true
+  }
+}
