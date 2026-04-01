@@ -1,8 +1,8 @@
 # ML Engine Implementation Progress
 
 **Started:** 2026-04-01
-**Current Phase:** Phase 5: Polish + Production
-**Tests:** 21/21 passing ✅ | npm build: ✅
+**Current Phase:** Phase 8: Physics-Based Regime Models
+**Tests:** 24/24 passing ✅ | npm build: ✅
 
 ---
 
@@ -132,7 +132,28 @@
 - [ ] Firebase App Check (requires Firebase project + reCAPTCHA Enterprise)
 - [ ] Full 31-point security checklist
 
-## Phase 7: Go Live
+## Phase 8: Physics-Based Regime Models
+
+— FP-FK PDE + Tsallis q-Gaussians + Anomalous Diffusion + Regime Ensemble
+
+### File Structure
+
+| File | Status | Notes |
+|---|---|---|
+| `ml-engine/models/regime/fp_fk_regime.py` | ✅ DONE | Full Fokker-Planck + Fisher-KPP PDE regime detector. Crank-Nicolson implicit diffusion + explicit upwind advection. 40×40 grid on (VR, ADX) space. Tsallis q-Gaussians via Borges numerical MLE. Criticality index κ = ‖∇·J‖/P_total. Wave speed c* = 2·√(D_q·r). AMD-phase-modulated reaction rate. |
+| `ml-engine/models/regime/anomalous_diffusion.py` | ✅ DONE | Hurst exponent via DFA (most robust) + GHE (multifractality) + Variance Ratio. Weighted ensemble: 0.5·H_dfa + 0.3·H_vr + 0.2·H_ghe. Multifractality classification: MONOFRACTAL/MILD/STRONG. Vol clustering indicator. |
+| `ml-engine/models/regime/regime_ensemble.py` | ✅ DONE | Combines HMM + FPFKRegimeDetector + AnomalousDiffusionModel. Adaptive weights: FP-FK weight ∝ |q−1| deviation (more weight when non-Gaussian). 6-signal deleverage: criticality spike, crisis regime, compression squeeze, Hurst extremes, wave acceleration, multi-signal agreement. Stop multiplier: regime × Hurst. |
+| `ml-engine/tests/test_phase1.py` | ✅ UPDATED | Added test_fp_fk_regime_detector, test_anomalous_diffusion_model, test_regime_ensemble |
+
+### Phase 8 Tests
+
+| Test | Status |
+|---|---|
+| test_fp_fk_regime_detector | ✅ PASS |
+| test_anomalous_diffusion_model | ✅ PASS |
+| test_regime_ensemble | ✅ PASS |
+
+### Phase 7: Go Live
 - [x] Monitoring workflow (.github/workflows/monitor.yml) ✅
   - Health checks every 5 min: ML Engine /health, BFF /health, Frontend
   - ML model freshness check: alert if models stale >7 days
@@ -168,11 +189,12 @@
 
 | Commit | Phase | Description | Tests |
 |---|---|---|---|
-| 5de6caf | Phase 1 | ML Engine foundation + BFF consensus routes + ML Signals tab | 16/16 ✅ |
-| 12b404e | Phase 2+4 | HMM, SVM, MLP, AMD NB, TimeProbability, News Intelligence | 21/21 ✅ |
-| 3b8669c | Phase 5+6 | GitHub Actions CI/CD, Dockerfiles, docker-compose, CODEOWNERS, Dependabot | 21/21 ✅ |
-| 8feb4cf | Phase 6 security | Native security headers, rate limiting (sliding window), RBAC | 21/21 ✅ |
-| (pending) | Phase 7 | Monitoring (5-min health checks, Slack/Discord alerts), Railway config, model versioning (scripts/version_models.py), deployment guide, rollback workflow | 21/21 ✅ |
+| 5de6caf | Phase 1 | ML Engine foundation + BFF consensus routes + ML Signals tab | 16/16 |
+| 12b404e | Phase 2+4 | HMM, SVM, MLP, AMD NB, TimeProbability, News Intelligence | 21/21 |
+| 3b8669c | Phase 5+6 | GitHub Actions CI/CD, Dockerfiles, docker-compose, CODEOWNERS, Dependabot | 21/21 |
+| 8feb4cf | Phase 6 security | Native security headers, rate limiting (sliding window), RBAC | 21/21 |
+| (pending) | Phase 7 | Monitoring, Railway config, model versioning, deployment guide, rollback workflow | 21/21 |
+| (pending) | Phase 8 | FP-FK PDE + Fisher-KPP + Tsallis q-Gaussians + Anomalous Diffusion + Hurst + RegimeEnsemble | 24/24 |
 
 ---
 

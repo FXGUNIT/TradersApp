@@ -28,6 +28,7 @@ from training.trainer import Trainer
 from training.model_store import ModelStore
 from inference.predictor import Predictor
 from inference.consensus_aggregator import ConsensusAggregator
+from models.regime.regime_ensemble import RegimeEnsemble
 
 
 # -------------------------------------------------------------------------
@@ -39,17 +40,19 @@ trainer: Trainer | None = None
 predictor: Predictor | None = None
 consensus_agg: ConsensusAggregator | None = None
 store: ModelStore | None = None
+regime_ensemble: RegimeEnsemble | None = None
 start_time: float = time.time()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global db, trainer, predictor, consensus_agg, store
+    global db, trainer, predictor, consensus_agg, store, regime_ensemble
     db = CandleDatabase(config.DB_PATH)
     trainer = Trainer(db_path=config.DB_PATH, store_dir=config.MODEL_STORE)
     predictor = Predictor(store_dir=config.MODEL_STORE)
     consensus_agg = ConsensusAggregator()
     store = ModelStore(config.MODEL_STORE)
+    regime_ensemble = RegimeEnsemble(random_state=42)
 
     # Load models on startup
     try:
@@ -286,7 +289,164 @@ async def predict(request: PredictRequest):
             math_engine_snapshot=me,
         )
 
+        # Append physics-based regime from FP-FK + Anomalous Diffusion
+        try:
+            if not df.empty and regime_ensemble is not None:
+                feat_for_regime = engineer_features(df)
+                for col in ["vr", "adx", "atr", "ci", "vwap", "amd_ACCUMULATION",
+                            "amd_MANIPULATION", "amd_DISTRIBUTION", "amd_TRANSITION", "amd_UNCLEAR"]:
+                    if col not in feat_for_regime.columns:
+                        feat_for_regime[col] = 0.0
+                regime_result = regime_ensemble.advance(feat_for_regime)
+                output["physics_regime"] = {
+                    "regime": regime_result["regime"],
+                    "regime_id": regime_result["regime_id"],
+                    "confidence": regime_result["regime_confidence"],
+                    "posteriors": regime_result["regime_posteriors"],
+                    "q_parameter": regime_result["fp_fk"]["q_parameter"],
+                    "fk_wave_speed": regime_result["fp_fk"]["fk_wave_speed"],
+                    "fk_wave_acceleration": regime_result["fp_fk"]["fk_wave_acceleration"],
+                    "criticality_index": regime_result["fp_fk"]["criticality_index"],
+                    "front_direction": regime_result["fp_fk"]["front_direction"],
+                    "hurst_H": regime_result["anomalous_diffusion"]["hurst_H"],
+                    "diffusion_type": regime_result["anomalous_diffusion"]["diffusion_type"],
+                    "vol_clustering": regime_result["anomalous_diffusion"]["vol_clustering"],
+                    "deleverage_signal": regime_result["deleverage_signal"],
+                    "deleverage_reason": regime_result["deleverage_reason"],
+                    "stop_multiplier": regime_result["stop_multiplier"],
+                    "position_adjustment": regime_result["position_adjustment"],
+                    "signal_adjustment": regime_result["signal_adjustment"],
+                    "explanation": regime_result["explanation"],
+                }
+        except Exception as e:
+            output["physics_regime"] = {"error": str(e)}
+
         return output
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# -------------------------------------------------------------------------
+# FP-FK + Anomalous Diffusion Regime Endpoint
+# -------------------------------------------------------------------------
+
+class RegimeRequest(BaseModel):
+    symbol: str = Field(default="MNQ")
+    candles: list[dict] = Field(default_factory=list)
+
+
+@app.post("/regime")
+async def get_regime(request: RegimeRequest):
+    """
+    Full physics-based regime analysis combining:
+
+    1. HMM — Gaussian Hidden Markov Model (COMPRESSION/NORMAL/EXPANSION)
+    2. FP-FK — Fokker-Planck + Fisher-KPP PDE with Tsallis q-Gaussians
+       - Tsallis q-parameter: measures fat-tailedness/deviation from Gaussian
+       - Fisher-KPP wave speed: velocity of regime transition front
+       - Criticality index κ: divergence of probability flux (deleverage trigger)
+       - Wave front acceleration: imminent regime shift warning
+    3. Anomalous Diffusion — Hurst exponent via DFA + GHE
+       - H < 0.5 → antipersistent (mean-reversion)
+       - H > 0.5 → persistent (momentum)
+       - Multifractality: complexity of return dynamics
+
+    Returns deleverage probability, stop loss multiplier, and signal adjustment.
+    """
+    try:
+        # Build candles DataFrame
+        if request.candles:
+            df = pd.DataFrame([c for c in request.candles])
+            df["timestamp"] = pd.to_datetime(df["timestamp"])
+        else:
+            df = db.get_latest_candles(request.symbol, n=200)
+            if df.empty:
+                raise HTTPException(status_code=400, detail="No candles available.")
+
+        if len(df) < 50:
+            raise HTTPException(status_code=400, detail="Need at least 50 candles for regime analysis.")
+
+        # Engineer features needed for regime models
+        feat_df = engineer_features(df)
+        me_snapshot = request.candles[0] if request.candles else {}
+
+        # Inject math engine features if available
+        for col in ["vr", "adx", "atr", "ci", "vwap", "amd_ACCUMULATION",
+                    "amd_MANIPULATION", "amd_DISTRIBUTION", "amd_TRANSITION", "amd_UNCLEAR"]:
+            if col not in feat_df.columns:
+                feat_df[col] = 0.0
+
+        # Advance the regime ensemble
+        regime_result = regime_ensemble.advance(feat_df)
+
+        return {
+            "ok": True,
+            "regime": regime_result["regime"],
+            "regime_id": regime_result["regime_id"],
+            "confidence": regime_result["regime_confidence"],
+            "posteriors": regime_result["regime_posteriors"],
+            "model_weights": regime_result["model_weights"],
+            "hmm_agreement": regime_result["model_weights"]["hmm"] == regime_result["model_weights"]["fp_fk"],
+
+            # FP-FK
+            "fp_fk": {
+                "regime": regime_result["fp_fk"]["regime"],
+                "q_parameter": regime_result["fp_fk"]["q_parameter"],
+                "fk_wave_speed": regime_result["fp_fk"]["fk_wave_speed"],
+                "fk_min_wave_speed": regime_result["fp_fk"]["fk_min_wave_speed"],
+                "fk_wave_acceleration": regime_result["fp_fk"]["fk_wave_acceleration"],
+                "criticality_index": regime_result["fp_fk"]["criticality_index"],
+                "front_direction": regime_result["fp_fk"]["front_direction"],
+                "front_position_normalized": regime_result["fp_fk"]["front_position_normalized"],
+                "reaction_rate": regime_result["fp_fk"]["reaction_rate"],
+                "diffusion_coeff": regime_result["fp_fk"]["diffusion_coeff"],
+                "drift_vr": regime_result["fp_fk"]["drift_vr"],
+                "drift_adx": regime_result["fp_fk"]["drift_adx"],
+                "entropy_rate": regime_result["fp_fk"]["entropy_rate"],
+                "current_vr": regime_result["fp_fk"]["current_vr"],
+                "current_adx": regime_result["fp_fk"]["current_adx"],
+                "explanation": regime_result["fp_fk"]["explanation"],
+            },
+
+            # HMM
+            "hmm": {
+                "regime": regime_result["hmm"]["regime"],
+                "confidence": regime_result["hmm"]["confidence"],
+                "previous_regime": regime_result["hmm"]["previous_regime"],
+                "regime_change": regime_result["hmm"]["regime_change"],
+                "transition_prob": regime_result["hmm"]["transition_prob"],
+            },
+
+            # Anomalous Diffusion
+            "anomalous_diffusion": {
+                "hurst_H": regime_result["anomalous_diffusion"]["hurst_H"],
+                "H_dfa": regime_result["anomalous_diffusion"]["H_dfa"],
+                "H_vr": regime_result["anomalous_diffusion"]["H_vr"],
+                "H_ghe": regime_result["anomalous_diffusion"]["H_ghe"],
+                "diffusion_type": regime_result["anomalous_diffusion"]["diffusion_type"],
+                "multifractality": regime_result["anomalous_diffusion"]["multifractality"],
+                "H_trend": regime_result["anomalous_diffusion"]["H_trend"],
+                "vol_clustering": regime_result["anomalous_diffusion"]["vol_clustering"],
+                "position_adjustment": regime_result["anomalous_diffusion"]["position_adjustment"],
+                "implication": regime_result["anomalous_diffusion"]["implication"],
+            },
+
+            # Deleverage & adjustments
+            "deleverage_signal": regime_result["deleverage_signal"],
+            "deleverage_reason": regime_result["deleverage_reason"],
+            "signal_adjustment": regime_result["signal_adjustment"],
+            "stop_multiplier": regime_result["stop_multiplier"],
+            "position_adjustment": regime_result["position_adjustment"],
+
+            # Full explanation
+            "physics_explanation": regime_result["explanation"],
+            "n_candles": len(df),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
 
     except HTTPException:
         raise
