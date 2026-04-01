@@ -1,0 +1,228 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, staging]
+  pull_request:
+    branches: [main, staging]
+
+env:
+  NODE_VERSION: '20'
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  # -------------------------------------------------------------------------
+  # Frontend: React + Vite
+  # -------------------------------------------------------------------------
+  frontend:
+    name: Frontend Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+        continue-on-error: false
+
+      - name: Build
+        run: npm run build
+        continue-on-error: false
+
+  # -------------------------------------------------------------------------
+  # ML Engine: Python FastAPI
+  # -------------------------------------------------------------------------
+  ml-engine:
+    name: ML Engine Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ml-engine
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-ml-${{ hashFiles('ml-engine/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-ml-
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run pytest
+        run: pytest tests/ -v --tb=short
+        continue-on-error: false
+
+      - name: Build Docker image
+        run: docker build -t ghcr.io/${{ github.repository }}/ml-engine:${{ github.sha }} .
+        continue-on-error: false
+
+      - name: Docker health check
+        run: |
+          docker run -d --name ml-engine-test -p 8001:8001 ghcr.io/${{ github.repository }}/ml-engine:${{ github.sha }}
+          sleep 10
+          docker exec ml-engine-test python -c "import httpx; r=httpx.get('http://localhost:8001/health', timeout=5); assert r.status_code == 200, r.text"
+          docker stop ml-engine-test
+
+  # -------------------------------------------------------------------------
+  # BFF Server: Node.js
+  # -------------------------------------------------------------------------
+  bff:
+    name: BFF Server
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: bff
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: bff/package.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint (if eslint config exists)
+        run: npm run lint 2>/dev/null || true
+        continue-on-error: true
+
+      - name: Build Docker image
+        run: docker build -t ghcr.io/${{ github.repository }}/bff:${{ github.sha }} .
+        continue-on-error: false
+
+  # -------------------------------------------------------------------------
+  # Deploy to Staging (auto on push to staging branch)
+  # -------------------------------------------------------------------------
+  deploy-staging:
+    name: Deploy Staging
+    runs-on: ubuntu-latest
+    needs: [frontend, ml-engine, bff]
+    if: github.ref == 'refs/heads/staging' && github.event_name == 'push'
+    environment:
+      name: staging
+      url: https://staging.traders.app
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Railway: deploy ML Engine
+      - name: Deploy ML Engine to Railway (staging)
+        run: |
+          curl --request POST \
+            --url https://api.railway.app/v0/environments/${{ vars.RAILWAY_STAGING_ENV_ID }}/services/${{ vars.RAILWAY_STAGING_ML_SERVICE_ID }}/deployments \
+            --header 'Authorization: Bearer ${{ secrets.RAILWAY_TOKEN }}' \
+            --header 'Content-Type: application/json' \
+            --data '{"branch": "staging", "healthCheckPath": "/health"}'
+        continue-on-error: true
+
+      # Railway: deploy BFF
+      - name: Deploy BFF to Railway (staging)
+        run: |
+          curl --request POST \
+            --url https://api.railway.app/v0/environments/${{ vars.RAILWAY_STAGING_ENV_ID }}/services/${{ vars.RAILWAY_STAGING_BFF_SERVICE_ID }}/deployments \
+            --header 'Authorization: Bearer ${{ secrets.RAILWAY_TOKEN }}' \
+            --header 'Content-Type: application/json' \
+            --data '{"branch": "staging"}'
+        continue-on-error: true
+
+      # Vercel: deploy frontend
+      - name: Deploy Frontend to Vercel (staging)
+        run: npx vercel --prod --token ${{ secrets.VERCEL_TOKEN }}
+        continue-on-error: true
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+  # -------------------------------------------------------------------------
+  # Deploy to Production (on push to main branch)
+  # -------------------------------------------------------------------------
+  deploy-production:
+    name: Deploy Production
+    runs-on: ubuntu-latest
+    needs: [frontend, ml-engine, bff]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment:
+      name: production
+      url: https://traders.app
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Push Docker images to GHCR
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push ML Engine image
+        run: |
+          docker build -t ghcr.io/${{ github.repository }}/ml-engine:latest ml-engine/
+          docker push ghcr.io/${{ github.repository }}/ml-engine:latest
+        continue-on-error: false
+
+      - name: Build and push BFF image
+        run: |
+          docker build -t ghcr.io/${{ github.repository }}/bff:latest bff/
+          docker push ghcr.io/${{ github.repository }}/bff:latest
+        continue-on-error: false
+
+      # Railway: deploy ML Engine (production)
+      - name: Deploy ML Engine to Railway (production)
+        run: |
+          curl --request POST \
+            --url https://api.railway.app/v0/environments/${{ vars.RAILWAY_PROD_ENV_ID }}/services/${{ vars.RAILWAY_PROD_ML_SERVICE_ID }}/deployments \
+            --header 'Authorization: Bearer ${{ secrets.RAILWAY_TOKEN }}' \
+            --header 'Content-Type: application/json' \
+            --data '{"image": "ghcr.io/${{ github.repository }}/ml-engine:latest", "branch": "main"}'
+        continue-on-error: true
+
+      # Railway: deploy BFF (production)
+      - name: Deploy BFF to Railway (production)
+        run: |
+          curl --request POST \
+            --url https://api.railway.app/v0/environments/${{ vars.RAILWAY_PROD_ENV_ID }}/services/${{ vars.RAILWAY_PROD_BFF_SERVICE_ID }}/deployments \
+            --header 'Authorization: Bearer ${{ secrets.RAILWAY_TOKEN }}' \
+            --header 'Content-Type: application/json' \
+            --data '{"image": "ghcr.io/${{ github.repository }}/bff:latest", "branch": "main"}'
+        continue-on-error: true
+
+      # Vercel: deploy frontend (production)
+      - name: Deploy Frontend to Vercel (production)
+        run: npx vercel --prod --token ${{ secrets.VERCEL_TOKEN }}
+        continue-on-error: true
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
