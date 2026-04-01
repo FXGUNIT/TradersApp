@@ -11,6 +11,22 @@ import {
   Search,          // Phase 3: Cross-Examination
   Landmark,        // Phase 4: Qwen assembling briefing
   Trophy,          // Phase 5: Gemini rendering verdict
+  // ML Consensus tab icons
+  Zap,             // ML signal active
+  TrendingUp,      // LONG signal
+  TrendingDown,    // SHORT signal
+  Minus,           // NEUTRAL signal
+  Target,          // RRR
+  Shield,          // Exit strategy
+  DollarSign,      // Position sizing
+  Clock,           // Timing
+  BarChart2,       // Model votes
+  Activity,        // Alpha score
+  CheckCircle,     // Health check
+  XCircle,         // Error/offline
+  RefreshCw,       // Refresh
+  ChevronRight,    // Arrow
+  Award,           // Best window
 } from 'lucide-react';
 
 const AURA_COLORS = {
@@ -32,6 +48,543 @@ const PHASE_DEFINITIONS = [
 ];
 
 const STAGE_ORDER = ['stage1', 'stage2', 'stage3', 'stage4', 'stage5', 'complete'];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ML Consensus Tab
+// ─────────────────────────────────────────────────────────────────────────────
+
+const BFF_BASE = import.meta.env.VITE_BFF_URL || "http://127.0.0.1:8788";
+
+const SIGNAL_COLORS = {
+  LONG: { bg: 'rgba(48,209,88,0.08)', border: 'rgba(48,209,88,0.3)', text: '#30D158', label: 'LONG' },
+  SHORT: { bg: 'rgba(255,69,58,0.08)', border: 'rgba(255,69,58,0.3)', text: '#FF453A', label: 'SHORT' },
+  NEUTRAL: { bg: 'rgba(100,100,100,0.08)', border: 'rgba(100,100,100,0.2)', text: '#8E8E93', label: 'NEUTRAL' },
+};
+
+const SESSION_NAMES = ['Pre-Market', 'Main Trading', 'Post-Market'];
+const SESSION_COLORS = ['rgba(255,159,10,0.7)', 'rgba(10,132,255,0.9)', 'rgba(124,58,237,0.9)'];
+
+function SignalBadge({ signal, confidence }) {
+  const c = SIGNAL_COLORS[signal] || SIGNAL_COLORS.NEUTRAL;
+  const Icon = signal === 'LONG' ? TrendingUp : signal === 'SHORT' ? TrendingDown : Minus;
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 8,
+      padding: '8px 16px', borderRadius: 12,
+      background: c.bg, border: `1.5px solid ${c.border}`,
+    }}>
+      <Icon size={18} color={c.text} />
+      <span style={{ fontSize: 15, fontWeight: 800, color: c.text, letterSpacing: 1 }}>
+        {c.label}
+      </span>
+      {confidence != null && (
+        <span style={{ fontSize: 11, color: c.text, opacity: 0.8, marginLeft: 4 }}>
+          {(confidence * 100).toFixed(0)}%
+        </span>
+      )}
+    </div>
+  );
+}
+
+function MetricRow({ icon: Icon, label, value, sub, color = 'var(--text-primary)', muted }) {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '7px 0',
+      borderBottom: '1px solid var(--border-subtle, rgba(255,255,255,0.06))',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <Icon size={13} color={muted ? 'var(--text-tertiary)' : 'var(--text-secondary)'} />
+        <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500 }}>
+          {label}
+        </span>
+      </div>
+      <div style={{ textAlign: 'right' }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: muted ? 'var(--text-tertiary)' : color }}>
+          {value || '—'}
+        </div>
+        {sub && (
+          <div style={{ fontSize: 10, color: 'var(--text-tertiary)', marginTop: 1 }}>
+            {sub}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SectionCard({ title, icon: Icon, children, accent }) {
+  return (
+    <div style={{
+      background: 'var(--surface-glass, rgba(255,255,255,0.03))',
+      border: `1px solid ${accent || 'var(--border-subtle)'}`,
+      borderRadius: 14,
+      padding: '14px 16px',
+      marginBottom: 12,
+    }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 7,
+        marginBottom: 12,
+        paddingBottom: 10,
+        borderBottom: '1px solid var(--border-subtle)',
+      }}>
+        {Icon && <Icon size={14} color={accent || 'var(--text-secondary)'} />}
+        <span style={{
+          fontSize: 10, fontWeight: 800, letterSpacing: 2,
+          color: accent || 'var(--text-secondary)',
+          textTransform: 'uppercase',
+        }}>
+          {title}
+        </span>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function VoteItem({ name, signal, confidence, reason }) {
+  const c = SIGNAL_COLORS[signal] || SIGNAL_COLORS.NEUTRAL;
+  const Icon = signal === 'LONG' ? TrendingUp : signal === 'SHORT' ? TrendingDown : Minus;
+  return (
+    <div style={{
+      padding: '8px 0',
+      borderBottom: '1px solid var(--border-subtle)',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 3 }}>
+        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>
+          {name}
+        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <Icon size={12} color={c.text} />
+          <span style={{ fontSize: 11, fontWeight: 700, color: c.text }}>
+            {signal}
+          </span>
+          {confidence != null && (
+            <span style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>
+              {(confidence * 100).toFixed(0)}%
+            </span>
+          )}
+        </div>
+      </div>
+      {reason && (
+        <div style={{ fontSize: 10, color: 'var(--text-tertiary)', lineHeight: 1.4 }}>
+          {reason}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MlConsensusTab({ theme, normalizedTheme }) {
+  const isDark = normalizedTheme === "midnight" || normalizedTheme === "night";
+  const [consensus, setConsensus] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [lastRefresh, setLastRefresh] = useState(null);
+
+  const fetchConsensus = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`${BFF_BASE}/ml/consensus?session=1`, {
+        signal: AbortSignal.timeout(15000),
+      });
+      const data = await res.json();
+      setConsensus(data);
+      setLastRefresh(new Date());
+    } catch (err) {
+      setError(err.message || 'Failed to reach ML Engine');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchConsensus();
+    const interval = setInterval(fetchConsensus, 60_000);
+    return () => clearInterval(interval);
+  }, [fetchConsensus]);
+
+  const signal = consensus?.signal || 'NEUTRAL';
+  const confidence = consensus?.confidence;
+  const session = consensus?.session || { name: 'Main Trading', id: 1, session_pct: 0, minutes_into_session: 0 };
+  const sc = SIGNAL_COLORS[signal];
+
+  const sinceRefresh = lastRefresh
+    ? `${Math.round((Date.now() - lastRefresh.getTime()) / 1000)}s ago`
+    : '—';
+
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', gap: 0,
+      height: '100%', overflow: 'hidden',
+    }}>
+      {/* ML Header */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '12px 20px',
+        borderBottom: `1px solid ${AURA_COLORS.borderSubtle}`,
+        flexShrink: 0,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <Activity size={16} color={consensus?.ok !== false ? '#30D158' : '#FF453A'} />
+          <span style={{
+            fontSize: 11, fontWeight: 800, letterSpacing: 2,
+            color: 'var(--text-secondary)', textTransform: 'uppercase',
+          }}>
+            ML Consensus Signal
+          </span>
+          {consensus?.ok !== false ? (
+            <CheckCircle size={12} color="#30D158" />
+          ) : (
+            <XCircle size={12} color="#FF453A" />
+          )}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>
+            Updated {sinceRefresh}
+          </span>
+          <button
+            onClick={fetchConsensus}
+            disabled={loading}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 5,
+              padding: '6px 12px', borderRadius: 8,
+              background: 'var(--accent-glow, rgba(10,132,255,0.1))',
+              border: `1px solid ${AURA_COLORS.info}`,
+              color: AURA_COLORS.info,
+              fontSize: 11, fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer',
+              opacity: loading ? 0.6 : 1,
+              transition: 'all 0.2s',
+            }}
+          >
+            <RefreshCw size={11} style={{ animation: loading ? 'cc-spin 1s linear infinite' : 'none' }} />
+            Refresh
+          </button>
+        </div>
+      </div>
+
+      {/* Scrollable body */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 24px' }}>
+
+        {loading && !consensus && (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 0', gap: 12 }}>
+            <div style={{
+              width: 28, height: 28,
+              border: '2.5px solid var(--border-subtle)',
+              borderTopColor: AURA_COLORS.info,
+              borderRadius: '50%',
+              animation: 'cc-spin 0.8s linear infinite',
+            }} />
+            <span style={{ fontSize: 11, color: 'var(--text-secondary)', letterSpacing: 1 }}>
+              FETCHING ML CONSENSUS...
+            </span>
+          </div>
+        )}
+
+        {error && !consensus && (
+          <div style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 20px', gap: 12,
+            textAlign: 'center',
+          }}>
+            <XCircle size={32} color="#FF453A" />
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#FF453A' }}>ML Engine Offline</div>
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{error}</div>
+            <div style={{ fontSize: 11, color: 'var(--text-tertiary)', maxWidth: 400, lineHeight: 1.6 }}>
+              Start the ML Engine with: <code style={{ fontSize: 10 }}>cd ml-engine && python -m uvicorn main:app --port 8001</code>
+            </div>
+            <button
+              onClick={fetchConsensus}
+              style={{
+                marginTop: 8, padding: '8px 20px', borderRadius: 8,
+                background: 'rgba(10,132,255,0.1)', border: `1px solid ${AURA_COLORS.info}`,
+                color: AURA_COLORS.info, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+              }}
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
+        {consensus && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+
+            {/* ── Hero Signal Card ── */}
+            <div style={{
+              padding: '20px 20px 16px',
+              borderRadius: 16,
+              background: sc.bg,
+              border: `1.5px solid ${sc.border}`,
+              marginBottom: 14,
+              textAlign: 'center',
+            }}>
+              <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: 3, color: sc.text, opacity: 0.7, marginBottom: 8, textTransform: 'uppercase' }}>
+                Collective Consensus
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
+                <SignalBadge signal={signal} confidence={confidence} />
+                <div style={{ textAlign: 'left' }}>
+                  <div style={{ fontSize: 24, fontWeight: 900, color: sc.text, lineHeight: 1 }}>
+                    {signal === 'LONG' ? '▲' : signal === 'SHORT' ? '▼' : '—'}
+                  </div>
+                </div>
+              </div>
+              <div style={{ marginTop: 10, fontSize: 11, color: sc.text, opacity: 0.8 }}>
+                Confidence: {(confidence * 100 || 0).toFixed(1)}% &nbsp;·&nbsp; {consensus.models_used || 0} models &nbsp;·&nbsp; {consensus.data_trades_analyzed || 0} trades analyzed
+              </div>
+            </div>
+
+            {/* ── Session Context ── */}
+            <SectionCard title="Session" icon={Clock} accent={SESSION_COLORS[session.id] || SESSION_COLORS[1]}>
+              <MetricRow
+                icon={Clock} label="Current Session"
+                value={session.name}
+                color={SESSION_COLORS[session.id] || SESSION_COLORS[1]}
+              />
+              <MetricRow
+                icon={Activity} label="Session Progress"
+                value={`${((session.session_pct || 0) * 100).toFixed(0)}%`}
+                sub={`${session.minutes_into_session || 0} min elapsed`}
+              />
+              <MetricRow
+                icon={Award} label="Best Alpha Window"
+                value="10:00–11:30 ET"
+                sub="Historical edge: 5–6 ticks avg"
+              />
+            </SectionCard>
+
+            {/* ── Alpha Score ── */}
+            {consensus.alpha && (
+              <SectionCard title="Alpha Score" icon={Activity} accent="rgba(255,204,0,0.8)">
+                <MetricRow
+                  icon={Activity} label="Alpha Ticks"
+                  value={`${(consensus.alpha.alpha_score || 0).toFixed(1)}`}
+                  sub="Edge over random per trade"
+                  color={consensus.alpha.alpha_score > 0 ? '#30D158' : '#FF453A'}
+                />
+                <MetricRow
+                  icon={Activity} label="Confidence"
+                  value={`${((consensus.alpha.alpha_confidence || 0) * 100).toFixed(0)}%`}
+                />
+                <MetricRow
+                  icon={Activity} label="Stability"
+                  value={`${((consensus.alpha.alpha_stability || 0) * 100).toFixed(0)}%`}
+                  sub="% rolling windows with +alpha"
+                />
+                <MetricRow
+                  icon={Award} label="Best Window"
+                  value={consensus.alpha.best_alpha_window || '—'}
+                />
+              </SectionCard>
+            )}
+
+            {/* ── Expected Move ── */}
+            {consensus.expected_move && (
+              <SectionCard title="Expected Move" icon={Target} accent="rgba(10,132,255,0.8)">
+                <MetricRow
+                  icon={Target} label="Conservative"
+                  value={`${consensus.expected_move.conservative_ticks || 0} ticks`}
+                  sub="25th percentile"
+                />
+                <MetricRow
+                  icon={Target} label="Expected"
+                  value={`${consensus.expected_move.expected_ticks || 0} ticks`}
+                  sub="50th percentile (median)"
+                  color="#30D158"
+                />
+                <MetricRow
+                  icon={Target} label="Aggressive"
+                  value={`${consensus.expected_move.aggressive_ticks || 0} ticks`}
+                  sub="75th percentile"
+                />
+                <MetricRow
+                  icon={Target} label="Uncertainty Band"
+                  value={`±${((consensus.expected_move.uncertainty_band || 0) / 2).toFixed(0)} ticks`}
+                  sub="IQR width / 2"
+                />
+              </SectionCard>
+            )}
+
+            {/* ── RRR ── */}
+            {consensus.rrr && (
+              <SectionCard title="Risk:Reward Ratio" icon={Target} accent="rgba(255,159,10,0.8)">
+                <MetricRow
+                  icon={Target} label="Recommended R:R"
+                  value={`1:${(consensus.rrr.recommended_rr || 2).toFixed(1)}`}
+                  color="#FF9F0A"
+                />
+                <MetricRow
+                  icon={Target} label="Expected Win Rate"
+                  value={`${((consensus.rrr.expected_win_rate || 0.5) * 100).toFixed(0)}%`}
+                />
+                <MetricRow
+                  icon={Target} label="Profit Factor"
+                  value={(consensus.rrr.profit_factor || 1).toFixed(2)}
+                />
+                <MetricRow
+                  icon={Target} label="Confidence"
+                  value={`${((consensus.rrr.confidence || 0) * 100).toFixed(0)}%`}
+                  sub={`Based on ${consensus.rrr.sample_size || 0} trades`}
+                />
+                {consensus.rrr.why_this_rr && (
+                  <div style={{
+                    marginTop: 8, padding: '8px 10px', borderRadius: 8,
+                    background: 'rgba(255,159,10,0.06)',
+                    border: '1px solid rgba(255,159,10,0.15)',
+                    fontSize: 10.5, color: 'var(--text-secondary)',
+                    lineHeight: 1.5,
+                  }}>
+                    {consensus.rrr.why_this_rr}
+                  </div>
+                )}
+              </SectionCard>
+            )}
+
+            {/* ── Exit Strategy ── */}
+            {consensus.exit_plan && (
+              <SectionCard title="Exit Strategy (ML)" icon={Shield} accent="rgba(124,58,237,0.8)">
+                <MetricRow
+                  icon={Shield} label="Strategy"
+                  value={consensus.exit_plan.strategy || 'ML-DETERMINED'}
+                  color="rgba(124,58,237,0.9)"
+                />
+                <MetricRow
+                  icon={Shield} label="Stop Loss"
+                  value={`${consensus.exit_plan.stop_loss_ticks || 20} ticks`}
+                />
+                <MetricRow
+                  icon={Shield} label="TP1 — Close"
+                  value={`${((consensus.exit_plan.tp1_pct || 0) * 100).toFixed(0)}% @ ${consensus.exit_plan.tp1_ticks || 0}t`}
+                />
+                <MetricRow
+                  icon={Shield} label="TP2 — Close"
+                  value={`${((consensus.exit_plan.tp2_pct || 0) * 100).toFixed(0)}% @ ${consensus.exit_plan.tp2_ticks || 0}t`}
+                />
+                <MetricRow
+                  icon={Shield} label="Trailing Distance"
+                  value={`${consensus.exit_plan.trailing_distance_ticks || 0} ticks`}
+                  sub={`activate at ${consensus.exit_plan.trail_activate_at_ticks || 0}t in profit`}
+                />
+                <MetricRow
+                  icon={Clock} label="Max Hold"
+                  value={`${consensus.exit_plan.max_hold_minutes || 60} min`}
+                />
+              </SectionCard>
+            )}
+
+            {/* ── Position Sizing ── */}
+            {consensus.position_sizing && (
+              <SectionCard title="Position Sizing" icon={DollarSign} accent="rgba(48,209,88,0.8)">
+                <MetricRow
+                  icon={DollarSign} label="Contracts"
+                  value={consensus.position_sizing.contracts || 1}
+                  color="#30D158"
+                />
+                <MetricRow
+                  icon={DollarSign} label="Risk / Trade"
+                  value={`$${(consensus.position_sizing.risk_per_trade_dollars || 0).toFixed(0)}`}
+                  sub={`${((consensus.position_sizing.risk_pct_of_account || 0) * 100).toFixed(2)}% of account`}
+                />
+                <MetricRow
+                  icon={DollarSign} label="Kelly Fraction"
+                  value={`${((consensus.position_sizing.kelly_fraction || 0) * 100).toFixed(0)}%`}
+                  sub="Half-Kelly applied"
+                />
+                <MetricRow
+                  icon={Clock} label="Max Wait"
+                  value={`${consensus.position_sizing.max_wait_minutes || 30} min`}
+                  sub={consensus.position_sizing.drawdown_throttled ? 'Drawdown throttle: SIZE HALVED' : 'Normal sizing'}
+                  color={consensus.position_sizing.drawdown_throttled ? '#FF453A' : undefined}
+                />
+              </SectionCard>
+            )}
+
+            {/* ── Timing ── */}
+            {consensus.timing && (
+              <SectionCard title="Entry Timing" icon={Clock} accent="rgba(10,132,255,0.8)">
+                <MetricRow
+                  icon={Clock} label="Enter Now"
+                  value={consensus.timing.enter_now ? 'YES' : 'WAIT'}
+                  color={consensus.timing.enter_now ? '#30D158' : '#FF453A'}
+                />
+                <MetricRow
+                  icon={Activity} label="P(Profitable Now)"
+                  value={`${((consensus.timing.P_profitable_entry_now || 0.5) * 100).toFixed(0)}%`}
+                />
+                <MetricRow
+                  icon={Award} label="Best Window"
+                  value={consensus.timing.best_entry_window || '—'}
+                />
+                {consensus.timing.candle_close_entry !== false && (
+                  <MetricRow
+                    icon={Clock} label="Wait for Candle Close"
+                    value="ALWAYS"
+                    sub="Never enter mid-candle"
+                    muted
+                  />
+                )}
+              </SectionCard>
+            )}
+
+            {/* ── Model Votes ── */}
+            {consensus.votes && Object.keys(consensus.votes).length > 0 && (
+              <SectionCard title={`Model Votes (${Object.keys(consensus.votes).length})`} icon={BarChart2} accent="rgba(255,255,255,0.4)">
+                {Object.entries(consensus.votes).map(([name, vote]) => (
+                  <VoteItem
+                    key={name}
+                    name={name}
+                    signal={vote.signal}
+                    confidence={vote.confidence}
+                    reason={vote.reason}
+                  />
+                ))}
+              </SectionCard>
+            )}
+
+            {/* ── News Warning ── */}
+            {consensus.news && (
+              <SectionCard title="News & Events" icon={Activity} accent="rgba(255,69,58,0.8)">
+                <MetricRow
+                  icon={Activity} label="Next Event"
+                  value={consensus.news.next_event?.title || '—'}
+                  sub={consensus.news.next_event ? `in ${consensus.news.next_event.timeUntil_min || 0} min` : ''}
+                  color={consensus.news.trade_allowed === false ? '#FF453A' : undefined}
+                />
+                <MetricRow
+                  icon={Activity} label="Trading Allowed"
+                  value={consensus.news.trade_allowed !== false ? 'YES' : 'REDUCE SIZE'}
+                  color={consensus.news.trade_allowed !== false ? '#30D158' : '#FF453A'}
+                />
+                {consensus.news.warning && (
+                  <div style={{
+                    marginTop: 8, padding: '8px 10px', borderRadius: 8,
+                    background: 'rgba(255,69,58,0.06)',
+                    border: '1px solid rgba(255,69,58,0.2)',
+                    fontSize: 10.5, color: '#FF453A', lineHeight: 1.5,
+                  }}>
+                    {consensus.news.warning}
+                  </div>
+                )}
+              </SectionCard>
+            )}
+
+            {/* ── Footer ── */}
+            <div style={{
+              textAlign: 'center', paddingTop: 8,
+              fontSize: 9.5, color: 'var(--text-tertiary)', letterSpacing: 0.5,
+            }}>
+              ML Engine {consensus?.ok !== false ? 'online' : 'offline'} &nbsp;·&nbsp;
+              v{consensus?.model_freshness || '?'} &nbsp;·&nbsp;
+              {consensus?.models_used || 0} models &nbsp;·&nbsp;
+              {consensus?.data_trades_analyzed || 0} trades
+            </div>
+
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function WarRoomLoader() {
   const [currentStage, setCurrentStage] = useState(councilStage.current);
@@ -167,6 +720,7 @@ export default function CollectiveConsciousness({ onBack, theme, auth, currentTh
   const normalizedTheme = currentTheme || theme || "lumiere";
   const isDark = normalizedTheme === "midnight" || normalizedTheme === "night";
   const { users } = useUsers();
+  const [activeTab, setActiveTab] = useState('chat'); // 'chat' | 'ml'
   const [messages, setMessages] = useState([]);
   const [localHistory, setLocalHistory] = useState([]);
   const [input, setInput] = useState('');
@@ -300,9 +854,10 @@ User Question: ${trimmed}`;
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '12px 20px',
-      borderBottom: `1px solid ${AURA_COLORS.borderSubtle}`,
+        padding: '10px 20px',
+        borderBottom: `1px solid ${AURA_COLORS.borderSubtle}`,
         flexShrink: 0,
+        gap: 12,
       }}>
         <button
           onClick={onBack}
@@ -314,30 +869,61 @@ User Question: ${trimmed}`;
             color: AURA_COLORS.info,
             fontSize: 14,
             fontWeight: 600,
-            padding: '8px 16px',
+            padding: '7px 14px',
             borderRadius: 8,
             transition: 'all 0.2s',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
-            gap: '8px',
+            gap: '6px',
+            flexShrink: 0,
           }}
         >
-          <span style={{ fontSize: 16 }}>←</span> Back to Hub
+          <span style={{ fontSize: 16 }}>←</span> Back
         </button>
 
+        {/* Tab Switcher */}
         <div style={{
-          fontSize: 12,
-          fontWeight: 700,
-          letterSpacing: 2.5,
-          color: mutedColor,
-          textTransform: 'uppercase',
+          display: 'flex',
+          gap: 4,
+          background: 'var(--surface-glass, rgba(255,255,255,0.05))',
+          border: `1px solid ${AURA_COLORS.borderSubtle}`,
+          borderRadius: 10,
+          padding: 3,
+          flexShrink: 0,
         }}>
-          COLLECTIVE CONSCIOUSNESS
+          {[
+            { key: 'chat', label: 'AI Chat', Icon: Brain },
+            { key: 'ml', label: 'ML Signals', Icon: Activity },
+          ].map(({ key, label, Icon }) => (
+            <button
+              key={key}
+              onClick={() => setActiveTab(key)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '6px 14px',
+                borderRadius: 7,
+                border: 'none',
+                fontSize: 12,
+                fontWeight: 700,
+                letterSpacing: 0.5,
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                background: activeTab === key
+                  ? (key === 'ml' ? 'rgba(10,132,255,0.15)' : 'var(--accent-glow, rgba(10,132,255,0.1))')
+                  : 'transparent',
+                color: activeTab === key ? AURA_COLORS.info : 'var(--text-tertiary)',
+                fontFamily: 'inherit',
+              }}
+            >
+              <Icon size={13} />
+              {label}
+            </button>
+          ))}
         </div>
 
         {/* Theme Switcher + Status */}
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexShrink: 0 }}>
           <ThemeSwitcher
             currentTheme={normalizedTheme}
             onThemeChange={onThemeChange}
@@ -346,7 +932,10 @@ User Question: ${trimmed}`;
         </div>
       </div>
 
-      {/* Chat area */}
+      {/* Tab content */}
+      {activeTab === 'ml' ? (
+        <MlConsensusTab theme={theme} normalizedTheme={normalizedTheme} />
+      ) : (
       <div style={{
         flex: 1,
         overflowY: 'auto',
@@ -503,7 +1092,7 @@ User Question: ${trimmed}`;
           <div ref={chatEndRef} />
         </div>
       </div>
-
+      )}  {/* closes ternary: : ( <div>...chat...</div> ) */}
       {/* Input bar */}
       <div style={{
         padding: '16px 20px',
