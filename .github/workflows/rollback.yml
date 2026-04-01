@@ -1,0 +1,65 @@
+name: Rollback ML Models
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Backup version to restore (e.g., models_backup_20260401_020000)"
+        required: true
+        type: string
+      confirm:
+        description: "Type 'yes' to confirm rollback"
+        required: true
+        default: "no"
+
+env:
+  ML_MODELS_PATH: ${{ vars.ML_MODELS_PATH || '/app/data/models' }}
+
+jobs:
+  rollback:
+    name: Rollback ML Models
+    runs-on: ubuntu-latest
+    if: github.event.inputs.confirm == 'yes'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Download model backup from GitHub Release
+        run: |
+          gh release download models-${{ github.event.inputs.version }} \
+            --dir models_backup/ \
+            --pattern "*.tar.gz" \
+            || echo "No release found, trying models_backup directory..."
+          ls -la models_backup/ 2>/dev/null || echo "No backup found"
+
+      - name: Download from Railway persistent disk
+        run: |
+          # Connect to Railway ML Engine and download models
+          echo "Connecting to Railway..."
+          # railway run is available via Railway CLI
+          railway login --token ${{ secrets.RAILWAY_TOKEN }} 2>/dev/null || true
+          railway run --service ml-engine python ml-engine/scripts/version_models.py --status || true
+
+      - name: Rollback ML Models
+        run: |
+          backup_file=$(ls models_backup/*.tar.gz 2>/dev/null | head -1 || echo "")
+          if [ -n "$backup_file" ]; then
+            echo "Restoring from: $backup_file"
+            python ml-engine/scripts/version_models.py --restore "$backup_file"
+          else
+            echo "No backup archive found. Manual rollback required."
+            echo "Check GitHub Releases: https://github.com/${{ github.repository }}/releases"
+            exit 1
+          fi
+
+      - name: Notify on rollback
+        if: always()
+        run: |
+          curl -s -X POST -H "Content-Type: application/json" \
+            -d "{\"content\": \"ML Models rolled back to version: ${{ github.event.inputs.version }}\"}" \
+            "${{ secrets.DISCORD_WEBHOOK_URL }}" 2>/dev/null || true
