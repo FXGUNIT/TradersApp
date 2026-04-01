@@ -193,8 +193,8 @@
 | 12b404e | Phase 2+4 | HMM, SVM, MLP, AMD NB, TimeProbability, News Intelligence | 21/21 |
 | 3b8669c | Phase 5+6 | GitHub Actions CI/CD, Dockerfiles, docker-compose, CODEOWNERS, Dependabot | 21/21 |
 | 8feb4cf | Phase 6 security | Native security headers, rate limiting (sliding window), RBAC | 21/21 |
-| (pending) | Phase 7 | Monitoring, Railway config, model versioning, deployment guide, rollback workflow | 21/21 |
-| (pending) | Phase 8 | FP-FK PDE + Fisher-KPP + Tsallis q-Gaussians + Anomalous Diffusion + Hurst + RegimeEnsemble | 24/24 |
+| 5e61cad | Phase 7 | Monitoring, Railway config, model versioning, deployment guide, rollback workflow | 21/21 |
+| 7664726 | Phase 8 | FP-FK PDE + Fisher-KPP + Tsallis q-Gaussians + Anomalous Diffusion + Hurst + RegimeEnsemble | 24/24 |
 
 ---
 
