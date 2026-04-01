@@ -1,4 +1,13 @@
 
+# Python bytecode (never commit compiled .pyc files)
+__pycache__/
+*.py[cod]
+*.cpython-*.pyc
+.pytest_cache/
+
+# ML model backups (large, generated at runtime)
+model_backups/
+
 # Logs
 logs
 *.log
