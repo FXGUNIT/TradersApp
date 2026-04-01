@@ -72,7 +72,7 @@ function AuthLogo() {
       >
         <img
           src="/logo.png"
-          alt="Logo"
+          alt="Traders Regiment logo"
           style={{
             borderRadius: "50%",
             overflow: "hidden",

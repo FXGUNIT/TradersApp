@@ -60,7 +60,7 @@ export function Breadcrumbs({ items, onNavigate, theme }) {
             }}
             title={item.label}
           >
-            {item.icon} {item.label}
+            {typeof item.icon === "function" ? (() => { const Ic = item.icon; return <Ic size={12} />; })() : item.icon} {item.label}
           </button>
           {index < items.length - 1 && <span style={{ color: theme.dim, fontSize: 10 }}>{"\u203A"}</span>}
         </div>

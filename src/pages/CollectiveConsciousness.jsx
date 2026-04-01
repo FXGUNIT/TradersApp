@@ -38,12 +38,14 @@ function WarRoomLoader() {
 
   useEffect(() => {
     const interval = setInterval(() => {
-      if (councilStage.current !== currentStage) {
-        setCurrentStage(councilStage.current);
+      const latest = councilStage.current;
+      if (latest !== currentStage) {
+        setCurrentStage(latest);
       }
     }, 200);
     return () => clearInterval(interval);
-  }, [currentStage]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // intentionally stable — reads councilStage ref directly
 
   const ci = STAGE_ORDER.indexOf(currentStage);
 

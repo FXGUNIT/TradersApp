@@ -1,43 +1,54 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CSS_VARS } from "../../styles/cssVars.js";
+import { CheckCircle2, XCircle, AlertTriangle, Info, Siren } from "lucide-react";
+
+const TOAST_ICONS = {
+  success: CheckCircle2,
+  error: XCircle,
+  warning: AlertTriangle,
+  info: Info,
+  critical: Siren,
+};
 
 const TOAST_COLORS = {
   success: {
     border: CSS_VARS.statusSuccess,
     bg: "var(--status-success-soft, rgba(48, 209, 88, 0.1))",
     text: CSS_VARS.statusSuccess,
-    icon: "\u2713",
   },
   error: {
     border: CSS_VARS.statusDanger,
     bg: "var(--status-danger-soft, rgba(255, 69, 58, 0.1))",
     text: CSS_VARS.statusDanger,
-    icon: "\u2715",
   },
   warning: {
     border: CSS_VARS.statusWarning,
     bg: "var(--status-warning-soft, rgba(255, 214, 10, 0.1))",
     text: CSS_VARS.statusWarning,
-    icon: "\u26A0",
   },
   info: {
     border: CSS_VARS.statusInfo,
     bg: "var(--status-info-soft, rgba(10, 132, 255, 0.1))",
     text: CSS_VARS.statusInfo,
-    icon: "\u2139",
   },
   critical: {
     border: CSS_VARS.statusDanger,
     bg: "var(--status-danger-soft-strong, rgba(255, 59, 48, 0.15))",
     text: CSS_VARS.statusDanger,
-    icon: "\uD83D\uDEA8",
   },
 };
 
 export default function Toast({ toasts, onDismiss, fontFamily = "inherit" }) {
   const [swipedToast, setSwipedToast] = useState(null);
   const [touchStart, setTouchStart] = useState(null);
-  const isMobile = window.innerWidth < 768;
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    setIsMobile(window.innerWidth < 768);
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   const handleTouchStart = (event, toastId) => {
     setTouchStart({ x: event.touches[0].clientX, id: toastId });
@@ -80,6 +91,10 @@ export default function Toast({ toasts, onDismiss, fontFamily = "inherit" }) {
       {toasts.map((toast) => {
         const color = TOAST_COLORS[toast.type] || TOAST_COLORS.info;
         const isBeingSwiped = swipedToast === toast.id;
+        const ToastIcon = TOAST_ICONS[toast.type] || Info;
+        const progressDuration = toast.duration || 3000;
+        const progressMs = Math.max(1, progressDuration);
+        const progressPct = ((toast.time_remaining || progressDuration) / progressMs) * 100;
 
         return (
           <div
@@ -122,13 +137,13 @@ export default function Toast({ toasts, onDismiss, fontFamily = "inherit" }) {
                 left: 0,
                 height: "3px",
                 background: color.border,
-                width: `${((toast.time_remaining || toast.duration || 3000) / (toast.duration || 3000)) * 100}%`,
-                animation: `${toast.duration || 3000}ms linear backwards`,
+                width: `${Math.min(100, Math.max(0, progressPct))}%`,
+                animation: `${progressMs}ms linear backwards`,
                 borderRadius: "0 0 0 8px",
               }}
             />
 
-            <span style={{ fontSize: 18, fontWeight: 700, flexShrink: 0 }}>{color.icon}</span>
+            <ToastIcon size={18} style={{ flexShrink: 0 }} />
             <span style={{ flex: 1, lineHeight: 1.4 }}>{toast.message}</span>
 
             <button
@@ -155,7 +170,7 @@ export default function Toast({ toasts, onDismiss, fontFamily = "inherit" }) {
                 event.currentTarget.style.opacity = "0.6";
               }}
             >
-              {"\u2715"}
+              <XCircle size={16} />
             </button>
 
             {isMobile && toasts.length > 1 && (

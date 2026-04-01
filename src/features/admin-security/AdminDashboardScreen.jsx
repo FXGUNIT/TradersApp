@@ -1,5 +1,8 @@
 /* eslint-disable */
 import { useEffect, useMemo, useState } from "react";
+import {
+  Home, Shield, Users, Search, X, DollarSign, Wrench, Bell, Clock,
+} from "lucide-react";
 import NotificationCenter from "../../components/NotificationCenter.jsx";
 import CommandPalette from "../../components/CommandPalette.jsx";
 import UserSwitcher from "../../components/UserSwitcher.jsx";
@@ -94,19 +97,7 @@ export default function AdminDashboardScreen({
     }
   }, [notificationCenterOpen, hasPendingApprovals]);
   const [currentMobilePage, setCurrentMobilePage] = useState("users"); // Current mobile nav page
-  const [notifications] = useState([
-    // Sample notifications
-    {
-      title: "✓ User Approved",
-      message: "John Doe has been approved",
-      time: "2 hrs ago",
-    },
-    {
-      title: "🚫 Account Blocked",
-      message: "Suspicious activity detected",
-      time: "5 hrs ago",
-    },
-  ]);
+  const [notifications] = useState([]); // loaded from Firebase in production
 
   // MODULE 8: Visual Polish & Experience (#121, #126, #134, #137, #138)
 
@@ -648,9 +639,9 @@ export default function AdminDashboardScreen({
       {/* RULE #91: Breadcrumbs Navigation */}
       <Breadcrumbs
         items={[
-          { icon: "🏠", label: "Home", path: "/", onNavigate: true },
-          { icon: "🛡️", label: "Admin", path: "/admin", onNavigate: true },
-          { icon: "👥", label: "Users", path: "/admin/users", active: true },
+          { icon: Home, label: "Home", path: "/", onNavigate: true },
+          { icon: Shield, label: "Admin", path: "/admin", onNavigate: true },
+          { icon: Users, label: "Users", path: "/admin/users", active: true },
         ]}
         onNavigate={() => void 0}
         theme={T}
@@ -791,7 +782,7 @@ export default function AdminDashboardScreen({
             className="btn-glass"
             title="Group users by their status"
           >
-            {groupByStatus ? "⊟ Grouped" : "⊞ Group By"}
+            {groupByStatus ? "Grouped" : "Group By"}
           </button>
 
           {/* RULE #58: Advanced Filter Toggle */}
@@ -827,7 +818,7 @@ export default function AdminDashboardScreen({
             className="btn-glass"
             title="Show advanced filtering options"
           >
-            {showAdvancedFilter ? "⊟ Filters" : "⚙ Filters"}
+            {showAdvancedFilter ? "Hide Filters" : "Filters"}
           </button>
 
           <button
@@ -939,7 +930,7 @@ export default function AdminDashboardScreen({
             className="btn-glass"
             title="Open Tools Menu"
           >
-            🛠️ TOOLS
+            TOOLS
           </button>
 
           {/* RULE #119: Notification Center Button */}
@@ -978,7 +969,7 @@ export default function AdminDashboardScreen({
             className="btn-glass"
             title="Open Notification Center"
           >
-            🔔{" "}
+            <Bell size={14} />{" "}
             {notifications.length > 0 && (
               <span
                 style={{
@@ -1043,7 +1034,7 @@ export default function AdminDashboardScreen({
             }}
             className="btn-glass"
           >
-            {maintenanceModeActive ? "⏱️ MAINTENANCE ON" : "⏱️ MAINTENANCE OFF"}
+            {maintenanceModeActive ? "MAINTENANCE ON" : "MAINTENANCE OFF"}
           </button>
 
           <button
@@ -1112,7 +1103,7 @@ export default function AdminDashboardScreen({
                 }),
           }}
         >
-          👥 Users
+          Users
         </div>
       </div>
 
@@ -1155,7 +1146,7 @@ export default function AdminDashboardScreen({
             className="glass-panel"
           >
             <span style={{ color: T.cyan, fontSize: 14, fontWeight: 600 }}>
-              🔍
+              <Search size={14} />
             </span>
             <input
               type="text"
@@ -1202,7 +1193,7 @@ export default function AdminDashboardScreen({
                 onMouseEnter={(e) => (e.currentTarget.style.color = T.text)}
                 onMouseLeave={(e) => (e.currentTarget.style.color = T.muted)}
               >
-                ✕
+                <X size={14} />
               </button>
             )}
           </div>
@@ -1230,7 +1221,7 @@ export default function AdminDashboardScreen({
                   letterSpacing: 1,
                 }}
               >
-                💰 Balance Range:
+                <DollarSign size={14} /> Balance Range:
               </span>
 
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -2456,7 +2447,7 @@ export default function AdminDashboardScreen({
                         }}
                         className="btn-glass"
                       >
-                        ✕ BAN
+                        BAN
                       </button>
                     )}
                     {normalizedStatus === "BLOCKED" && (
@@ -2635,7 +2626,7 @@ export default function AdminDashboardScreen({
                 }}
                 className="btn-glass"
               >
-                ✕ CLOSE
+                CLOSE
               </button>
             </div>
 
@@ -3050,7 +3041,7 @@ export default function AdminDashboardScreen({
                     padding: "4px 8px",
                   }}
                 >
-                  ✕
+                  <X size={14} />
                 </button>
               </div>
 

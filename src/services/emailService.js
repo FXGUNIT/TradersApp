@@ -56,7 +56,7 @@ const EMAILJS_READY = Boolean(
  */
 export async function sendWelcomeEmail(email, fullName) {
   if (!EMAILJS_READY) {
-    console.warn("EmailJS not configured for welcome emails");
+    if (import.meta.env.DEV) console.warn("[EmailJS] not configured for welcome emails");
     return { success: true, skipped: true };
   }
 
@@ -74,14 +74,10 @@ export async function sendWelcomeEmail(email, fullName) {
       EMAILJS_PUBLIC_KEY,
     );
 
-    console.warn(
-      "✅ Welcome (Under Review) email sent:",
-      email,
-      response.status,
-    );
+    if (import.meta.env.DEV) console.log("[EmailJS] Welcome email sent:", email, response.status);
     return { success: true, response };
   } catch (error) {
-    console.error("❌ Welcome email failed:", error);
+    // error returned via { success: false, error }
     // Don't throw - email failure shouldn't block signup
     return { success: false, error };
   }
@@ -105,7 +101,7 @@ export async function sendWelcomeEmail(email, fullName) {
  */
 export async function sendApprovalConfirmationEmail(email, fullName) {
   if (!EMAILJS_READY) {
-    console.warn("EmailJS not configured for approval emails");
+    if (import.meta.env.DEV) console.warn("[EmailJS] not configured for approval emails");
     return { success: true, skipped: true };
   }
 
@@ -123,14 +119,9 @@ export async function sendApprovalConfirmationEmail(email, fullName) {
       EMAILJS_PUBLIC_KEY,
     );
 
-    console.warn(
-      "✅ Approval confirmation email sent:",
-      email,
-      response.status,
-    );
+    if (import.meta.env.DEV) console.log("[EmailJS] Approval email sent:", email, response.status);
     return { success: true, response };
   } catch (error) {
-    console.error("❌ Approval email failed:", error);
     // Don't throw - email failure shouldn't block approval
     return { success: false, error };
   }
@@ -158,7 +149,7 @@ export async function sendInviteEmail(
   customMessage = "",
 ) {
   if (!EMAILJS_READY) {
-    console.warn("EmailJS not configured for invite emails");
+    if (import.meta.env.DEV) console.warn("[EmailJS] not configured for invite emails");
     return { success: true, skipped: true };
   }
 
@@ -178,10 +169,10 @@ export async function sendInviteEmail(
       EMAILJS_PUBLIC_KEY,
     );
 
-    console.warn("✅ Invite email sent:", email, response.status);
+    if (import.meta.env.DEV) console.log("[EmailJS] Invite email sent:", email, response.status);
     return { success: true, response };
   } catch (error) {
-    console.error("❌ Invite email failed:", error);
+    // error returned via { success: false, error }
     return { success: false, error };
   }
 }
@@ -217,10 +208,10 @@ export async function sendRejectionEmail(email, fullName, reason = "") {
       EMAILJS_PUBLIC_KEY,
     );
 
-    console.warn("✅ Rejection email sent:", email, response.status);
+    if (import.meta.env.DEV) console.log("[EmailJS] Rejection email sent:", email, response.status);
     return { success: true, response };
   } catch (error) {
-    console.error("❌ Rejection email failed:", error);
+    // error returned via { success: false, error }
     return { success: false, error };
   }
 }

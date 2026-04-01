@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef } from "react";
 import { T } from "./terminalHelperComponents.jsx";
+import { CSS_VARS } from "../../styles/cssVars.js";
 
 /**
  * RiskSlider — luxury custom risk percentage slider.
@@ -221,7 +222,7 @@ export function RiskSlider({
         style={{
           position: "relative",
           height: 4,
-          background: `${CSS_VAR("--border-subtle")}`,
+          background: CSS_VARS.borderSubtle,
           borderRadius: 2,
           cursor: "pointer",
           marginBottom: 20,

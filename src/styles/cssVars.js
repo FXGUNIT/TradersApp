@@ -13,9 +13,9 @@ export const CSS_VARS = {
   textTertiary:
     "var(--text-tertiary, var(--aura-text-tertiary, #9ca3af))",
   borderSubtle:
-    "var(--border-subtle, var(--aura-border-subtle, rgba(0,0,0,0.05)))",
+    "var(--border-subtle, var(--aura-border-subtle, rgba(0,0,0,0.05))",
   borderStrong:
-    "var(--border-strong, var(--aura-border-strong, rgba(0,0,0,0.12)))",
+    "var(--border-strong, var(--aura-border-strong, rgba(0,0,0,0.12))",
   accentPrimary:
     "var(--accent-primary, var(--aura-accent-primary, #2563eb))",
   accentGlow: "var(--accent-glow, var(--aura-accent-glow, rgba(37,99,235,0.1)))",
@@ -38,7 +38,7 @@ export const CSS_VARS = {
   bg: "var(--base-layer, var(--aura-base-layer, #fbfbfc))",
   card: "var(--surface-elevated, var(--aura-surface-elevated, #ffffff))",
   border:
-    "var(--border-subtle, var(--aura-border-subtle, rgba(0,0,0,0.05)))",
+    "var(--border-subtle, var(--aura-border-subtle, rgba(0,0,0,0.05))",
   accent: "var(--accent-primary, var(--aura-accent-primary, #2563eb))",
   surface: "var(--surface-elevated, var(--aura-surface-elevated, #ffffff))",
 };

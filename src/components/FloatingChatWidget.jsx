@@ -16,6 +16,7 @@ export default function FloatingChatWidget({ auth, profile }) {
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [sendError, setSendError] = useState(false);
   const messagesEndRef = useRef(null);
 
   const userId = auth?.uid || profile?.uid || "anonymous";
@@ -63,7 +64,7 @@ export default function FloatingChatWidget({ auth, profile }) {
         await injectWelcomeMessage();
       },
       onError: (error) => {
-        console.error("Chat read error:", error);
+        if (import.meta.env.DEV) console.error("Chat read error:", error);
       },
     });
 
@@ -84,7 +85,9 @@ export default function FloatingChatWidget({ auth, profile }) {
     try {
       await SupportClient.sendSupportMessage({ userId, userEmail, text });
     } catch (error) {
-      console.error("Failed to send message:", error);
+      if (import.meta.env.DEV) console.error("Failed to send message:", error);
+      setSendError(true);
+      setTimeout(() => setSendError(false), 4000);
     } finally {
       setIsLoading(false);
     }

@@ -18,7 +18,7 @@ function AuthLogo() {
       >
         <img
           src="/logo.png"
-          alt="Logo"
+          alt="Traders Regiment logo"
           style={{
             borderRadius: "50%",
             overflow: "hidden",
@@ -42,7 +42,7 @@ function AuthLogo() {
               fontWeight: 700,
             }}
           >
-            THE DEPARTMENT OF INSTITUTIONAL ARTILLERY
+            TRADERS REGIMENT
           </div>
           <div
             style={{
@@ -53,7 +53,7 @@ function AuthLogo() {
               fontWeight: 700,
             }}
           >
-            TRADERS REGIMENT Territory.
+            Account Portal
           </div>
         </div>
       </div>

@@ -61,7 +61,7 @@ export async function approveUser(uid, adminUid) {
       approvedAt: new Date().toISOString(),
     });
 
-    console.log(`✅ User ${uid} approved by admin ${adminUid}`);
+    // approval logged via Firebase
 
     // Send notifications
     await sendApprovalConfirmationEmail(userData.email, userData.fullName);
@@ -73,7 +73,7 @@ export async function approveUser(uid, adminUid) {
 
     return { success: true };
   } catch (error) {
-    console.error(`❌ Failed to approve user ${uid}:`, error);
+    // error returned via { success: false, error }
     return { success: false, error: error.message };
   }
 }
@@ -87,7 +87,6 @@ export async function approveUser(uid, adminUid) {
  */
 export async function blockUser(uid, adminUid) {
   // (Placeholder for future implementation)
-  console.log(`Blocking user ${uid} by ${adminUid}`);
   const db = getDbOrNull();
   if (!db) {
     return { success: false, error: "Firebase unavailable" };
@@ -106,7 +105,6 @@ export async function blockUser(uid, adminUid) {
  */
 export async function lockUser(uid, adminUid) {
   // (Placeholder for future implementation)
-  console.log(`Locking user ${uid} by ${adminUid}`);
   const db = getDbOrNull();
   if (!db) {
     return { success: false, error: "Firebase unavailable" };
@@ -123,7 +121,6 @@ export async function lockUser(uid, adminUid) {
  */
 export async function listUsers() {
   // (Placeholder for future implementation)
-  console.log("Fetching all users");
   const db = getDbOrNull();
   if (!db) {
     return { success: false, error: "Firebase unavailable" };
