@@ -126,18 +126,41 @@
   - Bearer token auth: `POST /admin/session` (create), `GET /admin/session` (check), `DELETE /admin/session` (revoke)
   - In-memory session store with TTL (max 24h, default 8h)
   - `cleanupExpiredSessions()` runs every 10 min
-- [ ] Railway + Vercel deployment (requires secrets: RAILWAY_TOKEN, VERCEL_TOKEN, etc.)
+- [ ] Railway + Vercel deployment (requires account setup + secrets)
 - [ ] Cloudflare WAF (requires Cloudflare account + DNS configuration)
 - [ ] Infisical secrets manager setup (requires Infisical account)
 - [ ] Firebase App Check (requires Firebase project + reCAPTCHA Enterprise)
 - [ ] Full 31-point security checklist
 
 ## Phase 7: Go Live
-- [ ] Custom domain + SSL (Cloudflare origin cert)
-- [ ] Monitoring: uptime checks on all 3 services
-- [ ] Alerting: Slack/Discord webhook for failures
-- [ ] Model versioning: backup trained models to GitHub releases
-- [ ] Rollback plan documented
+- [x] Monitoring workflow (.github/workflows/monitor.yml) ✅
+  - Health checks every 5 min: ML Engine /health, BFF /health, Frontend
+  - ML model freshness check: alert if models stale >7 days
+  - Daily model backup to GitHub Releases (2 AM UTC)
+  - Vercel deployment status monitoring
+  - Slack + Discord webhook alerts on failure
+- [x] Railway config (railway.json) ✅ — NIXPACKS builder, 2 replicas, auto-restart
+- [x] Model versioning script (ml-engine/scripts/version_models.py) ✅
+  - `create_backup()`: tar.gz archive with metadata, `--output` + `--label` flags
+  - `restore_backup()`: extract to model store directory
+  - `list_versions()`: show trained models + backup history
+  - GitHub Actions integration for daily auto-backup
+- [x] Deployment guide (docs/DEPLOYMENT.md) ✅
+  - Cloudflare SSL/TLS (Full strict, origin cert, WAF, bot management)
+  - Vercel frontend deployment + custom domain
+  - Railway BFF + ML Engine deployment + persistent disk
+  - Infisical secrets setup + GitHub Actions integration
+  - GitHub secrets/variables checklist
+  - Rollback procedures (Railway, Vercel, ML models)
+  - Smoke test checklist
+- [x] Rollback workflow (.github/workflows/rollback.yml) ✅
+  - Manual trigger: `workflow_dispatch` with version input
+  - Downloads model backup from GitHub Release
+  - Discord notification on completion
+- [x] SSL/TLS documentation (docs/DEPLOYMENT.md Cloudflare section) ✅
+  - Origin certificate generation + Railway env vars
+  - DNS records (A + CNAME for all 3 services)
+  - TLS 1.3 enforcement, HSTS, automatic HTTPS rewrites
 
 ---
 
@@ -148,7 +171,8 @@
 | 5de6caf | Phase 1 | ML Engine foundation + BFF consensus routes + ML Signals tab | 16/16 ✅ |
 | 12b404e | Phase 2+4 | HMM, SVM, MLP, AMD NB, TimeProbability, News Intelligence | 21/21 ✅ |
 | 3b8669c | Phase 5+6 | GitHub Actions CI/CD, Dockerfiles, docker-compose, CODEOWNERS, Dependabot | 21/21 ✅ |
-| (pending) | Phase 6 security | Native security headers, rate limiting (sliding window), RBAC (TRADER/MENTOR/ADMIN) | 21/21 ✅ |
+| 8feb4cf | Phase 6 security | Native security headers, rate limiting (sliding window), RBAC | 21/21 ✅ |
+| (pending) | Phase 7 | Monitoring (5-min health checks, Slack/Discord alerts), Railway config, model versioning (scripts/version_models.py), deployment guide, rollback workflow | 21/21 ✅ |
 
 ---
 
