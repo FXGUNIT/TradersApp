@@ -3,6 +3,17 @@ import { existsSync, readFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { resolve } from "node:path";
 import {
+  addSecurityHeaders,
+  RateLimiter,
+  ROLES,
+  authorizeRequest,
+  createAdminSession,
+  validateAdminToken,
+  revokeAdminSession,
+  cleanupExpiredSessions,
+  getRateLimitConfig,
+} from "./services/security.mjs";
+import {
   getDocumentMeta,
   getHubContent,
   listDocumentMeta,
@@ -132,6 +143,26 @@ const TELEGRAM_CHAT_ID =
 const ADMIN_ATTEMPT_LIMIT = 3;
 const ADMIN_LOCKOUT_WINDOW_MS = 15 * 60 * 1000;
 
+// ---------------------------------------------------------------------------
+// Security: Rate limiters (one per endpoint class)
+// ---------------------------------------------------------------------------
+const _rateLimiters = new Map();
+
+function getRateLimiter(pathname) {
+  const config = getRateLimitConfig(pathname);
+  if (!_rateLimiters.has(config)) {
+    _rateLimiters.set(config, new RateLimiter({ ...config, name: pathname }));
+  }
+  return _rateLimiters.get(config);
+}
+
+/** Cleanup expired rate limit entries every 10 minutes. */
+const _rlCleanup = setInterval(() => {
+  for (const rl of _rateLimiters.values()) rl._cleanup();
+  cleanupExpiredSessions();
+}, 10 * 60 * 1000);
+_rlCleanup.unref();
+
 const AI_PROVIDER_DEFINITIONS = [
   {
     key: "groq",
@@ -230,13 +261,15 @@ const buildAiStatusPayload = () =>
   });
 
 const json = (res, statusCode, payload, origin = "*") => {
-  res.writeHead(statusCode, {
+  const headers = {
     "Content-Type": "application/json; charset=utf-8",
     "Access-Control-Allow-Origin": origin,
     "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
-    "Cache-Control": "no-store",
-  });
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Access-Control-Expose-Headers": "Retry-After, X-RateLimit-Remaining, X-RateLimit-Reset",
+  };
+  addSecurityHeaders(headers);
+  res.writeHead(statusCode, headers);
   res.end(JSON.stringify(payload));
 };
 
@@ -453,6 +486,45 @@ const sendTelegramMessage = async (message, parseMode = "HTML") => {
 const server = createServer(async (req, res) => {
   const origin = resolveOrigin(req);
   const url = new URL(req.url || "/", `http://${req.headers.host || `${HOST}:${PORT}`}`);
+  const pathname = url.pathname;
+
+  // --- Security: Rate Limiting ---
+  if (req.method !== "OPTIONS") {
+    const clientKey = getClientKey(req);
+    const limiter = getRateLimiter(pathname);
+    const result = limiter.check(clientKey);
+
+    if (!result.allowed) {
+      json(
+        res,
+        429,
+        {
+          ok: false,
+          error: "Rate limit exceeded.",
+          retryAfterMs: result.resetMs,
+        },
+        origin,
+      );
+      res.writeHead(429, {
+        ...Object.fromEntries(
+          Object.entries({
+            "Retry-After": String(Math.ceil(result.resetMs / 1000)),
+            "X-RateLimit-Remaining": "0",
+            "X-RateLimit-Reset": String(Math.ceil(result.resetMs / 1000)),
+          })
+        ),
+      });
+      return;
+    }
+
+    // Inform client of remaining budget (non-breaking)
+    res.on("header", () => {
+      res.removeHeader("X-RateLimit-Remaining");
+      res.removeHeader("X-RateLimit-Reset");
+      res.setHeader("X-RateLimit-Remaining", String(result.remaining));
+      res.setHeader("X-RateLimit-Reset", String(Math.ceil(result.resetMs / 1000)));
+    });
+  }
 
   if (req.method === "OPTIONS") {
     json(res, 204, {}, origin);
@@ -467,7 +539,14 @@ const server = createServer(async (req, res) => {
       {
         ok: true,
         service: "tradersapp-bff",
+        version: "1.0.0",
         adminPasswordConfigured: Boolean(ADMIN_PASS_HASH),
+        security: {
+          rateLimiting: true,
+          rbac: true,
+          securityHeaders: true,
+          corsOriginsCount: ALLOWED_ORIGINS.length || "all",
+        },
         adminRateLimit: {
           attempts: ADMIN_ATTEMPT_LIMIT,
           windowMs: ADMIN_LOCKOUT_WINDOW_MS,
@@ -593,6 +672,15 @@ const server = createServer(async (req, res) => {
     return;
   }
 
+  // --- RBAC: Require ADMIN role for admin routes ---
+  if (pathname.startsWith("/admin")) {
+    const auth = authorizeRequest(req);
+    if (!auth.authorized) {
+      json(res, 403, { ok: false, error: auth.error }, origin);
+      return;
+    }
+  }
+
   const adminRouteHandler = createAdminRouteHandler({
     approveAdminUser,
     blockAdminUser,
@@ -606,6 +694,67 @@ const server = createServer(async (req, res) => {
   });
   const handledAdminRoute = await adminRouteHandler(req, res, url, origin);
   if (handledAdminRoute) {
+    return;
+  }
+
+  // --- Admin Session Management ---
+  // POST /admin/session — create a session token (requires valid admin password)
+  if (req.method === "POST" && pathname === "/admin/session") {
+    try {
+      const body = await readJsonBody(req);
+      const password = String(body.password || "");
+
+      if (!ADMIN_PASS_HASH) {
+        json(res, 503, { ok: false, error: "Admin password not configured." }, origin);
+        return;
+      }
+
+      if (!password) {
+        json(res, 400, { ok: false, error: "Password required." }, origin);
+        return;
+      }
+
+      if (!constantTimeMatch(hashPassword(password), ADMIN_PASS_HASH)) {
+        json(res, 401, { ok: false, error: "Invalid admin password." }, origin);
+        return;
+      }
+
+      const ttlMs = Math.min(Number(body.ttlMs) || 8 * 3600 * 1000, 24 * 3600 * 1000);
+      const token = createAdminSession(ROLES.ADMIN, ttlMs);
+      json(res, 200, {
+        ok: true,
+        token,
+        expiresInMs: ttlMs,
+        role: ROLES.ADMIN,
+      }, origin);
+      return;
+    } catch (error) {
+      json(res, 400, { ok: false, error: error.message || "Session creation failed." }, origin);
+      return;
+    }
+  }
+
+  // DELETE /admin/session — revoke current session
+  if (req.method === "DELETE" && pathname === "/admin/session") {
+    const authHdr = req.headers.authorization || "";
+    if (authHdr.startsWith("Bearer ")) {
+      revokeAdminSession(authHdr.slice(7).trim());
+    }
+    json(res, 200, { ok: true, message: "Session revoked." }, origin);
+    return;
+  }
+
+  // GET /admin/session — check session validity
+  if (req.method === "GET" && pathname === "/admin/session") {
+    const authHeader = req.headers.authorization || "";
+    if (authHeader.startsWith("Bearer ")) {
+      const result = validateAdminToken(authHeader.slice(7).trim());
+      if (result.valid) {
+        json(res, 200, { ok: true, valid: true, role: result.role }, origin);
+        return;
+      }
+    }
+    json(res, 200, { ok: true, valid: false, role: null }, origin);
     return;
   }
 

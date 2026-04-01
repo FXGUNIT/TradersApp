@@ -113,13 +113,23 @@
   - Production deploy: GHCR images + Railway + Vercel
 - [x] CODEOWNERS (.github/CODEOWNERS) ✅
 - [x] Dependabot (.github/dependabot.yml, weekly npm + pip) ✅
+- [x] Security headers (bff/services/security.mjs + server.mjs) ✅
+  - X-Content-Type-Options, X-Frame-Options, X-XSS-Protection, Referrer-Policy, Permissions-Policy, CSP
+  - Injected on every response via `addSecurityHeaders()`
+- [x] Rate limiting (bff/services/security.mjs) ✅
+  - Sliding window, per-IP, in-memory (no external deps)
+  - 7 endpoint classes: global (100/min), ML predict (10/min), news (20/min), admin (20/5min), AI chat (30/min), terminal write (60/min), health (300/min)
+  - `Retry-After`, `X-RateLimit-Remaining`, `X-RateLimit-Reset` headers on every response
+- [x] RBAC enforcement (bff/services/security.mjs + server.mjs) ✅
+  - Roles: TRADER (0), MENTOR (1), ADMIN (2) — hierarchical
+  - Route permission map: admin routes require ADMIN, ML/news/public require none
+  - Bearer token auth: `POST /admin/session` (create), `GET /admin/session` (check), `DELETE /admin/session` (revoke)
+  - In-memory session store with TTL (max 24h, default 8h)
+  - `cleanupExpiredSessions()` runs every 10 min
 - [ ] Railway + Vercel deployment (requires secrets: RAILWAY_TOKEN, VERCEL_TOKEN, etc.)
 - [ ] Cloudflare WAF (requires Cloudflare account + DNS configuration)
 - [ ] Infisical secrets manager setup (requires Infisical account)
 - [ ] Firebase App Check (requires Firebase project + reCAPTCHA Enterprise)
-- [ ] Helmet.js security headers (server.mjs integration — TODO: add to bff/server.mjs)
-- [ ] RBAC: TRADER/MENTOR/ADMIN enforcement on all API routes
-- [ ] Rate limiting: express-rate-limit on BFF endpoints
 - [ ] Full 31-point security checklist
 
 ## Phase 7: Go Live
@@ -137,7 +147,8 @@
 |---|---|---|---|
 | 5de6caf | Phase 1 | ML Engine foundation + BFF consensus routes + ML Signals tab | 16/16 ✅ |
 | 12b404e | Phase 2+4 | HMM, SVM, MLP, AMD NB, TimeProbability, News Intelligence | 21/21 ✅ |
-| (pending) | Phase 5+6 | GitHub Actions CI/CD, Dockerfiles, docker-compose, CODEOWNERS, Dependabot | 21/21 ✅ |
+| 3b8669c | Phase 5+6 | GitHub Actions CI/CD, Dockerfiles, docker-compose, CODEOWNERS, Dependabot | 21/21 ✅ |
+| (pending) | Phase 6 security | Native security headers, rate limiting (sliding window), RBAC (TRADER/MENTOR/ADMIN) | 21/21 ✅ |
 
 ---
 
