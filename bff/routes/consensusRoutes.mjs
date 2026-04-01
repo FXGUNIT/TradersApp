@@ -12,6 +12,7 @@ import {
   getMlModelStatus,
   triggerMlTraining,
   checkMlHealth,
+  getPhysicsRegime,
 } from "../services/consensusEngine.mjs";
 
 export function createConsensusRouteHandler({
@@ -77,6 +78,19 @@ export function createConsensusRouteHandler({
       try {
         const result = await checkMlHealth();
         json(res, result.ok ? 200 : 503, result, origin);
+        return true;
+      } catch (err) {
+        json(res, 500, { ok: false, error: err.message }, origin);
+        return true;
+      }
+    }
+
+    // GET /ml/regime — full physics-based regime (HMM + FP-FK + Tsallis q + Hurst)
+    if (req.method === "GET" && pathname === "/ml/regime") {
+      try {
+        const candles = _parseQueryJson(url.searchParams.get("candles")) || [];
+        const result = await getPhysicsRegime(candles);
+        json(res, result.ok !== false ? 200 : 503, result, origin);
         return true;
       } catch (err) {
         json(res, 500, { ok: false, error: err.message }, origin);
