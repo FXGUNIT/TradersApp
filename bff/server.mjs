@@ -1,4 +1,4 @@
-import { createHash, timingSafeEqual } from "node:crypto";
+import "dotenv/config";
 import { existsSync, readFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { resolve } from "node:path";

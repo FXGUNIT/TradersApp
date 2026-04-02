@@ -436,6 +436,18 @@ export async function logNewsReaction(newsId, reactionData) {
 }
 
 /**
+ * Check ML Engine health.
+ */
+export async function checkMlHealth() {
+  try {
+    const res = await mlRequest("/health", null, 5_000);
+    return { ok: true, ...res };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
+/**
  * Fetch recent news reactions from ML Engine (ML training data).
  */
 export async function getMLNewsReactions(limit = 50) {
@@ -445,13 +457,6 @@ export async function getMLNewsReactions(limit = 50) {
   } catch (err) {
     console.error('[consensusEngine] news/reactions failed:', err.message);
     return { ok: false, entries: [], error: err.message };
-  }
-}
-  try {
-    const res = await mlRequest("/health", null, 5_000);
-    return { ok: true, ...res };
-  } catch (err) {
-    return { ok: false, error: err.message };
   }
 }
 
