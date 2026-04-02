@@ -13,7 +13,10 @@ import {
   triggerMlTraining,
   checkMlHealth,
   getPhysicsRegime,
+  triggerMLNewsTraining,
+  getMLNewsReactions,
 } from "../services/consensusEngine.mjs";
+import { fetchBreakingNews } from "../services/breakingNewsService.mjs";
 
 export function createConsensusRouteHandler({
   json,
@@ -31,13 +34,65 @@ export function createConsensusRouteHandler({
         const sessionId = parseInt(url.searchParams.get("session") || "1", 10);
         const symbol = url.searchParams.get("symbol") || "MNQ";
 
-        const result = await getMlConsensus({
-          mathEngine,
-          recentCandles,
-          keyLevels,
-          sessionId: isNaN(sessionId) ? 1 : sessionId,
-          symbol,
-        });
+        // Fetch ML consensus + breaking news in parallel (news non-blocking, 3s timeout)
+        const [result, newsResult] = await Promise.all([
+          getMlConsensus({
+            mathEngine,
+            recentCandles,
+            keyLevels,
+            sessionId: isNaN(sessionId) ? 1 : sessionId,
+            symbol,
+          }),
+          fetchBreakingNews({ maxItems: 15, minImpact: 'LOW' }).catch(() => ({ items: [], total: 0 })),
+        ]);
+
+        // Merge breaking news into consensus response
+        result.breaking_news = {
+          items: newsResult.items || [],
+          total: newsResult.total || 0,
+          highImpactCount: newsResult.highImpactCount || 0,
+          sources: newsResult.sources || {},
+          fetchedAt: newsResult.fetchedAt || new Date().toISOString(),
+        };
+
+        // Compute news bias for this session
+        if (newsResult.items?.length > 0) {
+          const bullish = newsResult.items.filter(i => i.sentiment === 'bullish').length;
+          const bearish = newsResult.items.filter(i => i.sentiment === 'bearish').length;
+          result.news_sentiment = {
+            bullish,
+            bearish,
+            neutral: newsResult.items.length - bullish - bearish,
+            bias: bullish > bearish ? 'bullish' : bearish > bullish ? 'bearish' : 'neutral',
+            highImpactCount: newsResult.highImpactCount,
+          };
+          // Sentiment-adjusted confidence: reduce if strong opposing sentiment
+          if (result.confidence && result.news_sentiment.bias !== 'neutral') {
+            const opposing = result.signal === 'LONG'
+              ? (result.news_sentiment.bias === 'bearish')
+              : (result.news_sentiment.bias === 'bullish');
+            if (opposing && result.news_sentiment.highImpactCount > 0) {
+              result.confidence = Math.max(0.3, result.confidence - 0.15);
+              result.confidenceNote = 'Reduced due to opposing high-impact news sentiment';
+            }
+          }
+        }
+
+        // Fire-and-forget: trigger ML self-training on HIGH impact news
+        // (non-blocking — doesn't delay the consensus response)
+        const highImpactItems = newsResult.items?.filter(i => i.impact === 'HIGH') || [];
+        for (const item of highImpactItems.slice(0, 2)) {
+          triggerMLNewsTraining(item).catch(() => {});
+        }
+
+        // Include recent news reactions for ML training context
+        const newsReactions = await getMLNewsReactions(30).catch(() => ({ ok: false, entries: [] }));
+        result.news_reactions = {
+          entries: newsReactions.entries || [],
+          total: newsReactions.total || 0,
+          avg_alpha_ticks: newsReactions.avg_alpha_ticks || 0,
+          validated_pct: newsReactions.validated_pct || 0,
+        };
 
         json(res, result.ok ? 200 : 503, result, origin);
         return true;

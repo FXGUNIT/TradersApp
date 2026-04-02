@@ -396,7 +396,57 @@ export async function triggerMlTraining(mode = "incremental") {
 /**
  * Check if ML Engine is healthy.
  */
-export async function checkMlHealth() {
+/**
+ * Send HIGH impact breaking news to ML Engine for classification + self-training.
+ * Called automatically when breaking news is detected in consensus response.
+ */
+export async function triggerMLNewsTraining(newsItem) {
+  if (!newsItem || newsItem.impact !== 'HIGH') return { triggered: false };
+  try {
+    const res = await mlRequest('/news-trigger', {
+      news: newsItem,
+      trigger_type: 'breaking_news_high_impact',
+    }, 8000);
+    return { triggered: true, response: res };
+  } catch (err) {
+    console.error('[consensusEngine] news-trigger failed:', err.message);
+    return { triggered: false, error: err.message };
+  }
+}
+
+/**
+ * Log market reaction to a breaking news item (called at 5/15/30/60 min intervals).
+ */
+export async function logNewsReaction(newsId, reactionData) {
+  try {
+    const res = await mlRequest('/news/reaction', {
+      news_id: newsId,
+      reaction_5m: reactionData.reaction5m,
+      reaction_15m: reactionData.reaction15m,
+      reaction_30m: reactionData.reaction30m,
+      reaction_60m: reactionData.reaction60m,
+      direction: reactionData.direction,
+      magnitude: reactionData.magnitude,
+    }, 5000);
+    return { ok: true, ...res };
+  } catch (err) {
+    console.error('[consensusEngine] news/reaction failed:', err.message);
+    return { ok: false, error: err.message };
+  }
+}
+
+/**
+ * Fetch recent news reactions from ML Engine (ML training data).
+ */
+export async function getMLNewsReactions(limit = 50) {
+  try {
+    const res = await mlRequest(`/news/reactions?limit=${limit}`, null, 5000);
+    return res;
+  } catch (err) {
+    console.error('[consensusEngine] news/reactions failed:', err.message);
+    return { ok: false, entries: [], error: err.message };
+  }
+}
   try {
     const res = await mlRequest("/health", null, 5_000);
     return { ok: true, ...res };

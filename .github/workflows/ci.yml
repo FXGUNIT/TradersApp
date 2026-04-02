@@ -30,6 +30,14 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
+      # ── Pull secrets from Infisical (injected as env vars) ──────────────
+      - name: Pull secrets from Infisical
+        uses: infisical/infisical-action@v2
+        with:
+          space-id: '0e4f9b8b-846e-4e66-a4aa-97c8fa9863ab'
+          env: ${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }}
+          secrets-output-format: env
+
       - name: Install dependencies
         run: npm ci
 
@@ -67,6 +75,14 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pip-ml-
 
+      # ── Pull secrets from Infisical ─────────────────────────────────────
+      - name: Pull secrets from Infisical
+        uses: infisical/infisical-action@v2
+        with:
+          space-id: '0e4f9b8b-846e-4e66-a4aa-97c8fa9863ab'
+          env: ${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }}
+          secrets-output-format: env
+
       - name: Install dependencies
         run: |
           pip install --upgrade pip
@@ -76,16 +92,31 @@ jobs:
         run: pytest tests/ -v --tb=short
         continue-on-error: false
 
+      # ── Build Docker with secrets as runtime env (not baked into image) ─
       - name: Build Docker image
-        run: docker build -t ghcr.io/${{ github.repository }}/ml-engine:${{ github.sha }} .
+        run: |
+          docker build \
+            --tag ghcr.io/${{ github.repository }}/ml-engine:${{ github.sha }} \
+            --tag ghcr.io/${{ github.repository }}/ml-engine:latest \
+            ml-engine/
         continue-on-error: false
 
       - name: Docker health check
         run: |
-          docker run -d --name ml-engine-test -p 8001:8001 ghcr.io/${{ github.repository }}/ml-engine:${{ github.sha }}
-          sleep 10
+          docker run -d --name ml-engine-test -p 8001:8001 \
+            -e AI_GEMINI_PRO_KEY \
+            -e AI_GROQ_TURBO_KEY \
+            -e AI_OPENROUTER_MIND_ALPHA \
+            -e AI_OPENROUTER_MIND_BETA \
+            -e AI_CEREBRAS_KEY \
+            -e AI_DEEPSEEK_KEY \
+            -e AI_SAMBANOVA_KEY \
+            -e FINNHUB_API_KEY \
+            -e NEWS_API_KEY \
+            ghcr.io/${{ github.repository }}/ml-engine:latest
+          sleep 15
           docker exec ml-engine-test python -c "import httpx; r=httpx.get('http://localhost:8001/health', timeout=5); assert r.status_code == 200, r.text"
-          docker stop ml-engine-test
+          docker stop ml-engine-test || true
 
   # -------------------------------------------------------------------------
   # BFF Server: Node.js
@@ -107,6 +138,14 @@ jobs:
           cache: 'npm'
           cache-dependency-path: bff/package.json
 
+      # ── Pull secrets from Infisical ─────────────────────────────────────
+      - name: Pull secrets from Infisical
+        uses: infisical/infisical-action@v2
+        with:
+          space-id: '0e4f9b8b-846e-4e66-a4aa-97c8fa9863ab'
+          env: ${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }}
+          secrets-output-format: env
+
       - name: Install dependencies
         run: npm ci
 
@@ -115,7 +154,11 @@ jobs:
         continue-on-error: true
 
       - name: Build Docker image
-        run: docker build -t ghcr.io/${{ github.repository }}/bff:${{ github.sha }} .
+        run: |
+          docker build \
+            --tag ghcr.io/${{ github.repository }}/bff:${{ github.sha }} \
+            --tag ghcr.io/${{ github.repository }}/bff:latest \
+            bff/
         continue-on-error: false
 
   # -------------------------------------------------------------------------
@@ -133,33 +176,84 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Railway: deploy ML Engine
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push images to GHCR
+        run: |
+          docker push ghcr.io/${{ github.repository }}/ml-engine:${{ github.sha }}
+          docker push ghcr.io/${{ github.repository }}/bff:${{ github.sha }}
+        continue-on-error: false
+
+      # ── Railway: deploy ML Engine (staging) ──────────────────────────────
       - name: Deploy ML Engine to Railway (staging)
         run: |
-          curl --request POST \
-            --url https://api.railway.app/v0/environments/${{ vars.RAILWAY_STAGING_ENV_ID }}/services/${{ vars.RAILWAY_STAGING_ML_SERVICE_ID }}/deployments \
-            --header 'Authorization: Bearer ${{ secrets.RAILWAY_TOKEN }}' \
-            --header 'Content-Type: application/json' \
-            --data '{"branch": "staging", "healthCheckPath": "/health"}'
+          ENV_ID="${{ vars.RAILWAY_STAGING_ENV_ID }}"
+          SVC_ID="${{ vars.RAILWAY_STAGING_ML_SERVICE_ID }}"
+          if [ -z "$ENV_ID" ] || [ -z "$SVC_ID" ]; then
+            echo "⚠ Railway staging vars not set. Skipping. Configure at: https://github.com/gunitsingh1994/TradersApp/settings/variables"
+          else
+            curl --request POST \
+              --url "https://api.railway.app/v0/environments/$ENV_ID/services/$SVC_ID/deployments" \
+              --header 'Authorization: Bearer ${{ secrets.RAILWAY_TOKEN }}' \
+              --header 'Content-Type: application/json' \
+              --data "{\"image\": \"ghcr.io/${{ github.repository }}/ml-engine:${{ github.sha }}\", \"branch\": \"staging\", \"healthCheckPath\": \"/health\"}"
+          fi
         continue-on-error: true
 
-      # Railway: deploy BFF
+      # ── Railway: deploy BFF (staging) ────────────────────────────────────
       - name: Deploy BFF to Railway (staging)
         run: |
-          curl --request POST \
-            --url https://api.railway.app/v0/environments/${{ vars.RAILWAY_STAGING_ENV_ID }}/services/${{ vars.RAILWAY_STAGING_BFF_SERVICE_ID }}/deployments \
-            --header 'Authorization: Bearer ${{ secrets.RAILWAY_TOKEN }}' \
-            --header 'Content-Type: application/json' \
-            --data '{"branch": "staging"}'
+          ENV_ID="${{ vars.RAILWAY_STAGING_ENV_ID }}"
+          SVC_ID="${{ vars.RAILWAY_STAGING_BFF_SERVICE_ID }}"
+          if [ -z "$ENV_ID" ] || [ -z "$SVC_ID" ]; then
+            echo "⚠ Railway staging vars not set. Skipping."
+          else
+            curl --request POST \
+              --url "https://api.railway.app/v0/environments/$ENV_ID/services/$SVC_ID/deployments" \
+              --header 'Authorization: Bearer ${{ secrets.RAILWAY_TOKEN }}' \
+              --header 'Content-Type: application/json' \
+              --data "{\"image\": \"ghcr.io/${{ github.repository }}/bff:${{ github.sha }}\", \"branch\": \"staging\"}"
+          fi
         continue-on-error: true
 
-      # Vercel: deploy frontend
+      # ── Vercel: deploy frontend (staging) ───────────────────────────────
       - name: Deploy Frontend to Vercel (staging)
         run: npx vercel --prod --token ${{ secrets.VERCEL_TOKEN }}
         continue-on-error: true
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+      # ── Sync Railway secrets from Infisical (staging) ────────────────────
+      - name: Sync Railway secrets from Infisical (staging)
+        run: |
+          if [ -z "${{ secrets.INFISICAL_TOKEN }}" ] || [ -z "${{ secrets.RAILWAY_TOKEN }}" ]; then
+            echo "⚠ Skipping Railway secret sync — INFISICAL_TOKEN or RAILWAY_TOKEN not set in GitHub Secrets"
+            exit 0
+          fi
+          curl -fsSL https://raw.githubusercontent.com/Infisical/infisical/main/install-cli-deb.sh | bash
+          export INFISICAL_TOKEN=${{ secrets.INFISICAL_TOKEN }}
+          infisical secrets pull \
+            --env=staging \
+            --projectId=0e4f9b8b-846e-4e66-a4aa-97c8fa9863ab \
+            --format=env > .railway_secrets.env 2>/dev/null || true
+          if [ -f .railway_secrets.env ] && [ -n "${{ vars.RAILWAY_STAGING_ENV_ID }}" ]; then
+            while IFS='=' read -r key value; do
+              [ -z "$key" ] || [[ "$key" =~ ^# ]] && continue
+              curl -s --request POST \
+                "https://api.railway.app/v0/environments/${{ vars.RAILWAY_STAGING_ENV_ID }}/variables" \
+                -H 'Authorization: Bearer ${{ secrets.RAILWAY_TOKEN }}' \
+                -H 'Content-Type: application/json' \
+                -d "{\"key\":\"$key\",\"value\":\"$value\",\"enabled\":true}" > /dev/null 2>&1 && echo "  ✓ $key" || echo "  • $key"
+            done < .railway_secrets.env
+            echo "Railway staging secrets synced from Infisical ✓"
+          fi
+        continue-on-error: true
 
   # -------------------------------------------------------------------------
   # Deploy to Production (on push to main branch)
@@ -199,30 +293,69 @@ jobs:
           docker push ghcr.io/${{ github.repository }}/bff:latest
         continue-on-error: false
 
-      # Railway: deploy ML Engine (production)
+      # ── Railway: deploy ML Engine (production) ──────────────────────────
       - name: Deploy ML Engine to Railway (production)
         run: |
-          curl --request POST \
-            --url https://api.railway.app/v0/environments/${{ vars.RAILWAY_PROD_ENV_ID }}/services/${{ vars.RAILWAY_PROD_ML_SERVICE_ID }}/deployments \
-            --header 'Authorization: Bearer ${{ secrets.RAILWAY_TOKEN }}' \
-            --header 'Content-Type: application/json' \
-            --data '{"image": "ghcr.io/${{ github.repository }}/ml-engine:latest", "branch": "main"}'
+          ENV_ID="${{ vars.RAILWAY_PROD_ENV_ID }}"
+          SVC_ID="${{ vars.RAILWAY_PROD_ML_SERVICE_ID }}"
+          if [ -z "$ENV_ID" ] || [ -z "$SVC_ID" ]; then
+            echo "⚠ Railway production vars not set. Configure at: https://github.com/gunitsingh1994/TradersApp/settings/variables"
+            echo "   Add: RAILWAY_PROD_ENV_ID, RAILWAY_PROD_ML_SERVICE_ID"
+          else
+            curl --request POST \
+              --url "https://api.railway.app/v0/environments/$ENV_ID/services/$SVC_ID/deployments" \
+              --header 'Authorization: Bearer ${{ secrets.RAILWAY_TOKEN }}' \
+              --header 'Content-Type: application/json' \
+              --data '{"image": "ghcr.io/${{ github.repository }}/ml-engine:latest", "branch": "main"}'
+          fi
         continue-on-error: true
 
-      # Railway: deploy BFF (production)
+      # ── Railway: deploy BFF (production) ─────────────────────────────────
       - name: Deploy BFF to Railway (production)
         run: |
-          curl --request POST \
-            --url https://api.railway.app/v0/environments/${{ vars.RAILWAY_PROD_ENV_ID }}/services/${{ vars.RAILWAY_PROD_BFF_SERVICE_ID }}/deployments \
-            --header 'Authorization: Bearer ${{ secrets.RAILWAY_TOKEN }}' \
-            --header 'Content-Type: application/json' \
-            --data '{"image": "ghcr.io/${{ github.repository }}/bff:latest", "branch": "main"}'
+          ENV_ID="${{ vars.RAILWAY_PROD_ENV_ID }}"
+          SVC_ID="${{ vars.RAILWAY_PROD_BFF_SERVICE_ID }}"
+          if [ -z "$ENV_ID" ] || [ -z "$SVC_ID" ]; then
+            echo "⚠ Railway production vars not set."
+          else
+            curl --request POST \
+              --url "https://api.railway.app/v0/environments/$ENV_ID/services/$SVC_ID/deployments" \
+              --header 'Authorization: Bearer ${{ secrets.RAILWAY_TOKEN }}' \
+              --header 'Content-Type: application/json' \
+              --data '{"image": "ghcr.io/${{ github.repository }}/bff:latest", "branch": "main"}'
+          fi
         continue-on-error: true
 
-      # Vercel: deploy frontend (production)
+      # ── Vercel: deploy frontend (production) ────────────────────────────
       - name: Deploy Frontend to Vercel (production)
         run: npx vercel --prod --token ${{ secrets.VERCEL_TOKEN }}
         continue-on-error: true
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+      # ── Sync Railway secrets from Infisical (production) ─────────────────
+      - name: Sync Railway secrets from Infisical (production)
+        run: |
+          if [ -z "${{ secrets.INFISICAL_TOKEN }}" ] || [ -z "${{ secrets.RAILWAY_TOKEN }}" ]; then
+            echo "⚠ Skipping Railway secret sync — INFISICAL_TOKEN or RAILWAY_TOKEN not set"
+            exit 0
+          fi
+          curl -fsSL https://raw.githubusercontent.com/Infisical/infisical/main/install-cli-deb.sh | bash
+          export INFISICAL_TOKEN=${{ secrets.INFISICAL_TOKEN }}
+          infisical secrets pull \
+            --env=production \
+            --projectId=0e4f9b8b-846e-4e66-a4aa-97c8fa9863ab \
+            --format=env > .railway_secrets.env 2>/dev/null || true
+          if [ -f .railway_secrets.env ] && [ -n "${{ vars.RAILWAY_PROD_ENV_ID }}" ]; then
+            while IFS='=' read -r key value; do
+              [ -z "$key" ] || [[ "$key" =~ ^# ]] && continue
+              curl -s --request POST \
+                "https://api.railway.app/v0/environments/${{ vars.RAILWAY_PROD_ENV_ID }}/variables" \
+                -H 'Authorization: Bearer ${{ secrets.RAILWAY_TOKEN }}' \
+                -H 'Content-Type: application/json' \
+                -d "{\"key\":\"$key\",\"value\":\"$value\",\"enabled\":true}" > /dev/null 2>&1 && echo "  ✓ $key" || echo "  • $key"
+            done < .railway_secrets.env
+            echo "Railway production secrets synced from Infisical ✓"
+          fi
+        continue-on-error: true

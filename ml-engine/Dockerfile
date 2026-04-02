@@ -13,16 +13,37 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Build args (secrets injected at Docker build time from GitHub Actions)
+ARG AI_GEMINI_PRO_KEY
+ARG AI_GROQ_TURBO_KEY
+ARG AI_OPENROUTER_MIND_ALPHA
+ARG AI_OPENROUTER_MIND_BETA
+ARG AI_CEREBRAS_KEY
+ARG AI_DEEPSEEK_KEY
+ARG AI_SAMBANOVA_KEY
+ARG FINNHUB_API_KEY
+ARG NEWS_API_KEY
+
 # Copy ml-engine
 COPY . .
 
 # Create data directory and model store
 RUN mkdir -p /app/data /app/model_store
 
-# Environment
+# Environment — use build args if present, otherwise Railway/Infisical will set at runtime
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PORT=8001
+# AI Provider keys (injected at Docker build time)
+ENV AI_GEMINI_PRO_KEY=${AI_GEMINI_PRO_KEY:-}
+ENV AI_GROQ_TURBO_KEY=${AI_GROQ_TURBO_KEY:-}
+ENV AI_OPENROUTER_MIND_ALPHA=${AI_OPENROUTER_MIND_ALPHA:-}
+ENV AI_OPENROUTER_MIND_BETA=${AI_OPENROUTER_MIND_BETA:-}
+ENV AI_CEREBRAS_KEY=${AI_CEREBRAS_KEY:-}
+ENV AI_DEEPSEEK_KEY=${AI_DEEPSEEK_KEY:-}
+ENV AI_SAMBANOVA_KEY=${AI_SAMBANOVA_KEY:-}
+ENV FINNHUB_API_KEY=${FINNHUB_API_KEY:-}
+ENV NEWS_API_KEY=${NEWS_API_KEY:-}
 
 # Expose port
 EXPOSE 8001

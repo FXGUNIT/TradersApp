@@ -1,7 +1,8 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import MessageRenderer from '../components/MessageRenderer.jsx';
 import ThemeSwitcher from '../components/ThemeSwitcher.jsx';
 import AiEnginesStatus from '../components/AiEnginesStatus.jsx';
+import BreakingNewsPanel from '../components/BreakingNewsPanel.jsx';
 import { runDeliberation, councilStage, MASTER_INTELLIGENCE_SYSTEM_PROMPT } from '../services/ai-router.js';
 import { getISTState } from '../utils/tradingUtils.js';
 import {
@@ -69,7 +70,7 @@ const SIGNAL_COLORS = {
 const SESSION_NAMES = ['Pre-Market', 'Main Trading', 'Post-Market'];
 const SESSION_COLORS = ['rgba(255,159,10,0.7)', 'rgba(10,132,255,0.9)', 'rgba(124,58,237,0.9)'];
 
-function SignalBadge({ signal, confidence }) {
+const SignalBadge = React.memo(function SignalBadge({ signal, confidence }) {
   const c = SIGNAL_COLORS[signal] || SIGNAL_COLORS.NEUTRAL;
   const Icon = signal === 'LONG' ? TrendingUp : signal === 'SHORT' ? TrendingDown : Minus;
   return (
@@ -89,9 +90,9 @@ function SignalBadge({ signal, confidence }) {
       )}
     </div>
   );
-}
+});
 
-function MetricRow({ icon: Icon, label, value, sub, color = 'var(--text-primary)', muted }) {
+const MetricRow = React.memo(function MetricRow({ icon: Icon, label, value, sub, color = 'var(--text-primary)', muted }) {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -116,9 +117,9 @@ function MetricRow({ icon: Icon, label, value, sub, color = 'var(--text-primary)
       </div>
     </div>
   );
-}
+});
 
-function SectionCard({ title, icon: Icon, children, accent }) {
+const SectionCard = React.memo(function SectionCard({ title, icon: Icon, children, accent }) {
   return (
     <div style={{
       background: 'var(--surface-glass, rgba(255,255,255,0.03))',
@@ -145,7 +146,7 @@ function SectionCard({ title, icon: Icon, children, accent }) {
       {children}
     </div>
   );
-}
+});
 
 // ── Physics Regime Section ──────────────────────────────────────────────────
 
@@ -156,7 +157,7 @@ const REGIME_COLORS = {
   CRISIS:      '#FF453A',
 };
 
-function RegimeBadge({ regime }) {
+const RegimeBadge = React.memo(function RegimeBadge({ regime }) {
   const color = REGIME_COLORS[regime] || REGIME_COLORS.NORMAL;
   return (
     <div style={{
@@ -172,9 +173,9 @@ function RegimeBadge({ regime }) {
       </span>
     </div>
   );
-}
+});
 
-function PhysicsRegimeSection({ regime }) {
+const PhysicsRegimeSection = React.memo(function PhysicsRegimeSection({ regime }) {
   const r = regime;
   const regimeColor = REGIME_COLORS[r.regime] || REGIME_COLORS.NORMAL;
 
@@ -337,9 +338,9 @@ function PhysicsRegimeSection({ regime }) {
       )}
     </SectionCard>
   );
-}
+});
 
-function VoteItem({ name, signal, confidence, reason }) {
+const VoteItem = React.memo(function VoteItem({ name, signal, confidence, reason }) {
   const c = SIGNAL_COLORS[signal] || SIGNAL_COLORS.NEUTRAL;
   const Icon = signal === 'LONG' ? TrendingUp : signal === 'SHORT' ? TrendingDown : Minus;
   return (
@@ -370,9 +371,9 @@ function VoteItem({ name, signal, confidence, reason }) {
       )}
     </div>
   );
-}
+});
 
-function MlConsensusTab({ theme, normalizedTheme }) {
+const MlConsensusTab = React.memo(function MlConsensusTab({ theme, normalizedTheme }) {
   const isDark = normalizedTheme === "midnight" || normalizedTheme === "night";
   const [consensus, setConsensus] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -502,6 +503,9 @@ function MlConsensusTab({ theme, normalizedTheme }) {
             </button>
           </div>
         )}
+
+        {/* ── Breaking News Panel ── */}
+        <BreakingNewsPanel mathEngine={consensus?.feature_vector} />
 
         {consensus && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
@@ -744,20 +748,42 @@ function MlConsensusTab({ theme, normalizedTheme }) {
             )}
 
             {/* ── News Warning ── */}
-            {consensus.news && (
+            {(consensus.news || consensus.breaking_news) && (
               <SectionCard title="News & Events" icon={Activity} accent="rgba(255,69,58,0.8)">
-                <MetricRow
-                  icon={Activity} label="Next Event"
-                  value={consensus.news.next_event?.title || '—'}
-                  sub={consensus.news.next_event ? `in ${consensus.news.next_event.timeUntil_min || 0} min` : ''}
-                  color={consensus.news.trade_allowed === false ? '#FF453A' : undefined}
-                />
+                {consensus.news_sentiment && (
+                  <>
+                    <MetricRow
+                      icon={TrendingUp} label="News Sentiment"
+                      value={consensus.news_sentiment.bias.toUpperCase()}
+                      sub={`${consensus.news_sentiment.bullish}↑ / ${consensus.news_sentiment.bearish}↓ · ${consensus.news_sentiment.highImpactCount} HIGH impact`}
+                      color={consensus.news_sentiment.bias === 'bullish' ? '#30D158' : consensus.news_sentiment.bias === 'bearish' ? '#FF453A' : '#8E8E93'}
+                    />
+                    {consensus.confidenceNote && (
+                      <div style={{
+                        marginTop: 4, padding: '4px 8px', borderRadius: 6,
+                        background: 'rgba(245,158,11,0.06)',
+                        border: '1px solid rgba(245,158,11,0.2)',
+                        fontSize: 9.5, color: '#F59E0B',
+                      }}>
+                        {consensus.confidenceNote}
+                      </div>
+                    )}
+                  </>
+                )}
+                {consensus.news?.next_event && (
+                  <MetricRow
+                    icon={Activity} label="Next Scheduled Event"
+                    value={consensus.news.next_event.title}
+                    sub={consensus.news.next_event ? `in ${consensus.news.next_event.timeUntil_min || 0} min` : ''}
+                    color={consensus.news.trade_allowed === false ? '#FF453A' : undefined}
+                  />
+                )}
                 <MetricRow
                   icon={Activity} label="Trading Allowed"
-                  value={consensus.news.trade_allowed !== false ? 'YES' : 'REDUCE SIZE'}
-                  color={consensus.news.trade_allowed !== false ? '#30D158' : '#FF453A'}
+                  value={consensus.news?.trade_allowed !== false ? 'YES' : 'REDUCE SIZE'}
+                  color={consensus.news?.trade_allowed !== false ? '#30D158' : '#FF453A'}
                 />
-                {consensus.news.warning && (
+                {consensus.news?.warning && (
                   <div style={{
                     marginTop: 8, padding: '8px 10px', borderRadius: 8,
                     background: 'rgba(255,69,58,0.06)',
@@ -788,7 +814,7 @@ function MlConsensusTab({ theme, normalizedTheme }) {
   );
 }
 
-function WarRoomLoader() {
+const WarRoomLoader = React.memo(function WarRoomLoader() {
   const [currentStage, setCurrentStage] = useState(councilStage.current);
 
   useEffect(() => {
@@ -914,7 +940,7 @@ function WarRoomLoader() {
       `}</style>
     </div>
   );
-}
+});
 
 import { useUsers } from '../hooks/useUsers';
 

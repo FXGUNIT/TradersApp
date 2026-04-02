@@ -15,6 +15,8 @@
 
 /** Headers set on every response for defense-in-depth. */
 export const SECURITY_HEADERS = {
+  // Strict-Transport-Security — enforce TLS for 12 months, include subdomains, preload
+  "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
   // Prevent MIME type sniffing
   "X-Content-Type-Options": "nosniff",
   // Prevent clickjacking
