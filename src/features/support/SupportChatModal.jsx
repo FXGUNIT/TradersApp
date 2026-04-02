@@ -1,10 +1,13 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { onValue, push, ref, set } from "firebase/database";
+
+const BFF_BASE = import.meta.env.VITE_BFF_URL || "";
 
 export default function SupportChatModal({
   isOpen,
   userId,
   userName,
+  userEmail,
   onClose,
   auth,
   showToast,
@@ -12,21 +15,22 @@ export default function SupportChatModal({
 }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
-  const [_isTyping, setIsTyping] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
   const [otherUserTyping] = useState(false);
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
   const canUseDb = Boolean(firebaseDb);
   const chatPath = `support_chats/${userId}`;
 
-  const scrollToBottom = () => {
+  const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
+  }, []);
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages, scrollToBottom]);
 
+  // ── Real-time listener on Firebase RTDB ──────────────────────────────
   useEffect(() => {
     if (!isOpen || !userId || !canUseDb) return undefined;
 
@@ -43,32 +47,57 @@ export default function SupportChatModal({
       }
     });
 
-    return () => {
-      unsubscribe();
-    };
+    return () => { unsubscribe(); };
   }, [isOpen, userId, chatPath, canUseDb, firebaseDb]);
 
+  // ── Send message ─────────────────────────────────────────────────────
   const handleSendMessage = async () => {
-    if (!input.trim() || !canUseDb) return;
+    if (!input.trim()) return;
 
+    const text = input.trim();
+    setInput("");
+    setIsTyping(false);
+    clearTimeout(typingTimeoutRef.current);
+
+    // Write to Firebase RTDB (real-time — user sees it immediately + admin sees it)
+    if (canUseDb) {
+      try {
+        const messagesRef = ref(firebaseDb, `${chatPath}/messages`);
+        const newMessageRef = push(messagesRef);
+        await set(newMessageRef, {
+          sender: "user",                              // ← user sending, not admin
+          senderName: userName || auth?.displayName || "User",
+          senderEmail: userEmail || auth?.email || "",
+          text,
+          timestamp: Date.now(),
+          read: false,
+          fromTelegram: false,
+        });
+      } catch (e) {
+        console.error("[SupportChatModal] Firebase write failed:", e);
+        showToast?.("Failed to send. Try again.", "error");
+        return;
+      }
+    }
+
+    // Notify admin via Telegram BFF (non-blocking)
     try {
-      const messagesRef = ref(firebaseDb, `${chatPath}/messages`);
-      const newMessageRef = push(messagesRef);
-      await set(newMessageRef, {
-        sender: "admin",
-        senderName: auth?.displayName || "Admin",
-        text: input.trim(),
-        timestamp: Date.now(),
-        read: false,
+      await fetch(`${BFF_BASE}/support/message`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId,
+          userEmail: userEmail || auth?.email || "",
+          userName: userName || auth?.displayName || "User",
+          text,
+        }),
       });
-
-      setInput("");
-      setIsTyping(false);
     } catch {
-      showToast("Failed to send message. Connection issue.", "error");
+      // Non-fatal — Firebase RTDB already saved the message
     }
   };
 
+  // ── Typing indicator ─────────────────────────────────────────────────
   const handleTyping = (text) => {
     setInput(text);
 
@@ -116,6 +145,7 @@ export default function SupportChatModal({
         }}
         className="restored-modal"
       >
+        {/* Header */}
         <div
           style={{
             padding: "16px 20px",
@@ -127,13 +157,17 @@ export default function SupportChatModal({
         >
           <div>
             <div style={{ color: "#F2F2F7", fontSize: 14, fontWeight: 600 }}>
-              {userName}
+              {userName || "Support Chat"}
             </div>
-            {otherUserTyping && (
-              <div style={{ color: "#0A84FF", fontSize: 11, marginTop: 4 }}>
-                typing...
-              </div>
-            )}
+            <div style={{ color: "#30D158", fontSize: 11, marginTop: 2 }}>
+              {canUseDb ? "Connected" : "Offline mode"}
+              {isTyping && (
+                <span style={{ color: "#0A84FF", marginLeft: 6 }}>typing...</span>
+              )}
+              {otherUserTyping && (
+                <span style={{ color: "#0A84FF", marginLeft: 6 }}>Support is typing...</span>
+              )}
+            </div>
           </div>
           <button
             onClick={onClose}
@@ -149,6 +183,7 @@ export default function SupportChatModal({
           </button>
         </div>
 
+        {/* Messages */}
         <div
           style={{
             flex: 1,
@@ -165,16 +200,21 @@ export default function SupportChatModal({
                 color: "var(--text-secondary, #A1A1A6)",
                 textAlign: "center",
                 marginTop: 20,
+                lineHeight: 1.6,
               }}
             >
-              No messages yet. Start the conversation.
+              No messages yet.<br />
+              <span style={{ fontSize: 11 }}>
+                Start the conversation — an admin will reply via Telegram.
+              </span>
             </div>
           ) : (
-            messages.map((msg) => {
+            messages.map((msg, idx) => {
               const isAdmin = msg.sender === "admin";
+              const isUser  = msg.sender === "user";
               return (
                 <div
-                  key={`msg_${msg.timestamp}`}
+                  key={`msg_${msg.timestamp}_${idx}`}
                   style={{
                     display: "flex",
                     justifyContent: isAdmin ? "flex-end" : "flex-start",
@@ -185,11 +225,11 @@ export default function SupportChatModal({
                     style={{
                       background: isAdmin
                         ? "rgba(0,122,255,0.3)"
-                        : "rgba(255,255,255,0.1)",
+                        : "rgba(48,209,88,0.15)",
                       border: `1px solid ${
                         isAdmin
                           ? "rgba(0,122,255,0.5)"
-                          : "rgba(255,255,255,0.2)"
+                          : "rgba(48,209,88,0.25)"
                       }`,
                       borderRadius: 12,
                       padding: "10px 14px",
@@ -200,22 +240,55 @@ export default function SupportChatModal({
                     {!isAdmin && (
                       <div
                         style={{
-                          color: "#A1A1A6",
+                          color: "#636366",
                           fontSize: 10,
                           marginBottom: 4,
+                          fontWeight: 600,
                         }}
                       >
-                        {msg.senderName || msg.email || "User"}
+                        {msg.senderName || msg.senderEmail || "You"}
+                      </div>
+                    )}
+                    {isAdmin && (
+                      <div
+                        style={{
+                          color: "#0A84FF",
+                          fontSize: 10,
+                          marginBottom: 4,
+                          fontWeight: 600,
+                        }}
+                      >
+                        {msg.senderName || "Support Team"}
+                        {msg.fromTelegram && (
+                          <span style={{ color: "#30D158", marginLeft: 4, fontSize: 9 }}>
+                            via Telegram
+                          </span>
+                        )}
                       </div>
                     )}
                     <div
                       style={{
                         color: "var(--text-primary, #F2F2F7)",
                         fontSize: 13,
-                        lineHeight: 1.4,
+                        lineHeight: 1.5,
                       }}
                     >
                       {msg.text}
+                    </div>
+                    <div
+                      style={{
+                        color: "#636366",
+                        fontSize: 9,
+                        marginTop: 4,
+                        textAlign: isAdmin ? "right" : "left",
+                      }}
+                    >
+                      {msg.timestamp
+                        ? new Date(msg.timestamp).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })
+                        : ""}
                     </div>
                   </div>
                 </div>
@@ -225,6 +298,7 @@ export default function SupportChatModal({
           <div ref={messagesEndRef} />
         </div>
 
+        {/* Input */}
         <div
           style={{
             padding: "16px 20px",
@@ -238,12 +312,12 @@ export default function SupportChatModal({
             value={input}
             onChange={(event) => handleTyping(event.target.value)}
             onKeyDown={(event) => {
-              if (event.key === "Enter") {
+              if (event.key === "Enter" && !event.shiftKey) {
                 event.preventDefault();
                 handleSendMessage();
               }
             }}
-            placeholder="Type message..."
+            placeholder="Type your message..."
             style={{
               flex: 1,
               background: "var(--input-bg, rgba(255,255,255,0.05))",
@@ -252,7 +326,7 @@ export default function SupportChatModal({
               padding: "10px 12px",
               color: "#F2F2F7",
               fontSize: 13,
-              fontFamily: "Consolas, monospace",
+              fontFamily: "inherit",
             }}
           />
           <button
@@ -266,25 +340,15 @@ export default function SupportChatModal({
               borderRadius: 8,
               padding: "10px 16px",
               color: input.trim()
-                ? "var(--text-primary, #000)"
+                ? "#fff"
                 : "var(--text-secondary, #A1A1A6)",
               fontSize: 13,
               fontWeight: 700,
               cursor: input.trim() ? "pointer" : "default",
               transition: "all 0.2s",
             }}
-            onMouseEnter={(event) => {
-              if (input.trim()) {
-                event.currentTarget.style.boxShadow = "0 0 12px rgba(0,122,255,0.5)";
-                event.currentTarget.style.transform = "scale(1.05)";
-              }
-            }}
-            onMouseLeave={(event) => {
-              event.currentTarget.style.boxShadow = "none";
-              event.currentTarget.style.transform = "scale(1)";
-            }}
           >
-            SEND
+            Send
           </button>
         </div>
       </div>

@@ -18,11 +18,16 @@ on:
           - frontend
 
 env:
+  # URLs pulled from GitHub Variables (set via setup-production.ps1)
+  # These are NOT secrets — they're public endpoint URLs
   ML_ENGINE_URL: ${{ vars.ML_ENGINE_URL || 'https://api.traders.app' }}
   BFF_URL: ${{ vars.BFF_URL || 'https://bff.traders.app' }}
   FRONTEND_URL: ${{ vars.FRONTEND_URL || 'https://traders.app' }}
+  # Alert webhooks from GitHub Secrets (set via setup-infisical.ps1)
   SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
   DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+  # Railway token from GitHub Secrets (set via setup-production.ps1)
+  RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
 
 jobs:
   # -------------------------------------------------------------------------
@@ -153,19 +158,12 @@ jobs:
       - name: Alert if models stale (>7 days)
         if: env.last_trained != 'unknown' && env.last_trained != ''
         run: |
-          days_old=$(python3 -c "
-from datetime import datetime, timezone
-try:
-    last = datetime.fromisoformat('${{ env.last_trained }}'.replace('Z','+00:00'))
-    age = (datetime.now(timezone.utc) - last).days
-    print(age)
-except:
-    print(-1)
-" 2>/dev/null || echo "-1")
+          python_script="from datetime import datetime,timezone; d='${{ env.last_trained }}'.replace('Z','+00:00'); print((datetime.now(timezone.utc)-datetime.fromisoformat(d)).days)"
+          days_old=$(python3 -c "$python_script" 2>/dev/null || echo "-1")
           echo "Model age: $days_old days"
           if [ "$days_old" -gt 7 ]; then
-            curl -s -X POST -H "Content-Type: application/json" \
-              -d "{\"content\": \":warning: ML Models are $days_old days old (>7 day threshold) — consider retraining\"}" \
+            curl -s -X POST -H 'Content-Type: application/json' \
+              -d '{"content": ":warning: ML Models are '"$days_old"' days old (>7 day threshold) - consider retraining"}' \
               "${{ env.DISCORD_WEBHOOK_URL }}" 2>/dev/null || true
           fi
 
@@ -189,18 +187,14 @@ except:
       - name: Download trained models from ML Engine
         run: |
           mkdir -p models_backup
-          curl -s "${{ env.ML_ENGINE_URL }}/model-status" | python3 -c "
-import sys, json, os
-data = json.load(sys.stdin)
-print('Models:', json.dumps(data, indent=2))
-" 2>/dev/null || echo "Could not reach ML engine"
+          curl -sf "${{ env.ML_ENGINE_URL }}/model-status" > models_backup/status.json 2>/dev/null || echo '{}' > models_backup/status.json
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: models-$(date +%Y-%m-%d)
           name: ML Models $(date +%Y-%m-%d)
-          body: "Automated daily ML model backup."
+          body: Automated daily ML model backup.
           files: models_backup/*
           draft: false
           prerelease: false

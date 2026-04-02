@@ -9,12 +9,41 @@
 Things Claude has already done for you:
 - ✅ All code written and committed
 - ✅ `vercel.json` created (Vercel config with security headers + Firebase env vars)
-- ✅ `wrangler.toml.example` created (Cloudflare Workers config)
-- ✅ `railway.json` already exists
-- ✅ GitHub Actions CI/CD already written
+- ✅ `railway.json` already exists for BFF + ML Engine
+- ✅ GitHub Actions CI/CD already written (with Infisical secret sync)
+- ✅ Infisical workspace configured (workspace ID: `0e4f9b8b-846e-4e66-a4aa-97c8fa9863ab`)
 - ✅ `ml-engine/scripts/migrate_to_postgres.py` ready (Neon migration script)
+- ✅ `scripts/setup-infisical.ps1` — one-shot setup of all secrets
 
 **What you need to do:** Click through 4 dashboards to link your accounts.
+
+---
+
+## STEP 0 — Infisical Setup (FIRST — do this before everything else)
+
+Infisical is the **single source of truth for all secrets**. Everything else (Railway, Vercel, CI) pulls from it.
+
+1. Go to **[app.infisical.com](https://app.infisical.com)** → your workspace
+2. Navigate to **Settings → Access Tokens → Create Token**
+3. Name it `GitHub Actions` → select **"Read/Write"** scope → Copy the token (starts with `is.`)
+4. Run the setup script:
+   ```powershell
+   .\scripts\setup-infisical.ps1 -InfisicalToken "is.your_token_here"
+   ```
+   This will:
+   - Push all secrets from your `.env.local` into Infisical (production / staging / development)
+   - Set GitHub Actions secrets (INFISICAL_TOKEN + all AI keys)
+   - Document the full secret schema
+
+5. In Infisical dashboard → **Settings → Integrations**:
+   - **GitHub App**: connect `TradersApp` repo → enable "Auto-inject secrets into GitHub Actions"
+   - **Railway** (optional): connect Railway project → auto-inject into BFF + ML Engine services
+
+**Local dev with Infisical:**
+```bash
+npm run dev:infisical          # Frontend with secrets from Infisical
+npm run bff:dev:infisical      # BFF with secrets from Infisical
+```
 
 ---
 
@@ -47,19 +76,6 @@ For **BFF**:
 6. Environment Variable: `BFF_PORT` = `8788`
 7. Copy the **Service ID**
 
-For **Environment Variables** (in Railway project settings):
-1. Project Settings → Environment → **Production**
-2. Add these variables (values from `.env.local` on your machine):
-   ```
-   BFF_ADMIN_PASS_HASH=3eb02e9d7b591705b146ae87b1c2e7fe0daccf8e6603bb0872c54cb9091f96e0
-   MASTER_SALT=46bd6c4a99b24642e0215af90b19ac89962a5e13b9aa5f8c1bed85d0538e0f13
-   ML_ENGINE_URL=https://api.traders.app
-   ```
-3. For ML Engine service, add:
-   ```
-   DATABASE_URL=sqlite:///ml-engine/trading_data.db   # SQLite for now
-   ```
-
 ### 1C. Link Railway to GitHub (for auto-deploy)
 1. In Railway: Project Settings → **GitHub Sync** → connect repo
 2. Enable **Auto-Deploy**: ✅ ON (deploys on every push to `main`)
@@ -68,13 +84,18 @@ For **Environment Variables** (in Railway project settings):
 1. Go to [railway.app/account](https://railway.app/account)
 2. Scroll to **Tokens** → Click **"Create Token"**
 3. Name: `GitHub Actions` → Copy the token
-4. Go to **GitHub.com → your repo → Settings → Secrets and variables → Actions**
-5. Click **"New repository secret"**:
-   - Name: `RAILWAY_TOKEN` → Paste token
-6. Also add these as **Repository Variables** (not Secrets):
-   - `RAILWAY_PROD_ENV_ID` → paste your Environment ID
-   - `RAILWAY_PROD_ML_SERVICE_ID` → paste ML Engine Service ID
-   - `RAILWAY_PROD_BFF_SERVICE_ID` → paste BFF Service ID
+4. Set as GitHub Secret:
+   ```bash
+   gh secret set RAILWAY_TOKEN --body "your_token" --repo gunitsingh1994/TradersApp
+   ```
+5. Also add these as **Repository Variables** (not Secrets):
+   ```bash
+   gh variable set RAILWAY_PROD_ENV_ID --body "your_env_id" --repo gunitsingh1994/TradersApp
+   gh variable set RAILWAY_PROD_ML_SERVICE_ID --body "your_ml_service_id" --repo gunitsingh1994/TradersApp
+   gh variable set RAILWAY_PROD_BFF_SERVICE_ID --body "your_bff_service_id" --repo gunitsingh1994/TradersApp
+   ```
+
+> **⚠️ NOTE:** Railway environment variables are synced from Infisical automatically after each deploy. The setup-infisical.ps1 script handles this. You do NOT need to manually enter secrets in the Railway dashboard — they flow from Infisical → Railway via the CI/CD pipeline.
 
 ---
 
@@ -91,26 +112,27 @@ For **Environment Variables** (in Railway project settings):
 6. Root Directory: `.` (leave as default)
 7. **Build Command**: `npm run build`
 8. **Output Directory**: `dist`
-9. **Environment Variables** — Add these:
+9. **Environment Variables** — these are pulled from Infisical automatically. You can also add manually:
    ```
    VITE_BFF_URL               = https://bff.traders.app
-   VITE_FIREBASE_API_KEY      = AIzaSyBPN7fIZ-UfVQ5EMti1TzrFPsi4wtUEtKI
+   VITE_FIREBASE_API_KEY      = (from Infisical: AIzaSyBPN7fIZ-UfVQ5EMti1TzrFPsi4wtUEtKI)
    VITE_FIREBASE_AUTH_DOMAIN  = traders-regiment.firebaseapp.com
    VITE_FIREBASE_PROJECT_ID    = traders-regiment
    VITE_FIREBASE_STORAGE_BUCKET = traders-regiment.appspot.com
-   VITE_FIREBASE_MESSAGING_SENDER_ID = (from your .env.local)
-   VITE_FIREBASE_APP_ID       = (from your .env.local)
+   VITE_FIREBASE_MESSAGING_SENDER_ID = (from Infisical)
+   VITE_FIREBASE_APP_ID       = (from Infisical)
    ```
+   > **⚠️ NOTE:** Vercel environment variables are synced from Infisical automatically after each deploy. Use the `infisical-sync.yml` workflow to trigger a manual sync if needed.
 10. Click **"Deploy"** — takes ~2 minutes
 
 ### 2B. Link to GitHub (for auto-deploy)
 1. Project Settings → **GitHub Integration** → **"Configure GitHub App"**
 2. Install Vercel on your GitHub account
 3. Enable **"Include scope of GitHub Repositories"** → select TradersApp
-4. Add to GitHub Secrets (github.com → Settings → Secrets):
-   - `VERCEL_TOKEN` → (from Vercel Dashboard → Settings → Tokens → Create Token)
-   - `VERCEL_ORG_ID` → (from Vercel Dashboard → Settings → Teams → copy Org ID)
-   - `VERCEL_PROJECT_ID` → (from Vercel Dashboard → Settings → copy Project ID)
+4. Get Vercel credentials from Vercel Dashboard → Settings → Tokens:
+   - `VERCEL_TOKEN` → set in GitHub Secrets (via setup-infisical.ps1)
+   - `VERCEL_ORG_ID` → set in GitHub Secrets
+   - `VERCEL_PROJECT_ID` → set in GitHub Secrets
 
 ### 2C. Custom Domain (traders.app)
 1. In Vercel: Project Settings → **Domains**
@@ -198,10 +220,9 @@ Add these records (Vercel will give you the values after Step 2):
    - Postgres Version: `16`
 4. Copy the **Connection String** (looks like: `postgresql://user:pass@ep-xxx.us-east-2.aws.neon.tech/neondb?sslmode=require`)
 
-### 4B. Add to Infisical
-1. Go to **[infisical.com](https://infisical.com)** → your workspace
-2. Add Secret → `DATABASE_URL` → paste Neon connection string
-3. Also add `DATABASE_URL` as a Railway environment variable
+### 4B. Add to Infisical (not Railway directly)
+1. In Infisical dashboard: add secret → `DATABASE_URL` → paste Neon connection string
+2. The CI/CD pipeline (infisical-sync.yml) will auto-sync it to Railway after the next deploy.
 
 ### 4C. Run Migration
 ```bash
@@ -213,21 +234,6 @@ python ml-engine/scripts/migrate_to_postgres.py \
   --source ml-engine/trading_data.db \
   --target-url "$DATABASE_URL"
 ```
-
----
-
-## STEP 5 — Infisical GitHub App (already done)
-
-Infisical is already configured:
-- Workspace ID: `0e4f9b8b-846e-4e66-a4aa-97c8fa9863ab`
-- Dev environment exists
-- `npm run bff:dev:infisical` already works
-
-**To add the GitHub App integration:**
-1. Go to **app.infisical.com** → your workspace
-2. Navigate to **Settings → Integrations → GitHub**
-3. Connect your GitHub account/repo
-4. Enable **"Auto-inject secrets into GitHub Actions"**
 
 ---
 

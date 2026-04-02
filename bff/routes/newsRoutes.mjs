@@ -2,10 +2,25 @@
  * News Routes — BFF routes for news intelligence.
  *
  * Routes:
- *   GET  /news/upcoming    — upcoming 3★+ high-impact events
+ *   GET  /news/upcoming    — upcoming 3★+ high-impact events (Forex Factory)
  *   GET  /news/countdown   — countdown to next high-impact event
+ *   GET  /news/breaking    — real-time breaking news (Finnhub + NewsData + YF RSS)
+ *   GET  /news/reactions   — market reactions to breaking news (ML training data)
+ *   POST /news/reactions   — log market reaction to a specific breaking news item
  */
 import { getUpcomingEvents } from "../services/newsService.mjs";
+import {
+  fetchBreakingNews,
+  getCachedNews,
+  getRecentNewsReactions,
+  updateNewsReactions,
+  triggerMLRetrainOnNews,
+  getNewsReactions,
+} from "../services/breakingNewsService.mjs";
+
+// In-process cache for breaking news (30s TTL)
+let _breakingCache = null;
+let _breakingCacheTs = 0;
 
 export function createNewsRouteHandler({
   json,
@@ -64,6 +79,117 @@ export function createNewsRouteHandler({
           next_event: null,
           trade_allowed: true,
         }, origin);
+        return true;
+      }
+    }
+
+    // GET /news/breaking — real-time breaking news (30s polling safe)
+    if (req.method === "GET" && pathname === "/news/breaking") {
+      try {
+        const fresh = url.searchParams.get("fresh") === "true";
+        const minImpact = url.searchParams.get("minImpact") || "LOW";
+        const maxItems = parseInt(url.searchParams.get("max") || "30", 10);
+
+        let data;
+        if (fresh || !_breakingCache || (Date.now() - _breakingCacheTs) > 600_000) {
+          data = await fetchBreakingNews({ maxItems, minImpact });
+          _breakingCache = data;
+          _breakingCacheTs = Date.now();
+        } else {
+          data = _breakingCache;
+        }
+
+        // Fire-and-forget ML retrain on HIGH impact items
+        const highImpact = data.items.filter(i => i.impact === 'HIGH' && !i.reactionLogged);
+        for (const item of highImpact.slice(0, 2)) {
+          triggerMLRetrainOnNews(item).catch(() => {});
+        }
+
+        json(res, 200, {
+          ok: true,
+          ...data,
+          cached: !fresh,
+          cacheAgeMs: fresh ? 0 : (Date.now() - _breakingCacheTs),
+        }, origin);
+        return true;
+      } catch (err) {
+        console.error('[newsRoutes] /news/breaking error:', err.message);
+        json(res, 200, {
+          ok: false,
+          error: err.message,
+          items: [],
+          total: 0,
+          highImpactCount: 0,
+        }, origin);
+        return true;
+      }
+    }
+
+    // GET /news/reactions — market reactions to breaking news (ML training data)
+    if (req.method === "GET" && pathname === "/news/reactions") {
+      try {
+        const minutes = parseInt(url.searchParams.get("minutes") || "120", 10);
+        const reactions = getRecentNewsReactions(minutes);
+        const cached = getCachedNews();
+
+        json(res, 200, {
+          ok: true,
+          reactions,
+          recentNews: cached.items.slice(0, 20),
+          fetchedAt: new Date().toISOString(),
+        }, origin);
+        return true;
+      } catch (err) {
+        json(res, 200, { ok: false, error: err.message, reactions: [], recentNews: [] }, origin);
+        return true;
+      }
+    }
+
+    // POST /news/reactions — log market reaction to a breaking news item
+    if (req.method === "POST" && pathname === "/news/reactions") {
+      try {
+        const body = typeof req.body === 'object' ? req.body : {};
+        const { newsId, reaction5m, reaction15m, reaction30m, reaction60m, direction, magnitude } = body;
+
+        if (!newsId) {
+          json(res, 400, { ok: false, error: 'newsId required' }, origin);
+          return true;
+        }
+
+        const existing = getNewsReactions(newsId);
+        const reactionData = {
+          newsId,
+          reaction5m: reaction5m ?? existing?.reaction5m,
+          reaction15m: reaction15m ?? existing?.reaction15m,
+          reaction30m: reaction30m ?? existing?.reaction30m,
+          reaction60m: reaction60m ?? existing?.reaction60m,
+          direction: direction ?? existing?.direction,
+          magnitude: magnitude ?? existing?.magnitude,
+          loggedAt: Date.now(),
+        };
+
+        const { logNewsReaction } = await import('../services/breakingNewsService.mjs');
+        logNewsReaction(newsId, reactionData);
+
+        json(res, 200, { ok: true, reaction: reactionData }, origin);
+        return true;
+      } catch (err) {
+        json(res, 500, { ok: false, error: err.message }, origin);
+        return true;
+      }
+    }
+
+    // POST /news/candle-update — update candle prices for reaction tracking
+    // Called by BFF MathEngine data every 5 minutes
+    if (req.method === "POST" && pathname === "/news/candle-update") {
+      try {
+        const body = typeof req.body === 'object' ? req.body : {};
+        const { close, high, low, open, volume } = body;
+        updateNewsReactions({ close, high, low, open, volume });
+        json(res, 200, { ok: true }, origin);
+        return true;
+      } catch (err) {
+        json(res, 500, { ok: false, error: err.message }, origin);
         return true;
       }
     }

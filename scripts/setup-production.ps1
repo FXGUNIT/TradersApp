@@ -71,9 +71,9 @@ Write-Host "Railway variables set" -ForegroundColor Green
 # ── Step 4: Vercel → GitHub Secrets + Variables ───────────────────────────
 Write-Host "`n[4/5] Setting Vercel credentials in GitHub..." -ForegroundColor Yellow
 gh secret set VERCEL_TOKEN --body $VercelToken --repo $Repo
-gh variable set VERCEL_ORG_ID --body $VercelOrgId --repo $Repo
-gh variable set VERCEL_PROJECT_ID --body $VercelProjectId --repo $Repo
-Write-Host "Vercel variables set" -ForegroundColor Green
+gh secret set VERCEL_ORG_ID --body $VercelOrgId --repo $Repo
+gh secret set VERCEL_PROJECT_ID --body $VercelProjectId --repo $Repo
+Write-Host "Vercel variables set (as secrets for CI)" -ForegroundColor Green
 
 # ── Step 5: Alert Webhooks ──────────────────────────────────────────────────
 if ($SlackWebhook) {
@@ -90,7 +90,7 @@ if ($DiscordWebhook) {
 }
 
 # ── Step 6: Verify all ──────────────────────────────────────────────────────
-Write-Host "`n[6/5] Verifying GitHub Variables..." -ForegroundColor Yellow
+Write-Host "`n[6/6] Verifying GitHub Variables..." -ForegroundColor Yellow
 $vars = gh variable list --repo $Repo
 Write-Host $vars
 

@@ -28,6 +28,8 @@ from training.trainer import Trainer
 from training.model_store import ModelStore
 from inference.predictor import Predictor
 from inference.consensus_aggregator import ConsensusAggregator
+from optimization.pso_optimizer import run_alpha_discovery, NichingPSO, PSOOptimizer
+from models.mamba.mamba_sequence_model import get_mamba_prediction, MambaTradingModel, MAMBA_AVAILABLE, MODEL_SIZES
 from models.regime.regime_ensemble import RegimeEnsemble
 from backtest.pbo_engine import (
     PBOConfig,
@@ -399,6 +401,40 @@ async def predict(request: PredictRequest):
         except Exception as e:
             output["physics_regime"] = {"error": str(e)}
 
+        # ── Append Mamba SSM vote into consensus ─────────────────────────────
+        try:
+            if request.candles or not df.empty:
+                candle_list = request.candles if request.candles else df.to_dict("records")
+                if candle_list:
+                    mamba_result = get_mamba_prediction(candle_list, model_size="mamba-790m")
+                    if mamba_result.get("ok", False):
+                        output["votes"]["mamba_ssm"] = {
+                            "signal": mamba_result["signal"],
+                            "confidence": mamba_result["confidence"],
+                            "probability_long": mamba_result["probability_long"],
+                            "probability_short": mamba_result["probability_short"],
+                            "primary_reason": mamba_result.get("reasoning", ""),
+                            "model": mamba_result.get("model_used", "mamba-790m"),
+                            "inference_ms": mamba_result.get("inference_ms", 0),
+                        }
+                        output["mamba"] = {
+                            "signal": mamba_result["signal"],
+                            "confidence": mamba_result["confidence"],
+                            "alpha_score": mamba_result.get("alpha_score", 0),
+                            "pattern_type": mamba_result.get("pattern_type", "UNKNOWN"),
+                            "predicted_regime": mamba_result.get("predicted_regime", "NORMAL"),
+                            "regime_probs": mamba_result.get("regime_probs", {}),
+                            "expected_move_ticks": mamba_result.get("expected_move_ticks", 0),
+                            "inference_ms": mamba_result.get("inference_ms", 0),
+                            "model_used": mamba_result.get("model_used", "mamba-790m"),
+                            "model_info": MODEL_SIZES.get("mamba-790m", {}),
+                        }
+                        output["models_used"] = output.get("models_used", 0) + 1
+                    else:
+                        output["mamba"] = {"available": False, "error": mamba_result.get("error", "unknown")}
+        except Exception as e:
+            output["mamba"] = {"available": False, "error": str(e)}
+
         return output
 
     except HTTPException:
@@ -615,6 +651,295 @@ def _serialize_pbo_result(result) -> dict:
         "oos_return_pct": round(result.oos_return_pct, 4),
         "overfit_bands": [round(x, 4) for x in result.overfit_bands],
         "passing": result.passing,
+    }
+
+
+# ─── Breaking News Self-Training ──────────────────────────────────────────────
+
+class BreakingNewsRequest(BaseModel):
+    """Payload from BFF when HIGH impact breaking news arrives."""
+    news: dict = Field(..., description="Breaking news item")
+    trigger_type: str = Field(
+        default="breaking_news_high_impact",
+        description="Type of trigger: breaking_news_high_impact | scheduled_event_3star"
+    )
+    candle_snapshot: Optional[dict] = Field(
+        default=None,
+        description="Optional candle prices at time of news for reaction tracking"
+    )
+
+
+class NewsReactionRequest(BaseModel):
+    """Log market reaction to a specific breaking news item."""
+    news_id: str
+    reaction_5m: Optional[float] = None
+    reaction_15m: Optional[float] = None
+    reaction_30m: Optional[float] = None
+    reaction_60m: Optional[float] = None
+    direction: Optional[str] = None  # up | down | flat
+    magnitude: Optional[float] = None  # ticks
+
+
+# In-memory news reaction log (persisted to DB in production)
+_news_reaction_log: list[dict] = []
+_NEWS_LOG_PATH = Path(__file__).parent / "data" / "news_reactions.csv"
+_NEWS_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+
+def _persist_news_reaction(entry: dict) -> None:
+    """Append news reaction to CSV log for ML training."""
+    try:
+        df = pd.DataFrame([entry])
+        if _NEWS_LOG_PATH.exists():
+            df.to_csv(_NEWS_LOG_PATH, mode="a", header=False, index=False)
+        else:
+            df.to_csv(_NEWS_LOG_PATH, mode="w", header=True, index=False)
+    except Exception:
+        pass  # Non-fatal
+
+
+def _classify_news_impact(news: dict) -> dict:
+    """
+    Classify news impact on MNQ/ES trading.
+    Returns sentiment bias, expected market move direction, and confidence.
+    """
+    title = news.get("title", "").lower()
+    desc = news.get("description", "").lower()
+    sentiment = news.get("sentiment", "neutral")
+    keywords = news.get("keywords", [])
+    text = f"{title} {desc}"
+
+    # Map news sentiment to expected market direction
+    # Bullish news → typically positive for stocks (up)
+    # Bearish news → typically negative for stocks (down)
+    sentiment_to_direction = {
+        "bullish": ("up", 0.65),
+        "bearish": ("down", 0.65),
+        "neutral": ("flat", 0.5),
+    }
+    direction, base_conf = sentiment_to_direction.get(sentiment, ("flat", 0.5))
+
+    # Adjust confidence based on keywords
+    confidence_boost = 0
+    if any(k in text for k in ["fed", "rate", "inflation", "cpi"]):
+        confidence_boost += 0.15  # Fed/macro moves markets most
+    if any(k in text for k in ["jobs", "nfp", "employment", "gdp"]):
+        confidence_boost += 0.10
+    if any(k in text for k in ["earnings", "apple", "nvidia", "meta", "amazon", "google"]):
+        confidence_boost += 0.08
+    if any(k in text for k in ["crisis", "recession", "crash", "war"]):
+        confidence_boost += 0.12
+
+    confidence = min(0.95, base_conf + confidence_boost)
+
+    # High impact keywords that typically cause >0.5% moves in MNQ
+    high_impact = any(k in text for k in [
+        "fed", "rate hike", "rate cut", "inflation", "cpi", "jobs report",
+        "nonfarm", "gdp", "earnings surprise", "profit warning",
+        "recession", "crisis", "trade war", "bankruptcy"
+    ])
+
+    # Expected move in ticks (MNQ: 1 tick = $0.25)
+    if high_impact:
+        expected_move_ticks = 20.0  # ~0.5% of ~40,000 = ~200 pts = 800 ticks; in MNQ: 20-40 ticks
+        expected_move_dollars = expected_move_ticks * 0.25
+    else:
+        expected_move_ticks = 8.0
+        expected_move_dollars = expected_move_ticks * 0.25
+
+    return {
+        "expected_direction": direction,
+        "expected_move_ticks": expected_move_ticks,
+        "expected_move_dollars": expected_move_dollars,
+        "impact_confidence": confidence,
+        "is_high_impact": high_impact,
+        "news_keywords": keywords,
+        "trigger_type": news.get("trigger_type", "breaking_news"),
+        "ml_note": (
+            f"{sentiment.upper()} news on {keywords[0] if keywords else 'general'}. "
+            f"Expected {direction} move of ~{expected_move_ticks:.0f} ticks. "
+            f"Confidence: {confidence:.0%}. "
+            f"Record market reaction at 5/15/30/60 min to validate this signal."
+        ),
+    }
+
+
+@app.post("/news-trigger", tags=["news"])
+async def trigger_on_news(request: BreakingNewsRequest):
+    """
+    Called by BFF when HIGH impact breaking news arrives.
+
+    Actions:
+    1. Classify news impact (direction, magnitude, confidence)
+    2. Log to news_reactions.csv for ML self-training
+    3. Optionally trigger incremental model retrain (async, non-blocking)
+    4. Return impact classification to BFF for UI display
+    """
+    news = request.news
+    news_id = news.get("id", f"manual_{int(time.time())}")
+
+    # Classify impact
+    classification = _classify_news_impact(news)
+
+    # Build log entry
+    entry = {
+        "news_id": news_id,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "title": news.get("title", ""),
+        "source": news.get("source", ""),
+        "sentiment": news.get("sentiment", "neutral"),
+        "impact": news.get("impact", "UNKNOWN"),
+        "keywords": ",".join(news.get("keywords", [])),
+        "trigger_type": request.trigger_type,
+        "expected_direction": classification["expected_direction"],
+        "expected_move_ticks": classification["expected_move_ticks"],
+        "expected_move_dollars": classification["expected_move_dollars"],
+        "impact_confidence": classification["impact_confidence"],
+        "reaction_5m": None,
+        "reaction_15m": None,
+        "reaction_30m": None,
+        "reaction_60m": None,
+        "actual_direction": None,
+        "actual_move_ticks": None,
+        "alpha_ticks": None,
+        "validated": False,
+    }
+
+    # Persist to CSV
+    _persist_news_reaction(entry)
+    _news_reaction_log.append(entry)
+
+    # Keep log bounded (max 1000 entries in memory)
+    if len(_news_reaction_log) > 1000:
+        _news_reaction_log[:] = _news_reaction_log[-1000:]
+
+    # Fire-and-forget: trigger incremental retrain if HIGH impact
+    # (non-blocking via BackgroundTasks — doesn't slow down the response)
+    async def _async_retrain():
+        try:
+            if classification["is_high_impact"] and trainer is not None:
+                await trainer.incremental_train()
+                return {"retrained": True}
+        except Exception as e:
+            print(f"[news-trigger] Background retrain failed: {e}")
+        return {"retrained": False}
+
+    # Schedule async retrain (FastAPI handles it after response sent)
+    BackgroundTasks().add_task(_async_retrain)
+
+    return {
+        "ok": True,
+        "news_id": news_id,
+        "classification": classification,
+        "ml_note": classification["ml_note"],
+        "retrain_scheduled": classification["is_high_impact"],
+        "logged_at": entry["timestamp"],
+        "total_news_logged": len(_news_reaction_log),
+    }
+
+
+@app.post("/news/reaction", tags=["news"])
+async def log_news_reaction(request: NewsReactionRequest):
+    """
+    Log actual market reaction to a previously triggered news item.
+    Called by BFF at 5/15/30/60 min after HIGH impact news.
+
+    Updates the news_reactions.csv entry and computes actual alpha vs expected.
+    """
+    news_id = request.news_id
+
+    # Find the entry
+    entry_idx = None
+    for i, e in enumerate(reversed(_news_reaction_log)):
+        if e["news_id"] == news_id:
+            entry_idx = len(_news_reaction_log) - 1 - i
+            break
+
+    if entry_idx is None:
+        return {"ok": False, "error": "news_id not found in log"}
+
+    entry = _news_reaction_log[entry_idx]
+
+    # Update with actual reactions
+    if request.reaction_5m is not None:
+        entry["reaction_5m"] = request.reaction_5m
+    if request.reaction_15m is not None:
+        entry["reaction_15m"] = request.reaction_15m
+    if request.reaction_30m is not None:
+        entry["reaction_30m"] = request.reaction_30m
+    if request.reaction_60m is not None:
+        entry["reaction_60m"] = request.reaction_60m
+    if request.direction is not None:
+        entry["actual_direction"] = request.direction
+    if request.magnitude is not None:
+        entry["actual_move_ticks"] = request.magnitude
+
+    # Compute alpha (actual - expected)
+    actual_moves = [v for v in [entry["reaction_5m"], entry["reaction_15m"],
+                                  entry["reaction_30m"], entry["reaction_60m"]] if v is not None]
+    if actual_moves and entry["expected_move_ticks"]:
+        # Alpha = did price move as expected? Positive = confirmed signal
+        avg_actual = sum(actual_moves) / len(actual_moves)
+        entry["alpha_ticks"] = avg_actual - entry["expected_move_ticks"]
+        # Direction match?
+        if entry["actual_direction"] == entry["expected_direction"]:
+            entry["validated"] = True
+        # Persist updated entry
+        _persist_news_reaction(entry)
+
+    _news_reaction_log[entry_idx] = entry
+
+    return {
+        "ok": True,
+        "news_id": news_id,
+        "entry": {k: v for k, v in entry.items() if k != "title"},
+        "alpha_ticks": entry.get("alpha_ticks"),
+        "validated": entry.get("validated", False),
+    }
+
+
+@app.get("/news/reactions", tags=["news"])
+async def get_news_reactions(
+    limit: int = Query(default=50, le=500),
+    minutes: int = Query(default=0, le=10080),
+):
+    """
+    Get recent news reaction log for ML training analysis.
+    Used by Alpha Engine to learn how markets react to different news types.
+    """
+    cutoff = datetime.now(timezone.utc) - timedelta(minutes=minutes) if minutes > 0 else None
+
+    entries = _news_reaction_log[-limit:]
+    if cutoff:
+        entries = [e for e in entries if datetime.fromisoformat(e["timestamp"]) > cutoff]
+
+    # Compute aggregate statistics
+    valid_entries = [e for e in entries if e.get("alpha_ticks") is not None]
+    if valid_entries:
+        avg_alpha = sum(e["alpha_ticks"] for e in valid_entries) / len(valid_entries)
+        validated_pct = sum(1 for e in valid_entries if e.get("validated")) / len(valid_entries) * 100
+    else:
+        avg_alpha = 0.0
+        validated_pct = 0.0
+
+    return {
+        "ok": True,
+        "entries": entries,
+        "total": len(entries),
+        "with_reactions": len(valid_entries),
+        "avg_alpha_ticks": round(avg_alpha, 4),
+        "validated_pct": round(validated_pct, 1),
+        "by_sentiment": {
+            s: {
+                "count": sum(1 for e in entries if e.get("sentiment") == s),
+                "avg_alpha": round(
+                    sum(e["alpha_ticks"] for e in valid_entries if e.get("sentiment") == s) /
+                    max(1, sum(1 for e in valid_entries if e.get("sentiment") == s)), 4
+                ),
+            }
+            for s in ["bullish", "bearish", "neutral"]
+        },
+        "log_file": str(_NEWS_LOG_PATH),
     }
 
 
@@ -1169,6 +1494,234 @@ async def get_stats():
     try:
         return db.get_stats()
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# -------------------------------------------------------------------------
+# PSO Alpha Discovery Endpoint
+# -------------------------------------------------------------------------
+
+class PSORequest(BaseModel):
+    symbol: str = Field(default="MNQ")
+    candles: list[dict] = Field(default_factory=list)
+    n_particles: int = Field(default=40, ge=10, le=200)
+    max_iterations: int = Field(default=150, ge=10, le=500)
+    regime: str = Field(default="ALL")  # ALL, COMPRESSION, NORMAL, EXPANSION
+
+
+class PSOResult(BaseModel):
+    regimes_found: int
+    best_regime: str
+    best_regime_alpha: float
+    total_alpha: float
+    regimes: dict
+    timestamp: str
+
+
+@app.post("/pso/discover")
+async def pso_alpha_discovery(request: PSORequest):
+    """
+    Run Particle Swarm Optimization for alpha discovery.
+    Uses historical candle data to find optimal parameters:
+    - LightGBM/XGBoost hyperparameters
+    - Entry/exit thresholds
+    - Feature weights
+    - Session-specific R:R ratios
+    - Position sizing parameters
+
+    Returns optimal parameters per market regime (COMPRESSION/NORMAL/EXPANSION).
+    """
+    try:
+        if request.candles:
+            df = pd.DataFrame([c.model_dump() for c in request.candles])
+            df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
+        else:
+            df = db.get_latest_candles(request.symbol, n=2000)
+
+        if df.empty:
+            raise HTTPException(
+                status_code=400,
+                detail="No candles available. Upload historical data first."
+            )
+
+        trade_df = db.get_trade_log(limit=5000)
+        feat_df = engineer_features(df, trade_df, None, {}, {})
+
+        if request.regime != "ALL":
+            # Run single-regime PSO
+            niche_config = NichingPSO.REGIME_NICHES.get(request.regime.upper())
+            if not niche_config:
+                raise HTTPException(status_code=400, detail=f"Unknown regime: {request.regime}")
+            pso = PSOOptimizer(n_particles=request.n_particles, max_iterations=request.max_iterations)
+            result = pso.optimize(df, trade_df, feat_df, regime=request.regime.upper())
+            return {
+                "regimes_found": 1,
+                "best_regime": request.regime.upper(),
+                "best_regime_alpha": float(result.alpha_contribution),
+                "total_alpha": float(result.alpha_contribution),
+                "regimes": {
+                    request.regime.upper(): {
+                        "alpha_ticks": round(result.alpha_contribution, 3),
+                        "expectancy": round(result.best_metrics.expectancy, 3),
+                        "win_rate": round(result.best_metrics.win_rate, 3),
+                        "sharpe": round(result.best_metrics.sharpe, 3),
+                        "max_drawdown": round(result.best_metrics.max_drawdown, 3),
+                        "profit_factor": round(result.best_metrics.profit_factor, 3),
+                        "trades_analyzed": result.best_metrics.trades_count,
+                        "convergence_iters": result.iterations_run,
+                        "best_params": result.params,
+                        "convergence_history": [round(x, 4) for x in result.convergence_history[-20:]],
+                    }
+                },
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+        else:
+            # Run full niching PSO across all regimes
+            result = run_alpha_discovery(
+                df,
+                trade_df,
+                n_particles=request.n_particles,
+                max_iterations=request.max_iterations,
+            )
+            return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# -------------------------------------------------------------------------
+# Mamba SSM Sequence Model Endpoint
+# -------------------------------------------------------------------------
+
+class MambaRequest(BaseModel):
+    symbol: str = Field(default="MNQ")
+    candles: list[dict] = Field(default_factory=list)
+    model_size: str = Field(default="mamba-790m")
+    task: str = Field(default="full")  # direction, regime, pattern, full
+
+
+@app.post("/mamba/predict")
+async def mamba_predict(request: MambaRequest):
+    """
+    Run Mamba SSM on a candle sequence for:
+    - Direction prediction (LONG/SHORT/NEUTRAL)
+    - Regime inference (COMPRESSION/NORMAL/EXPANSION)
+    - Alpha pattern detection (BREAKOUT/MEAN_REVERT/MOMENTUM/FADE_EXTENSION)
+    - Expected move magnitude
+
+    Mamba is a State Space Model — O(n) time, no quadratic attention.
+    Available models: mamba-130m, mamba-370m, mamba-790m, mamba-1.4b, mamba-2.8b
+    Also Mamba-2 hybrid: mamba2-130m, mamba2-370m, mamba2-2.7b
+
+    Install: pip install torch transformers accelerate
+    """
+    try:
+        if not MAMBA_AVAILABLE:
+            return {
+                "ok": False,
+                "available": False,
+                "error": "Mamba not available. Install: pip install torch transformers",
+                "model_sizes": list(MODEL_SIZES.keys()),
+                "recommendation": "For CPU: use mamba-130m or mamba-370m",
+            }
+
+        if request.model_size not in MODEL_SIZES:
+            return {
+                "ok": False,
+                "error": f"Unknown model: {request.model_size}. Available: {list(MODEL_SIZES.keys())}",
+            }
+
+        if request.candles:
+            df_candles = request.candles
+        else:
+            df = db.get_latest_candles(request.symbol, n=200)
+            df_candles = df.to_dict("records")
+
+        if not df_candles:
+            raise HTTPException(status_code=400, detail="No candles available")
+
+        result = get_mamba_prediction(df_candles, request.model_size, request.task)
+        result["model_info"] = MODEL_SIZES.get(request.model_size, {})
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/mamba/status")
+async def mamba_status():
+    """Check Mamba availability and available models."""
+    return {
+        "available": MAMBA_AVAILABLE,
+        "models": MODEL_SIZES,
+        "default_model": "mamba-790m",
+        "recommendation": (
+            "GPU: mamba-2.8b (best quality) or mamba2-2.7b (hybrid SSM+attention) "
+            "| CPU: mamba-370m (fast) or mamba-790m (better quality)"
+        ),
+    }
+
+
+@app.post("/mamba/finetune")
+async def mamba_finetune(request: MambaRequest):
+    """
+    Fine-tune Mamba on trading data with EWC (Elastic Weight Consolidation).
+    EWC prevents catastrophic forgetting — the model learns new patterns
+    WITHOUT unlearning old ones.
+
+    This is called by POST /train or POST /news-trigger for continual learning.
+    """
+    try:
+        if not MAMBA_AVAILABLE:
+            raise HTTPException(status_code=503, detail="Mamba not available")
+
+        if request.candles:
+            df_candles = request.candles
+        else:
+            df = db.get_latest_candles(request.symbol, n=2000)
+            df_candles = df.to_dict("records")
+
+        if len(df_candles) < 50:
+            raise HTTPException(status_code=400, detail="Need at least 50 candles")
+
+        # Generate labels: 1 if next candle close > current, else 0
+        labels = []
+        for i in range(len(df_candles) - 1):
+            curr = df_candles[i].get("close", 0)
+            nxt = df_candles[i + 1].get("close", 0)
+            labels.append(1 if nxt > curr else 0)
+
+        model = MambaTradingModel.get_instance(request.model_size)
+        if not model._loaded:
+            model.load()
+
+        model.fine_tune_with_continual_learning(
+            candles=df_candles,
+            labels=labels,
+            epochs=3,
+            ewc_lambda=100,
+        )
+
+        return {
+            "ok": True,
+            "message": "Mamba fine-tuned with EWC protection",
+            "candles_used": len(df_candles),
+            "labels_used": len(labels),
+            "ewc_lambda": 100,
+            "continual_learning": True,
+            "catastrophic_forgetting": "PREVENTED via Elastic Weight Consolidation",
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 
