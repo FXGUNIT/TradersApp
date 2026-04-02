@@ -1,0 +1,77 @@
+# DVC Pipeline Definition — TradersApp ML Data
+# Data Version Control pipeline for reproducible ML workflows
+
+# Stage 1: Load and validate incoming data
+stages:
+  load_candles:
+    cmd: python ml-engine/data/load_ninjatrader_csv.py
+    deps:
+      - ml-engine/data/load_ninjatrader_csv.py
+    params:
+      - data.csv_path
+    outs:
+      - ml-engine/data/trading_data.db
+    metrics:
+      - ml-engine/data/load_stats.json:
+          cache: false
+    plots:
+      - ml-engine/data/candle_stats.csv:
+          cache: false
+
+  # Stage 2: Feature engineering
+  features:
+    cmd: python ml-engine/features/feature_pipeline.py
+    deps:
+      - ml-engine/data/trading_data.db
+      - ml-engine/features/feature_pipeline.py
+    params:
+      - features.window_size
+      - features.indicators
+    outs:
+      - ml-engine/data/features.parquet
+    metrics:
+      - ml-engine/data/feature_stats.json:
+          cache: false
+
+  # Stage 3: Train regime models
+  train_regime:
+    cmd: python ml-engine/models/regime/train_regime_models.py
+    deps:
+      - ml-engine/data/features.parquet
+      - ml-engine/models/regime/hmm_regime.py
+      - ml-engine/models/regime/fp_fk_regime.py
+      - ml-engine/models/regime/anomalous_diffusion.py
+    params:
+      - regime.n_states
+      - regime.test_size
+    outs:
+      - ml-engine/models/regime/hmm_model.pkl
+      - ml-engine/models/regime/fp_fk_model.pkl
+      - ml-engine/models/regime/ad_model.pkl
+
+  # Stage 4: Train direction model
+  train_direction:
+    cmd: python ml-engine/models/direction/train_direction_model.py
+    deps:
+      - ml-engine/data/features.parquet
+      - ml-engine/models/direction/direction_model.py
+    params:
+      - direction.test_size
+      - direction.model_type
+    outs:
+      - ml-engine/models/direction/lgb_model.pkl
+
+  # Stage 5: Consensus evaluation
+  evaluate:
+    cmd: python ml-engine/inference/evaluate_consensus.py
+    deps:
+      - ml-engine/models/regime/hmm_model.pkl
+      - ml-engine/models/regime/fp_fk_model.pkl
+      - ml-engine/models/regime/ad_model.pkl
+      - ml-engine/models/direction/lgb_model.pkl
+      - ml-engine/data/features.parquet
+    params:
+      - evaluation.metrics
+    metrics:
+      - ml-engine/data/evaluation_metrics.json:
+          cache: false

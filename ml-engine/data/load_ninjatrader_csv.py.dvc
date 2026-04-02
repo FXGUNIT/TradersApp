@@ -1,0 +1,5 @@
+outs:
+- md5: 147ccf5e8908af79a85d6794de39e4cd
+  size: 4899
+  hash: md5
+  path: load_ninjatrader_csv.py

@@ -1,4 +1,14 @@
 
+# SQLite databases (generated at runtime)
+*.db
+*.db-shm
+*.db-wal
+
+# DVC cache and storage (large binary cache)
+.dvc/cache/
+.dvc/tmp/
+ml-engine/dvc-storage/
+
 # Python bytecode (never commit compiled .pyc files)
 __pycache__/
 *.py[cod]

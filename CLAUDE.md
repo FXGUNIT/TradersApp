@@ -386,3 +386,128 @@ class BaseResponse(BaseModel):
 - [ ] Never catch `Exception` broadly — catch specific exceptions
 - [ ] Never use `eval()` or `new Function()` — use `JSON.parse` for JSON
 - [ ] Never make the ML engine depend on the BFF — BFF calls ML, never reverse
+
+---
+
+## Evidence First Rule
+
+**Before writing ANY code**, Claude/OpenClaw MUST list:
+```
+Evidence examined: [exact file:line references]
+```
+
+Never accept code on the first try. Always require a second "fix" pass with real runtime evidence (test output, error logs). This cuts hallucinated bugs by forcing grounded reasoning.
+
+---
+
+## Tests First Rule
+
+For any ML code change:
+1. Write the test first (describe expected input/output shape)
+2. Run the test
+3. Paste exact failure output back
+4. Only then implement to fix real failures
+
+Never write implementation code before the test is defined.
+
+---
+
+## Debug Protocol (8 Steps)
+
+When a bug appears, follow this order. Human does steps 1-3 first:
+
+1. **Reproduce** — Confirm the bug exists with exact steps
+2. **Log** — Capture exact error message, stack trace, timestamps
+3. **Isolate** — Narrow down to the exact file/function/line
+4. **Measure** — Add timing/logging to quantify the problem
+5. **Hypothesize** — Form theory based on evidence above
+6. **Fix** — Implement the minimal fix
+7. **Verify** — Run same reproduction steps, confirm fix
+8. **Document** — Add test case or log to prevent recurrence
+
+---
+
+## Performance Rules
+
+| Metric | Target | Enforced |
+|--------|--------|----------|
+| ML Consensus latency | < 200ms | Hard limit |
+| BFF → ML Engine | < 5s timeout | Circuit breaker |
+| BFF → News | < 3s timeout | Circuit breaker |
+| Circuit breaker | 5 failures / 30s | Auto-open |
+| Cache TTL (consensus) | 60s | Redis or in-memory |
+| Cache TTL (regime) | 300s | Redis or in-memory |
+
+Rules:
+- ML predictions: cache with Redis (TTL per endpoint type)
+- Heavy operations: thread pool or worker process, never block main thread
+- In React: use `React.memo` + `useMemo` + `useCallback` aggressively
+- No inline styles — CSS classes only
+- Candle data loading: max 10k rows per request, paginate larger queries
+- Model inference: lazy-load models, unload after 5 min inactivity
+- Feature computation: precompute on load, cache per symbol/timeframe
+
+---
+
+## Trade-off Rules
+
+When Claude/OpenClaw proposes a solution, the priority order is:
+
+1. **Safety over speed** — A safe system that is slightly slower is preferred
+2. **Correctness over elegance** — Simple and correct beats clever and broken
+3. **Robustness over optimization** — Never optimize at the cost of edge case handling
+4. **Readability over brevity** — Future humans (including future Claude) must understand code
+5. **Explicit over implicit** — No magic, no hidden state, no silent fallbacks
+
+In order routing: safety > correctness > robustness > readability > performance
+
+---
+
+## Security Checklist (Review Before Every Commit)
+
+After any code change touching orders, data, or auth, human manually reviews:
+
+- [ ] No secrets hardcoded (API keys, tokens, passwords)
+- [ ] No `eval()` or `new Function()` usage
+- [ ] Input validation on all external data (params, body, headers)
+- [ ] SQL injection prevention (parameterized queries only)
+- [ ] No user-controlled file paths (path traversal prevention)
+- [ ] Rate limiting on all public endpoints
+- [ ] Circuit breaker on all external calls
+- [ ] Timeout on all external calls (5s ML, 3s news)
+- [ ] CORS properly configured (no wildcard in production)
+- [ ] Error messages don't expose internal paths or system details
+
+Review takes 60 seconds. Catches almost everything.
+
+---
+
+## Paper Trading Rule (Non-Negotiable)
+
+**ALL signals must be paper traded for 1 full trading week before any live use.**
+
+Definition of "paper trade": Log every consensus signal with entry, stop, target, and outcome. Compare against actual price movement. Track win rate, RRR, and session performance.
+
+Rules:
+- Paper trade log must exist before any live consideration
+- All 6 model families must be tested in paper before weighting changes
+- Any new regime detection change requires 1 week paper trade
+- Human trader reviews paper trade log weekly
+
+---
+
+## Required Project Files
+
+Every session starts with access to these (do not work without them):
+
+| File | Purpose | When to Read |
+|------|---------|-------------|
+| CLAUDE.md | Architecture bible | Every session |
+| SPEC.md | Requirements & blockers | Every session |
+| EDGE-CASES.md | Market scenarios | Data/risk/execution code |
+| DOMAIN-RULES.md | Trading rules | Signal/risk code |
+| LEGACY-PATTERNS.md | Existing patterns | ML/integration code |
+| PROMPT-TEMPLATE.md | Session starter | Every new session |
+
+**Anti-pattern:** Starting a session without reviewing relevant sections of these files.
+
