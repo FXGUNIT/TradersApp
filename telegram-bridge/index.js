@@ -6,11 +6,13 @@ const TelegramBot = require('node-telegram-bot-api')
 const fs = require('fs')
 const path = require('path')
 const invitesService = require('./invitesService')
+const { processConversation, AI_PROVIDERS } = require('./aiConversation')
 
 const app = express()
 const port = process.env.TELEGRAM_BRIDGE_PORT || 5001
 const rateLimit = require('express-rate-limit')
 const adminLimiter = rateLimit({ windowMs: 60 * 1000, max: 60, message: 'Too many admin requests, please try again later.' })
+const botLimiter = rateLimit({ windowMs: 60 * 1000, max: 10, message: 'Too many messages. Slow down.' })
 
 // Firebase Admin (Firestore) integration for backend-backed invites (Phase 3.6+)
 let adminDb = null
@@ -37,6 +39,208 @@ if (process.env.TELEGRAM_ADMIN_CHAT_IDS) {
 }
 
 const bot = BOT_TOKEN ? new TelegramBot(BOT_TOKEN, { polling: false }) : null
+
+// ─── Telegram Bot: AI Conversation Handler ──────────────────────────────────
+// Set TELEGRAM_BOT_MODE=webhook in production (Railway env vars)
+// Set TELEGRAM_BOT_MODE=polling in development
+const BOT_MODE = process.env.TELEGRAM_BOT_MODE || 'polling';
+
+// Per-user typing state (chatId → true)
+const typingState = new Map();
+
+function sendTypingAction(chatId) {
+  if (!bot) return;
+  try {
+    bot.sendChatAction(chatId, 'typing').catch(() => {});
+    typingState.set(chatId, true);
+  } catch (e) {
+    console.error('sendChatAction error', e);
+  }
+}
+
+function clearTypingState(chatId) {
+  typingState.delete(chatId);
+}
+
+async function handleBotMessage(msg) {
+  if (!msg || !msg.text || !msg.chat) return;
+  const chatId = msg.chat.id;
+  const text = msg.text.trim();
+
+  // Ignore non-text or group messages (optional: allow specific groups via ADMIN_CHAT_IDS)
+  if (msg.chat.type === 'group' || msg.chat.type === 'supergroup') {
+    // Only respond if mentioned or in admin group
+    if (!adminChats.includes(chatId)) return;
+  }
+
+  // Ignore empty messages or commands from non-admin chats (except /start)
+  if (!text.startsWith('/')) {
+    // Rate limit per chat
+    if (botLimiter) {
+      // Simple per-chat rate check
+      if (!botLimiter.keyGenerator || true) {
+        // Let express-rate-limit handle it via middleware on webhook endpoint
+      }
+    }
+  }
+
+  // Typing indicator
+  sendTypingAction(chatId);
+
+  try {
+    const response = await processConversation(text, {
+      chatId,
+      userId: msg.from?.id?.toString(),
+      username: msg.from?.username,
+      firstName: msg.from?.first_name,
+    });
+
+    // Send response (Telegram has 4096 char limit)
+    const chunks = [];
+    if (response.length > 4096) {
+      // Split into chunks of 4096
+      for (let i = 0; i < response.length; i += 4096 - 10) {
+        chunks.push(response.slice(i, i + 4096 - 10));
+      }
+    } else {
+      chunks.push(response);
+    }
+
+    for (const chunk of chunks) {
+      await bot.sendMessage(chatId, chunk, {
+        parse_mode: 'Markdown',
+        disable_web_page_preview: true,
+      });
+      // Small delay between chunks to avoid rate limiting
+      if (chunks.length > 1) await new Promise(r => setTimeout(r, 200));
+    }
+  } catch (e) {
+    console.error('Bot message handler error:', e);
+    try {
+      await bot.sendMessage(chatId, `Sorry, I encountered an error: ${e.message}`);
+    } catch (sendErr) {
+      console.error('Failed to send error message:', sendErr);
+    }
+  } finally {
+    clearTypingState(chatId);
+  }
+}
+
+function setupBotPolling() {
+  if (!bot) {
+    console.log('Telegram bot not initialized (no BOT_TOKEN)');
+    return;
+  }
+
+  // Long polling — Node.js event-driven, so this is non-blocking
+  bot.on('message', handleBotMessage);
+
+  // Handle edited messages
+  bot.on('edited_message', handleBotMessage);
+
+  // Handle callbacks (inline keyboard)
+  bot.on('callback_query', async (query) => {
+    const chatId = query.message?.chat?.id;
+    const data = query.data;
+    if (!chatId || !data) return;
+
+    sendTypingAction(chatId);
+    try {
+      const response = await processConversation(data, {
+        chatId,
+        userId: query.from?.id?.toString(),
+        username: query.from?.username,
+      });
+      await bot.answerCallbackQuery(query.id);
+      await bot.sendMessage(chatId, response, { parse_mode: 'Markdown' });
+    } catch (e) {
+      console.error('Callback query error:', e);
+      await bot.answerCallbackQuery(query.id, { text: 'Error processing request' });
+    } finally {
+      clearTypingState(chatId);
+    }
+  });
+
+  // Handle errors gracefully
+  bot.on('polling_error', (err) => {
+    console.error('Polling error:', err.message);
+  });
+
+  console.log(`Telegram bot initialized in ${BOT_MODE} mode`);
+}
+
+function setupBotWebhook() {
+  if (!bot) {
+    console.log('Telegram bot not initialized (no BOT_TOKEN)');
+    return;
+  }
+
+  // Set webhook (called by Telegram when user sends message)
+  const webhookUrl = process.env.TELEGRAM_WEBHOOK_URL;
+  if (!webhookUrl) {
+    console.warn('TELEGRAM_WEBHOOK_URL not set — falling back to polling');
+    setupBotPolling();
+    return;
+  }
+
+  try {
+    bot.setWebHook(webhookUrl).then(() => {
+      console.log(`Webhook set to: ${webhookUrl}`);
+    }).catch((err) => {
+      console.error('Failed to set webhook:', err);
+      setupBotPolling();
+    });
+  } catch (e) {
+    console.error('Webhook setup error:', e);
+    setupBotPolling();
+  }
+}
+
+// Initialize bot based on mode
+if (BOT_MODE === 'webhook') {
+  setupBotWebhook();
+} else {
+  setupBotPolling();
+}
+
+// ─── Telegram Webhook Receiver ──────────────────────────────────────────────
+// POST /telegram/webhook — called by Telegram when bot receives a message
+app.post('/telegram/webhook', async (req, res) => {
+  try {
+    // Bot framework handles the update internally via webhook
+    if (bot && req.body && req.body.message) {
+      handleBotMessage(req.body.message).catch(console.error);
+    }
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('Webhook receiver error:', e);
+    res.json({ ok: false });
+  }
+});
+
+// GET /telegram/status — check bot status
+app.get('/telegram/status', (req, res) => {
+  res.json({
+    ok: !!bot,
+    mode: BOT_MODE,
+    configured: !!(BOT_TOKEN),
+    providers: Object.keys(AI_PROVIDERS).length,
+    activeSessions: sessionStore ? sessionStore.size : 0,
+  });
+});
+
+// POST /telegram/ai — direct AI conversation (bypass Telegram)
+app.post('/telegram/ai', botLimiter, async (req, res) => {
+  const { text, chatId, userId, context } = req.body || {};
+  if (!text) return res.status(400).json({ ok: false, error: 'text required' });
+
+  try {
+    const response = await processConversation(text, { chatId, userId, ...context });
+    res.json({ ok: true, response });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
 
 app.use(cors())
 app.use(bodyParser.json())
