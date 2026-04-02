@@ -7,7 +7,7 @@ import sys
 import time
 import traceback
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 import numpy as np
@@ -29,6 +29,20 @@ from training.model_store import ModelStore
 from inference.predictor import Predictor
 from inference.consensus_aggregator import ConsensusAggregator
 from models.regime.regime_ensemble import RegimeEnsemble
+from backtest.pbo_engine import (
+    PBOConfig,
+    WFPBOConfig,
+    evaluate_pbo,
+    walk_forward_pbo,
+    monte_carlo_pbo,
+    monte_carlo_returns,
+    run_full_pbo_evaluation,
+    auto_tune_to_pass_pbo,
+    momentum_strategy,
+    mean_reversion_strategy,
+    regime_switching_strategy,
+    sharpe_ratio,
+)
 
 
 # -------------------------------------------------------------------------
@@ -140,6 +154,70 @@ class UploadCandlesRequest(BaseModel):
 class UploadTradesRequest(BaseModel):
     symbol: str = Field(default="MNQ")
     trades: list[TradeInput]
+
+
+# -------------------------------------------------------------------------
+# Backtest / PBO Pydantic models
+# -------------------------------------------------------------------------
+
+class PBOBacktestRequest(BaseModel):
+    """Run CPCV-based PBO evaluation on strategy variants."""
+    strategy_name: str = Field(default="momentum")
+    symbol: str = Field(default="MNQ")
+    strategy_type: str = Field(default="momentum", pattern="^(momentum|mean_reversion|regime_switching)$")
+    lookback: list[int] = Field(default_factory=lambda: [5, 10, 20, 30, 50])
+    threshold: list[float] = Field(default_factory=lambda: [0.005, 0.01, 0.015, 0.02])
+    n_trials: int = Field(default=100, ge=20, le=500)
+    n_permutations: int = Field(default=100, ge=20, le=500)
+    n_train_splits: int = Field(default=5, ge=2, le=10)
+    purge_pct: float = Field(default=0.1, ge=0.0, le=0.3)
+    embargo_pct: float = Field(default=0.1, ge=0.0, le=0.3)
+    confidence_level: float = Field(default=0.05, ge=0.01, le=0.2)
+    min_trades: int = Field(default=100, ge=20)
+
+
+class MCBacktestRequest(BaseModel):
+    """Run Monte Carlo PBO evaluation."""
+    strategy_name: str = Field(default="momentum")
+    symbol: str = Field(default="MNQ")
+    strategy_type: str = Field(default="momentum", pattern="^(momentum|mean_reversion|regime_switching)$")
+    n_simulations: int = Field(default=1000, ge=100, le=5000)
+    n_trials: int = Field(default=50, ge=10, le=200)
+    block_size: int = Field(default=20, ge=5, le=100)
+    min_trades: int = Field(default=100, ge=20)
+
+
+class FullPBOBacktestRequest(BaseModel):
+    """Run all 3 PBO modes: CPCV + Walk-Forward + Monte Carlo."""
+    strategy_name: str = Field(default="momentum")
+    symbol: str = Field(default="MNQ")
+    strategy_type: str = Field(default="momentum", pattern="^(momentum|mean_reversion|regime_switching)$")
+    lookback: list[int] = Field(default_factory=lambda: [5, 10, 20, 30, 50])
+    threshold: list[float] = Field(default_factory=lambda: [0.005, 0.01, 0.015, 0.02])
+    n_trials: int = Field(default=100, ge=20, le=500)
+    n_simulations: int = Field(default=1000, ge=100, le=5000)
+    min_trades: int = Field(default=100, ge=20)
+
+
+class AutotuneRequest(BaseModel):
+    """Auto-tune ML model hyperparameters to minimize PBO."""
+    strategy_name: str = Field(default="momentum")
+    symbol: str = Field(default="MNQ")
+    strategy_type: str = Field(default="momentum", pattern="^(momentum|mean_reversion|regime_switching)$")
+    initial_grid: dict = Field(default_factory=lambda: {
+        "lookback": [5, 10, 20, 30],
+        "threshold": [0.005, 0.01, 0.015],
+    })
+    target_pbo: float = Field(default=0.05, ge=0.01, le=0.2)
+    max_refinements: int = Field(default=3, ge=1, le=5)
+    min_trades: int = Field(default=100, ge=20)
+
+
+class BacktestTradesRequest(BaseModel):
+    """Upload trade log for PBO evaluation."""
+    symbol: str = Field(default="MNQ")
+    trades: list[TradeInput]
+    returns_override: list[float] | None = Field(default=None)  # precomputed returns
 
 
 # -------------------------------------------------------------------------
@@ -452,6 +530,414 @@ async def get_regime(request: RegimeRequest):
         raise
     except Exception as e:
         traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# -------------------------------------------------------------------------
+# Backtest / PBO Endpoints
+# -------------------------------------------------------------------------
+
+def _build_returns(
+    symbol: str,
+    trades: list[dict] | None,
+    returns_override: list[float] | None,
+    min_trades: int,
+) -> np.ndarray:
+    """
+    Build returns array from trade log or precomputed returns.
+    Returns: 1D numpy array of tick-level or trade-level returns.
+    """
+    if returns_override is not None:
+        arr = np.array(returns_override, dtype=float)
+        if len(arr) < min_trades:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Need {min_trades} returns, got {len(arr)}"
+            )
+        return arr
+
+    if trades:
+        pnl = [t.get("pnl_ticks", 0.0) or 0.0 for t in trades]
+        arr = np.array(pnl, dtype=float)
+        if len(arr) < min_trades:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Need {min_trades} trades, got {len(trades)}"
+            )
+        return arr
+
+    # Fallback: use candle returns from DB
+    try:
+        end = datetime.now(timezone.utc).isoformat()
+        start = (datetime.now(timezone.utc) - timedelta(days=90)).isoformat()
+        df = db.get_candles(start, end, symbol, limit=10000)
+        if df.empty:
+            raise HTTPException(status_code=400, detail="No candle data. Upload data first.")
+        returns = np.diff(df["close"].values) / df["close"].values[:-1]
+        if len(returns) < min_trades:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Need {min_trades} candles, got {len(returns)}"
+            )
+        return returns
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to build returns: {e}")
+
+
+def _get_strategy_fn(stype: str):
+    """Map strategy type string to function."""
+    return {
+        "momentum": momentum_strategy,
+        "mean_reversion": mean_reversion_strategy,
+        "regime_switching": regime_switching_strategy,
+    }.get(stype, momentum_strategy)
+
+
+def _serialize_pbo_result(result) -> dict:
+    """Convert PBOResult dataclass to dict for JSON serialization."""
+    return {
+        "strategy_name": result.strategy_name,
+        "pbo": round(result.pbo, 6),
+        "sharpe_oracle": round(result.sharpe_oracle, 4),
+        "sharpe_oos": round(result.sharpe_oos, 4),
+        "sharpe_avg": round(result.sharpe_avg, 4),
+        "sharpe_std": round(result.sharpe_std, 4),
+        "sharpe_diff": round(result.sharpe_diff, 4),
+        "sharpe_sharpe": round(result.sharpe_sharpe, 4),
+        "sharpe_prob": round(result.sharpe_prob, 4),
+        "n_trials": result.n_trials,
+        "n_passed": result.n_passed,
+        "pass_rate": round(result.pass_rate, 4),
+        "best_variant_idx": result.best_variant_idx,
+        "best_params": result.best_params,
+        "oos_return_pct": round(result.oos_return_pct, 4),
+        "overfit_bands": [round(x, 4) for x in result.overfit_bands],
+        "passing": result.passing,
+    }
+
+
+@app.post("/backtest/pbo", tags=["backtest"])
+async def run_pbo_backtest(request: PBOBacktestRequest):
+    """
+    Run Combinatorial Purged Cross-Validation (CPCV) PBO evaluation.
+
+    Implements Marco Lopez de Prado's PBO methodology:
+    1. Grid search over strategy hyperparameter variants
+    2. CPCV splits with train/purge/embargo buffers
+    3. Permutation test: shuffle Sharpe distribution N times
+    4. PBO = fraction of shuffles where best < median
+
+    Returns per-model votes + consensus signal.
+    Pass if PBO < confidence_level (default 0.05).
+    """
+    try:
+        returns = _build_returns(request.symbol, None, None, request.min_trades)
+
+        # Build param grid
+        param_grid = {
+            "lookback": request.lookback,
+            "threshold": request.threshold,
+        }
+
+        config = PBOConfig(
+            n_trials=request.n_trials,
+            n_permutations=request.n_permutations,
+            n_train_splits=request.n_train_splits,
+            purge_pct=request.purge_pct,
+            embargo_pct=request.embargo_pct,
+            confidence_level=request.confidence_level,
+            random_state=42,
+        )
+
+        strategy_fn = _get_strategy_fn(request.strategy_type)
+
+        result = evaluate_pbo(
+            strategy_name=request.strategy_name,
+            returns=returns,
+            strategy_fn=strategy_fn,
+            param_grid=param_grid,
+            config=config,
+            verbose=True,
+        )
+
+        return {
+            "ok": True,
+            "mode": "cpcv_pbo",
+            "strategy_name": request.strategy_name,
+            "strategy_type": request.strategy_type,
+            "returns_count": int(len(returns)),
+            "param_grid": param_grid,
+            **_serialize_pbo_result(result),
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/backtest/mc", tags=["backtest"])
+async def run_mc_backtest(request: MCBacktestRequest):
+    """
+    Run Monte Carlo PBO evaluation.
+
+    Generates synthetic return paths via block bootstrap (regime-aware)
+    and evaluates PBO across N simulated market paths.
+
+    Pass if PBO < 0.05.
+    """
+    try:
+        returns = _build_returns(request.symbol, None, None, request.min_trades)
+
+        param_grid = {
+            "lookback": [5, 10, 20, 30],
+            "threshold": [0.005, 0.01, 0.015],
+        }
+
+        config = PBOConfig(
+            n_trials=request.n_trials,
+            n_permutations=50,
+            random_state=42,
+        )
+
+        strategy_fn = _get_strategy_fn(request.strategy_type)
+
+        result = monte_carlo_pbo(
+            strategy_name=request.strategy_name,
+            returns=returns,
+            strategy_fn=strategy_fn,
+            param_grid=param_grid,
+            n_simulations=request.n_simulations,
+            pbo_config=config,
+            random_state=42,
+            verbose=True,
+        )
+
+        return {
+            "ok": True,
+            "mode": "monte_carlo_pbo",
+            "strategy_name": request.strategy_name,
+            "strategy_type": request.strategy_type,
+            "returns_count": int(len(returns)),
+            "n_simulations": result["n_simulations"],
+            "n_variants": result["n_variants"],
+            "pbo": round(result["pbo"], 6),
+            "passing": result["passing"],
+            "aggregate": {k: round(v, 4) if isinstance(v, float) else v
+                          for k, v in result["aggregate"].items()},
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/backtest/full", tags=["backtest"])
+async def run_full_pbo(request: FullPBOBacktestRequest):
+    """
+    Run ALL 3 PBO evaluation modes and return unified result.
+
+    Modes:
+      1. CPCV PBO — Combinatorial Purged Cross-Validation
+      2. Walk-Forward PBO — Expanding window with OOS validation
+      3. Monte Carlo PBO — Block bootstrap synthetic paths
+
+    Strategy PASSES overall if ≥ 2/3 modes pass (PBO < 0.05).
+
+    This is the primary backtest endpoint for model self-validation.
+    Each ML model should call this after training to verify it passes PBO.
+    """
+    try:
+        returns = _build_returns(request.symbol, None, None, request.min_trades)
+
+        param_grid = {
+            "lookback": request.lookback,
+            "threshold": request.threshold,
+        }
+
+        strategy_fn = _get_strategy_fn(request.strategy_type)
+
+        results = run_full_pbo_evaluation(
+            strategy_name=request.strategy_name,
+            returns=returns,
+            strategy_fn=strategy_fn,
+            param_grid=param_grid,
+            n_trials=request.n_trials,
+            verbose=True,
+        )
+
+        # Serialize each mode's result
+        output = {
+            "ok": True,
+            "mode": "full_pbo",
+            "strategy_name": request.strategy_name,
+            "strategy_type": request.strategy_type,
+            "returns_count": int(len(returns)),
+            "n_trials": request.n_trials,
+            "n_simulations": request.n_simulations,
+            "overall_passing": results["overall_passing"],
+            "modes_passed": results["modes_passed"],
+            "total_modes": results["total_modes"],
+            "passing_modes": results["passing_modes"],
+        }
+
+        # CPCV results
+        if results.get("cpcv"):
+            cpcv = results["cpcv"]
+            output["cpcv"] = {
+                "pbo": round(cpcv["pbo"], 6),
+                "sharpe_oos": round(cpcv["sharpe_oos"], 4),
+                "sharpe_avg": round(cpcv["sharpe_avg"], 4),
+                "sharpe_sharpe": round(cpcv["sharpe_sharpe"], 4),
+                "passing": cpcv["passing"],
+                "best_params": cpcv.get("best_params", {}),
+            }
+
+        # Walk-forward results
+        if results.get("walk_forward"):
+            wf = results["walk_forward"]
+            output["walk_forward"] = {
+                "n_windows": wf.get("n_windows", 0),
+                "avg_oos_sharpe": round(wf["avg_oos_sharpe"], 4),
+                "sharpe_consistency": round(wf["sharpe_consistency"], 4),
+                "avg_pbo": round(wf["avg_pbo"], 6),
+                "pbo_pass_rate": round(wf["pbo_pass_rate"], 4),
+                "passing": wf["passing"],
+            }
+
+        # Monte Carlo results
+        if results.get("monte_carlo"):
+            mc = results["monte_carlo"]
+            output["monte_carlo"] = {
+                "pbo": round(mc["pbo"], 6),
+                "avg_sharpe": round(mc["avg_sharpe"], 4),
+                "sharpe_sharpe": round(mc["sharpe_sharpe"], 4),
+                "sharpe_consistency": round(mc["sharpe_consistency"], 4),
+                "passing": mc["passing"],
+            }
+
+        return output
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/backtest/autotune", tags=["backtest"])
+async def autotune_pbo(request: AutotuneRequest):
+    """
+    Auto-tune a strategy's hyperparameters to pass PBO testing.
+
+    Algorithm:
+      1. Run PBO on initial grid
+      2. If PBO > target: narrow grid toward best params
+      3. Repeat up to max_refinements
+      4. Return the params that minimize PBO
+
+    Each ML model should call this as part of its training pipeline.
+    The auto-tuned params are then used in the model for live trading.
+    """
+    try:
+        returns = _build_returns(request.symbol, None, None, request.min_trades)
+
+        strategy_fn = _get_strategy_fn(request.strategy_type)
+
+        config = PBOConfig(
+            n_trials=max(20, request.n_trials // 2),
+            n_permutations=100,
+            n_train_splits=5,
+            purge_pct=0.1,
+            embargo_pct=0.1,
+            confidence_level=request.target_pbo,
+            random_state=42,
+        )
+
+        best_result, best_params = auto_tune_to_pass_pbo(
+            strategy_name=request.strategy_name,
+            returns=returns,
+            strategy_fn=strategy_fn,
+            initial_param_grid=request.initial_grid,
+            pbo_config=config,
+            target_pbo=request.target_pbo,
+            max_refinements=request.max_refinements,
+            verbose=True,
+        )
+
+        return {
+            "ok": True,
+            "mode": "autotune_pbo",
+            "strategy_name": request.strategy_name,
+            "strategy_type": request.strategy_type,
+            "returns_count": int(len(returns)),
+            "target_pbo": request.target_pbo,
+            "max_refinements": request.max_refinements,
+            "overall_passing": best_result.passing if best_result else False,
+            "final_pbo": round(best_result.pbo, 6) if best_result else None,
+            "best_params": best_params,
+            "best_sharpe_oos": round(best_result.sharpe_oos, 4) if best_result else None,
+            "best_sharpe_avg": round(best_result.sharpe_avg, 4) if best_result else None,
+            "sharpe_sharpe": round(best_result.sharpe_sharpe, 4) if best_result else None,
+            "passing": best_result.passing if best_result else False,
+            "recommendation": (
+                f"Use params {best_params} for {request.strategy_name}. "
+                f"PBO={round(best_result.pbo, 4) if best_result else 'N/A'} "
+                f"({'PASS' if best_result and best_result.passing else 'FAIL'} at "
+                f"target {request.target_pbo:.2%})"
+            ) if best_result else "Could not find passing parameters",
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/backtest/returns", tags=["backtest"])
+async def compute_returns_for_backtest(request: BacktestTradesRequest):
+    """
+    Convert uploaded trades into returns array for backtesting.
+    Returns the PnL sequence that can be passed to /backtest/full.
+    """
+    try:
+        if not request.trades:
+            raise HTTPException(status_code=400, detail="No trades provided")
+
+        if request.returns_override:
+            arr = np.array(request.returns_override, dtype=float)
+        else:
+            pnl = [t.get("pnl_ticks", 0.0) or 0.0 for t in request.trades]
+            arr = np.array(pnl, dtype=float)
+
+        if len(arr) < 50:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Need at least 50 trades/returns, got {len(arr)}"
+            )
+
+        return {
+            "ok": True,
+            "count": len(arr),
+            "mean_return": round(float(np.mean(arr)), 4),
+            "std_return": round(float(np.std(arr)), 4),
+            "sharpe": round(sharpe_ratio(arr), 4),
+            "positive_count": int(np.sum(arr > 0)),
+            "negative_count": int(np.sum(arr < 0)),
+            "total_return": round(float(np.sum(arr)), 4),
+            "max_drawdown": round(float(np.min(np.maximum.accumulate(arr) - arr)), 4),
+            "returns_preview": arr[:20].tolist(),
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
