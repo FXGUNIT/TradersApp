@@ -812,7 +812,7 @@ const MlConsensusTab = React.memo(function MlConsensusTab({ theme, normalizedThe
       </div>
     </div>
   );
-}
+});
 
 const WarRoomLoader = React.memo(function WarRoomLoader() {
   const [currentStage, setCurrentStage] = useState(councilStage.current);
