@@ -31,6 +31,10 @@ export async function bffFetch(path, options = {}) {
 
   try {
     const response = await fetch(buildUrl(path), options);
+    // 401/403 = not authenticated yet, 404 = endpoint may not exist — treat as null, not error
+    if (response.status === 401 || response.status === 403 || response.status === 404) {
+      return null;
+    }
     if (!response.ok) {
       return null;
     }

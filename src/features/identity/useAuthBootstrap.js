@@ -5,6 +5,14 @@ import {
   clearPendingGoogleSignup,
 } from "./authFlowStorage.js";
 
+/** Wrap any promise with a timeout — resolves to null on timeout. */
+function withTimeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise((resolve) => setTimeout(() => resolve(null), ms)),
+  ]);
+}
+
 /**
  * Bootstraps the Firebase auth state listener, syncing Firebase session to app state.
  * App.jsx no longer holds Firebase plumbing directly.
@@ -33,6 +41,16 @@ export function useAuthBootstrap({
       return () => clearTimeout(timer);
     }
 
+    // Safety timeout: if Firebase auth doesn't respond within 8s, go to login
+    const authTimeout = setTimeout(() => {
+      if (!authBootstrapCompleteRef.current) {
+        authBootstrapCompleteRef.current = true;
+        console.warn("[AuthBootstrap] Firebase auth timed out — proceeding to login");
+        setScreen("login");
+        setIsInitialLoading(false);
+      }
+    }, 8000);
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       try {
         const auditHarnessEnabled =
@@ -40,6 +58,11 @@ export function useAuthBootstrap({
           import.meta.env.DEV &&
           Boolean(window.__TradersAppAudit);
         if (auditHarnessEnabled) {
+          clearTimeout(authTimeout);
+          if (!authBootstrapCompleteRef.current) {
+            authBootstrapCompleteRef.current = true;
+            setIsInitialLoading(false);
+          }
           return;
         }
 
@@ -47,6 +70,11 @@ export function useAuthBootstrap({
           typeof window !== "undefined" &&
           window.__TRADERS_AUDIT_DATA?.active === true;
         if (auditMode) {
+          clearTimeout(authTimeout);
+          if (!authBootstrapCompleteRef.current) {
+            authBootstrapCompleteRef.current = true;
+            setIsInitialLoading(false);
+          }
           return;
         }
 
@@ -55,47 +83,27 @@ export function useAuthBootstrap({
             return;
           }
 
-          try {
-            await user.reload();
-          } catch (reloadError) {
-            console.warn("Auth user reload skipped:", reloadError.message);
+          // Wrap network calls with 5s timeout to prevent hanging
+          await withTimeout(user.reload(), 5000);
+
+          const token = await withTimeout(user.getIdToken(true), 5000);
+          if (!token) {
+            // Timed out or failed — proceed without token
+            console.warn("[AuthBootstrap] Token fetch timed out, proceeding without auth");
           }
 
-          try {
-            const token = await user.getIdToken(true);
-            const authData = {
-              uid: user.uid,
-              token,
-              refreshToken: user.refreshToken,
-              email: user.email,
-              emailVerified: user.emailVerified,
-            };
-            setAuth(authData);
-            await checkUserStatus(authData);
-          } catch (tokenError) {
-            console.warn(
-              "Token refresh failed, trying non-refreshed token:",
-              tokenError.message,
-            );
-            try {
-              const token = await user.getIdToken(false);
-              const authData = {
-                uid: user.uid,
-                token,
-                refreshToken: user.refreshToken,
-                email: user.email,
-                emailVerified: user.emailVerified,
-              };
-              setAuth(authData);
-              await checkUserStatus(authData);
-            } catch (fallbackError) {
-              console.warn(
-                "All token methods failed but user exists in Firebase:",
-                fallbackError.message,
-              );
-            }
-          }
-        } else if (!isAdminAuthenticated) {
+          const authData = {
+            uid: user.uid,
+            token: token || null,
+            refreshToken: user.refreshToken,
+            email: user.email,
+            emailVerified: user.emailVerified,
+          };
+          setAuth(authData);
+
+          // checkUserStatus can also hang — give it 5s max
+          await withTimeout(checkUserStatus(authData), 5000);
+        } else {
           setAuth(null);
           setProfile(null);
           setGoogleUser(null);
@@ -104,7 +112,10 @@ export function useAuthBootstrap({
         }
       } catch (error) {
         console.error("Auth state change error:", error);
+        setAuth(null);
+        setScreen("login");
       } finally {
+        clearTimeout(authTimeout);
         if (!authBootstrapCompleteRef.current) {
           authBootstrapCompleteRef.current = true;
           setIsInitialLoading(false);
@@ -112,7 +123,10 @@ export function useAuthBootstrap({
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      clearTimeout(authTimeout);
+      unsubscribe();
+    };
   }, [checkUserStatus, isAdminAuthenticated, setAuth, setProfile, setGoogleUser, setScreen, setIsInitialLoading]);
 }
 
