@@ -1,19 +1,26 @@
 # Prometheus configuration for TradersApp ML Engine
-# Scrapes: ML Engine, BFF, Prometheus itself
+# Used by both Docker Compose and k8s (via ConfigMap)
 
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
 
-# ─── Alertmanager (optional) ──────────────────────────────────────────────────
+# ─── Alertmanager ──────────────────────────────────────────────────────────
 alerting:
   alertmanagers:
     - static_configs:
-        - targets: []
+        - targets:
+            # Prometheus runs its own Alertmanager internally for Docker Compose.
+            # In k8s with Prometheus Operator, this is replaced by the Operator CRD.
+            # For standalone: runs Alertmanager at port 9093.
+            - alertmanager:9093
 
-# ─── Rule files ─────────────────────────────────────────────────────────────
+# ─── Alert rule files ───────────────────────────────────────────────────────
+# Mounted from k8s/observability/alerts/ in Docker, or loaded via
+# PrometheusRule CRD in k8s Prometheus Operator.
 rule_files:
-  - "alerts/*.yml"
+  - "/etc/prometheus/rules/*.yml"
+  - "/etc/prometheus/rules/infrastructure.rules.yml"
 
 # ─── Scrape targets ────────────────────────────────────────────────────────
 
@@ -23,27 +30,106 @@ scrape_configs:
     static_configs:
       - targets: ["localhost:9090"]
 
-  # ML Engine — FastAPI with Prometheus metrics
+  # ML Engine — FastAPI with Prometheus client
   - job_name: "ml-engine"
+    kubernetes_sd_configs:
+      # k8s native: discover pods with app=ml-engine label
+      - role: pod
+        namespaces:
+          names:
+            - tradersapp
+    relabel_configs:
+      # Only pick pods with ml-engine app label
+      - source_labels: [__meta_kubernetes_pod_label_app]
+        regex: ml-engine
+        action: keep
+      # Only pick pods with prometheus.io/scrape=true
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+        regex: "true"
+        action: keep
+      # Use the metrics port from annotation (default 9091)
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_port]
+        action: replace
+        target_label: __param_port
+        regex: (.+)
+        replacement: $1
+      # Fallback to container port 8001
+      - source_labels: [__meta_kubernetes_pod_container_port_number]
+        action: replace
+        target_label: __param_port
+        regex: (.+)
+        replacement: $1
+      # Preserve labels
+      - action: labelmap
+        regex: __meta_kubernetes_pod_label_(.+)
+    # Fallback static config for Docker Compose (no k8s API)
     static_configs:
       - targets: ["host.docker.internal:8001"]
+        labels:
+          app: ml-engine
+          tier: ml
     metrics_path: /metrics
     scrape_interval: 10s
     scrape_timeout: 5s
 
   # BFF — Node.js with Prometheus client
   - job_name: "bff"
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names:
+            - tradersapp
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_label_app]
+        regex: bff
+        action: keep
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+        regex: "true"
+        action: keep
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_port]
+        action: replace
+        target_label: __param_port
+        regex: (.+)
+        replacement: $1
+      - action: labelmap
+        regex: __meta_kubernetes_pod_label_(.+)
     static_configs:
       - targets: ["host.docker.internal:8788"]
+        labels:
+          app: bff
+          tier: api
     metrics_path: /metrics
     scrape_interval: 10s
 
-  # Prometheus push gateway (for batch jobs)
+  # Triton Inference Server
+  - job_name: "triton"
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names:
+            - tradersapp
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_label_app]
+        regex: triton
+        action: keep
+      - action: labelmap
+        regex: __meta_kubernetes_pod_label_(.+)
+    static_configs:
+      - targets: ["host.docker.internal:8002"]
+        labels:
+          app: triton
+          tier: inference
+    metrics_path: /metrics
+    scrape_interval: 30s
+
+  # Prometheus push gateway (for batch/cron jobs)
   - job_name: "pushgateway"
     static_configs:
       - targets: ["host.docker.internal:9091"]
+    honor_labels: true
 
-  # Node exporter (host metrics)
+  # Node exporter (host machine metrics)
   - job_name: "node"
     static_configs:
       - targets: ["host.docker.internal:9100"]
+    scrape_interval: 30s

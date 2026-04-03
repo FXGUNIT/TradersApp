@@ -24,14 +24,32 @@ services:
       - "9090:9090"
     volumes:
       - ./k8s/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./k8s/observability/alerts:/etc/prometheus/rules:ro
       - prometheus-data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
       - '--storage.tsdb.retention.time=30d'
       - '--web.enable-lifecycle'
+      - '--rule.path=/etc/prometheus/rules'
+      - '--web.page-title=TradersApp Prometheus'
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  # ── Alertmanager (internal, for Docker Compose standalone) ─────────────────
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: traders-alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./k8s/observability/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager-data:/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+    restart: unless-stopped
 
   # ── Grafana ────────────────────────────────────────────────────────────────
   grafana:
@@ -44,13 +62,14 @@ services:
       GF_SECURITY_ADMIN_PASSWORD: traders123
       GF_USERS_ALLOW_SIGN_UP: "false"
       GF_FEATURE_TOGGLES_ENABLE: publicDashboards
+      GF_ALERTING_ENABLED: "true"
     volumes:
       - grafana-data:/var/lib/grafana
       - ./k8s/observability/grafana-provisioning:/etc/grafana/provisioning:ro
     depends_on:
       - prometheus
       - loki
-      - jaeger
+    restart: unless-stopped
 
   # ── Loki (Log aggregation) ────────────────────────────────────────────────
   loki:
@@ -64,17 +83,23 @@ services:
     command: -config.file=/etc/loki/local-config.yaml
     depends_on:
       - promtail
+    restart: unless-stopped
 
-  # ── Promtail (Log shipper) ────────────────────────────────────────────────
+  # ── Promtail (Log shipper) ──────────────────────────────────────────────────
   promtail:
     image: grafana/promtail:3.2.0
     container_name: traders-promtail
     volumes:
       - /var/log:/var/log:ro
       - ./k8s/observability/promtail.yml:/etc/promtail/config.yml:ro
+      # Ship ML Engine logs
+      - ml-engine-logs:/var/log/tradersapp/ml-engine:ro
+      # Ship BFF logs
+      - bff-logs:/var/log/tradersapp/bff:ro
     command: -config.file=/etc/promtail/config.yml
     depends_on:
       - loki
+    restart: unless-stopped
 
   # ── Jaeger (Distributed tracing) ─────────────────────────────────────────
   jaeger:
@@ -82,20 +107,32 @@ services:
     container_name: traders-jaeger
     ports:
       - "16686:16686"  # UI
-      - "6831:6831"  # UDP agent
+      - "6831:6831"   # UDP agent (legacy)
       - "14268:14268"  # HTTP collector
       - "4317:4317"   # gRPC collector (OTLP)
+      - "4318:4318"   # HTTP OTLP receiver
     environment:
       COLLECTOR_OTLP_ENABLED: "true"
       SPAN_STORAGE_TYPE: badger
       BADGER_EPHEMERAL: "false"
       BADGER_DIRECTORY_KEY: /badger/data
       BADGER_DIRECTORY_VALUE: /badger/wal
+      # OTLP exporter config
+      JAEGER_ENDPOINT: http://localhost:14268/api/traces
     volumes:
       - jaeger-data:/badger
+    restart: unless-stopped
+
+  # ── Node Exporter (host metrics) ───────────────────────────────────────────
+  # Note: runs on Docker host, not in container. Install separately:
+  #   docker run -d --name node-exporter -p 9100:9100 prom/node-exporter
+  # Or on host: wget https://github.com/prometheus/node_exporter/releases/...
 
 volumes:
   prometheus-data:
   grafana-data:
   loki-data:
   jaeger-data:
+  alertmanager-data:
+  ml-engine-logs:
+  bff-logs:

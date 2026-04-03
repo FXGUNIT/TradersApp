@@ -1,0 +1,107 @@
+# k8s/observability/alerts/infrastructure.rules.yml
+# Prometheus alerting rules for TradersApp infrastructure
+groups:
+  - name: kafka-availability
+    interval: 30s
+    rules:
+      - alert: KafkaDown
+        expr: kafka_consumer_group_lag > 10000
+        for: 5m
+        labels:
+          severity: critical
+          service: kafka
+        annotations:
+          summary: "Kafka consumer lag > 10,000 messages"
+          description: "Kafka consumer is falling behind — possible broker issue or consumer failure."
+
+      - alert: KafkaProducerErrorRate
+        expr: rate(kafka_producer_errors_total[5m]) > 0.01
+        for: 3m
+        labels:
+          severity: warning
+          service: kafka
+        annotations:
+          summary: "Kafka producer error rate elevated"
+          description: "Kafka producer is experiencing elevated error rates."
+
+  - name: redis-availability
+    interval: 30s
+    rules:
+      - alert: RedisDown
+        expr: redis_connected_clients == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: redis
+        annotations:
+          summary: "Redis has no connected clients"
+          description: "Redis may be down or unreachable — ML Engine will use in-memory fallback."
+
+      - alert: RedisMemoryHigh
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          service: redis
+        annotations:
+          summary: "Redis memory usage > 90%"
+          description: "Redis is approaching its memory limit."
+
+  - name: data-quality
+    interval: 60s
+    rules:
+      - alert: DataQualityCriticalFailures
+        expr: increase(ml_dq_critical_failures_total[5m]) > 0
+        for: 2m
+        labels:
+          severity: critical
+          service: ml-engine
+        annotations:
+          summary: "Data quality critical failures detected"
+          description: "Great Expectations has detected critical data quality failures — pipeline may be blocked."
+
+  - name: bff-availability
+    interval: 30s
+    rules:
+      - alert: BFFDown
+        expr: up{job="bff"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: bff
+        annotations:
+          summary: "BFF is down"
+          description: "BFF has been unreachable for more than 1 minute."
+
+      - alert: BFFHighLatency
+        expr: histogram_quantile(0.99, sum(rate(bff_http_request_duration_seconds_bucket[5m])) by (le)) > 2
+        for: 5m
+        labels:
+          severity: warning
+          service: bff
+        annotations:
+          summary: "BFF p99 latency > 2 seconds"
+          description: "BFF is experiencing high latency — possible backend congestion."
+
+  - name: observability-health
+    interval: 60s
+    rules:
+      - alert: PrometheusTargetDown
+        expr: up{job!="prometheus"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: observability
+        annotations:
+          summary: "Prometheus scrape target is down"
+          description: "A target Prometheus should be scraping is unreachable."
+
+      - alert: GrafanaDown
+        expr: up{job="grafana"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          service: observability
+        annotations:
+          summary: "Grafana is down"
+          description: "Grafana is unreachable — dashboards unavailable."

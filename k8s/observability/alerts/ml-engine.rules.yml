@@ -1,0 +1,178 @@
+# k8s/observability/alerts/ml-engine.rules.yml
+# Prometheus alerting rules for TradersApp ML Engine
+#
+# Deploy:
+#   Docker: mount into prometheus container
+#   k8s: apply via Prometheus Operator PrometheusRule CRD
+groups:
+  - name: ml-engine-availability
+    interval: 30s
+    rules:
+      # ML Engine is down
+      - alert: MLEngineDown
+        expr: up{job="ml-engine"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: ml-engine
+        annotations:
+          summary: "ML Engine is down"
+          description: "ML Engine has been unreachable for more than 1 minute."
+
+      # BFF cannot reach ML Engine
+      - alert: BFFCannotReachMLEngine
+        expr: rate(bff_ml_engine_errors_total[5m]) > 0
+        for: 2m
+        labels:
+          severity: warning
+          service: bff
+        annotations:
+          summary: "BFF cannot reach ML Engine"
+          description: "BFF is experiencing errors reaching ML Engine."
+
+      # High ML Engine error rate
+      - alert: MLEngineHighErrorRate
+        expr: rate(ml_http_requests_total{status=~"5.."}[5m]) / rate(ml_http_requests_total[5m]) > 0.05
+        for: 3m
+        labels:
+          severity: critical
+          service: ml-engine
+        annotations:
+          summary: "ML Engine error rate > 5%"
+          description: "ML Engine is returning 5%+ errors."
+
+  - name: ml-engine-latency
+    interval: 30s
+    rules:
+      # Prediction latency SLA breach (p99 > 200ms)
+      - alert: MLPredictionLatencyHigh
+        expr: histogram_quantile(0.99, sum(rate(ml_prediction_latency_seconds_bucket[5m])) by (le)) > 0.2
+        for: 5m
+        labels:
+          severity: warning
+          service: ml-engine
+        annotations:
+          summary: "Prediction latency p99 > 200ms"
+          description: "ML prediction latency has exceeded 200ms for 5 minutes."
+
+      # Prediction latency critical (> 500ms)
+      - alert: MLPredictionLatencyCritical
+        expr: histogram_quantile(0.99, sum(rate(ml_prediction_latency_seconds_bucket[5m])) by (le)) > 0.5
+        for: 2m
+        labels:
+          severity: critical
+          service: ml-engine
+        annotations:
+          summary: "Prediction latency p99 > 500ms (CRITICAL)"
+          description: "ML prediction latency has exceeded 500ms — SLA breached."
+
+      # BFF → ML Engine round-trip high
+      - alert: BFFToMLEngineLatencyHigh
+        expr: histogram_quantile(0.95, sum(rate(ml_http_request_duration_seconds_bucket{handler="/ml/consensus"}[5m])) by (le)) > 1
+        for: 5m
+        labels:
+          severity: warning
+          service: bff
+        annotations:
+          summary: "BFF → ML Engine round-trip > 1s (p95)"
+          description: "End-to-end consensus endpoint latency exceeds 1 second."
+
+  - name: ml-engine-drift
+    interval: 60s
+    rules:
+      # Feature drift detected (PSI > 0.2)
+      - alert: MLFeatureDriftDetected
+        expr: ml_feature_drift_psi > 0.2
+        for: 10m
+        labels:
+          severity: warning
+          service: ml-engine
+        annotations:
+          summary: "Feature drift detected (PSI > 0.2)"
+          description: "Feature distribution has drifted — PSI exceeds threshold."
+
+      # Concept drift (win rate change)
+      - alert: MLConceptDriftWinRate
+        expr: abs(ml_concept_drift_win_rate - 0.5) > 0.15
+        for: 30m
+        labels:
+          severity: warning
+          service: ml-engine
+        annotations:
+          summary: "Concept drift: win rate deviation > 15%"
+          description: "Historical win rate has deviated significantly from baseline."
+
+      # Drift alert storm (too many drift alerts)
+      - alert: MLDriftAlertStorm
+        expr: increase(ml_drift_alerts_total[15m]) > 5
+        for: 5m
+        labels:
+          severity: critical
+          service: ml-engine
+        annotations:
+          summary: "Drift alert storm — 5+ alerts in 15 minutes"
+          description: "Multiple drift alerts detected — possible regime change or data quality issue."
+
+  - name: ml-engine-training
+    interval: 60s
+    rules:
+      # Retraining triggered
+      - alert: MLRetrainingTriggered
+        expr: increase(ml_retrain_triggered_total[30m]) > 0
+        for: 1m
+        labels:
+          severity: info
+          service: ml-engine
+        annotations:
+          summary: "ML model retraining triggered"
+          description: "Automatic retraining has been triggered by drift detection."
+
+      # Retraining stuck (takes too long)
+      - alert: MLRetrainingStuck
+        expr: ml_retrain_in_progress == 1
+        for: 30m
+        labels:
+          severity: warning
+          service: ml-engine
+        annotations:
+          summary: "ML retraining is taking too long (>30min)"
+          description: "Model retraining has been running for over 30 minutes."
+
+  - name: ml-engine-cache
+    interval: 60s
+    rules:
+      # Cache hit ratio too low (cold cache after warmup)
+      - alert: MLCacheHitRatioLow
+        expr: ml_cache_hits_total / (ml_cache_hits_total + ml_cache_misses_total) < 0.3
+        for: 15m
+        labels:
+          severity: warning
+          service: ml-engine
+        annotations:
+          summary: "Cache hit ratio < 30%"
+          description: "Cache is not being used effectively — possible cache eviction issue."
+
+  - name: ml-engine-circuit-breaker
+    interval: 30s
+    rules:
+      # Circuit breaker open
+      - alert: MLCircuitBreakerOpen
+        expr: ml_circuit_breaker_state == 2
+        for: 1m
+        labels:
+          severity: critical
+          service: ml-engine
+        annotations:
+          summary: "Circuit breaker OPEN — ML Engine rejecting requests"
+          description: "Circuit breaker has opened due to repeated failures. System in degraded mode."
+
+      # Circuit breaker half-open (recovering)
+      - alert: MLCircuitBreakerHalfOpen
+        expr: ml_circuit_breaker_state == 1
+        for: 2m
+        labels:
+          severity: warning
+          service: ml-engine
+        annotations:
+          summary: "Circuit breaker HALF-OPEN — testing recovery"
+          description: "Circuit breaker is testing if ML Engine has recovered."

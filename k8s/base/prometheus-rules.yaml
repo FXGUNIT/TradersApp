@@ -1,0 +1,142 @@
+# k8s/base/prometheus-rules.yaml — PrometheusRule CRDs for k8s
+# Prometheus Operator will pick these up automatically.
+# Requires prometheus-operator to be installed in the cluster.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: ml-engine-alerts
+  namespace: tradersapp
+  labels:
+    app: ml-engine
+    team: ml-platform
+spec:
+  groups:
+    - name: ml-engine-availability
+      interval: 30s
+      rules:
+        - alert: MLEngineDown
+          expr: up{job="ml-engine"} == 0
+          for: 1m
+          labels:
+            severity: critical
+            service: ml-engine
+          annotations:
+            summary: "ML Engine is down"
+            description: "ML Engine has been unreachable for more than 1 minute."
+        - alert: MLEngineHighErrorRate
+          expr: rate(ml_http_requests_total{status=~"5.."}[5m]) / rate(ml_http_requests_total[5m]) > 0.05
+          for: 3m
+          labels:
+            severity: critical
+            service: ml-engine
+          annotations:
+            summary: "ML Engine error rate > 5%"
+    - name: ml-engine-latency
+      interval: 30s
+      rules:
+        - alert: MLPredictionLatencyHigh
+          expr: histogram_quantile(0.99, sum(rate(ml_prediction_latency_seconds_bucket[5m])) by (le)) > 0.2
+          for: 5m
+          labels:
+            severity: warning
+            service: ml-engine
+          annotations:
+            summary: "Prediction latency p99 > 200ms"
+        - alert: MLPredictionLatencyCritical
+          expr: histogram_quantile(0.99, sum(rate(ml_prediction_latency_seconds_bucket[5m])) by (le)) > 0.5
+          for: 2m
+          labels:
+            severity: critical
+            service: ml-engine
+          annotations:
+            summary: "Prediction latency p99 > 500ms (CRITICAL)"
+    - name: ml-engine-drift
+      interval: 60s
+      rules:
+        - alert: MLFeatureDriftDetected
+          expr: ml_feature_drift_psi > 0.2
+          for: 10m
+          labels:
+            severity: warning
+            service: ml-engine
+          annotations:
+            summary: "Feature drift detected (PSI > 0.2)"
+        - alert: MLDriftAlertStorm
+          expr: increase(ml_drift_alerts_total[15m]) > 5
+          for: 5m
+          labels:
+            severity: critical
+            service: ml-engine
+          annotations:
+            summary: "Drift alert storm — 5+ alerts in 15 minutes"
+    - name: ml-engine-resilience
+      interval: 30s
+      rules:
+        - alert: MLCircuitBreakerOpen
+          expr: ml_circuit_breaker_state == 2
+          for: 1m
+          labels:
+            severity: critical
+            service: ml-engine
+          annotations:
+            summary: "Circuit breaker OPEN — ML Engine rejecting requests"
+        - alert: DataQualityCriticalFailures
+          expr: increase(ml_dq_critical_failures_total[5m]) > 0
+          for: 2m
+          labels:
+            severity: critical
+            service: ml-engine
+          annotations:
+            summary: "Data quality critical failures detected"
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: infrastructure-alerts
+  namespace: tradersapp
+  labels:
+    app: infrastructure
+    team: ml-platform
+spec:
+  groups:
+    - name: bff-availability
+      interval: 30s
+      rules:
+        - alert: BFFDown
+          expr: up{job="bff"} == 0
+          for: 1m
+          labels:
+            severity: critical
+            service: bff
+          annotations:
+            summary: "BFF is down"
+        - alert: BFFCannotReachMLEngine
+          expr: rate(bff_ml_engine_errors_total[5m]) > 0
+          for: 2m
+          labels:
+            severity: warning
+            service: bff
+          annotations:
+            summary: "BFF cannot reach ML Engine"
+    - name: kafka-availability
+      interval: 30s
+      rules:
+        - alert: KafkaConsumerLag
+          expr: kafka_consumer_group_lag > 10000
+          for: 5m
+          labels:
+            severity: critical
+            service: kafka
+          annotations:
+            summary: "Kafka consumer lag > 10,000 messages"
+    - name: redis-availability
+      interval: 30s
+      rules:
+        - alert: RedisDown
+          expr: redis_connected_clients == 0
+          for: 1m
+          labels:
+            severity: warning
+            service: redis
+          annotations:
+            summary: "Redis has no connected clients"

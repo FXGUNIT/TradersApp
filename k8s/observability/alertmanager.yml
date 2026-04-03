@@ -1,0 +1,54 @@
+# Alertmanager configuration for TradersApp
+# Sends alerts to configured receivers (webhook, email, Slack, PagerDuty, etc.)
+global:
+  resolve_timeout: 5m
+
+route:
+  group_by: ["alertname", "service", "severity"]
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 12h
+  receiver: default
+  routes:
+    # Critical alerts → page immediately
+    - match:
+        severity: critical
+      receiver: critical-alerts
+      group_wait: 0s
+      repeat_interval: 1h
+    # Warning alerts → notify
+    - match:
+        severity: warning
+      receiver: warning-alerts
+    # Info alerts → log only
+    - match:
+        severity: info
+      receiver: default
+
+receivers:
+  # Default (warning + info)
+  - name: default
+    webhook_configs:
+      # Configure your webhook URL here for generic integrations
+      # - url: http://example.com/webhook
+      # For Telegram, use a bot webhook or external receiver:
+      # - url: https://api.telegram.org/bot<TOKEN>/sendMessage?chat_id=<CHAT_ID>
+
+  # Critical alerts — add your paging mechanism here
+  - name: critical-alerts
+    webhook_configs:
+      # Replace with PagerDuty, OpsGenie, or a script that pages you
+      - url: http://localhost:9093/alerts/critical
+
+  # Warning alerts — Slack, email, etc.
+  - name: warning-alerts
+    webhook_configs:
+      - url: http://localhost:9093/alerts/warning
+
+# Inhibition rules: suppress warnings when critical fires for same service
+inhibit_rules:
+  - source_match:
+      severity: "critical"
+    target_match:
+      severity: "warning"
+    equal: ["service"]
