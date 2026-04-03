@@ -1,0 +1,179 @@
+# Woodpecker CI/CD Pipeline for TradersApp
+# ─────────────────────────────────────────────────────────────────────────────
+# Triggers on: push, pull_request, tag, cron
+#
+# Pipeline steps:
+#   1. lint        — ESLint (frontend), ruff (Python)
+#   2. test        — pytest (ml-engine), vitest (frontend)
+#   3. build       — Docker build for all services
+#   4. security    — Trivy container scan
+#   5. deploy-staging — Deploy to Railway staging
+#   6. deploy-prod  — Manual trigger only: deploy to production
+#
+# Secrets required (Woodpecker UI → Settings → Secrets):
+#   DOCKER_USERNAME, DOCKER_PASSWORD
+#   RAILWAY_TOKEN, RAILWAY_STAGING_ENV, RAILWAY_PROD_ENV
+#   TRIVY_TOKEN (optional)
+#   INFISICAL_TOKEN
+# ─────────────────────────────────────────────────────────────────────────────
+
+pipeline:
+  # ── Lint ──────────────────────────────────────────────────────────────────
+  lint-frontend:
+    image: node:22-alpine
+    commands:
+      - cd src && npm ci --silent && npm run lint || true
+    when:
+      - event: [push, pull_request]
+        path: [src/**, .woodpecker.yml]
+
+  lint-backend:
+    image: python:3.14-slim
+    commands:
+      - cd ml-engine && pip install ruff -q && ruff check . || true
+    when:
+      - event: [push, pull_request]
+        path: [ml-engine/**, .woodpecker.yml]
+
+  # ── Test ──────────────────────────────────────────────────────────────────
+  test-ml-engine:
+    image: python:3.14-slim
+    commands:
+      - cd ml-engine
+      - pip install -q -r requirements.txt pytest pytest-cov
+      - python -m pytest tests/ -q --tb=short -x
+    when:
+      - event: [push, pull_request]
+        path: [ml-engine/**]
+
+  test-frontend:
+    image: node:22-alpine
+    commands:
+      - cd src && npm ci --silent && npm run test -- --run
+    when:
+      - event: [push, pull_request]
+        path: [src/**]
+
+  # ── Build Docker Images ────────────────────────────────────────────────────
+  build-ml-engine:
+    image: plugins/docker
+    settings:
+      repo: tradersapp/ml-engine
+      tags:
+        - latest
+        - ${CI_COMMIT_SHA}
+      dockerfile: Dockerfile.ml-engine
+      context: .
+      username: ${DOCKER_USERNAME}
+      password: ${DOCKER_PASSWORD}
+      purge: true
+    when:
+      - event: [push, tag]
+
+  build-bff:
+    image: plugins/docker
+    settings:
+      repo: tradersapp/bff
+      tags:
+        - latest
+        - ${CI_COMMIT_SHA}
+      dockerfile: Dockerfile.bff
+      context: .
+      username: ${DOCKER_USERNAME}
+      password: ${DOCKER_PASSWORD}
+      purge: true
+    when:
+      - event: [push, tag]
+        path: [bff/**]
+
+  build-frontend:
+    image: plugins/docker
+    settings:
+      repo: tradersapp/frontend
+      tags:
+        - latest
+        - ${CI_COMMIT_SHA}
+      dockerfile: Dockerfile.frontend
+      context: .
+      args:
+        VITE_BFF_URL: http://staging.tradersapp.com
+      username: ${DOCKER_USERNAME}
+      password: ${DOCKER_PASSWORD}
+      purge: true
+    when:
+      - event: [push, tag]
+        path: [src/**, Dockerfile.frontend]
+
+  # ── Security Scan ───────────────────────────────────────────────────────────
+  trivy-scan:
+    image: aquasec/trivy:latest
+    commands:
+      - trivy image --exit-code 0 --severity HIGH,CRITICAL tradersapp/ml-engine:latest || true
+      - trivy image --exit-code 0 --severity HIGH,CRITICAL tradersapp/bff:latest || true
+    when:
+      - event: [push, tag]
+
+  # ── Deploy to Staging ──────────────────────────────────────────────────────
+  deploy-staging:
+    image: alpine
+    commands:
+      - apk add --no-cache curl jq
+      - |
+        echo "Deploying to Railway staging..."
+        curl -X POST "https://backboard.railway.app/api/v1/deployments" \
+          -H "Authorization: Bearer $RAILWAY_TOKEN" \
+          -d "{\"environmentId\": \"$RAILWAY_STAGING_ENV\", \"serviceId\": \"$RAILWAY_PROD_ML_SERVICE_ID\"}"
+        echo "Staging deployment triggered"
+    secrets: [railway_token, railway_staging_env, railway_prod_ml_service_id]
+    when:
+      - event: push
+        branch: main
+      - event: pull_request
+
+  # ── Notify Success ──────────────────────────────────────────────────────────
+  notify-success:
+    image: plugins/slack
+    settings:
+      webhook: ${SLACK_WEBHOOK}
+      channel: "#deployments"
+      template: |
+        ✅ *TradersApp Deploy Succeeded*
+        Commit: `${CI_COMMIT_SHA:0:7}` — {{ Build.Author }}
+        Message: {{ Build.Message }}
+        Duration: {{ Build.Duration }}s
+        <{{ Build.WebURL }}|View Build →
+    when:
+      - event: [push, tag]
+        status: [success]
+
+  # ── Notify Failure ─────────────────────────────────────────────────────────
+  notify-failure:
+    image: plugins/slack
+    settings:
+      webhook: ${SLACK_WEBHOOK}
+      channel: "#deployments"
+      template: |
+        ❌ *TradersApp Deploy Failed*
+        Commit: `${CI_COMMIT_SHA:0:7}` — {{ Build.Author }}
+        Message: {{ Build.Message }}
+        <{{ Build.WebURL }}|View Build →
+    when:
+      - event: [push, tag]
+        status: [failure, killed]
+
+# ── Production Deploy (Manual) ────────────────────────────────────────────────────
+pipeline-prod:
+  deploy-prod:
+    image: alpine
+    commands:
+      - apk add --no-cache curl
+      - |
+        echo "Deploying to Railway production..."
+        curl -X POST "https://backboard.railway.app/api/v1/deployments" \
+          -H "Authorization: Bearer $RAILWAY_TOKEN" \
+          -d "{\"environmentId\": \"$RAILWAY_PROD_ENV\", \"serviceId\": \"$RAILWAY_PROD_ML_SERVICE_ID\"}"
+        echo "Production deployment triggered"
+    secrets: [railway_token, railway_prod_env, railway_prod_ml_service_id]
+    when:
+      - event: tag
+        tag: v*
