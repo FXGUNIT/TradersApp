@@ -1,0 +1,80 @@
+# k8s/ml-deployment.yaml — Python ML Engine on k3s
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ml-engine
+  namespace: tradersapp
+  labels:
+    app: ml-engine
+    tier: ml
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ml-engine
+  template:
+    metadata:
+      labels:
+        app: ml-engine
+        tier: ml
+    spec:
+      containers:
+        - name: ml-engine
+          image: tradersapp/ml-engine:latest
+          ports:
+            - containerPort: 8001
+          env:
+            - name: DB_PATH
+              value: "/data/trading_data.db"
+            - name: MODEL_STORE
+              value: "/models/store"
+            - name: REDIS_HOST
+              value: "redis"
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: "kafka:29092"
+            - name: MLFLOW_TRACKING_URI
+              value: "http://mlflow:5000"
+            - name: OTEL_SERVICE_NAME
+              value: "ml-engine"
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 2000m
+              memory: 2Gi
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: models
+              mountPath: /models
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8001
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8001
+            initialDelaySeconds: 15
+            periodSeconds: 10
+      volumes:
+        - name: data
+          emptyDir: {}
+        - name: models
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ml-engine
+  namespace: tradersapp
+spec:
+  type: ClusterIP
+  selector:
+    app: ml-engine
+  ports:
+    - port: 8001
+      targetPort: 8001
