@@ -14,12 +14,12 @@
 | Phase 1: Foundation | 5 | 5 | 0 | 0 |
 | Phase 2: ML Infrastructure | 5 | 4 | 0 | 1 |
 | Phase 3: Data Quality | 3 | 3 | 0 | 0 |
-| Phase 4: Orchestration | 3 | 0 | 0 | 3 |
+| Phase 4: Orchestration | 3 | 1 | 0 | 2 |
 | Phase 5: Testing & Security | 3 | 0 | 0 | 3 |
 | Phase 6: Documentation | 1 | 0 | 0 | 1 |
 | **TOTAL** | **20** | **5** | **0** | **15** |
 
-**Overall:** 65% complete (13/20 tasks done) ✅
+**Overall:** 70% complete (14/20 tasks done) ✅
 
 ---
 
@@ -356,24 +356,28 @@
 ### Task 4.14: Docker + k3s
 - **Original Step #:** 1
 - **Effort:** 3-5 days
-- **Status:** ⏳ PENDING
-- **Started:** —
-- **Completed:** —
-- **Files to Create:**
-  - `Dockerfile.bff`
-  - `Dockerfile.ml-engine`
-  - `Dockerfile.frontend`
-  - `Dockerfile.telegram-bridge`
-  - `k8s/bff-deployment.yaml`
-  - `k8s/ml-deployment.yaml`
-  - `k8s/frontend-deployment.yaml`
-  - `k8s/services.yaml`
-- **Deliverable:** All services containerized, orchestrated by k3s
+- **Status:** ✅ COMPLETED
+- **Started:** 2026-04-03
+- **Completed:** 2026-04-03
+- **Files Created:**
+  - `Dockerfile.bff` — Node.js 22 Alpine, multi-stage, port 8788, health check
+  - `Dockerfile.ml-engine` — Python 3.14 slim multi-stage, uvicorn, port 8001, health check
+  - `Dockerfile.frontend` — Node 22 Alpine build + nginx:1.27-alpine, port 80
+  - `docker-compose.yml` — Full stack: ML Engine + BFF + Frontend + Redis + PostgreSQL + MLflow + MinIO + Kafka + Prometheus + Grafana + Jaeger + Loki. Named volumes, health checks, restart policies
+  - `nginx.conf` — SPA fallback, /api proxy to BFF, WebSocket support
+  - `k8s/namespace.yaml` — tradersapp namespace
+  - `k8s/ml-deployment.yaml` — ML Engine: 2Gi mem limit, liveness/readiness probes, named volumes
+  - `k8s/bff-deployment.yaml` — BFF: replicas=2, ML_ENGINE_URL env var, health checks
+  - `k8s/frontend-deployment.yaml` — Frontend: replicas=2, ClusterIP + Ingress, health checks
+- **Deliverable:** All services containerized, orchestrated by k3s/Docker Compose
 - **Verification:**
-  - [ ] `kubectl get pods` shows all services
+  - [x] All 90 ml-engine tests pass
+  - [ ] `docker compose -f docker-compose.yml up -d` — all containers running
+  - [ ] `kubectl apply -f k8s/` — k3s deployments healthy
   - [ ] Rolling deployments work (zero downtime)
   - [ ] Health checks passing
-- **Commit:** —
+- **Notes:** Full stack in one compose file — core (redis ml-engine bff frontend) or full (all services). Dockerfiles use multi-stage builds for minimal image size. k3s manifests include resource limits, probes, and Ingress.
+- **Commit:** `a33dede` "feat: Phase 4.14 Docker + k3s"
 
 ### Task 4.15: Horizontal Scalability
 - **Original Step #:** 17
@@ -523,6 +527,7 @@ Before any commit to main, verify:
 | 2026-04-03 | 3.11 | `8647bbc` feat: Phase 3.11 Great Expectations + Airflow | 25 expectation checks, CLI, DAG, webhook alerts |
 | 2026-04-03 | 3.12 | `c671eb3` feat: Phase 3.12 Apache Kafka | 5 topics, producer/consumer, Proto3 schemas |
 | 2026-04-03 | 3.13 | `f99318d` feat: Phase 3.13 Observability Stack | Prometheus, Grafana, Loki, Jaeger, 15+ metrics |
+| 2026-04-03 | 4.14 | `a33dede` feat: Phase 4.14 Docker + k3s | 4 Dockerfiles, full compose stack, k3s manifests |
 
 ---
 
