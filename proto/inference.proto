@@ -1,0 +1,98 @@
+syntax = "proto3";
+
+package traders.inference;
+
+option java_multiple_files = true;
+option java_package = "com.tradersapp.inference";
+
+service InferenceService {
+  rpc Predict(PredictRequest) returns (PredictResponse);
+  rpc PredictBatch(BatchPredictRequest) returns (BatchPredictResponse);
+  rpc GetModelStatus(Empty) returns (ModelStatusResponse);
+  rpc Benchmark(BenchmarkRequest) returns (BenchmarkResponse);
+}
+
+message PredictRequest {
+  string symbol = 1;
+  repeated Candle candles = 2;
+  repeated Trade trades = 3;
+  int32 session_id = 4;
+  map<string, string> math_engine_snapshot = 5;
+  map<string, string> key_levels = 6;
+}
+
+message PredictResponse {
+  map<string, ModelVote> votes = 1;
+  Consensus consensus = 2;
+  repeated string models_loaded = 3;
+  int32 feature_count = 4;
+}
+
+message BatchPredictRequest {
+  repeated PredictRequest requests = 1;
+}
+
+message BatchPredictResponse {
+  repeated PredictResponse responses = 1;
+}
+
+message Consensus {
+  string signal = 1;
+  double confidence = 2;
+  double long_score = 3;
+  double short_score = 4;
+  double score_margin = 5;
+  int32 votes_total = 6;
+  int32 votes_long = 7;
+  int32 votes_short = 8;
+}
+
+message ModelStatusResponse {
+  repeated ModelInfo models = 1;
+  bool inference_server_ready = 2;
+}
+
+message ModelInfo {
+  string name = 1;
+  string version = 2;
+  string trained_at = 3;
+  double roc_auc = 4;
+  double accuracy = 5;
+  int32 feature_count = 6;
+}
+
+message BenchmarkRequest {
+  int32 n_samples = 1;
+  int32 batch_size = 2;
+}
+
+message BenchmarkResponse {
+  double p50_ms = 1;
+  double p95_ms = 2;
+  double p99_ms = 3;
+  double throughput = 4;
+  string source = 5;
+}
+
+message Empty {}
+
+// Shared types
+message Candle {
+  string symbol = 1;
+  string timestamp = 2;
+  double open = 3;
+  double high = 4;
+  double low = 5;
+  double close = 6;
+  double volume = 7;
+}
+
+message Trade {
+  string symbol = 1;
+  string direction = 2;
+  string entry_time = 3;
+  string exit_time = 4;
+  double pnl_ticks = 5;
+  double pnl_dollars = 6;
+  string result = 7;
+}

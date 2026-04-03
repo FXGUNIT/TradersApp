@@ -1,0 +1,95 @@
+syntax = "proto3";
+
+package traders.telegram;
+
+option java_multiple_files = true;
+option java_package = "com.tradersapp.telegram";
+
+service TelegramService {
+  rpc SendSignal(SendSignalRequest) returns (SendSignalResponse);
+  rpc SendAlert(SendAlertRequest) returns (SendAlertResponse);
+  rpc GetUserPreferences(UserRequest) returns (UserPreferencesResponse);
+  rpc UpdateUserPreferences(UpdatePreferencesRequest) returns (UpdatePreferencesResponse);
+  rpc BroadcastToAllUsers(BroadcastRequest) returns (BroadcastResponse);
+}
+
+message SendSignalRequest {
+  int64 chat_id = 1;
+  string symbol = 2;
+  string signal = 3;       // LONG | SHORT | NEUTRAL
+  double confidence = 4;
+  string regime = 5;
+  TimingDetails timing = 6;
+  repeated string risks = 7;
+}
+
+message TimingDetails {
+  string entry_window = 1;
+  string stop_loss = 2;
+  string target = 3;
+  string rrr = 4;
+  bool enter_now = 5;
+}
+
+message SendSignalResponse {
+  bool sent = 1;
+  string message_id = 2;
+  string error = 3;
+}
+
+message SendAlertRequest {
+  int64 chat_id = 1;
+  string alert_type = 2;   // drift | trade | system | news
+  string severity = 3;     // info | warning | critical
+  string message = 4;
+}
+
+message SendAlertResponse {
+  bool sent = 1;
+  string error = 2;
+}
+
+message UserRequest {
+  int64 chat_id = 1;
+}
+
+message UserPreferences {
+  int64 chat_id = 1;
+  string username = 2;
+  bool signal_alerts_enabled = 3;
+  bool drift_alerts_enabled = 4;
+  bool news_alerts_enabled = 5;
+  bool daily_summary_enabled = 6;
+  repeated string symbols = 7;
+  string trade_direction = 8;  // LONG | SHORT | BOTH
+  double min_confidence = 9;
+  string timezone = 10;
+  int64 created_at = 11;
+  int64 last_active = 12;
+}
+
+message UserPreferencesResponse {
+  UserPreferences preferences = 1;
+  bool found = 2;
+}
+
+message UpdatePreferencesRequest {
+  int64 chat_id = 1;
+  UserPreferences preferences = 2;
+}
+
+message UpdatePreferencesResponse {
+  bool updated = 1;
+  string error = 2;
+}
+
+message BroadcastRequest {
+  string message = 1;
+  string alert_type = 2;
+  string severity = 3;
+}
+
+message BroadcastResponse {
+  int32 users_notified = 1;
+  repeated int64 failed_chat_ids = 2;
+}

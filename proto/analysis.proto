@@ -1,0 +1,74 @@
+syntax = "proto3";
+
+package traders.analysis;
+
+option java_multiple_files = true;
+option java_package = "com.tradersapp.analysis";
+
+service AnalysisService {
+  rpc GetConsensus(ConsensusRequest) returns (ConsensusResponse);
+  rpc StreamRegime(StreamRegimeRequest) returns (stream RegimeUpdate);
+  rpc DetectDrift(DriftRequest) returns (DriftResponse);
+}
+
+message ConsensusRequest {
+  string symbol = 1;
+  repeated Candle candles = 2;
+  repeated Trade trades = 3;
+  int32 session_id = 4;
+  map<string, string> math_engine_snapshot = 5;
+}
+
+message ConsensusResponse {
+  string signal = 1;
+  double confidence = 2;
+  double long_score = 3;
+  double short_score = 4;
+  map<string, ModelVote> votes = 5;
+  TimingRecommendation timing = 6;
+  string regime = 7;
+  string generated_at = 8;
+}
+
+message ModelVote {
+  string model_name = 1;
+  string signal = 2;
+  double probability_long = 3;
+  double probability_short = 4;
+  double confidence = 5;
+  string primary_reason = 6;
+  map<string, double> top_factors = 7;
+}
+
+message TimingRecommendation {
+  bool enter_now = 1;
+  bool candle_close_entry = 2;
+  string best_window = 3;
+  string reason = 4;
+  int32 stale_after_minutes = 5;
+}
+
+message StreamRegimeRequest {
+  string symbol = 1;
+  int32 poll_interval_seconds = 2;
+}
+
+message RegimeUpdate {
+  string regime = 1;
+  double confidence = 2;
+  string timestamp = 3;
+  string amd_phase = 4;
+}
+
+message DriftRequest {
+  string symbol = 1;
+  string drift_type = 2;   // feature | concept | regime
+}
+
+message DriftResponse {
+  bool drift_detected = 1;
+  string severity = 2;     // warning | alert | critical
+  double score = 3;
+  double threshold = 4;
+  string description = 5;
+}

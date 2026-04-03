@@ -1,0 +1,63 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# TradersApp — Keycloak + Trivy Docker Compose
+# ─────────────────────────────────────────────────────────────────────────────
+# Self-hosted SSO (Keycloak) + Vulnerability Scanning (Trivy).
+#
+# Start:
+#   docker compose -f docker-compose.keycloak.yml up -d
+#
+# Access:
+#   Keycloak: http://localhost:8080  (admin / traders123)
+#   Trivy:    CLI only (scan via: trivy image tradersapp/ml-engine:latest)
+# ─────────────────────────────────────────────────────────────────────────────
+
+version: "3.8"
+
+services:
+  # ── Keycloak ────────────────────────────────────────────────────────────────
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0
+    container_name: traders-keycloak
+    command: start-dev --import-realm
+    ports:
+      - "8080:8080"
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_PASSWORD:-traders123}
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres_keycloak:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak123}
+      KC_HOSTNAME_STRICT: "false"
+      KC_PROXY: edge
+    volumes:
+      - ./keycloak/realms:/opt/keycloak/data/import:ro
+    depends_on:
+      postgres_keycloak:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/8080; echo $?"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    restart: unless-stopped
+
+  # ── PostgreSQL for Keycloak ─────────────────────────────────────────────────
+  postgres_keycloak:
+    image: postgres:16-alpine
+    container_name: traders-postgres-keycloak
+    environment:
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak123}
+      POSTGRES_DB: keycloak
+    volumes:
+      - postgres-keycloak-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres-keycloak-data:
