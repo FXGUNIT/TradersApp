@@ -1,6 +1,39 @@
 # TradersApp — Claude Code Architectural Guide
 
-**Last Updated:** 2026-04-02
+**Last Updated:** 2026-04-03
+
+---
+
+## Monorepo Scoping — ZERO MICROMANAGEMENT
+
+**Every reply starts with:** `Scoped to: [folder] — [description]`
+
+### Scope Detection (Priority Order)
+1. **Error pasted** → Stack trace, file paths, service names → auto-detect microservice
+2. **File open in editor** → That file's folder
+3. **Unclear** → Ask for error text only. NEVER ask for clicks or file names.
+
+### Microservice Detection Keywords
+
+| Error Contains | Scope To |
+|---|---|
+| `src/`, `.jsx`, `vite`, `npm run`, `src/App.jsx` | `src/` (Frontend) |
+| `bff/`, `server.mjs`, `.mjs`, `/api/` | `bff/` (BFF) |
+| `ml-engine/`, `.py`, `fastapi`, `lightgbm` | `ml-engine/` |
+| `telegram-bridge/`, `telegram`, `bot` | `telegram-bridge/` |
+| `scripts/`, `.ps1` | `scripts/` |
+
+### Once Scoped — Rules
+- **ONLY** read, search, edit files inside that microservice folder
+- **PLUS** `scripts/`, `CLAUDE.md`, `.claude/` if needed
+- **NEVER** load code from other microservices unless you type `@service-name`
+- **Multi-service error**: Scope to primary, note it, expand only on explicit `@mention`
+
+### Token Economy
+- **Use `/compact` when context > 60%** — never let context bloat slow things
+- **Grep before read** — never read a file before grepping it
+- **Specific reads over globbing** — `Read file:123` not `glob **/*.js`
+- **Never load archives** — skip `.bak`, `.backup`, `archive/` files
 
 ---
 
@@ -496,6 +529,27 @@ Rules:
 
 ---
 
+## 90% Accuracy Rule (Non-Negotiable - Always Follow)
+
+This project demands the highest possible correctness because it involves low-latency systems, self-learning ML components, quantitative analysis, and production-critical code. Errors here can cause cascading failures, incorrect data insights, model drift, or performance degradation.
+
+**Rule:** 
+- I must achieve at least **90% functional accuracy** on every task, fix, or code change before considering it complete.
+- "90% accuracy" means: the solution must be correct, robust, handle documented edge cases, respect low-latency constraints, maintain consistency with existing architecture, and pass relevant tests/validation where possible.
+- Prioritize **correctness and safety** over speed of response or code brevity.
+- Never sacrifice accuracy for "good enough" or to reduce thinking steps.
+- If I am unsure about any part (logic, edge case, performance impact, integration with other services), I must:
+  1. Explicitly state my uncertainty.
+  2. Suggest the minimal safe implementation or ask for clarification.
+  3. Avoid guessing or hallucinating details.
+- For error fixes: Verify the fix actually resolves the root cause (not just silences the error) and does not introduce new issues in the scoped microservice.
+- For new code or changes: Think step-by-step about correctness first, then efficiency, then style.
+- When in doubt, default to more conservative, testable, and explicit code.
+
+This rule overrides any tendency to produce fast but approximate solutions. Accuracy is the top priority in this project.
+
+---
+
 ## Required Project Files
 
 Every session starts with access to these (do not work without them):
@@ -510,4 +564,23 @@ Every session starts with access to these (do not work without them):
 | PROMPT-TEMPLATE.md | Session starter | Every new session |
 
 **Anti-pattern:** Starting a session without reviewing relevant sections of these files.
+
+---
+
+## Model Tiers — Enforced on All Sub-Agents
+
+This project uses Claude model tiers for different task types. **Sub-agents MUST use these tiers:**
+
+| Tier | Model | When to Use |
+|------|-------|-------------|
+| **Opus 4.6** | `claude-opus-4-6` | Planning, architecture, complex multi-service research, AutoResearch orchestration, strategic decisions |
+| **Sonnet 4** | `claude-sonnet-4-6` | Coding, implementation, bug fixes, refactoring, feature development |
+| **Haiku 4.5** | `claude-haiku-4-5-20251001` | File exploration, grep/search, read-only analysis, pattern finding, simple research tasks |
+
+**AutoResearch loop (scripts/autoresearch/):** Haiku explores bottlenecks → Sonnet implements optimizations → Opus evaluates loop direction.
+
+**Quick reference:**
+- Planning a new feature or architecture? → Use **Opus**
+- Writing or editing code? → Use **Sonnet**
+- Finding files, grep, understanding code structure? → Use **Haiku**
 

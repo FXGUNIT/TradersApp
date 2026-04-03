@@ -1,4 +1,10 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
+import {
+  getRememberDevice,
+  setRememberDevice,
+  getDeviceFingerprint,
+  parseUserAgent,
+} from "../../services/adminAuthService.js";
 
 export default function AdminUnlockModal({
   authButton,
@@ -22,6 +28,23 @@ export default function AdminUnlockModal({
   verificationError,
   verificationState,
 }) {
+  const [rememberDevice, setRememberDeviceState] = useState(false);
+  const [deviceInfo, setDeviceInfo] = useState("");
+
+  useEffect(() => {
+    if (show) {
+      setRememberDeviceState(getRememberDevice());
+      const { browser, os, device } = parseUserAgent();
+      const fp = getDeviceFingerprint();
+      setDeviceInfo(`${browser} on ${os}${device !== "desktop" ? ` (${device})` : ""} · ${fp.substring(0, 12)}...`);
+    }
+  }, [show]);
+
+  const handleRememberChange = (checked) => {
+    setRememberDeviceState(checked);
+    setRememberDevice(checked);
+  };
+
   if (!show) {
     return null;
   }
@@ -97,12 +120,16 @@ export default function AdminUnlockModal({
                 onChange={(event) => onMasterEmailChange(event.target.value)}
                 style={{
                   width: "100%",
-                  padding: 10,
-                  background: "rgba(0,0,0,0.5)",
-                  border: "1px solid #333",
-                  color: "#fff",
-                  borderRadius: 6,
+                  padding: 12,
+                  background: theme.surface || "rgba(0,0,0,0.15)",
+                  border: `1px solid ${theme.border || "#374151"}`,
+                  color: theme.text || "#fff",
+                  borderRadius: 8,
                   fontFamily: theme.font,
+                  fontSize: 14,
+                  boxSizing: "border-box",
+                  outline: "none",
+                  transition: "border-color 0.2s ease",
                 }}
                 placeholder="Enter Master ID"
               />
@@ -246,10 +273,14 @@ export default function AdminUnlockModal({
                 style={{
                   width: "100%",
                   padding: 12,
-                  background: "rgba(0,0,0,0.5)",
-                  border: "1px solid #333",
-                  color: "#fff",
+                  paddingRight: 60,
+                  background: theme.surface || "rgba(0,0,0,0.5)",
+                  border: `1px solid ${theme.border || "#333"}`,
+                  color: theme.text || "#fff",
                   borderRadius: 8,
+                  fontFamily: theme.font,
+                  fontSize: 14,
+                  boxSizing: "border-box",
                 }}
                 placeholder="Enter Master Admin Password"
                 onKeyDown={(event) => {
@@ -261,16 +292,33 @@ export default function AdminUnlockModal({
               <button
                 type="button"
                 onClick={onTogglePasswordVisibility}
+                aria-label={showPassword ? "Hide password" : "Show password"}
                 style={{
                   position: "absolute",
-                  right: 10,
+                  right: 8,
                   top: "50%",
                   transform: "translateY(-50%)",
-                  background: "none",
+                  background: "transparent",
                   border: "none",
-                  color: "#888",
+                  color: theme.muted || "#9CA3AF",
                   cursor: "pointer",
-                  fontSize: 12,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  fontFamily: theme.font,
+                  letterSpacing: 1,
+                  padding: "6px 8px",
+                  borderRadius: 4,
+                  zIndex: 1,
+                  lineHeight: 1,
+                  minWidth: 40,
+                  textAlign: "center",
+                  transition: "color 0.15s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.color = theme.blue || "#3B82F6";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = theme.muted || "#9CA3AF";
                 }}
               >
                 {showPassword ? "HIDE" : "SHOW"}
@@ -288,6 +336,53 @@ export default function AdminUnlockModal({
                 {passwordError}
               </div>
             )}
+
+            {/* Remember this device */}
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                marginTop: 14,
+                marginBottom: 4,
+                cursor: "pointer",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={rememberDevice}
+                onChange={(e) => handleRememberChange(e.target.checked)}
+                style={{
+                  width: 16,
+                  height: 16,
+                  cursor: "pointer",
+                  accentColor: theme.blue || "#3B82F6",
+                }}
+              />
+              <div>
+                <div
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: theme.blue || "#3B82F6",
+                    fontFamily: theme.font,
+                    letterSpacing: 0.5,
+                  }}
+                >
+                  Remember this device
+                </div>
+                <div
+                  style={{
+                    fontSize: 10,
+                    color: theme.muted || "#9CA3AF",
+                    fontFamily: theme.font,
+                    marginTop: 2,
+                  }}
+                >
+                  {deviceInfo}
+                </div>
+              </div>
+            </label>
           </div>
         )}
 

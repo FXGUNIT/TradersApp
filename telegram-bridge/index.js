@@ -432,11 +432,13 @@ async function handleBotMessage(msg) {
   sendTypingAction(chatId)
 
   try {
+    const isAdmin = adminChats.includes(chatId)
     const response = await processConversation(text, {
       chatId,
       userId: msg.from?.id?.toString(),
       username: msg.from?.username,
       firstName: msg.from?.first_name,
+      isAdmin,
     })
 
     const chunks = []

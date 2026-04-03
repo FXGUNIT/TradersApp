@@ -2,6 +2,7 @@ import "dotenv/config";
 import { existsSync, readFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { resolve } from "node:path";
+import { createHash, timingSafeEqual } from "node:crypto";
 import {
   addSecurityHeaders,
   RateLimiter,
@@ -10,6 +11,8 @@ import {
   createAdminSession,
   validateAdminToken,
   revokeAdminSession,
+  listAdminSessions,
+  revokeSessionById,
   cleanupExpiredSessions,
   getRateLimitConfig,
 } from "./services/security.mjs";
@@ -72,45 +75,49 @@ import { createSupportRouteHandler } from "./routes/supportRoutes.mjs";
 import { createTerminalAnalyticsService } from "./services/terminalAnalyticsService.mjs";
 
 const loadEnvFiles = () => {
-  const rootDir = process.cwd();
+  const cwd = process.cwd();
+  // Search cwd first, then project root (parent of bff/ when running from bff/)
+  const searchDirs = [cwd, resolve(cwd, "..")];
   const files = [".env", ".env.local"];
   const shellDefined = new Set(Object.keys(process.env));
   const fileDefined = new Set();
 
-  files.forEach((fileName) => {
-    const filePath = resolve(rootDir, fileName);
-    if (!existsSync(filePath)) {
-      return;
+  for (const dir of searchDirs) {
+    for (const fileName of files) {
+      const filePath = resolve(dir, fileName);
+      if (!existsSync(filePath)) {
+        continue;
+      }
+
+      const content = readFileSync(filePath, "utf8");
+      content.split(/\r?\n/).forEach((line) => {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith("#")) {
+          return;
+        }
+
+        const separatorIndex = trimmed.indexOf("=");
+        if (separatorIndex <= 0) {
+          return;
+        }
+
+        const key = trimmed.slice(0, separatorIndex).trim();
+        let value = trimmed.slice(separatorIndex + 1).trim();
+
+        if (
+          (value.startsWith('"') && value.endsWith('"')) ||
+          (value.startsWith("'") && value.endsWith("'"))
+        ) {
+          value = value.slice(1, -1);
+        }
+
+        if (!shellDefined.has(key) || fileDefined.has(key)) {
+          process.env[key] = value;
+          fileDefined.add(key);
+        }
+      });
     }
-
-    const content = readFileSync(filePath, "utf8");
-    content.split(/\r?\n/).forEach((line) => {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith("#")) {
-        return;
-      }
-
-      const separatorIndex = trimmed.indexOf("=");
-      if (separatorIndex <= 0) {
-        return;
-      }
-
-      const key = trimmed.slice(0, separatorIndex).trim();
-      let value = trimmed.slice(separatorIndex + 1).trim();
-
-      if (
-        (value.startsWith('"') && value.endsWith('"')) ||
-        (value.startsWith("'") && value.endsWith("'"))
-      ) {
-        value = value.slice(1, -1);
-      }
-
-      if (!shellDefined.has(key) || fileDefined.has(key)) {
-        process.env[key] = value;
-        fileDefined.add(key);
-      }
-    });
-  });
+  }
 };
 
 loadEnvFiles();
@@ -672,8 +679,77 @@ const server = createServer(async (req, res) => {
     return;
   }
 
+  // --- Unauthenticated: Admin Password Verification ---
+  // POST /auth/admin/verify — verify admin password WITHOUT requiring a session token.
+  // This is intentionally unauthenticated so users can unlock admin without a token first.
+  if (req.method === "POST" && pathname === "/auth/admin/verify") {
+    const clientKey = getClientKey(req);
+    const attemptState = getAdminPasswordAttemptState(clientKey);
+
+    if (attemptState.lockoutUntil && attemptState.lockoutUntil > Date.now()) {
+      json(res, 429, {
+        ok: false,
+        verified: false,
+        error: "Too many attempts. Try again later.",
+        retryAfterMs: attemptState.lockoutUntil - Date.now(),
+      }, origin);
+      return;
+    }
+
+    if (!ADMIN_PASS_HASH) {
+      json(res, 503, {
+        ok: false,
+        verified: false,
+        error: "Admin password secret is not configured on the BFF.",
+      }, origin);
+      return;
+    }
+
+    try {
+      const body = await readJsonBody(req);
+      const password = String(body.password || "");
+
+      if (!password) {
+        json(res, 400, {
+          ok: false,
+          verified: false,
+          error: "Admin password is required.",
+        }, origin);
+        return;
+      }
+
+      const isValid = constantTimeMatch(hashPassword(password), ADMIN_PASS_HASH);
+
+      if (!isValid) {
+        const nextAttemptState = registerAdminPasswordFailedAttempt(
+          clientKey, ADMIN_ATTEMPT_LIMIT, ADMIN_LOCKOUT_WINDOW_MS,
+        );
+        json(res, 401, {
+          ok: false,
+          verified: false,
+          error: "Invalid admin password.",
+          attemptsRemaining: Math.max(0, ADMIN_ATTEMPT_LIMIT - nextAttemptState.attempts),
+          retryAfterMs: nextAttemptState.lockoutUntil > 0 ? nextAttemptState.lockoutUntil - Date.now() : 0,
+        }, origin);
+        return;
+      }
+
+      clearAdminPasswordFailedAttempts(clientKey);
+      json(res, 200, { ok: true, verified: true }, origin);
+      return;
+    } catch (error) {
+      json(res, 400, {
+        ok: false,
+        verified: false,
+        error: error.message || "Invalid request.",
+      }, origin);
+      return;
+    }
+  }
+
   // --- RBAC: Require ADMIN role for admin routes ---
-  if (pathname.startsWith("/admin")) {
+  // Exclude: POST /admin/session (validates password directly in body, no token needed)
+  if (pathname.startsWith("/admin") && !(pathname === "/admin/session" && req.method === "POST")) {
     const auth = authorizeRequest(req);
     if (!auth.authorized) {
       json(res, 403, { ok: false, error: auth.error }, origin);
@@ -720,7 +796,15 @@ const server = createServer(async (req, res) => {
       }
 
       const ttlMs = Math.min(Number(body.ttlMs) || 8 * 3600 * 1000, 24 * 3600 * 1000);
-      const token = createAdminSession(ROLES.ADMIN, ttlMs);
+      const device = {
+        fingerprint: String(body.deviceFingerprint || "unknown"),
+        browser: String(body.deviceBrowser || req.headers["user-agent"] || "Unknown").substring(0, 80),
+        os: String(body.deviceOs || "unknown"),
+        device: String(body.deviceType || "unknown"),
+        ip: req.headers["x-forwarded-for"] || req.headers["x-real-ip"] || "unknown",
+        rememberDevice: !!body.rememberDevice,
+      };
+      const token = createAdminSession(ROLES.ADMIN, ttlMs, device);
       json(res, 200, {
         ok: true,
         token,
@@ -755,6 +839,65 @@ const server = createServer(async (req, res) => {
       }
     }
     json(res, 200, { ok: true, valid: false, role: null }, origin);
+    return;
+  }
+
+  // GET /admin/sessions — list all active sessions (admin auth required)
+  if (req.method === "GET" && pathname === "/admin/sessions") {
+    const auth = authorizeRequest(req);
+    if (!auth.authorized) {
+      json(res, 403, { ok: false, error: auth.error }, origin);
+      return;
+    }
+    const all = listAdminSessions();
+    // Strip full tokens from response — only expose short IDs
+    const safe = all.map(({ token: _t, ...rest }) => rest);
+    json(res, 200, { ok: true, sessions: safe }, origin);
+    return;
+  }
+
+  // DELETE /admin/sessions — revoke a specific session (admin auth required)
+  // Accepts: { id: "short_id" } (preferred) or { token: "full_token" }
+  if (req.method === "DELETE" && pathname === "/admin/sessions") {
+    const auth = authorizeRequest(req);
+    if (!auth.authorized) {
+      json(res, 403, { ok: false, error: auth.error }, origin);
+      return;
+    }
+    try {
+      const body = await readJsonBody(req);
+      const { id, token: revokeToken } = body || {};
+
+      // Resolve to full token: prefer id (short), fallback to full token
+      let fullToken = revokeToken;
+      if (!fullToken && id) {
+        const allSessions = listAdminSessions(); // returns { token, id, device, ... }
+        const match = allSessions.find((s) => s.id === id);
+        if (match) fullToken = match.token;
+      }
+
+      if (!fullToken) {
+        json(res, 400, { ok: false, error: "Session id or token required." }, origin);
+        return;
+      }
+
+      // Prevent revoking your own session (must keep at least one)
+      const authToken = (req.headers.authorization || "").replace("Bearer ", "").trim();
+      const allSessions = listAdminSessions();
+      if (allSessions.length <= 1 && allSessions[0]?.token === fullToken) {
+        json(res, 400, { ok: false, error: "Cannot revoke the only active session." }, origin);
+        return;
+      }
+
+      const revoked = revokeSessionById(fullToken);
+      if (revoked) {
+        json(res, 200, { ok: true, message: "Session revoked." }, origin);
+      } else {
+        json(res, 404, { ok: false, error: "Session not found." }, origin);
+      }
+    } catch {
+      json(res, 400, { ok: false, error: "Invalid request." }, origin);
+    }
     return;
   }
 

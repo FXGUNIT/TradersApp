@@ -142,6 +142,25 @@
         "privacyAccepted": true,
         "eulaAccepted": true
       }
+    },
+    "vfNHXXRlVWeU5rnM0BkslQat2mj1": {
+      "uid": "vfNHXXRlVWeU5rnM0BkslQat2mj1",
+      "email": "cricgunit@gmail.com",
+      "fullName": "Cric Gunit",
+      "country": "India",
+      "city": "Meerut",
+      "instagram": "",
+      "linkedin": "",
+      "proficiency": "intermediate",
+      "authProvider": "google",
+      "emailVerified": true,
+      "status": "PENDING",
+      "consentState": {
+        "termsAccepted": true,
+        "privacyAccepted": true
+      },
+      "submittedAt": "2026-04-03T09:09:14.493Z",
+      "updatedAt": "2026-04-03T09:09:14.493Z"
     }
   }
 }

@@ -1,4 +1,23 @@
 import { useEffect, useState } from "react";
+
+const REACT_FORWARD_REF = typeof Symbol !== "undefined" && Symbol.for
+  ? Symbol.for("react.forward_ref")
+  : 0; // fallback for environments without Symbol
+
+function isRenderableIcon(icon) {
+  // lucide-react icons are React.forwardRef objects: { $$typeof: Symbol(react.forward_ref), render: fn }
+  if (typeof icon === "function") return true;
+  if (
+    icon &&
+    typeof icon === "object" &&
+    icon.$$typeof === REACT_FORWARD_REF &&
+    typeof icon.render === "function"
+  ) {
+    return true;
+  }
+  // Already a rendered React element (e.g. <Home />) — return as-is
+  return false;
+}
 import { CSS_VARS } from "../../styles/cssVars.js";
 import {
   BarChart2,        // Analytics
@@ -60,7 +79,7 @@ export function Breadcrumbs({ items, onNavigate, theme }) {
             }}
             title={item.label}
           >
-            {typeof item.icon === "function" ? (() => { const Ic = item.icon; return <Ic size={12} />; })() : item.icon} {item.label}
+            {isRenderableIcon(item.icon) ? (() => { const Ic = item.icon; return <Ic size={12} />; })() : item.icon} {item.label}
           </button>
           {index < items.length - 1 && <span style={{ color: theme.dim, fontSize: 10 }}>{"\u203A"}</span>}
         </div>
@@ -233,8 +252,8 @@ export function BackToTopButton({ theme }) {
       }}
       style={{
         position: "fixed",
-        bottom: "30px",
-        right: "30px",
+        bottom: "80px",
+        right: "20px",
         background: `linear-gradient(135deg, ${theme.purple}, ${theme.blue})`,
         border: "none",
         borderRadius: "50%",
@@ -247,7 +266,7 @@ export function BackToTopButton({ theme }) {
         color: theme.text,
         fontSize: 20,
         fontWeight: 700,
-        zIndex: 900,
+        zIndex: 9999,
         transition: "all 0.3s ease-in-out",
         boxShadow: `0 8px 24px ${CSS_VARS.borderStrong}, 0 0 20px ${theme.purple}40`,
         animation: "float 3s ease-in-out infinite",

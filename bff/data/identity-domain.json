@@ -4,7 +4,18 @@
       "uid": "demo-user",
       "email": "demo@example.com",
       "role": "user",
-      "status": "PENDING"
+      "status": "PENDING",
+      "fullName": "demo@example.com",
+      "isLocked": false,
+      "failedAttempts": 0,
+      "approvedAt": null,
+      "approvedBy": null,
+      "blockedAt": null,
+      "blockedBy": null,
+      "lockedBy": null,
+      "lastLoginAt": null,
+      "lastLoginAttempt": null,
+      "updatedAt": "2026-04-03T09:09:14.506Z"
     },
     "f44845f7-1ee8-485c-bd91-c615ec5ed494": {
       "uid": "f44845f7-1ee8-485c-bd91-c615ec5ed494",
@@ -14,7 +25,14 @@
       "isLocked": false,
       "approvedBy": "admin-test",
       "approvedAt": "2026-03-28T23:44:06.711Z",
-      "updatedAt": "2026-03-28T23:44:06.711Z"
+      "updatedAt": "2026-03-28T23:44:06.711Z",
+      "fullName": "f44845f7-1ee8-485c-bd91-c615ec5ed494@example.com",
+      "failedAttempts": 0,
+      "blockedAt": null,
+      "blockedBy": null,
+      "lockedBy": null,
+      "lastLoginAt": null,
+      "lastLoginAttempt": null
     },
     "8ba41228-0033-4a94-849c-2271fc071241": {
       "uid": "8ba41228-0033-4a94-849c-2271fc071241",
@@ -24,7 +42,16 @@
       "isLocked": false,
       "updatedAt": "2026-03-29T02:31:54.809Z",
       "displayName": "Identity Verify User",
-      "profileStage": "verified"
+      "profileStage": "verified",
+      "fullName": "Identity Verify User",
+      "failedAttempts": 0,
+      "approvedAt": null,
+      "approvedBy": null,
+      "blockedAt": null,
+      "blockedBy": null,
+      "lockedBy": null,
+      "lastLoginAt": null,
+      "lastLoginAttempt": null
     },
     "14409bef-14a8-4460-81b8-ce09563554eb": {
       "uid": "14409bef-14a8-4460-81b8-ce09563554eb",
@@ -34,7 +61,14 @@
       "isLocked": false,
       "approvedBy": "admin-test",
       "approvedAt": "2026-03-28T23:51:49.290Z",
-      "updatedAt": "2026-03-28T23:51:49.290Z"
+      "updatedAt": "2026-03-28T23:51:49.290Z",
+      "fullName": "14409bef-14a8-4460-81b8-ce09563554eb@example.com",
+      "failedAttempts": 0,
+      "blockedAt": null,
+      "blockedBy": null,
+      "lockedBy": null,
+      "lastLoginAt": null,
+      "lastLoginAttempt": null
     },
     "bf8b0e46-09f6-447e-9b19-f39c0b00caab": {
       "uid": "bf8b0e46-09f6-447e-9b19-f39c0b00caab",
@@ -44,7 +78,14 @@
       "isLocked": false,
       "approvedBy": "admin-test",
       "approvedAt": "2026-03-29T00:01:07.840Z",
-      "updatedAt": "2026-03-29T00:01:07.840Z"
+      "updatedAt": "2026-03-29T00:01:07.840Z",
+      "fullName": "bf8b0e46-09f6-447e-9b19-f39c0b00caab@example.com",
+      "failedAttempts": 0,
+      "blockedAt": null,
+      "blockedBy": null,
+      "lockedBy": null,
+      "lastLoginAt": null,
+      "lastLoginAttempt": null
     },
     "354fc758-4a4e-497f-b778-413cb6d8f447": {
       "uid": "354fc758-4a4e-497f-b778-413cb6d8f447",
@@ -54,7 +95,14 @@
       "isLocked": false,
       "approvedBy": "admin-test",
       "approvedAt": "2026-03-29T00:02:27.238Z",
-      "updatedAt": "2026-03-29T00:02:27.238Z"
+      "updatedAt": "2026-03-29T00:02:27.238Z",
+      "fullName": "354fc758-4a4e-497f-b778-413cb6d8f447@example.com",
+      "failedAttempts": 0,
+      "blockedAt": null,
+      "blockedBy": null,
+      "lockedBy": null,
+      "lastLoginAt": null,
+      "lastLoginAttempt": null
     },
     "415d2816-3e7c-4b1f-9f77-2b696c266008": {
       "uid": "415d2816-3e7c-4b1f-9f77-2b696c266008",
@@ -64,7 +112,14 @@
       "isLocked": false,
       "approvedBy": "admin-test",
       "approvedAt": "2026-03-29T00:09:48.522Z",
-      "updatedAt": "2026-03-29T00:09:48.523Z"
+      "updatedAt": "2026-03-29T00:09:48.523Z",
+      "fullName": "415d2816-3e7c-4b1f-9f77-2b696c266008@example.com",
+      "failedAttempts": 0,
+      "blockedAt": null,
+      "blockedBy": null,
+      "lockedBy": null,
+      "lastLoginAt": null,
+      "lastLoginAttempt": null
     },
     "7f274d8d-41b1-4a82-b82d-7331df2750ed": {
       "uid": "7f274d8d-41b1-4a82-b82d-7331df2750ed",
@@ -74,7 +129,14 @@
       "isLocked": false,
       "approvedBy": "admin-test",
       "approvedAt": "2026-03-29T00:45:58.409Z",
-      "updatedAt": "2026-03-29T00:45:58.409Z"
+      "updatedAt": "2026-03-29T00:45:58.409Z",
+      "fullName": "7f274d8d-41b1-4a82-b82d-7331df2750ed@example.com",
+      "failedAttempts": 0,
+      "blockedAt": null,
+      "blockedBy": null,
+      "lockedBy": null,
+      "lastLoginAt": null,
+      "lastLoginAttempt": null
     },
     "552d35eb-3a4f-4569-8517-2685f9a185f8": {
       "uid": "552d35eb-3a4f-4569-8517-2685f9a185f8",
@@ -84,7 +146,14 @@
       "isLocked": false,
       "approvedBy": "admin-test",
       "approvedAt": "2026-03-29T00:54:41.088Z",
-      "updatedAt": "2026-03-29T00:54:41.088Z"
+      "updatedAt": "2026-03-29T00:54:41.088Z",
+      "fullName": "552d35eb-3a4f-4569-8517-2685f9a185f8@example.com",
+      "failedAttempts": 0,
+      "blockedAt": null,
+      "blockedBy": null,
+      "lockedBy": null,
+      "lastLoginAt": null,
+      "lastLoginAttempt": null
     },
     "8fb5a910-ecf7-4444-9235-a7523e2ae45c": {
       "uid": "8fb5a910-ecf7-4444-9235-a7523e2ae45c",
@@ -94,10 +163,43 @@
       "isLocked": false,
       "approvedBy": "admin-test",
       "approvedAt": "2026-03-29T02:31:54.738Z",
-      "updatedAt": "2026-03-29T02:31:54.738Z"
+      "updatedAt": "2026-03-29T02:31:54.738Z",
+      "fullName": "8fb5a910-ecf7-4444-9235-a7523e2ae45c@example.com",
+      "failedAttempts": 0,
+      "blockedAt": null,
+      "blockedBy": null,
+      "lockedBy": null,
+      "lastLoginAt": null,
+      "lastLoginAttempt": null
+    },
+    "vfNHXXRlVWeU5rnM0BkslQat2mj1": {
+      "uid": "vfNHXXRlVWeU5rnM0BkslQat2mj1",
+      "fullName": "Cric Gunit",
+      "email": "cricgunit@gmail.com",
+      "country": "India",
+      "city": "Meerut",
+      "instagram": "",
+      "linkedin": "",
+      "proficiency": "intermediate",
+      "authProvider": "google",
+      "emailVerified": true,
+      "status": "PENDING",
+      "role": "user",
+      "createdAt": "2026-04-03T09:09:14.489Z",
+      "passwordLastChanged": "2026-04-03T09:09:14.489Z",
+      "failedAttempts": 0,
+      "isLocked": false,
+      "updatedAt": "2026-04-03T09:09:14.506Z",
+      "approvedAt": null,
+      "approvedBy": null,
+      "blockedAt": null,
+      "blockedBy": null,
+      "lockedBy": null,
+      "lastLoginAt": null,
+      "lastLoginAttempt": null
     }
   },
   "sessions": {
-    "8ba41228-0033-4a94-849c-2271fc071241": []
+    "8ba41228-0033-4a94-849c-2271fc071241": {}
   }
 }

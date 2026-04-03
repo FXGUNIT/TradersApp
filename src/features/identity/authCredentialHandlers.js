@@ -539,7 +539,7 @@ export const executeStructuredSignup = async ({
   await sendWelcomeEmail(cleanEmail, fullName);
 
   sendTelegramAlert(
-    `ðŸ‘¤ <b>NEW TRADER APPLICATION</b>\nEmail: <code>${cleanEmail}</code>\nStatus: ðŸŸ¡ PENDING`,
+    `👤 <b>NEW TRADER APPLICATION</b>\nEmail: <code>${cleanEmail}</code>\nStatus: 🟡 PENDING`,
   );
 
   clearPendingGoogleSignup();

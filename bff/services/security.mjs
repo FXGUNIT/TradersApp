@@ -187,7 +187,7 @@ export const ROUTE_PERMISSIONS = {
   null: ROLES.TRADER,
 };
 
-/** Map of valid admin sessions: token → {role, createdAt, expiresAt} */
+/** Map of valid admin sessions: token → {role, createdAt, expiresAt, device} */
 const _adminSessions = new Map();
 
 /** Generate a cryptographically random session token. */
@@ -200,13 +200,24 @@ function _generateToken() {
 /**
  * Create an admin session and return the token.
  * Token expires after ADMIN_SESSION_TTL_MS.
+ * @param {string} role - ROLES.ADMIN or ROLES.MENTOR
+ * @param {number} ttlMs - time-to-live in ms
+ * @param {object} device - {fingerprint, browser, os, device, ip}
  */
-export function createAdminSession(role = ROLES.ADMIN, ttlMs = 8 * 60 * 60 * 1000) {
+export function createAdminSession(role = ROLES.ADMIN, ttlMs = 8 * 60 * 60 * 1000, device = {}) {
   const token = _generateToken();
   _adminSessions.set(token, {
     role,
     createdAt: Date.now(),
     expiresAt: Date.now() + ttlMs,
+    device: {
+      fingerprint: device.fingerprint || "unknown",
+      browser: device.browser || "Unknown Browser",
+      os: device.os || "Unknown OS",
+      device: device.device || "Unknown Device",
+      ip: device.ip || "unknown",
+      rememberDevice: !!device.rememberDevice,
+    },
   });
   return token;
 }
@@ -229,6 +240,39 @@ export function validateAdminToken(token) {
 /** Revoke an admin session. */
 export function revokeAdminSession(token) {
   _adminSessions.delete(token);
+}
+
+/**
+ * List all active admin sessions (without exposing actual tokens).
+ * Returns array of {id, device, createdAt, expiresAt, active}.
+ * id = first 8 chars of token for identification.
+ */
+export function listAdminSessions() {
+  cleanupExpiredSessions();
+  const sessions = [];
+  for (const [token, session] of _adminSessions.entries()) {
+    sessions.push({
+      id: token.substring(0, 8),
+      token, // full token for revocation
+      device: session.device,
+      createdAt: session.createdAt,
+      expiresAt: session.expiresAt,
+      active: true,
+    });
+  }
+  return sessions;
+}
+
+/**
+ * Revoke a session by its full token.
+ * Returns true if found and revoked, false if not found.
+ */
+export function revokeSessionById(token) {
+  if (_adminSessions.has(token)) {
+    _adminSessions.delete(token);
+    return true;
+  }
+  return false;
 }
 
 /** Clean up expired sessions (call periodically). */
@@ -266,18 +310,40 @@ export function getRequiredRole(pathname) {
   return ROUTE_PERMISSIONS[null]; // Default: TRADER
 }
 
+/** Timing-safe string comparison. */
+const constantTimeMatch = (left, right) => {
+  const a = Buffer.from(String(left || ""), "utf8");
+  const b = Buffer.from(String(right || ""), "utf8");
+  if (a.length !== b.length) return false;
+  let mismatch = 0;
+  for (let i = 0; i < a.length; i++) {
+    mismatch |= a[i] ^ b[i];
+  }
+  return mismatch === 0;
+};
+
 /**
- * Authenticate a request using Bearer token or admin password session.
+ * Authenticate a request using Bearer token, service key, or admin password session.
  * Returns {authenticated: bool, role: string|null}.
  */
 export function authenticateRequest(req) {
   const authHeader = req.headers.authorization || req.headers.Authorization || "";
 
+  // 1. Bearer token (admin session token)
   if (authHeader.startsWith("Bearer ")) {
     const token = authHeader.slice(7).trim();
     const result = validateAdminToken(token);
     if (result.valid) {
       return { authenticated: true, role: result.role };
+    }
+  }
+
+  // 2. Service key (trusted services like Telegram bridge)
+  const serviceKey = req.headers["x-support-key"] || "";
+  if (serviceKey) {
+    const configuredKey = process.env.SUPPORT_SERVICE_KEY || "";
+    if (configuredKey && constantTimeMatch(serviceKey, configuredKey)) {
+      return { authenticated: true, role: ROLES.ADMIN };
     }
   }
 

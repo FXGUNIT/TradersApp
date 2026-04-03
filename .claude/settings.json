@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash",
+      "Read",
+      "Edit",
+      "Write",
+      "Glob",
+      "Grep",
+      "TodoWrite",
+      "WebSearch",
+      "WebFetch",
+      "Agent",
+      "NotebookEdit",
+      "TaskOutput",
+      "TaskStop"
+    ]
+  },
+  "compact": {
+    "aggressive": true,
+    "thresholdPercent": 60
+  },
+  "ui": {
+    "showMemoryIndicators": true
+  }
+}

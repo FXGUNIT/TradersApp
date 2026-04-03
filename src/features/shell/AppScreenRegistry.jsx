@@ -368,10 +368,10 @@ export default function AppScreenRegistry({
               className="btn-glass"
             >
               {currentTheme === "lumiere"
-                ? "â˜€ï¸ LUMIERE"
+                ? "☀️¸ LUMIERE"
                 : currentTheme === "amber"
-                  ? "ðŸŸ  AMBER"
-                  : "ðŸŒ™ MIDNIGHT"}
+                  ? "🟠 AMBER"
+                  : "🌙 MIDNIGHT"}
             </button>
             <button
               onClick={() => setScreen("sessions")}
@@ -389,7 +389,7 @@ export default function AppScreenRegistry({
               }}
               className="btn-glass"
             >
-              ðŸ“± SESSIONS
+              📱 SESSIONS
             </button>
           </div>
           <Suspense fallback={<LoadingFallback />}>

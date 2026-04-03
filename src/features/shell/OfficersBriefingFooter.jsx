@@ -68,7 +68,7 @@ export default function OfficersBriefingFooter({
         <div
           style={{
             color: CSS_VARS.textSecondary,
-            fontSize: "0.9rem",
+            fontSize: "1.05rem",
             fontStyle: "italic",
             lineHeight: 1.8,
             fontFamily: theme.font,
@@ -109,7 +109,7 @@ export default function OfficersBriefingFooter({
       >
         <span
           style={{
-            fontSize: "0.7rem",
+            fontSize: "0.85rem",
             fontWeight: 700,
             color: "var(--text-secondary)",
             letterSpacing: "0.1em",
@@ -120,13 +120,13 @@ export default function OfficersBriefingFooter({
         </span>
         <span
           style={{
-            fontSize: "0.64rem",
+            fontSize: "0.78rem",
             fontWeight: 700,
             color: "var(--status-info)",
             background: "color-mix(in srgb, var(--status-info) 12%, transparent)",
             border: "1px solid color-mix(in srgb, var(--status-info) 25%, transparent)",
             borderRadius: 999,
-            padding: "4px 8px",
+            padding: "4px 10px",
             textTransform: "uppercase",
             letterSpacing: "0.08em",
           }}
@@ -136,7 +136,7 @@ export default function OfficersBriefingFooter({
         {allUnconfigured && (
           <span
             style={{
-              fontSize: "0.64rem",
+              fontSize: "0.78rem",
               fontWeight: 600,
               color: "var(--text-secondary)",
             }}
@@ -169,7 +169,7 @@ export default function OfficersBriefingFooter({
               />
               <span
                 style={{
-                  fontSize: "0.68rem",
+                  fontSize: "0.82rem",
                   fontWeight: 600,
                   color: color.text,
                   fontFamily: "ui-monospace, monospace",
@@ -194,9 +194,9 @@ export default function OfficersBriefingFooter({
         <div
           style={{
             color: CSS_VARS.textTertiary,
-            fontSize: "0.75rem",
-            letterSpacing: "0.1em",
-            fontWeight: 500,
+            fontSize: "0.9rem",
+            letterSpacing: "0.15em",
+            fontWeight: 600,
             marginBottom: 0,
             textTransform: "uppercase",
           }}

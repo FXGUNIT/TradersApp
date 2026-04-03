@@ -305,6 +305,21 @@ export default function TradersRegiment() {
   const [showAdminPwd, setShowAdminPwd] = useState(false);
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
+  // HARD SAFETY TIMEOUT: If Firebase auth hasn't resolved within 10s, force to login.
+  // This is outside useAuthBootstrap so it survives React StrictMode unmount/remount cycles.
+  // authBootstrapCompleteRef ensures this doesn't fire if auth already completed.
+  const hardTimeoutRef = useRef(false);
+  useEffect(() => {
+    if (hardTimeoutRef.current) return;
+    const timer = setTimeout(() => {
+      if (hardTimeoutRef.current) return;
+      hardTimeoutRef.current = true;
+      console.warn("[App] Auth hard timeout — forcing to login screen");
+      setScreen("login");
+      setIsInitialLoading(false);
+    }, 10000);
+    return () => clearTimeout(timer);
+  }, []);
   const [isAudioMuted, setIsAudioMuted] = useState(() => {
     try { return localStorage.getItem("audio_muted") === "true"; } catch { return false; }
   });

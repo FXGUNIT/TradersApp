@@ -1,0 +1,116 @@
+# TradersApp — MLflow Self-Hosted MLOps Stack
+# Run: docker compose -f docker-compose.mlflow.yml up -d
+# Access: http://localhost:5000
+
+version: "3.9"
+
+services:
+  # ── MLflow Tracking Server ───────────────────────────────────────────────
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:latest
+    container_name: traders-mlflow
+    ports:
+      - "5000:5000"
+    environment:
+      # Backend store: PostgreSQL
+      MLFLOW_BACKEND_STORE: postgresql://mlflow:mlflow123@postgres:5432/mlflow
+      # Artifact store: MinIO (S3-compatible)
+      MLFLOW_ARTIFACT_ROOT: s3://mlflow-artifacts/
+      # AWS credentials for MinIO
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-minioadmin}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-minioadmin}
+      AWS_DEFAULT_REGION: us-east-1
+      # Use S3-compatible endpoint (MinIO)
+      MLFLOW_S3_ENDPOINT_URL: ${MLFLOW_S3_ENDPOINT_URL:-http://minio:9000}
+      # Disable SSL for local MinIO
+      AWS_SECURE: "false"
+      # Server settings
+      MLFLOW_SERVER_WORKERS: 2
+      MLFLOW_SERVER_PORT: 5000
+      GUNICORN_OPTS: "--workers 2 --timeout 300 --access-logfile -"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+    networks:
+      - mlflow-net
+    volumes:
+      - mlflow-logs:/mlflow/logs
+
+  # ── PostgreSQL Backend Store ─────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: traders-postgres-mlflow
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: mlflow
+      POSTGRES_USER: mlflow
+      POSTGRES_PASSWORD: mlflow123
+    volumes:
+      - postgres-mlflow-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mlflow -d mlflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - mlflow-net
+
+  # ── MinIO (S3-Compatible Object Store for Artifacts) ──────────────────────
+  minio:
+    image: minio/minio:latest
+    container_name: traders-minio
+    ports:
+      - "9000:9000"   # API
+      - "9001:9001"   # Console
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_DEFAULT_BUCKETS: mlflow-artifacts
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - mlflow-net
+
+  # ── MinIO Client (for bucket setup) ──────────────────────────────────────
+  minio-setup:
+    image: minio/mc:latest
+    container_name: traders-minio-setup
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 minioadmin minioadmin;
+      mc mb local/mlflow-artifacts --ignore-existing;
+      mc anonymous set download local/mlflow-artifacts;
+      exit 0;
+      "
+    networks:
+      - mlflow-net
+
+networks:
+  mlflow-net:
+    driver: bridge
+
+volumes:
+  postgres-mlflow-data:
+  minio-data:
+  mlflow-logs:

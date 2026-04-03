@@ -37,8 +37,16 @@ export function useMaintenanceMode({
             return;
           }
 
+          // 401/403 = unauthenticated — maintenance is not active for public users
+          if (response?._authError) {
+            setMaintenanceModeActive(false);
+            return;
+          }
+
           if (response?.success === false) {
-            throw new Error(response.error || "Failed to load maintenance.");
+            // BFF is reachable but returned an error — use cached state
+            setMaintenanceModeActive(readMaintenanceCache());
+            return;
           }
 
           if (typeof response?.maintenanceActive === "boolean") {
@@ -46,14 +54,16 @@ export function useMaintenanceMode({
             return;
           }
         } catch (error) {
-          console.warn("Maintenance state client load failed, falling back:", error);
+          // BFF unreachable or network error — use cached state
+          setMaintenanceModeActive(readMaintenanceCache());
         }
+      } else {
+        setMaintenanceModeActive(readMaintenanceCache());
       }
 
       if (!active) {
         return;
       }
-      setMaintenanceModeActive(readMaintenanceCache());
     };
 
     void loadState();

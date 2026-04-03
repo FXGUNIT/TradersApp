@@ -177,6 +177,16 @@ function detectIntent(text) {
   if (lower.includes('/pbo') || lower.includes('backtest') || lower.includes('backtesting')) {
     return { intent: 'pbo', params: {} };
   }
+  if (lower.includes('/sessions') || lower.includes('/session list') || lower.includes('active sessions')) {
+    return { intent: 'admin_sessions', params: {} };
+  }
+  if (lower.match(/\/revoke\s+([a-f0-9]{8,})/) || lower.includes('/logout device')) {
+    const match = lower.match(/\/revoke\s+([a-f0-9]{8,})/);
+    return { intent: 'admin_revoke', params: { sessionId: match ? match[1] : null } };
+  }
+  if (lower.includes('/admin status') || lower.includes('/status admin')) {
+    return { intent: 'admin_status', params: {} };
+  }
   if (lower.match(/^(what|how|why|when|should i|is it|can i|tell me|explain|define|describe)/i)) {
     return { intent: 'education', params: {} };
   }
@@ -266,6 +276,78 @@ async function callBFFConsensus() {
 
     req.on('error', (e) => resolve({ ok: false, error: e.message }));
     req.on('timeout', () => { req.destroy(); resolve({ ok: false, error: 'Timeout' }); });
+    req.end();
+  });
+}
+
+/**
+ * Call BFF admin sessions endpoint to list active admin sessions.
+ * Requires admin auth token (set in SUPPORT_SERVICE_KEY / TELEGRAM_ADMIN_API_KEY).
+ */
+async function callBFFAdminSessions() {
+  const bffUrl = process.env.BFF_URL || 'http://127.0.0.1:8788';
+  const serviceKey = process.env.SUPPORT_SERVICE_KEY || process.env.TELEGRAM_ADMIN_API_KEY || '';
+
+  return new Promise((resolve) => {
+    const url = new URL(`${bffUrl}/admin/sessions`);
+    const options = {
+      hostname: url.hostname,
+      port: url.port || 80,
+      path: url.pathname,
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Support-Key': serviceKey,
+      },
+      timeout: 10000,
+    };
+    const req = http.request(options, (res) => {
+      let body = '';
+      res.on('data', chunk => body += chunk);
+      res.on('end', () => {
+        try { resolve({ ok: res.statusCode < 400, status: res.statusCode, data: JSON.parse(body) }); }
+        catch { resolve({ ok: false, status: res.statusCode, error: 'Parse error' }); }
+      });
+    });
+    req.on('error', (e) => resolve({ ok: false, error: e.message }));
+    req.on('timeout', () => { req.destroy(); resolve({ ok: false, error: 'Timeout' }); });
+    req.end();
+  });
+}
+
+/**
+ * Revoke a specific admin session by token.
+ */
+async function callBFFRevokeSession(sessionId) {
+  const bffUrl = process.env.BFF_URL || 'http://127.0.0.1:8788';
+  const serviceKey = process.env.SUPPORT_SERVICE_KEY || process.env.TELEGRAM_ADMIN_API_KEY || '';
+
+  return new Promise((resolve) => {
+    const url = new URL(`${bffUrl}/admin/sessions`);
+    const body = JSON.stringify({ id: sessionId });
+    const options = {
+      hostname: url.hostname,
+      port: url.port || 80,
+      path: url.pathname,
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Support-Key': serviceKey,
+        'Content-Length': Buffer.byteLength(body),
+      },
+      timeout: 10000,
+    };
+    const req = http.request(options, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        try { resolve({ ok: res.statusCode < 400, status: res.statusCode, data: JSON.parse(data) }); }
+        catch { resolve({ ok: false, status: res.statusCode, error: 'Parse error' }); }
+      });
+    });
+    req.on('error', (e) => resolve({ ok: false, error: e.message }));
+    req.on('timeout', () => { req.destroy(); resolve({ ok: false, error: 'Timeout' }); });
+    req.write(body);
     req.end();
   });
 }
@@ -631,7 +713,97 @@ async function processConversation(text, context = {}) {
 /position — Get position sizing advice
 /pbo — Learn about backtest overfitting
 
+*Admin Commands* (owner only):
+/sessions — View active admin sessions
+/revoke [id] — Logout a specific session
+/admin status — System status overview
+
 Or just ask any trading question in natural language!`;
+  }
+
+  // ── Admin-only commands ──────────────────────────────────────────────────
+  if (intent === 'admin_sessions' || intent === 'admin_revoke' || intent === 'admin_status') {
+    if (!context.isAdmin) {
+      return 'Access denied. Admin commands are reserved for the owner.';
+    }
+    if (intent === 'admin_sessions') {
+      const result = await callBFFAdminSessions();
+      if (!result.ok || !result.data?.sessions) {
+        return 'Could not fetch sessions. Is the admin server running?';
+      }
+      const sessions = result.data.sessions || [];
+      if (sessions.length === 0) {
+        return 'No active admin sessions found.';
+      }
+      const lines = ['*Active Admin Sessions:*\n'];
+      sessions.forEach((s, i) => {
+        const dev = s.device || {};
+        const created = new Date(s.createdAt).toLocaleString();
+        const expires = new Date(s.expiresAt).toLocaleString();
+        const rem = dev.rememberDevice ? ' (remembered)' : '';
+        const browser = dev.browser || 'Unknown';
+        const os = dev.os || 'Unknown';
+        lines.push(`${i + 1}. \`${s.id}...\` ${rem}`);
+        lines.push(`   ${browser} on ${os}`);
+        lines.push(`   Created: ${created}`);
+        lines.push(`   Expires: ${expires}\n`);
+      });
+      lines.push('\n_Revoke with:_ /revoke [id]');
+      return lines.join('\n');
+    }
+    if (intent === 'admin_revoke') {
+      const sessionId = context.params?.sessionId;
+      if (!sessionId) {
+        return 'Usage: /revoke [session-id]\n\nFirst use /sessions to see active sessions.';
+      }
+      // We need the full token, but Telegram only has the short ID.
+      // For now, we list sessions and match by ID prefix.
+      const listResult = await callBFFAdminSessions();
+      if (!listResult.ok) {
+        return 'Could not fetch sessions to revoke.';
+      }
+      const sessions = listResult.data?.sessions || [];
+      const target = sessions.find(s => s.id === sessionId);
+      if (!target) {
+        return `Session \`${sessionId}...\` not found. Use /sessions to see active sessions.`;
+      }
+      const revokeResult = await callBFFRevokeSession(sessionId);
+      if (revokeResult.ok) {
+        return `Session \`${sessionId}...\` revoked. Device logged out.`;
+      }
+      return `Failed to revoke: ${revokeResult.data?.error || revokeResult.error || 'Unknown error'}`;
+    }
+    if (intent === 'admin_status') {
+      const sessionsResult = await callBFFAdminSessions();
+      const sessions = sessionsResult.data?.sessions || [];
+      const bffHealth = await new Promise(resolve => {
+        const url = new URL('http://127.0.0.1:8788/health');
+        require('http').get(url, res => {
+          let d = '';
+          res.on('data', c => d += c);
+          res.on('end', () => { try { resolve(JSON.parse(d)); } catch { resolve(null); } });
+        }).on('error', () => resolve(null));
+      });
+      const mlHealth = await new Promise(resolve => {
+        const url = new URL('http://localhost:8001/health');
+        require('http').get(url, res => {
+          let d = '';
+          res.on('data', c => d += c);
+          res.on('end', () => { try { resolve(JSON.parse(d)); } catch { resolve(null); } });
+        }).on('error', () => resolve(null));
+      });
+      const status = [];
+      status.push('*Admin Status*\n');
+      status.push('*BFF:* ' + (bffHealth?.ok !== false ? '✅ Online' : '❌ Offline'));
+      status.push('*ML Engine:* ' + (mlHealth?.ok !== false ? '✅ Online' : '❌ Offline'));
+      status.push('*Active Sessions:* ' + sessions.length);
+      sessions.forEach(s => {
+        const rem = (s.device?.rememberDevice) ? ' [remembered]' : '';
+        status.push('• ' + s.id + '... ' + (s.device?.browser || '?') + ' on ' + (s.device?.os || '?') + rem);
+      });
+      status.push('\n*Sessions managed via:* /sessions | /revoke [id]');
+      return status.join('\n');
+    }
   }
 
   // Add user message to session

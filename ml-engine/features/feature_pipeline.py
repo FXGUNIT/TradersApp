@@ -312,7 +312,7 @@ def compute_cross_session_features(df: pd.DataFrame, session_agg: pd.DataFrame) 
     session_agg["trade_date"] = pd.to_datetime(session_agg["trade_date"])
 
     # Map session aggregates back to candles by date + session
-    df["trade_date"] = df["timestamp"].dt.date
+    df["trade_date"] = pd.to_datetime(df["timestamp"].dt.date)
     df = df.merge(
         session_agg[["trade_date", "session_id", "gap_pct", "range_vs_atr", "direction", "volume_ratio"]],
         on=["trade_date", "session_id"],
