@@ -1,0 +1,49 @@
+# Prometheus configuration for TradersApp ML Engine
+# Scrapes: ML Engine, BFF, Prometheus itself
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+# ─── Alertmanager (optional) ──────────────────────────────────────────────────
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+
+# ─── Rule files ─────────────────────────────────────────────────────────────
+rule_files:
+  - "alerts/*.yml"
+
+# ─── Scrape targets ────────────────────────────────────────────────────────
+
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # ML Engine — FastAPI with Prometheus metrics
+  - job_name: "ml-engine"
+    static_configs:
+      - targets: ["host.docker.internal:8001"]
+    metrics_path: /metrics
+    scrape_interval: 10s
+    scrape_timeout: 5s
+
+  # BFF — Node.js with Prometheus client
+  - job_name: "bff"
+    static_configs:
+      - targets: ["host.docker.internal:8788"]
+    metrics_path: /metrics
+    scrape_interval: 10s
+
+  # Prometheus push gateway (for batch jobs)
+  - job_name: "pushgateway"
+    static_configs:
+      - targets: ["host.docker.internal:9091"]
+
+  # Node exporter (host metrics)
+  - job_name: "node"
+    static_configs:
+      - targets: ["host.docker.internal:9100"]

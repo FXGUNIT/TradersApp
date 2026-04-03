@@ -1,0 +1,156 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "title": "Prediction Latency (p99)",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(ml_prediction_latency_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p99 latency"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": { "mode": "absolute", "steps": [{ "value": 0, "color": "green" }, { "value": 0.2, "color": "yellow" }, { "value": 0.5, "color": "red" }] }
+        }
+      }
+    },
+    {
+      "title": "Prediction Confidence",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "targets": [{ "expr": "ml_prediction_confidence", "legendFormat": "confidence" }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": { "mode": "absolute", "steps": [{ "value": 0, "color": "red" }, { "value": 0.55, "color": "yellow" }, { "value": 0.7, "color": "green" }] }
+        }
+      }
+    },
+    {
+      "title": "Models Loaded",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 3, "x": 12, "y": 0 },
+      "targets": [{ "expr": "ml_models_loaded", "legendFormat": "models" }],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": { "mode": "absolute", "steps": [{ "value": 0, "color": "red" }, { "value": 1, "color": "green" }] }
+        }
+      }
+    },
+    {
+      "title": "Cache Hit Ratio",
+      "type": "gauge",
+      "gridPos": { "h": 4, "w": 5, "x": 15, "y": 0 },
+      "targets": [{ "expr": "ml_cache_hit_ratio", "legendFormat": "hit ratio" }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0, "max": 1,
+          "thresholds": { "mode": "absolute", "steps": [{ "value": 0, "color": "red" }, { "value": 0.8, "color": "yellow" }, { "value": 0.9, "color": "green" }] }
+        }
+      }
+    },
+    {
+      "title": "Feature Drift PSI",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 4 },
+      "targets": [{ "expr": "ml_feature_drift_psi", "legendFormat": "PSI" }],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": { "mode": "absolute", "steps": [{ "value": 0, "color": "green" }, { "value": 0.1, "color": "yellow" }, { "value": 0.2, "color": "red" }] }
+        }
+      }
+    },
+    {
+      "title": "Drift Alerts",
+      "type": "timeseries",
+      "gridPos": { "h": 4, "w": 10, "x": 4, "y": 4 },
+      "targets": [
+        { "expr": "rate(ml_concept_drift_detected_total[5m])", "legendFormat": "concept drift" },
+        { "expr": "rate(ml_feature_drift_detected_total[5m])", "legendFormat": "feature drift" },
+        { "expr": "rate(ml_regime_drift_detected_total[5m])", "legendFormat": "regime drift" }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "short" }
+      }
+    },
+    {
+      "title": "Retrain Status",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 14, "y": 4 },
+      "targets": [{ "expr": "ml_retrain_in_progress", "legendFormat": "in progress" }],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [{ "type": "value", "options": { "0": { "text": "IDLE", "color": "green" }, "1": { "text": "TRAINING", "color": "yellow" } } }],
+          "thresholds": { "mode": "absolute", "steps": [{ "value": 0, "color": "green" }, { "value": 1, "color": "yellow" }] }
+        }
+      }
+    },
+    {
+      "title": "HTTP Request Rate",
+      "type": "timeseries",
+      "gridPos": { "h": 5, "w": 12, "x": 0, "y": 8 },
+      "targets": [{ "expr": "sum(rate(ml_http_requests_total[1m])) by (endpoint)", "legendFormat": "{{endpoint}}" }],
+      "fieldConfig": {
+        "defaults": { "unit": "reqps" }
+      }
+    },
+    {
+      "title": "HTTP Latency (p95)",
+      "type": "timeseries",
+      "gridPos": { "h": 5, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        { "expr": "histogram_quantile(0.95, sum(rate(ml_http_request_duration_seconds_bucket[5m])) by (le, endpoint))", "legendFormat": "{{endpoint}}" }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "s" }
+      }
+    },
+    {
+      "title": "Circuit Breaker State",
+      "type": "stat",
+      "gridPos": { "h": 3, "w": 8, "x": 0, "y": 13 },
+      "targets": [{ "expr": "ml_circuit_breaker_state", "legendFormat": "state" }],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [{ "type": "value", "options": { "0": { "text": "CLOSED", "color": "green" }, "1": { "text": "HALF-OPEN", "color": "yellow" }, "2": { "text": "OPEN", "color": "red" } } }],
+          "thresholds": { "mode": "absolute", "steps": [{ "value": 0, "color": "green" }, { "value": 1, "color": "yellow" }, { "value": 2, "color": "red" }] }
+        }
+      }
+    },
+    {
+      "title": "Data Quality",
+      "type": "stat",
+      "gridPos": { "h": 3, "w": 8, "x": 8, "y": 13 },
+      "targets": [{ "expr": "ml_dq_critical_failures", "legendFormat": "critical failures" }],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": { "mode": "absolute", "steps": [{ "value": 0, "color": "green" }, { "value": 1, "color": "red" }] }
+        }
+      }
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 38,
+  "tags": ["tradersapp", "ml-engine"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "TradersApp ML Engine",
+  "uid": "tradersapp-ml-engine",
+  "version": 1,
+  "weekStart": ""
+}

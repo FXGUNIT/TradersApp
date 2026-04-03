@@ -1,0 +1,101 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# TradersApp — Observability Stack Docker Compose
+# ─────────────────────────────────────────────────────────────────────────────
+# Self-hosted: Prometheus + Grafana + Loki + Jaeger for TradersApp ML Engine.
+#
+# Start:
+#   docker compose -f docker-compose.observability.yml up -d
+#
+# Access:
+#   Grafana:    http://localhost:3001  (admin / traders123)
+#   Prometheus: http://localhost:9090
+#   Loki:       http://localhost:3100  (via Grafana datasource)
+#   Jaeger:     http://localhost:16686
+# ─────────────────────────────────────────────────────────────────────────────
+
+version: "3.8"
+
+services:
+  # ── Prometheus ─────────────────────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.54.0
+    container_name: traders-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./k8s/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # ── Grafana ────────────────────────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:11.3.0
+    container_name: traders-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: traders123
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_FEATURE_TOGGLES_ENABLE: publicDashboards
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./k8s/observability/grafana-provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - prometheus
+      - loki
+      - jaeger
+
+  # ── Loki (Log aggregation) ────────────────────────────────────────────────
+  loki:
+    image: grafana/loki:3.2.0
+    container_name: traders-loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - loki-data:/loki
+      - ./k8s/observability/loki.yml:/etc/loki/local-config.yaml:ro
+    command: -config.file=/etc/loki/local-config.yaml
+    depends_on:
+      - promtail
+
+  # ── Promtail (Log shipper) ────────────────────────────────────────────────
+  promtail:
+    image: grafana/promtail:3.2.0
+    container_name: traders-promtail
+    volumes:
+      - /var/log:/var/log:ro
+      - ./k8s/observability/promtail.yml:/etc/promtail/config.yml:ro
+    command: -config.file=/etc/promtail/config.yml
+    depends_on:
+      - loki
+
+  # ── Jaeger (Distributed tracing) ─────────────────────────────────────────
+  jaeger:
+    image: jaegertracing/all-in-one:1.59
+    container_name: traders-jaeger
+    ports:
+      - "16686:16686"  # UI
+      - "6831:6831"  # UDP agent
+      - "14268:14268"  # HTTP collector
+      - "4317:4317"   # gRPC collector (OTLP)
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+      SPAN_STORAGE_TYPE: badger
+      BADGER_EPHEMERAL: "false"
+      BADGER_DIRECTORY_KEY: /badger/data
+      BADGER_DIRECTORY_VALUE: /badger/wal
+    volumes:
+      - jaeger-data:/badger
+
+volumes:
+  prometheus-data:
+  grafana-data:
+  loki-data:
+  jaeger-data:

@@ -1,0 +1,16 @@
+# Grafana dashboard provisioning
+# Auto-imports TradersApp ML Engine dashboards on startup
+
+apiVersion: 1
+
+providers:
+  - name: TradersApp Dashboards
+    orgId: 1
+    folder: TradersApp
+    folderUid: ""
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards
