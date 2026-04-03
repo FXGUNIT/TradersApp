@@ -419,6 +419,174 @@
             text-align: center;
         }
 
+        /* SYSTEM CHART STYLES */
+        .system-chart {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+            margin: 20px 0;
+        }
+
+        .system-layer {
+            margin-bottom: 20px;
+            padding: 16px;
+            border-radius: 12px;
+        }
+
+        .system-layer.frontend-layer {
+            background: linear-gradient(135deg, #102030, #161b22);
+            border: 1px solid #58a6ff;
+        }
+
+        .system-layer.bff-layer {
+            background: linear-gradient(135deg, #2a1810, #161b22);
+            border: 1px solid #f0883e;
+        }
+
+        .system-layer.ml-layer {
+            background: linear-gradient(135deg, #2a1020, #161b22);
+            border: 1px solid #a371f7;
+        }
+
+        .system-layer.external-layer {
+            background: linear-gradient(135deg, #102a15, #161b22);
+            border: 1px solid #3fb950;
+        }
+
+        .layer-header {
+            font-size: 14px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            text-align: center;
+        }
+
+        .frontend-layer .layer-header { color: #58a6ff; }
+        .bff-layer .layer-header { color: #f0883e; }
+        .ml-layer .layer-header { color: #a371f7; }
+        .external-layer .layer-header { color: #3fb950; }
+
+        .component-row {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .comp-box {
+            background: var(--bg-dark);
+            border: 2px solid var(--border);
+            border-radius: 10px;
+            padding: 12px 16px;
+            min-width: 100px;
+            text-align: center;
+            font-size: 12px;
+        }
+
+        .comp-box span {
+            font-size: 18px;
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .comp-box small {
+            display: block;
+            font-size: 10px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        .comp-box.page-comp { border-color: #58a6ff; }
+        .comp-box.route-comp { border-color: #f0883e; }
+        .comp-box.inference-comp { border-color: #a371f7; }
+        .comp-box.ext-box { border-color: #3fb950; }
+
+        .internal-arrows {
+            text-align: center;
+            padding: 12px 0 0;
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .arrow-h {
+            font-family: monospace;
+            background: rgba(255,255,255,0.05);
+            padding: 4px 12px;
+            border-radius: 4px;
+        }
+
+        /* CONNECTION MAP */
+        .connection-map {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .conn-row {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .conn-row:last-child {
+            border-bottom: none;
+        }
+
+        .conn-label {
+            width: 140px;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        .conn-arrow {
+            flex: 1;
+            font-size: 11px;
+            color: var(--text-muted);
+            font-family: monospace;
+            text-align: center;
+        }
+
+        .conn-box {
+            width: 280px;
+            font-size: 11px;
+            font-family: monospace;
+        }
+
+        /* FILE REFERENCE GRID */
+        .file-ref-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 16px;
+            margin: 20px 0;
+        }
+
+        .file-ref {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 16px;
+        }
+
+        .ref-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--accent-blue);
+            margin-bottom: 10px;
+        }
+
+        .file-ref code {
+            display: block;
+            font-size: 10px;
+            color: var(--text-muted);
+            font-family: monospace;
+            padding: 3px 0;
+        }
+
         /* Table */
         table {
             width: 100%;
@@ -622,150 +790,201 @@
     <main class="main">
         <!-- PAGE 1: OVERVIEW -->
         <div id="overview" class="page active">
-            <h1>🗺️ TradersApp Architecture</h1>
-            <p class="subtitle">Complete data flow - from user click to trading signal</p>
+            <h1>🗺️ TradersApp - Complete Connection Map</h1>
+            <p class="subtitle">Every function, feature, and how they connect - the complete picture</p>
 
-            <!-- COMPLETE DATA FLOW CHART -->
-            <div class="flow-chart">
+            <!-- INTERCONNECTED SYSTEM CHART -->
+            <div class="system-chart">
                 
-                <!-- Level 1: USER INPUT -->
-                <div class="flow-level">
-                    <div class="level-label">1. USER INPUT</div>
-                    <div class="flow-box-group">
-                        <div class="flow-box blue">
-                            <span class="flow-icon">🌐</span>
-                            <div class="flow-name">Browser App</div>
-                            <div class="flow-detail">CollectiveConsciousness.jsx</div>
+                <!-- === FRONTEND LAYER === -->
+                <div class="system-layer frontend-layer">
+                    <div class="layer-header">⚛️ FRONTEND (React)</div>
+                    
+                    <div class="component-row">
+                        <div class="comp-box page-comp">
+                            <span>📊</span> Pages
+                            <small>CollectiveConsciousness</small>
                         </div>
-                        <div class="flow-box green">
-                            <span class="flow-icon">📱</span>
-                            <div class="flow-name">Telegram</div>
-                            <div class="flow-detail">/signal, /start</div>
+                        <div class="comp-box">
+                            <span>🧠</span> Features
+                            <small>consensus, terminal</small>
+                        </div>
+                        <div class="comp-box">
+                            <span>🧩</span> Components
+                            <small>BreakingNewsPanel</small>
+                        </div>
+                        <div class="comp-box">
+                            <span>🔌</span> Services
+                            <small>clients, gateways</small>
+                        </div>
+                        <div class="comp-box">
+                            <span>⚓</span> Hooks
+                            <small>useAuth, useTheme</small>
+                        </div>
+                    </div>
+                    
+                    <div class="internal-arrows">
+                        <span class="arrow-h">Pages → Features → Components → Services → Hooks</span>
+                    </div>
+                </div>
+                
+                <!-- === BFF LAYER === -->
+                <div class="system-layer bff-layer">
+                    <div class="layer-header">🔷 BFF (Node.js)</div>
+                    
+                    <div class="component-row">
+                        <div class="comp-box route-comp">
+                            <span>🛤️</span> Routes
+                            <small>consensus</small>
+                        </div>
+                        <div class="comp-box">
+                            <span>⚙️</span> Services
+                            <small>consensusEngine</small>
+                        </div>
+                        <div class="comp-box">
+                            <span>🔐</span> Security
+                            <small>security.mjs</small>
+                        </div>
+                        <div class="comp-box">
+                            <span>📰</span> News
+                            <small>breakingNews</small>
+                        </div>
+                        <div class="comp-box">
+                            <span>📊</span> Analytics
+                            <small>terminalAnalytics</small>
                         </div>
                     </div>
                 </div>
                 
-                <div class="flow-connector">
-                    <span>↓ HTTPS / Webhooks</span>
-                </div>
-                
-                <!-- Level 2: FRONTEND -->
-                <div class="flow-level">
-                    <div class="level-label">2. FRONTEND (React)</div>
-                    <div class="flow-box-group">
-                        <div class="flow-box blue">
-                            <span class="flow-icon">⚛️</span>
-                            <div class="flow-name">Pages</div>
-                            <div class="flow-detail">CollectiveConsciousness, RegimentHub</div>
+                <!-- === ML ENGINE LAYER === -->
+                <div class="system-layer ml-layer">
+                    <div class="layer-header">🐍 ML ENGINE (Python)</div>
+                    
+                    <div class="component-row">
+                        <div class="comp-box inference-comp">
+                            <span>🔮</span> Inference
+                            <small>predictor</small>
                         </div>
-                        <div class="flow-box blue">
-                            <span class="flow-icon">⚛️</span>
-                            <div class="flow-name">Features</div>
-                            <div class="flow-detail">consensus, terminal, admin</div>
+                        <div class="comp-box">
+                            <span>🗳️</span> Aggregator
+                            <small>consensus</small>
                         </div>
-                        <div class="flow-box blue">
-                            <span class="flow-icon">⚛️</span>
-                            <div class="flow-name">Services</div>
-                            <div class="flow-detail">consensusGateway, firebase</div>
+                        <div class="comp-box">
+                            <span>🧠</span> Models
+                            <small>direction</small>
                         </div>
-                    </div>
-                </div>
-                
-                <div class="flow-connector">
-                    <span>↓ HTTP Request: /api/consensus</span>
-                </div>
-                
-                <!-- Level 3: BFF -->
-                <div class="flow-level">
-                    <div class="level-label">3. BFF (Node.js)</div>
-                    <div class="flow-box-group">
-                        <div class="flow-box orange">
-                            <span class="flow-icon">🔷</span>
-                            <div class="flow-name">Routes</div>
-                            <div class="flow-detail">consensusRoutes, identityRoutes</div>
+                        <div class="comp-box">
+                            <span>📈</span> Regime
+                            <small>hmm_regime</small>
                         </div>
-                        <div class="flow-box orange">
-                            <span class="flow-icon">🔷</span>
-                            <div class="flow-name">Services</div>
-                            <div class="flow-detail">consensusEngine, breakingNews</div>
+                        <div class="comp-box">
+                            <span>⏰</span> Session
+                            <small>time_prob</small>
                         </div>
-                        <div class="flow-box orange">
-                            <span class="flow-icon">🔷</span>
-                            <div class="flow-name">Security</div>
-                            <div class="flow-detail">Rate limiter, JWT</div>
+                        <div class="comp-box">
+                            <span>📊</span> Features
+                            <small>RSI, MACD</small>
                         </div>
                     </div>
                 </div>
                 
-                <div class="flow-connector">
-                    <span>↓ REST: /ml/consensus</span>
-                </div>
-                
-                <!-- Level 4: ML ENGINE -->
-                <div class="flow-level">
-                    <div class="level-label">4. ML ENGINE (Python)</div>
-                    <div class="flow-box-group">
-                        <div class="flow-box purple">
-                            <span class="flow-icon">🐍</span>
-                            <div class="flow-name">Inference</div>
-                            <div class="flow-detail">predictor → consensus_aggregator</div>
+                <!-- === EXTERNAL LAYER === -->
+                <div class="system-layer external-layer">
+                    <div class="layer-header">💾 EXTERNAL SERVICES</div>
+                    
+                    <div class="component-row">
+                        <div class="comp-box ext-box">
+                            <span>🔥</span> Firebase
+                            <small>Auth, DB</small>
                         </div>
-                        <div class="flow-box purple">
-                            <span class="flow-icon">🐍</span>
-                            <div class="flow-name">Models</div>
-                            <div class="flow-detail">direction, regime, session</div>
+                        <div class="comp-box ext-box">
+                            <span>📰</span> News API
+                            <small>Market data</small>
                         </div>
-                        <div class="flow-box purple">
-                            <span class="flow-icon">🐍</span>
-                            <div class="flow-name">Features</div>
-                            <div class="flow-detail">RSI, MACD, SMA</div>
+                        <div class="comp-box ext-box">
+                            <span>📦</span> Redis
+                            <small>Cache</small>
                         </div>
-                    </div>
-                </div>
-                
-                <div class="flow-connector">
-                    <span>← Returns: {signal, confidence, alpha, rrr}</span>
-                </div>
-                
-                <!-- Level 5: BACK TO USER -->
-                <div class="flow-level">
-                    <div class="level-label">5. RESPONSE TO USER</div>
-                    <div class="flow-box-group">
-                        <div class="flow-box blue">
-                            <span class="flow-icon">📊</span>
-                            <div class="flow-name">UI Update</div>
-                            <div class="flow-detail">Signal badge, confidence %</div>
+                        <div class="comp-box ext-box">
+                            <span>🗄️</span> Database
+                            <small>Candles</small>
                         </div>
-                        <div class="flow-box green">
-                            <span class="flow-icon">📱</span>
-                            <div class="flow-name">Telegram Msg</div>
-                            <div class="flow-detail">Markdown signal</div>
+                        <div class="comp-box ext-box">
+                            <span>📱</span> Telegram
+                            <small>Bot API</small>
+                        </div>
+                        <div class="comp-box ext-box">
+                            <span>🔐</span> Infisical
+                            <small>Secrets</small>
                         </div>
                     </div>
                 </div>
                 
             </div>
 
-            <!-- SIDE CONNECTIONS -->
-            <h2 style="margin-top:40px;">📡 Side Connections</h2>
-            <div class="side-flow">
-                <div class="side-row">
-                    <div class="side-box">🔐 Firebase Auth</div>
-                    <span>← User login</span>
-                    <div class="side-box">📱 Telegram</div>
-                    <span>→ Webhooks</span>
+            <!-- CONNECTIONS MAP -->
+            <h2 style="margin-top:30px;">📌 How Everything Connects</h2>
+            
+            <div class="connection-map">
+                
+                <div class="conn-row">
+                    <div class="conn-label">USER → FRONTEND</div>
+                    <div class="conn-arrow">───────── HTTPS ─────────</div>
+                    <div class="conn-box">Browser ←→ Telegram</div>
                 </div>
-                <div class="side-row">
-                    <div class="side-box">📰 News API</div>
-                    <span>→ Breaking news</span>
-                    <div class="side-box">🗄️ Database</div>
-                    <span>→ Candle data</span>
+                
+                <div class="conn-row">
+                    <div class="conn-label">FRONTEND → BFF</div>
+                    <div class="conn-arrow">────── HTTP API ──────</div>
+                    <div class="conn-box">consensusGateway → consensusRoutes</div>
                 </div>
-                <div class="side-row">
-                    <div class="side-box">📦 Redis</div>
-                    <span>→ Cache</span>
-                    <div class="side-box">☁️ Infisical</div>
-                    <span>→ Secrets</span>
+                
+                <div class="conn-row">
+                    <div class="conn-label">BFF → ML</div>
+                    <div class="conn-arrow">────── REST ──────</div>
+                    <div class="conn-box">consensusEngine → predictor</div>
+                </div>
+                
+                <div class="conn-row">
+                    <div class="conn-label">ML → MODELS</div>
+                    <div class="conn-arrow">─ predict() ─</div>
+                    <div class="conn-box">predictor → direction + regime + session</div>
+                </div>
+                
+                <div class="conn-row">
+                    <div class="conn-label">MODELS → RESULT</div>
+                    <div class="conn-arrow">─ aggregate() ─</div>
+                    <div class="conn-box">votes → consensus_aggregator</div>
+                </div>
+                
+            </div>
+
+            <!-- COMPLETE FILE REFERENCE -->
+            <h2 style="margin-top:30px;">📁 Key Files Reference</h2>
+            <div class="file-ref-grid">
+                <div class="file-ref">
+                    <div class="ref-title">Frontend → BFF</div>
+                    <code>src/services/gateways/consensusGateway.js</code>
+                    <code>→ bff/routes/consensusRoutes.mjs</code>
+                    <code>→ bff/services/consensusEngine.mjs</code>
+                </div>
+                <div class="file-ref">
+                    <div class="ref-title">BFF → ML Engine</div>
+                    <code>bff/services/consensusEngine.mjs</code>
+                    <code>→ ml-engine/inference/predictor.py</code>
+                    <code>→ ml-engine/inference/consensus_aggregator.py</code>
+                </div>
+                <div class="file-ref">
+                    <div class="ref-title">News Flow</div>
+                    <code>src/components/BreakingNewsPanel.jsx</code>
+                    <code>→ bff/services/breakingNewsService.mjs</code>
+                    <code>→ External News API</code>
+                </div>
+                <div class="file-ref">
+                    <div class="ref-title">Telegram</div>
+                    <code>telegram-bridge/index.js</code>
+                    <code>→ telegram-bridge/aiConversation.js</code>
+                    <code>→ Firebase Auth</code>
                 </div>
             </div>
 
