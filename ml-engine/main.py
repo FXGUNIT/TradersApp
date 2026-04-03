@@ -31,6 +31,9 @@ from infrastructure.performance import (
 from infrastructure.drift_detector import (
     DriftMonitor, DriftThresholds,
 )
+from feedback.feedback_logger import FeedbackLogger
+from feedback.trade_log_processor import TradeLogProcessor
+from feedback.retrain_pipeline import RetrainPipeline, RetrainConfig
 from features.feature_pipeline import engineer_features, get_feature_vector
 from training.trainer import Trainer
 from training.model_store import ModelStore
@@ -66,12 +69,16 @@ consensus_agg: ConsensusAggregator | None = None
 store: ModelStore | None = None
 regime_ensemble: RegimeEnsemble | None = None
 drift_monitor: DriftMonitor | None = None
+feedback_logger: FeedbackLogger | None = None
+trade_processor: TradeLogProcessor | None = None
+retrain_pipeline: RetrainPipeline | None = None
 start_time: float = time.time()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global db, trainer, predictor, consensus_agg, store, regime_ensemble, drift_monitor
+    global feedback_logger, trade_processor, retrain_pipeline
     db = CandleDatabase(config.DB_PATH)
     trainer = Trainer(db_path=config.DB_PATH, store_dir=config.MODEL_STORE)
     predictor = Predictor(store_dir=config.MODEL_STORE)
@@ -79,6 +86,11 @@ async def lifespan(app: FastAPI):
     store = ModelStore(config.MODEL_STORE)
     regime_ensemble = RegimeEnsemble(random_state=42)
     drift_monitor = DriftMonitor()
+
+    # Feedback loop — closed-loop retraining pipeline
+    feedback_logger = FeedbackLogger(db)
+    trade_processor = TradeLogProcessor(db, feedback_logger)
+    retrain_pipeline = RetrainPipeline(db, trainer, drift_monitor, trade_processor)
 
     # Load models on startup
     try:
@@ -2121,3 +2133,264 @@ async def global_exception_handler(request, exc):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8001, reload=False)
+
+
+# -------------------------------------------------------------------------
+# Feedback Loop Endpoints
+# -------------------------------------------------------------------------
+
+class FeedbackSignalRequest(BaseModel):
+    """Log a consensus signal for outcome tracking."""
+    signal: str = Field(..., description="LONG / SHORT / NEUTRAL")
+    confidence: float = Field(..., ge=0.0, le=1.0)
+    votes: dict = Field(default_factory=dict)
+    consensus: dict = Field(default_factory=dict)
+    regime: str | None = None
+    regime_confidence: float | None = None
+    market_regime: str | None = None
+    session_phase: str | None = None
+    symbol: str = Field(default="MNQ")
+    session_id: int = Field(default=1)
+
+
+class FeedbackRetrainRequest(BaseModel):
+    """Trigger a retrain pipeline run."""
+    trigger: str = Field(
+        default="manual",
+        description="manual | drift | scheduled",
+    )
+    symbol: str = Field(default="MNQ")
+    training_mode: str = Field(
+        default="incremental",
+        description="full or incremental",
+    )
+    auto_retrain_on_drift: bool = Field(default=True)
+
+
+@app.post("/feedback/signal")
+async def log_signal(request: FeedbackSignalRequest):
+    """
+    Log a consensus signal for later outcome matching.
+
+    Call this after every /predict or /consensus call to record
+    the signal + market context for the feedback loop.
+
+    Returns signal_id — save this to link to trade outcomes later.
+    """
+    if feedback_logger is None:
+        raise HTTPException(status_code=503, detail="Feedback logger not initialized")
+
+    try:
+        signal_id = feedback_logger.log_signal(
+            signal=request.signal,
+            confidence=request.confidence,
+            votes=request.votes,
+            consensus=request.consensus,
+            regime=request.regime,
+            regime_confidence=request.regime_confidence,
+            market_regime=request.market_regime,
+            session_phase=request.session_phase,
+            symbol=request.symbol,
+            session_id=request.session_id,
+        )
+        return {"ok": True, "signal_id": signal_id}
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/feedback/record-outcome")
+async def record_outcome(
+    signal_id: int,
+    trade_id: int,
+    result: str = Field(..., description="win / loss / be"),
+    correct: bool = Field(...),
+    pnl_ticks: float | None = None,
+    pnl_dollars: float | None = None,
+    actual_move_ticks: float | None = None,
+    expected_move_ticks: float | None = None,
+):
+    """
+    Record the outcome of a matched trade for a previously logged signal.
+
+    This closes the feedback loop: signal → trade closed → outcome recorded.
+    Also feeds the ConceptDriftDetector for rolling accuracy monitoring.
+    """
+    if feedback_logger is None or trade_processor is None:
+        raise HTTPException(status_code=503, detail="Feedback components not initialized")
+
+    try:
+        feedback_logger.record_outcome(
+            signal_id=signal_id,
+            trade_id=trade_id,
+            result=result,
+            correct=correct,
+            pnl_ticks=pnl_ticks,
+            pnl_dollars=pnl_dollars,
+            actual_move_ticks=actual_move_ticks,
+            expected_move_ticks=expected_move_ticks,
+        )
+
+        # Feed concept drift detector
+        if drift_monitor is not None:
+            # Get signal confidence for this signal_id
+            with db.conn() as c:
+                row = c.execute(
+                    "SELECT signal, confidence FROM signal_log WHERE id = ?",
+                    (signal_id,),
+                ).fetchone()
+            if row:
+                correct_val = 1 if correct else 0
+                drift_monitor.concept_drift.record_prediction(
+                    correct=bool(correct_val),
+                    confidence=float(row[1]) if row[1] else 0.5,
+                )
+
+        return {"ok": True, "signal_id": signal_id, "trade_id": trade_id, "correct": correct}
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/feedback/signals")
+async def get_signals(
+    limit: int = Query(default=100, ge=1, le=1000),
+    symbol: str = Query(default="MNQ"),
+):
+    """
+    Get recent consensus signal history with optional outcome data.
+    """
+    if feedback_logger is None:
+        raise HTTPException(status_code=503, detail="Feedback logger not initialized")
+
+    try:
+        df = feedback_logger.get_signal_history(limit=limit)
+        stats = feedback_logger.get_feedback_stats()
+        return {
+            "signals": df.to_dict(orient="records"),
+            "stats": stats,
+        }
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/feedback/stats")
+async def get_feedback_stats(symbol: str = Query(default="MNQ")):
+    """
+    Get feedback loop statistics: signal count, win rate, unmatched signals.
+    """
+    if feedback_logger is None:
+        raise HTTPException(status_code=503, detail="Feedback logger not initialized")
+
+    try:
+        stats = feedback_logger.get_feedback_stats(symbol=symbol)
+        concept = drift_monitor.concept_drift.detect() if drift_monitor else {}
+        return {
+            "signal_stats": stats,
+            "concept_drift": concept,
+        }
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/feedback/process-trades")
+async def process_trades(symbol: str = Query(default="MNQ")):
+    """
+    Process all closed trades and match them to consensus signals.
+
+    Finds unmatched closed trades, links them to the nearest prior signal,
+    computes correct/incorrect, and feeds the ConceptDriftDetector.
+
+    Called by the Airflow DAG every week.
+    """
+    if trade_processor is None or drift_monitor is None:
+        raise HTTPException(status_code=503, detail="Trade processor not initialized")
+
+    try:
+        result = trade_processor.process_all(
+            drift_monitor=drift_monitor,
+            symbol=symbol,
+        )
+        return result
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/feedback/retrain")
+async def trigger_retrain(
+    request: FeedbackRetrainRequest,
+):
+    """
+    Trigger the closed-loop retrain pipeline.
+
+    Triggers:
+      - manual: User-initiated retrain (always runs if rate limit allows)
+      - drift: Auto-triggered on drift detection (requires confirmed drift)
+      - scheduled: Airflow weekly trigger (always runs if rate limit allows)
+
+    Safety guards:
+      - Max 2 retrains per day
+      - Min 20 new trades since last training
+      - Drift must be confirmed for auto-retrain
+    """
+    if retrain_pipeline is None:
+        raise HTTPException(status_code=503, detail="Retrain pipeline not initialized")
+
+    try:
+        # Override training mode from request
+        original_mode = retrain_pipeline.config.training_mode
+        retrain_pipeline.config.training_mode = request.training_mode
+        retrain_pipeline.config.symbol = request.symbol
+        retrain_pipeline.config.auto_retrain_on_drift = request.auto_retrain_on_drift
+
+        report = retrain_pipeline.run(
+            trigger=request.trigger,
+            verbose=True,
+        )
+
+        # Restore
+        retrain_pipeline.config.training_mode = original_mode
+
+        return {
+            "triggered": report.triggered,
+            "reason": report.reason,
+            "should_retrain": report.drift_status.get("should_retrain", False),
+            "overall_drift_status": report.drift_status.get("overall_status", "unknown"),
+            "training_result": (
+                report.training_result.get("models", {})
+                if report.training_result else None
+            ),
+            "error": report.error,
+            "duration_sec": round(report.duration_sec, 2),
+            "timestamp": report.timestamp,
+        }
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/feedback/retrain-status")
+async def get_retrain_status():
+    """
+    Get current retrain pipeline status: last training, drift status, feedback stats.
+    """
+    if db is None or drift_monitor is None or feedback_logger is None:
+        raise HTTPException(status_code=503, detail="Components not initialized")
+
+    try:
+        last_train = db.get_last_training("direction_ensemble")
+        stats = feedback_logger.get_feedback_stats()
+        concept = drift_monitor.concept_drift.detect()
+
+        return {
+            "last_training": last_train,
+            "feedback_stats": stats,
+            "concept_drift": concept,
+            "pipeline_ready": retrain_pipeline is not None,
+        }
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
