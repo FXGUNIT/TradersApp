@@ -28,6 +28,9 @@ from data.candle_db import CandleDatabase
 from infrastructure.performance import (
     get_cache, get_sla_monitor, RedisCache, CacheConfig, SLAMonitor,
 )
+from infrastructure.drift_detector import (
+    DriftMonitor, DriftThresholds,
+)
 from features.feature_pipeline import engineer_features, get_feature_vector
 from training.trainer import Trainer
 from training.model_store import ModelStore
@@ -62,18 +65,20 @@ predictor: Predictor | None = None
 consensus_agg: ConsensusAggregator | None = None
 store: ModelStore | None = None
 regime_ensemble: RegimeEnsemble | None = None
+drift_monitor: DriftMonitor | None = None
 start_time: float = time.time()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global db, trainer, predictor, consensus_agg, store, regime_ensemble
+    global db, trainer, predictor, consensus_agg, store, regime_ensemble, drift_monitor
     db = CandleDatabase(config.DB_PATH)
     trainer = Trainer(db_path=config.DB_PATH, store_dir=config.MODEL_STORE)
     predictor = Predictor(store_dir=config.MODEL_STORE)
     consensus_agg = ConsensusAggregator()
     store = ModelStore(config.MODEL_STORE)
     regime_ensemble = RegimeEnsemble(random_state=42)
+    drift_monitor = DriftMonitor()
 
     # Load models on startup
     try:
@@ -281,6 +286,292 @@ async def get_cache_stats():
     return {
         "cache_stats": cache.get_stats(),
         "redis_available": cache._client is not None,
+    }
+
+
+# -------------------------------------------------------------------------
+# MLflow Integration
+# -------------------------------------------------------------------------
+
+MLFLOW_AVAILABLE = False
+try:
+    from infrastructure.mlflow_client import get_mlflow_client, MLFLOW_TRACKING_URI, MLFLOW_AVAILABLE as _MLF_AVAILABLE
+    MLFLOW_AVAILABLE = _MLF_AVAILABLE
+except ImportError:
+    MLFLOW_AVAILABLE = False
+    MLFLOW_TRACKING_URI = "http://localhost:5000"
+    def get_mlflow_client(*args, **kwargs):
+        class NoOpClient:
+            def start_run(self, *a, **k): return self
+            def log_params(self, *a, **k): pass
+            def log_metrics(self, *a, **k): pass
+            def log_tag(self, *a, **k): pass
+            def get_experiment_summary(self): return {"available": False}
+            def __enter__(self): return self
+            def __exit__(self, *a): pass
+            def end_run(self, *a, **k): pass
+        return NoOpClient()
+
+
+@app.get("/mlflow/status")
+async def mlflow_status():
+    """Check MLflow server connectivity and availability."""
+    if not MLFLOW_AVAILABLE:
+        return {
+            "ok": True,
+            "mlflow_available": False,
+            "message": "mlflow package not installed. Install: pip install mlflow",
+        }
+    try:
+        from infrastructure.mlflow_client import get_mlflow_client
+        client = get_mlflow_client("direction")
+        summary = client.get_experiment_summary()
+        return {
+            "ok": True,
+            "mlflow_available": True,
+            "tracking_uri": MLFLOW_TRACKING_URI,
+            "experiments": summary,
+        }
+    except Exception as e:
+        return {
+            "ok": True,
+            "mlflow_available": True,
+            "mlflow_error": str(e),
+            "tracking_uri": MLFLOW_TRACKING_URI,
+            "message": "MLflow installed but server unreachable. Start with: docker compose -f docker-compose.mlflow.yml up -d",
+        }
+
+
+@app.get("/mlflow/experiments")
+async def mlflow_experiments(experiment: str | None = None):
+    """
+    Query MLflow experiments and runs.
+    Use ?experiment=direction to filter by experiment name.
+    """
+    if not MLFLOW_AVAILABLE:
+        return {"ok": False, "error": "mlflow not installed"}
+    try:
+        from infrastructure.mlflow_client import get_mlflow_client
+        exp_name = experiment or "direction"
+        client = get_mlflow_client(exp_name)
+        return {
+            "ok": True,
+            "experiment": f"tradersapp_{exp_name}",
+            "summary": client.get_experiment_summary(),
+            "tracking_uri": MLFLOW_TRACKING_URI,
+        }
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.get("/mlflow/models")
+async def mlflow_models(model_prefix: str = "direction"):
+    """
+    List registered models in MLflow model registry.
+    Shows current production + staging models with versions.
+    """
+    if not MLFLOW_AVAILABLE:
+        return {"ok": False, "error": "mlflow not installed"}
+    try:
+        from infrastructure.mlflow_client import get_mlflow_client
+        client = get_mlflow_client(model_prefix)
+        results = {}
+
+        # Check production for direction models
+        for model_name in [f"{model_prefix}_lightgbm", f"{model_prefix}_random_forest",
+                           f"{model_prefix}_xgboost"]:
+            prod = client.get_production_model(model_name)
+            if prod:
+                results[model_name] = prod
+
+        return {
+            "ok": True,
+            "models": results,
+            "tracking_uri": MLFLOW_TRACKING_URI,
+            "dashboard_url": f"{MLFLOW_TRACKING_URI}/#/models",
+        }
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.post("/mlflow/promote")
+async def mlflow_promote(
+    model_name: str,
+    from_stage: str = "staging",
+    to_stage: str = "production",
+):
+    """
+    Promote a model from staging → production in MLflow registry.
+    Example: POST /mlflow/promote?model_name=direction_lightgbm
+    """
+    if not MLFLOW_AVAILABLE:
+        return {"ok": False, "error": "mlflow not installed"}
+    try:
+        from infrastructure.mlflow_client import get_mlflow_client
+        client = get_mlflow_client("direction")
+        result = client.promote_model(model_name, from_stage, to_stage)
+        return {"ok": True, "promotion": result}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+# -------------------------------------------------------------------------
+# Drift Detection
+# -------------------------------------------------------------------------
+
+class RecordPredictionRequest(BaseModel):
+    """Record a prediction result for concept drift monitoring."""
+    correct: bool
+    confidence: float = Field(ge=0.0, le=1.0)
+    model_name: str = Field(default="ensemble")
+
+
+class DriftDetectRequest(BaseModel):
+    """Run drift detection on demand."""
+    symbol: str = Field(default="MNQ")
+    candles: list[dict] = Field(default_factory=list)
+    trades: list[dict] = Field(default_factory=list)
+    current_regime: str | None = Field(default=None)
+    regime_confidence: float = Field(default=1.0, ge=0.0, le=1.0)
+
+
+@app.get("/drift/status", tags=["drift"])
+async def drift_status():
+    """
+    Get current drift status for all three drift detectors:
+    - Feature drift (PSI on rolling windows)
+    - Concept drift (rolling win rate vs baseline)
+    - Regime drift (HMM posterior persistence)
+    """
+    if drift_monitor is None:
+        return {"ok": False, "error": "DriftMonitor not initialized"}
+    try:
+        features_df = pd.DataFrame()
+        trades_df = pd.DataFrame()
+        if db is not None:
+            try:
+                trades_df = db.get_trade_log(limit=500)
+            except Exception:
+                pass
+        result = drift_monitor.check_all(features_df, trades_df)
+        return {"ok": True, **result}
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/drift/detect", tags=["drift"])
+async def drift_detect(request: DriftDetectRequest):
+    """
+    Run full drift detection across all three drift detectors.
+
+    - Feature drift: PSI against rolling baseline distributions
+    - Concept drift: rolling win rate vs training-time baseline
+    - Regime drift: HMM posterior consistency
+
+    Returns should_retrain = True when drift severity warrants retraining.
+    """
+    if drift_monitor is None:
+        return {"ok": False, "error": "DriftMonitor not initialized"}
+    try:
+        features_df = pd.DataFrame(request.candles) if request.candles else pd.DataFrame()
+        if not features_df.empty and "timestamp" in features_df.columns:
+            features_df["timestamp"] = pd.to_datetime(features_df["timestamp"], errors="coerce")
+
+        trades_df = pd.DataFrame(request.trades) if request.trades else pd.DataFrame()
+
+        result = drift_monitor.check_all(
+            features_df=features_df,
+            trades_df=trades_df,
+            current_regime=request.current_regime,
+            regime_confidence=request.regime_confidence,
+        )
+
+        return {"ok": True, **result}
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/drift/record-prediction", tags=["drift"])
+async def drift_record_prediction(request: RecordPredictionRequest):
+    """
+    Record a prediction result for concept drift monitoring.
+
+    After each trade resolves (win/loss), call this to track
+    rolling accuracy against the training-time baseline.
+    When accuracy drops below threshold, retraining is recommended.
+    """
+    if drift_monitor is None:
+        return {"ok": False, "error": "DriftMonitor not initialized"}
+    try:
+        drift_monitor.concept_drift.record_prediction(
+            correct=request.correct,
+            confidence=request.confidence,
+        )
+        concept_result = drift_monitor.concept_drift.detect()
+        return {
+            "ok": True,
+            "recorded": True,
+            "concept_drift": concept_result,
+            "should_retrain": drift_monitor.concept_drift.should_retrain(),
+        }
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/drift/baseline", tags=["drift"])
+async def drift_set_baseline(symbol: str = "MNQ"):
+    """
+    Refresh the drift baselines from current DB data.
+
+    Call this after training to establish the new "normal" baseline
+    against which future drift is measured.
+    """
+    if drift_monitor is None or db is None:
+        return {"ok": False, "error": "DriftMonitor or DB not initialized"}
+    try:
+        trades_df = db.get_trade_log(limit=10000, symbol=symbol)
+        end = datetime.now(timezone.utc).isoformat()
+        start = (datetime.now(timezone.utc) - timedelta(days=90)).isoformat()
+        features_df_raw = db.get_candles(start, end, symbol, limit=10000)
+        features_df = features_df_raw
+
+        if len(trades_df) < 50:
+            return {"ok": False, "error": f"Not enough trades: {len(trades_df)} (need ≥50)"}
+
+        drift_monitor.feature_drift.update_baseline(features_df, trades_df)
+        drift_monitor.concept_drift.set_baseline(trades_df)
+
+        return {
+            "ok": True,
+            "baseline_trades": len(trades_df),
+            "baseline_candles": len(features_df),
+            "message": "Drift baselines updated. Future drift will be measured against this data.",
+        }
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/drift/thresholds", tags=["drift"])
+async def drift_thresholds():
+    """Get current drift detection thresholds."""
+    if drift_monitor is None:
+        return {"ok": False, "error": "DriftMonitor not initialized"}
+    t = drift_monitor.thresholds
+    return {
+        "ok": True,
+        "psi_feature_warning": t.psi_feature_warning,
+        "psi_feature_alert": t.psi_feature_alert,
+        "psi_feature_critical": t.psi_feature_critical,
+        "accuracy_drop_warning": t.accuracy_drop_warning,
+        "accuracy_drop_alert": t.accuracy_drop_alert,
+        "rolling_window_trades": t.rolling_window_trades,
+        "regime_change_threshold": t.regime_change_threshold,
+        "min_baseline_trades": t.min_baseline_trades,
+        "min_current_trades": t.min_current_trades,
     }
 
 

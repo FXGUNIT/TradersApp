@@ -1,6 +1,7 @@
 """
 Self-Training Pipeline — orchestrates training of all ML models.
 Handles: data loading → feature engineering → model training → model store.
+Integrates MLflow for experiment tracking and model registry.
 """
 import time
 import traceback
@@ -21,6 +22,31 @@ from training.cross_validator import TimeSeriesCrossValidator
 from models.direction.lightgbm_classifier import LightGBMClassifier
 from models.direction.random_forest import RandomForestClassifierModel
 from models.direction.xgboost_classifier import XGBoostClassifier
+
+# Optional MLflow integration
+try:
+    from infrastructure.mlflow_client import get_mlflow_client, MLFLOW_AVAILABLE
+except ImportError:
+    MLFLOW_AVAILABLE = False
+
+# Drift detection — refresh baselines after each training run
+try:
+    from infrastructure.drift_detector import DriftMonitor
+    _drift_monitor = DriftMonitor()
+except ImportError:
+    _drift_monitor = None
+    def get_mlflow_client(*args, **kwargs):
+        class NoOpClient:
+            def start_run(self, *args, **kwargs): return self
+            def log_params(self, *args, **kwargs): pass
+            def log_metrics(self, *args, **kwargs): pass
+            def log_tag(self, *args, **kwargs): pass
+            def log_model(self, *args, **kwargs): return {"ok": False}
+            def auto_register_if_passing(self, *args, **kwargs): return {"registered": False}
+            def __enter__(self): return self
+            def __exit__(self, *args): pass
+            def end_run(self, *args, **kwargs): pass
+        return NoOpClient()
 
 
 class Trainer:
@@ -149,6 +175,17 @@ class Trainer:
             results = {}
             self._trained_models = []
 
+            # ── MLflow: start experiment run ──────────────────────────────────
+            mlflow_client = get_mlflow_client("direction")
+            mlflow_client.log_params({
+                "mode": mode,
+                "symbol": symbol,
+                "min_trades": min_trades,
+                "n_candles": len(candles),
+                "n_trades": len(trade_log),
+                "n_features": len(feature_cols),
+            })
+
             for model_key, model_cls in models_to_train:
                 if verbose:
                     print(f"\n{'─'*40}")
@@ -156,8 +193,20 @@ class Trainer:
                     print(f"{'─'*40}")
 
                 try:
+                    # ── MLflow: track per-model run ─────────────────────────────
+                    run_tags = {
+                        "model_family": "direction",
+                        "model_type": model_key,
+                        "mode": mode,
+                    }
+                    mlflow_client.log_tag("model", model_key)
+
                     model = model_cls()
                     metrics = model.train(X, y, feature_cols=feature_cols, verbose=verbose)
+
+                    # ── MLflow: log metrics ──────────────────────────────────────
+                    mlflow_client.log_metrics(metrics)
+                    mlflow_client.log_tag(f"{model_key}_cv_auc", str(metrics.get("cv_roc_auc_mean", 0)))
 
                     # Store model
                     version = self.store.save(
@@ -166,6 +215,36 @@ class Trainer:
                         metrics=metrics,
                         feature_cols=feature_cols,
                     )
+
+                    # ── MLflow: log model artifact ─────────────────────────────
+                    model_metadata = {
+                        "model_type": model_key,
+                        "version": version,
+                        "mode": mode,
+                        "feature_count": len(feature_cols),
+                        "training_samples": len(trade_log),
+                    }
+                    mlflow_result = mlflow_client.log_model(
+                        model=model,
+                        model_name=f"direction_{model_key}",
+                        sample_input=X.head(5),
+                        metadata=model_metadata,
+                        registered=False,  # Manual promotion after review
+                    )
+                    if verbose and mlflow_result.get("ok"):
+                        print(f"  [MLflow] Artifact logged: {mlflow_result.get('artifact_uri', '')}")
+
+                    # ── MLflow: auto-register if passing PBO thresholds ──────────
+                    reg_result = mlflow_client.auto_register_if_passing(
+                        model_name=f"direction_{model_key}",
+                        metrics=metrics,
+                        model=model,
+                        metadata=model_metadata,
+                        stage="staging",
+                    )
+                    if verbose and reg_result.get("registered"):
+                        print(f"  [MLflow] Auto-registered: {reg_result.get('stage', '')} "
+                              f"v{reg_result.get('version', '')}")
 
                     # Update model registry in DB
                     self.db.upsert_model({
@@ -206,6 +285,27 @@ class Trainer:
             duration = time.time() - started_at
             self.db.complete_training(train_log_id, len(trade_log), duration, "success")
 
+            # ── MLflow: log training summary ───────────────────────────────────
+            mlflow_client.log_metrics({
+                "training_duration_sec": round(duration, 2),
+                "candles_used": len(candles),
+                "trades_used": len(trade_log),
+                "n_models_trained": sum(1 for r in results.values() if r["status"] == "success"),
+            })
+            mlflow_client.log_tag("training_status", "success")
+
+            # ── Drift Monitor: refresh baselines after training ───────────────
+            if _drift_monitor is not None:
+                try:
+                    _drift_monitor.feature_drift.update_baseline(feature_df, trade_log)
+                    _drift_monitor.concept_drift.set_baseline(trade_log)
+                    if verbose:
+                        print(f"  [DriftMonitor] Baselines updated: {len(trade_log)} trades, "
+                              f"{len(feature_df)} feature rows")
+                except Exception as e:
+                    if verbose:
+                        print(f"  [DriftMonitor] Baseline update skipped: {e}")
+
             summary = {
                 "mode": mode,
                 "training_duration_sec": round(duration, 2),
@@ -215,9 +315,14 @@ class Trainer:
                 "feature_count": len(feature_cols),
                 "models": results,
                 "trained_at": datetime.now(timezone.utc).isoformat(),
+                "mlflow_tracking_uri": MLFLOW_TRACKING_URI,
             }
 
             if verbose:
+                print(f"\n  [MLflow] Tracking: {MLFLOW_TRACKING_URI}")
+                if MLFLOW_AVAILABLE:
+                    exp_summary = mlflow_client.get_experiment_summary()
+                    print(f"  [MLflow] Total runs: {exp_summary.get('runs', 'N/A')}")
                 print(f"\n{'='*60}")
                 print(f"TRAINING COMPLETE — {duration:.1f}s")
                 print(f"{'='*60}")
@@ -230,6 +335,9 @@ class Trainer:
 
         except Exception as e:
             error_msg = f"{type(e).__name__}: {e}"
+            if "mlflow_client" in dir():
+                mlflow_client.log_tag("training_status", "failed")
+                mlflow_client.log_tag("error", error_msg[:200])
             self.db.fail_training(train_log_id, error_msg)
             traceback.print_exc()
             raise

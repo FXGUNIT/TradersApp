@@ -17,7 +17,7 @@ Each ADR follows this structure:
 | [ADR-001](ADR-001-dvc-data-versioning.md) | DVC for Data Versioning | Accepted | 2026-04-02 |
 | [ADR-002](ADR-002-redis-caching.md) | Redis Cache with In-Memory LRU Fallback | Accepted | 2026-04-02 |
 | [ADR-003](ADR-003-circuit-breakers.md) | Circuit Breaker Pattern for ML Engine | Accepted | 2026-04-02 |
-| [ADR-004](ADR-004-mlflow-choice.md) | MLflow Self-Hosted for MLOps | Pending | — |
+| [ADR-004](ADR-004-mlflow-choice.md) | MLflow Self-Hosted for MLOps | Accepted | 2026-04-03 |
 | [ADR-005](ADR-005-kafka-choice.md) | Apache Kafka for Event-Driven Communication | Pending | — |
 | [ADR-006](ADR-006-k3s-choice.md) | k3s for Container Orchestration | Pending | — |
 | [ADR-007](ADR-007-feast-choice.md) | Feast Feature Store with Redis Online Store | Pending | — |
@@ -29,6 +29,7 @@ Each ADR follows this structure:
 | [ADR-013](ADR-013-testing-strategy.md) | Multi-Level Testing Strategy | Pending | — |
 | [ADR-014](ADR-014-observability-stack.md) | Prometheus + Grafana + Loki + Jaeger | Pending | — |
 | [ADR-015](ADR-015-keycloak-sso.md) | Keycloak for Zero-Trust SSO | Pending | — |
+| [ADR-016](ADR-016-drift-detection.md) | Unified Drift Detection (PSI + Win Rate + HMM) | Accepted | 2026-04-03 |
 
 ## Process
 
