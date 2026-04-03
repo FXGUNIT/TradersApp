@@ -1,0 +1,51 @@
+{{- /*
+k8s/helm/tradersapp/templates/NOTES.txt
+Helm deployment notes for TradersApp
+*/ -}}
+Thank you for installing TradersApp {{ .Chart.Version }}!
+
+To get started:
+
+1. Create the namespace:
+   kubectl create namespace {{ .Values.namespace }}
+
+2. Add your secrets (replace CHANGEME values):
+   kubectl create secret generic tradersapp-secrets \
+     --from-literal=POSTGRES_PASSWORD=your_real_password \
+     --from-literal=JWT_SECRET=your_real_jwt_secret \
+     --namespace {{ .Values.namespace }}
+
+3. (Optional) Set up image pull secrets if using a private registry:
+   kubectl create secret docker-registry regcred \
+     --docker-server=ghcr.io \
+     --docker-username=YOUR_USER \
+     --docker-password=YOUR_TOKEN \
+     --namespace {{ .Values.namespace }}
+
+4. Install the chart:
+   # Dev:
+   helm install tradersapp ./k8s/helm/tradersapp -n {{ .Values.namespace }} -f ./k8s/helm/tradersapp/values.yaml
+
+   # Production (with overrides):
+   helm install tradersapp ./k8s/helm/tradersapp \
+     -n {{ .Values.namespace }} \
+     -f values.prod.yaml
+
+5. Check status:
+   kubectl get pods -n {{ .Values.namespace }}
+   kubectl get svc -n {{ .Values.namespace }}
+   kubectl get hpa -n {{ .Values.namespace }}
+
+6. Enable Triton (GPU node required):
+   helm upgrade tradersapp ./k8s/helm/tradersapp \
+     -n {{ .Values.namespace }} \
+     --set triton.enabled=true
+
+Service endpoints:
+  ML Engine:  http://ml-engine.{{ .Values.namespace }}.svc:8001
+  BFF:        http://bff.{{ .Values.namespace }}.svc:8788
+  Frontend:   http://frontend.{{ .Values.namespace }}.svc:80
+
+For full observability, install kube-prometheus-stack:
+  helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+  helm install prometheus prometheus-community/kube-prometheus-stack -n monitoring --create-namespace

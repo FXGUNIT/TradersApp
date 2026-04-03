@@ -1,17 +1,15 @@
-# k8s/bff-deployment.yaml — Node.js BFF on k3s
+{{- /* BFF Deployment + Service */ -}}
+{{- if .Values.bff.enabled -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: bff
-  namespace: tradersapp
+  namespace: {{ include "tradersapp.namespace" . }}
   labels:
-    app: bff
+    {{- include "tradersapp.labels" . | nindent 4 }}
     tier: api
-  annotations:
-    prometheus.io/scrape: "true"
-    prometheus.io/port: "8788"
 spec:
-  replicas: 2
+  replicas: {{ .Values.bff.replicaCount }}
   selector:
     matchLabels:
       app: bff
@@ -25,66 +23,50 @@ spec:
       labels:
         app: bff
         tier: api
+        {{- include "tradersapp.labels" . | nindent 8 }}
       annotations:
         prometheus.io/scrape: "true"
-        prometheus.io/port: "8788"
+        prometheus.io/port: "{{ .Values.bff.service.port }}"
     spec:
       securityContext:
         runAsNonRoot: true
         runAsUser: 1001
-        runAsGroup: 1001
       containers:
         - name: bff
-          image: tradersapp/bff:latest
-          imagePullPolicy: Always
+          image: "{{ .Values.bff.image.repository }}:{{ .Values.bff.image.tag }}"
+          imagePullPolicy: {{ include "tradersapp.imagePullPolicy" .Values.bff.image }}
           ports:
-            - containerPort: 8788
-              name: http
-          envFrom:
-            - configMapRef:
-                name: bff-config
+            - name: http
+              containerPort: {{ .Values.bff.service.port }}
           env:
             - name: ML_ENGINE_URL
               value: "http://ml-engine:8001"
             - name: REDIS_HOST
               value: "redis"
-            - name: JWT_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: tradersapp-secrets
-                  key: JWT_SECRET
-                  optional: true
-            - name: BFF_API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: tradersapp-secrets
-                  key: BFF_API_KEY
-                  optional: true
+            - name: NODE_ENV
+              value: "production"
+          {{- with .Values.bff.resources }}
           resources:
-            requests:
-              cpu: 100m
-              memory: 128Mi
-            limits:
-              cpu: 500m
-              memory: 512Mi
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           startupProbe:
             httpGet:
               path: /health
-              port: 8788
+              port: {{ .Values.bff.service.port }}
             failureThreshold: 30
             periodSeconds: 10
             initialDelaySeconds: 5
           livenessProbe:
             httpGet:
               path: /health
-              port: 8788
+              port: {{ .Values.bff.service.port }}
             failureThreshold: 3
             periodSeconds: 15
             initialDelaySeconds: 20
           readinessProbe:
             httpGet:
               path: /health
-              port: 8788
+              port: {{ .Values.bff.service.port }}
             failureThreshold: 3
             periodSeconds: 10
             initialDelaySeconds: 10
@@ -92,26 +74,20 @@ spec:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             capabilities:
-              drop:
-                - ALL
-          lifecycle:
-            preStop:
-              exec:
-                command: ["/bin/sh", "-c", "sleep 3"]
+              drop: ["ALL"]
       terminationGracePeriodSeconds: 30
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: bff
-  namespace: tradersapp
-  labels:
-    app: bff
+  namespace: {{ include "tradersapp.namespace" . }}
 spec:
-  type: ClusterIP
+  type: {{ .Values.bff.service.type }}
   selector:
     app: bff
   ports:
     - name: http
-      port: 8788
-      targetPort: 8788
+      port: {{ .Values.bff.service.port }}
+      targetPort: {{ .Values.bff.service.port }}
+{{- end }}

@@ -1,14 +1,15 @@
-# k8s/frontend-deployment.yaml — React Frontend on k3s
+{{- /* Frontend Deployment + Service + Ingress */ -}}
+{{- if .Values.frontend.enabled -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: frontend
-  namespace: tradersapp
+  namespace: {{ include "tradersapp.namespace" . }}
   labels:
-    app: frontend
+    {{- include "tradersapp.labels" . | nindent 4 }}
     tier: web
 spec:
-  replicas: 2
+  replicas: {{ .Values.frontend.replicaCount }}
   selector:
     matchLabels:
       app: frontend
@@ -22,36 +23,33 @@ spec:
       labels:
         app: frontend
         tier: web
+        {{- include "tradersapp.labels" . | nindent 8 }}
     spec:
       securityContext:
         runAsNonRoot: true
         runAsUser: 101
-        runAsGroup: 101
       containers:
         - name: frontend
-          image: tradersapp/frontend:latest
-          imagePullPolicy: Always
+          image: "{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }}"
+          imagePullPolicy: {{ include "tradersapp.imagePullPolicy" .Values.frontend.image }}
           ports:
-            - containerPort: 80
-              name: http
+            - name: http
+              containerPort: {{ .Values.frontend.service.port }}
+          {{- with .Values.frontend.resources }}
           resources:
-            requests:
-              cpu: 50m
-              memory: 64Mi
-            limits:
-              cpu: 200m
-              memory: 128Mi
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           livenessProbe:
             httpGet:
               path: /
-              port: 80
+              port: {{ .Values.frontend.service.port }}
             failureThreshold: 3
             periodSeconds: 15
             initialDelaySeconds: 10
           readinessProbe:
             httpGet:
               path: /
-              port: 80
+              port: {{ .Values.frontend.service.port }}
             failureThreshold: 3
             periodSeconds: 10
             initialDelaySeconds: 5
@@ -59,65 +57,40 @@ spec:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             capabilities:
-              drop:
-                - ALL
+              drop: ["ALL"]
       terminationGracePeriodSeconds: 15
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: frontend
-  namespace: tradersapp
-  labels:
-    app: frontend
+  namespace: {{ include "tradersapp.namespace" . }}
 spec:
-  type: ClusterIP
+  type: {{ .Values.frontend.service.type }}
   selector:
     app: frontend
   ports:
     - name: http
-      port: 80
-      targetPort: 80
+      port: {{ .Values.frontend.service.port }}
+      targetPort: {{ .Values.frontend.service.port }}
+{{- if .Values.frontend.ingress.enabled }}
 ---
-# External-facing Ingress for the frontend
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: frontend-ingress
-  namespace: tradersapp
-  annotations:
-    # Traefik annotations (k3s default ingress controller)
-    ingress.kubernetes.io/ssl-redirect: "false"
+  namespace: {{ include "tradersapp.namespace" . }}
 spec:
   rules:
-    - host: tradersapp.local
+    - host: {{ .Values.frontend.ingress.host }}
       http:
         paths:
-          - path: /
+          - path: {{ .Values.frontend.ingress.path }}
             pathType: Prefix
             backend:
               service:
                 name: frontend
                 port:
-                  number: 80
----
-# Internal BFF ingress (frontend → BFF)
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: bff-ingress
-  namespace: tradersapp
-  annotations:
-    ingress.kubernetes.io/ssl-redirect: "false"
-spec:
-  rules:
-    - host: api.tradersapp.local
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: bff
-                port:
-                  number: 8788
+                  number: {{ .Values.frontend.service.port }}
+{{- end }}
+{{- end }}

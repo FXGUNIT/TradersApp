@@ -1,0 +1,109 @@
+# Production Helm values for TradersApp
+# Usage: helm upgrade --install tradersapp ./k8s/helm/tradersapp -f values.prod.yaml
+
+namespace: tradersapp
+
+# ML Engine — production resources
+mlEngine:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: tradersapp/ml-engine
+    tag: "v1.0.0"
+    pullPolicy: IfNotPresent
+  service:
+    port: 8001
+    metricsPort: 9091
+    type: ClusterIP
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 2000m
+      memory: 2Gi
+  autoscaling:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 4
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+  persistence:
+    enabled: true
+    size: 5Gi
+    storageClass: standard  # Use local-path on k3s
+
+# BFF — production resources
+bff:
+  enabled: true
+  replicaCount: 3
+  image:
+    repository: tradersapp/bff
+    tag: "v1.0.0"
+    pullPolicy: IfNotPresent
+  service:
+    port: 8788
+    type: ClusterIP
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 8
+    targetCPUUtilizationPercentage: 60
+
+# Frontend — production resources
+frontend:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: tradersapp/frontend
+    tag: "v1.0.0"
+    pullPolicy: IfNotPresent
+  service:
+    port: 80
+    type: ClusterIP
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+  ingress:
+    enabled: true
+    host: tradersapp.io
+    path: /
+
+# Triton — disabled by default (GPU required)
+triton:
+  enabled: false
+
+# Redis
+redis:
+  enabled: true
+  image:
+    repository: redis
+    tag: "7-alpine"
+  persistence:
+    enabled: true
+    size: 1Gi
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+# Security
+security:
+  networkPolicies: true
+  podDisruptionBudgets: true
+  runAsNonRoot: true
+  readOnlyRootFilesystem: true

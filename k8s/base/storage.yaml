@@ -1,0 +1,51 @@
+# k8s/base/storage.yaml — PersistentVolumeClaims for TradersApp
+#
+# ML model store needs persistent storage (survives pod restarts).
+# Data directory uses ephemeral (emptyDir) — models are versioned in MLflow.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ml-models-pvc
+  namespace: tradersapp
+  labels:
+    app: ml-engine
+    type: models
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: standard  # Use 'local-path' on k3s, 'standard' on bare k8s
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mlflow-artifacts-pvc
+  namespace: tradersapp
+  labels:
+    app: mlflow
+    type: artifacts
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+  storageClassName: standard
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-pvc
+  namespace: tradersapp
+  labels:
+    app: redis
+    type: cache
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: standard

@@ -1,0 +1,69 @@
+# k8s/base/pod-monitor.yaml — PodMonitor for Prometheus scraping
+# Uses Prometheus Operator custom resources for auto-discovery.
+# Requires prometheus-operator or kube-prometheus-stack installed.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: ml-engine-monitor
+  namespace: tradersapp
+  labels:
+    team: ml-platform
+    app: ml-engine
+spec:
+  selector:
+    matchLabels:
+      app: ml-engine
+  podMetricsEndpoints:
+    # ML Engine: Prometheus metrics endpoint on port 9091
+    - port: metrics
+      path: /metrics
+      interval: 15s
+      scrapeTimeout: 10s
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_pod_name]
+          targetLabel: pod
+        - sourceLabels: [__meta_kubernetes_namespace]
+          targetLabel: namespace
+        - sourceLabels: [__meta_kubernetes_pod_label_app]
+          targetLabel: app
+    # Fallback: metrics via main HTTP port
+    - port: http
+      path: /metrics
+      interval: 15s
+      scrapeTimeout: 10s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: bff-monitor
+  namespace: tradersapp
+  labels:
+    team: ml-platform
+    app: bff
+spec:
+  selector:
+    matchLabels:
+      app: bff
+  podMetricsEndpoints:
+    - port: http
+      path: /metrics
+      interval: 15s
+      scrapeTimeout: 10s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: triton-monitor
+  namespace: tradersapp
+  labels:
+    team: ml-platform
+    app: triton
+spec:
+  selector:
+    matchLabels:
+      app: triton
+  podMetricsEndpoints:
+    - port: metrics
+      path: /metrics
+      interval: 15s
+      scrapeTimeout: 10s

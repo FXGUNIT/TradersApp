@@ -1,0 +1,154 @@
+# Default values for TradersApp Helm chart.
+# Override with: helm install -f values.prod.yaml tradersapp ./k8s/helm/tradersapp
+
+# Global defaults
+namespace: tradersapp
+imagePullSecrets: []
+
+# ML Engine
+mlEngine:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: tradersapp/ml-engine
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    port: 8001
+    metricsPort: 9091
+    type: ClusterIP
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 2000m
+      memory: 2Gi
+  autoscaling:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 4
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+  persistence:
+    enabled: true
+    size: 5Gi
+    storageClass: standard
+
+# BFF
+bff:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: tradersapp/bff
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    port: 8788
+    type: ClusterIP
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 8
+    targetCPUUtilizationPercentage: 60
+
+# Frontend
+frontend:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: tradersapp/frontend
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    port: 80
+    type: ClusterIP
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+  ingress:
+    enabled: true
+    host: tradersapp.local
+    path: /
+
+# Triton Inference Server
+triton:
+  enabled: false  # Requires GPU node, set to true if GPU available
+  replicaCount: 1
+  image:
+    repository: nvcr.io/nvidia/tritonserver
+    tag: "24.03-py3"
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+      nvidia.com/gpu: 1
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+      nvidia.com/gpu: 1
+  service:
+    ports:
+      http: 8000
+      grpc: 8001
+      metrics: 8002
+
+# Redis (in-cluster)
+redis:
+  enabled: true
+  image:
+    repository: redis
+    tag: 7-alpine
+  persistence:
+    enabled: true
+    size: 1Gi
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+# Observability (Prometheus + Grafana via kube-prometheus-stack)
+observability:
+  enabled: false  # Enable if using kube-prometheus-stack
+  prometheus:
+    enabled: false
+  grafana:
+    enabled: false
+
+# Security
+security:
+  networkPolicies: true
+  podDisruptionBudgets: true
+  runAsNonRoot: true
+  readOnlyRootFilesystem: true
+
+# Pod annotations for Prometheus
+podAnnotations:
+  prometheus.io/scrape: "true"
+
+# Pod tolerations (for mixed node pools)
+tolerations: []
+# Example GPU toleration:
+# - key: nvidia.com/gpu
+#   operator: Exists
+#   effect: NoSchedule
+
+# Node selector (for specific node pools)
+nodeSelector: {}
+# Example GPU node:
+# nvidia.com/gpu: "true"
