@@ -35,6 +35,8 @@ artifacts
 .env
 .env.local
 .env.*.local
+bff/.env
+bff/.env.local
 
 # Editor directories and files
 .vscode/*

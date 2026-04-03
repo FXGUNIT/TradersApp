@@ -5,19 +5,107 @@
  * ML Engine endpoints:
  *   GET  /health          — health check
  *   GET  /model-status   — model status + last trained
- *   POST /predict        — run consensus prediction
+ *   GET  /sla            — SLA compliance report
+ *   GET  /cache/stats    — Redis cache hit/miss stats
+ *   POST /predict        — run consensus prediction (cached, 10s TTL)
+ *   POST /regime          — regime analysis (cached, 60s TTL)
  *   POST /train          — trigger training (async)
  *   POST /train-sync     — trigger training (sync, use sparingly)
  *
  * The BFF acts as a BFF (Backend-for-Frontend): it transforms
  * MathEngine.js state into ML feature vectors, calls the Python ML Engine,
  * and returns a unified consensus signal to the React frontend.
+ *
+ * Resilience:
+ * - Circuit breaker: opens after 5 failures in 30s, returns NEUTRAL fallback
+ * - Request timeout: 30s max per call
+ * - Graceful degradation: NEUTRAL signal when ML Engine unavailable
  */
+
+// ── Circuit Breaker ────────────────────────────────────────────────────────────
+
+const CB_STATE = { CLOSED: "CLOSED", OPEN: "OPEN", HALF_OPEN: "HALF_OPEN" };
+
+class CircuitBreaker {
+  constructor(name, { failureThreshold = 5, recoveryTimeoutMs = 30_000, halfOpenMaxCalls = 3 } = {}) {
+    this.name = name;
+    this.failureThreshold = failureThreshold;
+    this.recoveryTimeoutMs = recoveryTimeoutMs;
+    this.halfOpenMaxCalls = halfOpenMaxCalls;
+    this._state = CB_STATE.CLOSED;
+    this._failureCount = 0;
+    this._successCount = 0;
+    this._lastFailureTime = null;
+    this._halfOpenCalls = 0;
+  }
+
+  get state() {
+    if (this._state === CB_STATE.OPEN && this._lastFailureTime) {
+      if (Date.now() - this._lastFailureTime > this.recoveryTimeoutMs) {
+        this._state = CB_STATE.HALF_OPEN;
+        this._halfOpenCalls = 0;
+        this._successCount = 0;
+      }
+    }
+    return this._state;
+  }
+
+  recordSuccess() {
+    if (this._state === CB_STATE.HALF_OPEN) {
+      this._successCount++;
+      if (this._successCount >= this.halfOpenMaxCalls) {
+        this._state = CB_STATE.CLOSED;
+        this._failureCount = 0;
+        this._successCount = 0;
+        console.log(`[CircuitBreaker:${this.name}] HALF_OPEN → CLOSED (recovered)`);
+      }
+    } else if (this._state === CB_STATE.CLOSED) {
+      this._failureCount = 0;
+    }
+  }
+
+  recordFailure() {
+    this._failureCount++;
+    this._lastFailureTime = Date.now();
+    if (this._state === CB_STATE.HALF_OPEN) {
+      this._state = CB_STATE.OPEN;
+      this._successCount = 0;
+      console.log(`[CircuitBreaker:${this.name}] HALF_OPEN → OPEN (still failing)`);
+    } else if (this._failureCount >= this.failureThreshold) {
+      this._state = CB_STATE.OPEN;
+      console.log(`[CircuitBreaker:${this.name}] CLOSED → OPEN (${this._failureCount} failures)`);
+    }
+  }
+
+  isAvailable() {
+    if (this.state === CB_STATE.OPEN) return false;
+    if (this.state === CB_STATE.HALF_OPEN) {
+      if (this._halfOpenCalls >= this.halfOpenMaxCalls) return false;
+      this._halfOpenCalls++;
+    }
+    return true;
+  }
+}
+
+// Global circuit breaker instance for ML Engine
+const _mlCircuitBreaker = new CircuitBreaker("ml-engine", {
+  failureThreshold: 5,
+  recoveryTimeoutMs: 30_000,
+});
+
+// ── ML Engine Client ──────────────────────────────────────────────────────────
 
 const ML_ENGINE_BASE = process.env.ML_ENGINE_URL || "http://127.0.0.1:8001";
 const ML_REQUEST_TIMEOUT_MS = 30_000;
 
 async function mlRequest(path, body = null, timeout = ML_REQUEST_TIMEOUT_MS) {
+  // Circuit breaker check
+  if (!_mlCircuitBreaker.isAvailable()) {
+    const err = new Error(`Circuit breaker OPEN for ML Engine — state: ${_mlCircuitBreaker.state}`);
+    err.code = "CIRCUIT_OPEN";
+    throw err;
+  }
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeout);
 
@@ -36,14 +124,20 @@ async function mlRequest(path, body = null, timeout = ML_REQUEST_TIMEOUT_MS) {
 
     if (!res.ok) {
       const text = await res.text().catch(() => "");
+      _mlCircuitBreaker.recordFailure();
       throw new Error(`ML Engine ${res.status}: ${text || res.statusText}`);
     }
 
+    _mlCircuitBreaker.recordSuccess();
     return await res.json();
   } catch (err) {
     clearTimeout(timer);
     if (err.name === "AbortError") {
+      _mlCircuitBreaker.recordFailure();
       throw new Error(`ML Engine request timed out after ${timeout}ms`);
+    }
+    if (err.code !== "CIRCUIT_OPEN") {
+      _mlCircuitBreaker.recordFailure();
     }
     throw err;
   }
@@ -333,15 +427,25 @@ export async function getMlConsensus({
     };
   } catch (err) {
     // Graceful degradation: return fallback signal when ML Engine unavailable
-    console.error("[consensusEngine] ML Engine unavailable:", err.message);
+    const isCircuitOpen = err.code === "CIRCUIT_OPEN";
+    console.error(
+      isCircuitOpen
+        ? `[consensusEngine] Circuit breaker OPEN — ML Engine failing`
+        : `[consensusEngine] ML Engine unavailable: ${err.message}`
+    );
 
     return {
       ok: false,
-      source: "ml_engine_fallback",
+      source: isCircuitOpen ? "circuit_breaker_fallback" : "ml_engine_fallback",
+      circuit_breaker: {
+        state: _mlCircuitBreaker.state,
+        failure_count: _mlCircuitBreaker._failureCount,
+        recovery_timeout_s: Math.max(0, Math.ceil((_mlCircuitBreaker._lastFailureTime + _mlCircuitBreaker.recoveryTimeoutMs - Date.now()) / 1000)),
+      },
       timestamp: new Date().toISOString(),
       signal: "NEUTRAL",
       confidence: 0.5,
-      error: err.message,
+      error: isCircuitOpen ? "ML Engine circuit breaker OPEN — using fallback" : err.message,
       votes: {},
       session: {
         id: sessionId,
@@ -357,12 +461,14 @@ export async function getMlConsensus({
       regime: null,
       timing: {
         enter_now: false,
-        reason: "ML Engine offline — enter manually with firm rules only",
+        reason: isCircuitOpen
+          ? "ML Engine circuit breaker OPEN — NEUTRAL signal, enter with firm rules only"
+          : "ML Engine offline — enter manually with firm rules only",
         P_profitable_entry_now: 0.5,
       },
       models_used: 0,
       data_trades_analyzed: 0,
-      model_freshness: "offline",
+      model_freshness: isCircuitOpen ? "circuit_breaker_open" : "offline",
       feature_vector: features,
     };
   }
@@ -396,6 +502,54 @@ export async function triggerMlTraining(mode = "incremental") {
 /**
  * Check if ML Engine is healthy.
  */
+export async function checkMlHealth() {
+  try {
+    const res = await mlRequest("/health", null, 5_000);
+    return { ok: true, ...res };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
+/**
+ * Get circuit breaker status for ML Engine calls.
+ */
+export function getMlCircuitStatus() {
+  return {
+    name: _mlCircuitBreaker.name,
+    state: _mlCircuitBreaker.state,
+    failure_count: _mlCircuitBreaker._failureCount,
+    last_failure_age_s: _mlCircuitBreaker._lastFailureTime
+      ? Math.round((Date.now() - _mlCircuitBreaker._lastFailureTime) / 1000)
+      : null,
+    recovery_timeout_s: Math.ceil(_mlCircuitBreaker.recoveryTimeoutMs / 1000),
+    is_available: _mlCircuitBreaker.isAvailable(),
+  };
+}
+
+/**
+ * Get SLA report from ML Engine.
+ */
+export async function getMlSlaReport(endpoint = null) {
+  try {
+    const url = endpoint ? `/sla?endpoint=${encodeURIComponent(endpoint)}` : "/sla";
+    return await mlRequest(url, null, 5_000);
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
+/**
+ * Get cache statistics from ML Engine.
+ */
+export async function getMlCacheStats() {
+  try {
+    return await mlRequest("/cache/stats", null, 5_000);
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
 /**
  * Send HIGH impact breaking news to ML Engine for classification + self-training.
  * Called automatically when breaking news is detected in consensus response.
@@ -431,18 +585,6 @@ export async function logNewsReaction(newsId, reactionData) {
     return { ok: true, ...res };
   } catch (err) {
     console.error('[consensusEngine] news/reaction failed:', err.message);
-    return { ok: false, error: err.message };
-  }
-}
-
-/**
- * Check ML Engine health.
- */
-export async function checkMlHealth() {
-  try {
-    const res = await mlRequest("/health", null, 5_000);
-    return { ok: true, ...res };
-  } catch (err) {
     return { ok: false, error: err.message };
   }
 }
@@ -486,6 +628,9 @@ export function createConsensusEngineService() {
     getMlModelStatus,
     triggerMlTraining,
     checkMlHealth,
+    getMlCircuitStatus,
+    getMlSlaReport,
+    getMlCacheStats,
     getPhysicsRegime,
     buildMlFeatureVector,
   };

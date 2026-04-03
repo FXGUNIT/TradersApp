@@ -6,6 +6,8 @@ import os
 import sys
 import time
 import traceback
+import hashlib
+import json
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -23,6 +25,9 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 import config
 from data.candle_db import CandleDatabase
+from infrastructure.performance import (
+    get_cache, get_sla_monitor, RedisCache, CacheConfig, SLAMonitor,
+)
 from features.feature_pipeline import engineer_features, get_feature_vector
 from training.trainer import Trainer
 from training.model_store import ModelStore
@@ -252,6 +257,33 @@ async def health():
     }
 
 
+@app.get("/sla")
+async def get_sla_report(endpoint: str | None = None):
+    """
+    SLA compliance report for ML Engine endpoints.
+    Use ?endpoint=/predict to filter to a specific endpoint.
+    Returns P50/P95/P99 latency, error rate, and uptime per rolling window.
+    """
+    monitor = get_sla_monitor()
+    report = monitor.get_sla_report(endpoint or "ALL")
+    return {
+        "endpoint": endpoint or "ALL",
+        "windows": report,
+        "targets": SLAMonitor.SLA_TARGETS,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@app.get("/cache/stats")
+async def get_cache_stats():
+    """Cache hit/miss statistics for Redis + in-memory LRU."""
+    cache = get_cache()
+    return {
+        "cache_stats": cache.get_stats(),
+        "redis_available": cache._client is not None,
+    }
+
+
 # -------------------------------------------------------------------------
 # Training
 # -------------------------------------------------------------------------
@@ -311,8 +343,27 @@ async def predict(request: PredictRequest):
     """
     Run all loaded models on current market state.
     Returns per-model votes + consensus signal.
+    Cached in Redis (10s TTL) for sub-50ms repeat predictions.
     """
     try:
+        # ── SLA Monitor ───────────────────────────────────────────────────
+        monitor = get_sla_monitor()
+        start = time.time()
+
+        # ── Cache check (Redis or in-memory LRU) ──────────────────────────
+        cache = get_cache()
+        candle_hash = hashlib.sha256(
+            json.dumps(request.candles[-20:], sort_keys=True, default=str).encode()
+        ).hexdigest()[:16]
+        cache_key = f"predict:{request.symbol}:{request.session_id}:{candle_hash}"
+
+        cached = cache.get(cache_key)
+        if cached is not None:
+            cached["_cached"] = True
+            cached["_cache_age_ms"] = round((time.time() - start) * 1000, 1)
+            monitor.record("/predict", (time.time() - start) * 1000, 200)
+            return cached
+
         # Build candles DataFrame
         if request.candles:
             df = pd.DataFrame([c.model_dump() for c in request.candles])
@@ -435,11 +486,20 @@ async def predict(request: PredictRequest):
         except Exception as e:
             output["mamba"] = {"available": False, "error": str(e)}
 
+        # ── Cache result (10s TTL for live predictions) ───────────────────
+        cache.set(cache_key, output, ttl=10)
+
+        # ── SLA recording ─────────────────────────────────────────────────
+        latency_ms = (time.time() - start) * 1000
+        monitor.record("/predict", latency_ms, 200)
+        output["_latency_ms"] = round(latency_ms, 1)
         return output
 
     except HTTPException:
         raise
     except Exception as e:
+        latency_ms = (time.time() - start) * 1000
+        monitor.record("/predict", latency_ms, 500)
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -470,7 +530,24 @@ async def get_regime(request: RegimeRequest):
        - Multifractality: complexity of return dynamics
 
     Returns deleverage probability, stop loss multiplier, and signal adjustment.
+    Cached in Redis (60s TTL) — regime changes slowly.
     """
+    start = time.time()
+    cache = get_cache()
+    monitor = get_sla_monitor()
+
+    # ── Cache check (regime changes slowly — 60s TTL) ────────────────────
+    candle_hash = hashlib.sha256(
+        json.dumps(request.candles[-20:], sort_keys=True, default=str).encode()
+    ).hexdigest()[:16]
+    cache_key = f"regime:{request.symbol}:{candle_hash}"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        cached["_cached"] = True
+        cached["_cache_age_ms"] = round((time.time() - start) * 1000, 1)
+        monitor.record("/regime", (time.time() - start) * 1000, 200)
+        return cached
+
     try:
         # Build candles DataFrame
         if request.candles:
@@ -562,9 +639,18 @@ async def get_regime(request: RegimeRequest):
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
+        # ── Cache result (60s TTL for regime) ───────────────────────────
+        cache.set(cache_key, output, ttl=60)
+        latency_ms = (time.time() - start) * 1000
+        monitor.record("/regime", latency_ms, 200)
+        output["_latency_ms"] = round(latency_ms, 1)
+        return output
+
     except HTTPException:
         raise
     except Exception as e:
+        latency_ms = (time.time() - start) * 1000
+        monitor.record("/regime", latency_ms, 500)
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 

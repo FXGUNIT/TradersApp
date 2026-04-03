@@ -276,6 +276,14 @@ class CircuitBreaker:
                     self._half_open_calls = 0
             return self._state
 
+    def _try_transition_to_half_open(self):
+        """Idempotent OPEN→HALF_OPEN transition. Call at start of public methods."""
+        if self._state == CircuitState.OPEN:
+            if self._last_failure_time and \
+               time.time() - self._last_failure_time > self.recovery_timeout:
+                self._state = CircuitState.HALF_OPEN
+                self._half_open_calls = 0
+
     def record_success(self):
         with self._lock:
             self._failure_count = 0
@@ -299,6 +307,24 @@ class CircuitBreaker:
                 self._state = CircuitState.OPEN
                 print(f"[CircuitBreaker:{self.name}] CLOSED → OPEN ({self._failure_count} failures)")
 
+    def is_available(self) -> bool:
+        """Returns True if circuit allows requests. Idempotent OPEN→HALF_OPEN transition."""
+        with self._lock:
+            self._try_transition_to_half_open()
+            print(f"DEBUG: _state={self._state} HALF_OPEN={CircuitState.HALF_OPEN} eq={self._state == CircuitState.HALF_OPEN}")
+            if self._state == CircuitState.OPEN:
+                print("DEBUG: returning False (OPEN)")
+                return False
+            if self._state == CircuitState.HALF_OPEN:
+                print(f"DEBUG: HALF_OPEN, _half_open_calls={self._half_open_calls} max={self.half_open_max_calls}")
+                if self._half_open_calls >= self.half_open_max_calls:
+                    print("DEBUG: returning False (limit reached)")
+                    return False
+                self._half_open_calls += 1
+                print(f"DEBUG: incremented to {self._half_open_calls}")
+            print(f"DEBUG: returning True")
+            return True
+
     @contextmanager
     def call(self, fallback: Any = None):
         """
@@ -320,9 +346,6 @@ class CircuitBreaker:
             raise
         else:
             self.record_success()
-
-    def is_available(self) -> bool:
-        return self.state != CircuitState.OPEN
 
 
 # ─── SLA Monitor ──────────────────────────────────────────────────────────────
@@ -399,7 +422,7 @@ class SLAMonitor:
             return 0.0
         sorted_vals = sorted(values)
         idx = int(len(sorted_vals) * p)
-        return sorted_vals[min(idx, len(sorted_vals) - 1)]
+        return sorted_vals[min(max(idx - 1, 0), len(sorted_vals) - 1)]
 
     def get_sla_report(self, endpoint: str = "ALL") -> dict:
         """Get SLA compliance report for an endpoint."""

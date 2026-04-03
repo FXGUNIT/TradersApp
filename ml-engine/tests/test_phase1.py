@@ -633,3 +633,176 @@ def test_config_values():
     assert config.FIRM_MAX_RISK_PCT == 0.003
     assert len(config.AMD_PHASES) == 5
     assert len(config.SESSION_CONFIG) == 3
+
+
+# -------------------------------------------------------------------------
+# Test 14: Redis Cache (in-memory LRU fallback)
+# -------------------------------------------------------------------------
+
+def test_redis_cache_get_set():
+    """Verify RedisCache get/set with in-memory fallback."""
+    from infrastructure.performance import RedisCache, CacheConfig
+
+    cfg = CacheConfig(default_ttl=5)
+    cache = RedisCache(cfg)
+
+    # Set and get
+    cache.set("test_key", {"signal": "LONG", "confidence": 0.75}, ttl=5)
+    result = cache.get("test_key")
+
+    assert result is not None
+    assert result["signal"] == "LONG"
+    assert result["confidence"] == 0.75
+
+    # Miss
+    assert cache.get("nonexistent_key") is None
+
+    # Stats
+    stats = cache.get_stats()
+    assert "hits" in stats
+    assert "misses" in stats
+    assert "hit_rate" in stats
+
+
+def test_redis_cache_ttl_expiry():
+    """Verify cache entries expire after TTL."""
+    from infrastructure.performance import RedisCache, CacheConfig
+
+    cfg = CacheConfig(default_ttl=1)  # 1 second TTL
+    cache = RedisCache(cfg)
+
+    cache.set("short_lived", {"value": 42}, ttl=1)
+    assert cache.get("short_lived") is not None
+
+    import time
+    time.sleep(1.1)
+    assert cache.get("short_lived") is None
+
+
+def test_redis_cache_key_generation():
+    """Verify deterministic cache key generation."""
+    from infrastructure.performance import RedisCache, CacheConfig
+
+    cfg = CacheConfig(key_prefix="test:")
+    cache = RedisCache(cfg)
+
+    params1 = {"candles": [1, 2, 3], "session_id": 1}
+    params2 = {"candles": [1, 2, 3], "session_id": 1}
+    params3 = {"candles": [1, 2, 4], "session_id": 1}
+
+    key1 = cache._make_key("predict", params1)
+    key2 = cache._make_key("predict", params2)
+    key3 = cache._make_key("predict", params3)
+
+    # Same params → same key
+    assert key1 == key2
+    # Different params → different key
+    assert key1 != key3
+    # Key has prefix
+    assert key1.startswith("test:predict:")
+
+
+# -------------------------------------------------------------------------
+# Test 15: Circuit Breaker
+# -------------------------------------------------------------------------
+
+def test_circuit_breaker_state_machine():
+    """Verify circuit breaker opens after failures and recovers."""
+    from infrastructure.performance import CircuitBreaker, CircuitState
+
+    cb = CircuitBreaker(
+        name="test_service",
+        failure_threshold=3,
+        recovery_timeout=1.0,
+        half_open_max_calls=2,
+    )
+
+    # Initially closed
+    assert cb.state == CircuitState.CLOSED
+    assert cb.is_available() is True
+
+    # 2 failures — still closed
+    cb.record_failure()
+    cb.record_failure()
+    assert cb.state == CircuitState.CLOSED
+    assert cb.is_available() is True
+
+    # 3rd failure — opens
+    cb.record_failure()
+    assert cb.state == CircuitState.OPEN
+    assert cb.is_available() is False
+
+    # Wait for recovery timeout
+    import time
+    time.sleep(1.1)
+
+    # Opens to half-open
+    assert cb.state == CircuitState.HALF_OPEN
+
+    # Success recovers
+    cb.record_success()
+    cb.record_success()
+    assert cb.state == CircuitState.CLOSED
+
+
+def test_circuit_breaker_half_open_limit():
+    """Verify half-open limits concurrent test requests."""
+    from infrastructure.performance import CircuitBreaker
+
+    cb = CircuitBreaker(
+        name="test",
+        failure_threshold=3,
+        recovery_timeout=0.2,
+        half_open_max_calls=2,
+    )
+
+    # Force to OPEN state
+    cb.record_failure()
+    import time; time.sleep(0.05)
+    cb.record_failure()
+    import time; time.sleep(0.05)
+    cb.record_failure()
+    import time; time.sleep(0.3)  # wait for recovery timeout
+
+    # Transition to HALF_OPEN (triggered by accessing state property)
+    current_state = cb.state
+    assert current_state == "HALF_OPEN"
+
+    # Each is_available() call: reads state property (no side effect) then increments counter
+    r1 = cb.is_available()
+    assert r1 is True
+    assert cb._half_open_calls == 1
+
+    r2 = cb.is_available()
+    assert r2 is True
+    assert cb._half_open_calls == 2
+
+    r3 = cb.is_available()
+    assert r3 is False  # no slots left
+
+
+
+
+# -------------------------------------------------------------------------
+# Test 16: SLA Monitor
+# -------------------------------------------------------------------------
+
+def test_sla_monitor_record_and_report():
+    """Verify SLA monitor records latencies and computes percentiles."""
+    from infrastructure.performance import SLAMonitor
+
+    monitor = SLAMonitor(max_samples=1000)
+
+    # Record some requests
+    monitor.record("/predict", 30.0, 200)
+    monitor.record("/predict", 50.0, 200)
+    monitor.record("/predict", 100.0, 200)
+    monitor.record("/predict", 200.0, 500)  # error
+
+    report = monitor.get_sla_report("/predict")
+
+    assert "1m" in report
+    assert report["1m"]["requests"] == 4
+    assert report["1m"]["errors"] == 1
+    assert report["1m"]["p50_ms"] == 50.0
+    assert report["1m"]["sla_p95_ok"] is True  # 100ms < 200ms target

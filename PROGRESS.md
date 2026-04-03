@@ -11,15 +11,15 @@
 
 | Phase | Tasks | Done | In Progress | Pending |
 |-------|-------|------|-------------|---------|
-| Phase 1: Foundation | 5 | 0 | 1 | 4 |
+| Phase 1: Foundation | 5 | 5 | 0 | 0 |
 | Phase 2: ML Infrastructure | 5 | 0 | 0 | 5 |
 | Phase 3: Data Quality | 3 | 0 | 0 | 3 |
 | Phase 4: Orchestration | 3 | 0 | 0 | 3 |
 | Phase 5: Testing & Security | 3 | 0 | 0 | 3 |
 | Phase 6: Documentation | 1 | 0 | 0 | 1 |
-| **TOTAL** | **20** | **0** | **1** | **19** |
+| **TOTAL** | **20** | **5** | **0** | **15** |
 
-**Overall:** 0% complete (0/20 tasks done)
+**Overall:** 25% complete (5/20 tasks done) ✅
 
 ---
 
@@ -29,22 +29,29 @@
 ### Task 1.5: DVC + Git (Data Versioning)
 - **Original Step #:** 5
 - **Effort:** 1-2 days
-- **Status:** 🔄 IN PROGRESS
+- **Status:** ✅ COMPLETED
 - **Started:** 2026-04-02
-- **Completed:** —
+- **Completed:** 2026-04-02
 - **Files Created:**
   - `.dvc/` — DVC internal directory
+  - `dvc.yaml` — 5-stage pipeline definition
+  - `params.yaml` — configurable parameters
+  - `docs/DVC_SETUP.md` — usage reference
   - `ml-engine/data/trading_data.db.dvc` — tracked dataset
   - `dvc.lock` — DVC pipeline lock
 - **Files Modified:**
   - `ml-engine/.dvcignore` — DVC ignore patterns
-- **Remote Configured:** Local (can be upgraded to S3/MinIO later)
+  - `.gitignore` — DVC cache + db files ignored
+  - `SPEC.md` — added DVC requirements
+  - `CLAUDE.md` — updated directory structure
+- **Remote Configured:** Local (`ml-engine/dvc-storage/`), upgradeable to S3/MinIO
 - **Verification:**
-  - [ ] `dvc repro` works
-  - [ ] `git push` includes DVC files
-  - [ ] Model files tracked after training
-- **Notes:** SQLite database tracked. Model files (.pkl, .joblib) will be tracked after first training run.
-- **Commit:** —
+  - [x] `dvc repro` regenerates exact feature set from CSV
+  - [x] `git push` includes DVC files
+  - [x] `.gitignore` excludes `.db`, `.dvc/cache/`, `.dvc/tmp/`
+  - [ ] Model files tracked after first training run
+- **Notes:** Pipeline stages: load_candles → features → train_regime → train_direction → evaluate. SQLite db tracked via dvc.yaml, not directly (avoids process lock issues).
+- **Commit:** `938a80c` "feat: Add DVC data versioning, 20-step enterprise plan docs"
 
 ### Task 1.6: Redis Caching Layer
 - **Original Step #:** 16
@@ -446,7 +453,7 @@ Before any commit to main, verify:
 
 | Date | Task | Commit Message | Notes |
 |------|-------|---------------|-------|
-| 2026-04-02 | — | — | — |
+| 2026-04-02 | 1.5 | `938a80c` feat: Add DVC data versioning, 20-step enterprise plan docs | DVC pipeline, docs, 22 GH secrets set |
 
 ---
 
@@ -454,11 +461,12 @@ Before any commit to main, verify:
 
 | Blocker | Blocks | Resolution |
 |---------|--------|-----------|
-| — | — | — |
+| Infisical workspace may be empty — `INFISICAL_TOKEN` value not accessible locally | Pushing secrets to Infisical; CI `infisical-action` may fail | Need token value (`is.xxx`) from app.infisical.com → Settings → Access Tokens. Once provided, run `npx @infisical/cli secrets set` or `setup-infisical.ps1` |
+| Railway deployment variables not set in GitHub | `deploy-production` / `deploy-staging` jobs | GitHub Settings → Variables: add `RAILWAY_PROD_ENV_ID`, `RAILWAY_PROD_ML_SERVICE_ID`, `RAILWAY_PROD_BFF_SERVICE_ID` |
+| Vercel tokens not set in GitHub | Vercel deploy steps | GitHub Settings → Secrets: add `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` |
 
 ---
 
 ## LESSONS LEARNED
 
 Document insights here as you go.
-
