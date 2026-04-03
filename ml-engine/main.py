@@ -39,6 +39,11 @@ from training.trainer import Trainer
 from training.model_store import ModelStore
 from inference.predictor import Predictor
 from inference.consensus_aggregator import ConsensusAggregator
+from inference.triton_client import TritonInferenceClient, get_inference_client
+from inference.onnx_exporter import export_model, export_all as export_all_models, list_onnx_models, get_onnx_output_dir
+from inference.triton_server import TRITON_REPO
+
+ONNX_DIR = get_onnx_output_dir()
 from optimization.pso_optimizer import run_alpha_discovery, NichingPSO, PSOOptimizer
 from models.mamba.mamba_sequence_model import get_mamba_prediction, MambaTradingModel, MAMBA_AVAILABLE, MODEL_SIZES
 from models.regime.regime_ensemble import RegimeEnsemble
@@ -72,13 +77,14 @@ drift_monitor: DriftMonitor | None = None
 feedback_logger: FeedbackLogger | None = None
 trade_processor: TradeLogProcessor | None = None
 retrain_pipeline: RetrainPipeline | None = None
+triton_client: TritonInferenceClient | None = None
 start_time: float = time.time()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global db, trainer, predictor, consensus_agg, store, regime_ensemble, drift_monitor
-    global feedback_logger, trade_processor, retrain_pipeline
+    global feedback_logger, trade_processor, retrain_pipeline, triton_client
     db = CandleDatabase(config.DB_PATH)
     trainer = Trainer(db_path=config.DB_PATH, store_dir=config.MODEL_STORE)
     predictor = Predictor(store_dir=config.MODEL_STORE)
@@ -91,6 +97,10 @@ async def lifespan(app: FastAPI):
     feedback_logger = FeedbackLogger(db)
     trade_processor = TradeLogProcessor(db, feedback_logger)
     retrain_pipeline = RetrainPipeline(db, trainer, drift_monitor, trade_processor)
+
+    # Triton inference client (lazy — only connects when needed)
+    triton_client = get_inference_client()
+    print(f"[Triton] Inference client ready (source: {triton_client.get_server_status().get('connected') and 'triton' or 'local'})")
 
     # Load models on startup
     try:
@@ -2394,3 +2404,144 @@ async def get_retrain_status():
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# -------------------------------------------------------------------------
+# Triton / vLLM Inference Serving
+# -------------------------------------------------------------------------
+
+class TritonInferenceRequest(BaseModel):
+    features: list[list[float]] | list[dict]
+    model_name: str = Field(default="lightgbm_direction")
+    symbol: str = Field(default="MNQ")
+
+
+@app.post("/inference/predict")
+async def triton_predict(request: TritonInferenceRequest):
+    """
+    Run inference via Triton (GPU) or local ONNX Runtime fallback.
+
+    Priority: Triton gRPC → ONNX Runtime local → sklearn joblib fallback.
+
+    Target: < 50ms p99 latency.
+
+    Request body:
+      features: list of feature vectors (flat list[float] or dict with named features)
+      model_name: Triton model name (default: lightgbm_direction)
+    """
+    t0 = time.time()
+
+    client = triton_client or get_inference_client()
+    result = client.predict(features=request.features, model_name=request.model_name)
+
+    result["latency_ms"] = round((time.time() - t0) * 1000, 2)
+    result["symbol"] = request.symbol
+
+    return result
+
+
+@app.get("/inference/status")
+async def triton_status():
+    """
+    Get Triton server status and available models.
+    """
+    client = triton_client or get_inference_client()
+    status = client.get_server_status()
+    onnx_models = list_onnx_models()
+
+    return {
+        "triton": status,
+        "onnx_exported": onnx_models,
+        "onnx_dir": str(ONNX_DIR),
+        "triton_repo": str(TRITON_REPO),
+    }
+
+
+@app.post("/inference/export")
+async def export_onnx(model_name: str | None = None):
+    """
+    Export trained models to ONNX format for Triton serving.
+
+    POST /inference/export?model_name=lightgbm_direction
+    POST /inference/export   (exports all models)
+    """
+    try:
+        if model_name:
+            path = export_model(model_name)
+            return {"ok": True, "exported": str(path)}
+        else:
+            paths = export_all_models()
+            return {"ok": True, "exported": [str(p) for p in paths]}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/inference/setup")
+async def triton_setup():
+    """
+    Set up Triton model repository from exported ONNX models.
+    Copies ONNX files into the Triton model directory structure
+    and generates config.pbtxt files.
+    """
+    from inference.triton_server import setup_model_repository
+    setup_model_repository()
+    return {
+        "ok": True,
+        "message": "Triton model repository ready",
+        "repo": str(TRITON_REPO),
+    }
+
+
+@app.post("/inference/benchmark")
+async def triton_benchmark(n_samples: int = 1000, batch_size: int = 32):
+    """
+    Benchmark inference latency.
+
+    Returns p50, p95, p99 latency in ms.
+    """
+    client = triton_client or get_inference_client()
+    result = client.benchmark(n_samples=n_samples, batch_size=batch_size)
+    return result
+
+
+@app.post("/mamba/vllm")
+async def mamba_vllm_predict(candles: list[dict]):
+    """
+    Run Mamba via vLLM for sequence feature extraction.
+
+    Converts candle sequence to natural language narrative,
+    sends to vLLM server, parses structured features.
+    """
+    from inference.vllm_server import call_vllm, extract_sequence_features
+
+    # Build narrative from candles
+    if not candles:
+        return {"error": "No candles provided"}
+
+    recent = candles[-20:] if len(candles) >= 20 else candles
+    last = recent[-1]
+
+    narrative_parts = []
+    if len(recent) >= 2:
+        prev_close = recent[-2].get("close", 0)
+        curr_close = last.get("close", 0)
+        change = curr_close - prev_close
+        direction = "up" if change > 0 else "down"
+        narrative_parts.append(f"Candle closed {direction} {abs(change):.1f} ticks")
+
+    # Add AMD phase if available
+    if "amd_phase" in last:
+        narrative_parts.append(f"AMD phase: {last['amd_phase']}")
+
+    # Add regime
+    if "vr_regime" in last:
+        narrative_parts.append(f"Volatility regime: {last['vr_regime']}")
+
+    narrative = ". ".join(narrative_parts) if narrative_parts else "Market in transition."
+
+    t0 = time.time()
+    result = call_vllm(narrative)
+    result["latency_ms"] = round((time.time() - t0) * 1000, 2)
+    result["narrative"] = narrative
+
+    return result
