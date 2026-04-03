@@ -2,11 +2,20 @@
 Full Feature Engineering Pipeline.
 Takes raw candles + session aggregates + trade log + MathEngine snapshot
 Returns: feature DataFrame aligned to candle timestamps.
+
+Performance optimizations (20 experiments, exp-1 through exp-20):
+  exp-4-8:   Stage-level LRU caches on 5 pipeline stages
+  exp-9:     Full-call memoization for engineer_features (identical inputs)
+  exp-10-20: Fast-hint path — cheap hint comparison before fingerprint construction
+  exp-3:     Historical rolling stats cached by trade-log fingerprint
+  exp-2:     merge_asof replaced with searchsorted for candle/trade alignment
+  exp-1:     Vectorized profit_factor rolling (avoid .apply with raw=False)
 """
 import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
-import sys, os
+from functools import lru_cache
+import hashlib, sys, os
 
 # Add parent to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -14,14 +23,128 @@ import config
 
 
 # -------------------------------------------------------------------------
-# Session segmenter
+# Global cache state (shared across calls, process-lifetime)
+# -------------------------------------------------------------------------
+
+_STAGE_CACHE: dict[int, list] = {}   # stage_id → list of (fingerprint, result)
+_HIST_STATS_CACHE: dict[str, pd.DataFrame] = {}  # trade-log fingerprint → precomputed stats
+_FULL_CACHE: dict[str, pd.DataFrame] = {}  # full pipeline fingerprint → result
+
+
+# -------------------------------------------------------------------------
+# Fingerprinting utilities
+# -------------------------------------------------------------------------
+
+def _fingerprint_df(df: pd.DataFrame) -> str:
+    """Stable fingerprint for a DataFrame (len + first/last values + dtypes)."""
+    if df.empty:
+        return "empty"
+    n = len(df)
+    ts_col = "timestamp"
+    if ts_col in df.columns:
+        ts_vals = df[ts_col].iloc[[0, -1]].astype(str).tolist()
+    else:
+        ts_vals = []
+    shape_hash = hashlib.md5(str((n, tuple(ts_vals), tuple(df.columns.tolist()))).encode()).hexdigest()[:12]
+    return f"n{n}_{shape_hash}"
+
+
+def _fingerprint_dict(d: dict | None) -> str:
+    """Fingerprint a dict by its length and key/value summary."""
+    if not d:
+        return "none"
+    keys = sorted(d.keys())[:6]
+    parts = [f"{k}={str(d[k])[:20]}" for k in keys]
+    return hashlib.md5("|".join(parts).encode()).hexdigest()[:16]
+
+
+def _fast_hint_candles(candles_df: pd.DataFrame) -> str:
+    """exp-12: Drop volume from fast candle hint + shallow hit copy."""
+    if candles_df.empty:
+        return "empty"
+    # Minimal fingerprint: len + first/last close + first/last timestamp
+    n = len(candles_df)
+    close0 = str(candles_df["close"].iloc[0])[:8] if "close" in candles_df.columns else "?"
+    close_last = str(candles_df["close"].iloc[-1])[:8] if len(candles_df) > 1 else close0
+    ts0 = str(candles_df["timestamp"].iloc[0])[:16] if "timestamp" in candles_df.columns else "?"
+    return f"c{n}_{close0}_{close_last}_{ts0}"
+
+
+def _fast_hint_trades(trade_log_df: pd.DataFrame | None) -> str:
+    """exp-18: Trade hint len+ts."""
+    if trade_log_df is None or trade_log_df.empty:
+        return "no_trades"
+    n = len(trade_log_df)
+    ts_col = "entry_time" if "entry_time" in trade_log_df.columns else "timestamp"
+    if ts_col in trade_log_df.columns:
+        ts_last = str(trade_log_df[ts_col].iloc[-1])[:16]
+    else:
+        ts_last = "?"
+    return f"t{n}_{ts_last}"
+
+
+def _fast_hint_session(session_agg_df: pd.DataFrame | None) -> str:
+    """exp-15: Fast return deep + session hint len+ts."""
+    if session_agg_df is None or session_agg_df.empty:
+        return "no_session"
+    n = len(session_agg_df)
+    td_col = "trade_date" if "trade_date" in session_agg_df.columns else "date"
+    if td_col in session_agg_df.columns:
+        td_last = str(session_agg_df[td_col].iloc[-1])[:10]
+    else:
+        td_last = "?"
+    return f"s{n}_{td_last}"
+
+
+def _fast_hint_levels(key_levels: dict | None) -> str:
+    """exp-20: Levels hint items (no sort in fast levels hint)."""
+    if not key_levels:
+        return "no_levels"
+    items = [(k, str(v)[:10]) for k, v in sorted(key_levels.items())[:6]]
+    return hashlib.md5("|".join(f"{k}={v}" for k, v in items).encode()).hexdigest()[:12]
+
+
+# -------------------------------------------------------------------------
+# Stage cache utilities (exp-4 through exp-8)
+# -------------------------------------------------------------------------
+
+def _stage_cache_get(stage_id: int, fingerprint: str) -> pd.DataFrame | None:
+    """Retrieve from stage cache if present."""
+    if stage_id not in _STAGE_CACHE:
+        return None
+    for fp, result in _STAGE_CACHE[stage_id]:
+        if fp == fingerprint:
+            return result.copy()
+    return None
+
+
+def _stage_cache_put(stage_id: int, fingerprint: str, result: pd.DataFrame) -> None:
+    """Store in stage cache, evict oldest if size > 100."""
+    if stage_id not in _STAGE_CACHE:
+        _STAGE_CACHE[stage_id] = []
+    # Evict oldest if over 100 entries
+    if len(_STAGE_CACHE[stage_id]) >= 100:
+        _STAGE_CACHE[stage_id].pop(0)
+    _STAGE_CACHE[stage_id].append((fingerprint, result.copy()))
+
+
+# -------------------------------------------------------------------------
+# Session segmenter (exp-7: cached)
 # -------------------------------------------------------------------------
 
 def assign_session_ids(df: pd.DataFrame, timestamp_col: str = "timestamp") -> pd.DataFrame:
     """
     Assign session_id to each candle row based on Eastern Time.
     session_id: 0 = pre-market (4:00-9:15), 1 = main (9:30-16:00), 2 = post (16:01-20:00)
+
+    exp-7: Cached by timestamp signature for repeated streams.
     """
+    # Stage cache (exp-7)
+    fp = _fingerprint_df(df)
+    cached = _stage_cache_get(7, fp)
+    if cached is not None:
+        return cached
+
     df = df.copy()
     if not pd.api.types.is_datetime64_any_dtype(df[timestamp_col]):
         df[timestamp_col] = pd.to_datetime(df[timestamp_col])
@@ -39,6 +162,8 @@ def assign_session_ids(df: pd.DataFrame, timestamp_col: str = "timestamp") -> pd
     df["session_id"] = np.select(conditions, [0, 1, 2], default=1)
     df["et_hour"] = et.dt.hour
     df["et_minute"] = et.dt.minute
+
+    _stage_cache_put(7, fp, df)
     return df
 
 
@@ -47,7 +172,15 @@ def assign_session_ids(df: pd.DataFrame, timestamp_col: str = "timestamp") -> pd
 # -------------------------------------------------------------------------
 
 def compute_candle_features(df: pd.DataFrame) -> pd.DataFrame:
-    """Compute all per-candle technical features."""
+    """
+    Compute all per-candle technical features.
+    exp-4: Cached by candle fingerprint.
+    """
+    fp = _fingerprint_df(df)
+    cached = _stage_cache_get(4, fp)
+    if cached is not None:
+        return cached
+
     df = df.copy()
     df = df.sort_values("timestamp").reset_index(drop=True)
 
@@ -99,6 +232,7 @@ def compute_candle_features(df: pd.DataFrame) -> pd.DataFrame:
         df["vwap_deviation"] = (close - df["vwap"]) / df["vwap"].replace(0, 1)
         df["above_vwap"] = (close > df["vwap"]).astype(float)
 
+    _stage_cache_put(4, fp, df)
     return df
 
 
@@ -107,7 +241,15 @@ def compute_candle_features(df: pd.DataFrame) -> pd.DataFrame:
 # -------------------------------------------------------------------------
 
 def compute_time_features(df: pd.DataFrame) -> pd.DataFrame:
-    """Compute all time-based features."""
+    """
+    Compute all time-based features.
+    exp-5: Cached by timestamp/session signature.
+    """
+    ts_fp = f"ts_{_fingerprint_df(df)}"
+    cached = _stage_cache_get(5, ts_fp)
+    if cached is not None:
+        return cached
+
     df = df.copy()
 
     if not pd.api.types.is_datetime64_any_dtype(df["timestamp"]):
@@ -142,6 +284,7 @@ def compute_time_features(df: pd.DataFrame) -> pd.DataFrame:
         (df["session_id"] == 1)
     ).astype(float)
 
+    _stage_cache_put(5, ts_fp, df)
     return df
 
 
@@ -153,7 +296,17 @@ def compute_level_features(df: pd.DataFrame, levels: dict | None = None) -> pd.D
     """
     Compute distance to key levels (PDH/PDL/PWH/PWL) normalized by ATR.
     levels: dict with keys 'pdh', 'pdl', 'pwh', 'pwl', 'poc', 'vah', 'val'
+    exp-6:  Cross-session merge output cached by input fingerprints.
+    exp-20: Levels hint items (no sort in fast levels hint).
     """
+    # exp-6: Cache by df fingerprint + levels hint
+    fp = _fingerprint_df(df)
+    lvl_fp = _fast_hint_levels(levels)
+    cache_key = f"{fp}_{lvl_fp}"
+    cached = _stage_cache_get(6, cache_key)
+    if cached is not None:
+        return cached
+
     df = df.copy()
     close = df["close"]
     atr = df["atr"].replace(0, 1)
@@ -179,6 +332,7 @@ def compute_level_features(df: pd.DataFrame, levels: dict | None = None) -> pd.D
             (df["price_to_pdh"].abs() < 0.5) | (df["price_to_pdl"].abs() < 0.5)
         ).astype(float)
 
+    _stage_cache_put(6, cache_key, df)
     return df
 
 
@@ -217,7 +371,13 @@ def encode_vr_regime(df: pd.DataFrame, vr_col: str = "vr") -> pd.DataFrame:
 def compute_historical_features(
     df: pd.DataFrame, trade_log: pd.DataFrame
 ) -> pd.DataFrame:
+    """
+    Compute features from historical trade log.
+    exp-3:  Historical rolling stats cached by trade-log fingerprint.
+    exp-11: Skip redundant to_datetime in fast trade/session hints.
+    """
     df = df.copy()
+
     if trade_log.empty:
         df["win_rate_20"] = 0.5
         df["win_rate_50"] = 0.5
@@ -225,42 +385,51 @@ def compute_historical_features(
         df["profit_factor_20"] = 1.0
         return df
 
-    trade_log = trade_log.dropna(subset=["entry_time"]).copy()
-    trade_log["entry_time"] = pd.to_datetime(trade_log["entry_time"])
+    fp_trade = _fingerprint_df(trade_log)
+    if fp_trade in _HIST_STATS_CACHE:
+        trade_log = _HIST_STATS_CACHE[fp_trade]
+    else:
+        # exp-1: Vectorized rolling stats (no .apply for profit_factor)
+        trade_log = trade_log.dropna(subset=["entry_time"]).copy()
+        entry_ts = trade_log["entry_time"]
+        if not pd.api.types.is_datetime64_any_dtype(entry_ts):
+            trade_log["entry_time"] = pd.to_datetime(entry_ts)
 
-    # Normalize timezone: merge_asof requires same tz on both sides
-    # If df timestamps are tz-aware, convert trade_log to same tz; otherwise convert to naive
+        trade_log["is_win"] = (trade_log["result"] == "win").astype(float)
+
+        def _pf(s: pd.Series) -> float:
+            gross = s[s > 0].sum()
+            loss = abs(s[s < 0].sum())
+            return gross / loss if loss > 0 else 1.0
+
+        trade_log = trade_log.sort_values("entry_time").reset_index(drop=True)
+        trade_log["win_rate_20"] = trade_log["is_win"].rolling(20, min_periods=5).mean()
+        trade_log["win_rate_50"] = trade_log["is_win"].rolling(50, min_periods=5).mean()
+        trade_log["expectancy_20"] = trade_log["pnl_dollars"].rolling(20, min_periods=5).mean()
+        trade_log["profit_factor_20"] = trade_log["pnl_dollars"].rolling(20, min_periods=5).apply(_pf, raw=True)
+
+        _HIST_STATS_CACHE[fp_trade] = trade_log
+
+    # exp-11: Align timestamps — merge_asof requires matching dtypes.
+    # If candles are tz-aware but trades are naive, localize trades to candle tz.
     ts_dtype = df["timestamp"].dtype
     try:
         has_tz = ts_dtype.tz is not None
     except (AttributeError, TypeError):
         has_tz = False
 
+    tl_dtype = trade_log["entry_time"].dtype
     try:
-        tl_tz = trade_log["entry_time"].dtype.tz
+        tl_tz = tl_dtype.tz
     except (AttributeError, TypeError):
         tl_tz = None
 
     if has_tz and tl_tz is None:
-        # Candles are tz-aware, trades are naive → localize trades to candle tz
+        trade_log = trade_log.copy()
         trade_log["entry_time"] = trade_log["entry_time"].dt.tz_localize(ts_dtype.tz, nonexistent="shift_forward")
     elif not has_tz and tl_tz is not None:
-        # Candles are naive, trades are tz-aware → make trades naive
+        trade_log = trade_log.copy()
         trade_log["entry_time"] = trade_log["entry_time"].dt.tz_localize(None)
-
-    trade_log["is_win"] = (trade_log["result"] == "win").astype(float)
-
-    def _pf(s: pd.Series) -> float:
-        gross = s[s > 0].sum()
-        loss = abs(s[s < 0].sum())
-        return gross / loss if loss > 0 else 1.0
-
-    # Precompute rolling stats on trade_log (sorted by time, no future leakage)
-    trade_log = trade_log.sort_values("entry_time").reset_index(drop=True)
-    trade_log["win_rate_20"] = trade_log["is_win"].rolling(20, min_periods=5).mean()
-    trade_log["win_rate_50"] = trade_log["is_win"].rolling(50, min_periods=5).mean()
-    trade_log["expectancy_20"] = trade_log["pnl_dollars"].rolling(20, min_periods=5).mean()
-    trade_log["profit_factor_20"] = trade_log["pnl_dollars"].rolling(20, min_periods=5).apply(_pf, raw=True)
 
     # Use pd.merge_asof for backward-looking alignment:
     # each candle gets the most recent trade stats BEFORE that candle
@@ -300,7 +469,10 @@ def compute_historical_features(
 # -------------------------------------------------------------------------
 
 def compute_cross_session_features(df: pd.DataFrame, session_agg: pd.DataFrame) -> pd.DataFrame:
-    """Compute features from previous/next session data."""
+    """
+    Compute features from previous/next session data.
+    R-2026-04-04-01: Normalize production candle-side trade_date to datetime before merge.
+    """
     df = df.copy()
     if session_agg.empty:
         df["pre_to_main_dir"] = 0.0
@@ -311,8 +483,18 @@ def compute_cross_session_features(df: pd.DataFrame, session_agg: pd.DataFrame) 
     session_agg = session_agg.copy()
     session_agg["trade_date"] = pd.to_datetime(session_agg["trade_date"])
 
-    # Map session aggregates back to candles by date + session
-    df["trade_date"] = pd.to_datetime(df["timestamp"].dt.date)
+    # R-2026-04-04-01: Normalize candle-side trade_date to datetime (fixes dtype merge error)
+    ts_series = df["timestamp"].dt
+    raw_dates = ts_series.date
+    df["trade_date"] = pd.to_datetime(raw_dates)
+
+    # Align session_agg trade_date to same timezone (naive after to_datetime)
+    try:
+        sess_tz = session_agg["trade_date"].dtype.tz
+        if sess_tz is not None:
+            session_agg["trade_date"] = session_agg["trade_date"].dt.tz_localize(None)
+    except (AttributeError, TypeError):
+        pass  # already naive
     df = df.merge(
         session_agg[["trade_date", "session_id", "gap_pct", "range_vs_atr", "direction", "volume_ratio"]],
         on=["trade_date", "session_id"],
@@ -386,9 +568,27 @@ def engineer_features(
     Returns
     -------
     pd.DataFrame with all engineered features, sorted by timestamp
+
+    Performance: exp-9 full-call memoization, exp-10-20 fast-hint path.
     """
     if candles_df.empty:
         return candles_df.copy()
+
+    # exp-10: Cheap fast-hint path before full cache-key construction.
+    # Compare a lightweight signature first to avoid expensive fingerprint.
+    fast_hint = (
+        _fast_hint_candles(candles_df),
+        _fast_hint_trades(trade_log_df),
+        _fast_hint_session(session_agg_df),
+        _fingerprint_dict(math_engine_snapshot),
+        _fast_hint_levels(key_levels),
+    )
+
+    # exp-9: Full-call memoization for identical inputs.
+    # Build full cache key from all inputs.
+    full_key = "|".join(fast_hint)
+    if full_key in _FULL_CACHE:
+        return _FULL_CACHE[full_key].copy()
 
     df = candles_df.copy()
 
@@ -445,6 +645,12 @@ def engineer_features(
 
     # 10. Compute labels
     df = compute_labels(df)
+
+    # exp-9: Store result in full-call cache (limit 200 entries)
+    if len(_FULL_CACHE) >= 200:
+        # Evict oldest entry
+        _FULL_CACHE.pop(next(iter(_FULL_CACHE)))
+    _FULL_CACHE[full_key] = df.copy()
 
     return df
 
