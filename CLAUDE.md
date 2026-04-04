@@ -437,6 +437,55 @@ python -m dvc repro             # Recompute pipeline
 
 ---
 
+## Self-Hosted MLflow (MLOps)
+
+**Every training run, experiment, and model promotion is tracked in MLflow.** Self-hosted via k3s or Docker Compose.
+
+### Components
+
+| Component | Purpose | Port |
+|-----------|---------|------|
+| `mlflow` server | Experiment tracking UI + API | 5000 |
+| `mlflow-postgres` | Metadata backend (runs, params, metrics) | 5432 |
+| `minio` | S3-compatible artifact store (models, plots) | 9000 |
+
+### Start (Docker Compose)
+```bash
+docker compose -f docker-compose.mlflow.yml up -d
+# Access: http://localhost:5000
+```
+
+### Kubernetes
+```bash
+helm install tradersapp ./k8s/helm/tradersapp -f values.prod.yaml
+# MLflow available at: http://mlflow.tradersapp.svc.cluster.local:5000
+```
+
+### Environment variables (ML Engine)
+```bash
+MLFLOW_TRACKING_URI=http://mlflow:5000        # MLflow server
+MLFLOW_S3_ENDPOINT_URL=http://minio:9000     # MinIO artifact root
+AWS_ACCESS_KEY_ID=minioadmin
+AWS_SECRET_ACCESS_KEY=minioadmin123
+```
+
+### Model lifecycle (3 stages)
+```
+None → Staging → Production → Archived
+```
+- **Staging**: new model passes PBO < 5%, Sharpe ≥ 0.5, win rate ≥ 50%
+- **Production**: manually promoted after paper trade verification
+- **Archived**: production model older than 7 days auto-archived
+
+### Key rules
+- Every `trainer.train_all()` call automatically logs to MLflow
+- `auto_register_if_passing()` promotes to Staging if thresholds met
+- `promote_model()` moves Staging → Production after paper trade review
+- `archive_stale_models()` auto-archives production models older than 7 days
+- DVC commit hash is logged as `dvc_commit` tag on every run (data lineage)
+
+---
+
 ## Git Workflow
 
 1. **Every feature** gets its own branch: `feature/session-fatigue`
