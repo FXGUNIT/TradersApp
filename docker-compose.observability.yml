@@ -123,6 +123,26 @@ services:
       - jaeger-data:/badger
     restart: unless-stopped
 
+  # ── Redis (Feast online store) ───────────────────────────────────────────────
+  # Feast online store for low-latency feature retrieval during inference.
+  # Used by ml-engine/features/feast_client.py for real-time candle features.
+  redis:
+    image: redis:7-alpine
+    container_name: traders-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+    labels:
+      tradersapp.service: feast-online-store
+
   # ── Node Exporter (host metrics) ───────────────────────────────────────────
   # Note: runs on Docker host, not in container. Install separately:
   #   docker run -d --name node-exporter -p 9100:9100 prom/node-exporter
@@ -136,3 +156,4 @@ volumes:
   alertmanager-data:
   ml-engine-logs:
   bff-logs:
+  redis-data:
