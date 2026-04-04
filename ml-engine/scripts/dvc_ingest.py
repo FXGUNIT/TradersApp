@@ -42,11 +42,19 @@ def run(csv_path: str | None = None, symbol: str = "MNQ") -> dict:
     db.write_session_aggregates(agg)
     print(f"[DVC ingest] Wrote {len(agg)} session aggregates")
 
-    return {
+    stats = {
         "candles": len(df),
         "sessions": int(df["session_id"].nunique()),
         "date_range": [str(df["timestamp"].min()), str(df["timestamp"].max())],
+        "symbol": symbol,
     }
+
+    out_stats = ML_DIR / "data" / "ingest_stats.json"
+    with open(out_stats, "w") as f:
+        json.dump(stats, f, indent=2)
+    print(f"[DVC ingest] Wrote stats to {out_stats}")
+
+    return stats
 
 
 if __name__ == "__main__":
