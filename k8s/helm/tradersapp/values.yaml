@@ -29,6 +29,12 @@ mlEngine:
     maxReplicas: 4
     targetCPUUtilizationPercentage: 70
     targetMemoryUtilizationPercentage: 80
+  dataQuality:
+    validateBeforeTrain: true
+    blockOnCritical: true
+    requireGreatExpectations: true
+    lookbackDays: 90
+    alertWebhook: ""
   persistence:
     enabled: true
     size: 5Gi
@@ -170,6 +176,16 @@ mlflow:
   enabled: true
   replicaCount: 1
   trackingUri: http://mlflow:5000
+  # Optional pre-created Kubernetes Secret for MLflow credentials.
+  # If empty, this chart will create a secret from values below.
+  # Recommended for production: set this to a secret managed via Infisical/External Secrets.
+  secretRef:
+    existingSecret: ""
+    postgresDbKey: POSTGRES_DB
+    postgresUserKey: POSTGRES_USER
+    postgresPasswordKey: POSTGRES_PASSWORD
+    minioUserKey: MINIO_ROOT_USER
+    minioPasswordKey: MINIO_ROOT_PASSWORD
   gunicornOptions: --workers 2 --timeout=300
   service:
     type: ClusterIP

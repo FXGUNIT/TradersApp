@@ -1,20 +1,31 @@
-{{- if .Values.mlflow.enabled }}
+﻿{{- if .Values.mlflow.enabled }}
+{{- $namespace := include "tradersapp.namespace" . }}
+{{- $secretName := default "mlflow-runtime-secret" .Values.mlflow.secretRef.existingSecret }}
+{{- $postgresDbKey := default "POSTGRES_DB" .Values.mlflow.secretRef.postgresDbKey }}
+{{- $postgresUserKey := default "POSTGRES_USER" .Values.mlflow.secretRef.postgresUserKey }}
+{{- $postgresPasswordKey := default "POSTGRES_PASSWORD" .Values.mlflow.secretRef.postgresPasswordKey }}
+{{- $minioUserKey := default "MINIO_ROOT_USER" .Values.mlflow.secretRef.minioUserKey }}
+{{- $minioPasswordKey := default "MINIO_ROOT_PASSWORD" .Values.mlflow.secretRef.minioPasswordKey }}
+{{- if not .Values.mlflow.secretRef.existingSecret }}
 apiVersion: v1
 kind: Secret
 metadata:
-  name: mlflow-postgres-secret
-  namespace: {{ include "tradersapp.namespace" . }}
+  name: {{ $secretName }}
+  namespace: {{ $namespace }}
 type: Opaque
 stringData:
-  POSTGRES_DB: {{ .Values.mlflow.postgres.database | quote }}
-  POSTGRES_USER: {{ .Values.mlflow.postgres.user | quote }}
-  POSTGRES_PASSWORD: {{ .Values.mlflow.postgres.password | quote }}
+  {{ $postgresDbKey }}: {{ .Values.mlflow.postgres.database | quote }}
+  {{ $postgresUserKey }}: {{ .Values.mlflow.postgres.user | quote }}
+  {{ $postgresPasswordKey }}: {{ .Values.mlflow.postgres.password | quote }}
+  {{ $minioUserKey }}: {{ .Values.mlflow.minio.user | quote }}
+  {{ $minioPasswordKey }}: {{ .Values.mlflow.minio.password | quote }}
 ---
+{{- end }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: mlflow-postgres
-  namespace: {{ include "tradersapp.namespace" . }}
+  namespace: {{ $namespace }}
   labels:
     app: mlflow-postgres
     tier: data
@@ -36,22 +47,35 @@ spec:
           ports:
             - name: postgres
               containerPort: 5432
-          envFrom:
-            - secretRef:
-                name: mlflow-postgres-secret
+          env:
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $secretName }}
+                  key: {{ $postgresDbKey }}
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $secretName }}
+                  key: {{ $postgresUserKey }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $secretName }}
+                  key: {{ $postgresPasswordKey }}
           {{- with .Values.mlflow.postgres.resources }}
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
           livenessProbe:
             exec:
-              command: ["pg_isready", "-U", "{{ .Values.mlflow.postgres.user }}", "-d", "{{ .Values.mlflow.postgres.database }}"]
+              command: ["/bin/sh", "-ec", "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""]
             initialDelaySeconds: 15
             periodSeconds: 10
             failureThreshold: 3
           readinessProbe:
             exec:
-              command: ["pg_isready", "-U", "{{ .Values.mlflow.postgres.user }}", "-d", "{{ .Values.mlflow.postgres.database }}"]
+              command: ["/bin/sh", "-ec", "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""]
             initialDelaySeconds: 5
             periodSeconds: 5
             failureThreshold: 3
@@ -76,7 +100,7 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: mlflow-postgres-pvc
-  namespace: {{ include "tradersapp.namespace" . }}
+  namespace: {{ $namespace }}
 spec:
   accessModes:
     - ReadWriteOnce
@@ -92,7 +116,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: mlflow-postgres
-  namespace: {{ include "tradersapp.namespace" . }}
+  namespace: {{ $namespace }}
 spec:
   type: ClusterIP
   selector:
@@ -102,21 +126,11 @@ spec:
       port: 5432
       targetPort: 5432
 ---
-apiVersion: v1
-kind: Secret
-metadata:
-  name: minio-secret
-  namespace: {{ include "tradersapp.namespace" . }}
-type: Opaque
-stringData:
-  MINIO_ROOT_USER: {{ .Values.mlflow.minio.user | quote }}
-  MINIO_ROOT_PASSWORD: {{ .Values.mlflow.minio.password | quote }}
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: minio
-  namespace: {{ include "tradersapp.namespace" . }}
+  namespace: {{ $namespace }}
   labels:
     app: minio
     tier: storage
@@ -149,13 +163,13 @@ spec:
             - name: MINIO_ROOT_USER
               valueFrom:
                 secretKeyRef:
-                  name: minio-secret
-                  key: MINIO_ROOT_USER
+                  name: {{ $secretName }}
+                  key: {{ $minioUserKey }}
             - name: MINIO_ROOT_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: minio-secret
-                  key: MINIO_ROOT_PASSWORD
+                  name: {{ $secretName }}
+                  key: {{ $minioPasswordKey }}
           {{- with .Values.mlflow.minio.resources }}
           resources:
             {{- toYaml . | nindent 12 }}
@@ -202,7 +216,7 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: minio-pvc
-  namespace: {{ include "tradersapp.namespace" . }}
+  namespace: {{ $namespace }}
 spec:
   accessModes:
     - ReadWriteOnce
@@ -218,7 +232,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: minio
-  namespace: {{ include "tradersapp.namespace" . }}
+  namespace: {{ $namespace }}
 spec:
   type: ClusterIP
   selector:
@@ -235,7 +249,7 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: minio-setup
-  namespace: {{ include "tradersapp.namespace" . }}
+  namespace: {{ $namespace }}
   annotations:
     "helm.sh/hook": post-install,post-upgrade
     "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
@@ -259,13 +273,13 @@ spec:
             - name: MINIO_ROOT_USER
               valueFrom:
                 secretKeyRef:
-                  name: minio-secret
-                  key: MINIO_ROOT_USER
+                  name: {{ $secretName }}
+                  key: {{ $minioUserKey }}
             - name: MINIO_ROOT_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: minio-secret
-                  key: MINIO_ROOT_PASSWORD
+                  name: {{ $secretName }}
+                  key: {{ $minioPasswordKey }}
           command: ["/bin/sh", "-c"]
           args:
             - |
@@ -279,7 +293,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: mlflow
-  namespace: {{ include "tradersapp.namespace" . }}
+  namespace: {{ $namespace }}
   labels:
     app: mlflow
     tier: mlops
@@ -310,34 +324,45 @@ spec:
         - name: mlflow
           image: "{{ .Values.mlflow.image.repository }}:{{ .Values.mlflow.image.tag }}"
           imagePullPolicy: {{ include "tradersapp.imagePullPolicy" .Values.mlflow.image }}
+          command: ["/bin/sh", "-ec"]
           args:
-            - mlflow
-            - server
-            - --host
-            - 0.0.0.0
-            - --port
-            - {{ .Values.mlflow.service.port | quote }}
-            - --backend-store-uri
-            - postgresql://{{ .Values.mlflow.postgres.user }}:{{ .Values.mlflow.postgres.password }}@mlflow-postgres:5432/{{ .Values.mlflow.postgres.database }}
-            - --artifacts-destination
-            - s3://{{ .Values.mlflow.s3.bucket }}/
-            - --serve-artifacts
-            - --gunicorn-opts
-            - {{ .Values.mlflow.gunicornOptions | quote }}
+            - |
+              mlflow server \
+                --host 0.0.0.0 \
+                --port {{ .Values.mlflow.service.port }} \
+                --backend-store-uri "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@mlflow-postgres:5432/${POSTGRES_DB}" \
+                --artifacts-destination "s3://{{ .Values.mlflow.s3.bucket }}/" \
+                --serve-artifacts \
+                --gunicorn-opts "{{ .Values.mlflow.gunicornOptions }}"
           ports:
             - name: http
               containerPort: {{ .Values.mlflow.service.port }}
           env:
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $secretName }}
+                  key: {{ $postgresDbKey }}
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $secretName }}
+                  key: {{ $postgresUserKey }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $secretName }}
+                  key: {{ $postgresPasswordKey }}
             - name: AWS_ACCESS_KEY_ID
               valueFrom:
                 secretKeyRef:
-                  name: minio-secret
-                  key: MINIO_ROOT_USER
+                  name: {{ $secretName }}
+                  key: {{ $minioUserKey }}
             - name: AWS_SECRET_ACCESS_KEY
               valueFrom:
                 secretKeyRef:
-                  name: minio-secret
-                  key: MINIO_ROOT_PASSWORD
+                  name: {{ $secretName }}
+                  key: {{ $minioPasswordKey }}
             - name: AWS_DEFAULT_REGION
               value: {{ .Values.mlflow.s3.region | quote }}
             - name: MLFLOW_S3_ENDPOINT_URL
@@ -394,7 +419,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: mlflow
-  namespace: {{ include "tradersapp.namespace" . }}
+  namespace: {{ $namespace }}
 spec:
   type: {{ .Values.mlflow.service.type }}
   selector:
