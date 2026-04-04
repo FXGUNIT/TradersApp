@@ -158,3 +158,46 @@ groups:
         annotations:
           summary: "Grafana is down"
           description: "Grafana is unreachable — dashboards unavailable."
+
+  - name: mlflow-mlops
+    interval: 60s
+    rules:
+      - alert: MLflowDown
+        expr: up{job="mlflow"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: mlflow
+        annotations:
+          summary: "MLflow tracking server is down"
+          description: "MLflow has been unreachable for 2+ minutes. Experiment tracking and model registry unavailable."
+
+      - alert: MLflowHighLatency
+        expr: histogram_quantile(0.95, sum(rate(ml_http_request_duration_seconds_bucket{endpoint="/api/2.0/mlflow/runs/search"}[5m])) by (le)) > 5
+        for: 5m
+        labels:
+          severity: warning
+          service: mlflow
+        annotations:
+          summary: "MLflow API latency > 5s p95"
+          description: "MLflow search runs API is slow. May indicate heavy query or database congestion."
+
+      - alert: MLflowPostgresDown
+        expr: up{job="mlflow-postgres"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: mlflow
+        annotations:
+          summary: "MLflow PostgreSQL backend is down"
+          description: "MLflow cannot store experiment metadata. All new runs will fail."
+
+      - alert: MinIODown
+        expr: up{job="minio"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          service: mlflow
+        annotations:
+          summary: "MinIO artifact store is down"
+          description: "MinIO S3 store is unreachable. Model artifacts cannot be saved or retrieved."

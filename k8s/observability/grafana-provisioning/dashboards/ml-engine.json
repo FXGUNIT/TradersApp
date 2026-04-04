@@ -955,7 +955,240 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 31
+        "y": 35
+      },
+      "id": 106,
+      "panels": [],
+      "title": "MLflow — MLOps",
+      "type": "row"
+    },
+    {
+      "title": "MLflow Experiments",
+      "description": "Experiment tracking: active runs, logged metrics, model registry",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 36
+      },
+      "targets": [
+        {
+          "expr": "sum(ml_training_runs_total)",
+          "legendFormat": "total runs"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"value": 0, "color": "green"},
+              {"value": 1, "color": "blue"}
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Models Registered",
+      "description": "Models in MLflow model registry by stage",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 36
+      },
+      "targets": [
+        {
+          "expr": "sum(ml_models_registered)",
+          "legendFormat": "models"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"value": 0, "color": "yellow"},
+              {"value": 1, "color": "green"}
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Training Duration (sec)",
+      "description": "Model training wall-clock time per experiment",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 36
+      },
+      "targets": [
+        {
+          "expr": "ml_training_duration_seconds",
+          "legendFormat": "{{ experiment }}/{{ run }}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 20
+          }
+        }
+      }
+    },
+    {
+      "title": "Artifact Size (MB)",
+      "description": "Model artifact storage size in MinIO",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 36
+      },
+      "targets": [
+        {
+          "expr": "ml_artifact_size_bytes / 1048576",
+          "legendFormat": "{{ model_name }}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "decmbytes",
+          "custom": {
+            "lineWidth": 2
+          }
+        }
+      }
+    },
+    {
+      "title": "Active MLflow Runs",
+      "description": "Currently running MLflow experiments",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 40
+      },
+      "targets": [
+        {
+          "expr": "ml_active_runs",
+          "legendFormat": "active"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"value": 0, "color": "gray"},
+              {"value": 1, "color": "green"},
+              {"value": 5, "color": "yellow"}
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "MinIO / Artifact Store",
+      "description": "MinIO S3-compatible object store health",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 40
+      },
+      "targets": [
+        {
+          "expr": "up{job=\"minio\"}",
+          "legendFormat": "minio"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"value": 0, "color": "red"},
+              {"value": 1, "color": "green"}
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "PostgreSQL (MLflow Backend)",
+      "description": "MLflow experiment metadata store",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 40
+      },
+      "targets": [
+        {
+          "expr": "up{job=\"mlflow-postgres\"}",
+          "legendFormat": "postgres"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"value": 0, "color": "red"},
+              {"value": 1, "color": "green"}
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "MLflow Tracking Server",
+      "description": "MLflow server health",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 40
+      },
+      "targets": [
+        {
+          "expr": "up{job=\"mlflow\"}",
+          "legendFormat": "mlflow"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"value": 0, "color": "red"},
+              {"value": 1, "color": "green"}
+            ]
+          }
+        }
+      }
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 44
       },
       "id": 104,
       "panels": [],

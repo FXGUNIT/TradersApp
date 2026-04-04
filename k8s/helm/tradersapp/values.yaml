@@ -161,12 +161,33 @@ kafka:
       replicationFactor: 1
 
 # Observability (Prometheus + Grafana via kube-prometheus-stack)
-observability:
-  enabled: false  # Enable if using kube-prometheus-stack
-  prometheus:
-    enabled: false
-  grafana:
-    enabled: false
+# Note: enable via kube-prometheus-stack Helm chart, not this chart
+# observability:
+#   enabled: false
+
+# MLflow (self-hosted MLOps: experiment tracking + model registry)
+mlflow:
+  enabled: true
+  replicaCount: 1
+  service:
+    type: ClusterIP
+  postgres:
+    password: mlflow123
+  minio:
+    user: minioadmin
+    password: minioadmin123
+    size: 20Gi
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: standard
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
 
 # Security
 security:

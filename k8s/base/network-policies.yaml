@@ -230,3 +230,100 @@ spec:
     # Prometheus egress to metrics targets (cloud, etc.)
     - to:
         - namespaceSelector: {}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: mlflow-policy
+  namespace: tradersapp
+spec:
+  podSelector:
+    matchLabels:
+      app: mlflow
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # ML Engine can log experiments
+    - from:
+        - podSelector:
+            matchLabels:
+              app: ml-engine
+      ports:
+        - protocol: TCP
+          port: 5000
+    # External access (via Ingress or port-forward in dev)
+    - from: []
+      ports:
+        - protocol: TCP
+          port: 5000
+  egress:
+    # Outbound: PostgreSQL (MLflow backend)
+    - to:
+        - podSelector:
+            matchLabels:
+              app: mlflow-postgres
+      ports:
+        - protocol: TCP
+          port: 5432
+    # Outbound: MinIO (artifact storage)
+    - to:
+        - podSelector:
+            matchLabels:
+              app: minio
+      ports:
+        - protocol: TCP
+          port: 9000
+    # DNS
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: mlflow-postgres-policy
+  namespace: tradersapp
+spec:
+  podSelector:
+    matchLabels:
+      app: mlflow-postgres
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: mlflow
+      ports:
+        - protocol: TCP
+          port: 5432
+  egress: []  # PostgreSQL is stateless, no outbound needed
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: minio-policy
+  namespace: tradersapp
+spec:
+  podSelector:
+    matchLabels:
+      app: minio
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: mlflow
+        - podSelector:
+            matchLabels:
+              app: ml-engine
+      ports:
+        - protocol: TCP
+          port: 9000
+  egress: []  # MinIO artifact storage, no outbound needed
