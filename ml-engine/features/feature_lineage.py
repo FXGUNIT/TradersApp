@@ -441,7 +441,10 @@ def warmup_online_store(
     import time
 
     warmup_start = time.perf_counter()
-    from ml_engine.features.feast_client import get_all_features
+    try:
+        from ml_engine.features.feast_client import get_all_features
+    except ModuleNotFoundError:
+        from features.feast_client import get_all_features  # local run
 
     now = pd.Timestamp.now(tz="UTC")
     timestamps = pd.date_range(
