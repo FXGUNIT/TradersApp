@@ -233,6 +233,42 @@ def get_metrics(registry=DEFAULT_REGISTRY) -> dict:
         registry=registry,
     )
 
+    # ── MLflow / MLOps ─────────────────────────────────────────────────
+    metrics["training_runs_total"] = Counter(
+        name="ml_training_runs_total",
+        documentation="Total MLflow training runs completed",
+        labelnames=["experiment", "status"],
+        registry=registry,
+    )
+    metrics["active_runs"] = Gauge(
+        name="ml_active_runs",
+        documentation="Currently active MLflow runs",
+        registry=registry,
+    )
+    metrics["models_registered"] = Gauge(
+        name="ml_models_registered",
+        documentation="Models registered in MLflow model registry",
+        labelnames=["model_name", "stage"],
+        registry=registry,
+    )
+    metrics["training_duration_seconds"] = Gauge(
+        name="ml_training_duration_seconds",
+        documentation="Training run wall-clock duration in seconds",
+        labelnames=["experiment", "run"],
+        registry=registry,
+    )
+    metrics["artifact_size_bytes"] = Gauge(
+        name="ml_artifact_size_bytes",
+        documentation="Model artifact size in bytes",
+        labelnames=["model_name"],
+        registry=registry,
+    )
+    metrics["mlflow_experiments"] = Gauge(
+        name="ml_mlflow_experiments",
+        documentation="Number of MLflow experiments",
+        registry=registry,
+    )
+
     _metrics = metrics
     return _metrics
 
@@ -365,6 +401,56 @@ def set_models_loaded(count: int):
         return
 
     _metrics["models_loaded"].set(max(0, count))
+
+
+def record_training_run(experiment: str, status: str = "success"):
+    """Record a completed MLflow training run."""
+    global _metrics
+    if _metrics is None:
+        _metrics = get_metrics()
+    if not PROMETHEUS_AVAILABLE:
+        return
+    _metrics["training_runs_total"].labels(experiment=experiment, status=status).inc()
+
+
+def set_active_runs(count: int):
+    """Set the number of currently active MLflow runs."""
+    global _metrics
+    if _metrics is None:
+        _metrics = get_metrics()
+    if not PROMETHEUS_AVAILABLE:
+        return
+    _metrics["active_runs"].set(max(0, count))
+
+
+def record_model_registered(model_name: str, stage: str):
+    """Record a model registered in MLflow model registry."""
+    global _metrics
+    if _metrics is None:
+        _metrics = get_metrics()
+    if not PROMETHEUS_AVAILABLE:
+        return
+    _metrics["models_registered"].labels(model_name=model_name, stage=stage).set(1)
+
+
+def record_training_duration(experiment: str, run: str, seconds: float):
+    """Record training duration for an MLflow run."""
+    global _metrics
+    if _metrics is None:
+        _metrics = get_metrics()
+    if not PROMETHEUS_AVAILABLE:
+        return
+    _metrics["training_duration_seconds"].labels(experiment=experiment, run=run).set(seconds)
+
+
+def record_artifact_size(model_name: str, bytes_size: int):
+    """Record the size of a logged model artifact."""
+    global _metrics
+    if _metrics is None:
+        _metrics = get_metrics()
+    if not PROMETHEUS_AVAILABLE:
+        return
+    _metrics["artifact_size_bytes"].labels(model_name=model_name).set(max(0, bytes_size))
 
 
 # ─── Prometheus /metrics Endpoint Handler ────────────────────────────────────────
