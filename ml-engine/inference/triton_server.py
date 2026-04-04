@@ -181,12 +181,23 @@ class TritonServer:
                 self._gpu_count = torch.cuda.device_count()
                 self._gpu_name = torch.cuda.get_device_name(0)
                 print(f"[Triton] GPU available: {self._gpu_name} ({self._gpu_count} device(s))")
+                self._record_gpu_prometheus()
             else:
                 self._gpu_count = 0
                 print("[Triton] No GPU — will run CPU-only inference")
         except ImportError:
             self._gpu_count = 0
             print("[Triton] PyTorch not available — CPU inference only")
+
+    def _record_gpu_prometheus(self):
+        """Record GPU metrics to Prometheus on startup."""
+        try:
+            from infrastructure.prometheus_exporter import record_gpu_metrics, PROMETHEUS_AVAILABLE
+            if PROMETHEUS_AVAILABLE and record_gpu_metrics:
+                record_gpu_metrics()
+                print("[Triton] GPU metrics exported to Prometheus")
+        except Exception:
+            pass
 
     def _build_command(self, model_repo: Path | None = None) -> list[str]:
         """Build the Triton server launch command."""

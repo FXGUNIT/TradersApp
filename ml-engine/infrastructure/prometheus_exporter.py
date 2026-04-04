@@ -269,6 +269,69 @@ def get_metrics(registry=DEFAULT_REGISTRY) -> dict:
         registry=registry,
     )
 
+    # ── Triton Inference Metrics ───────────────────────────────────────────
+    metrics["inference_latency_seconds"] = Histogram(
+        name="ml_inference_latency_seconds",
+        documentation="End-to-end inference latency (batching + Triton round-trip)",
+        buckets=(0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 1.0),
+        registry=registry,
+    )
+    metrics["inference_triton_roundtrip_seconds"] = Histogram(
+        name="ml_inference_triton_roundtrip_seconds",
+        documentation="Triton gRPC round-trip latency",
+        buckets=(0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2),
+        registry=registry,
+    )
+    metrics["inference_batch_size"] = Histogram(
+        name="ml_inference_batch_size",
+        documentation="Batch size used per inference call",
+        buckets=(1, 2, 4, 8, 16, 32, 64, 128),
+        registry=registry,
+    )
+    metrics["inference_queue_depth"] = Gauge(
+        name="ml_inference_queue_depth",
+        documentation="Current inference request queue depth",
+        registry=registry,
+    )
+    metrics["inference_source"] = Counter(
+        name="ml_inference_source_total",
+        documentation="Inference calls by source (triton, onnx_local, sklearn_local)",
+        labelnames=("source",),
+        registry=registry,
+    )
+    metrics["inference_requests_total"] = Counter(
+        name="ml_inference_requests_total",
+        documentation="Total inference requests",
+        labelnames=("model", "symbol"),
+        registry=registry,
+    )
+    metrics["inference_errors_total"] = Counter(
+        name="ml_inference_errors_total",
+        documentation="Inference errors",
+        labelnames=("model", "error_type"),
+        registry=registry,
+    )
+    metrics["triton_server_up"] = Gauge(
+        name="ml_triton_server_up",
+        documentation="Triton server health (1=up, 0=down)",
+        registry=registry,
+    )
+    metrics["gpu_utilization"] = Gauge(
+        name="ml_gpu_utilization_percent",
+        documentation="GPU utilization percentage (0-100)",
+        registry=registry,
+    )
+    metrics["gpu_memory_used_bytes"] = Gauge(
+        name="ml_gpu_memory_used_bytes",
+        documentation="GPU memory used in bytes",
+        registry=registry,
+    )
+    metrics["gpu_memory_total_bytes"] = Gauge(
+        name="ml_gpu_memory_total_bytes",
+        documentation="Total GPU memory in bytes",
+        registry=registry,
+    )
+
     _metrics = metrics
     return _metrics
 
@@ -508,6 +571,135 @@ def sync_mlflow_registry(registry_models: dict[str, list[dict]]):
 
     for (model_name, stage), count in counts.items():
         gauge.labels(model_name=model_name, stage=stage).set(count)
+
+
+# ─── Inference + GPU Metrics ──────────────────────────────────────────────────────
+
+def record_inference_latency(
+    latency_seconds: float,
+    source: str = "triton",
+    batch_size: int = 1,
+):
+    """Record inference latency histogram."""
+    global _metrics
+    if _metrics is None:
+        _metrics = get_metrics()
+    if not PROMETHEUS_AVAILABLE:
+        return
+    _metrics["inference_latency_seconds"].observe(max(0, latency_seconds))
+    _metrics["inference_source"].labels(source=source).inc()
+    _metrics["inference_batch_size"].observe(max(1, batch_size))
+
+
+def record_triton_roundtrip(latency_seconds: float):
+    """Record Triton gRPC round-trip latency."""
+    global _metrics
+    if _metrics is None:
+        _metrics = get_metrics()
+    if not PROMETHEUS_AVAILABLE:
+        return
+    _metrics["inference_triton_roundtrip_seconds"].observe(max(0, latency_seconds))
+
+
+def set_inference_queue_depth(depth: int):
+    """Set current inference queue depth gauge."""
+    global _metrics
+    if _metrics is None:
+        _metrics = get_metrics()
+    if not PROMETHEUS_AVAILABLE:
+        return
+    _metrics["inference_queue_depth"].set(max(0, int(depth)))
+
+
+def record_inference_request(model: str, symbol: str = "MNQ"):
+    """Record an inference request."""
+    global _metrics
+    if _metrics is None:
+        _metrics = get_metrics()
+    if not PROMETHEUS_AVAILABLE:
+        return
+    _metrics["inference_requests_total"].labels(model=model, symbol=symbol).inc()
+
+
+def record_inference_error(model: str, error_type: str):
+    """Record an inference error."""
+    global _metrics
+    if _metrics is None:
+        _metrics = get_metrics()
+    if not PROMETHEUS_AVAILABLE:
+        return
+    _metrics["inference_errors_total"].labels(model=model, error_type=error_type).inc()
+
+
+def set_triton_server_up(is_up: bool):
+    """Set Triton server health gauge."""
+    global _metrics
+    if _metrics is None:
+        _metrics = get_metrics()
+    if not PROMETHEUS_AVAILABLE:
+        return
+    _metrics["triton_server_up"].set(1 if is_up else 0)
+
+
+def record_gpu_metrics():
+    """
+    Poll GPU metrics and update Prometheus gauges.
+    Call periodically (e.g., every 30s) from a background task.
+    """
+    global _metrics
+    if _metrics is None:
+        _metrics = get_metrics()
+    if not PROMETHEUS_AVAILABLE:
+        return
+
+    try:
+        import pynvml  # type: ignore
+
+        pynvml.nvmlInit()
+        device_count = pynvml.nvmlDeviceGetCount()
+
+        for i in range(min(device_count, 4)):  # Cap at 4 GPUs
+            handle = pynvml.nvmlDeviceGetHandleByIndex(i)
+            util = pynvml.nvmlDeviceGetUtilizationRates(handle)
+            mem_info = pynvml.nvmlDeviceGetMemoryInfo(handle)
+
+            label = f"gpu{i}"
+            _metrics["gpu_utilization"].labels(device=label).set(int(util.gpu))
+            _metrics["gpu_memory_used_bytes"].labels(device=label).set(int(mem_info.used))
+            _metrics["gpu_memory_total_bytes"].labels(device=label).set(int(mem_info.total))
+
+        pynvml.nvmlShutdown()
+
+    except ImportError:
+        # pynvml not installed — try torch CUDA
+        try:
+            import torch
+            if torch.cuda.is_available():
+                for i in range(torch.cuda.device_count()):
+                    mem_allocated = torch.cuda.memory_allocated(i)
+                    mem_reserved = torch.cuda.memory_reserved(i)
+                    label = f"gpu{i}"
+                    _metrics["gpu_memory_used_bytes"].labels(device=label).set(int(mem_allocated))
+                    _metrics["gpu_memory_total_bytes"].labels(
+                        device=label
+                    ).set(int(torch.cuda.get_device_properties(i).total_memory))
+        except Exception:
+            pass
+
+
+def get_inference_metrics_summary() -> dict:
+    """Return a summary of all inference metrics for health checks."""
+    global _metrics
+    if _metrics is None:
+        _metrics = get_metrics()
+    if not PROMETHEUS_AVAILABLE:
+        return {"prometheus_available": False}
+
+    return {
+        "prometheus_available": True,
+        "triton_server_up": bool(_metrics["triton_server_up"]._value.get()),
+        "queue_depth": int(_metrics["inference_queue_depth"]._value.get()),
+    }
 
 
 # ─── Prometheus /metrics Endpoint Handler ────────────────────────────────────────

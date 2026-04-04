@@ -38,6 +38,23 @@ try:
 except ImportError:
     ORT_AVAILABLE = False
 
+try:
+    from infrastructure.prometheus_exporter import (
+        record_inference_latency,
+        record_triton_roundtrip,
+        record_inference_request,
+        record_inference_error,
+        set_triton_server_up,
+        PROMETHEUS_AVAILABLE as _PROM_AVAILABLE,
+    )
+except ImportError:
+    record_inference_latency = None
+    record_triton_roundtrip = None
+    record_inference_request = None
+    record_inference_error = None
+    set_triton_server_up = None
+    _PROM_AVAILABLE = False
+
 
 class TritonInferenceClient:
     """
@@ -116,6 +133,16 @@ class TritonInferenceClient:
             result = self._triton_predict(flat_features, model)
             result["source"] = "triton"
             result["inference_ms"] = round((time.perf_counter() - t0) * 1000, 2)
+            if record_inference_latency and _PROM_AVAILABLE:
+                record_inference_latency(
+                    latency_seconds=(time.perf_counter() - t0),
+                    source="triton",
+                    batch_size=len(flat_features),
+                )
+            if record_inference_request and _PROM_AVAILABLE:
+                record_inference_request(model=model)
+            if set_triton_server_up and _PROM_AVAILABLE:
+                set_triton_server_up(True)
             return result
 
         # ONNX Runtime local fallback
@@ -123,12 +150,28 @@ class TritonInferenceClient:
             result = self._onnx_local_predict(flat_features, model, feature_cols)
             result["source"] = "onnx_local"
             result["inference_ms"] = round((time.perf_counter() - t0) * 1000, 2)
+            if record_inference_latency and _PROM_AVAILABLE:
+                record_inference_latency(
+                    latency_seconds=(time.perf_counter() - t0),
+                    source="onnx_local",
+                    batch_size=len(flat_features),
+                )
+            if record_inference_request and _PROM_AVAILABLE:
+                record_inference_request(model=model)
             return result
 
         # sklearn fallback
         result = self._sklearn_local_predict(flat_features, model, feature_cols)
         result["source"] = "sklearn_local"
         result["inference_ms"] = round((time.perf_counter() - t0) * 1000, 2)
+        if record_inference_latency and _PROM_AVAILABLE:
+            record_inference_latency(
+                latency_seconds=(time.perf_counter() - t0),
+                source="sklearn_local",
+                batch_size=len(flat_features),
+            )
+        if record_inference_request and _PROM_AVAILABLE:
+            record_inference_request(model=model)
         return result
 
     def _normalize_features(
@@ -202,9 +245,16 @@ class TritonInferenceClient:
             return self._build_result(p_long, p_short, confidence, signals)
 
         except Exception as e:
+            error_type = type(e).__name__
+            if record_inference_error and _PROM_AVAILABLE:
+                record_inference_error(model_name, error_type)
+            if set_triton_server_up and _PROM_AVAILABLE:
+                set_triton_server_up(False)
             print(f"[Triton] gRPC error: {e}, falling back to local inference")
             self._grpc_client = None  # Disable Triton for future calls
-            return self._onnx_local_predict(features, model_name, self._get_feature_cols(model_name))
+            if ORT_AVAILABLE:
+                return self._onnx_local_predict(features, model_name, self._get_feature_cols(model_name))
+            return self._sklearn_local_predict(features, model_name, self._get_feature_cols(model_name))
 
     def _onnx_local_predict(
         self,

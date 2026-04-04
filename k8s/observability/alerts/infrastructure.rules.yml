@@ -201,3 +201,67 @@ groups:
         annotations:
           summary: "MinIO artifact store is down"
           description: "MinIO S3 store is unreachable. Model artifacts cannot be saved or retrieved."
+
+  - name: triton-inference
+    interval: 30s
+    rules:
+      - alert: TritonDown
+        expr: ml_triton_server_up == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: triton
+        annotations:
+          summary: "Triton Inference Server is down"
+          description: "Triton server has been unreachable for 1+ minutes. ML Engine will fall back to ONNX Runtime local inference."
+
+      - alert: TritonHighLatency
+        expr: histogram_quantile(0.99, sum(rate(ml_inference_triton_roundtrip_seconds_bucket[5m])) by (le)) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: triton
+        annotations:
+          summary: "Triton inference p99 latency > 100ms"
+          description: "Triton gRPC round-trip is exceeding 100ms. Check GPU utilization and model batch sizes."
+
+      - alert: TritonLowBatchUtilization
+        expr: avg(ml_inference_batch_size_sum / ml_inference_batch_size_count) < 4
+        for: 15m
+        labels:
+          severity: info
+          service: triton
+        annotations:
+          summary: "Triton batch utilization is low"
+          description: "Average batch size is below 4. Consider reducing max_wait_ms in the batching layer or disabling batching for latency-sensitive paths."
+
+      - alert: GPUUnderutilized
+        expr: ml_gpu_utilization_percent < 20
+        for: 15m
+        labels:
+          severity: warning
+          service: triton
+        annotations:
+          summary: "GPU utilization < 20%"
+          description: "GPU is underutilized. Check if Triton is correctly batching requests or if GPU instances are undersubscribed."
+
+      - alert: GPUMemoryHigh
+        expr: ml_gpu_memory_used_bytes / ml_gpu_memory_total_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          service: triton
+        annotations:
+          summary: "GPU memory usage > 90%"
+          description: "GPU is running low on memory. Reduce batch sizes or model count per GPU."
+
+      - alert: InferenceErrorRate
+        expr: sum(rate(ml_inference_errors_total[5m])) > 0.01
+        for: 3m
+        labels:
+          severity: critical
+          service: ml-engine
+        annotations:
+          summary: "Inference error rate > 1%"
+          description: "More than 1% of inference requests are failing. Check Triton logs and model availability."
+

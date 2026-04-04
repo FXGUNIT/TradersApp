@@ -1,0 +1,347 @@
+{{- /*
+Triton Inference Server — GPU-accelerated ONNX model serving.
+
+Requires:
+  - GPU node with nvidia.com/gpu label (set nodeSelector below)
+  - NVIDIA device plugin installed in k3s
+  - ml-models PVC mounted at /models (populated by ml-engine export pipeline)
+
+Optimization features enabled:
+  - Dynamic batching (preferred_batch_size: [1, 8, 16, 32, 64])
+  - CUDA async execution
+  - Pinned memory for input/output tensors
+  - gRPC + HTTP + Metrics ports exposed
+*/ -}}
+{{- $namespace := include "tradersapp.namespace" . }}
+{{- $triton := .Values.triton -}}
+{{- $gpuResource := "nvidia.com/gpu" -}}
+
+{{- if $triton.enabled }}
+---
+# PVC for ONNX model artifacts
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "tradersapp.fullname" . }}-triton-models
+  namespace: {{ $namespace }}
+  labels:
+    app: triton
+    {{- include "tradersapp.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ $triton.modelStorage.size | default "2Gi" }}
+  {{- if $triton.modelStorage.storageClass }}
+  storageClassName: {{ $triton.modelStorage.storageClass }}
+  {{- end }}
+{{- end }}
+
+{{- if and $triton.enabled $triton.autoscaling.enabled }}
+---
+# HPA for Triton — scales inference pods by custom metric (inference queue depth)
+# Note: Prometheus Adapter must be configured to expose triton_inference_queue_depth
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "tradersapp.fullname" . }}-triton
+  namespace: {{ $namespace }}
+  labels:
+    app: triton
+    {{- include "tradersapp.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "tradersapp.fullname" . }}-triton
+  minReplicas: {{ $triton.autoscaling.minReplicas | default 1 }}
+  maxReplicas: {{ $triton.autoscaling.maxReplicas | default 4 }}
+  metrics:
+    - type: Resource
+      resource:
+        name: nvidia.com/gpu
+        target:
+          type: Utilization
+          averageUtilization: {{ $triton.autoscaling.targetGPUUtilization | default 80 }}
+    - type: External
+      external:
+        metric:
+          name: triton_inference_queue_depth
+          selector:
+            matchLabels:
+              model: lightgbm_direction
+        target:
+          type: AverageValue
+          averageValue: "10"
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 30
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 15
+    scaleDown:
+      stabilizationWindowSeconds: 120
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 60
+{{- end }}
+
+{{- if $triton.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "tradersapp.fullname" . }}-triton
+  namespace: {{ $namespace }}
+  labels:
+    app: triton
+    tier: inference
+    {{- include "tradersapp.labels" . | nindent 4 }}
+  {{- if $triton.podAnnotations }}
+  annotations:
+    {{- toYaml $triton.podAnnotations | nindent 4 }}
+  {{- end }}
+spec:
+  replicas: {{ $triton.replicaCount | default 1 }}
+  selector:
+    matchLabels:
+      app: triton
+  {{- if $triton.strategy }}
+  strategy:
+    {{- toYaml $triton.strategy | nindent 4 }}
+  {{- else }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  {{- end }}
+  template:
+    metadata:
+      labels:
+        app: triton
+        tier: inference
+      {{- if $triton.prometheusMetrics | default true }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8002"
+        prometheus.io/path: "/metrics"
+      {{- end }}
+    spec:
+      {{- include "tradersapp.imagePullSecrets" . | nindent 6 }}
+      {{- include "tradersapp.tolerations" . | nindent 6 }}
+      {{- include "tradersapp.nodeSelector" . | nindent 6 }}
+      {{- if $triton.securityContext | default true }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 2000
+        fsGroup: 2000
+      {{- end }}
+      # Anti-affinity: prefer spreading across GPU nodes
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: triton
+                topologyKey: kubernetes.io/hostname
+      containers:
+        - name: triton
+          image: "{{ $triton.image.repository }}:{{ $triton.image.tag }}"
+          imagePullPolicy: {{ include "tradersapp.imagePullPolicy" $triton.image }}
+          ports:
+            - containerPort: 8000
+              name: http
+              protocol: TCP
+            - containerPort: 8001
+              name: grpc
+              protocol: TCP
+            - containerPort: 8002
+              name: metrics
+              protocol: TCP
+          args:
+            - tritonserver
+            - --model-repository=/models/triton
+            - --backend-config=onnxruntime,allow-async-execution=true
+            {{- if $triton.strictModelConfig | default false }}
+            - --strict-model-config=true
+            {{- else }}
+            - --strict-model-config=false
+            {{- end }}
+            {{- if $triton.logging.verbose | default false }}
+            - --log-verbose=1
+            {{- else }}
+            - --log-verbo se=0
+            {{- end }}
+            - --http-server-address=0.0.0.0
+            - --grpc-server-address=0.0.0.0
+            - --metrics-port=8002
+            - --allow-grpc=true
+            - --allow-http=true
+            - --allow-metrics=true
+            {{- if $triton.inferenceStagingSeconds }}
+            - --inference-warmup={{ $triton.inferenceStagingSeconds }}
+            {{- end }}
+          env:
+            - name: CUDA_VISIBLE_DEVICES
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.annotations['triton.cuda.device']
+            - name: NVIDIA_DRIVER_CAPABILITIES
+              value: "all"
+            {{- if $triton.env }}
+            {{- range $key, $val := $triton.env }}
+            - name: {{ $key }}
+              value: {{ $val | quote }}
+            {{- end }}
+            {{- end }}
+          {{- with $triton.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          startupProbe:
+            httpGet:
+              path: /v2/health/ready
+              port: 8000
+            failureThreshold: 60
+            periodSeconds: 10
+            initialDelaySeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /v2/health/ready
+              port: 8000
+            failureThreshold: 3
+            periodSeconds: 10
+            initialDelaySeconds: 60
+          livenessProbe:
+            httpGet:
+              path: /v2/health/live
+              port: 8000
+            failureThreshold: 3
+            periodSeconds: 30
+            initialDelaySeconds: 120
+          volumeMounts:
+            - name: triton-models
+              mountPath: /models/triton
+              readOnly: true
+            - name: tmp-gpu
+              mountPath: /tmp
+            {{- if $triton.volumeMounts }}
+            {{- toYaml $triton.volumeMounts | nindent 12 }}
+            {{- end }}
+          {{- if $triton.containerSecurityContext | default true }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          {{- end }}
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "sleep {{ $triton.gracefulShutdownSeconds | default 5 }}"]
+      volumes:
+        - name: triton-models
+          persistentVolumeClaim:
+            claimName: {{ include "tradersapp.fullname" . }}-triton-models
+        - name: tmp-gpu
+          emptyDir:
+            medium: Memory
+            sizeLimit: {{ $triton.tmpStorageSize | default "1Gi" }}
+      terminationGracePeriodSeconds: {{ $triton.terminationGracePeriodSeconds | default 60 }}
+      {{- if $triton.priorityClassName }}
+      priorityClassName: {{ $triton.priorityClassName }}
+      {{- end }}
+
+---
+# ClusterIP Service — only exposed within the cluster
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "tradersapp.fullname" . }}-triton
+  namespace: {{ $namespace }}
+  labels:
+    app: triton
+    {{- include "tradersapp.labels" . | nindent 4 }}
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8002"
+spec:
+  type: ClusterIP
+  selector:
+    app: triton
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+      protocol: TCP
+    - name: grpc
+      port: 8001
+      targetPort: 8001
+      protocol: TCP
+    - name: metrics
+      port: 8002
+      targetPort: 8002
+      protocol: TCP
+
+{{- /* Per-model config: generate config.pbtxt for each ONNX model */ -}}
+{{- range $modelName, $modelConfig := $triton.models }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "tradersapp.fullname" $ }}-triton-model-{{ $modelName | replace "_" "-" }}
+  namespace: {{ $namespace }}
+data:
+  config.pbtxt: |
+    name: "{{ $modelName }}"
+    platform: "onnxruntime_onnx"
+    max_batch_size: {{ $modelConfig.maxBatchSize | default 64 }}
+    version_policy: {{
+      if eq ($modelConfig.versionPolicy | default "specific") "specific" }}
+      specific: { versions: [{{ $modelConfig.version | default 1 }}] }
+      {{- else if eq ($modelConfig.versionPolicy | default "specific") "latest" }}
+      latest: { num_versions: 1 }
+      {{- else }}
+      all: {}
+      {{- end }}
+    dynamic_batching: {
+      preferred_batch_size: [{{ $modelConfig.preferredBatchSizes | default "1, 8, 16, 32, 64" }}],
+      max_queue_delay_microseconds: {{ $modelConfig.maxQueueDelayUs | default 100 }}
+    }
+    instance_group: [
+      {
+        count: {{ $modelConfig.instanceCount | default 1 }}
+        kind: KIND_GPU
+      }
+    ]
+    optimization: {
+      input_pinned_memory: { enable: true }
+      output_pinned_memory: { enable: true }
+      eager_batching: { enable: {{ $modelConfig.eagerBatching | default false }} }
+    }
+    parameters: {
+      "execute_window_size": { string_value: "{{ $modelConfig.executeWindowSize | default "2" }}" }
+      "preferred_batch_size": { string_value: "{{ $modelConfig.preferredBatchSizes | default "1,8,16,32,64" }}" }
+    }
+    input: [
+      {
+        name: "input"
+        data_type: TYPE_FP32
+        dims: [{{ $modelConfig.inputDims | default (join "," (seq 1 $modelConfig.nFeatures | list)) }}]
+      }
+    ]
+    output: [
+      { name: "prob_long", data_type: TYPE_FP32, dims: [-1] },
+      { name: "prob_short", data_type: TYPE_FP32, dims: [-1] },
+      { name: "confidence", data_type: TYPE_FP32, dims: [-1] },
+      { name: "signal", data_type: TYPE_STRING, dims: [-1] }
+    ]
+{{- end }}
+{{- end }}

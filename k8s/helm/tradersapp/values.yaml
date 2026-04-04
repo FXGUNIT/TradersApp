@@ -87,14 +87,22 @@ frontend:
     host: tradersapp.local
     path: /
 
-# Triton Inference Server
+# Triton Inference Server — GPU-accelerated ONNX model serving
+# Set enabled=true and configure nodeSelector + tolerations for GPU nodes
 triton:
   enabled: false  # Requires GPU node, set to true if GPU available
   replicaCount: 1
   image:
     repository: nvcr.io/nvidia/tritonserver
-    tag: "24.03-py3"
+    tag: "24.04-py3"
     pullPolicy: IfNotPresent
+  # Node selector for GPU nodes (uncomment when GPU nodes available)
+  nodeSelector:
+    # nvidia.com/gpu: "true"
+  tolerations:
+    # - key: nvidia.com/gpu
+    #   operator: Exists
+    #   effect: NoSchedule
   resources:
     requests:
       cpu: 500m
@@ -109,6 +117,65 @@ triton:
       http: 8000
       grpc: 8001
       metrics: 8002
+  # PVC for ONNX model artifacts
+  modelStorage:
+    size: 2Gi
+    storageClass: standard  # Change to 'local-path' or 'nfs' in prod
+  # tmpfs for GPU memory spill
+  tmpStorageSize: 1Gi
+  # Graceful shutdown (allow in-flight requests to complete)
+  gracefulShutdownSeconds: 5
+  # Inference warmup (load models before accepting traffic)
+  inferenceStagingSeconds: 30
+  # Model config defaults
+  strictModelConfig: false
+  logging:
+    verbose: false
+  prometheusMetrics: true
+  # Autoscaling (GPU-based HPA — requires Prometheus Adapter for queue depth metric)
+  autoscaling:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 4
+    targetGPUUtilization: 80  # %
+  # Rolling update strategy
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  # Per-model tuning (keyed by model name)
+  models:
+    lightgbm_direction:
+      nFeatures: 50
+      maxBatchSize: 64
+      preferredBatchSizes: [1, 8, 16, 32, 64]
+      maxQueueDelayUs: 100
+      instanceCount: 2  # 2 GPU instances for parallel inference
+      version: 1
+      versionPolicy: specific  # specific | latest | all
+      inputDims: [50]
+      eagerBatching: false
+    random_forest:
+      nFeatures: 50
+      maxBatchSize: 64
+      preferredBatchSizes: [1, 8, 16, 32, 64]
+      maxQueueDelayUs: 100
+      instanceCount: 1
+      version: 1
+      versionPolicy: specific
+      inputDims: [50]
+      eagerBatching: false
+    xgboost_direction:
+      nFeatures: 50
+      maxBatchSize: 64
+      preferredBatchSizes: [1, 8, 16, 32, 64]
+      maxQueueDelayUs: 100
+      instanceCount: 1
+      version: 1
+      versionPolicy: specific
+      inputDims: [50]
+      eagerBatching: false
 
 # Redis (in-cluster)
 redis:
