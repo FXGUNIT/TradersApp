@@ -46,7 +46,7 @@ services:
       GITEA__service__REQUIRE_SIGNIN_VIEW: "false"
       GITEA__packages__ENABLED: "true"
       GITEA__api__MAX_RESPONSE_ITEMS: "50"
-      GITEA__webhook__ALLOWED_HOST_LIST: ${GITEA_WEBHOOK_ALLOWED_HOST_LIST:-external}
+      GITEA__webhook__ALLOWED_HOST_LIST: ${GITEA_WEBHOOK_ALLOWED_HOST_LIST:-external,loopback,private}
       GITEA__mailer__ENABLED: "false"
     restart: unless-stopped
     volumes:
@@ -76,6 +76,7 @@ services:
       WOODPECKER_GITEA: "true"
       WOODPECKER_GITEA_URL: ${WOODPECKER_GITEA_URL:-http://gitea:3000/}
       WOODPECKER_EXPERT_FORGE_OAUTH_HOST: ${WOODPECKER_EXPERT_FORGE_OAUTH_HOST:-${GITEA_ROOT_URL:?set GITEA_ROOT_URL}}
+      WOODPECKER_EXPERT_WEBHOOK_HOST: ${WOODPECKER_WEBHOOK_HOST:-http://woodpecker-server:8000}
       WOODPECKER_GITEA_CLIENT: ${WOODPECKER_GITEA_CLIENT:?set WOODPECKER_GITEA_CLIENT}
       WOODPECKER_GITEA_SECRET: ${WOODPECKER_GITEA_SECRET:?set WOODPECKER_GITEA_SECRET}
       WOODPECKER_PLUGINS_PRIVILEGED: ${WOODPECKER_PLUGINS_PRIVILEGED:-woodpeckerci/plugin-docker-buildx,docker.io/woodpeckerci/plugin-docker-buildx,quay.io/woodpeckerci/plugin-docker-buildx}
