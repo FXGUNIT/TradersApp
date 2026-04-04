@@ -3,7 +3,7 @@
 # Tracked with DVC: git commit this file, dvc push to remote
 # To reproduce: dvc pull && dvc repro
 outs:
-- md5: 22ebdd36e102f2af2f5766b7297dcad3
-  size: 4096
+- md5: e1acf9507c9279ba81a5e3774058dc59
+  size: 90112
   hash: md5
   path: trading_data.db
