@@ -177,7 +177,7 @@ triton:
       inputDims: [50]
       eagerBatching: false
 
-# Redis (in-cluster)
+# Redis (in-cluster) — shared between Feast online store and ML Engine cache
 redis:
   enabled: true
   image:
@@ -193,6 +193,53 @@ redis:
     limits:
       cpu: 200m
       memory: 256Mi
+
+# Feast Feature Store — centralized, versioned feature access
+# Online: Redis (shared with cache) — <10ms retrieval
+# Offline: SQLite → Parquet → Feast materialization
+feast:
+  enabled: true
+  # Trading symbol for feature retrieval
+  symbol: MNQ
+  # Online store TTL in seconds (24 hours — re-materialized daily)
+  onlineTtlSeconds: 86400
+  # PVC for Parquet feature files (offline store)
+  featureStorage:
+    size: 2Gi
+    storageClass: standard
+  # Materialization CronJob: SQLite → Parquet → Redis
+  materialization:
+    enabled: true
+    schedule: "0 5 * * *"  # Daily at 05:00 UTC (before trading day)
+    concurrencyPolicy: Forbid  # No overlapping runs
+    successfulJobsHistoryLimit: 3
+    failedJobsHistoryLimit: 3
+    startingDeadlineSeconds: 300
+    backoffLimit: 2
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+    initContainerSecurityContext: true
+    containerSecurityContext: true
+    startupProbe:
+      exec:
+        command: ["python", "-c", "import sys; sys.path.insert(0,'/app'); from ml_engine.data.candle_db import CandleDatabase; db = CandleDatabase(); print(db.get_stats())"]
+      initialDelaySeconds: 10
+      periodSeconds: 5
+      failureThreshold: 12
+  # Streaming materialization (Kafka → Redis every 5 min)
+  # Enable when Kafka is deployed for real-time candle features
+  streaming:
+    enabled: false
+    concurrencyPolicy: Replace
+  # Secret reference for optional credentials
+  secretRef:
+    existingSecret: ""
+  volumeMounts: []
 
 # Kafka (event-driven inter-service communication)
 kafka:
