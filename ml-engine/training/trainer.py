@@ -25,9 +25,27 @@ from models.direction.xgboost_classifier import XGBoostClassifier
 
 # Optional MLflow integration
 try:
-    from infrastructure.mlflow_client import get_mlflow_client, MLFLOW_AVAILABLE
+    from infrastructure.mlflow_client import get_mlflow_client, MLFLOW_AVAILABLE, MLFLOW_TRACKING_URI
 except ImportError:
     MLFLOW_AVAILABLE = False
+    MLFLOW_TRACKING_URI = "http://localhost:5000"
+
+# Optional Prometheus integration
+try:
+    from infrastructure.prometheus_exporter import (
+        record_training_run,
+        record_training_duration,
+        record_artifact_size,
+        record_model_registered,
+        PROMETHEUS_AVAILABLE as _PROM_AVAILABLE,
+    )
+    PROMETHEUS_AVAILABLE = _PROM_AVAILABLE
+except ImportError:
+    PROMETHEUS_AVAILABLE = False
+    record_training_run = None
+    record_training_duration = None
+    record_artifact_size = None
+    record_model_registered = None
 
 # Drift detection — refresh baselines after each training run
 try:
@@ -306,6 +324,28 @@ class Trainer:
                     if verbose:
                         print(f"  [DriftMonitor] Baseline update skipped: {e}")
 
+            # ── Prometheus: record training run metrics ──────────────────────
+            if record_training_run and PROMETHEUS_AVAILABLE:
+                record_training_run("direction", "success")
+                record_training_duration("direction", version, round(duration, 2))
+            if record_model_registered and PROMETHEUS_AVAILABLE:
+                for model_key, result_data in results.items():
+                    if result_data.get("status") == "success":
+                        # Check if model was registered in registry
+                        try:
+                            mv = mlflow_client.get_production_model(f"direction_{model_key}")
+                            stage = mv.get("stage", "staging") if mv else "staging"
+                            record_model_registered(f"direction_{model_key}", stage)
+                        except Exception:
+                            record_model_registered(f"direction_{model_key}", "staging")
+            if record_artifact_size and PROMETHEUS_AVAILABLE:
+                for model_key, result_data in results.items():
+                    version = result_data.get("version")
+                    if version:
+                        p = self.store._model_path(model_key, version)
+                        if p.exists():
+                            record_artifact_size(f"direction_{model_key}", p.stat().st_size)
+
             summary = {
                 "mode": mode,
                 "training_duration_sec": round(duration, 2),
@@ -338,6 +378,9 @@ class Trainer:
             if "mlflow_client" in dir():
                 mlflow_client.log_tag("training_status", "failed")
                 mlflow_client.log_tag("error", error_msg[:200])
+            # ── Prometheus: record failed run ──────────────────────────────
+            if record_training_run and PROMETHEUS_AVAILABLE:
+                record_training_run("direction", "failed")
             self.db.fail_training(train_log_id, error_msg)
             traceback.print_exc()
             raise
