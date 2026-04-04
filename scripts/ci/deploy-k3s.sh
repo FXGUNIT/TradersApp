@@ -25,6 +25,7 @@ export KUBECONFIG="$kubeconfig_path"
 frontend_repo="${REGISTRY_HOST}/${CI_REPO_OWNER}/frontend"
 bff_repo="${REGISTRY_HOST}/${CI_REPO_OWNER}/bff"
 ml_engine_repo="${REGISTRY_HOST}/${CI_REPO_OWNER}/ml-engine"
+mlflow_repo="${REGISTRY_HOST}/${CI_REPO_OWNER}/mlflow"
 image_tag="${CI_COMMIT_SHA}"
 
 kubectl create namespace "$K8S_NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
@@ -47,10 +48,13 @@ helm upgrade --install "$release_name" "$chart_dir" \
   --set-string bff.image.tag="$image_tag" \
   --set-string mlEngine.image.repository="$ml_engine_repo" \
   --set-string mlEngine.image.tag="$image_tag" \
+  --set-string mlflow.image.repository="$mlflow_repo" \
+  --set-string mlflow.image.tag="$image_tag" \
   --wait \
   --timeout 10m
 
 kubectl rollout status deployment/frontend -n "$K8S_NAMESPACE" --timeout=180s
 kubectl rollout status deployment/bff -n "$K8S_NAMESPACE" --timeout=180s
 kubectl rollout status deployment/ml-engine -n "$K8S_NAMESPACE" --timeout=180s
+kubectl rollout status deployment/mlflow -n "$K8S_NAMESPACE" --timeout=180s
 kubectl get pods -n "$K8S_NAMESPACE"

@@ -18,4 +18,6 @@ helm template tradersapp "$chart_dir" \
   --set-string bff.image.tag=test-sha \
   --set-string mlEngine.image.repository=registry.example.com/example/ml-engine \
   --set-string mlEngine.image.tag=test-sha \
+  --set-string mlflow.image.repository=registry.example.com/example/mlflow \
+  --set-string mlflow.image.tag=test-sha \
   > /dev/null

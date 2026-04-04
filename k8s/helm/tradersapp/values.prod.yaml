@@ -110,7 +110,7 @@ mlflow:
     type: ClusterIP
     port: 5000
   image:
-    repository: ghcr.io/mlflow/mlflow
+    repository: registry.example.com/example/mlflow
     tag: v2.21.3
     pullPolicy: IfNotPresent
   postgres:

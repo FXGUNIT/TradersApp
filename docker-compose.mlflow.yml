@@ -65,7 +65,10 @@ services:
       - mlflow-net
 
   mlflow:
-    image: ghcr.io/mlflow/mlflow:v2.21.3
+    build:
+      context: .
+      dockerfile: Dockerfile.mlflow
+    image: tradersapp/mlflow:local
     container_name: traders-mlflow
     ports:
       - "5000:5000"
