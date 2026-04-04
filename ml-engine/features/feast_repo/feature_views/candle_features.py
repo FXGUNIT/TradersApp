@@ -22,13 +22,22 @@ from feast import FeatureView, Field, FileSource
 from feast.types import Float64, Int64
 from feast.infra.offline_stores.parquet_source import ParquetSource
 
-from ml_engine.features.feast_repo.data_sources.candles_source import candles_parquet_source
+from ml_engine.features.feast_repo.data_sources.candles_source import (
+    candles_parquet_source,
+    kafka_candle_source,
+)
 
 # ─── Source ─────────────────────────────────────────────────────────────────────
 
-# Use Parquet for offline (registered via ParquetSource)
-# For online: custom TradersProvider materializes from SQLite to Redis
-_candle_source = candles_parquet_source
+# Batch source for offline training (Parquet)
+_batch_source = candles_parquet_source
+
+# ─── Streaming Source ───────────────────────────────────────────────────────────
+# Enable Kafka streaming once Kafka is deployed.
+# Set feast.streaming.enabled=true in Helm values and KAFKA_BOOTSTRAP_SERVERS env var.
+# Uncomment the line below once Kafka is running:
+# _stream_source = kafka_candle_source
+_stream_source = None  # Disabled until Kafka is deployed
 
 
 # ─── FeatureView ────────────────────────────────────────────────────────────────
@@ -102,7 +111,8 @@ candle_features = FeatureView(
         Field(name="vr_regime", dtype=Int64),  # 0=Compression, 1=Normal, 2=Expansion
         Field(name="volatility_regime", dtype=Int64),  # VR-encoded regime
     ],
-    source=_candle_source,
+    source=_batch_source,
+    stream_source=_stream_source,  # Enable KafkaSource once deployed
     online=True,
     offline=True,
 )
