@@ -7,7 +7,7 @@
 # DVC cache and storage (large binary cache)
 .dvc/cache/
 .dvc/tmp/
-ml-engine/dvc-storage/
+.dvc/plots/
 
 # Python bytecode (never commit compiled .pyc files)
 __pycache__/

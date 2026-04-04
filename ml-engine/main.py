@@ -33,6 +33,21 @@ from infrastructure.drift_detector import (
 )
 from feedback.feedback_logger import FeedbackLogger
 
+# ── Event-driven: Kafka producer + consumer ──────────────────────────────────────
+_kafka_producer: Optional[Any] = None
+_kafka_consumer: Optional[Any] = None
+
+try:
+    from kafka.producer import KafkaProducerClient, get_producer
+    from kafka.consumer import KafkaConsumerClient, get_consumer
+    KAFKA_AVAILABLE = True
+except ImportError:
+    KAFKA_AVAILABLE = False
+    KafkaProducerClient = None
+    KafkaConsumerClient = None
+    get_producer = None
+    get_consumer = None
+
 # ── Observability: Prometheus metrics ──────────────────────────────────────────
 try:
     from infrastructure.prometheus_exporter import (
@@ -105,6 +120,8 @@ feedback_logger: FeedbackLogger | None = None
 trade_processor: TradeLogProcessor | None = None
 retrain_pipeline: RetrainPipeline | None = None
 triton_client: TritonInferenceClient | None = None
+kafka_producer: Any | None = None   # set in lifespan
+kafka_consumer: Any | None = None   # set in lifespan
 start_time: float = time.time()
 
 
@@ -112,6 +129,8 @@ start_time: float = time.time()
 async def lifespan(app: FastAPI):
     global db, trainer, predictor, consensus_agg, store, regime_ensemble, drift_monitor
     global feedback_logger, trade_processor, retrain_pipeline, triton_client
+    global kafka_producer, kafka_consumer
+
     db = CandleDatabase(config.DB_PATH)
     trainer = Trainer(db_path=config.DB_PATH, store_dir=config.MODEL_STORE)
     predictor = Predictor(store_dir=config.MODEL_STORE)
@@ -124,6 +143,23 @@ async def lifespan(app: FastAPI):
     feedback_logger = FeedbackLogger(db)
     trade_processor = TradeLogProcessor(db, feedback_logger)
     retrain_pipeline = RetrainPipeline(db, trainer, drift_monitor, trade_processor)
+
+    # ── Kafka: producer + consumer ──────────────────────────────────────────────
+    if KAFKA_AVAILABLE:
+        try:
+            kafka_producer = get_producer()
+            kafka_consumer = get_consumer()
+            if kafka_consumer and kafka_consumer._enable:
+                kafka_consumer.start(blocking=False)
+                print("[Kafka] Consumer running in background thread")
+        except Exception as e:
+            print(f"[Kafka] Init warning: {e}")
+            kafka_producer = None
+            kafka_consumer = None
+    else:
+        print("[Kafka] confluent-kafka not installed — event publishing disabled")
+        kafka_producer = None
+        kafka_consumer = None
 
     # Triton inference client (lazy — only connects when needed)
     triton_client = get_inference_client()
@@ -145,6 +181,10 @@ async def lifespan(app: FastAPI):
 
     # Cleanup
     print("ML Engine shutting down...")
+    if kafka_consumer:
+        kafka_consumer.stop()
+    if kafka_producer:
+        kafka_producer.close()
 
 
 # -------------------------------------------------------------------------
@@ -881,6 +921,32 @@ async def predict(request: PredictRequest):
                         output["mamba"] = {"available": False, "error": mamba_result.get("error", "unknown")}
         except Exception as e:
             output["mamba"] = {"available": False, "error": str(e)}
+
+        # ── Publish consensus signal to Kafka (non-blocking) ─────────────
+        if KAFKA_AVAILABLE and kafka_producer is not None:
+            try:
+                from datetime import datetime as dt
+                kafka_producer.publish_consensus(
+                    symbol=request.symbol,
+                    signal={
+                        "signal": output.get("signal", "NEUTRAL"),
+                        "confidence": output.get("confidence", 0.0),
+                        "long_score": output.get("long_score", 0),
+                        "short_score": output.get("short_score", 0),
+                        "votes": output.get("votes", {}),
+                        "generated_at": dt.now().isoformat(),
+                    },
+                    regime=output.get("physics_regime", {}).get("regime"),
+                )
+                # Also publish per-model predictions
+                for model_name, vote in output.get("votes", {}).items():
+                    kafka_producer.publish_prediction(
+                        symbol=request.symbol,
+                        model_name=model_name,
+                        prediction=vote,
+                    )
+            except Exception:
+                pass  # Never block response for Kafka failure
 
         # ── Cache result (10s TTL for live predictions) ───────────────────
         cache.set(cache_key, output, ttl=10)

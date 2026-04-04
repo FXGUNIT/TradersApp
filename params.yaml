@@ -4,6 +4,7 @@
 data:
   csv_path: ml-engine/data/ninjatrader_export.csv
   db_path: ml-engine/data/trading_data.db
+  symbol: MNQ
 
 features:
   window_size: 14
@@ -23,6 +24,11 @@ regime:
 direction:
   test_size: 0.2
   model_type: lightgbm
+  random_state: 42
+
+train:
+  mode: incremental
+  min_trades: 100
   random_state: 42
 
 evaluation:

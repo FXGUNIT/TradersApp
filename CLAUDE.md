@@ -389,6 +389,54 @@ class BaseResponse(BaseModel):
 
 ---
 
+## Data Versioning (DVC)
+
+**Every dataset, model, and experiment is versioned with DVC + Git.** No exception — reproducibility is non-negotiable.
+
+### DVC Setup
+```bash
+python -m dvc init
+python -m dvc remote add -d storage ml-engine/dvc-storage
+```
+
+### Tracked files (.dvc files in Git)
+
+| File | Tracked Data |
+|------|-------------|
+| `ml-engine/data/trading_data.db.dvc` | SQLite: candles, session_aggregates, trade_log |
+| `ml-engine/models/store.dvc` | Trained model binaries (direction, regime, session, etc.) |
+
+### Pipeline stages
+```bash
+python -m dvc repro              # Run full pipeline (only changed stages)
+python -m dvc repro <stage>     # Run specific stage
+python -m dvc status            # What needs recomputing
+python -m dvc metrics diff      # Compare metrics between runs
+python -m dvc params diff       # Show params that changed
+```
+
+### Adding new data files
+```bash
+python -m dvc add ml-engine/data/new_file.csv
+git add ml-engine/data/new_file.csv.dvc  # Commit .dvc file, not the data
+```
+
+### Reproducing from scratch
+```bash
+python -m dvc pull              # Restore data + models from remote
+python -m dvc repro             # Recompute pipeline
+```
+
+### Key rules
+- **Never** `git add` large binary data or model files — DVC handles them
+- **Always** `git add` the corresponding `.dvc` file after `dvc add`
+- `dvc.yaml` defines the pipeline: `ingest → features → train → evaluate`
+- `params.yaml` holds all tunable hyperparameters — version it alongside code
+- After training: `python -m dvc push` to upload models to DVC remote
+- Before pulling on a new machine: `python -m dvc pull` to restore models
+
+---
+
 ## Git Workflow
 
 1. **Every feature** gets its own branch: `feature/session-fatigue`

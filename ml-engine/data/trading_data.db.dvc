@@ -1,0 +1,9 @@
+# ml-engine/data/trading_data.db.dvc — SQLite trading database
+# Tables: candles, session_aggregates, trade_log, feature_stats
+# Tracked with DVC: git commit this file, dvc push to remote
+# To reproduce: dvc pull && dvc repro
+outs:
+- md5: 22ebdd36e102f2af2f5766b7297dcad3
+  size: 4096
+  hash: md5
+  path: trading_data.db

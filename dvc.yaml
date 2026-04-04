@@ -1,77 +1,87 @@
-# DVC Pipeline Definition — TradersApp ML Data
-# Data Version Control pipeline for reproducible ML workflows
+# dvc.yaml — TradersApp DVC Pipeline
+# Reproducible ML: every dataset, model, and experiment is versioned with DVC + Git.
+#
+# Usage:
+#   python -m dvc repro             — run pipeline (recomputes changed stages)
+#   python -m dvc repro <stage>     — run specific stage only
+#   python -m dvc status            — show what needs recomputing
+#   python -m dvc metrics diff      — compare metrics between pipeline runs
+#   python -m dvc params diff       — show params that changed
+#
+# DVC-tracked data files (committed to Git as .dvc files):
+#   ml-engine/data/trading_data.db.dvc   ← dvc add ml-engine/data/trading_data.db
+#   ml-engine/models/store.dvc          ← dvc add ml-engine/models/store
+#
+# To reproduce from scratch:
+#   python -m dvc pull                      # restore data + models from remote
+#   python -m dvc repro                     # recompute pipeline
+#
+# Setup first time:
+#   python -m dvc init
+#   python -m dvc remote add -d storage ml-engine/dvc-storage
 
-# Stage 1: Load and validate incoming data
+# ─── Global parameters ─────────────────────────────────────────────────────────
+params:
+  - data.csv_path
+  - data.symbol
+  - features.window_size
+  - train.mode
+  - train.min_trades
+
+# ─── Pipeline Stages ────────────────────────────────────────────────────────────
+
 stages:
-  load_candles:
-    cmd: python ml-engine/data/load_ninjatrader_csv.py
-    deps:
-      - ml-engine/data/load_ninjatrader_csv.py
+
+  # ── Stage 1: Ingest ──────────────────────────────────────────────────────────
+  # Load raw CSV → normalized SQLite database
+  # Triggers: new CSV file or schema change
+  # NOTE: trading_data.db itself is tracked via ml-engine/data/trading_data.db.dvc
+  ingest:
+    cmd: python ml-engine/scripts/dvc_ingest.py
     params:
       - data.csv_path
-    outs:
-      - ml-engine/data/trading_data.db
-    metrics:
-      - ml-engine/data/load_stats.json:
-          cache: false
-    plots:
-      - ml-engine/data/candle_stats.csv:
-          cache: false
+      - data.symbol
+    deps:
+      - ml-engine/data/load_ninjatrader_csv.py
+      - ml-engine/data/candle_db.py
+      - ml-engine/features/feature_pipeline.py
+    outs: []
 
-  # Stage 2: Feature engineering
+  # ── Stage 2: Features ───────────────────────────────────────────────────────
+  # Engineer features from candles → parquet + stats JSON
+  # Triggers: new data in db or feature pipeline code change
   features:
-    cmd: python ml-engine/features/feature_pipeline.py
+    cmd: python ml-engine/scripts/dvc_features.py
     deps:
       - ml-engine/data/trading_data.db
       - ml-engine/features/feature_pipeline.py
+      - ml-engine/data/candle_db.py
     params:
       - features.window_size
-      - features.indicators
-    outs:
-      - ml-engine/data/features.parquet
-    metrics:
-      - ml-engine/data/feature_stats.json:
-          cache: false
 
-  # Stage 3: Train regime models
-  train_regime:
-    cmd: python ml-engine/models/regime/train_regime_models.py
-    deps:
-      - ml-engine/data/features.parquet
-      - ml-engine/models/regime/hmm_regime.py
-      - ml-engine/models/regime/fp_fk_regime.py
-      - ml-engine/models/regime/anomalous_diffusion.py
+  # ── Stage 3: Train ──────────────────────────────────────────────────────────
+  # Train all ML models → ml-engine/models/store/
+  # Triggers: new data, new features, or training code change
+  # NOTE: ml-engine/models/store is tracked via ml-engine/models/store.dvc
+  train:
+    cmd: python ml-engine/scripts/dvc_train.py
     params:
-      - regime.n_states
-      - regime.test_size
-    outs:
-      - ml-engine/models/regime/hmm_model.pkl
-      - ml-engine/models/regime/fp_fk_model.pkl
-      - ml-engine/models/regime/ad_model.pkl
-
-  # Stage 4: Train direction model
-  train_direction:
-    cmd: python ml-engine/models/direction/train_direction_model.py
+      - train.mode
+      - train.min_trades
     deps:
-      - ml-engine/data/features.parquet
-      - ml-engine/models/direction/direction_model.py
-    params:
-      - direction.test_size
-      - direction.model_type
-    outs:
-      - ml-engine/models/direction/lgb_model.pkl
+      - ml-engine/data/trading_data.db
+      - ml-engine/features/feature_pipeline.py
+      - ml-engine/training/trainer.py
+      - ml-engine/models/direction
+      - ml-engine/models/regime
+    outs: []
 
-  # Stage 5: Consensus evaluation
+  # ── Stage 4: Evaluate ───────────────────────────────────────────────────────
+  # Run backtesting → evaluation_metrics.json
+  # Triggers: new model versions or new data
   evaluate:
-    cmd: python ml-engine/inference/evaluate_consensus.py
+    cmd: python ml-engine/scripts/dvc_evaluate.py
     deps:
-      - ml-engine/models/regime/hmm_model.pkl
-      - ml-engine/models/regime/fp_fk_model.pkl
-      - ml-engine/models/regime/ad_model.pkl
-      - ml-engine/models/direction/lgb_model.pkl
-      - ml-engine/data/features.parquet
-    params:
-      - evaluation.metrics
-    metrics:
-      - ml-engine/data/evaluation_metrics.json:
-          cache: false
+      - ml-engine/models/store
+      - ml-engine/data/trading_data.db
+    outs: []

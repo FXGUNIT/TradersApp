@@ -207,6 +207,32 @@ def get_metrics(registry=DEFAULT_REGISTRY) -> dict:
         registry=registry,
     )
 
+    # ── Kafka Event Publishing ────────────────────────────────────────
+    metrics["kafka_published"] = Counter(
+        name="ml_kafka_messages_published_total",
+        documentation="Total messages published to Kafka topics",
+        labelnames=["topic"],
+        registry=registry,
+    )
+    metrics["kafka_publish_errors"] = Counter(
+        name="ml_kafka_publish_errors_total",
+        documentation="Total Kafka publish failures",
+        labelnames=["topic"],
+        registry=registry,
+    )
+    metrics["kafka_consumer_processed"] = Counter(
+        name="ml_kafka_consumer_messages_processed_total",
+        documentation="Total messages consumed from Kafka topics",
+        labelnames=["topic"],
+        registry=registry,
+    )
+    metrics["kafka_consumer_lag"] = Gauge(
+        name="ml_kafka_consumer_lag",
+        documentation="Consumer lag per topic-partition",
+        labelnames=["topic", "partition"],
+        registry=registry,
+    )
+
     _metrics = metrics
     return _metrics
 
@@ -287,6 +313,46 @@ def record_retrain(triggered: bool, in_progress: bool = False):
     if triggered:
         _metrics["retrain_triggered"].inc()
     _metrics["retrain_in_progress"].set(1 if in_progress else 0)
+
+
+def record_kafka_published(topic: str):
+    """Record a Kafka message published."""
+    global _metrics
+    if _metrics is None:
+        _metrics = get_metrics()
+    if not PROMETHEUS_AVAILABLE:
+        return
+    _metrics["kafka_published"].labels(topic=topic).inc()
+
+
+def record_kafka_publish_error(topic: str):
+    """Record a Kafka publish failure."""
+    global _metrics
+    if _metrics is None:
+        _metrics = get_metrics()
+    if not PROMETHEUS_AVAILABLE:
+        return
+    _metrics["kafka_publish_errors"].labels(topic=topic).inc()
+
+
+def record_kafka_consumer_processed(topic: str):
+    """Record a Kafka consumer message processed."""
+    global _metrics
+    if _metrics is None:
+        _metrics = get_metrics()
+    if not PROMETHEUS_AVAILABLE:
+        return
+    _metrics["kafka_consumer_processed"].labels(topic=topic).inc()
+
+
+def set_kafka_consumer_lag(topic: str, partition: int, lag: int):
+    """Set consumer lag gauge for a topic-partition."""
+    global _metrics
+    if _metrics is None:
+        _metrics = get_metrics()
+    if not PROMETHEUS_AVAILABLE:
+        return
+    _metrics["kafka_consumer_lag"].labels(topic=topic, partition=str(partition)).set(max(0, lag))
 
 
 def set_models_loaded(count: int):

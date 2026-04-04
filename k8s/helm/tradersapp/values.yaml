@@ -121,6 +121,45 @@ redis:
       cpu: 200m
       memory: 256Mi
 
+# Kafka (event-driven inter-service communication)
+kafka:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: apache/kafka
+    tag: 3.7.0
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: standard
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+  config:
+    KAFKA_LOG_RETENTION_HOURS: "168"
+    KAFKA_LOG_SEGMENT_BYTES: "1073741824"
+    KAFKA_MESSAGE_MAX_BYTES: "1048576"
+  topics:
+    - name: candle-data
+      partitions: 6
+      replicationFactor: 1
+    - name: consensus-signals
+      partitions: 6
+      replicationFactor: 1
+    - name: model-predictions
+      partitions: 6
+      replicationFactor: 1
+    - name: feedback-loop
+      partitions: 3
+      replicationFactor: 1
+    - name: drift-alerts
+      partitions: 3
+      replicationFactor: 1
+
 # Observability (Prometheus + Grafana via kube-prometheus-stack)
 observability:
   enabled: false  # Enable if using kube-prometheus-stack

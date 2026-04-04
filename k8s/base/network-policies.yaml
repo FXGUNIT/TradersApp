@@ -43,7 +43,7 @@ spec:
       ports:
         - protocol: TCP
           port: 5432
-    # Outbound: Kafka
+    # Outbound: Kafka (bootstrap + internal KRaft)
     - to:
         - podSelector:
             matchLabels:
@@ -51,6 +51,8 @@ spec:
       ports:
         - protocol: TCP
           port: 9092
+        - protocol: TCP
+          port: 29092
     # Outbound: MLflow
     - to:
         - podSelector:
@@ -195,6 +197,8 @@ spec:
       ports:
         - protocol: TCP
           port: 9092
+        - protocol: TCP
+          port: 29092
   egress: []  # Kafka brokers don't need outbound in single-node
 ---
 apiVersion: networking.k8s.io/v1

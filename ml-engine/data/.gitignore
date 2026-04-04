@@ -1,3 +1,13 @@
-/schema.sql
-/candle_db.py
-/load_ninjatrader_csv.py
+# This file uses local gitignore (DVC convention)
+# Ignore all binary data files — tracked via DVC .dvc files
+*.db
+*.db-shm
+*.db-wal
+*.csv
+*.parquet
+*.npy
+*.npz
+processed/
+raw/
+interim/
+features/

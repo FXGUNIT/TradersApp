@@ -75,6 +75,7 @@ The `CI_*` keys remain in Infisical as the authoritative values for pipeline exe
    ```bash
    docker compose --env-file .env.cicd -f docker-compose.gitea.yml up -d
    ```
+   In the bundled Compose stack, Woodpecker talks to Gitea over the internal Docker DNS name `http://gitea:3000/` while browsers still use the public `GITEA_ROOT_URL`. This split is required for localhost setups, otherwise OAuth code exchange will fail inside the Woodpecker container.
 3. Create an admin user in Gitea if this is the first boot:
    ```bash
    set -a

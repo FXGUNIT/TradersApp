@@ -24,6 +24,59 @@ groups:
           summary: "Kafka producer error rate elevated"
           description: "Kafka producer is experiencing elevated error rates."
 
+      - alert: KafkaConsumerLagHigh
+        expr: ml_kafka_consumer_lag > 500
+        for: 5m
+        labels:
+          severity: warning
+          service: kafka
+        annotations:
+          summary: "ML Engine Kafka consumer lag > 500"
+          description: "ML Engine consumer for {{ $labels.topic }} partition {{ $labels.partition }} is lagging behind. Consumer group may be stuck."
+
+      - alert: KafkaPublishFailure
+        expr: rate(ml_kafka_publish_errors_total[5m]) > 0
+        for: 2m
+        labels:
+          severity: warning
+          service: kafka
+        annotations:
+          summary: "Kafka message publish failures detected"
+          description: "ML Engine failed to publish messages to Kafka topic {{ $labels.topic }}. Events may be lost."
+
+      - alert: KafkaConsumerProcessingStalled
+        expr: increase(ml_kafka_consumer_messages_processed_total[10m]) == 0
+        for: 10m
+        labels:
+          severity: warning
+          service: kafka
+        annotations:
+          summary: "ML Engine Kafka consumer stalled"
+          description: "No messages processed in the last 10 minutes on topic {{ $labels.topic }}. Consumer may be stuck."
+
+  - name: kafka-event-volume
+    interval: 60s
+    rules:
+      - alert: KafkaConsensusSignalsLow
+        expr: increase(ml_kafka_messages_published_total{topic="consensus-signals"}[30m]) < 1
+        for: 30m
+        labels:
+          severity: info
+          service: kafka
+        annotations:
+          summary: "No consensus signals published in 30 minutes"
+          description: "ML Engine hasn't published any consensus signals to Kafka. Either the service is idle or the producer is stuck."
+
+      - alert: KafkaCandleDataLow
+        expr: increase(ml_kafka_messages_published_total{topic="candle-data"}[15m]) < 1
+        for: 15m
+        labels:
+          severity: warning
+          service: kafka
+        annotations:
+          summary: "No candle data published in 15 minutes"
+          description: "No candle data events in the last 15 minutes. Data ingestion pipeline may be stalled."
+
   - name: redis-availability
     interval: 30s
     rules:
