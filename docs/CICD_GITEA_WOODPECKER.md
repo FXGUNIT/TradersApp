@@ -20,6 +20,7 @@ Infisical remains the source of truth for secrets. The CI/CD stack does not intr
 - `scripts/ci/deploy-k3s.sh`
 - `scripts/ci/render-cicd-env.ps1`
 - `k8s/helm/tradersapp/templates/*.yaml`
+- `Dockerfile.mlflow`
 
 ## Prerequisites
 
@@ -147,11 +148,11 @@ On pull requests and manual runs:
 
 On pushes to `main`:
 
-- builds and pushes `frontend`, `bff`, and `ml-engine` images into Gitea
+- builds and pushes `frontend`, `bff`, `ml-engine`, and `mlflow` images into Gitea
 - tags each image with `${CI_COMMIT_SHA}` and `latest`
 - creates or updates the Kubernetes pull secret
 - runs `helm upgrade --install tradersapp ...`
-- waits for the `frontend`, `bff`, and `ml-engine` deployments to roll out
+- waits for the `frontend`, `bff`, `ml-engine`, and `mlflow` deployments to roll out
 
 ## 8. Deployment contract
 
