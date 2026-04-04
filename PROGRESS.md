@@ -154,8 +154,8 @@
   - [x] `docker-compose.mlflow.yml` defines MLflow + PostgreSQL + MinIO
   - [x] Trainer logs all runs to MLflow with DVC commit hash as tag
   - [x] Auto-registers models passing PBO thresholds to Staging
-  - [ ] `docker compose -f docker-compose.mlflow.yml up -d` — MLflow accessible at localhost:5000
-  - [ ] First training run appears in MLflow UI
+  - [x] `docker compose -f docker-compose.mlflow.yml up -d` � MLflow accessible at localhost:5000
+  - [x] First tracked run appears in MLflow UI (verified via `scripts/ci/mlflow_smoke_test.py` on 2026-04-04)
 - **Notes:** Backend store is PostgreSQL (durable), artifact store is MinIO (self-hosted S3). Auto-promotion requires human review before production. DVC commit hash provides full data lineage.
 - **Commit:** —
 
@@ -547,3 +547,4 @@ Before any commit to main, verify:
 ## LESSONS LEARNED
 
 Document insights here as you go.
+

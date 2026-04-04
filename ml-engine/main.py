@@ -438,7 +438,7 @@ async def mlflow_status():
     """Check MLflow server connectivity and availability."""
     if not MLFLOW_AVAILABLE:
         return {
-            "ok": True,
+            "ok": False,
             "mlflow_available": False,
             "message": "mlflow package not installed. Install: pip install mlflow",
         }
@@ -454,7 +454,7 @@ async def mlflow_status():
         }
     except Exception as e:
         return {
-            "ok": True,
+            "ok": False,
             "mlflow_available": True,
             "mlflow_error": str(e),
             "tracking_uri": MLFLOW_TRACKING_URI,
@@ -523,6 +523,12 @@ async def mlflow_promote(
         from infrastructure.mlflow_client import get_mlflow_client
         client = get_mlflow_client("direction")
         result = client.promote_model(model_name, from_stage, to_stage)
+        if not result.get("ok", False):
+            return {
+                "ok": False,
+                "error": result.get("error") or result.get("reason") or "Model promotion failed",
+                "promotion": result,
+            }
         return {"ok": True, "promotion": result}
     except Exception as e:
         return {"ok": False, "error": str(e)}
