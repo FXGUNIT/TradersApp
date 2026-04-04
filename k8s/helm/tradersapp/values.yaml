@@ -63,6 +63,10 @@ bff:
     minReplicas: 2
     maxReplicas: 8
     targetCPUUtilizationPercentage: 60
+  analysisTransport:
+    mode: http
+    grpcAddress: analysis-service:50051
+    grpcStrict: false
 
 # Frontend
 frontend:

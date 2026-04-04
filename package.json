@@ -13,6 +13,7 @@
     "dev:local": "vite",
     "build": "vite build",
     "lint": "eslint .",
+    "verify:ddd": "node scripts/architecture/verify-ddd-boundaries.mjs",
     "preview": "vite preview",
     "audit:ui": "node scripts/ui-audit/run-ui-audit.mjs",
     "test:performance": "node performanceTestRunner.js",
