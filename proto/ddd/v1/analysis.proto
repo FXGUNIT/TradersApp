@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package traders.ddd.v1.analysis;
+
+option java_multiple_files = true;
+option java_package = "com.tradersapp.ddd.v1.analysis";
+
+import "proto/ddd/v1/common.proto";
+
+service AnalysisService {
+  rpc GetConsensus(GetConsensusRequest) returns (GetConsensusResponse);
+  rpc Health(traders.ddd.v1.HealthRequest) returns (traders.ddd.v1.HealthResponse);
+}
+
+message GetConsensusRequest {
+  string symbol = 1;
+  int32 session_id = 2;
+  map<string, double> features = 3;
+  repeated traders.ddd.v1.Candle candles = 4;
+  repeated traders.ddd.v1.Trade trades = 5;
+}
+
+message GetConsensusResponse {
+  string signal = 1;
+  double confidence = 2;
+  uint32 models_used = 3;
+  uint32 data_trades_analyzed = 4;
+  string model_freshness = 5;
+  map<string, string> timing = 6;
+  map<string, double> vote_confidences = 7;
+  string regime = 8;
+}
+

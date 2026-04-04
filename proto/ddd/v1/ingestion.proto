@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package traders.ddd.v1.ingestion;
+
+option java_multiple_files = true;
+option java_package = "com.tradersapp.ddd.v1.ingestion";
+
+import "proto/ddd/v1/common.proto";
+
+service IngestionService {
+  rpc IngestCandles(traders.ddd.v1.CandleBatch) returns (IngestCandlesResponse);
+  rpc Health(traders.ddd.v1.HealthRequest) returns (traders.ddd.v1.HealthResponse);
+}
+
+message IngestCandlesResponse {
+  bool accepted = 1;
+  uint32 rows_written = 2;
+  string last_timestamp = 3;
+  string message = 4;
+}
+

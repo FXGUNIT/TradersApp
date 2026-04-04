@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package traders.ddd.v1.learning;
+
+option java_multiple_files = true;
+option java_package = "com.tradersapp.ddd.v1.learning";
+
+import "proto/ddd/v1/common.proto";
+
+service LearningService {
+  rpc TriggerTraining(TriggerTrainingRequest) returns (traders.ddd.v1.TrainResult);
+  rpc EvaluateDrift(EvaluateDriftRequest) returns (EvaluateDriftResponse);
+  rpc Health(traders.ddd.v1.HealthRequest) returns (traders.ddd.v1.HealthResponse);
+}
+
+message TriggerTrainingRequest {
+  string mode = 1;   // full | incremental
+  string symbol = 2;
+  uint32 min_trades = 3;
+  string trigger = 4; // scheduled | manual | drift
+}
+
+message EvaluateDriftRequest {
+  string symbol = 1;
+  string drift_type = 2; // feature | concept | regime
+}
+
+message EvaluateDriftResponse {
+  bool drift_detected = 1;
+  string severity = 2;
+  double score = 3;
+  double threshold = 4;
+  string message = 5;
+}
+

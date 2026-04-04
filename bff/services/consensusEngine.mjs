@@ -22,6 +22,7 @@
  * - Graceful degradation: NEUTRAL signal when ML Engine unavailable
  */
 import { recordMlEngineRequest, setCircuitBreakerState } from "../metrics.mjs";
+import { predictConsensusTransport } from "./analysisTransport.mjs";
 
 // ── Circuit Breaker ────────────────────────────────────────────────────────────
 
@@ -128,6 +129,15 @@ async function mlRequest(path, body = null, timeout = ML_REQUEST_TIMEOUT_MS) {
   let statusCode = 0;
 
   try {
+    // Predict path can use gRPC transport (with HTTP fallback) for low-latency inter-service calls.
+    if (path === "/predict" && body) {
+      const result = await predictConsensusTransport(body, timeout);
+      statusCode = 200;
+      _mlCircuitBreaker.recordSuccess();
+      syncCircuitBreakerMetric();
+      return result;
+    }
+
     const opts = {
       method: body ? "POST" : "GET",
       headers: { "Content-Type": "application/json" },
