@@ -65,6 +65,8 @@ AUTO_REGISTER_THRESHOLD = {
     "pbo": 0.05,      # Pass if PBO < 5%
     "sharpe_min": 0.5,  # Pass if Sharpe >= 0.5
     "win_rate_min": 0.50,  # Pass if win rate >= 50%
+    "cv_roc_auc_min": 0.55,  # Fallback validation gate for classifiers
+    "cv_accuracy_min": 0.52,  # Avoid registering near-random classifiers
 }
 
 
@@ -133,7 +135,7 @@ class MLflowTrackingClient:
             return self
 
         # Add DVC data version tag if available
-        extra_tags = tags or {}
+        extra_tags = dict(tags or {})
         dvc_commit = self._get_dvc_commit()
         if dvc_commit:
             extra_tags["dvc_commit"] = dvc_commit
@@ -284,7 +286,7 @@ class MLflowTrackingClient:
                             signature = None
 
                         model_info = mlflow.sklearn.log_model(
-                            sk_model=model,
+                            sk_model=model_to_log,
                             artifact_path=artifact_path,
                             signature=signature,
                             registered_model_name=model_name if registered else None,
@@ -356,12 +358,19 @@ class MLflowTrackingClient:
         pbo = metrics.get("pbo", 1.0)
         sharpe = metrics.get("sharpe_oracle", 0.0)
         win_rate = metrics.get("win_rate", 0.0)
+        cv_auc = metrics.get("cv_roc_auc_mean", 0.0)
+        cv_accuracy = metrics.get("cv_accuracy_mean", 0.0)
 
-        should_register = (
+        strategy_thresholds_met = (
             pbo < AUTO_REGISTER_THRESHOLD["pbo"]
             and sharpe >= AUTO_REGISTER_THRESHOLD["sharpe_min"]
             and win_rate >= AUTO_REGISTER_THRESHOLD["win_rate_min"]
         )
+        classifier_thresholds_met = (
+            cv_auc >= AUTO_REGISTER_THRESHOLD["cv_roc_auc_min"]
+            and cv_accuracy >= AUTO_REGISTER_THRESHOLD["cv_accuracy_min"]
+        )
+        should_register = strategy_thresholds_met or classifier_thresholds_met
 
         if not should_register:
             return {
@@ -370,6 +379,8 @@ class MLflowTrackingClient:
                 "pbo": pbo,
                 "sharpe": sharpe,
                 "win_rate": win_rate,
+                "cv_roc_auc_mean": cv_auc,
+                "cv_accuracy_mean": cv_accuracy,
                 "thresholds": AUTO_REGISTER_THRESHOLD,
             }
 

@@ -195,122 +195,147 @@ class Trainer:
 
             # ── MLflow: start experiment run ──────────────────────────────────
             mlflow_client = get_mlflow_client("direction")
-            mlflow_client.log_params({
-                "mode": mode,
-                "symbol": symbol,
-                "min_trades": min_trades,
-                "n_candles": len(candles),
-                "n_trades": len(trade_log),
-                "n_features": len(feature_cols),
-            })
+            training_run_name = f"direction_training_{symbol.lower()}_{mode}"
+            with mlflow_client.start_run(
+                run_name=training_run_name,
+                tags={
+                    "pipeline": "direction_training",
+                    "mode": mode,
+                    "symbol": symbol,
+                },
+                description="Train direction models and register validated candidates.",
+            ):
+                mlflow_client.log_params({
+                    "mode": mode,
+                    "symbol": symbol,
+                    "min_trades": min_trades,
+                    "n_candles": len(candles),
+                    "n_trades": len(trade_log),
+                    "n_features": len(feature_cols),
+                })
 
-            for model_key, model_cls in models_to_train:
-                if verbose:
-                    print(f"\n{'─'*40}")
-                    print(f"Training: {model_key.upper()}")
-                    print(f"{'─'*40}")
-
-                try:
-                    # ── MLflow: track per-model run ─────────────────────────────
-                    run_tags = {
-                        "model_family": "direction",
-                        "model_type": model_key,
-                        "mode": mode,
-                    }
-                    mlflow_client.log_tag("model", model_key)
-
-                    model = model_cls()
-                    metrics = model.train(X, y, feature_cols=feature_cols, verbose=verbose)
-
-                    # ── MLflow: log metrics ──────────────────────────────────────
-                    mlflow_client.log_metrics(metrics)
-                    mlflow_client.log_tag(f"{model_key}_cv_auc", str(metrics.get("cv_roc_auc_mean", 0)))
-
-                    # Store model
-                    version = self.store.save(
-                        model_name=model_key,
-                        pipeline=model.pipeline,
-                        metrics=metrics,
-                        feature_cols=feature_cols,
-                    )
-
-                    # ── MLflow: log model artifact ─────────────────────────────
-                    model_metadata = {
-                        "model_type": model_key,
-                        "version": version,
-                        "mode": mode,
-                        "feature_count": len(feature_cols),
-                        "training_samples": len(trade_log),
-                    }
-                    mlflow_result = mlflow_client.log_model(
-                        model=model,
-                        model_name=f"direction_{model_key}",
-                        sample_input=X.head(5),
-                        metadata=model_metadata,
-                        registered=False,  # Manual promotion after review
-                    )
-                    if verbose and mlflow_result.get("ok"):
-                        print(f"  [MLflow] Artifact logged: {mlflow_result.get('artifact_uri', '')}")
-
-                    # ── MLflow: auto-register if passing PBO thresholds ──────────
-                    reg_result = mlflow_client.auto_register_if_passing(
-                        model_name=f"direction_{model_key}",
-                        metrics=metrics,
-                        model=model,
-                        metadata=model_metadata,
-                        stage="staging",
-                    )
-                    if verbose and reg_result.get("registered"):
-                        print(f"  [MLflow] Auto-registered: {reg_result.get('stage', '')} "
-                              f"v{reg_result.get('version', '')}")
-
-                    # Update model registry in DB
-                    self.db.upsert_model({
-                        "model_name": model_key,
-                        "model_type": "direction",
-                        "version": version,
-                        "trained_at": datetime.now(timezone.utc).isoformat(),
-                        "data_trades": len(trade_log),
-                        "data_days": len(candles) // 78,  # ~78 5-min candles per trading day
-                        "accuracy": metrics.get("cv_accuracy_mean", 0),
-                        "roc_auc": metrics.get("cv_roc_auc_mean", 0),
-                        "win_rate": None,
-                        "expectancy": None,
-                        "profit_factor": None,
-                        "sharpe": None,
-                        "max_drawdown": None,
-                        "is_active": 1,
-                        "file_path": str(self.store._model_path(model_key, version)),
-                    })
-
-                    results[model_key] = {"status": "success", "version": version, **metrics}
-                    self._trained_models.append({
-                        "name": model_key,
-                        "version": version,
-                        "metrics": metrics,
-                    })
-
+                for model_key, model_cls in models_to_train:
                     if verbose:
-                        print(f"  ✓ Saved as {model_key}_{version}")
+                        print(f"\n{'─'*40}")
+                        print(f"Training: {model_key.upper()}")
+                        print(f"{'─'*40}")
 
-                except Exception as e:
-                    error = f"{type(e).__name__}: {e}"
-                    if verbose:
-                        print(f"  ✗ Failed: {error}")
-                        traceback.print_exc()
-                    results[model_key] = {"status": "error", "error": error}
+                    try:
+                        with mlflow_client.start_run(
+                            run_name=f"direction_{model_key}_{mode}",
+                            tags={
+                                "model_family": "direction",
+                                "model_type": model_key,
+                                "mode": mode,
+                                "symbol": symbol,
+                            },
+                            description=f"Train and evaluate the {model_key} direction model.",
+                            nested=True,
+                        ):
+                            mlflow_client.log_params({
+                                "model_type": model_key,
+                                "training_samples": len(trade_log),
+                                "feature_count": len(feature_cols),
+                            })
 
-            duration = time.time() - started_at
-            self.db.complete_training(train_log_id, len(trade_log), duration, "success")
+                            model = model_cls()
+                            metrics = model.train(X, y, feature_cols=feature_cols, verbose=verbose)
 
-            # ── MLflow: log training summary ───────────────────────────────────
-            mlflow_client.log_metrics({
-                "training_duration_sec": round(duration, 2),
-                "candles_used": len(candles),
-                "trades_used": len(trade_log),
-                "n_models_trained": sum(1 for r in results.values() if r["status"] == "success"),
-            })
-            mlflow_client.log_tag("training_status", "success")
+                            mlflow_client.log_metrics(metrics)
+                            mlflow_client.log_tag("model", model_key)
+                            mlflow_client.log_tag(
+                                "validation_cv_auc",
+                                str(metrics.get("cv_roc_auc_mean", 0))
+                            )
+
+                            version = self.store.save(
+                                model_name=model_key,
+                                pipeline=model.pipeline,
+                                metrics=metrics,
+                                feature_cols=feature_cols,
+                            )
+
+                            model_metadata = {
+                                "model_type": model_key,
+                                "version": version,
+                                "mode": mode,
+                                "feature_count": len(feature_cols),
+                                "training_samples": len(trade_log),
+                                "symbol": symbol,
+                            }
+                            mlflow_result = mlflow_client.log_model(
+                                model=model.pipeline,
+                                model_name=f"direction_{model_key}",
+                                sample_input=X.head(5),
+                                metadata=model_metadata,
+                                registered=False,
+                            )
+                            if verbose and mlflow_result.get("ok"):
+                                print(f"  [MLflow] Artifact logged: {mlflow_result.get('artifact_uri', '')}")
+
+                            reg_result = mlflow_client.auto_register_if_passing(
+                                model_name=f"direction_{model_key}",
+                                metrics=metrics,
+                                model=model.pipeline,
+                                metadata=model_metadata,
+                                stage="Staging",
+                            )
+                            if verbose and reg_result.get("registered"):
+                                print(f"  [MLflow] Auto-registered: {reg_result.get('stage', '')} "
+                                      f"v{reg_result.get('version', '')}")
+
+                            self.db.upsert_model({
+                                "model_name": model_key,
+                                "model_type": "direction",
+                                "version": version,
+                                "trained_at": datetime.now(timezone.utc).isoformat(),
+                                "data_trades": len(trade_log),
+                                "data_days": len(candles) // 78,
+                                "accuracy": metrics.get("cv_accuracy_mean", 0),
+                                "roc_auc": metrics.get("cv_roc_auc_mean", 0),
+                                "win_rate": None,
+                                "expectancy": None,
+                                "profit_factor": None,
+                                "sharpe": None,
+                                "max_drawdown": None,
+                                "is_active": 1,
+                                "file_path": str(self.store._model_path(model_key, version)),
+                            })
+
+                            results[model_key] = {
+                                "status": "success",
+                                "version": version,
+                                "mlflow_artifact_uri": mlflow_result.get("artifact_uri"),
+                                "mlflow_registered": reg_result.get("registered", False),
+                                "mlflow_stage": reg_result.get("stage"),
+                                "mlflow_registry_version": reg_result.get("version"),
+                                **metrics,
+                            }
+                            self._trained_models.append({
+                                "name": model_key,
+                                "version": version,
+                                "metrics": metrics,
+                            })
+
+                            if verbose:
+                                print(f"  ✓ Saved as {model_key}_{version}")
+
+                    except Exception as e:
+                        error = f"{type(e).__name__}: {e}"
+                        if verbose:
+                            print(f"  ✗ Failed: {error}")
+                            traceback.print_exc()
+                        results[model_key] = {"status": "error", "error": error}
+
+                duration = time.time() - started_at
+                self.db.complete_training(train_log_id, len(trade_log), duration, "success")
+                mlflow_client.log_metrics({
+                    "training_duration_sec": round(duration, 2),
+                    "candles_used": len(candles),
+                    "trades_used": len(trade_log),
+                    "n_models_trained": sum(1 for r in results.values() if r["status"] == "success"),
+                })
+                mlflow_client.log_tag("training_status", "success")
 
             # ── Drift Monitor: refresh baselines after training ───────────────
             if _drift_monitor is not None:
@@ -327,17 +352,12 @@ class Trainer:
             # ── Prometheus: record training run metrics ──────────────────────
             if record_training_run and PROMETHEUS_AVAILABLE:
                 record_training_run("direction", "success")
-                record_training_duration("direction", version, round(duration, 2))
+                record_training_duration("direction", training_run_name, round(duration, 2))
             if record_model_registered and PROMETHEUS_AVAILABLE:
                 for model_key, result_data in results.items():
                     if result_data.get("status") == "success":
-                        # Check if model was registered in registry
-                        try:
-                            mv = mlflow_client.get_production_model(f"direction_{model_key}")
-                            stage = mv.get("stage", "staging") if mv else "staging"
-                            record_model_registered(f"direction_{model_key}", stage)
-                        except Exception:
-                            record_model_registered(f"direction_{model_key}", "staging")
+                        stage = result_data.get("mlflow_stage") or "Staging"
+                        record_model_registered(f"direction_{model_key}", stage)
             if record_artifact_size and PROMETHEUS_AVAILABLE:
                 for model_key, result_data in results.items():
                     version = result_data.get("version")
@@ -397,3 +417,4 @@ class Trainer:
     def get_last_training_info(self, model_name: str = "direction_ensemble") -> dict:
         """Get the last training log entry for a model."""
         return self.db.get_last_training(model_name) or {}
+
