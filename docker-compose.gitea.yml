@@ -78,6 +78,7 @@ services:
       WOODPECKER_EXPERT_FORGE_OAUTH_HOST: ${WOODPECKER_EXPERT_FORGE_OAUTH_HOST:-${GITEA_ROOT_URL:?set GITEA_ROOT_URL}}
       WOODPECKER_GITEA_CLIENT: ${WOODPECKER_GITEA_CLIENT:?set WOODPECKER_GITEA_CLIENT}
       WOODPECKER_GITEA_SECRET: ${WOODPECKER_GITEA_SECRET:?set WOODPECKER_GITEA_SECRET}
+      WOODPECKER_PLUGINS_PRIVILEGED: ${WOODPECKER_PLUGINS_PRIVILEGED:-woodpeckerci/plugin-docker-buildx,docker.io/woodpeckerci/plugin-docker-buildx,quay.io/woodpeckerci/plugin-docker-buildx}
       WOODPECKER_LOG_LEVEL: info
     restart: unless-stopped
     volumes:

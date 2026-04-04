@@ -44,16 +44,10 @@ steps:
     pull: true
     privileged: true
     depends_on: [verify-frontend, verify-bff, verify-ml-engine, verify-k8s]
-    environment:
-      REGISTRY_HOST:
-        from_secret: registry_host
-      VITE_BFF_URL:
-        from_secret: vite_bff_url
-      VITE_API_URL:
-        from_secret: vite_api_url
     settings:
-      registry: ${REGISTRY_HOST}
-      repo: ${REGISTRY_HOST}/${CI_REPO_OWNER}/frontend
+      registry:
+        from_secret: registry_host
+      repo: ${CI_REPO_OWNER}/frontend
       context: .
       dockerfile: Dockerfile.frontend
       tags:
@@ -63,9 +57,6 @@ steps:
         from_secret: registry_username
       password:
         from_secret: registry_password
-      build_args_from_env:
-        - VITE_BFF_URL
-        - VITE_API_URL
     when:
       - event: push
         branch: main
@@ -75,12 +66,10 @@ steps:
     pull: true
     privileged: true
     depends_on: [verify-frontend, verify-bff, verify-ml-engine, verify-k8s]
-    environment:
-      REGISTRY_HOST:
-        from_secret: registry_host
     settings:
-      registry: ${REGISTRY_HOST}
-      repo: ${REGISTRY_HOST}/${CI_REPO_OWNER}/bff
+      registry:
+        from_secret: registry_host
+      repo: ${CI_REPO_OWNER}/bff
       context: .
       dockerfile: Dockerfile.bff
       tags:
@@ -99,12 +88,10 @@ steps:
     pull: true
     privileged: true
     depends_on: [verify-frontend, verify-bff, verify-ml-engine, verify-k8s]
-    environment:
-      REGISTRY_HOST:
-        from_secret: registry_host
     settings:
-      registry: ${REGISTRY_HOST}
-      repo: ${REGISTRY_HOST}/${CI_REPO_OWNER}/ml-engine
+      registry:
+        from_secret: registry_host
+      repo: ${CI_REPO_OWNER}/ml-engine
       context: .
       dockerfile: Dockerfile.ml-engine
       tags:
@@ -123,12 +110,10 @@ steps:
     pull: true
     privileged: true
     depends_on: [verify-frontend, verify-bff, verify-ml-engine, verify-k8s]
-    environment:
-      REGISTRY_HOST:
-        from_secret: registry_host
     settings:
-      registry: ${REGISTRY_HOST}
-      repo: ${REGISTRY_HOST}/${CI_REPO_OWNER}/mlflow
+      registry:
+        from_secret: registry_host
+      repo: ${CI_REPO_OWNER}/mlflow
       context: .
       dockerfile: Dockerfile.mlflow
       tags:
