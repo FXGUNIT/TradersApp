@@ -69,8 +69,10 @@ async function getGrpcAnalysisClient() {
   }
 
   _grpcClientPromise = (async () => {
-    const grpc = await import("@grpc/grpc-js");
-    const protoLoader = await import("@grpc/proto-loader");
+    const grpcModule = await import("@grpc/grpc-js");
+    const protoLoaderModule = await import("@grpc/proto-loader");
+    const grpc = grpcModule.default || grpcModule;
+    const protoLoader = protoLoaderModule.default || protoLoaderModule;
 
     const packageDefinition = protoLoader.loadSync(ANALYSIS_PROTO_PATH, {
       keepCase: true,
@@ -181,4 +183,3 @@ export function getAnalysisTransportConfig() {
     grpc_strict: ANALYSIS_GRPC_STRICT,
   };
 }
-
