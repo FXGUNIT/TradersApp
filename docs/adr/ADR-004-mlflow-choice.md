@@ -17,10 +17,11 @@ The ML Engine trains multiple model families (LightGBM, XGBoost, RandomForest, H
 Use **MLflow Self-Hosted** as the MLOps platform:
 
 **Architecture:**
-- **MLflow Tracking Server** (Docker): `http://localhost:5000`
+- **MLflow Tracking Server** (Docker + k3s Helm): `http://localhost:5000` locally, `http://mlflow:5000` in cluster
 - **Backend Store:** PostgreSQL 16 (durable, queryable experiment metadata)
 - **Artifact Store:** MinIO (S3-compatible, self-hosted — no cloud dependency)
-- **CI integration:** `infisical/infisical-action` injects AWS credentials for MinIO
+- **Artifact access mode:** MLflow serves artifacts through `--serve-artifacts`
+- **CI integration:** Woodpecker builds and publishes a custom MLflow image with PostgreSQL and S3 drivers
 
 **What gets tracked:**
 - Every training run: parameters, metrics (ROC-AUC, Sharpe, win rate, PBO)
@@ -33,7 +34,7 @@ Use **MLflow Self-Hosted** as the MLOps platform:
 None → Staging → Production → Archived
 ```
 
-**Auto-registration:** Models that pass PBO threshold (PBO < 5%, Sharpe ≥ 0.5, win rate ≥ 50%) are auto-registered to Staging. Human reviews and promotes to Production.
+**Auto-registration:** Models that pass either the strategy gate (PBO < 5%, Sharpe ≥ 0.5, win rate ≥ 50%) or the classifier fallback gate (CV ROC-AUC ≥ 0.55, CV accuracy ≥ 0.52) are auto-registered to Staging. Human reviews and promotes to Production.
 
 **Endpoints:**
 - `GET /mlflow/status` — server connectivity check
@@ -49,7 +50,7 @@ None → Staging → Production → Archived
 
 **Infrastructure:**
 ```bash
-docker compose -f docker-compose.mlflow.yml up -d
+docker compose -f docker-compose.mlflow.yml up -d --build
 # Access at http://localhost:5000
 ```
 
@@ -73,3 +74,4 @@ docker compose -f docker-compose.mlflow.yml up -d
 - MLflow autolog handles most sklearn models automatically
 - Can upgrade MinIO to real AWS S3 by changing `MLFLOW_S3_ENDPOINT_URL`
 - CI pulls MLflow artifacts using service token stored in Infisical
+
