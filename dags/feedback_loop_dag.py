@@ -15,8 +15,17 @@ Requires:
   - trade_log populated with closed trades
 """
 
+import sys
+from pathlib import Path
+
 import pendulum
 from airflow.decorators import dag, task
+from airflow.exceptions import AirflowException
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+ML_ENGINE_ROOT = PROJECT_ROOT / "ml-engine"
+if str(ML_ENGINE_ROOT) not in sys.path:
+    sys.path.insert(0, str(ML_ENGINE_ROOT))
 
 
 @dag(
@@ -101,6 +110,28 @@ def feedback_retrain_loop():
         resp.raise_for_status()
         return resp.json()
 
+    @task(task_id="validate_data_quality_gate")
+    def validate_data_quality_gate(**context):
+        import os
+        from data_quality.validation_pipeline import run_full_validation
+
+        db_path = os.environ.get(
+            "DQ_DB_PATH",
+            str(ML_ENGINE_ROOT / "data" / "trading_data.db"),
+        )
+        report = run_full_validation(db_path=db_path, block=False)
+        if not report.get("passed", False):
+            failed_suites = [
+                name for name, suite in report.get("suites", {}).items()
+                if not suite.get("passed", False)
+            ]
+            raise AirflowException(
+                "Data quality gate failed before retrain. "
+                f"critical_failures={report.get('critical_failures', 0)}, "
+                f"failed_suites={failed_suites}"
+            )
+        return report
+
     @task(task_id="report")
     def report(results: dict, **context):
         import json
@@ -123,10 +154,12 @@ def feedback_retrain_loop():
         return summary
 
     # Task flow
+    dq = validate_data_quality_gate()
     pr = process_trades()
     dd = check_drift()
     rr = run_retrain()
-    report(pr >> dd >> rr)
+    summary = report(rr)
+    dq >> pr >> dd >> rr >> summary
 
 
 feedback_retrain_loop()

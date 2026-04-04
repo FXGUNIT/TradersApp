@@ -1,0 +1,81 @@
+x-airflow-common: &airflow-common
+  image: apache/airflow:2.10.5-python3.11
+  environment:
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres:5432/airflow
+    AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "false"
+    AIRFLOW__API__AUTH_BACKENDS: airflow.api.auth.backend.basic_auth
+    AIRFLOW_UID: ${AIRFLOW_UID:-50000}
+    PYTHONPATH: /opt/tradersapp/ml-engine:/opt/tradersapp
+    DQ_DB_PATH: /opt/tradersapp/ml-engine/data/trading_data.db
+    DQ_BLOCK_ON_CRITICAL: "true"
+    DQ_REQUIRE_GX: "true"
+    MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI:-http://mlflow:5000}
+    DQ_ALERT_WEBHOOK: ${DQ_ALERT_WEBHOOK:-}
+    ML_ENGINE_URL: ${ML_ENGINE_URL:-http://ml-engine:8001}
+  volumes:
+    - ./dags:/opt/airflow/dags
+    - ./ml-engine:/opt/tradersapp/ml-engine
+    - ./airflow:/opt/tradersapp/airflow
+    - airflow-logs:/opt/airflow/logs
+  depends_on:
+    airflow-postgres:
+      condition: service_healthy
+  networks:
+    - default
+
+services:
+  airflow-postgres:
+    image: postgres:16-alpine
+    container_name: traders-airflow-postgres
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - airflow-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow -d airflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  airflow-init:
+    <<: *airflow-common
+    container_name: traders-airflow-init
+    entrypoint: /bin/bash
+    command: -lc "pip install --no-cache-dir -r /opt/tradersapp/airflow/requirements.txt && airflow db migrate && airflow users create --username admin --firstname Traders --lastname Admin --role Admin --email admin@tradersapp.local --password admin || true"
+    restart: "no"
+
+  airflow-webserver:
+    <<: *airflow-common
+    container_name: traders-airflow-webserver
+    ports:
+      - "8081:8080"
+    entrypoint: /bin/bash
+    command: -lc "pip install --no-cache-dir -r /opt/tradersapp/airflow/requirements.txt && airflow webserver"
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      interval: 20s
+      timeout: 10s
+      retries: 10
+    restart: unless-stopped
+
+  airflow-scheduler:
+    <<: *airflow-common
+    container_name: traders-airflow-scheduler
+    entrypoint: /bin/bash
+    command: -lc "pip install --no-cache-dir -r /opt/tradersapp/airflow/requirements.txt && airflow scheduler"
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+volumes:
+  airflow-postgres-data:
+  airflow-logs:

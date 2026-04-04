@@ -1,27 +1,23 @@
 """
-Trade Log Expectations — Great Expectations suite for trading performance data.
-
-Validates: trade_log table (entry/exit times, PnL, results, direction).
+Trade log expectations for model training safety.
 """
 
 from __future__ import annotations
 
-import pandas as pd
-import numpy as np
 from datetime import datetime, timezone
-from typing import Optional
+
+import pandas as pd
 
 
 class TradeExpectations:
-    """
-    Expectation suite for the trade_log table.
-    """
+    """Data-quality expectations for `trade_log`."""
 
+    REQUIRED_COLUMNS = ("entry_time", "direction", "result", "pnl_ticks", "pnl_dollars")
     VALID_RESULTS = {"win", "loss", "breakeven", "open"}
     VALID_DIRECTIONS = {"long", "short"}
     VALID_AMD_PHASES = {"ACCUMULATION", "MANIPULATION", "DISTRIBUTION", "TRANSITION", "UNCLEAR"}
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.results: list[dict] = []
         self._critical_failures = 0
         self._warning_failures = 0
@@ -32,195 +28,155 @@ class TradeExpectations:
         self._warning_failures = 0
 
         if df.empty:
-            return {"suite": "trade_expectations", "passed": False, "message": "empty dataset"}
+            self._fail("empty_dataset", "Trade dataset is empty", "critical")
+            return self._summary()
 
         self._check_required_columns(df)
-        self._check_no_null_pnl(df)
+        if any(col not in df.columns for col in self.REQUIRED_COLUMNS):
+            return self._summary()
+
+        self._check_entry_time_parseable(df)
         self._check_result_values(df)
         self._check_direction_values(df)
-        self._check_entry_before_exit(df)
-        self._check_pnl_ticks_signed(df)
-        self._check_win_result_matches_pnl(df)
-        self._check_amd_phase_valid(df)
+        self._check_pnl_not_null(df)
+        self._check_pnl_sign_vs_result(df)
+        self._check_exit_after_entry(df)
         self._check_confidence_range(df)
-        self._check_no_duplicate_trades(df)
+        self._warn_duplicate_entry_times(df)
+        self._warn_amd_phase_values(df)
 
         return self._summary()
 
-    def _check_required_columns(self, df: pd.DataFrame):
-        required = ["entry_time", "exit_time", "pnl_dollars", "pnl_ticks", "result", "direction"]
-        missing = [c for c in required if c not in df.columns]
+    def _check_required_columns(self, df: pd.DataFrame) -> None:
+        missing = [col for col in self.REQUIRED_COLUMNS if col not in df.columns]
         if missing:
             self._fail("required_columns", f"Missing columns: {missing}", "critical")
         else:
             self._pass("required_columns", "All required columns present")
 
-    def _check_no_null_pnl(self, df: pd.DataFrame):
-        if "pnl_dollars" not in df.columns:
-            return
-        nulls = df["pnl_dollars"].isna().sum()
-        if nulls > 0:
-            self._fail("no_null_pnl", f"{nulls} null pnl_dollars values", "critical")
-        else:
-            self._pass("no_null_pnl", "No null pnl_dollars values")
-
-    def _check_result_values(self, df: pd.DataFrame):
-        if "result" not in df.columns:
-            return
-        invalid = ~df["result"].isin(self.VALID_RESULTS)
-        bad = invalid.sum()
+    def _check_entry_time_parseable(self, df: pd.DataFrame) -> None:
+        parsed = pd.to_datetime(df["entry_time"], errors="coerce", utc=True)
+        bad = int(parsed.isna().sum())
         if bad > 0:
-            self._fail(
-                "result_values",
-                f"{bad} rows with invalid result values: {df.loc[invalid, 'result'].unique()}",
-                "critical",
-            )
+            self._fail("entry_time_parseable", f"{bad} rows have invalid entry_time", "critical")
         else:
-            self._pass("result_values", "All result values are valid")
+            self._pass("entry_time_parseable", "All entry_time values are parseable")
 
-    def _check_direction_values(self, df: pd.DataFrame):
-        if "direction" not in df.columns:
-            return
-        invalid = ~df["direction"].isin(self.VALID_DIRECTIONS)
-        bad = invalid.sum()
+    def _check_result_values(self, df: pd.DataFrame) -> None:
+        values = df["result"].astype(str).str.lower().str.strip()
+        bad = int((~values.isin(self.VALID_RESULTS)).sum())
         if bad > 0:
-            self._fail(
-                "direction_values",
-                f"{bad} rows with invalid direction values",
-                "critical",
-            )
+            self._fail("result_values", f"{bad} invalid result values", "critical")
         else:
-            self._pass("direction_values", "All direction values are valid")
+            self._pass("result_values", "All result values valid")
 
-    def _check_entry_before_exit(self, df: pd.DataFrame):
-        if "entry_time" not in df.columns or "exit_time" not in df.columns:
-            return
-        entry = pd.to_datetime(df["entry_time"])
-        exit = pd.to_datetime(df["exit_time"])
-
-        # Only check closed trades
-        closed = exit.notna()
-        bad = (entry[closed] >= exit[closed]).sum()
+    def _check_direction_values(self, df: pd.DataFrame) -> None:
+        values = df["direction"].astype(str).str.lower().str.strip()
+        bad = int((~values.isin(self.VALID_DIRECTIONS)).sum())
         if bad > 0:
-            self._fail(
-                "entry_before_exit",
-                f"{bad} closed trades where entry_time >= exit_time",
-                "critical",
-            )
+            self._fail("direction_values", f"{bad} invalid direction values", "critical")
         else:
-            self._pass("entry_before_exit", "All closed trades have entry < exit")
+            self._pass("direction_values", "All direction values valid")
 
-    def _check_pnl_ticks_signed(self, df: pd.DataFrame):
-        """PnL ticks should be positive for wins and negative for losses."""
-        if "pnl_ticks" not in df.columns or "result" not in df.columns:
+    def _check_pnl_not_null(self, df: pd.DataFrame) -> None:
+        bad_ticks = int(df["pnl_ticks"].isna().sum())
+        bad_dollars = int(df["pnl_dollars"].isna().sum())
+        if bad_ticks > 0:
+            self._fail("pnl_ticks_not_null", f"{bad_ticks} null pnl_ticks values", "critical")
+        else:
+            self._pass("pnl_ticks_not_null", "No null pnl_ticks values")
+        if bad_dollars > 0:
+            self._fail("pnl_dollars_not_null", f"{bad_dollars} null pnl_dollars values", "critical")
+        else:
+            self._pass("pnl_dollars_not_null", "No null pnl_dollars values")
+
+    def _check_pnl_sign_vs_result(self, df: pd.DataFrame) -> None:
+        result = df["result"].astype(str).str.lower().str.strip()
+        pnl_ticks = pd.to_numeric(df["pnl_ticks"], errors="coerce")
+
+        bad_win = int(((result == "win") & (pnl_ticks <= 0)).sum())
+        bad_loss = int(((result == "loss") & (pnl_ticks >= 0)).sum())
+        if bad_win > 0:
+            self._fail("win_pnl_sign", f"{bad_win} winning trades have non-positive pnl_ticks", "critical")
+        else:
+            self._pass("win_pnl_sign", "Winning trade pnl signs are correct")
+        if bad_loss > 0:
+            self._fail("loss_pnl_sign", f"{bad_loss} losing trades have non-negative pnl_ticks", "critical")
+        else:
+            self._pass("loss_pnl_sign", "Losing trade pnl signs are correct")
+
+    def _check_exit_after_entry(self, df: pd.DataFrame) -> None:
+        if "exit_time" not in df.columns:
+            self._pass("exit_after_entry", "exit_time column absent; skipped")
             return
-
-        # Wins should have positive ticks
-        wins = df["result"] == "win"
-        bad_wins = (wins & (df["pnl_ticks"] <= 0)).sum()
-        if bad_wins > 0:
-            self._fail(
-                "pnl_ticks_signed_win",
-                f"{bad_wins} win trades with pnl_ticks <= 0",
-                "critical",
-            )
-
-        # Losses should have negative ticks
-        losses = df["result"] == "loss"
-        bad_losses = (losses & (df["pnl_ticks"] >= 0)).sum()
-        if bad_losses > 0:
-            self._fail(
-                "pnl_ticks_signed_loss",
-                f"{bad_losses} loss trades with pnl_ticks >= 0",
-                "critical",
-            )
-
-        if bad_wins == 0 and bad_losses == 0:
-            self._pass("pnl_ticks_signed", "All PnL signs match trade results")
-
-    def _check_win_result_matches_pnl(self, df: pd.DataFrame):
-        """Win trades should have positive pnl_dollars."""
-        if "pnl_dollars" not in df.columns or "result" not in df.columns:
-            return
-        wins = df["result"] == "win"
-        bad = (wins & (df["pnl_dollars"] <= 0)).sum()
+        entry = pd.to_datetime(df["entry_time"], errors="coerce", utc=True)
+        exit_time = pd.to_datetime(df["exit_time"], errors="coerce", utc=True)
+        closed = exit_time.notna()
+        bad = int((entry[closed] >= exit_time[closed]).sum())
         if bad > 0:
-            self._fail(
-                "win_pnl_positive",
-                f"{bad} win trades with pnl_dollars <= 0",
-                "warning",
-            )
+            self._fail("exit_after_entry", f"{bad} trades have exit_time <= entry_time", "critical")
         else:
-            self._pass("win_pnl_positive", "All win trades have positive pnl_dollars")
+            self._pass("exit_after_entry", "Closed trades have exit_time > entry_time")
 
-    def _check_amd_phase_valid(self, df: pd.DataFrame):
-        if "amd_phase" not in df.columns:
-            return
-        invalid = ~df["amd_phase"].isin(self.VALID_AMD_PHASES)
-        bad = invalid.sum()
-        if bad > 0:
-            self._fail(
-                "amd_phase_values",
-                f"{bad} rows with invalid amd_phase",
-                "warning",
-            )
-        else:
-            self._pass("amd_phase_values", "All amd_phase values are valid")
-
-    def _check_confidence_range(self, df: pd.DataFrame):
+    def _check_confidence_range(self, df: pd.DataFrame) -> None:
         if "confidence" not in df.columns:
+            self._pass("confidence_range", "confidence column absent; skipped")
             return
-        out_of_range = ~df["confidence"].between(0, 1)
-        bad = out_of_range.sum()
+        confidence = pd.to_numeric(df["confidence"], errors="coerce")
+        bad = int((~confidence.between(0, 1)).sum())
         if bad > 0:
-            self._fail(
-                "confidence_range",
-                f"{bad} rows with confidence outside [0, 1]",
-                "critical",
-            )
+            self._fail("confidence_range", f"{bad} rows have confidence outside [0, 1]", "critical")
         else:
-            self._pass("confidence_range", "All confidence values in [0, 1]")
+            self._pass("confidence_range", "Confidence values in [0, 1]")
 
-    def _check_no_duplicate_trades(self, df: pd.DataFrame):
-        if "entry_time" not in df.columns:
-            return
-        dup = df["entry_time"].duplicated().sum()
+    def _warn_duplicate_entry_times(self, df: pd.DataFrame) -> None:
+        dup = int(df["entry_time"].duplicated().sum())
         if dup > 0:
-            self._warn(
-                "no_duplicate_entry_times",
-                f"{dup} duplicate entry_time values (may be intentional for multiple strategies)",
-            )
+            self._warn("duplicate_entry_time", f"{dup} duplicate entry_time rows found")
         else:
-            self._pass("no_duplicate_entry_times", "No duplicate entry_time values")
+            self._pass("duplicate_entry_time", "No duplicate entry_time rows")
 
-    def _fail(self, name: str, message: str, severity: str = "critical"):
+    def _warn_amd_phase_values(self, df: pd.DataFrame) -> None:
+        if "amd_phase" not in df.columns:
+            self._pass("amd_phase_values", "amd_phase column absent; skipped")
+            return
+        values = df["amd_phase"].astype(str).str.strip().str.upper()
+        bad = int((~values.isin(self.VALID_AMD_PHASES)).sum())
+        if bad > 0:
+            self._warn("amd_phase_values", f"{bad} rows have non-standard amd_phase values")
+        else:
+            self._pass("amd_phase_values", "AMD phase values are valid")
+
+    def _fail(self, name: str, message: str, severity: str = "critical") -> None:
         self.results.append({"name": name, "status": "fail", "message": message, "severity": severity})
         if severity == "critical":
             self._critical_failures += 1
 
-    def _pass(self, name: str, message: str):
+    def _pass(self, name: str, message: str) -> None:
         self.results.append({"name": name, "status": "pass", "message": message, "severity": "info"})
 
-    def _warn(self, name: str, message: str):
+    def _warn(self, name: str, message: str) -> None:
         self.results.append({"name": name, "status": "warn", "message": message, "severity": "warning"})
         self._warning_failures += 1
 
     def _summary(self) -> dict:
-        critical_passed = all(
-            r["status"] != "fail" for r in self.results if r["severity"] == "critical"
-        )
+        checks_passed = sum(1 for row in self.results if row["status"] == "pass")
+        checks_failed = sum(1 for row in self.results if row["status"] == "fail")
+        checks_warned = sum(1 for row in self.results if row["status"] == "warn")
         return {
             "suite": "trade_expectations",
-            "passed": critical_passed,
+            "passed": self._critical_failures == 0,
             "critical_failures": self._critical_failures,
             "warning_failures": self._warning_failures,
-            "checks_passed": sum(1 for r in self.results if r["status"] == "pass"),
-            "checks_failed": sum(1 for r in self.results if r["status"] == "fail"),
-            "checks_warned": sum(1 for r in self.results if r["status"] == "warn"),
+            "checks_passed": checks_passed,
+            "checks_failed": checks_failed,
+            "checks_warned": checks_warned,
             "total_checks": len(self.results),
             "results": self.results,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
         }
 
 
 def get_trade_suite() -> TradeExpectations:
     return TradeExpectations()
+
