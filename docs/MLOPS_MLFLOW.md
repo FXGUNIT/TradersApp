@@ -90,6 +90,31 @@ This creates:
 - The Helm chart deploys PostgreSQL, MinIO, a MinIO bucket setup job, and MLflow.
 - `ml-engine` gets `MLFLOW_TRACKING_URI=http://mlflow:5000`.
 - CI/CD builds and publishes the custom MLflow image and injects the commit SHA into the Helm release.
+- Production deploys use a runtime Kubernetes secret (`mlflow-runtime-secret`) for:
+  - `POSTGRES_PASSWORD`
+  - `MINIO_ROOT_USER`
+  - `MINIO_ROOT_PASSWORD`
+  This secret is created by `scripts/ci/deploy-k3s.sh` from Woodpecker secrets synced from Infisical.
+
+## Infisical Secret Mapping (Production)
+
+Keep these values in Infisical (for example under `production`):
+
+- `CI_MLFLOW_POSTGRES_PASSWORD`
+- `CI_MLFLOW_MINIO_USER`
+- `CI_MLFLOW_MINIO_PASSWORD`
+
+Then mirror them into Woodpecker repository secrets:
+
+- `mlflow_postgres_password`
+- `mlflow_minio_user`
+- `mlflow_minio_password`
+
+During deploy, the pipeline converts those into Kubernetes secret keys expected by Helm:
+
+- `POSTGRES_PASSWORD`
+- `MINIO_ROOT_USER`
+- `MINIO_ROOT_PASSWORD`
 
 ## Secrets
 

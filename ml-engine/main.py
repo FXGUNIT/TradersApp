@@ -18,7 +18,7 @@ from fastapi import FastAPI, HTTPException, BackgroundTasks, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse, Response
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, Any
 
 # Add ml-engine to path
 sys.path.insert(0, str(Path(__file__).parent))
@@ -57,6 +57,9 @@ try:
         record_cache as record_prometheus_cache,
         record_retrain as record_prometheus_retrain,
         set_models_loaded as set_prometheus_models_loaded,
+        set_active_runs as set_prometheus_active_runs,
+        set_mlflow_experiment_count as set_prometheus_mlflow_experiment_count,
+        sync_mlflow_registry as sync_prometheus_mlflow_registry,
     )
     PROMETHEUS_AVAILABLE = True
 except ImportError:
@@ -66,6 +69,9 @@ except ImportError:
     record_prometheus_cache = None
     record_prometheus_retrain = None
     set_prometheus_models_loaded = None
+    set_prometheus_active_runs = None
+    set_prometheus_mlflow_experiment_count = None
+    sync_prometheus_mlflow_registry = None
 
 # ── Observability: Jaeger tracing ─────────────────────────────────────────────
 try:
@@ -446,11 +452,23 @@ async def mlflow_status():
         from infrastructure.mlflow_client import get_mlflow_client
         client = get_mlflow_client("direction")
         summary = client.get_experiment_summary()
+        overview = client.get_tracking_overview()
+
+        if (
+            PROMETHEUS_AVAILABLE
+            and overview.get("available")
+            and set_prometheus_mlflow_experiment_count
+            and set_prometheus_active_runs
+        ):
+            set_prometheus_mlflow_experiment_count(int(overview.get("experiments", 0)))
+            set_prometheus_active_runs(int(overview.get("active_runs", 0)))
+
         return {
             "ok": True,
             "mlflow_available": True,
             "tracking_uri": MLFLOW_TRACKING_URI,
             "experiments": summary,
+            "overview": overview,
         }
     except Exception as e:
         return {
@@ -474,10 +492,23 @@ async def mlflow_experiments(experiment: str | None = None):
         from infrastructure.mlflow_client import get_mlflow_client
         exp_name = experiment or "direction"
         client = get_mlflow_client(exp_name)
+        summary = client.get_experiment_summary()
+        overview = client.get_tracking_overview()
+
+        if (
+            PROMETHEUS_AVAILABLE
+            and overview.get("available")
+            and set_prometheus_mlflow_experiment_count
+            and set_prometheus_active_runs
+        ):
+            set_prometheus_mlflow_experiment_count(int(overview.get("experiments", 0)))
+            set_prometheus_active_runs(int(overview.get("active_runs", 0)))
+
         return {
             "ok": True,
             "experiment": f"tradersapp_{exp_name}",
-            "summary": client.get_experiment_summary(),
+            "summary": summary,
+            "overview": overview,
             "tracking_uri": MLFLOW_TRACKING_URI,
         }
     except Exception as e:
@@ -496,6 +527,8 @@ async def mlflow_models(model_prefix: str = "direction"):
         from infrastructure.mlflow_client import get_mlflow_client
         client = get_mlflow_client(model_prefix)
         results = client.get_registry_models(f"{model_prefix}_")
+        if PROMETHEUS_AVAILABLE and sync_prometheus_mlflow_registry:
+            sync_prometheus_mlflow_registry(results)
 
         return {
             "ok": True,
@@ -529,6 +562,11 @@ async def mlflow_promote(
                 "error": result.get("error") or result.get("reason") or "Model promotion failed",
                 "promotion": result,
             }
+
+        if PROMETHEUS_AVAILABLE and sync_prometheus_mlflow_registry:
+            registry_snapshot = client.get_registry_models("direction_")
+            sync_prometheus_mlflow_registry(registry_snapshot)
+
         return {"ok": True, "promotion": result}
     except Exception as e:
         return {"ok": False, "error": str(e)}

@@ -423,6 +423,16 @@ def set_active_runs(count: int):
     _metrics["active_runs"].set(max(0, count))
 
 
+def set_mlflow_experiment_count(count: int):
+    """Set the total number of MLflow experiments."""
+    global _metrics
+    if _metrics is None:
+        _metrics = get_metrics()
+    if not PROMETHEUS_AVAILABLE:
+        return
+    _metrics["mlflow_experiments"].set(max(0, count))
+
+
 def record_model_registered(model_name: str, stage: str):
     """Record a model registered in MLflow model registry."""
     global _metrics
@@ -451,6 +461,53 @@ def record_artifact_size(model_name: str, bytes_size: int):
     if not PROMETHEUS_AVAILABLE:
         return
     _metrics["artifact_size_bytes"].labels(model_name=model_name).set(max(0, bytes_size))
+
+
+def set_data_quality_metrics(critical_failures: int, checks_passed: int):
+    """Set latest data quality metric gauges."""
+    global _metrics
+    if _metrics is None:
+        _metrics = get_metrics()
+    if not PROMETHEUS_AVAILABLE:
+        return
+    _metrics["dq_critical_failures"].set(max(0, int(critical_failures)))
+    _metrics["dq_checks_passed"].set(max(0, int(checks_passed)))
+
+
+def sync_mlflow_registry(registry_models: dict[str, list[dict]]):
+    """
+    Refresh MLflow registry gauge labels from a registry snapshot.
+
+    Expected structure:
+      {
+        "model_name": [
+          {"version": "1", "stage": "Staging", ...},
+          ...
+        ]
+      }
+    """
+    global _metrics
+    if _metrics is None:
+        _metrics = get_metrics()
+    if not PROMETHEUS_AVAILABLE:
+        return
+
+    counts: dict[tuple[str, str], int] = {}
+    for model_name, versions in (registry_models or {}).items():
+        for version in versions or []:
+            stage = str(version.get("stage") or "None")
+            key = (str(model_name), stage)
+            counts[key] = counts.get(key, 0) + 1
+
+    gauge = _metrics["models_registered"]
+    try:
+        gauge.clear()
+    except Exception:
+        # Older prometheus-client versions may not support clear().
+        pass
+
+    for (model_name, stage), count in counts.items():
+        gauge.labels(model_name=model_name, stage=stage).set(count)
 
 
 # ─── Prometheus /metrics Endpoint Handler ────────────────────────────────────────

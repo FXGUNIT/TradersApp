@@ -23,6 +23,14 @@ from models.direction.lightgbm_classifier import LightGBMClassifier
 from models.direction.random_forest import RandomForestClassifierModel
 from models.direction.xgboost_classifier import XGBoostClassifier
 
+# Optional data quality gate (Great Expectations + expectation suites)
+try:
+    from data_quality.validation_pipeline import run_full_validation
+    DATA_QUALITY_AVAILABLE = True
+except ImportError:
+    DATA_QUALITY_AVAILABLE = False
+    run_full_validation = None
+
 # Optional MLflow integration
 try:
     from infrastructure.mlflow_client import get_mlflow_client, MLFLOW_AVAILABLE, MLFLOW_TRACKING_URI
@@ -116,6 +124,45 @@ class Trainer:
                 print(f"\n{'='*60}")
                 print(f"ML TRAINING PIPELINE — {mode.upper()} mode")
                 print(f"{'='*60}")
+
+            dq_gate_enabled = os.environ.get("DQ_VALIDATE_BEFORE_TRAIN", "true").lower() == "true"
+            if dq_gate_enabled:
+                if not DATA_QUALITY_AVAILABLE or run_full_validation is None:
+                    raise RuntimeError(
+                        "Data quality gate is enabled (DQ_VALIDATE_BEFORE_TRAIN=true) but validation pipeline is unavailable."
+                    )
+
+                try:
+                    dq_days = max(1, int(os.environ.get("DQ_VALIDATE_DAYS", "90")))
+                except ValueError:
+                    dq_days = 90
+
+                dq_report = run_full_validation(
+                    db_path=self.db.db_path,
+                    block=False,
+                    candles_days=dq_days,
+                    trades_days=dq_days,
+                    sessions_days=dq_days,
+                )
+                if verbose:
+                    print(
+                        "[DQ] Pre-train gate: "
+                        f"{'PASS' if dq_report.get('passed', False) else 'FAIL'} | "
+                        f"critical_failures={dq_report.get('critical_failures', 0)} | "
+                        f"warning_failures={dq_report.get('warning_failures', 0)}"
+                    )
+
+                if not dq_report.get("passed", False):
+                    failed_suites = [
+                        name
+                        for name, suite in dq_report.get("suites", {}).items()
+                        if not suite.get("passed", False)
+                    ]
+                    raise ValueError(
+                        "Data quality gate blocked training. "
+                        f"critical_failures={dq_report.get('critical_failures', 0)}, "
+                        f"failed_suites={failed_suites}"
+                    )
 
             # Step 1: Load data
             trade_log = self.db.get_trade_log(limit=10000, symbol=symbol)

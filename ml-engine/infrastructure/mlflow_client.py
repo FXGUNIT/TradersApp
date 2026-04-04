@@ -606,6 +606,38 @@ class MLflowTrackingClient:
         except Exception:
             return {"available": False}
 
+    def get_tracking_overview(self) -> dict:
+        """
+        Return high-level MLflow tracking counters for observability.
+
+        Includes:
+        - active experiment count
+        - active (RUNNING) run count across active experiments
+        """
+        if not MLFLOW_AVAILABLE:
+            return {"available": False}
+
+        try:
+            experiments = mlflow.search_experiments(view_type=ViewType.ACTIVE_ONLY)
+            active_runs = 0
+
+            for exp in experiments:
+                running = mlflow.search_runs(
+                    experiment_ids=[exp.experiment_id],
+                    filter_string="attributes.status = 'RUNNING'",
+                    run_view_type=ViewType.ACTIVE_ONLY,
+                    max_results=5000,
+                )
+                active_runs += len(running)
+
+            return {
+                "available": True,
+                "experiments": len(experiments),
+                "active_runs": active_runs,
+            }
+        except Exception as e:
+            return {"available": False, "error": str(e)}
+
     # ── Utilities ─────────────────────────────────────────────────────────────
 
     def _get_dvc_commit(self) -> str | None:
