@@ -323,6 +323,9 @@ spec:
         - podSelector:
             matchLabels:
               app: ml-engine
+        - podSelector:
+            matchLabels:
+              app: minio-setup
       ports:
         - protocol: TCP
           port: 9000

@@ -1,19 +1,4 @@
-{{- /*
-k8s/mlflow/ — Self-hosted MLflow MLOps Platform
-Components: PostgreSQL (backend), MinIO (S3-compatible), MLflow Tracking Server
-*/ -}}
-
----
-# ── PostgreSQL for MLflow backend store ────────────────────────────────────────
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: mlflow-postgres-config
-  namespace: {{ include "tradersapp.namespace" . }}
-data:
-  POSTGRES_DB: "mlflow"
-  POSTGRES_USER: "mlflow"
----
+{{- if .Values.mlflow.enabled }}
 apiVersion: v1
 kind: Secret
 metadata:
@@ -21,8 +6,9 @@ metadata:
   namespace: {{ include "tradersapp.namespace" . }}
 type: Opaque
 stringData:
-  POSTGRES_PASSWORD: {{ .Values.mlflow.postgres.password | default "mlflow123" | quote }}
-
+  POSTGRES_DB: {{ .Values.mlflow.postgres.database | quote }}
+  POSTGRES_USER: {{ .Values.mlflow.postgres.user | quote }}
+  POSTGRES_PASSWORD: {{ .Values.mlflow.postgres.password | quote }}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -43,65 +29,49 @@ spec:
         app: mlflow-postgres
         tier: data
     spec:
-      securityContext:
-        runAsNonRoot: true
-        runAsUser: 999
-        fsGroup: 999
       containers:
         - name: postgres
-          image: postgres:16-alpine
+          image: "{{ .Values.mlflow.postgres.image.repository }}:{{ .Values.mlflow.postgres.image.tag }}"
+          imagePullPolicy: {{ include "tradersapp.imagePullPolicy" .Values.mlflow.postgres.image }}
           ports:
             - name: postgres
               containerPort: 5432
-          env:
-            - name: POSTGRES_DB
-              valueFrom:
-                configMapKeyRef:
-                  name: mlflow-postgres-config
-                  key: POSTGRES_DB
-            - name: POSTGRES_USER
-              valueFrom:
-                configMapKeyRef:
-                  name: mlflow-postgres-config
-                  key: POSTGRES_USER
-            - name: POSTGRES_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: mlflow-postgres-secret
-                  key: POSTGRES_PASSWORD
+          envFrom:
+            - secretRef:
+                name: mlflow-postgres-secret
+          {{- with .Values.mlflow.postgres.resources }}
           resources:
-            requests:
-              cpu: 50m
-              memory: 128Mi
-            limits:
-              cpu: 500m
-              memory: 1Gi
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           livenessProbe:
             exec:
-              command: ["pg_isready", "-U", "mlflow", "-d", "mlflow"]
-            failureThreshold: 3
-            periodSeconds: 10
+              command: ["pg_isready", "-U", "{{ .Values.mlflow.postgres.user }}", "-d", "{{ .Values.mlflow.postgres.database }}"]
             initialDelaySeconds: 15
+            periodSeconds: 10
+            failureThreshold: 3
           readinessProbe:
             exec:
-              command: ["pg_isready", "-U", "mlflow", "-d", "mlflow"]
-            failureThreshold: 3
-            periodSeconds: 5
+              command: ["pg_isready", "-U", "{{ .Values.mlflow.postgres.user }}", "-d", "{{ .Values.mlflow.postgres.database }}"]
             initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 3
           securityContext:
             allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
             capabilities:
               drop: ["ALL"]
           volumeMounts:
-            - name: data
+            - name: postgres-data
               mountPath: /var/lib/postgresql/data
       volumes:
-        - name: data
+        - name: postgres-data
+          {{- if .Values.mlflow.postgres.persistence.enabled }}
           persistentVolumeClaim:
             claimName: mlflow-postgres-pvc
-
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
 ---
+{{- if .Values.mlflow.postgres.persistence.enabled }}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -110,14 +80,14 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce
-  {{- with .Values.mlflow.persistence.storageClass }}
+  {{- with .Values.mlflow.postgres.persistence.storageClass }}
   storageClassName: {{ . }}
   {{- end }}
   resources:
     requests:
-      storage: {{ .Values.mlflow.persistence.size | default "10Gi" }}
-
+      storage: {{ .Values.mlflow.postgres.persistence.size | quote }}
 ---
+{{- end }}
 apiVersion: v1
 kind: Service
 metadata:
@@ -131,10 +101,7 @@ spec:
     - name: postgres
       port: 5432
       targetPort: 5432
-
 ---
-# ── MinIO (S3-compatible artifact store) ───────────────────────────────────────
-
 apiVersion: v1
 kind: Secret
 metadata:
@@ -142,9 +109,8 @@ metadata:
   namespace: {{ include "tradersapp.namespace" . }}
 type: Opaque
 stringData:
-  MINIO_ROOT_USER: {{ .Values.mlflow.minio.user | default "minioadmin" | quote }}
-  MINIO_ROOT_PASSWORD: {{ .Values.mlflow.minio.password | default "minioadmin123" | quote }}
-
+  MINIO_ROOT_USER: {{ .Values.mlflow.minio.user | quote }}
+  MINIO_ROOT_PASSWORD: {{ .Values.mlflow.minio.password | quote }}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -165,11 +131,10 @@ spec:
         app: minio
         tier: storage
     spec:
-      securityContext:
-        runAsNonRoot: false
       containers:
         - name: minio
-          image: minio/minio:latest
+          image: "{{ .Values.mlflow.minio.image.repository }}:{{ .Values.mlflow.minio.image.tag }}"
+          imagePullPolicy: {{ include "tradersapp.imagePullPolicy" .Values.mlflow.minio.image }}
           args:
             - server
             - /data
@@ -191,56 +156,64 @@ spec:
                 secretKeyRef:
                   name: minio-secret
                   key: MINIO_ROOT_PASSWORD
+          {{- with .Values.mlflow.minio.resources }}
           resources:
-            requests:
-              cpu: 100m
-              memory: 256Mi
-            limits:
-              cpu: 500m
-              memory: 1Gi
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          startupProbe:
+            httpGet:
+              path: /minio/health/live
+              port: 9000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 30
           livenessProbe:
             httpGet:
               path: /minio/health/live
               port: 9000
-            failureThreshold: 3
-            periodSeconds: 15
             initialDelaySeconds: 30
+            periodSeconds: 15
+            failureThreshold: 3
           readinessProbe:
             httpGet:
               path: /minio/health/ready
               port: 9000
-            failureThreshold: 3
-            periodSeconds: 10
             initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 3
           securityContext:
             allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
             capabilities:
               drop: ["ALL"]
           volumeMounts:
-            - name: data
+            - name: minio-data
               mountPath: /data
       volumes:
-        - name: data
+        - name: minio-data
+          {{- if .Values.mlflow.minio.persistence.enabled }}
           persistentVolumeClaim:
             claimName: minio-pvc
-
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
 ---
-apiVersion: PersistentVolumeClaim
+{{- if .Values.mlflow.minio.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
 metadata:
   name: minio-pvc
   namespace: {{ include "tradersapp.namespace" . }}
 spec:
   accessModes:
     - ReadWriteOnce
-  {{- with .Values.mlflow.persistence.storageClass }}
+  {{- with .Values.mlflow.minio.persistence.storageClass }}
   storageClassName: {{ . }}
   {{- end }}
   resources:
     requests:
-      storage: {{ .Values.mlflow.minio.size | default "20Gi" }}
-
+      storage: {{ .Values.mlflow.minio.persistence.size | quote }}
 ---
+{{- end }}
 apiVersion: v1
 kind: Service
 metadata:
@@ -257,15 +230,15 @@ spec:
     - name: console
       port: 9001
       targetPort: 9001
-
 ---
-# ── MLflow Init Job (create MinIO bucket + alias) ─────────────────────────────────
-
 apiVersion: batch/v1
 kind: Job
 metadata:
   name: minio-setup
   namespace: {{ include "tradersapp.namespace" . }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
 spec:
   ttlSecondsAfterFinished: 300
   template:
@@ -276,22 +249,32 @@ spec:
       restartPolicy: OnFailure
       containers:
         - name: mc
-          image: minio/mc:latest
+          image: "{{ .Values.mlflow.minio.clientImage.repository }}:{{ .Values.mlflow.minio.clientImage.tag }}"
+          imagePullPolicy: {{ include "tradersapp.imagePullPolicy" .Values.mlflow.minio.clientImage }}
           env:
-            - name: MC_HOST_local
-              value: http://minio:9000 minioadmin minioadmin123
-          command:
-            - /bin/sh
-            - -c
+            - name: MINIO_ENDPOINT
+              value: {{ .Values.mlflow.s3.endpointUrl | quote }}
+            - name: MLFLOW_BUCKET
+              value: {{ .Values.mlflow.s3.bucket | quote }}
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: minio-secret
+                  key: MINIO_ROOT_USER
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: minio-secret
+                  key: MINIO_ROOT_PASSWORD
+          command: ["/bin/sh", "-c"]
+          args:
             - |
-              mc alias set local http://minio:9000 $(echo $MC_HOST_local | awk '{print $3,$4}')
-              mc mb local/mlflow-artifacts --ignore-existing
-              mc anonymous set download local/mlflow-artifacts
-              echo "MinIO setup complete"
-
+              until mc alias set local "${MINIO_ENDPOINT}" "${MINIO_ROOT_USER}" "${MINIO_ROOT_PASSWORD}"; do
+                echo "waiting for minio..."
+                sleep 3
+              done
+              mc mb --ignore-existing "local/${MLFLOW_BUCKET}"
 ---
-# ── MLflow Tracking Server ──────────────────────────────────────────────────────
-
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -301,7 +284,7 @@ metadata:
     app: mlflow
     tier: mlops
 spec:
-  replicas: {{ .Values.mlflow.replicaCount | default 1 }}
+  replicas: {{ .Values.mlflow.replicaCount }}
   selector:
     matchLabels:
       app: mlflow
@@ -317,39 +300,34 @@ spec:
         tier: mlops
       annotations:
         prometheus.io/scrape: "true"
-        prometheus.io/port: "5000"
+        prometheus.io/port: "{{ .Values.mlflow.service.port }}"
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      securityContext:
-        runAsNonRoot: true
-        runAsUser: 1000
-        fsGroup: 1000
       containers:
         - name: mlflow
-          image: ghcr.io/mlflow/mlflow:latest
+          image: "{{ .Values.mlflow.image.repository }}:{{ .Values.mlflow.image.tag }}"
+          imagePullPolicy: {{ include "tradersapp.imagePullPolicy" .Values.mlflow.image }}
           args:
             - mlflow
             - server
             - --host
             - 0.0.0.0
             - --port
-            - "5000"
+            - {{ .Values.mlflow.service.port | quote }}
             - --backend-store-uri
-            - postgresql://mlflow:{{ .Values.mlflow.postgres.password | default "mlflow123" }}@mlflow-postgres:5432/mlflow
-            - --default-artifact-root
-            - s3://mlflow-artifacts/
-            - --workers
-            - "2"
-            - --timeout
-            - "300"
+            - postgresql://{{ .Values.mlflow.postgres.user }}:{{ .Values.mlflow.postgres.password }}@mlflow-postgres:5432/{{ .Values.mlflow.postgres.database }}
+            - --artifacts-destination
+            - s3://{{ .Values.mlflow.s3.bucket }}/
+            - --serve-artifacts
+            - --gunicorn-opts
+            - {{ .Values.mlflow.gunicornOptions | quote }}
           ports:
             - name: http
-              containerPort: 5000
+              containerPort: {{ .Values.mlflow.service.port }}
           env:
-            # MinIO / S3 config
             - name: AWS_ACCESS_KEY_ID
               valueFrom:
                 secretKeyRef:
@@ -360,57 +338,57 @@ spec:
                 secretKeyRef:
                   name: minio-secret
                   key: MINIO_ROOT_PASSWORD
-            - name: MLFLOW_S3_ENDPOINT_URL
-              value: http://minio:9000
             - name: AWS_DEFAULT_REGION
-              value: us-east-1
-            - name: AWS_SECURE
-              value: "false"
-            # MLflow config
+              value: {{ .Values.mlflow.s3.region | quote }}
+            - name: MLFLOW_S3_ENDPOINT_URL
+              value: {{ .Values.mlflow.s3.endpointUrl | quote }}
             - name: MLFLOW_TRACKING_URI
-              value: http://mlflow:5000
-            - name: MLFLOW_ARTIFACT_ROOT
-              value: s3://mlflow-artifacts/
+              value: {{ .Values.mlflow.trackingUri | quote }}
+          {{- with .Values.mlflow.resources }}
           resources:
-            requests:
-              cpu: 250m
-              memory: 512Mi
-            limits:
-              cpu: 1000m
-              memory: 2Gi
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           startupProbe:
             httpGet:
               path: /health
-              port: 5000
-            failureThreshold: 30
-            periodSeconds: 10
+              port: {{ .Values.mlflow.service.port }}
             initialDelaySeconds: 15
+            periodSeconds: 10
+            failureThreshold: 30
           livenessProbe:
             httpGet:
               path: /health
-              port: 5000
-            failureThreshold: 3
-            periodSeconds: 30
+              port: {{ .Values.mlflow.service.port }}
             initialDelaySeconds: 20
+            periodSeconds: 30
+            failureThreshold: 3
           readinessProbe:
             httpGet:
               path: /health
-              port: 5000
-            failureThreshold: 3
-            periodSeconds: 10
+              port: {{ .Values.mlflow.service.port }}
             initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 3
           securityContext:
             allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
             capabilities:
               drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: 512Mi
+      {{- with .Values.tolerations }}
       tolerations:
-        {{- toYaml .Values.tolerations | nindent 8 }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-
 ---
 apiVersion: v1
 kind: Service
@@ -418,10 +396,11 @@ metadata:
   name: mlflow
   namespace: {{ include "tradersapp.namespace" . }}
 spec:
-  type: {{ .Values.mlflow.service.type | default "ClusterIP" }}
+  type: {{ .Values.mlflow.service.type }}
   selector:
     app: mlflow
   ports:
     - name: http
-      port: 5000
-      targetPort: 5000
+      port: {{ .Values.mlflow.service.port }}
+      targetPort: {{ .Values.mlflow.service.port }}
+{{- end }}

@@ -48,6 +48,8 @@ spec:
               value: "/data/trading_data.db"
             - name: MODEL_STORE
               value: "/models/store"
+            - name: MLFLOW_TRACKING_URI
+              value: {{ .Values.mlflow.trackingUri | quote }}
             - name: REDIS_HOST
               value: "redis"
             - name: KAFKA_BOOTSTRAP_SERVERS
@@ -89,6 +91,8 @@ spec:
               mountPath: /data
             - name: models
               mountPath: /models
+            - name: tmp
+              mountPath: /tmp
       volumes:
         - name: data
           emptyDir: {}
@@ -99,6 +103,10 @@ spec:
           {{- else }}
           emptyDir: {}
           {{- end }}
+        - name: tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: 256Mi
       terminationGracePeriodSeconds: 60
       {{- with .Values.tolerations }}
       tolerations:

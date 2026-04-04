@@ -391,6 +391,10 @@ class MLflowTrackingClient:
             metadata=metadata,
             registered=True,
         )
+        if not result.get("ok"):
+            result["registered"] = False
+            result["reason"] = "Model logging failed"
+            return result
 
         if result.get("ok") and self._client:
             try:
