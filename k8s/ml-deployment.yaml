@@ -44,8 +44,6 @@ spec:
           ports:
             - containerPort: 8001
               name: http
-            - containerPort: 9091  # Prometheus metrics
-              name: metrics
           envFrom:
             - configMapRef:
                 name: ml-engine-config
@@ -139,6 +137,3 @@ spec:
     - name: http
       port: 8001
       targetPort: 8001
-    - name: metrics
-      port: 9091
-      targetPort: 9091

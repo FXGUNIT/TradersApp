@@ -1,83 +1,55 @@
-# TradersApp — Algorithmic Trading ML Platform
+# TradersApp - Algorithmic Trading ML Platform
 
-**Collective Consciousness System** — ensemble ML consensus for day trading futures.
+**Collective Consciousness System** - ensemble ML consensus for day trading futures.
 
 ---
 
 ## Architecture Overview
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                     TradersApp Frontend (React)              │
-│            CollectiveConsciousness.jsx                        │
-└─────────────────┬───────────────────────────────────────────┘
-                  │ HTTP/gRPC
-┌─────────────────▼───────────────────────────────────────────┐
-│              BFF (Node.js — port 8788)                       │
-│   Consensus routing, security, rate limiting                  │
-└──────┬──────────────────────┬───────────────────────────────┘
-       │                      │
-       ▼                      ▼
-┌──────────────────┐  ┌──────────────────────────┐
-│ ML Engine        │  │ News Service             │
-│ FastAPI          │  │ port 8001                │
-│ port 8001        │  └──────────────────────────┘
-│                  │
-│ • Predictor      │
-│ • ConsensusAgg   │
-│ • DriftMonitor   │
-│ • Feast Client   │
-│ • Triton Client  │
-│ • Prometheus     │
-│ • OpenTelemetry  │
-└────────┬─────────┘
-         │
-    ┌────┴────────────────┐
-    ▼                     ▼
-┌────────────┐      ┌──────────┐
-│  Redis      │      │ Kafka     │
-│  Cache      │      │ 5 Topics  │
-└────────────┘      └───────────┘
+[Frontend] -> [BFF] -> [ML Engine]
+                 |         |
+                 v         v
+              [Redis]   [Kafka]
 ```
 
 ## Services
 
 | Service | Port | Language | Purpose |
-|---------|------|----------|---------|
-| Frontend | 80 | React | UI — Collective Consciousness |
-| BFF | 8788 | Node.js | API gateway, security |
-| ML Engine | 8001 | Python | Training, inference, drift |
-| Telegram Bridge | — | Node.js | Signal alerts |
-| Prometheus | 9090 | — | Metrics collection |
-| Grafana | 3001 | — | Dashboards |
-| Jaeger | 16686 | — | Distributed tracing |
-| Kafka | 9092 | — | Event bus |
+|---|---:|---|---|
+| Frontend | 80 | React | User interface |
+| BFF | 8788 | Node.js | API gateway and security boundary |
+| ML Engine | 8001 | Python | Training, inference, drift detection |
+| Prometheus | 9090 | - | Metrics collection |
+| Grafana | 3001 | - | Dashboards |
+| Jaeger | 16686 | - | Distributed tracing |
+| Kafka | 9092 | - | Event bus |
 
 ## Key Features
 
-- **Ensemble ML**: LightGBM + XGBoost + SVM + Neural Net + AMD classifier
-- **Closed-loop feedback**: Paper trades → drift detection → auto-retrain
-- **Feature store**: Feast with SQLite offline + Redis online
-- **GPU inference**: Triton + ONNX Runtime fallback chain
-- **Data quality**: Great Expectations + Airflow pipeline
-- **Observability**: Prometheus + Grafana + Loki + Jaeger
+- Ensemble ML with multiple model families
+- Closed-loop feedback and retraining
+- Feature store and online cache
+- GPU inference path with Triton fallback
+- Self-hosted observability stack
+- Self-hosted CI/CD with Gitea + Woodpecker + k3s
 
 ## Quick Start
 
 ```bash
-# Start full stack
+# Start the local application stack
 docker compose up -d
 
-# Start ML Engine only
-docker compose up -d ml-engine redis
-
-# Run tests
+# Run ML tests
 cd ml-engine && python -m pytest tests/ -q
-
-# View API docs
-open http://localhost:8001/docs
 ```
+
+## Operations Docs
+
+- [Self-hosted CI/CD](./CICD_GITEA_WOODPECKER.md)
+- [Deployment guide](./DEPLOYMENT.md)
+- [Setup guide](./SETUP.md)
 
 ## License
 
-Proprietary — FXGUNIT
+Proprietary - FXGUNIT

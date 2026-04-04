@@ -21,6 +21,7 @@
  * - Request timeout: 30s max per call
  * - Graceful degradation: NEUTRAL signal when ML Engine unavailable
  */
+import { recordMlEngineRequest, setCircuitBreakerState } from "../metrics.mjs";
 
 // ── Circuit Breaker ────────────────────────────────────────────────────────────
 
@@ -93,21 +94,38 @@ const _mlCircuitBreaker = new CircuitBreaker("ml-engine", {
   recoveryTimeoutMs: 30_000,
 });
 
+const CIRCUIT_BREAKER_METRIC_STATE = {
+  [CB_STATE.CLOSED]: 0,
+  [CB_STATE.HALF_OPEN]: 1,
+  [CB_STATE.OPEN]: 2,
+};
+
+function syncCircuitBreakerMetric() {
+  setCircuitBreakerState(
+    CIRCUIT_BREAKER_METRIC_STATE[_mlCircuitBreaker.state] ?? 0,
+  );
+}
+
+syncCircuitBreakerMetric();
+
 // ── ML Engine Client ──────────────────────────────────────────────────────────
 
 const ML_ENGINE_BASE = process.env.ML_ENGINE_URL || "http://127.0.0.1:8001";
 const ML_REQUEST_TIMEOUT_MS = 30_000;
 
 async function mlRequest(path, body = null, timeout = ML_REQUEST_TIMEOUT_MS) {
-  // Circuit breaker check
-  if (!_mlCircuitBreaker.isAvailable()) {
-    const err = new Error(`Circuit breaker OPEN for ML Engine — state: ${_mlCircuitBreaker.state}`);
+  const isAvailable = _mlCircuitBreaker.isAvailable();
+  syncCircuitBreakerMetric();
+  if (!isAvailable) {
+    const err = new Error(`Circuit breaker OPEN for ML Engine - state: ${_mlCircuitBreaker.state}`);
     err.code = "CIRCUIT_OPEN";
     throw err;
   }
 
+  const startedAt = Date.now();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeout);
+  let statusCode = 0;
 
   try {
     const opts = {
@@ -120,26 +138,29 @@ async function mlRequest(path, body = null, timeout = ML_REQUEST_TIMEOUT_MS) {
     }
 
     const res = await fetch(`${ML_ENGINE_BASE}${path}`, opts);
-    clearTimeout(timer);
+    statusCode = res.status;
 
     if (!res.ok) {
       const text = await res.text().catch(() => "");
-      _mlCircuitBreaker.recordFailure();
       throw new Error(`ML Engine ${res.status}: ${text || res.statusText}`);
     }
 
     _mlCircuitBreaker.recordSuccess();
+    syncCircuitBreakerMetric();
     return await res.json();
   } catch (err) {
-    clearTimeout(timer);
     if (err.name === "AbortError") {
-      _mlCircuitBreaker.recordFailure();
-      throw new Error(`ML Engine request timed out after ${timeout}ms`);
+      statusCode = 0;
+      err = new Error(`ML Engine request timed out after ${timeout}ms`);
     }
     if (err.code !== "CIRCUIT_OPEN") {
       _mlCircuitBreaker.recordFailure();
     }
+    syncCircuitBreakerMetric();
     throw err;
+  } finally {
+    clearTimeout(timer);
+    recordMlEngineRequest(path, statusCode, (Date.now() - startedAt) / 1000);
   }
 }
 

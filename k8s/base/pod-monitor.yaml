@@ -14,8 +14,7 @@ spec:
     matchLabels:
       app: ml-engine
   podMetricsEndpoints:
-    # ML Engine: Prometheus metrics endpoint on port 9091
-    - port: metrics
+    - port: http
       path: /metrics
       interval: 15s
       scrapeTimeout: 10s
@@ -26,11 +25,6 @@ spec:
           targetLabel: namespace
         - sourceLabels: [__meta_kubernetes_pod_label_app]
           targetLabel: app
-    # Fallback: metrics via main HTTP port
-    - port: http
-      path: /metrics
-      interval: 15s
-      scrapeTimeout: 10s
 ---
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
