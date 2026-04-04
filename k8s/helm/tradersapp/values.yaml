@@ -238,7 +238,7 @@ feast:
   # Streaming materialization (Kafka → Redis every 5 min)
   # Enable when Kafka is deployed for real-time candle features
   streaming:
-    enabled: false
+    enabled: true
     concurrencyPolicy: Replace
   # Secret reference for optional credentials
   secretRef:
