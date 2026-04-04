@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { resolve } from "node:path";
 import { createHash, timingSafeEqual } from "node:crypto";
+import { getMetrics, getContentType, recordHttpRequest } from "./metrics.mjs";
 import {
   addSecurityHeaders,
   RateLimiter,
@@ -491,12 +492,25 @@ const sendTelegramMessage = async (message, parseMode = "HTML") => {
 };
 
 const server = createServer(async (req, res) => {
+  const requestStartedAt = Date.now();
   const origin = resolveOrigin(req);
   const url = new URL(req.url || "/", `http://${req.headers.host || `${HOST}:${PORT}`}`);
   const pathname = url.pathname;
+  const method = req.method || "GET";
+
+  if (pathname !== "/metrics") {
+    res.once("finish", () => {
+      recordHttpRequest(
+        method,
+        pathname,
+        res.statusCode || 500,
+        (Date.now() - requestStartedAt) / 1000,
+      );
+    });
+  }
 
   // --- Security: Rate Limiting ---
-  if (req.method !== "OPTIONS") {
+  if (req.method !== "OPTIONS" && pathname !== "/metrics") {
     const clientKey = getClientKey(req);
     const limiter = getRateLimiter(pathname);
     const result = limiter.check(clientKey);
@@ -564,6 +578,18 @@ const server = createServer(async (req, res) => {
       },
       origin,
     );
+    return;
+  }
+
+  // ── Prometheus /metrics ───────────────────────────────────────────────────
+  if (method === "GET" && pathname === "/metrics") {
+    const metrics = await getMetrics();
+    const body = Buffer.from(metrics, "utf8");
+    res.writeHead(200, {
+      "Content-Type": getContentType(),
+      "Content-Length": body.byteLength,
+    });
+    res.end(body);
     return;
   }
 

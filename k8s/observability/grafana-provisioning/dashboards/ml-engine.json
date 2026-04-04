@@ -25,7 +25,10 @@
       "icon": "external link",
       "includeVars": false,
       "keepTime": true,
-      "tags": ["tradersapp", "observability"],
+      "tags": [
+        "tradersapp",
+        "observability"
+      ],
       "targetBlank": true,
       "title": "TradersApp Observability",
       "tooltip": "",
@@ -40,10 +43,26 @@
       "title": "Quick Links",
       "type": "dashboards",
       "options": [
-        { "text": "Prometheus", "description": "Metrics explorer", "url": "http://localhost:9090" },
-        { "text": "Grafana", "description": "Dashboards", "url": "http://localhost:3001" },
-        { "text": "Jaeger", "description": "Distributed traces", "url": "http://localhost:16686" },
-        { "text": "Loki", "description": "Log explorer", "url": "http://localhost:3100" }
+        {
+          "text": "Prometheus",
+          "description": "Metrics explorer",
+          "url": "http://localhost:9090"
+        },
+        {
+          "text": "Grafana",
+          "description": "Dashboards",
+          "url": "http://localhost:3001"
+        },
+        {
+          "text": "Jaeger",
+          "description": "Distributed traces",
+          "url": "http://localhost:16686"
+        },
+        {
+          "text": "Loki",
+          "description": "Log explorer",
+          "url": "http://localhost:3100"
+        }
       ]
     }
   ],
@@ -51,7 +70,12 @@
   "panels": [
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
       "id": 100,
       "panels": [],
       "title": "SLA Overview",
@@ -61,7 +85,12 @@
       "title": "Prediction Latency (p99)",
       "description": "SLA target: <200ms. Amber: >200ms. Red: >500ms.",
       "type": "stat",
-      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 1 },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 0,
+        "y": 6
+      },
       "targets": [
         {
           "expr": "histogram_quantile(0.99, sum(rate(ml_prediction_latency_seconds_bucket[5m])) by (le))",
@@ -75,9 +104,18 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "value": 0, "color": "green" },
-              { "value": 0.2, "color": "yellow" },
-              { "value": 0.5, "color": "red" }
+              {
+                "value": 0,
+                "color": "green"
+              },
+              {
+                "value": 0.2,
+                "color": "yellow"
+              },
+              {
+                "value": 0.5,
+                "color": "red"
+              }
             ]
           },
           "custom": {
@@ -89,24 +127,81 @@
     {
       "title": "Prediction Latency (p50)",
       "type": "stat",
-      "gridPos": { "h": 5, "w": 4, "x": 6, "y": 1 },
+      "gridPos": {
+        "h": 5,
+        "w": 4,
+        "x": 6,
+        "y": 6
+      },
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, sum(rate(ml_prediction_latency_seconds_bucket[5m])) by (le))",
+          "expr": "1000 * histogram_quantile(0.50, sum(rate(ml_prediction_latency_seconds_bucket[5m])) by (le))",
           "legendFormat": "p50"
         }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "ms",
-          "decimals": 2,
+          "decimals": 1,
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "value": 0, "color": "green" },
-              { "value": 50, "color": "yellow" },
-              { "value": 100, "color": "red" }
+              {
+                "value": 0,
+                "color": "green"
+              },
+              {
+                "value": 50,
+                "color": "yellow"
+              },
+              {
+                "value": 100,
+                "color": "red"
+              }
             ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Critical Path SLA (p95)",
+      "description": "BFF /ml/consensus p95 latency. Target: under 50ms.",
+      "type": "stat",
+      "gridPos": {
+        "h": 5,
+        "w": 4,
+        "x": 10,
+        "y": 6
+      },
+      "targets": [
+        {
+          "expr": "1000 * histogram_quantile(0.95, sum(rate(bff_http_request_duration_seconds_bucket{route=\"/ml/consensus\"}[5m])) by (le))",
+          "legendFormat": "p95"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "decimals": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": 0,
+                "color": "green"
+              },
+              {
+                "value": 50,
+                "color": "yellow"
+              },
+              {
+                "value": 100,
+                "color": "red"
+              }
+            ]
+          },
+          "custom": {
+            "displayMode": "color-background"
           }
         }
       }
@@ -115,7 +210,12 @@
       "title": "Cache Hit Ratio",
       "description": "Target: >80%. Cold cache after warmup = warning.",
       "type": "gauge",
-      "gridPos": { "h": 5, "w": 5, "x": 10, "y": 1 },
+      "gridPos": {
+        "h": 5,
+        "w": 4,
+        "x": 14,
+        "y": 6
+      },
       "targets": [
         {
           "expr": "ml_cache_hits_total / (ml_cache_hits_total + ml_cache_misses_total + 0.001)",
@@ -131,9 +231,18 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "value": 0, "color": "red" },
-              { "value": 0.5, "color": "yellow" },
-              { "value": 0.8, "color": "green" }
+              {
+                "value": 0,
+                "color": "red"
+              },
+              {
+                "value": 0.5,
+                "color": "yellow"
+              },
+              {
+                "value": 0.8,
+                "color": "green"
+              }
             ]
           }
         }
@@ -142,7 +251,12 @@
     {
       "title": "System Health",
       "type": "stat",
-      "gridPos": { "h": 5, "w": 4, "x": 15, "y": 1 },
+      "gridPos": {
+        "h": 5,
+        "w": 3,
+        "x": 18,
+        "y": 6
+      },
       "targets": [
         {
           "expr": "up{job=~\"ml-engine|bff|frontend\"} == 0",
@@ -152,14 +266,38 @@
       "fieldConfig": {
         "defaults": {
           "mappings": [
-            { "type": "value", "options": { "0": { "text": "ALL UP", "color": "green" } } },
-            { "type": "range", "options": { "from": 1, "to": 99, "result": { "text": "DEGRADED", "color": "red" } } }
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "ALL UP",
+                  "color": "green"
+                }
+              }
+            },
+            {
+              "type": "range",
+              "options": {
+                "from": 1,
+                "to": 99,
+                "result": {
+                  "text": "DEGRADED",
+                  "color": "red"
+                }
+              }
+            }
           ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "value": 0, "color": "green" },
-              { "value": 1, "color": "red" }
+              {
+                "value": 0,
+                "color": "green"
+              },
+              {
+                "value": 1,
+                "color": "red"
+              }
             ]
           }
         }
@@ -168,15 +306,31 @@
     {
       "title": "Active ML Models",
       "type": "stat",
-      "gridPos": { "h": 5, "w": 3, "x": 19, "y": 1 },
-      "targets": [{ "expr": "ml_models_loaded", "legendFormat": "models" }],
+      "gridPos": {
+        "h": 5,
+        "w": 3,
+        "x": 21,
+        "y": 6
+      },
+      "targets": [
+        {
+          "expr": "ml_models_loaded",
+          "legendFormat": "models"
+        }
+      ],
       "fieldConfig": {
         "defaults": {
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "value": 0, "color": "red" },
-              { "value": 1, "color": "green" }
+              {
+                "value": 0,
+                "color": "red"
+              },
+              {
+                "value": 1,
+                "color": "green"
+              }
             ]
           }
         }
@@ -184,26 +338,50 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 6 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 11
+      },
       "id": 101,
       "panels": [],
-      "title": "ML Engine — Prediction",
+      "title": "ML Engine - Prediction",
       "type": "row"
     },
     {
       "title": "Prediction Confidence",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 7 },
-      "targets": [{ "expr": "ml_prediction_confidence", "legendFormat": "confidence" }],
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 12
+      },
+      "targets": [
+        {
+          "expr": "ml_prediction_confidence",
+          "legendFormat": "confidence"
+        }
+      ],
       "fieldConfig": {
         "defaults": {
           "unit": "percentunit",
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "value": 0, "color": "red" },
-              { "value": 0.55, "color": "yellow" },
-              { "value": 0.7, "color": "green" }
+              {
+                "value": 0,
+                "color": "red"
+              },
+              {
+                "value": 0.55,
+                "color": "yellow"
+              },
+              {
+                "value": 0.7,
+                "color": "green"
+              }
             ]
           }
         }
@@ -213,17 +391,36 @@
       "title": "Feature Drift PSI",
       "description": "PSI thresholds: <0.1 stable, 0.1-0.2 watch, >0.2 drifted",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 7 },
-      "targets": [{ "expr": "ml_feature_drift_psi", "legendFormat": "PSI" }],
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 12
+      },
+      "targets": [
+        {
+          "expr": "ml_feature_drift_psi",
+          "legendFormat": "PSI"
+        }
+      ],
       "fieldConfig": {
         "defaults": {
           "decimals": 3,
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "value": 0, "color": "green" },
-              { "value": 0.1, "color": "yellow" },
-              { "value": 0.2, "color": "red" }
+              {
+                "value": 0,
+                "color": "green"
+              },
+              {
+                "value": 0.1,
+                "color": "yellow"
+              },
+              {
+                "value": 0.2,
+                "color": "red"
+              }
             ]
           }
         }
@@ -232,34 +429,83 @@
     {
       "title": "Drift Alerts (rate)",
       "type": "timeseries",
-      "gridPos": { "h": 4, "w": 8, "x": 8, "y": 7 },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 8,
+        "y": 12
+      },
       "targets": [
-        { "expr": "rate(ml_concept_drift_detected_total[5m])", "legendFormat": "concept drift/s" },
-        { "expr": "rate(ml_feature_drift_detected_total[5m])", "legendFormat": "feature drift/s" },
-        { "expr": "rate(ml_regime_drift_detected_total[5m])", "legendFormat": "regime drift/s" }
+        {
+          "expr": "rate(ml_concept_drift_detected_total[5m])",
+          "legendFormat": "concept drift/s"
+        },
+        {
+          "expr": "rate(ml_feature_drift_detected_total[5m])",
+          "legendFormat": "feature drift/s"
+        },
+        {
+          "expr": "rate(ml_regime_drift_detected_total[5m])",
+          "legendFormat": "regime drift/s"
+        }
       ],
       "fieldConfig": {
-        "defaults": { "unit": "short", "custom": { "lineWidth": 1, "fillOpacity": 30 } }
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 30
+          }
+        }
       }
     },
     {
       "title": "Retrain Status",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 7 },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 12
+      },
       "targets": [
-        { "expr": "ml_retrain_in_progress", "legendFormat": "in progress" },
-        { "expr": "increase(ml_retrain_triggered_total[1h])", "legendFormat": "triggered (1h)" }
+        {
+          "expr": "ml_retrain_in_progress",
+          "legendFormat": "in progress"
+        },
+        {
+          "expr": "increase(ml_retrain_triggered_total[1h])",
+          "legendFormat": "triggered (1h)"
+        }
       ],
       "fieldConfig": {
         "defaults": {
           "mappings": [
-            { "type": "value", "options": { "0": { "text": "IDLE", "color": "green" }, "1": { "text": "TRAINING", "color": "yellow" } } }
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "IDLE",
+                  "color": "green"
+                },
+                "1": {
+                  "text": "TRAINING",
+                  "color": "yellow"
+                }
+              }
+            }
           ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "value": 0, "color": "green" },
-              { "value": 1, "color": "yellow" }
+              {
+                "value": 0,
+                "color": "green"
+              },
+              {
+                "value": 1,
+                "color": "yellow"
+              }
             ]
           }
         }
@@ -268,39 +514,77 @@
     {
       "title": "Candles Ingested (rate)",
       "type": "timeseries",
-      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 7 },
-      "targets": [{ "expr": "rate(ml_candles_ingested_total[5m])", "legendFormat": "candles/s" }],
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 12
+      },
+      "targets": [
+        {
+          "expr": "rate(ml_candles_ingested_total[5m])",
+          "legendFormat": "candles/s"
+        }
+      ],
       "fieldConfig": {
-        "defaults": { "unit": "short", "custom": { "lineWidth": 2, "fillOpacity": 20 } }
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 20
+          }
+        }
       }
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 11 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 16
+      },
       "id": 102,
       "panels": [],
-      "title": "ML Engine — HTTP & Traffic",
+      "title": "ML Engine - HTTP & Traffic",
       "type": "row"
     },
     {
       "title": "HTTP Request Rate",
       "type": "timeseries",
-      "gridPos": { "h": 5, "w": 12, "x": 0, "y": 12 },
+      "gridPos": {
+        "h": 5,
+        "w": 12,
+        "x": 0,
+        "y": 17
+      },
       "targets": [
-        { "expr": "sum(rate(ml_http_requests_total[1m])) by (endpoint, status)", "legendFormat": "{{endpoint}} {{status}}" }
+        {
+          "expr": "sum(rate(ml_http_requests_total[1m])) by (endpoint, status)",
+          "legendFormat": "{{endpoint}} {{status}}"
+        }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "reqps",
-          "custom": { "lineWidth": 1, "fillOpacity": 25, "showPoints": "never" }
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 25,
+            "showPoints": "never"
+          }
         }
       }
     },
     {
       "title": "HTTP Latency (p95)",
-      "description": "BFF → ML Engine end-to-end",
+      "description": "BFF -> ML Engine end-to-end",
       "type": "timeseries",
-      "gridPos": { "h": 5, "w": 12, "x": 12, "y": 12 },
+      "gridPos": {
+        "h": 5,
+        "w": 12,
+        "x": 12,
+        "y": 17
+      },
       "targets": [
         {
           "expr": "histogram_quantile(0.95, sum(rate(ml_http_request_duration_seconds_bucket[5m])) by (le, endpoint))",
@@ -314,7 +598,10 @@
       "fieldConfig": {
         "defaults": {
           "unit": "s",
-          "custom": { "lineWidth": 1, "fillOpacity": 20 }
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 20
+          }
         }
       }
     },
@@ -322,7 +609,12 @@
       "title": "HTTP Error Rate",
       "description": "Percentage of 5xx responses",
       "type": "timeseries",
-      "gridPos": { "h": 4, "w": 8, "x": 0, "y": 17 },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 0,
+        "y": 22
+      },
       "targets": [
         {
           "expr": "sum(rate(ml_http_requests_total{status=~\"5..\"}[5m])) / sum(rate(ml_http_requests_total[5m])) * 100",
@@ -335,9 +627,18 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "value": 0, "color": "green" },
-              { "value": 1, "color": "yellow" },
-              { "value": 5, "color": "red" }
+              {
+                "value": 0,
+                "color": "green"
+              },
+              {
+                "value": 1,
+                "color": "yellow"
+              },
+              {
+                "value": 5,
+                "color": "red"
+              }
             ]
           }
         }
@@ -347,18 +648,36 @@
       "title": "Prediction Volume",
       "description": "Total predictions over time",
       "type": "timeseries",
-      "gridPos": { "h": 4, "w": 8, "x": 8, "y": 17 },
-      "targets": [{ "expr": "sum(increase(ml_http_requests_total{endpoint=\"/ml/consensus\"}[1m]))", "legendFormat": "predictions/min" }],
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 8,
+        "y": 22
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(ml_http_requests_total{endpoint=\"/ml/consensus\"}[1m]))",
+          "legendFormat": "predictions/min"
+        }
+      ],
       "fieldConfig": {
         "defaults": {
           "unit": "short",
-          "custom": { "lineWidth": 2, "fillOpacity": 20 }
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 20
+          }
         }
       }
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 21 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 26
+      },
       "id": 103,
       "panels": [],
       "title": "Resilience",
@@ -368,19 +687,54 @@
       "title": "Circuit Breaker State",
       "description": "0=Closed, 1=Half-Open, 2=Open",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 22 },
-      "targets": [{ "expr": "ml_circuit_breaker_state", "legendFormat": "state" }],
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 27
+      },
+      "targets": [
+        {
+          "expr": "ml_circuit_breaker_state",
+          "legendFormat": "state"
+        }
+      ],
       "fieldConfig": {
         "defaults": {
           "mappings": [
-            { "type": "value", "options": { "0": { "text": "CLOSED", "color": "green" }, "1": { "text": "HALF-OPEN", "color": "yellow" }, "2": { "text": "OPEN", "color": "red" } } }
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "CLOSED",
+                  "color": "green"
+                },
+                "1": {
+                  "text": "HALF-OPEN",
+                  "color": "yellow"
+                },
+                "2": {
+                  "text": "OPEN",
+                  "color": "red"
+                }
+              }
+            }
           ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "value": 0, "color": "green" },
-              { "value": 1, "color": "yellow" },
-              { "value": 2, "color": "red" }
+              {
+                "value": 0,
+                "color": "green"
+              },
+              {
+                "value": 1,
+                "color": "yellow"
+              },
+              {
+                "value": 2,
+                "color": "red"
+              }
             ]
           }
         }
@@ -390,15 +744,31 @@
       "title": "Data Quality Failures",
       "description": "Great Expectations critical failures",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 22 },
-      "targets": [{ "expr": "ml_dq_critical_failures_total", "legendFormat": "critical failures" }],
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 27
+      },
+      "targets": [
+        {
+          "expr": "ml_dq_critical_failures",
+          "legendFormat": "critical failures"
+        }
+      ],
       "fieldConfig": {
         "defaults": {
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "value": 0, "color": "green" },
-              { "value": 1, "color": "red" }
+              {
+                "value": 0,
+                "color": "green"
+              },
+              {
+                "value": 1,
+                "color": "red"
+              }
             ]
           }
         }
@@ -408,16 +778,35 @@
       "title": "Kafka Consumer Lag",
       "description": "Messages behind in Kafka consumer group",
       "type": "timeseries",
-      "gridPos": { "h": 4, "w": 8, "x": 8, "y": 22 },
-      "targets": [{ "expr": "kafka_consumer_group_lag", "legendFormat": "lag" }],
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 8,
+        "y": 27
+      },
+      "targets": [
+        {
+          "expr": "kafka_consumer_group_lag",
+          "legendFormat": "lag"
+        }
+      ],
       "fieldConfig": {
         "defaults": {
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "value": 0, "color": "green" },
-              { "value": 1000, "color": "yellow" },
-              { "value": 10000, "color": "red" }
+              {
+                "value": 0,
+                "color": "green"
+              },
+              {
+                "value": 1000,
+                "color": "yellow"
+              },
+              {
+                "value": 10000,
+                "color": "red"
+              }
             ]
           }
         }
@@ -426,15 +815,31 @@
     {
       "title": "Redis Connections",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 22 },
-      "targets": [{ "expr": "redis_connected_clients", "legendFormat": "clients" }],
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 27
+      },
+      "targets": [
+        {
+          "expr": "redis_connected_clients",
+          "legendFormat": "clients"
+        }
+      ],
       "fieldConfig": {
         "defaults": {
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "value": 0, "color": "red" },
-              { "value": 1, "color": "green" }
+              {
+                "value": 0,
+                "color": "red"
+              },
+              {
+                "value": 1,
+                "color": "green"
+              }
             ]
           }
         }
@@ -442,28 +847,51 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 26 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 31
+      },
       "id": 104,
       "panels": [],
-      "title": "BFF — API Gateway",
+      "title": "BFF - API Gateway",
       "type": "row"
     },
     {
       "title": "BFF Request Rate",
       "type": "timeseries",
-      "gridPos": { "h": 4, "w": 12, "x": 0, "y": 27 },
-      "targets": [{ "expr": "sum(rate(bff_http_requests_total[1m])) by (route, status)", "legendFormat": "{{route}} {{status}}" }],
+      "gridPos": {
+        "h": 4,
+        "w": 12,
+        "x": 0,
+        "y": 32
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(bff_http_requests_total[1m])) by (route, status)",
+          "legendFormat": "{{route}} {{status}}"
+        }
+      ],
       "fieldConfig": {
         "defaults": {
           "unit": "reqps",
-          "custom": { "lineWidth": 1, "fillOpacity": 25 }
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 25
+          }
         }
       }
     },
     {
       "title": "BFF Latency (p99)",
       "type": "timeseries",
-      "gridPos": { "h": 4, "w": 12, "x": 12, "y": 27 },
+      "gridPos": {
+        "h": 4,
+        "w": 12,
+        "x": 12,
+        "y": 32
+      },
       "targets": [
         {
           "expr": "histogram_quantile(0.99, sum(rate(bff_http_request_duration_seconds_bucket[5m])) by (le, route))",
@@ -473,28 +901,51 @@
       "fieldConfig": {
         "defaults": {
           "unit": "s",
-          "custom": { "lineWidth": 1, "fillOpacity": 20 }
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 20
+          }
         }
       }
     }
   ],
   "refresh": "10s",
   "schemaVersion": 38,
-  "tags": ["tradersapp", "ml-engine", "bff"],
+  "tags": [
+    "tradersapp",
+    "ml-engine",
+    "bff"
+  ],
   "templating": {
     "list": [
       {
-        "current": { "selected": false, "text": "Last 1 hour", "value": "1h" },
+        "current": {
+          "selected": false,
+          "text": "Last 1 hour",
+          "value": "1h"
+        },
         "hide": 0,
         "includeAll": false,
         "label": "Time Range",
         "multi": false,
         "name": "time_range",
         "options": [
-          { "text": "Last 15 minutes", "value": "15m" },
-          { "text": "Last 1 hour", "value": "1h" },
-          { "text": "Last 6 hours", "value": "6h" },
-          { "text": "Last 24 hours", "value": "24h" }
+          {
+            "text": "Last 15 minutes",
+            "value": "15m"
+          },
+          {
+            "text": "Last 1 hour",
+            "value": "1h"
+          },
+          {
+            "text": "Last 6 hours",
+            "value": "6h"
+          },
+          {
+            "text": "Last 24 hours",
+            "value": "24h"
+          }
         ],
         "query": "15m,1h,6h,24h",
         "queryValue": "",
@@ -504,14 +955,35 @@
       }
     ]
   },
-  "time": { "from": "now-1h", "to": "now" },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
   "timepicker": {
-    "refresh_intervals": ["5s", "10s", "30s", "1m", "5m", "15m", "30m", "1h"],
-    "time_options": ["5m", "15m", "30m", "1h", "6h", "12h", "24h", "7d"]
+    "refresh_intervals": [
+      "5s",
+      "10s",
+      "30s",
+      "1m",
+      "5m",
+      "15m",
+      "30m",
+      "1h"
+    ],
+    "time_options": [
+      "5m",
+      "15m",
+      "30m",
+      "1h",
+      "6h",
+      "12h",
+      "24h",
+      "7d"
+    ]
   },
   "timezone": "browser",
   "title": "TradersApp ML Engine",
   "uid": "tradersapp-ml-engine",
-  "version": 2,
+  "version": 3,
   "weekStart": ""
 }

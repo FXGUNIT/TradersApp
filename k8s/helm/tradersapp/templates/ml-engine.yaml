@@ -26,8 +26,12 @@ spec:
         {{- include "tradersapp.labels" . | nindent 8 }}
       annotations:
         prometheus.io/scrape: "true"
-        prometheus.io/port: "{{ .Values.mlEngine.service.metricsPort }}"
+        prometheus.io/port: "{{ .Values.mlEngine.service.port }}"
     spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
@@ -39,8 +43,6 @@ spec:
           ports:
             - name: http
               containerPort: {{ .Values.mlEngine.service.port }}
-            - name: metrics
-              containerPort: {{ .Values.mlEngine.service.metricsPort }}
           env:
             - name: DB_PATH
               value: "/data/trading_data.db"
@@ -120,7 +122,4 @@ spec:
     - name: http
       port: {{ .Values.mlEngine.service.port }}
       targetPort: {{ .Values.mlEngine.service.port }}
-    - name: metrics
-      port: {{ .Values.mlEngine.service.metricsPort }}
-      targetPort: {{ .Values.mlEngine.service.metricsPort }}
 {{- end }}

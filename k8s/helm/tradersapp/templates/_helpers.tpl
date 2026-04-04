@@ -45,5 +45,5 @@ helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version }}
 
 {{/* Image pull policy */}}
 {{- define "tradersapp.imagePullPolicy" -}}
-{{- .image.pullPolicy | default "IfNotPresent" }}
+{{- .pullPolicy | default "IfNotPresent" }}
 {{- end }}

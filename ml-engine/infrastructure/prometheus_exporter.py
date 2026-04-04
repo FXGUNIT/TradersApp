@@ -45,13 +45,13 @@ try:
     )
     from prometheus_client.openmetrics.exposition import generate_latest as om_generate_latest
     PROMETHEUS_AVAILABLE = True
+    DEFAULT_REGISTRY = REGISTRY
 except ImportError:
     PROMETHEUS_AVAILABLE = False
+    DEFAULT_REGISTRY = None
 
 
-# ─── Default Registry ──────────────────────────────────────────────────────────────
-
-DEFAULT_REGISTRY = REGISTRY
+_metrics: Optional[dict] = None
 
 
 # ─── Metric Definitions ─────────────────────────────────────────────────────────
@@ -61,8 +61,13 @@ def get_metrics(registry=DEFAULT_REGISTRY) -> dict:
     Returns dict of all Prometheus metrics.
     Lazily initializes metrics on first access.
     """
+    global _metrics
+
     if not PROMETHEUS_AVAILABLE:
         return {}
+
+    if _metrics is not None:
+        return _metrics
 
     metrics = {}
 
@@ -202,13 +207,11 @@ def get_metrics(registry=DEFAULT_REGISTRY) -> dict:
         registry=registry,
     )
 
-    return metrics
+    _metrics = metrics
+    return _metrics
 
 
 # ─── Singleton Metrics ────────────────────────────────────────────────────────────
-
-_metrics: Optional[dict] = None
-
 
 def record_prediction(
     latency_seconds: float,
@@ -284,6 +287,18 @@ def record_retrain(triggered: bool, in_progress: bool = False):
     if triggered:
         _metrics["retrain_triggered"].inc()
     _metrics["retrain_in_progress"].set(1 if in_progress else 0)
+
+
+def set_models_loaded(count: int):
+    """Set the number of currently loaded models."""
+    global _metrics
+    if _metrics is None:
+        _metrics = get_metrics()
+
+    if not PROMETHEUS_AVAILABLE:
+        return
+
+    _metrics["models_loaded"].set(max(0, count))
 
 
 # ─── Prometheus /metrics Endpoint Handler ────────────────────────────────────────

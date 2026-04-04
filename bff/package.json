@@ -11,6 +11,7 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "dotenv": "^16.3.1"
+    "dotenv": "^16.3.1",
+    "prom-client": "^15.1.3"
   }
 }

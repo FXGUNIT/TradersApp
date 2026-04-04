@@ -44,6 +44,30 @@ groups:
   - name: ml-engine-latency
     interval: 30s
     rules:
+      # SLA: Critical path must complete under 50ms (p95)
+      # Alert if /ml/consensus p95 > 50ms
+      - alert: MLSLACriticalPathBreach
+        expr: histogram_quantile(0.95, sum(rate(bff_http_request_duration_seconds_bucket{route="/ml/consensus"}[5m])) by (le)) > 0.050
+        for: 5m
+        labels:
+          severity: critical
+          service: bff
+          sla: "50ms"
+        annotations:
+          summary: "Consensus SLA breach - /ml/consensus p95 > 50ms"
+          description: "The /ml/consensus critical path has exceeded the 50ms target for 5 minutes. Current p95: {{ $value | humanizeDuration }}"
+
+      # SLA: p50 should be well under 50ms
+      - alert: MLPredictionP50High
+        expr: histogram_quantile(0.50, sum(rate(ml_prediction_latency_seconds_bucket[5m])) by (le)) > 0.050
+        for: 10m
+        labels:
+          severity: warning
+          service: ml-engine
+          sla: "50ms"
+        annotations:
+          summary: "Prediction p50 > 50ms"
+          description: "Median prediction latency has exceeded 50ms."
       # Prediction latency SLA breach (p99 > 200ms)
       - alert: MLPredictionLatencyHigh
         expr: histogram_quantile(0.99, sum(rate(ml_prediction_latency_seconds_bucket[5m])) by (le)) > 0.2
@@ -68,7 +92,7 @@ groups:
 
       # BFF → ML Engine round-trip high
       - alert: BFFToMLEngineLatencyHigh
-        expr: histogram_quantile(0.95, sum(rate(ml_http_request_duration_seconds_bucket{handler="/ml/consensus"}[5m])) by (le)) > 1
+        expr: histogram_quantile(0.95, sum(rate(bff_http_request_duration_seconds_bucket{route="/ml/consensus"}[5m])) by (le)) > 1
         for: 5m
         labels:
           severity: warning
@@ -104,7 +128,7 @@ groups:
 
       # Drift alert storm (too many drift alerts)
       - alert: MLDriftAlertStorm
-        expr: increase(ml_drift_alerts_total[15m]) > 5
+        expr: increase(ml_concept_drift_detected_total[15m]) + increase(ml_feature_drift_detected_total[15m]) + increase(ml_regime_drift_detected_total[15m]) > 5
         for: 5m
         labels:
           severity: critical

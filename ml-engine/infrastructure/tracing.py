@@ -21,6 +21,7 @@ import sys
 from pathlib import Path
 from typing import Optional, Callable, Any
 from contextlib import contextmanager
+from functools import wraps
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
@@ -42,10 +43,34 @@ _tracer: Optional[trace.Tracer] = None
 _initialized = False
 
 
+def _resolve_service_name(default: str = "ml-engine") -> str:
+    return (
+        os.environ.get("OTEL_SERVICE_NAME")
+        or os.environ.get("JAEGER_SERVICE_NAME")
+        or default
+    )
+
+
+def _resolve_jaeger_agent(default: str = "localhost:6831") -> str:
+    default_host, _, default_port = default.partition(":")
+    host = (
+        os.environ.get("OTEL_EXPORTER_JAEGER_AGENT_HOST_NAME")
+        or os.environ.get("JAEGER_AGENT_HOST")
+        or default_host
+    )
+    port = (
+        os.environ.get("OTEL_EXPORTER_JAEGER_AGENT_PORT")
+        or os.environ.get("JAEGER_AGENT_PORT")
+        or default_port
+        or "6831"
+    )
+    return f"{host}:{port}"
+
+
 def init_tracing(
-    service_name: str = "ml-engine",
-    jaeger_agent: str = "localhost:6831",
-    enabled: bool = True,
+    service_name: str | None = None,
+    jaeger_agent: str | None = None,
+    enabled: bool | None = None,
 ):
     """
     Initialize OpenTelemetry tracing with Jaeger exporter.
@@ -60,7 +85,10 @@ def init_tracing(
     if _initialized or not OTEL_AVAILABLE:
         return
 
-    if not enabled:
+    service_name = service_name or _resolve_service_name()
+    jaeger_agent = jaeger_agent or _resolve_jaeger_agent()
+
+    if enabled is None:
         enabled = os.environ.get("OTEL_ENABLED", "true").lower() != "false"
 
     if not enabled:
@@ -157,6 +185,7 @@ def trace_function(
     def decorator(func: Callable) -> Callable:
         name = span_name or func.__name__
 
+        @wraps(func)
         def wrapper(*args, **kwargs) -> Any:
             with trace_span(name, attributes):
                 return func(*args, **kwargs)
@@ -188,6 +217,7 @@ if OTEL_AVAILABLE:
             with tracer.start_as_current_span(span_name) as span:
                 span.set_attribute("http.method", request.method)
                 span.set_attribute("http.url", str(request.url))
+                span.set_attribute("http.route", request.url.path)
                 span.set_attribute("http.host", request.url.hostname or "")
                 span.set_attribute("http.scheme", request.url.scheme)
 

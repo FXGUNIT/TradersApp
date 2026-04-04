@@ -13,7 +13,6 @@ mlEngine:
     pullPolicy: IfNotPresent
   service:
     port: 8001
-    metricsPort: 9091
     type: ClusterIP
   resources:
     requests:

@@ -16,7 +16,7 @@ import numpy as np
 import pandas as pd
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse, Response
 from pydantic import BaseModel, Field
 from typing import Optional
 
@@ -32,6 +32,33 @@ from infrastructure.drift_detector import (
     DriftMonitor, DriftThresholds,
 )
 from feedback.feedback_logger import FeedbackLogger
+
+# ── Observability: Prometheus metrics ──────────────────────────────────────────
+try:
+    from infrastructure.prometheus_exporter import (
+        PrometheusMiddleware,
+        handle_metrics,
+        record_prediction as record_prometheus_prediction,
+        record_cache as record_prometheus_cache,
+        record_retrain as record_prometheus_retrain,
+        set_models_loaded as set_prometheus_models_loaded,
+    )
+    PROMETHEUS_AVAILABLE = True
+except ImportError:
+    PROMETHEUS_AVAILABLE = False
+    PrometheusMiddleware = None
+    record_prometheus_prediction = None
+    record_prometheus_cache = None
+    record_prometheus_retrain = None
+    set_prometheus_models_loaded = None
+
+# ── Observability: Jaeger tracing ─────────────────────────────────────────────
+try:
+    from infrastructure.tracing import init_tracing, add_jaeger_middleware
+    TRACING_AVAILABLE = True
+except ImportError:
+    TRACING_AVAILABLE = False
+    add_jaeger_middleware = None
 from feedback.trade_log_processor import TradeLogProcessor
 from feedback.retrain_pipeline import RetrainPipeline, RetrainConfig
 from features.feature_pipeline import engineer_features, get_feature_vector
@@ -108,6 +135,11 @@ async def lifespan(app: FastAPI):
         print(f"Loaded {len(predictor._models)} models on startup")
     except Exception as e:
         print(f"Warning: could not load models on startup: {e}")
+    finally:
+        if PROMETHEUS_AVAILABLE and set_prometheus_models_loaded and predictor is not None:
+            set_prometheus_models_loaded(len(predictor._models))
+        if PROMETHEUS_AVAILABLE and record_prometheus_retrain:
+            record_prometheus_retrain(triggered=False, in_progress=False)
 
     yield
 
@@ -134,6 +166,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ── Observability middleware ───────────────────────────────────────────────────
+# Prometheus HTTP metrics (must be outermost to capture all requests)
+if PROMETHEUS_AVAILABLE and PrometheusMiddleware:
+    app.add_middleware(PrometheusMiddleware)
+
+# Jaeger distributed tracing
+if TRACING_AVAILABLE and add_jaeger_middleware:
+    init_tracing()   # initialize once at startup
+    add_jaeger_middleware(app)
 
 
 # -------------------------------------------------------------------------
@@ -282,6 +324,22 @@ async def health():
         "last_training": stats.get("last_training"),
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
+
+
+# ── Prometheus /metrics ────────────────────────────────────────────────────────
+if PROMETHEUS_AVAILABLE:
+
+    @app.get("/metrics", include_in_schema=False)
+    async def metrics():
+        """Prometheus metrics endpoint for scraping."""
+        body, content_type = handle_metrics()
+        return Response(content=body, headers={"Content-Type": content_type})
+
+else:
+
+    @app.get("/metrics", include_in_schema=False)
+    async def metrics_unavailable():
+        return PlainTextResponse(content="# prometheus-client not installed\n", media_type="text/plain")
 
 
 @app.get("/sla")
@@ -617,10 +675,17 @@ async def train(request: TrainRequest, background: BackgroundTasks):
             )
             # Reload models after training
             predictor.load_all_models()
+            if PROMETHEUS_AVAILABLE and set_prometheus_models_loaded and predictor is not None:
+                set_prometheus_models_loaded(len(predictor._models))
             return result
         except Exception as e:
             return {"error": str(e), "traceback": traceback.format_exc()}
+        finally:
+            if PROMETHEUS_AVAILABLE and record_prometheus_retrain:
+                record_prometheus_retrain(triggered=False, in_progress=False)
 
+    if PROMETHEUS_AVAILABLE and record_prometheus_retrain:
+        record_prometheus_retrain(triggered=True, in_progress=True)
     background.add_task(_do_train)
 
     return {
@@ -635,6 +700,8 @@ async def train(request: TrainRequest, background: BackgroundTasks):
 async def train_sync(request: TrainRequest):
     """Synchronous training — waits for completion."""
     try:
+        if PROMETHEUS_AVAILABLE and record_prometheus_retrain:
+            record_prometheus_retrain(triggered=True, in_progress=True)
         result = trainer.train_direction_models(
             mode=request.mode,
             symbol=request.symbol,
@@ -642,9 +709,14 @@ async def train_sync(request: TrainRequest):
             verbose=True,
         )
         predictor.load_all_models()
+        if PROMETHEUS_AVAILABLE and set_prometheus_models_loaded and predictor is not None:
+            set_prometheus_models_loaded(len(predictor._models))
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if PROMETHEUS_AVAILABLE and record_prometheus_retrain:
+            record_prometheus_retrain(triggered=False, in_progress=False)
 
 
 # -------------------------------------------------------------------------
@@ -672,10 +744,21 @@ async def predict(request: PredictRequest):
 
         cached = cache.get(cache_key)
         if cached is not None:
+            if PROMETHEUS_AVAILABLE and record_prometheus_cache:
+                record_prometheus_cache(hit=True)
             cached["_cached"] = True
             cached["_cache_age_ms"] = round((time.time() - start) * 1000, 1)
-            monitor.record("/predict", (time.time() - start) * 1000, 200)
+            latency_ms = (time.time() - start) * 1000
+            monitor.record("/predict", latency_ms, 200)
+            if PROMETHEUS_AVAILABLE and record_prometheus_prediction:
+                record_prometheus_prediction(
+                    latency_seconds=latency_ms / 1000,
+                    confidence=float(cached.get("confidence") or 0.0),
+                    symbol=request.symbol,
+                )
             return cached
+        elif PROMETHEUS_AVAILABLE and record_prometheus_cache:
+            record_prometheus_cache(hit=False)
 
         # Build candles DataFrame
         if request.candles:
@@ -805,6 +888,12 @@ async def predict(request: PredictRequest):
         # ── SLA recording ─────────────────────────────────────────────────
         latency_ms = (time.time() - start) * 1000
         monitor.record("/predict", latency_ms, 200)
+        if PROMETHEUS_AVAILABLE and record_prometheus_prediction:
+            record_prometheus_prediction(
+                latency_seconds=latency_ms / 1000,
+                confidence=float(output.get("confidence") or 0.0),
+                symbol=request.symbol,
+            )
         output["_latency_ms"] = round(latency_ms, 1)
         return output
 
@@ -856,10 +945,14 @@ async def get_regime(request: RegimeRequest):
     cache_key = f"regime:{request.symbol}:{candle_hash}"
     cached = cache.get(cache_key)
     if cached is not None:
+        if PROMETHEUS_AVAILABLE and record_prometheus_cache:
+            record_prometheus_cache(hit=True)
         cached["_cached"] = True
         cached["_cache_age_ms"] = round((time.time() - start) * 1000, 1)
         monitor.record("/regime", (time.time() - start) * 1000, 200)
         return cached
+    elif PROMETHEUS_AVAILABLE and record_prometheus_cache:
+        record_prometheus_cache(hit=False)
 
     try:
         # Build candles DataFrame
@@ -2211,14 +2304,14 @@ async def log_signal(request: FeedbackSignalRequest):
 
 @app.post("/feedback/record-outcome")
 async def record_outcome(
-    signal_id: int,
-    trade_id: int,
-    result: str = Field(..., description="win / loss / be"),
-    correct: bool = Field(...),
-    pnl_ticks: float | None = None,
-    pnl_dollars: float | None = None,
-    actual_move_ticks: float | None = None,
-    expected_move_ticks: float | None = None,
+    signal_id: int = Query(..., description="Signal ID from the consensus log"),
+    trade_id: int = Query(..., description="Trade ID from execution"),
+    result: str = Query(..., description="win / loss / be"),
+    correct: bool = Query(..., description="Whether the signal was correct"),
+    pnl_ticks: float | None = Query(None, description="PnL in ticks"),
+    pnl_dollars: float | None = Query(None, description="PnL in dollars"),
+    actual_move_ticks: float | None = Query(None, description="Actual price move in ticks"),
+    expected_move_ticks: float | None = Query(None, description="Expected price move in ticks"),
 ):
     """
     Record the outcome of a matched trade for a previously logged signal.

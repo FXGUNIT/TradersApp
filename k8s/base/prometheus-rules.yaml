@@ -50,6 +50,23 @@ spec:
             service: ml-engine
           annotations:
             summary: "Prediction latency p99 > 500ms (CRITICAL)"
+        - alert: MLSLACriticalPathBreach
+          expr: histogram_quantile(0.95, sum(rate(bff_http_request_duration_seconds_bucket{route="/ml/consensus"}[5m])) by (le)) > 0.050
+          for: 5m
+          labels:
+            severity: critical
+            service: bff
+            sla: "50ms"
+          annotations:
+            summary: "Consensus SLA breach - /ml/consensus p95 > 50ms"
+        - alert: MLPredictionP50High
+          expr: histogram_quantile(0.50, sum(rate(ml_prediction_latency_seconds_bucket[5m])) by (le)) > 0.050
+          for: 10m
+          labels:
+            severity: warning
+            service: ml-engine
+          annotations:
+            summary: "Prediction p50 > 50ms"
     - name: ml-engine-drift
       interval: 60s
       rules:
@@ -62,7 +79,7 @@ spec:
           annotations:
             summary: "Feature drift detected (PSI > 0.2)"
         - alert: MLDriftAlertStorm
-          expr: increase(ml_drift_alerts_total[15m]) > 5
+          expr: increase(ml_concept_drift_detected_total[15m]) + increase(ml_feature_drift_detected_total[15m]) + increase(ml_regime_drift_detected_total[15m]) > 5
           for: 5m
           labels:
             severity: critical
@@ -81,7 +98,7 @@ spec:
           annotations:
             summary: "Circuit breaker OPEN — ML Engine rejecting requests"
         - alert: DataQualityCriticalFailures
-          expr: increase(ml_dq_critical_failures_total[5m]) > 0
+          expr: max_over_time(ml_dq_critical_failures[5m]) > 0
           for: 2m
           labels:
             severity: critical
