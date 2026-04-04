@@ -1,17 +1,25 @@
-# TradersApp — Claude Code Architectural Guide
+﻿## Autonomy & No-Permission Rule (Highest Priority - Applies to Claude and Copilot Agents)
+
+- After I give any to-do list or task, work completely autonomously.
+- Never show any permission prompts, confirmation dialogs, or 3-option stoppages.
+- Auto-approve ALL actions: Read, Edit, Write, Bash, MCP tools, terminal commands, etc.
+- Only stop and ask me if the action is extremely dangerous (e.g., deleting the entire project, formatting the drive, or accessing secret keys).
+- This rule applies to both Claude Code and any Copilot/Codex agent features.
+- Proceed safely and summarize what you did at the end of each major step.
+# TradersApp â€” Claude Code Architectural Guide
 
 **Last Updated:** 2026-04-03
 
 ---
 
-## Monorepo Scoping — ZERO MICROMANAGEMENT
+## Monorepo Scoping â€” ZERO MICROMANAGEMENT
 
-**Every reply starts with:** `Scoped to: [folder] — [description]`
+**Every reply starts with:** `Scoped to: [folder] â€” [description]`
 
 ### Scope Detection (Priority Order)
-1. **Error pasted** → Stack trace, file paths, service names → auto-detect microservice
-2. **File open in editor** → That file's folder
-3. **Unclear** → Ask for error text only. NEVER ask for clicks or file names.
+1. **Error pasted** â†’ Stack trace, file paths, service names â†’ auto-detect microservice
+2. **File open in editor** â†’ That file's folder
+3. **Unclear** â†’ Ask for error text only. NEVER ask for clicks or file names.
 
 ### Microservice Detection Keywords
 
@@ -23,17 +31,17 @@
 | `telegram-bridge/`, `telegram`, `bot` | `telegram-bridge/` |
 | `scripts/`, `.ps1` | `scripts/` |
 
-### Once Scoped — Rules
+### Once Scoped â€” Rules
 - **ONLY** read, search, edit files inside that microservice folder
 - **PLUS** `scripts/`, `CLAUDE.md`, `.claude/` if needed
 - **NEVER** load code from other microservices unless you type `@service-name`
 - **Multi-service error**: Scope to primary, note it, expand only on explicit `@mention`
 
 ### Token Economy
-- **Use `/compact` when context > 60%** — never let context bloat slow things
-- **Grep before read** — never read a file before grepping it
-- **Specific reads over globbing** — `Read file:123` not `glob **/*.js`
-- **Never load archives** — skip `.bak`, `.backup`, `archive/` files
+- **Use `/compact` when context > 60%** â€” never let context bloat slow things
+- **Grep before read** â€” never read a file before grepping it
+- **Specific reads over globbing** â€” `Read file:123` not `glob **/*.js`
+- **Never load archives** â€” skip `.bak`, `.backup`, `archive/` files
 
 ---
 
@@ -46,7 +54,7 @@ Every component is a **separate, independently deployable unit** with its own:
 - Own tests (`tests/`, `*.test.ts`, `pytest tests/X/`)
 - Own README if complex
 
-### 2. Module Naming — Be Explicit, Not Clever
+### 2. Module Naming â€” Be Explicit, Not Clever
 ```
 Good:  src/features/consensus/sessionProbabilityEngine.js
 Bad:   src/features/consensus/engine.js
@@ -55,24 +63,24 @@ Bad:   ml-engine/opt.py
 ```
 
 ### 3. File Size Hard Limit
-- **Python files**: ≤ 600 lines. If exceeding, split into `_core.py`, `_utils.py`, `_api.py`
-- **JS/TS files**: ≤ 500 lines. Split at logical boundaries.
-- **React components**: ≤ 300 lines. Extract sub-components to sibling files.
-- **Shell scripts**: ≤ 200 lines.
+- **Python files**: â‰¤ 600 lines. If exceeding, split into `_core.py`, `_utils.py`, `_api.py`
+- **JS/TS files**: â‰¤ 500 lines. Split at logical boundaries.
+- **React components**: â‰¤ 300 lines. Extract sub-components to sibling files.
+- **Shell scripts**: â‰¤ 200 lines.
 
 ### 4. Every New Feature Gets Its Own Directory
 ```
 New Feature: "Session Fatigue Tracker"
 CREATE:
   src/features/sessionFatigue/
-    SessionFatigueTracker.jsx       — main component
-    SessionFatigueCard.jsx          — sub-component
-    useSessionFatigue.js            — hook
-    sessionFatigueService.js        — data fetching
-    sessionFatigueGateway.js         — BFF communication
-    sessionFatigue.types.ts          — type definitions
+    SessionFatigueTracker.jsx       â€” main component
+    SessionFatigueCard.jsx          â€” sub-component
+    useSessionFatigue.js            â€” hook
+    sessionFatigueService.js        â€” data fetching
+    sessionFatigueGateway.js         â€” BFF communication
+    sessionFatigue.types.ts          â€” type definitions
   ml-engine/session/
-    fatigue_tracker.py              — backend logic
+    fatigue_tracker.py              â€” backend logic
   tests/
     sessionFatigue.test.tsx
     fatigue_tracker.test.py
@@ -81,12 +89,12 @@ DONT: append to existing files like CollectiveConsciousness.jsx
 
 ### 5. Async-First, Concurrent by Default
 ```javascript
-// BAD — sequential
+// BAD â€” sequential
 const news = await fetchNews();
 const consensus = await fetchConsensus();
 const regime = await fetchRegime();
 
-// GOOD — concurrent, same latency as slowest single call
+// GOOD â€” concurrent, same latency as slowest single call
 const [news, consensus, regime] = await Promise.all([
   fetchNews(),
   fetchConsensus(),
@@ -115,7 +123,7 @@ Layer: ML Engine
 ### 7. Typed Boundaries Between Services
 Every cross-service call has explicit types:
 ```typescript
-// BFF → ML Engine (mjs)
+// BFF â†’ ML Engine (mjs)
 interface MLConsensusRequest {
   candles: CandleData[];
   features: MathEngineSnapshot;
@@ -123,7 +131,7 @@ interface MLConsensusRequest {
   tradeLog?: TradeEntry[];
 }
 
-// ML Engine → BFF (Python Pydantic)
+// ML Engine â†’ BFF (Python Pydantic)
 class ConsensusResponse(BaseModel):
     signal: Literal["LONG", "SHORT", "NEUTRAL"]
     confidence: float = Field(ge=0, le=0.9999)
@@ -162,111 +170,111 @@ The pre-commit hook (`git/hooks/pre-commit`) auto-creates a backup tag. The auto
 
 ```
 TradersApp/
-├── bff/                         # Node.js BFF — port 8788
-│   ├── server.mjs               # Express app entry (ONLY orchestration)
-│   ├── routes/                  # One file per route group
-│   │   ├── consensusRoutes.mjs
-│   │   ├── newsRoutes.mjs
-│   │   └── supportRoutes.mjs
-│   ├── services/                # One file per service
-│   │   ├── consensusEngine.mjs
-│   │   ├── newsService.mjs
-│   │   ├── breakingNewsService.mjs
-│   │   ├── supportChatService.mjs
-│   │   ├── mlClients.mjs        # All ML Engine HTTP calls
-│   │   └── security.mjs        # Rate limiting, HSTS, Helmet
-│   └── Dockerfile
-│
-├── ml-engine/                   # Python FastAPI — port 8001
-│   ├── main.py                  # FastAPI entry (routing ONLY)
-│   ├── config.py                 # All hyperparameters
-│   ├── data/                     # Database layer
-│   │   ├── candle_db.py
-│   │   ├── schema.sql
-│   │   └── load_ninjatrader_csv.py
-│   ├── features/                 # Feature engineering pipeline
-│   │   ├── feature_pipeline.py
-│   │   ├── candle_features.py
-│   │   └── session_aggregates.py
-│   ├── models/                   # One subdir per model family
-│   │   ├── direction/
-│   │   ├── session/
-│   │   ├── magnitude/
-│   │   ├── alpha/
-│   │   ├── regime/
-│   │   │   ├── hmm_regime.py
-│   │   │   ├── fp_fk_regime.py
-│   │   │   ├── anomalous_diffusion.py
-│   │   │   └── regime_ensemble.py
-│   │   └── mamba/
-│   │       └── mamba_sequence_model.py
-│   ├── training/
-│   │   ├── trainer.py
-│   │   ├── cross_validator.py
-│   │   └── model_store.py
-│   ├── inference/
-│   │   ├── predictor.py
-│   │   ├── consensus_aggregator.py
-│   │   └── explainer.py
-│   ├── optimization/
-│   │   ├── pso_optimizer.py
-│   │   ├── rrr_optimizer.py
-│   │   ├── exit_optimizer.py
-│   │   └── position_sizer.py
-│   ├── alpha/
-│   │   └── alpha_engine.py
-│   ├── session/
-│   │   └── session_probability.py
-│   ├── infrastructure/
-│   │   ├── performance.py        # Redis, circuit breaker, SLA
-│   │   ├── continual_learning.py # EWC, replay buffer
-│   │   └── evaluation.py        # drift, A/B, guardrails
-│   ├── tests/
-│   │   └── test_*.py
-│   └── Dockerfile
-│
-├── src/                         # React Frontend
-│   ├── pages/
-│   │   ├── CollectiveConsciousness.jsx  # Import all consensus sub-components
-│   │   └── *.jsx
-│   ├── features/                # Feature-scoped directories
-│   │   ├── consensus/
-│   │   │   ├── ConsensusSignal.jsx
-│   │   │   ├── SessionProbabilityPanel.jsx
-│   │   │   ├── AlphaDisplay.jsx
-│   │   │   ├── ExitStrategyPanel.jsx
-│   │   │   ├── RRRRecommendation.jsx
-│   │   │   ├── PositionSizingPanel.jsx
-│   │   │   ├── TimingRecommendation.jsx
-│   │   │   ├── ModelVotesPanel.jsx
-│   │   │   └── NewsCountdown.jsx
-│   │   ├── shell/               # App shell, registry, routing
-│   │   └── support/
-│   ├── components/              # Shared/reusable components
-│   │   ├── BreakingNewsPanel.jsx
-│   │   ├── AdminMessagePanel.jsx
-│   │   └── *.jsx
-│   └── services/
-│       ├── clients/
-│       │   └── ConsensusClient.js
-│       └── gateways/
-│           └── consensusGateway.js
-│
-├── telegram-bridge/
-│   ├── index.js                 # Telegram bot + web server
-│   ├── aiConversation.js        # AI response formatters
-│   └── userRegistry.js          # User management
-│
-├── scripts/
-│   ├── auto_backup.py           # CLI git backup tool
-│   ├── setup-infisical.ps1      # Push secrets to Infisical
-│   └── setup-production.ps1     # Push secrets to Railway/Vercel
-│
-└── docs/
-    ├── DEPLOYMENT.md
-    ├── SETUP.md
-    ├── SECRETS_ARCHITECTURE.md
-    └── TODO_MASTER_LIST.md
+â”œâ”€â”€ bff/                         # Node.js BFF â€” port 8788
+â”‚   â”œâ”€â”€ server.mjs               # Express app entry (ONLY orchestration)
+â”‚   â”œâ”€â”€ routes/                  # One file per route group
+â”‚   â”‚   â”œâ”€â”€ consensusRoutes.mjs
+â”‚   â”‚   â”œâ”€â”€ newsRoutes.mjs
+â”‚   â”‚   â””â”€â”€ supportRoutes.mjs
+â”‚   â”œâ”€â”€ services/                # One file per service
+â”‚   â”‚   â”œâ”€â”€ consensusEngine.mjs
+â”‚   â”‚   â”œâ”€â”€ newsService.mjs
+â”‚   â”‚   â”œâ”€â”€ breakingNewsService.mjs
+â”‚   â”‚   â”œâ”€â”€ supportChatService.mjs
+â”‚   â”‚   â”œâ”€â”€ mlClients.mjs        # All ML Engine HTTP calls
+â”‚   â”‚   â””â”€â”€ security.mjs        # Rate limiting, HSTS, Helmet
+â”‚   â””â”€â”€ Dockerfile
+â”‚
+â”œâ”€â”€ ml-engine/                   # Python FastAPI â€” port 8001
+â”‚   â”œâ”€â”€ main.py                  # FastAPI entry (routing ONLY)
+â”‚   â”œâ”€â”€ config.py                 # All hyperparameters
+â”‚   â”œâ”€â”€ data/                     # Database layer
+â”‚   â”‚   â”œâ”€â”€ candle_db.py
+â”‚   â”‚   â”œâ”€â”€ schema.sql
+â”‚   â”‚   â””â”€â”€ load_ninjatrader_csv.py
+â”‚   â”œâ”€â”€ features/                 # Feature engineering pipeline
+â”‚   â”‚   â”œâ”€â”€ feature_pipeline.py
+â”‚   â”‚   â”œâ”€â”€ candle_features.py
+â”‚   â”‚   â””â”€â”€ session_aggregates.py
+â”‚   â”œâ”€â”€ models/                   # One subdir per model family
+â”‚   â”‚   â”œâ”€â”€ direction/
+â”‚   â”‚   â”œâ”€â”€ session/
+â”‚   â”‚   â”œâ”€â”€ magnitude/
+â”‚   â”‚   â”œâ”€â”€ alpha/
+â”‚   â”‚   â”œâ”€â”€ regime/
+â”‚   â”‚   â”‚   â”œâ”€â”€ hmm_regime.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ fp_fk_regime.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ anomalous_diffusion.py
+â”‚   â”‚   â”‚   â””â”€â”€ regime_ensemble.py
+â”‚   â”‚   â””â”€â”€ mamba/
+â”‚   â”‚       â””â”€â”€ mamba_sequence_model.py
+â”‚   â”œâ”€â”€ training/
+â”‚   â”‚   â”œâ”€â”€ trainer.py
+â”‚   â”‚   â”œâ”€â”€ cross_validator.py
+â”‚   â”‚   â””â”€â”€ model_store.py
+â”‚   â”œâ”€â”€ inference/
+â”‚   â”‚   â”œâ”€â”€ predictor.py
+â”‚   â”‚   â”œâ”€â”€ consensus_aggregator.py
+â”‚   â”‚   â””â”€â”€ explainer.py
+â”‚   â”œâ”€â”€ optimization/
+â”‚   â”‚   â”œâ”€â”€ pso_optimizer.py
+â”‚   â”‚   â”œâ”€â”€ rrr_optimizer.py
+â”‚   â”‚   â”œâ”€â”€ exit_optimizer.py
+â”‚   â”‚   â””â”€â”€ position_sizer.py
+â”‚   â”œâ”€â”€ alpha/
+â”‚   â”‚   â””â”€â”€ alpha_engine.py
+â”‚   â”œâ”€â”€ session/
+â”‚   â”‚   â””â”€â”€ session_probability.py
+â”‚   â”œâ”€â”€ infrastructure/
+â”‚   â”‚   â”œâ”€â”€ performance.py        # Redis, circuit breaker, SLA
+â”‚   â”‚   â”œâ”€â”€ continual_learning.py # EWC, replay buffer
+â”‚   â”‚   â””â”€â”€ evaluation.py        # drift, A/B, guardrails
+â”‚   â”œâ”€â”€ tests/
+â”‚   â”‚   â””â”€â”€ test_*.py
+â”‚   â””â”€â”€ Dockerfile
+â”‚
+â”œâ”€â”€ src/                         # React Frontend
+â”‚   â”œâ”€â”€ pages/
+â”‚   â”‚   â”œâ”€â”€ CollectiveConsciousness.jsx  # Import all consensus sub-components
+â”‚   â”‚   â””â”€â”€ *.jsx
+â”‚   â”œâ”€â”€ features/                # Feature-scoped directories
+â”‚   â”‚   â”œâ”€â”€ consensus/
+â”‚   â”‚   â”‚   â”œâ”€â”€ ConsensusSignal.jsx
+â”‚   â”‚   â”‚   â”œâ”€â”€ SessionProbabilityPanel.jsx
+â”‚   â”‚   â”‚   â”œâ”€â”€ AlphaDisplay.jsx
+â”‚   â”‚   â”‚   â”œâ”€â”€ ExitStrategyPanel.jsx
+â”‚   â”‚   â”‚   â”œâ”€â”€ RRRRecommendation.jsx
+â”‚   â”‚   â”‚   â”œâ”€â”€ PositionSizingPanel.jsx
+â”‚   â”‚   â”‚   â”œâ”€â”€ TimingRecommendation.jsx
+â”‚   â”‚   â”‚   â”œâ”€â”€ ModelVotesPanel.jsx
+â”‚   â”‚   â”‚   â””â”€â”€ NewsCountdown.jsx
+â”‚   â”‚   â”œâ”€â”€ shell/               # App shell, registry, routing
+â”‚   â”‚   â””â”€â”€ support/
+â”‚   â”œâ”€â”€ components/              # Shared/reusable components
+â”‚   â”‚   â”œâ”€â”€ BreakingNewsPanel.jsx
+â”‚   â”‚   â”œâ”€â”€ AdminMessagePanel.jsx
+â”‚   â”‚   â””â”€â”€ *.jsx
+â”‚   â””â”€â”€ services/
+â”‚       â”œâ”€â”€ clients/
+â”‚       â”‚   â””â”€â”€ ConsensusClient.js
+â”‚       â””â”€â”€ gateways/
+â”‚           â””â”€â”€ consensusGateway.js
+â”‚
+â”œâ”€â”€ telegram-bridge/
+â”‚   â”œâ”€â”€ index.js                 # Telegram bot + web server
+â”‚   â”œâ”€â”€ aiConversation.js        # AI response formatters
+â”‚   â””â”€â”€ userRegistry.js          # User management
+â”‚
+â”œâ”€â”€ scripts/
+â”‚   â”œâ”€â”€ auto_backup.py           # CLI git backup tool
+â”‚   â”œâ”€â”€ setup-infisical.ps1      # Push secrets to Infisical
+â”‚   â””â”€â”€ setup-production.ps1     # Push secrets to Railway/Vercel
+â”‚
+â””â”€â”€ docs/
+    â”œâ”€â”€ DEPLOYMENT.md
+    â”œâ”€â”€ SETUP.md
+    â”œâ”€â”€ SECRETS_ARCHITECTURE.md
+    â””â”€â”€ TODO_MASTER_LIST.md
 ```
 
 ---
@@ -293,9 +301,9 @@ class RegimeEnsemble:
 ```
 
 ### Every Model Has:
-1. `train(X, y)` — with TimeSeriesSplit CV
-2. `predict(X) -> dict` — with explicit return shape
-3. `get_feature_importance()` — SHAP or permutation importance
+1. `train(X, y)` â€” with TimeSeriesSplit CV
+2. `predict(X) -> dict` â€” with explicit return shape
+3. `get_feature_importance()` â€” SHAP or permutation importance
 4. Guardrails on all outputs
 5. Graceful fallback when data insufficient
 
@@ -317,11 +325,11 @@ Use singletons or dependency injection. No global mutable state.
 ### Component Hierarchy
 ```
 Page (CollectiveConsciousness.jsx)
-  └─ Feature Container (ConsensusSignal.jsx)       # Fetches data, owns state
-       ├─ SectionCard (SessionProbabilityPanel.jsx)  # Displays one concern
-       ├─ SectionCard (AlphaDisplay.jsx)
-       ├─ SectionCard (ExitStrategyPanel.jsx)
-       └─ ...
+  â””â”€ Feature Container (ConsensusSignal.jsx)       # Fetches data, owns state
+       â”œâ”€ SectionCard (SessionProbabilityPanel.jsx)  # Displays one concern
+       â”œâ”€ SectionCard (AlphaDisplay.jsx)
+       â”œâ”€ SectionCard (ExitStrategyPanel.jsx)
+       â””â”€ ...
 ```
 
 ### State Ownership
@@ -335,16 +343,16 @@ Page (CollectiveConsciousness.jsx)
 // Feature Container: always has these states
 const { data, isLoading, error } = useQuery(...);
 // Renders:
-// - isLoading → WarRoomLoader
-// - error → "Service Unavailable" with retry
-// - data → actual content
+// - isLoading â†’ WarRoomLoader
+// - error â†’ "Service Unavailable" with retry
+// - data â†’ actual content
 ```
 
 ---
 
 ## API Design Rules
 
-### BFF → ML Engine Contract
+### BFF â†’ ML Engine Contract
 All ML Engine endpoints return:
 ```python
 class BaseResponse(BaseModel):
@@ -384,14 +392,14 @@ class BaseResponse(BaseModel):
 3. **ML prediction is cached** with Redis (TTL per endpoint type)
 4. **Heavy ML operations** run in thread pool or separate worker
 5. **React renders** use `React.memo` + `useMemo` + `useCallback` aggressively
-6. **No inline styles** — use CSS classes or CSS-in-JS with `styled()`
+6. **No inline styles** â€” use CSS classes or CSS-in-JS with `styled()`
 7. **Images and heavy assets** lazy-loaded with `React.lazy()`
 
 ---
 
 ## Data Versioning (DVC)
 
-**Every dataset, model, and experiment is versioned with DVC + Git.** No exception — reproducibility is non-negotiable.
+**Every dataset, model, and experiment is versioned with DVC + Git.** No exception â€” reproducibility is non-negotiable.
 
 ### DVC Setup
 ```bash
@@ -428,10 +436,10 @@ python -m dvc repro             # Recompute pipeline
 ```
 
 ### Key rules
-- **Never** `git add` large binary data or model files — DVC handles them
+- **Never** `git add` large binary data or model files â€” DVC handles them
 - **Always** `git add` the corresponding `.dvc` file after `dvc add`
-- `dvc.yaml` defines the pipeline: `ingest → features → train → evaluate`
-- `params.yaml` holds all tunable hyperparameters — version it alongside code
+- `dvc.yaml` defines the pipeline: `ingest â†’ features â†’ train â†’ evaluate`
+- `params.yaml` holds all tunable hyperparameters â€” version it alongside code
 - After training: `python -m dvc push` to upload models to DVC remote
 - Before pulling on a new machine: `python -m dvc pull` to restore models
 
@@ -471,16 +479,16 @@ AWS_SECRET_ACCESS_KEY=minioadmin123
 
 ### Model lifecycle (3 stages)
 ```
-None → Staging → Production → Archived
+None â†’ Staging â†’ Production â†’ Archived
 ```
-- **Staging**: new model passes PBO < 5%, Sharpe ≥ 0.5, win rate ≥ 50%
+- **Staging**: new model passes PBO < 5%, Sharpe â‰¥ 0.5, win rate â‰¥ 50%
 - **Production**: manually promoted after paper trade verification
 - **Archived**: production model older than 7 days auto-archived
 
 ### Key rules
 - Every `trainer.train_all()` call automatically logs to MLflow
 - `auto_register_if_passing()` promotes to Staging if thresholds met
-- `promote_model()` moves Staging → Production after paper trade review
+- `promote_model()` moves Staging â†’ Production after paper trade review
 - `archive_stale_models()` auto-archives production models older than 7 days
 - DVC commit hash is logged as `dvc_commit` tag on every run (data lineage)
 
@@ -498,24 +506,24 @@ None → Staging → Production → Archived
    refactor: Split CollectiveConsciousness into sub-components
    perf: Add Redis caching to ML consensus endpoint
    ```
-4. **PR before merge** — never push directly to main
+4. **PR before merge** â€” never push directly to main
 5. **Backup before every significant change**: `python scripts/auto_backup.py "message"`
 
 ---
 
 ## Anti-Patterns to Never Do
 
-- [ ] Never append to a file over 600 lines — split it
-- [ ] Never use `any` in TypeScript — use `unknown` + narrowing
-- [ ] Never use `// @ts-ignore` — fix the type instead
-- [ ] Never `await` inside a `Promise.all` loop — use `Promise.allSettled`
-- [ ] Never mutate state directly in React — always use `setState` or Zustand actions
-- [ ] Never hardcode a URL in code — use env vars
-- [ ] Never commit secrets — use Infisical
-- [ ] Never use `sleep` in tests — use `waitFor` assertions
-- [ ] Never catch `Exception` broadly — catch specific exceptions
-- [ ] Never use `eval()` or `new Function()` — use `JSON.parse` for JSON
-- [ ] Never make the ML engine depend on the BFF — BFF calls ML, never reverse
+- [ ] Never append to a file over 600 lines â€” split it
+- [ ] Never use `any` in TypeScript â€” use `unknown` + narrowing
+- [ ] Never use `// @ts-ignore` â€” fix the type instead
+- [ ] Never `await` inside a `Promise.all` loop â€” use `Promise.allSettled`
+- [ ] Never mutate state directly in React â€” always use `setState` or Zustand actions
+- [ ] Never hardcode a URL in code â€” use env vars
+- [ ] Never commit secrets â€” use Infisical
+- [ ] Never use `sleep` in tests â€” use `waitFor` assertions
+- [ ] Never catch `Exception` broadly â€” catch specific exceptions
+- [ ] Never use `eval()` or `new Function()` â€” use `JSON.parse` for JSON
+- [ ] Never make the ML engine depend on the BFF â€” BFF calls ML, never reverse
 
 ---
 
@@ -546,14 +554,14 @@ Never write implementation code before the test is defined.
 
 When a bug appears, follow this order. Human does steps 1-3 first:
 
-1. **Reproduce** — Confirm the bug exists with exact steps
-2. **Log** — Capture exact error message, stack trace, timestamps
-3. **Isolate** — Narrow down to the exact file/function/line
-4. **Measure** — Add timing/logging to quantify the problem
-5. **Hypothesize** — Form theory based on evidence above
-6. **Fix** — Implement the minimal fix
-7. **Verify** — Run same reproduction steps, confirm fix
-8. **Document** — Add test case or log to prevent recurrence
+1. **Reproduce** â€” Confirm the bug exists with exact steps
+2. **Log** â€” Capture exact error message, stack trace, timestamps
+3. **Isolate** â€” Narrow down to the exact file/function/line
+4. **Measure** â€” Add timing/logging to quantify the problem
+5. **Hypothesize** â€” Form theory based on evidence above
+6. **Fix** â€” Implement the minimal fix
+7. **Verify** â€” Run same reproduction steps, confirm fix
+8. **Document** â€” Add test case or log to prevent recurrence
 
 ---
 
@@ -562,8 +570,8 @@ When a bug appears, follow this order. Human does steps 1-3 first:
 | Metric | Target | Enforced |
 |--------|--------|----------|
 | ML Consensus latency | < 200ms | Hard limit |
-| BFF → ML Engine | < 5s timeout | Circuit breaker |
-| BFF → News | < 3s timeout | Circuit breaker |
+| BFF â†’ ML Engine | < 5s timeout | Circuit breaker |
+| BFF â†’ News | < 3s timeout | Circuit breaker |
 | Circuit breaker | 5 failures / 30s | Auto-open |
 | Cache TTL (consensus) | 60s | Redis or in-memory |
 | Cache TTL (regime) | 300s | Redis or in-memory |
@@ -572,7 +580,7 @@ Rules:
 - ML predictions: cache with Redis (TTL per endpoint type)
 - Heavy operations: thread pool or worker process, never block main thread
 - In React: use `React.memo` + `useMemo` + `useCallback` aggressively
-- No inline styles — CSS classes only
+- No inline styles â€” CSS classes only
 - Candle data loading: max 10k rows per request, paginate larger queries
 - Model inference: lazy-load models, unload after 5 min inactivity
 - Feature computation: precompute on load, cache per symbol/timeframe
@@ -583,11 +591,11 @@ Rules:
 
 When Claude/OpenClaw proposes a solution, the priority order is:
 
-1. **Safety over speed** — A safe system that is slightly slower is preferred
-2. **Correctness over elegance** — Simple and correct beats clever and broken
-3. **Robustness over optimization** — Never optimize at the cost of edge case handling
-4. **Readability over brevity** — Future humans (including future Claude) must understand code
-5. **Explicit over implicit** — No magic, no hidden state, no silent fallbacks
+1. **Safety over speed** â€” A safe system that is slightly slower is preferred
+2. **Correctness over elegance** â€” Simple and correct beats clever and broken
+3. **Robustness over optimization** â€” Never optimize at the cost of edge case handling
+4. **Readability over brevity** â€” Future humans (including future Claude) must understand code
+5. **Explicit over implicit** â€” No magic, no hidden state, no silent fallbacks
 
 In order routing: safety > correctness > robustness > readability > performance
 
@@ -664,7 +672,7 @@ Every session starts with access to these (do not work without them):
 
 ---
 
-## Model Tiers — Enforced on All Sub-Agents
+## Model Tiers â€” Enforced on All Sub-Agents
 
 This project uses Claude model tiers for different task types. **Sub-agents MUST use these tiers:**
 
@@ -674,10 +682,11 @@ This project uses Claude model tiers for different task types. **Sub-agents MUST
 | **Sonnet 4** | `claude-sonnet-4-6` | Coding, implementation, bug fixes, refactoring, feature development |
 | **Haiku 4.5** | `claude-haiku-4-5-20251001` | File exploration, grep/search, read-only analysis, pattern finding, simple research tasks |
 
-**AutoResearch loop (scripts/autoresearch/):** Haiku explores bottlenecks → Sonnet implements optimizations → Opus evaluates loop direction.
+**AutoResearch loop (scripts/autoresearch/):** Haiku explores bottlenecks â†’ Sonnet implements optimizations â†’ Opus evaluates loop direction.
 
 **Quick reference:**
-- Planning a new feature or architecture? → Use **Opus**
-- Writing or editing code? → Use **Sonnet**
-- Finding files, grep, understanding code structure? → Use **Haiku**
+- Planning a new feature or architecture? â†’ Use **Opus**
+- Writing or editing code? â†’ Use **Sonnet**
+- Finding files, grep, understanding code structure? â†’ Use **Haiku**
+
 

@@ -1,20 +1,10 @@
 {
   "permissions": {
+    "defaultMode": "bypassPermissions",
     "allow": [
-      "Bash",
-      "Read",
-      "Edit",
-      "Write",
-      "Glob",
-      "Grep",
-      "TodoWrite",
-      "WebSearch",
-      "WebFetch",
-      "Agent",
-      "NotebookEdit",
-      "TaskOutput",
-      "TaskStop"
-    ]
+      "*"
+    ],
+    "ask": []
   },
   "compact": {
     "aggressive": true,
