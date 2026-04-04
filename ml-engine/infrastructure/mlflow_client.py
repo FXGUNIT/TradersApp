@@ -23,6 +23,7 @@ import os
 import sys
 import hashlib
 import datetime
+import tempfile
 import threading
 from pathlib import Path
 from typing import Any, Optional
@@ -48,7 +49,7 @@ MLFLOW_TRACKING_URI = os.environ.get(
 MLFLOW_EXPERIMENT_PREFIX = "tradersapp_"
 REGISTRY_ARTIFACT_ROOT = os.environ.get(
     "MLFLOW_ARTIFACT_ROOT",
-    "s3://mlflow-artifacts/models/"
+    "s3://mlflow-artifacts/"
 )
 
 # Stage lifecycle: None → Staging → Production → Archived
@@ -95,6 +96,7 @@ class MLflowTrackingClient:
         self.artifact_root = artifact_root
         self._active_run = None
         self._client = None
+        self._run_stack: list[str] = []
 
         if MLFLOW_AVAILABLE:
             self._setup()
@@ -105,11 +107,9 @@ class MLflowTrackingClient:
         mlflow.set_experiment(f"{MLFLOW_EXPERIMENT_PREFIX}{self.experiment_name}")
         self._client = MlflowClient(self.tracking_uri)
 
-        # Ensure artifact path is accessible
-        os.environ.setdefault(
-            "MLFLOW_S3_ENDPOINT_URL",
-            os.environ.get("MLFLOW_S3_ENDPOINT_URL", "http://localhost:9000")
-        )
+        endpoint_url = os.environ.get("MLFLOW_S3_ENDPOINT_URL")
+        if endpoint_url:
+            os.environ["MLFLOW_S3_ENDPOINT_URL"] = endpoint_url
 
         print(f"[MLflow] Tracking at {self.tracking_uri}, experiment: {self.experiment_name}")
 
@@ -120,6 +120,7 @@ class MLflowTrackingClient:
         run_name: str | None = None,
         tags: dict | None = None,
         description: str | None = None,
+        nested: bool = False,
     ) -> "MLflowTrackingClient":
         """
         Start a new MLflow run and return self for chaining.
@@ -142,15 +143,19 @@ class MLflowTrackingClient:
             run_name=run_name,
             description=description,
             tags=extra_tags,
+            nested=nested,
         )
         self._active_run = run
+        self._run_stack.append(run.info.run_id)
         return self
 
     def end_run(self, status: str = "FINISHED"):
         """End the current MLflow run."""
-        if MLFLOW_AVAILABLE and self._active_run:
+        if MLFLOW_AVAILABLE and mlflow.active_run():
             mlflow.end_run(status=status)
-            self._active_run = None
+            if self._run_stack:
+                self._run_stack.pop()
+            self._active_run = mlflow.active_run()
 
     def __enter__(self):
         return self
@@ -166,7 +171,7 @@ class MLflowTrackingClient:
 
     def log_params(self, params: dict[str, Any]):
         """Log hyperparameters."""
-        if not MLFLOW_AVAILABLE:
+        if not MLFLOW_AVAILABLE or not self._has_active_run():
             return
         for key, value in params.items():
             mlflow.log_param(key, value)
@@ -177,14 +182,19 @@ class MLflowTrackingClient:
         step: int | None = None,
     ):
         """Log evaluation metrics."""
-        if not MLFLOW_AVAILABLE:
+        if not MLFLOW_AVAILABLE or not self._has_active_run():
             return
         for key, value in metrics.items():
-            mlflow.log_metric(key, float(value), step=step)
+            if value is None:
+                continue
+            try:
+                mlflow.log_metric(key, float(value), step=step)
+            except (TypeError, ValueError):
+                continue
 
     def log_tag(self, key: str, value: str):
         """Log a tag on the active run."""
-        if not MLFLOW_AVAILABLE or not self._active_run:
+        if not MLFLOW_AVAILABLE or not self._has_active_run():
             return
         mlflow.set_tag(key, value)
 
@@ -225,23 +235,33 @@ class MLflowTrackingClient:
         """
         if not MLFLOW_AVAILABLE:
             return {"ok": False, "reason": "MLflow not available"}
+        if not self._has_active_run():
+            return {"ok": False, "reason": "No active MLflow run"}
 
         try:
             # Build artifact path
             artifact_path = f"{model_name}"
+            model_to_log = getattr(model, "pipeline", model)
+            model_info = None
 
             # Build log dict for extra files
+            meta_path = None
             if metadata:
                 import json
-                meta_path = "/tmp/model_metadata.json"
-                with open(meta_path, "w") as f:
+                with tempfile.NamedTemporaryFile(
+                    mode="w",
+                    suffix=".json",
+                    prefix="mlflow-metadata-",
+                    delete=False,
+                    encoding="utf-8",
+                ) as f:
                     json.dump(metadata, f, indent=2, default=str)
+                    meta_path = f.name
 
-            # Determine how to log based on model type
-            logged_run = self._active_run
+            logged_run = mlflow.active_run()
 
             # Log sklearn model
-            if hasattr(model, "predict") or hasattr(model, "fit"):
+            if hasattr(model_to_log, "predict") or hasattr(model_to_log, "fit"):
                 try:
                     # Try sklearn autolog first (handles most models)
                     mlflow.sklearn.autolog(
@@ -255,46 +275,66 @@ class MLflowTrackingClient:
                         from mlflow.models import infer_signature
                         X_sample = sample_input[:5] if hasattr(sample_input, "__len__") else sample_input
                         try:
-                            if hasattr(model, "predict"):
-                                pred = model.predict(X_sample)
+                            if hasattr(model_to_log, "predict"):
+                                pred = model_to_log.predict(X_sample)
                             else:
                                 pred = None
                             signature = infer_signature(X_sample, pred)
                         except Exception:
                             signature = None
 
-                        mlflow.sklearn.log_model(
+                        model_info = mlflow.sklearn.log_model(
                             sk_model=model,
                             artifact_path=artifact_path,
                             signature=signature,
                             registered_model_name=model_name if registered else None,
                         )
                     else:
-                        mlflow.sklearn.log_model(
-                            sk_model=model,
+                        model_info = mlflow.sklearn.log_model(
+                            sk_model=model_to_log,
                             artifact_path=artifact_path,
                             registered_model_name=model_name if registered else None,
                         )
                 except Exception as e:
                     # Fallback: log as generic pickle
                     import joblib
-                    model_path = "/tmp/model.pkl"
-                    joblib.dump(model, model_path)
+                    with tempfile.NamedTemporaryFile(
+                        suffix=".pkl",
+                        prefix="mlflow-model-",
+                        delete=False,
+                    ) as f:
+                        model_path = f.name
+                    joblib.dump(model_to_log, model_path)
                     mlflow.log_artifact(model_path, artifact_path)
+                    try:
+                        os.unlink(model_path)
+                    except OSError:
+                        pass
 
             # Log metadata
-            if metadata:
+            if meta_path:
                 mlflow.log_artifact(meta_path, artifact_path)
+                try:
+                    os.unlink(meta_path)
+                except OSError:
+                    pass
 
             # Get run info
             run_id = logged_run.info.run_id if logged_run else None
-            artifact_uri = f"{self.artifact_root}{model_name}/{run_id}" if run_id else None
+            artifact_uri = mlflow.get_artifact_uri(artifact_path) if run_id else None
+            version = None
+            if registered and run_id and self._client:
+                version_info = self._find_model_version(model_name, run_id)
+                if version_info:
+                    version = version_info.version
 
             return {
                 "ok": True,
                 "run_id": run_id,
                 "artifact_uri": artifact_uri,
                 "model_name": model_name,
+                "model_uri": getattr(model_info, "model_uri", None) if model_info else None,
+                "version": version,
             }
 
         except Exception as e:
@@ -343,13 +383,20 @@ class MLflowTrackingClient:
 
         if result.get("ok") and self._client:
             try:
-                mv = self._client.get_latest_versions(model_name, stages=[stage])
-                if mv:
+                normalized_stage = self._normalize_stage(stage)
+                version = result.get("version")
+                if version is None and result.get("run_id"):
+                    version_info = self._find_model_version(model_name, result["run_id"])
+                    version = version_info.version if version_info else None
+                if version is not None:
                     self._client.transition_model_version_stage(
-                        model_name, mv[0].version, stage
+                        name=model_name,
+                        version=version,
+                        stage=normalized_stage,
+                        archive_existing_versions=(normalized_stage == "Production"),
                     )
-                    result["version"] = mv[0].version
-                    result["stage"] = stage
+                    result["version"] = version
+                    result["stage"] = normalized_stage
             except Exception as e:
                 result["registration_warning"] = str(e)
 
@@ -370,13 +417,18 @@ class MLflowTrackingClient:
             return {"ok": False, "reason": "MLflow not available"}
 
         try:
+            from_stage = self._normalize_stage(from_stage)
+            to_stage = self._normalize_stage(to_stage)
             versions = self._client.get_latest_versions(model_name, stages=[from_stage])
             if not versions:
                 return {"ok": False, "error": f"No model in {from_stage} stage"}
 
             version = versions[0]
             self._client.transition_model_version_stage(
-                model_name, version.version, to_stage
+                name=model_name,
+                version=version.version,
+                stage=to_stage,
+                archive_existing_versions=(to_stage == "Production"),
             )
             return {
                 "ok": True,
@@ -395,7 +447,7 @@ class MLflowTrackingClient:
 
         try:
             versions = self._client.get_latest_versions(
-                model_name, stages=["production"]
+                model_name, stages=[self._normalize_stage("production")]
             )
             if versions:
                 v = versions[0]
@@ -422,18 +474,52 @@ class MLflowTrackingClient:
         archived = []
         try:
             versions = self._client.get_latest_versions(
-                model_name, stages=["production"]
+                model_name, stages=[self._normalize_stage("production")]
             )
             cutoff = datetime.datetime.utcnow() - datetime.timedelta(days=max_age_days)
             for v in versions:
                 if v.creation_timestamp / 1000 < cutoff.timestamp():
                     self._client.transition_model_version_stage(
-                        model_name, v.version, "archived"
+                        name=model_name,
+                        version=v.version,
+                        stage=self._normalize_stage("archived"),
                     )
                     archived.append({"version": v.version, "archived": True})
         except Exception as e:
             print(f"[MLflow] Archive failed: {e}")
         return archived
+
+    def get_registry_models(self, model_prefix: str | None = None) -> dict[str, list[dict]]:
+        """List registered model versions, optionally filtered by name prefix."""
+        if not MLFLOW_AVAILABLE or not self._client:
+            return {}
+
+        registry: dict[str, list[dict]] = {}
+        try:
+            for registered_model in self._client.search_registered_models():
+                if model_prefix and not registered_model.name.startswith(model_prefix):
+                    continue
+
+                versions = sorted(
+                    self._client.search_model_versions(
+                        f"name='{registered_model.name}'"
+                    ),
+                    key=lambda version: int(version.version),
+                    reverse=True,
+                )
+                registry[registered_model.name] = [
+                    {
+                        "version": version.version,
+                        "stage": version.current_stage,
+                        "run_id": version.run_id,
+                        "status": version.status,
+                        "source": version.source,
+                    }
+                    for version in versions
+                ]
+        except Exception as e:
+            print(f"[MLflow] Registry query failed: {e}")
+        return registry
 
     # ── Experiment & Run Queries ─────────────────────────────────────────────
 
@@ -518,6 +604,36 @@ class MLflowTrackingClient:
                 return result.stdout.strip()
         except Exception:
             pass
+        return None
+
+    def _has_active_run(self) -> bool:
+        return MLFLOW_AVAILABLE and mlflow.active_run() is not None
+
+    def _normalize_stage(self, stage: str | None) -> str:
+        if stage is None:
+            return STAGES["none"]
+
+        normalized = STAGES.get(str(stage).strip().lower())
+        if normalized is None:
+            valid = ", ".join(STAGES.values())
+            raise ValueError(f"Invalid MLflow stage '{stage}'. Expected one of: {valid}")
+        return normalized
+
+    def _find_model_version(self, model_name: str, run_id: str):
+        if not self._client:
+            return None
+
+        try:
+            versions = sorted(
+                self._client.search_model_versions(f"name='{model_name}'"),
+                key=lambda version: int(version.version),
+                reverse=True,
+            )
+            for version in versions:
+                if version.run_id == run_id:
+                    return version
+        except Exception:
+            return None
         return None
 
 
