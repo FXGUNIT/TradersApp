@@ -488,21 +488,14 @@ async def mlflow_experiments(experiment: str | None = None):
 async def mlflow_models(model_prefix: str = "direction"):
     """
     List registered models in MLflow model registry.
-    Shows current production + staging models with versions.
+    Shows all registered versions for the requested model prefix.
     """
     if not MLFLOW_AVAILABLE:
         return {"ok": False, "error": "mlflow not installed"}
     try:
         from infrastructure.mlflow_client import get_mlflow_client
         client = get_mlflow_client(model_prefix)
-        results = {}
-
-        # Check production for direction models
-        for model_name in [f"{model_prefix}_lightgbm", f"{model_prefix}_random_forest",
-                           f"{model_prefix}_xgboost"]:
-            prod = client.get_production_model(model_name)
-            if prod:
-                results[model_name] = prod
+        results = client.get_registry_models(f"{model_prefix}_")
 
         return {
             "ok": True,

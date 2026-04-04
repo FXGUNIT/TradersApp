@@ -413,6 +413,9 @@ class MLflowTrackingClient:
 
         result["registered"] = True
         result["reason"] = "Thresholds met"
+        result["validation_strategy"] = (
+            "strategy" if strategy_thresholds_met else "classifier"
+        )
         return result
 
     # ── Registry ─────────────────────────────────────────────────────────────
