@@ -144,6 +144,12 @@ steps:
         from_secret: k8s_namespace
       K8S_REGISTRY_SECRET:
         from_secret: k8s_registry_secret
+      MLFLOW_POSTGRES_PASSWORD:
+        from_secret: mlflow_postgres_password
+      MLFLOW_MINIO_USER:
+        from_secret: mlflow_minio_user
+      MLFLOW_MINIO_PASSWORD:
+        from_secret: mlflow_minio_password
       K8S_RELEASE_NAME: tradersapp
       K8S_HELM_VALUES_FILE: k8s/helm/tradersapp/values.prod.yaml
     commands:

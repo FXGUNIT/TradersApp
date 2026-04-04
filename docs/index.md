@@ -48,6 +48,7 @@ cd ml-engine && python -m pytest tests/ -q
 
 - [Self-hosted CI/CD](./CICD_GITEA_WOODPECKER.md)
 - [MLflow MLOps lifecycle](./MLOPS_MLFLOW.md)
+- [Data Quality + Airflow](./DATA_QUALITY_AIRFLOW.md)
 - [Deployment guide](./DEPLOYMENT.md)
 - [Setup guide](./SETUP.md)
 

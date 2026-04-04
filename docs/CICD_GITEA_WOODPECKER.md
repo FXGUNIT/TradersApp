@@ -59,6 +59,9 @@ Store these keys in the `production` environment in Infisical, in the shared roo
 - `CI_K3S_KUBECONFIG_B64`
 - `CI_K8S_NAMESPACE`
 - `CI_K8S_REGISTRY_SECRET`
+- `CI_MLFLOW_POSTGRES_PASSWORD`
+- `CI_MLFLOW_MINIO_USER`
+- `CI_MLFLOW_MINIO_PASSWORD`
 
 The `GITEA_*` and `WOODPECKER_*` keys are used to render `.env.cicd` for the self-hosted stack.
 Use a non-reserved Gitea bootstrap username such as `gitadmin`; `admin` is rejected by Gitea's default username blacklist.
@@ -128,6 +131,9 @@ Create these repository secrets in Woodpecker, using the matching values from In
 - `k3s_kubeconfig_b64` <- `CI_K3S_KUBECONFIG_B64`
 - `k8s_namespace` <- `CI_K8S_NAMESPACE`
 - `k8s_registry_secret` <- `CI_K8S_REGISTRY_SECRET`
+- `mlflow_postgres_password` <- `CI_MLFLOW_POSTGRES_PASSWORD`
+- `mlflow_minio_user` <- `CI_MLFLOW_MINIO_USER`
+- `mlflow_minio_password` <- `CI_MLFLOW_MINIO_PASSWORD`
 
 Example kubeconfig encoding:
 
@@ -152,6 +158,7 @@ On pushes to `main`:
 - tags each image with `${CI_COMMIT_SHA}` and `latest`
 - creates or updates the Kubernetes pull secret
 - runs `helm upgrade --install tradersapp ...`
+- creates/updates the `mlflow-runtime-secret` Kubernetes secret from Woodpecker secrets before Helm runs
 - waits for the `frontend`, `bff`, `ml-engine`, and `mlflow` deployments to roll out
 
 ## 8. Deployment contract

@@ -27,6 +27,12 @@ mlEngine:
     maxReplicas: 4
     targetCPUUtilizationPercentage: 70
     targetMemoryUtilizationPercentage: 80
+  dataQuality:
+    validateBeforeTrain: true
+    blockOnCritical: true
+    requireGreatExpectations: true
+    lookbackDays: 90
+    alertWebhook: ""
   persistence:
     enabled: true
     size: 5Gi
@@ -105,6 +111,15 @@ mlflow:
   enabled: true
   replicaCount: 1
   trackingUri: http://mlflow:5000
+  # In production, credentials should come from a runtime secret
+  # created from Infisical values during deploy.
+  secretRef:
+    existingSecret: mlflow-runtime-secret
+    postgresDbKey: POSTGRES_DB
+    postgresUserKey: POSTGRES_USER
+    postgresPasswordKey: POSTGRES_PASSWORD
+    minioUserKey: MINIO_ROOT_USER
+    minioPasswordKey: MINIO_ROOT_PASSWORD
   gunicornOptions: --workers 2 --timeout=300
   service:
     type: ClusterIP
@@ -120,7 +135,7 @@ mlflow:
       pullPolicy: IfNotPresent
     database: mlflow
     user: mlflow
-    password: CHANGEME_mlflow_postgres_password
+    password: ""
     persistence:
       enabled: true
       size: 10Gi
@@ -141,8 +156,8 @@ mlflow:
       repository: minio/mc
       tag: RELEASE.2025-08-13T08-35-41Z
       pullPolicy: IfNotPresent
-    user: CHANGEME_minio_user
-    password: CHANGEME_minio_password
+    user: ""
+    password: ""
     persistence:
       enabled: true
       size: 50Gi

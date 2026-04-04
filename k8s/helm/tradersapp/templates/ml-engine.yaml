@@ -56,6 +56,18 @@ spec:
               value: "kafka:29092"
             - name: OTEL_SERVICE_NAME
               value: "ml-engine"
+            - name: DQ_VALIDATE_BEFORE_TRAIN
+              value: {{ ternary "true" "false" .Values.mlEngine.dataQuality.validateBeforeTrain | quote }}
+            - name: DQ_BLOCK_ON_CRITICAL
+              value: {{ ternary "true" "false" .Values.mlEngine.dataQuality.blockOnCritical | quote }}
+            - name: DQ_REQUIRE_GX
+              value: {{ ternary "true" "false" .Values.mlEngine.dataQuality.requireGreatExpectations | quote }}
+            - name: DQ_VALIDATE_DAYS
+              value: {{ .Values.mlEngine.dataQuality.lookbackDays | quote }}
+            {{- if .Values.mlEngine.dataQuality.alertWebhook }}
+            - name: DQ_ALERT_WEBHOOK
+              value: {{ .Values.mlEngine.dataQuality.alertWebhook | quote }}
+            {{- end }}
           {{- with .Values.mlEngine.resources }}
           resources:
             {{- toYaml . | nindent 12 }}
