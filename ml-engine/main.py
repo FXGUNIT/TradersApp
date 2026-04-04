@@ -83,6 +83,12 @@ except ImportError:
 from feedback.trade_log_processor import TradeLogProcessor
 from feedback.retrain_pipeline import RetrainPipeline, RetrainConfig
 from features.feature_pipeline import engineer_features, get_feature_vector
+from features.feast_client import get_all_features as feast_get_all_features, get_feature_info
+from features.feature_lineage import (
+    FeatureLineageRegistry,
+    register_tradersapp_lineage,
+    warmup_online_store,
+)
 from training.trainer import Trainer
 from training.model_store import ModelStore
 from inference.predictor import Predictor
@@ -129,13 +135,15 @@ triton_client: TritonInferenceClient | None = None
 kafka_producer: Any | None = None   # set in lifespan
 kafka_consumer: Any | None = None   # set in lifespan
 start_time: float = time.time()
+lineage_registry: FeatureLineageRegistry | None = None
+feast_warmed: bool = False
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global db, trainer, predictor, consensus_agg, store, regime_ensemble, drift_monitor
     global feedback_logger, trade_processor, retrain_pipeline, triton_client
-    global kafka_producer, kafka_consumer
+    global kafka_producer, kafka_consumer, lineage_registry, feast_warmed
 
     db = CandleDatabase(config.DB_PATH)
     trainer = Trainer(db_path=config.DB_PATH, store_dir=config.MODEL_STORE)
@@ -170,6 +178,25 @@ async def lifespan(app: FastAPI):
     # Triton inference client (lazy — only connects when needed)
     triton_client = get_inference_client()
     print(f"[Triton] Inference client ready (source: {triton_client.get_server_status().get('connected') and 'triton' or 'local'})")
+
+    # ── Feast Feature Store: lineage registry + online store warmup ───────────────
+    lineage_registry = FeatureLineageRegistry()
+    register_tradersapp_lineage(lineage_registry)
+    print(f"[Feast] Feature lineage registered ({len(lineage_registry.get_all())} features)")
+
+    # Warmup Redis online store so first inference request is fast
+    try:
+        warmup_result = warmup_online_store(
+            redis_url=os.environ.get("FEAST_REDIS_URL", "redis://localhost:6379"),
+            db_path=config.DB_PATH,
+            symbol="MNQ",
+            lookback_minutes=60,
+        )
+        print(f"[Feast] Online store warmed: {warmup_result['timestamps_warmed']} timestamps loaded in {warmup_result['duration_ms']:.1f}ms")
+        feast_warmed = True
+    except Exception as e:
+        print(f"[Feast] Warmup skipped (online store unavailable): {e}")
+        feast_warmed = False
 
     # Load models on startup
     try:
@@ -368,6 +395,10 @@ async def health():
         "models_loaded": len(predictor._models) if predictor else 0,
         "models_available": models,
         "last_training": stats.get("last_training"),
+        "feast": {
+            "lineage_registered": len(lineage_registry.get_all()) if lineage_registry else 0,
+            "online_store_warmed": feast_warmed,
+        },
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -413,6 +444,175 @@ async def get_cache_stats():
         "cache_stats": cache.get_stats(),
         "redis_available": cache._client is not None,
     }
+
+
+# -------------------------------------------------------------------------
+# Feast Feature Store
+# -------------------------------------------------------------------------
+
+@app.get("/features/online", tags=["features"])
+async def get_online_features(
+    symbol: str = Query(default="MNQ"),
+    timestamp: str | None = Query(default=None, description="ISO8601 timestamp (default: now)"),
+):
+    """
+    Retrieve pre-materialized features from the Feast online store (Redis).
+
+    Returns candle features, historical trade stats, and session aggregates
+    in a single flat dict — the same features used during inference.
+
+    Falls back to direct SQLite queries if Feast/Redis is unavailable.
+    Latency target: <10ms from Redis.
+    """
+    start = time.time()
+    try:
+        features = feast_get_all_features(symbol=symbol, timestamp=timestamp)
+        latency_ms = (time.time() - start) * 1000
+
+        return {
+            "ok": True,
+            "symbol": symbol,
+            "timestamp": timestamp or datetime.now(timezone.utc).isoformat(),
+            "features": features,
+            "feature_count": len(features),
+            "latency_ms": round(latency_ms, 2),
+            "online_store": "redis" if features else "sqlite_fallback",
+        }
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.get("/features/info", tags=["features"])
+async def get_features_info():
+    """
+    Get metadata about all available features (names, types, source).
+    """
+    try:
+        info = get_feature_info()
+        catalog = lineage_registry.catalog() if lineage_registry else {}
+
+        # Count stale features
+        stale_critical = []
+        if lineage_registry:
+            stale_critical = [
+                f.feature_name for f in lineage_registry.get_stale_features(threshold_hours=24)
+            ]
+
+        return {
+            "ok": True,
+            "feast_available": info.get("feast_available", False),
+            "online_store": info.get("online_store", "unknown"),
+            "feature_views": {
+                "candle_features": len(info.get("candle_features", [])),
+                "historical_features": len(info.get("historical_features", [])),
+                "session_features": len(info.get("session_features", [])),
+            },
+            "total_features": sum(
+                len(v) for v in info.get("feature_views", {}).values()
+            ),
+            "catalog": catalog,
+            "stale_features": stale_critical,
+        }
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.get("/features/lineage", tags=["features"])
+async def get_feature_lineage(
+    feature_view: str | None = Query(default=None, description="Filter by feature view"),
+    stale_only: bool = Query(default=False, description="Only return stale features"),
+):
+    """
+    Get feature lineage metadata — source table, transformation, freshness.
+
+    Feature lineage tracks:
+    - What table/column each feature comes from
+    - What transformation produces it
+    - When it was last materialized
+    - Whether it's stale (>24h without refresh)
+    """
+    if lineage_registry is None:
+        return {"ok": False, "error": "Feature lineage registry not initialized"}
+
+    try:
+        if stale_only:
+            stale = lineage_registry.get_stale_features(threshold_hours=24)
+            features = [f.to_dict() for f in stale]
+        elif feature_view:
+            features = [f.to_dict() for f in lineage_registry.get_by_view(feature_view)]
+        else:
+            features = [f.to_dict() for f in lineage_registry.get_all()]
+
+        return {
+            "ok": True,
+            "feature_view": feature_view,
+            "stale_only": stale_only,
+            "count": len(features),
+            "features": features,
+        }
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.get("/features/lineage/{feature_name}", tags=["features"])
+async def get_feature_lineage_single(feature_name: str):
+    """Get lineage for a single feature by name."""
+    if lineage_registry is None:
+        return {"ok": False, "error": "Feature lineage registry not initialized"}
+
+    try:
+        lineage = lineage_registry.get(feature_name)
+        if lineage is None:
+            return {"ok": False, "error": f"Feature '{feature_name}' not found"}
+
+        return {"ok": True, "lineage": lineage.to_dict()}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.get("/features/materialization-history", tags=["features"])
+async def get_materialization_history(
+    feature_view: str | None = Query(default=None),
+    limit: int = Query(default=10, ge=1, le=100),
+):
+    """Get recent materialization run history from the lineage registry."""
+    if lineage_registry is None:
+        return {"ok": False, "error": "Feature lineage registry not initialized"}
+
+    try:
+        history = lineage_registry.get_materialization_history(
+            feature_view=feature_view,
+            limit=limit,
+        )
+        return {
+            "ok": True,
+            "feature_view": feature_view,
+            "runs": history,
+            "count": len(history),
+        }
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.post("/features/warmup", tags=["features"])
+async def trigger_warmup(
+    symbol: str = Query(default="MNQ"),
+    lookback_minutes: int = Query(default=60, ge=5, le=480),
+):
+    """
+    Manually trigger Feast online store warmup.
+    Pre-populates Redis with the most recent features for immediate inference.
+    """
+    try:
+        result = warmup_online_store(
+            redis_url=os.environ.get("FEAST_REDIS_URL", "redis://localhost:6379"),
+            db_path=config.DB_PATH,
+            symbol=symbol,
+            lookback_minutes=lookback_minutes,
+        )
+        return {"ok": True, "warmup": result}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
 
 
 # -------------------------------------------------------------------------
@@ -874,6 +1074,21 @@ async def predict(request: PredictRequest):
             feat_dict["session_id"] = request.session_id
         else:
             feat_dict = {}
+
+        # ── Feast: supplement with historical + session features ──────────────
+        # engineer_features gives candle-level features from live candles.
+        # Feast gives pre-materialized historical (rolling trade stats) + session
+        # aggregates — fill in any gaps from the online store (Redis).
+        try:
+            feast_feats = feast_get_all_features(
+                symbol=request.symbol,
+                timestamp=datetime.now(timezone.utc).isoformat(),
+            )
+            for k, v in feast_feats.items():
+                if k not in feat_dict or feat_dict.get(k) == 0:
+                    feat_dict[k] = v
+        except Exception:
+            pass  # Never block prediction for Feast failures
 
         # Aggregate
         model_metas = {}
