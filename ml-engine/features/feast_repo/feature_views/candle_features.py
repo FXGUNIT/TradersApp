@@ -36,8 +36,7 @@ _batch_source = candles_parquet_source
 # Enable Kafka streaming once Kafka is deployed.
 # Set feast.streaming.enabled=true in Helm values and KAFKA_BOOTSTRAP_SERVERS env var.
 # Uncomment the line below once Kafka is running:
-# _stream_source = kafka_candle_source
-_stream_source = None  # Disabled until Kafka is deployed
+_stream_source = kafka_candle_source  # Enabled — Kafka is deployed
 
 
 # ─── FeatureView ────────────────────────────────────────────────────────────────
