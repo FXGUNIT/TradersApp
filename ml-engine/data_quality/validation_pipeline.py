@@ -28,6 +28,7 @@ if str(ML_ENGINE_ROOT) not in sys.path:
 
 from data_quality.expectations.candle_expectations import get_candle_suite
 from data_quality.expectations.trade_expectations import get_trade_suite
+from data_quality.expectations.session_expectations import get_session_suite
 
 DEFAULT_DB_PATH = os.environ.get(
     "DQ_DB_PATH",
@@ -378,50 +379,7 @@ def validate_sessions(db_path: str = DEFAULT_DB_PATH, days: int = 90) -> dict:
             "n_rows": 0,
         }
 
-    required_columns = ("trade_date", "symbol", "direction", "gap_pct", "session_range", "range_vs_atr")
-    results: list[dict] = []
-    critical_failures = 0
-    warning_failures = 0
-
-    def check(name: str, condition: bool, message: str, severity: str = "critical") -> None:
-        nonlocal critical_failures, warning_failures
-        if condition:
-            results.append({"name": name, "status": "pass", "message": "passed", "severity": "info"})
-            return
-        results.append({"name": name, "status": "fail", "message": message, "severity": severity})
-        if severity == "critical":
-            critical_failures += 1
-        else:
-            warning_failures += 1
-
-    missing = [col for col in required_columns if col not in df.columns]
-    check("required_columns", not missing, f"Missing columns: {missing}", "critical")
-
-    if "direction" in df.columns:
-        valid_direction = df["direction"].astype(str).str.upper().isin({"LONG", "SHORT"})
-        check("direction_values", bool(valid_direction.all()), "Found invalid direction values", "critical")
-    if "gap_pct" in df.columns:
-        gap_ok = pd.to_numeric(df["gap_pct"], errors="coerce").between(-0.10, 0.10)
-        check("gap_pct_range", bool(gap_ok.fillna(False).all()), "gap_pct outside [-0.10, 0.10]", "warning")
-    if "session_range" in df.columns:
-        session_ok = pd.to_numeric(df["session_range"], errors="coerce") > 0
-        check("session_range_positive", bool(session_ok.fillna(False).all()), "session_range must be > 0", "critical")
-    if "range_vs_atr" in df.columns:
-        ratio_ok = pd.to_numeric(df["range_vs_atr"], errors="coerce").between(0, 5)
-        check("range_vs_atr_sanity", bool(ratio_ok.fillna(False).all()), "range_vs_atr outside [0, 5]", "warning")
-
-    native = {
-        "suite": "session_expectations",
-        "passed": critical_failures == 0,
-        "critical_failures": critical_failures,
-        "warning_failures": warning_failures,
-        "checks_passed": sum(1 for row in results if row["status"] == "pass"),
-        "checks_failed": sum(1 for row in results if row["status"] == "fail"),
-        "checks_warned": 0,
-        "total_checks": len(results),
-        "results": results,
-    }
-
+    native = get_session_suite().validate(df)
     try:
         gx_report = _run_gx_session_checks(df)
     except Exception as exc:
