@@ -70,7 +70,7 @@ function transformGrpcConsensusResponse(response) {
     model_freshness: response?.model_freshness || "unknown",
     timing: response?.timing || {},
     votes,
-    physics_regime: response?.regime || null,
+    physics_regime: response?.regime ? { regime: response.regime } : null,
     transport: "grpc",
   };
 }
