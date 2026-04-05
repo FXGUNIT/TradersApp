@@ -1,0 +1,444 @@
+# TradersApp Prometheus SLO Definitions & Alert Rules
+#
+# Deploy: kubectl apply -f k8s/prometheus-slos.yaml
+# Or include via PrometheusConfig in Helm values:
+#   prometheus:
+#     additionalScrapeConfigs:
+#       - job_name: 'tradersapp-slos'
+#         static_configs:
+#           - targets: ['bff:8788', 'ml-engine:8001', 'analysis-service:50051']
+#
+# Metrics required per service (exposed at /metrics):
+#   ML Engine: ml_engine_inference_latency_ms, ml_engine_inference_requests_total
+#   BFF: http_request_duration_seconds, http_requests_total
+#   Analysis Service: grpc_request_duration_seconds, grpc_requests_total
+#   Triton: triton_inference_latency_ms, triton_inference_queue_depth
+
+groups:
+  # ──────────────────────────────────────────────────────────────────────────
+  # GROUP 1: Service-Level SLOs
+  # ──────────────────────────────────────────────────────────────────────────
+  - name: tradersapp-slos
+    interval: 30s
+    rules:
+      # ── Availability SLOs (error rate < 0.5%) ───────────────────────────────
+
+      - record: tradersapp:http_requests_total:rate5m
+        expr: sum(rate(http_requests_total{service=~"bff|ml-engine|analysis-service"}[5m]))
+
+      - record: tradersapp:http_errors_total:rate5m
+        expr: sum(rate(http_requests_total{service="bff", status=~"5.."}[5m]))
+
+      - record: tradersapp:service_error_rate:ratio5m
+        expr: |
+          sum(rate(http_requests_total{service="bff", status=~"5.."}[5m]))
+          /
+          sum(rate(http_requests_total{service="bff"}[5m]))
+
+      # ── Latency SLOs ──────────────────────────────────────────────────────
+
+      # ML Engine consensus P95 latency
+      - record: tradersapp:ml_engine:p95_latency_5m
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(ml_engine_inference_latency_ms_bucket[5m])) by (le, endpoint)
+          )
+
+      # BFF P95 latency
+      - record: tradersapp:bff:p95_latency_5m
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(http_request_duration_seconds_bucket{service="bff"}[5m])) by (le, handler)
+          )
+
+      # Triton P95 latency
+      - record: tradersapp:triton:p95_latency_5m
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(triton_inference_latency_ms_bucket[5m])) by (le, model_name)
+          )
+
+      # ── Throughput SLOs ──────────────────────────────────────────────────
+
+      - record: tradersapp:requests_per_second:rate5m
+        expr: |
+          sum(rate(http_requests_total{service=~".*"}[5m]))
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # GROUP 2: Alert Rules — ML Engine
+  # ──────────────────────────────────────────────────────────────────────────
+  - name: ml-engine-alerts
+    interval: 30s
+    rules:
+      # ── Latency Alerts ───────────────────────────────────────────────────
+
+      - alert: MLEngineHighLatencyWarning
+        expr: |
+          histogram_quantile(0.95, sum(rate(ml_engine_inference_latency_ms_bucket{endpoint="/predict"}[5m])) by (le)) > 150
+        for: 5m
+        labels:
+          severity: warning
+          service: ml-engine
+          slo: latency
+        annotations:
+          summary: "ML Engine inference P95 latency above 150ms (warning)"
+          description: "ML Engine consensus P95 latency is {{ $value | printf \"%.1f\" }}ms (threshold: 150ms) for 5 minutes. Service is degraded."
+          runbook: "https://wiki.tradersapp.runbook/ml-engine-latency"
+
+      - alert: MLEngineHighLatencyCritical
+        expr: |
+          histogram_quantile(0.95, sum(rate(ml_engine_inference_latency_ms_bucket{endpoint="/predict"}[5m])) by (le)) > 200
+        for: 2m
+        labels:
+          severity: critical
+          service: ml-engine
+          slo: latency
+        annotations:
+          summary: "ML Engine inference P95 latency above 200ms (CRITICAL)"
+          description: "ML Engine consensus P95 latency is {{ $value | printf \"%.1f\" }}ms (threshold: 200ms). SLA breach imminent."
+          runbook: "https://wiki.tradersapp.runbook/ml-engine-latency"
+
+      - alert: MLEngineRegimeLatencyHigh
+        expr: |
+          histogram_quantile(0.95, sum(rate(ml_engine_inference_latency_ms_bucket{endpoint="/regime"}[5m])) by (le)) > 1500
+        for: 5m
+        labels:
+          severity: warning
+          service: ml-engine
+          slo: latency
+        annotations:
+          summary: "ML Engine regime detection P95 latency above 1500ms"
+          description: "Regime detection P95 latency is {{ $value | printf \"%.1f\" }}ms. FP-FK PDE solver may be under heavy load."
+
+      # ── Error Rate Alerts ─────────────────────────────────────────────────
+
+      - alert: MLEngineErrorRateWarning
+        expr: |
+          sum(rate(ml_engine_inference_errors_total[5m]))
+          /
+          sum(rate(ml_engine_inference_requests_total{endpoint="/predict"}[5m])) > 0.01
+        for: 5m
+        labels:
+          severity: warning
+          service: ml-engine
+          slo: availability
+        annotations:
+          summary: "ML Engine error rate above 1%"
+          description: "ML Engine error rate is {{ $value | printf \"%.2f\" }}% (threshold: 1%). Some requests are failing."
+
+      - alert: MLEngineErrorRateCritical
+        expr: |
+          sum(rate(ml_engine_inference_errors_total[5m]))
+          /
+          sum(rate(ml_engine_inference_requests_total{endpoint="/predict"}[5m])) > 0.05
+        for: 1m
+        labels:
+          severity: critical
+          service: ml-engine
+          slo: availability
+        annotations:
+          summary: "ML Engine error rate above 5% (CRITICAL)"
+          description: "ML Engine error rate is {{ $value | printf \"%.2f\" }}% (threshold: 5%). Service is failing."
+
+      # ── Throughput Alerts ────────────────────────────────────────────────
+
+      - alert: MLEngineLowThroughput
+        expr: |
+          sum(rate(ml_engine_inference_requests_total{endpoint="/predict"}[5m])) < 0.1
+        for: 10m
+        labels:
+          severity: warning
+          service: ml-engine
+        annotations:
+          summary: "ML Engine throughput very low"
+          description: "ML Engine handling less than 0.1 req/s over 10 minutes. May indicate service idle or connectivity issue."
+
+      # ── Health Check ──────────────────────────────────────────────────────
+
+      - alert: MLEngineDown
+        expr: |
+          up{job="ml-engine"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: ml-engine
+          slo: availability
+        annotations:
+          summary: "ML Engine pod is DOWN"
+          description: "ML Engine health check has been failing for 1 minute. Pod may be crashed or OOMKilled."
+          runbook: "https://wiki.tradersapp.runbook/ml-engine-down"
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # GROUP 3: Alert Rules — Triton Inference Server
+  # ──────────────────────────────────────────────────────────────────────────
+  - name: triton-alerts
+    interval: 30s
+    rules:
+      - alert: TritonHighQueueDepth
+        expr: |
+          avg(triton_inference_queue_depth) by (model_name) > 20
+        for: 5m
+        labels:
+          severity: warning
+          service: triton
+        annotations:
+          summary: "Triton inference queue depth high for {{ $labels.model_name }}"
+          description: "Queue depth for {{ $labels.model_name }} is {{ $value | printf "%.0f" }} (>20). Consider scaling replicas."
+
+      - alert: TritonHighLatency
+        expr: |
+          histogram_quantile(0.95, sum(rate(triton_inference_latency_ms_bucket[5m])) by (le, model_name)) > 100
+        for: 5m
+        labels:
+          severity: warning
+          service: triton
+        annotations:
+          summary: "Triton model {{ $labels.model_name }} P95 latency above 100ms"
+          description: "Model {{ $labels.model_name }} P95 latency is {{ $value | printf \"%.1f\" }}ms."
+
+      - alert: TritonGPUMemoryHigh
+        expr: |
+          avg(triton_gpu_memory_used_bytes / triton_gpu_memory_total_bytes) > 0.90
+        for: 5m
+        labels:
+          severity: warning
+          service: triton
+        annotations:
+          summary: "Triton GPU memory usage above 90%"
+          description: "GPU memory usage is {{ $value | printf \"%.1f\" }}%. May need to reduce batch size or model size."
+
+      - alert: TritonModelLoadFailure
+        expr: |
+          increase(triton_server_request_failure[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          service: triton
+        annotations:
+          summary: "Triton model failed to load"
+          description: "Triton server has failed to load a model in the last 5 minutes. Check model files and ONNX configuration."
+
+      - alert: TritonDown
+        expr: |
+          up{job="triton"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: triton
+        annotations:
+          summary: "Triton Inference Server is DOWN"
+          description: "Triton health check failing. Check pod logs: kubectl logs -n tradersapp deploy/triton."
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # GROUP 4: Alert Rules — BFF
+  # ──────────────────────────────────────────────────────────────────────────
+  - name: bff-alerts
+    interval: 30s
+    rules:
+      - alert: BFFHighLatency
+        expr: |
+          histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{service="bff"}[5m])) by (le)) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          service: bff
+          slo: latency
+        annotations:
+          summary: "BFF P95 latency above 500ms"
+          description: "BFF consensus endpoint P95 latency is {{ $value | printf \"%.3f\" }}s."
+
+      - alert: BFFErrorRateHigh
+        expr: |
+          sum(rate(http_requests_total{service="bff", status=~"5.."}[5m]))
+          /
+          sum(rate(http_requests_total{service="bff"}[5m])) > 0.01
+        for: 5m
+        labels:
+          severity: warning
+          service: bff
+          slo: availability
+        annotations:
+          summary: "BFF error rate above 1%"
+          description: "BFF error rate is {{ $value | printf \"%.2f\" }}%."
+
+      - alert: BFFDown
+        expr: |
+          up{job="bff"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: bff
+          slo: availability
+        annotations:
+          summary: "BFF is DOWN"
+          description: "BFF health check failing. Check pod: kubectl describe pod -n tradersapp -l app=bff"
+
+      - alert: BFFCircuitBreakerOpen
+        expr: |
+          avg(ml_engine_circuit_breaker_state{service="bff"}) == 2
+        for: 1m
+        labels:
+          severity: critical
+          service: bff
+        annotations:
+          summary: "BFF → ML Engine circuit breaker is OPEN"
+          description: "Circuit breaker has been open for 1 minute. ML Engine may be overloaded or unresponsive. BFF returning NEUTRAL fallback signals."
+          runbook: "https://wiki.tradersapp.runbook/circuit-breaker"
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # GROUP 5: Alert Rules — Feature Store (Feast)
+  # ──────────────────────────────────────────────────────────────────────────
+  - name: feast-alerts
+    interval: 60s
+    rules:
+      - alert: FeastRedisConnectionFailure
+        expr: |
+          redis_connection_errors_total > 0
+        for: 2m
+        labels:
+          severity: critical
+          service: feast
+        annotations:
+          summary: "Feast Redis connection failure"
+          description: "Redis online store connection errors detected. Online feature retrieval may be failing."
+
+      - alert: FeastMaterializationFailure
+        expr: |
+          feast_materialization_errors_total > 0
+        for: 1m
+        labels:
+          severity: warning
+          service: feast
+        annotations:
+          summary: "Feast materialization job failed"
+          description: "Feast materialization CronJob has recorded errors. Features may be stale. Check CronJob logs."
+
+      - alert: FeastFeatureStaleness
+        expr: |
+          feast_feature_age_seconds{feature_view="candle_features"} > 600
+        for: 10m
+        labels:
+          severity: warning
+          service: feast
+        annotations:
+          summary: "Feast candle features are stale (>10 minutes)"
+          description: "candle_features in Redis are {{ $value | printf \"%.0f\" }} seconds old (threshold: 600s). Streaming materialization may have failed."
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # GROUP 6: Alert Rules — Data Quality & Drift
+  # ──────────────────────────────────────────────────────────────────────────
+  - name: data-quality-alerts
+    interval: 60s
+    rules:
+      - alert: FeatureDriftDetected
+        expr: |
+          feast_feature_drift_score > 0.2
+        for: 5m
+        labels:
+          severity: warning
+          service: ml-engine
+        annotations:
+          summary: "Feature drift detected (PSI > 0.2)"
+          description: "Population Stability Index for features is {{ $value | printf \"%.3f\" }}. Training data distribution may have shifted."
+          runbook: "https://wiki.tradersapp.runbook/feature-drift"
+
+      - alert: ConceptDriftDetected
+        expr: |
+          ml_concept_drift_score > 0.5
+        for: 5m
+        labels:
+          severity: critical
+          service: ml-engine
+        annotations:
+          summary: "Concept drift detected (KL divergence > 0.5)"
+          description: "Label distribution has shifted significantly. Model may need retraining."
+          runbook: "https://wiki.tradersapp.runbook/concept-drift"
+
+      - alert: ModelAccuracyDegradation
+        expr: |
+          ml_model_rolling_accuracy < 0.50
+        for: 60m
+        labels:
+          severity: warning
+          service: ml-engine
+        annotations:
+          summary: "Model rolling accuracy below 50%"
+          description: "60-minute rolling accuracy is {{ $value | printf \"%.2f\" }}%. Model may be stale or market regime has changed."
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # GROUP 7: Alert Rules — Portfolio & Risk
+  # ──────────────────────────────────────────────────────────────────────────
+  - name: portfolio-alerts
+    interval: 60s
+    rules:
+      - alert: PortfolioHighDrawdown
+        expr: |
+          portfolio_max_drawdown_pct > 0.10
+        for: 5m
+        labels:
+          severity: warning
+          service: portfolio
+        annotations:
+          summary: "Portfolio drawdown exceeds 10%"
+          description: "Current max drawdown is {{ $value | printf \"%.1f\" }}%. Review position sizing and risk limits."
+
+      - alert: PortfolioCriticalDrawdown
+        expr: |
+          portfolio_max_drawdown_pct > 0.20
+        for: 1m
+        labels:
+          severity: critical
+          service: portfolio
+        annotations:
+          summary: "Portfolio drawdown exceeds 20% (CRITICAL)"
+          description: "Current max drawdown is {{ $value | printf \"%.1f\" }}%. STOP TRADING and review system."
+          runbook: "https://wiki.tradersapp.runbook/critical-drawdown"
+
+      - alert: WinRateAnomaly
+        expr: |
+          (portfolio_wins_total / portfolio_total_trades) < 0.40
+        for: 120m
+        labels:
+          severity: warning
+          service: portfolio
+        annotations:
+          summary: "Rolling win rate below 40%"
+          description: "Win rate over last 2 hours is {{ $value | printf \"%.1f\" }}%. May indicate regime change or system issue."
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # GROUP 8: SLO Burn Rate Alerts (multi-window)
+  # ──────────────────────────────────────────────────────────────────────────
+  - name: slo-burn-rate
+    interval: 60s
+    rules:
+      # Fast burn: 1h window, 14.4% error budget consumed/hr
+      - alert: SLOErrorBudgetFastBurn
+        expr: |
+          (
+            sum(rate(http_requests_total{service="bff", status=~"5.."}[1h]))
+            /
+            sum(rate(http_requests_total{service="bff"}[1h]))
+          ) > 0.001 * 0.1 * (1 / 1000)
+        for: 0m
+        labels:
+          severity: warning
+          slo: availability-99.5
+        annotations:
+          summary: "Fast burn rate: 10% of error budget consumed in 1h"
+          description: "BFF availability SLO (99.5%) error budget is burning at {{ $value | printf \"%.4f\" }}/h. Check ML Engine and BFF errors."
+
+      # Slow burn: 6h window, 2.4% error budget consumed/hr
+      - alert: SLOErrorBudgetSlowBurn
+        expr: |
+          (
+            sum(rate(http_requests_total{service="bff", status=~"5.."}[6h]))
+            /
+            sum(rate(http_requests_total{service="bff"}[6h]))
+          ) > 0.001 * 0.1 * (1 / 6000)
+        for: 0m
+        labels:
+          severity: warning
+          slo: availability-99.5
+        annotations:
+          summary: "Slow burn rate: error budget slowly depleting"
+          description: "BFF availability SLO error budget is depleting at {{ $value | printf \"%.5f\" }}/h. Sustained degradation detected over 6h window."
