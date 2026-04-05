@@ -29,6 +29,21 @@ mlEngine:
     maxReplicas: 4
     targetCPUUtilizationPercentage: 70
     targetMemoryUtilizationPercentage: 80
+  # KEDA event-driven autoscaling — scale on inference latency and queue depth
+  kedaAutoscaling:
+    enabled: false  # Enable with: helm upgrade --set mlEngine.kedaAutoscaling.enabled=true
+    minReplicas: 1
+    maxReplicas: 8
+    pollingInterval: 15      # seconds
+    cooldownPeriod: 300      # seconds (5 min) before scaling down
+    # Scale UP when P95 latency > 50ms (activation), further when > 150ms
+    latencyActivationThreshold: "50"
+    latencyThreshold: "150"
+    # Scale UP when queue depth > 5 (activation), further when > 20
+    queueDepthActivationThreshold: "5"
+    queueDepthThreshold: "20"
+    enableCpuTrigger: false
+    enableMemoryTrigger: false
   dataQuality:
     validateBeforeTrain: true
     blockOnCritical: true
@@ -64,6 +79,17 @@ bff:
     minReplicas: 2
     maxReplicas: 8
     targetCPUUtilizationPercentage: 60
+  # KEDA autoscaling for BFF — scale on request rate and latency
+  kedaAutoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 16
+    pollingInterval: 30
+    cooldownPeriod: 300
+    requestRateActivationThreshold: "2"
+    requestRateThreshold: "10"
+    latencyActivationThreshold: "200"
+    latencyThreshold: "500"
   analysisTransport:
     mode: grpc
     grpcAddress: analysis-service:50051
@@ -160,6 +186,17 @@ triton:
     minReplicas: 1
     maxReplicas: 4
     targetGPUUtilization: 80  # %
+  # KEDA autoscaling for Triton — scale on queue depth and GPU utilization
+  kedaAutoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 4
+    pollingInterval: 15
+    cooldownPeriod: 120
+    queueDepthActivationThreshold: "5"
+    queueDepthThreshold: "20"
+    gpuUtilizationActivationThreshold: "50"
+    gpuUtilizationThreshold: "80"
   # Rolling update strategy
   strategy:
     type: RollingUpdate
