@@ -52,3 +52,4 @@ bff/.env.local
 
 # Special Windows files
 nul
+airflow/reports/*.json
