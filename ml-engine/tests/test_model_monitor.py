@@ -151,6 +151,8 @@ def test_build_monitoring_snapshot_recommends_retrain_and_syncs_metrics(monkeypa
 
     monkeypatch.setattr(model_monitor, "engineer_features", lambda candles, trades, *_: pd.DataFrame({"feature_a": [0.1] * len(trades)}))
     monkeypatch.setattr(model_monitor, "get_sla_monitor", lambda: _FakeSLAMonitor())
+    monkeypatch.setattr(model_monitor, "MLFLOW_CLIENT_AVAILABLE", True)
+    monkeypatch.setattr(model_monitor, "PROMETHEUS_SYNC_AVAILABLE", True)
     monkeypatch.setattr(model_monitor, "get_mlflow_client", lambda experiment: _FakeMLflowClient())
     monkeypatch.setattr(model_monitor, "set_drift_monitoring_snapshot", lambda snapshot: captured.__setitem__("drift", snapshot))
     monkeypatch.setattr(model_monitor, "set_active_runs", lambda count: captured.__setitem__("active_runs", count))
@@ -186,6 +188,7 @@ def test_build_monitoring_snapshot_handles_insufficient_trades(monkeypatch):
     )
 
     monkeypatch.setattr(model_monitor, "get_sla_monitor", lambda: _FakeSLAMonitor())
+    monkeypatch.setattr(model_monitor, "MLFLOW_CLIENT_AVAILABLE", True)
     monkeypatch.setattr(model_monitor, "get_mlflow_client", lambda experiment: _FakeMLflowClient())
 
     snapshot = model_monitor.build_monitoring_snapshot(
