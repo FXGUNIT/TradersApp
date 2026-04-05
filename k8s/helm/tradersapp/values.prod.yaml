@@ -86,7 +86,7 @@ frontend:
     host: tradersapp.io
     path: /
 
-# Triton — disabled by default (GPU required)
+# Triton — enabled for GPU inference nodes
 triton:
   enabled: true
   replicaCount: 1

@@ -17,6 +17,8 @@ values_file="${K8S_HELM_VALUES_FILE:-$chart_dir/values.prod.yaml}"
 mlflow_secret_name="${MLFLOW_RUNTIME_SECRET:-mlflow-runtime-secret}"
 mlflow_postgres_db="${MLFLOW_POSTGRES_DB:-mlflow}"
 mlflow_postgres_user="${MLFLOW_POSTGRES_USER:-mlflow}"
+dq_alert_webhook="${DQ_ALERT_WEBHOOK:-}"
+dq_quarantine_dir="${DQ_QUARANTINE_DIR:-/data/dq_quarantine}"
 work_dir="$(mktemp -d)"
 kubeconfig_path="$work_dir/kubeconfig"
 
@@ -63,6 +65,8 @@ helm upgrade --install "$release_name" "$chart_dir" \
   --set-string bff.image.tag="$image_tag" \
   --set-string mlEngine.image.repository="$ml_engine_repo" \
   --set-string mlEngine.image.tag="$image_tag" \
+  --set-string mlEngine.dataQuality.alertWebhook="$dq_alert_webhook" \
+  --set-string mlEngine.dataQuality.quarantineDir="$dq_quarantine_dir" \
   --set-string mlflow.secretRef.existingSecret="$mlflow_secret_name" \
   --set-string mlflow.postgres.database="$mlflow_postgres_db" \
   --set-string mlflow.postgres.user="$mlflow_postgres_user" \
