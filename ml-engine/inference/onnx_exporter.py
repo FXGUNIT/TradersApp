@@ -129,12 +129,15 @@ def export_lightgbm(pipeline, feature_cols: list[str], model_name: str, version:
     initial_type = [("input", FloatTensorType([None, n_features]))]
     _ensure_lightgbm_converter_registered()
     try:
-        options = {type(inner_clf): {"zipmap": False}} if inner_clf is not None else None
+        options = {}
+        if inner_clf is not None:
+            options[type(inner_clf)] = {"zipmap": False}
+        options[id(clf)] = {"zipmap": False}
         onnx_model = convert_sklearn(
             pipeline,
             initial_types=initial_type,
             target_opset={"": 15, "ai.onnx.ml": 3},
-            options=options,
+            options=options or None,
         )
     except Exception as exc:
         if not ONNXMLTOOLS_AVAILABLE:

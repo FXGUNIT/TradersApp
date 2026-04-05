@@ -1,7 +1,7 @@
 {
   "model_name": "lightgbm_direction",
   "version": "20260405_131043",
-  "exported_at": "2026-04-05T13:32:29.516813+00:00",
+  "exported_at": "2026-04-05T13:35:17.264315+00:00",
   "feature_cols": [
     "open",
     "high",

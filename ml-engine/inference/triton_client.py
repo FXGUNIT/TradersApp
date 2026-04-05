@@ -272,7 +272,11 @@ class TritonInferenceClient:
     ) -> dict:
         """Run ONNX inference locally via ONNX Runtime."""
         if model_name not in self._ort_sessions:
-            onnx_files = list(self._onnx_dir.glob(f"{model_name}*.onnx"))
+            onnx_files = sorted(
+                self._onnx_dir.glob(f"{model_name}*.onnx"),
+                key=lambda p: p.stat().st_mtime,
+                reverse=True,
+            )
             if not onnx_files:
                 raise FileNotFoundError(f"No ONNX model found for {model_name}")
 
@@ -292,14 +296,48 @@ class TritonInferenceClient:
         X = np.array(features, dtype=np.float32)
         result = session.run(output_names, {input_name: X})
 
-        # Parse outputs
-        if len(result) >= 2:
-            p_long = result[0][:, 1] if result[0].ndim > 1 else result[0]
-            p_short = result[1] if len(result) > 1 else 1 - p_long
+        # Parse ONNX outputs across common classifier formats:
+        # - tensor probabilities [N,2]
+        # - label tensor [N] + probabilities tensor [N,2]
+        # - label tensor [N] + zipmap list[dict]
+        probabilities = None
+        for output in result:
+            if isinstance(output, np.ndarray) and output.ndim == 2 and output.shape[1] >= 2:
+                probabilities = output.astype(np.float32, copy=False)
+                break
+
+        if probabilities is None:
+            for output in result:
+                if isinstance(output, list) and output and isinstance(output[0], dict):
+                    class_keys = sorted({k for row in output for k in row.keys()})
+                    if len(class_keys) >= 2:
+                        neg_key, pos_key = class_keys[0], class_keys[-1]
+                        probabilities = np.array(
+                            [
+                                [float(row.get(neg_key, 0.0)), float(row.get(pos_key, 0.0))]
+                                for row in output
+                            ],
+                            dtype=np.float32,
+                        )
+                        break
+
+        if probabilities is not None:
+            p_short = probabilities[:, 0]
+            p_long = probabilities[:, 1]
         else:
-            proba = result[0]
-            p_long = proba[:, 1] if proba.ndim > 1 and proba.shape[1] == 2 else proba
-            p_short = 1 - p_long
+            raw = result[0]
+            if not isinstance(raw, np.ndarray):
+                raise TypeError(
+                    f"Unsupported ONNX output format for {model_name}: {type(raw).__name__}"
+                )
+
+            raw = np.asarray(raw, dtype=np.float32)
+            if raw.ndim == 2 and raw.shape[1] >= 2:
+                p_short = raw[:, 0]
+                p_long = raw[:, 1]
+            else:
+                p_long = np.clip(raw.reshape(-1), 0.0, 1.0)
+                p_short = 1.0 - p_long
 
         confidence = np.maximum(p_long, p_short)
         signals = np.where(
@@ -429,6 +467,11 @@ class TritonInferenceClient:
 
         # Generate synthetic features
         features = [[0.0] * n_features for _ in range(n_samples)]
+
+        # Warm up model/session once so cold-start initialization does not skew p99.
+        warmup_batch = features[: min(batch_size, n_samples)]
+        if warmup_batch:
+            self.predict(warmup_batch, model_name=model)
 
         total_t0 = time.perf_counter()
         latencies = []

@@ -12,9 +12,11 @@ x-airflow-common: &airflow-common
     DQ_DB_PATH: /opt/tradersapp/ml-engine/data/trading_data.db
     DQ_BLOCK_ON_CRITICAL: "true"
     DQ_REQUIRE_GX: "true"
-    MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI:-http://mlflow:5000}
+    MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI:-http://host.docker.internal:5000}
     DQ_ALERT_WEBHOOK: ${DQ_ALERT_WEBHOOK:-}
-    ML_ENGINE_URL: ${ML_ENGINE_URL:-http://ml-engine:8001}
+    ML_ENGINE_URL: ${ML_ENGINE_URL:-http://host.docker.internal:8001}
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
   volumes:
     - ./dags:/opt/airflow/dags
     - ./ml-engine:/opt/tradersapp/ml-engine
