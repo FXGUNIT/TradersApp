@@ -72,6 +72,7 @@ services:
     container_name: traders-mlflow
     ports:
       - "5000:5000"
+      - "5001:5001"
     environment:
       AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
       AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin123}
@@ -79,21 +80,10 @@ services:
       MLFLOW_S3_ENDPOINT_URL: ${MLFLOW_S3_ENDPOINT_URL:-http://minio:9000}
       MLFLOW_TRACKING_URI: http://localhost:5000
       BACKEND_STORE_URI: postgresql://${MLFLOW_POSTGRES_USER:-mlflow}:${MLFLOW_POSTGRES_PASSWORD:-mlflow123}@postgres:5432/${MLFLOW_POSTGRES_DB:-mlflow}
-      MLFLOW_ARTIFACTS_S3: s3://${MLFLOW_BUCKET:-mlflow-artifacts}/
-    # Run with gunicorn + Prometheus wrapper (exposes /metrics endpoint)
-    command:
-      - gunicorn
-      - --bind
-      - 0.0.0.0:5000
-      - --workers
-      - "2"
-      - --timeout
-      - "300"
-      - --access-logfile
-      - "-"
-      - --error-logfile
-      - "-"
-      - mlflow_metrics_wrapper:create_app()
+      POSTGRES_USER: ${MLFLOW_POSTGRES_USER:-mlflow}
+      POSTGRES_PASSWORD: ${MLFLOW_POSTGRES_PASSWORD:-mlflow123}
+      POSTGRES_DB: ${MLFLOW_POSTGRES_DB:-mlflow}
+      POSTGRES_HOST: postgres
     depends_on:
       postgres:
         condition: service_healthy

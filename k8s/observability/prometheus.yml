@@ -146,7 +146,7 @@ scrape_configs:
       - action: labelmap
         regex: __meta_kubernetes_pod_label_(.+)
     static_configs:
-      - targets: ["host.docker.internal:5000"]
+      - targets: ["host.docker.internal:5001"]
         labels:
           app: mlflow
           tier: mlops

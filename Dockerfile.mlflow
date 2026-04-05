@@ -3,25 +3,9 @@ FROM ghcr.io/mlflow/mlflow:v2.21.3
 RUN python -m pip install --no-cache-dir \
     psycopg2-binary==2.9.10 \
     boto3==1.37.38 \
-    prometheus-flask-exporter==0.23.2 \
-    psycopg2==2.9.10
+    prometheus-flask-exporter==0.23.2
 
-# Prometheus metrics proxy: exposes /metrics for MLflow on port 5001
-# Runs alongside MLflow server as a sidecar process.
-# MLflow itself handles all the tracking logic; this only generates metrics.
 COPY mlflow_metrics_proxy.py /mlflow_metrics_proxy.py
 
-# Entrypoint: start MLflow server AND the metrics proxy concurrently
-ENTRYPOINT []
-CMD [ \
-    "sh", "-ec", \
-    "python /mlflow_metrics_proxy.py & " \
-    "sleep 2 && " \
-    "mlflow server " \
-    "  --host 0.0.0.0 " \
-    "  --port 5000 " \
-    "  --backend-store-uri postgresql://${POSTGRES_USER:-mlflow}:${POSTGRES_PASSWORD:-mlflow123}@${POSTGRES_HOST:-postgres}:5432/${POSTGRES_DB:-mlflow} " \
-    "  --artifacts-destination s3://${MLFLOW_BUCKET:-mlflow-artifacts}/ " \
-    "  --serve-artifacts " \
-    "  --gunicorn-opts '${MLFLOW_GUNICORN_OPTS:---workers 2 --timeout=300}'" \
-]
+ENTRYPOINT ["sh", "-c"]
+CMD ["python /mlflow_metrics_proxy.py & sleep 2 && mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri postgresql://${POSTGRES_USER:-mlflow}:${POSTGRES_PASSWORD:-mlflow123}@${POSTGRES_HOST:-postgres}:5432/${POSTGRES_DB:-mlflow} --artifacts-destination s3://${MLFLOW_BUCKET:-mlflow-artifacts}/ --serve-artifacts --gunicorn-opts '--workers 2 --timeout=300'"]
