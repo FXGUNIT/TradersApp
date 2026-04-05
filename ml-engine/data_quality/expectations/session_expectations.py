@@ -98,7 +98,7 @@ class SessionExpectations:
             self._pass("trade_date_parseable", "All trade_date values are parseable")
 
     def _check_no_future_dates(self, df: pd.DataFrame) -> None:
-        parsed = pd.to_datetime(df["trade_date"], errors="coerce")
+        parsed = pd.to_datetime(df["trade_date"], errors="coerce", utc=True)
         cutoff = pd.Timestamp.now(tz=timezone.utc).normalize() + pd.Timedelta(days=1)
         bad = int((parsed > cutoff).sum())
         if bad > 0:

@@ -247,17 +247,22 @@ class TestSessionExpectations:
 class TestPSI:
     def test_psi_identical_distributions(self):
         np = pytest.importorskip("numpy")
-        expected = np.random.randn(1000) * 10 + 100
-        actual = np.random.randn(1000) * 10 + 100
+        rng = np.random.default_rng(42)
+        expected = rng.normal(100, 10, 1000)
+        actual = rng.normal(100, 10, 1000)
         psi = _psi(expected, actual)
         assert psi < 0.05  # Nearly identical distributions → low PSI
 
     def test_psi_different_distributions(self):
         np = pytest.importorskip("numpy")
-        expected = np.random.randn(1000) * 10 + 100
-        actual = np.random.randn(1000) * 10 + 200  # shifted by 10 std
+        rng_e = np.random.default_rng(42)
+        rng_a = np.random.default_rng(99)
+        expected = rng_e.normal(100, 10, 1000)
+        actual = rng_a.normal(100, 10, 1000)
+        # Shift means by 2 std devs (20 pts) — enough to overlap but produce PSI > 0.2
+        actual = actual + 20
         psi = _psi(expected, actual)
-        assert psi > 0.2  # Significant shift → high PSI
+        assert psi > 0.2, f"PSI={psi:.4f} — expected > 0.2 for shifted distributions"
 
     def test_psi_handles_insufficient_data(self):
         np = pytest.importorskip("numpy")
@@ -305,24 +310,28 @@ class TestDriftExpectations:
         monkeypatch.setenv("DQ_BASELINE_DIR", str(tmp_path))
         np = pytest.importorskip("numpy")
 
+        rng_b = np.random.default_rng(42)
+        rng_c = np.random.default_rng(99)
+
         # Create baseline
         baseline_df = pd.DataFrame({
-            "close": list(np.random.randn(500) * 5 + 100),
-            "volume": list(np.random.randint(100, 300, 500)),
+            "close": list(rng_b.normal(100, 5, 500)),
+            "volume": list(rng_b.integers(100, 300, 500)),
         })
         build_baseline_snapshot(baseline_df, "candles_5min", columns=["close", "volume"])
 
-        # Current df has shifted distribution
+        # Current df has shifted distribution (2 std devs / 10 pts — enough overlap for meaningful PSI)
         current_df = pd.DataFrame({
-            "close": list(np.random.randn(100) * 5 + 200),  # shifted mean
-            "volume": list(np.random.randint(100, 300, 100)),
+            "close": list(rng_c.normal(100, 5, 100) + 20),
+            "volume": list(rng_c.integers(100, 300, 100)),
         })
 
         suite = DriftExpectations()
         report = suite.validate(current_df, table="candles_5min")
         # PSI should be high due to shift
         critical_names = [r["name"] for r in report["results"] if r["status"] == "fail" and r["severity"] == "critical"]
-        assert any("psi_critical_close" in n for n in critical_names)
+        assert any("psi_critical_close" in n for n in critical_names), \
+            f"Expected psi_critical_close in critical failures; got {critical_names}"
 
 
 # ─── Integration: Validation Pipeline ──────────────────────────────────────────
