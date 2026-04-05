@@ -68,10 +68,10 @@ spec:
               value: {{ .Values.mlEngine.dataQuality.lookbackDays | quote }}
             - name: INFERENCE_P99_TARGET_MS
               value: {{ .Values.triton.inferenceLatencyTargetMs | default 100 | quote }}
-            {{- if .Values.mlEngine.dataQuality.alertWebhook }}
             - name: DQ_ALERT_WEBHOOK
-              value: {{ .Values.mlEngine.dataQuality.alertWebhook | quote }}
-            {{- end }}
+              value: {{ .Values.mlEngine.dataQuality.alertWebhook | default "" | quote }}
+            - name: DQ_QUARANTINE_DIR
+              value: {{ .Values.mlEngine.dataQuality.quarantineDir | default "/data/dq_quarantine" | quote }}
           {{- with .Values.mlEngine.resources }}
           resources:
             {{- toYaml . | nindent 12 }}

@@ -116,9 +116,18 @@ spec:
         prometheus.io/path: "/metrics"
       {{- end }}
     spec:
-      {{- include "tradersapp.imagePullSecrets" . | nindent 6 }}
-      {{- include "tradersapp.tolerations" . | nindent 6 }}
-      {{- include "tradersapp.nodeSelector" . | nindent 6 }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with ($triton.tolerations | default .Values.tolerations) }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with ($triton.nodeSelector | default .Values.nodeSelector) }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       {{- if $triton.securityContext | default true }}
       securityContext:
         runAsNonRoot: true

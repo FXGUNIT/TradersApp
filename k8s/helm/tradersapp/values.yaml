@@ -35,6 +35,7 @@ mlEngine:
     requireGreatExpectations: true
     lookbackDays: 90
     alertWebhook: ""
+    quarantineDir: "/data/dq_quarantine"
   persistence:
     enabled: true
     size: 5Gi

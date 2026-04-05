@@ -33,6 +33,7 @@ mlEngine:
     requireGreatExpectations: true
     lookbackDays: 90
     alertWebhook: ""
+    quarantineDir: "/data/dq_quarantine"
   persistence:
     enabled: true
     size: 5Gi
@@ -87,7 +88,16 @@ frontend:
 
 # Triton — disabled by default (GPU required)
 triton:
-  enabled: false
+  enabled: true
+  replicaCount: 1
+  cudaVisibleDevices: "0"
+  inferenceLatencyTargetMs: 100
+  nodeSelector:
+    nvidia.com/gpu: "true"
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
 
 # Redis
 redis:
