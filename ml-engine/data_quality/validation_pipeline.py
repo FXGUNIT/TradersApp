@@ -460,6 +460,7 @@ def run_full_validation(
     candles_days: int | None = None,
     trades_days: int | None = None,
     sessions_days: int | None = None,
+    update_baseline: bool = True,
 ) -> dict:
     started = time.time()
     default_days = int(os.environ.get("DQ_VALIDATE_DAYS", "90"))
@@ -467,19 +468,27 @@ def run_full_validation(
     trades_window = int(trades_days if trades_days is not None else default_days)
     sessions_window = int(sessions_days if sessions_days is not None else default_days)
 
-    suites = {
+    # Core structural validations (block on failure)
+    suites: dict[str, dict] = {
         "candles": validate_candles(db_path=db_path, days=candles_window),
         "trades": validate_trades(db_path=db_path, days=trades_window),
         "sessions": validate_sessions(db_path=db_path, days=sessions_window),
     }
-    overall_passed = all(suite.get("passed", False) for suite in suites.values())
+
+    # Drift detection (informational — always included but doesn't block pipeline)
+    suites["drift"] = validate_drift(db_path=db_path, days=candles_window)
+
+    # Only structural suites count toward the gate
+    structural_passed = all(suites[s].get("passed", False) for s in ("candles", "trades", "sessions"))
+    all_passed = all(suite.get("passed", False) for suite in suites.values())
     critical = sum(int(suite.get("critical_failures", 0)) for suite in suites.values())
     warning = sum(int(suite.get("warning_failures", 0)) for suite in suites.values())
 
     report = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "db_path": db_path,
-        "passed": overall_passed,
+        "passed": structural_passed,
+        "all_suites_passed": all_passed,
         "critical_failures": critical,
         "warning_failures": warning,
         "duration_ms": round((time.time() - started) * 1000, 1),
@@ -487,8 +496,25 @@ def run_full_validation(
     }
     _record_prometheus_dq_metrics(report)
 
-    if not overall_passed:
-        failed_suites = [name for name, suite in suites.items() if not suite.get("passed", False)]
+    # Update baseline only when structural checks pass
+    if structural_passed and update_baseline:
+        try:
+            from data_quality.expectations.statistical_expectations import compute_baseline_stats
+            candle_df = _read_sql(
+                db_path,
+                "SELECT * FROM candles_5min ORDER BY timestamp DESC LIMIT 5000",
+                (),
+                ["timestamp"],
+            )
+            if not candle_df.empty:
+                compute_baseline_stats(candle_df, "candles_5min")
+                print("[DQ] Baseline updated after passing validation")
+        except Exception as exc:
+            print(f"[DQ] Baseline update failed (non-blocking): {exc}")
+
+    if not structural_passed:
+        failed_suites = [name for name, suite in suites.items()
+                         if not suite.get("passed", False) and name != "drift"]
         _send_alert(f"Data quality gate failed. Failed suites: {failed_suites}")
         if block:
             raise ValueError(

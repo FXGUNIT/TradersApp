@@ -179,6 +179,24 @@ def get_metrics(registry=DEFAULT_REGISTRY) -> dict:
         documentation="Total number of data quality checks passed (cumulative)",
         registry=registry,
     )
+    metrics["dq_suite_critical_failures"] = Gauge(
+        name="ml_dq_suite_critical_failures",
+        documentation="Critical failures per DQ suite",
+        labelnames=["suite"],
+        registry=registry,
+    )
+    metrics["dq_suite_warnings"] = Gauge(
+        name="ml_dq_suite_warnings",
+        documentation="Warnings per DQ suite",
+        labelnames=["suite"],
+        registry=registry,
+    )
+    metrics["dq_suite_checks_passed"] = Gauge(
+        name="ml_dq_suite_checks_passed",
+        documentation="Checks passed per DQ suite",
+        labelnames=["suite"],
+        registry=registry,
+    )
 
     # ── HTTP Requests ─────────────────────────────────────────────────
     metrics["http_requests_total"] = Counter(
@@ -535,6 +553,24 @@ def set_data_quality_metrics(critical_failures: int, checks_passed: int):
         return
     _metrics["dq_critical_failures"].set(max(0, int(critical_failures)))
     _metrics["dq_checks_passed"].set(max(0, int(checks_passed)))
+
+
+def set_dq_suite_metrics(
+    suite: str,
+    critical_failures: int,
+    warnings: int = 0,
+    checks_passed: int = 0,
+):
+    """Set per-suite data quality metric gauges."""
+    global _metrics
+    if _metrics is None:
+        _metrics = get_metrics()
+    if not PROMETHEUS_AVAILABLE:
+        return
+    _metrics["dq_suite_critical_failures"].labels(suite=str(suite)).set(max(0, int(critical_failures)))
+    _metrics["dq_suite_warnings"].labels(suite=str(suite)).set(max(0, int(warnings)))
+    _metrics["dq_suite_checks_passed"].labels(suite=str(suite)).set(max(0, int(checks_passed)))
+    _metrics["dq_suite_checks_passed"].labels(suite=str(suite)).set(max(0, int(checks_passed)))
 
 
 def sync_mlflow_registry(registry_models: dict[str, list[dict]]):
