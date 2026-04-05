@@ -31,7 +31,6 @@ services:
       - '--storage.tsdb.path=/prometheus'
       - '--storage.tsdb.retention.time=30d'
       - '--web.enable-lifecycle'
-      - '--rule.path=/etc/prometheus/rules'
       - '--web.page-title=TradersApp Prometheus'
     extra_hosts:
       - "host.docker.internal:host-gateway"
