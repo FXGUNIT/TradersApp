@@ -950,6 +950,7 @@ async def drift_thresholds():
 async def monitoring_status(
     symbol: str = Query(default="MNQ"),
     sync_metrics: bool = Query(default=True),
+    wait_for_baseline: bool = Query(default=False),
 ):
     """
     Unified model-monitoring snapshot used by Airflow and Prometheus refreshes.
@@ -958,6 +959,12 @@ async def monitoring_status(
     - drift status and retrain recommendation
     - latency/SLA report for live inference
     - MLflow registry freshness and active-run state
+
+    Query params:
+    - symbol: trading symbol (default MNQ)
+    - sync_metrics: whether to push metrics to Prometheus (default True)
+    - wait_for_baseline: block until baseline trades are available (default False)
+                        Useful for initial setup; Airflow should not use this.
     """
     if drift_monitor is None or db is None:
         raise HTTPException(status_code=503, detail="Monitoring components not initialized")
@@ -969,8 +976,24 @@ async def monitoring_status(
             retrain_config=(retrain_pipeline.config if retrain_pipeline else None),
             symbol=symbol,
             sync_prometheus_metrics=sync_metrics,
+            wait_for_baseline=wait_for_baseline,
         )
         return {"ok": True, **snapshot}
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/monitoring/config", tags=["monitoring"])
+async def monitoring_config():
+    """
+    Return the current monitoring thresholds and configuration.
+    Used by Airflow to self-document what thresholds are active without
+    needing to rebuild the snapshot.
+    """
+    from infrastructure.model_monitor import get_monitoring_config
+    try:
+        return {"ok": True, **get_monitoring_config()}
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
