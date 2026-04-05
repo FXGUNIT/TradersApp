@@ -25,6 +25,9 @@ alerting:
 rule_files:
   - "/etc/prometheus/rules/*.yml"
   - "/etc/prometheus/rules/infrastructure.rules.yml"
+  - "/etc/prometheus/rules/ml-engine.rules.yml"
+  - "/etc/prometheus/rules/airflow.rules.yml"
+  - "/etc/prometheus/rules/recording.rules.yml"
 
 # ─── Scrape targets ────────────────────────────────────────────────────────
 
