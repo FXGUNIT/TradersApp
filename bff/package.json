@@ -7,7 +7,9 @@
     "analysis:start": "node analysis-server.mjs",
     "analysis:dev": "node analysis-server.mjs",
     "start": "node server.mjs",
-    "dev": "node server.mjs"
+    "dev": "node server.mjs",
+    "generate-grpc": "mkdir -p generated && grpc_tools_node_protoc --plugin=protoc-gen-ts=./node_modules/.bin/protoc-gen-ts --ts_out=generated --grpc_out=generated --js_out=import_style=commonjs,binary:generated --import_style=commonjs -I ../proto ../proto/ddd/v1/*.proto && echo 'JS gRPC stubs generated'",
+    "generate-grpc:watch": "watch 'npm run generate-grpc' ../proto"
   },
   "engines": {
     "node": ">=18.0.0"
