@@ -1,54 +1,193 @@
+# k8s/observability/alertmanager.yml
 # Alertmanager configuration for TradersApp
-# Sends alerts to configured receivers (webhook, email, Slack, PagerDuty, etc.)
+# Sends alerts to Slack, PagerDuty, and Discord based on severity
 global:
   resolve_timeout: 5m
+  # SMTP config for email alerts (optional)
+  # smtp_smarthost: 'smtp.example.com:587'
+  # smtp_from: 'alerts@tradersapp.local'
+  # smtp_auth_username: 'alerts@tradersapp.local'
+  # smtp_auth_password: '${SMTP_AUTH_PASSWORD}'
 
 route:
   group_by: ["alertname", "service", "severity"]
   group_wait: 10s
   group_interval: 10s
   repeat_interval: 12h
-  receiver: default
+  receiver: default-receiver
   routes:
-    # Critical alerts → page immediately
+    # Critical alerts → PagerDuty immediately (no group_wait)
     - match:
         severity: critical
-      receiver: critical-alerts
+      receiver: pagerduty-critical
       group_wait: 0s
       repeat_interval: 1h
-    # Warning alerts → notify
+    # Warning alerts → Slack channel
     - match:
         severity: warning
-      receiver: warning-alerts
-    # Info alerts → log only
+      receiver: slack-warning
+    # Info alerts → Slack #monitoring
     - match:
         severity: info
-      receiver: default
+      receiver: slack-info
+    # Service-specific routing: ML Engine critical → dedicated Slack channel
+    - match:
+        severity: critical
+        service: ml-engine
+      receiver: slack-ml-engine-critical
+    # Airflow alerts
+    - match:
+        service: airflow
+      receiver: slack-airflow
+    # Kafka alerts
+    - match:
+        service: kafka
+      receiver: slack-kafka
 
 receivers:
-  # Default (warning + info)
-  - name: default
-    webhook_configs:
-      # Configure your webhook URL here for generic integrations
-      # - url: http://example.com/webhook
-      # For Telegram, use a bot webhook or external receiver:
-      # - url: https://api.telegram.org/bot<TOKEN>/sendMessage?chat_id=<CHAT_ID>
+  # ── Default receiver (fallback) ──────────────────────────────────────────
+  - name: default-receiver
+    # Noop — all alerts should be routed above
 
-  # Critical alerts — add your paging mechanism here
-  - name: critical-alerts
-    webhook_configs:
-      # Replace with PagerDuty, OpsGenie, or a script that pages you
-      - url: http://localhost:9093/alerts/critical
+  # ── PagerDuty (critical production alerts) ──────────────────────────────
+  - name: pagerduty-critical
+    pagerduty_configs:
+      - routing_key: '${PAGERDUTY_ROUTING_KEY}'
+        severity: critical
+        description: '{{ range.Alerts }}{{ .Annotations.summary }}{{ end }}'
+        details:
+          alertname: '{{ range.Alerts }}{{ .Labels.alertname }}{{ end }}'
+          service: '{{ range.Alerts }}{{ .Labels.service }}{{ end }}'
+          severity: '{{ range.Alerts }}{{ .Labels.severity }}{{ end }}'
+          instance: '{{ range.Alerts }}{{ .Labels.instance }}{{ end }}'
+          pod: '{{ range.Alerts }}{{ .Labels.pod }}{{ end }}'
+        group: '{{ groupLabels.alertname }}'
+        component: '{{ range.Alerts }}{{ .Labels.service }}{{ end }}'
+        class: 'ml-engine'
+        client_url: 'http://grafana:3001'
 
-  # Warning alerts — Slack, email, etc.
-  - name: warning-alerts
-    webhook_configs:
-      - url: http://localhost:9093/alerts/warning
+  # ── Slack — ML Engine Critical ──────────────────────────────────────────
+  - name: slack-ml-engine-critical
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#alerts-critical'
+        username: 'Alertmanager Bot'
+        icon_emoji: ':rotating_light:'
+        title: '[CRITICAL] {{ range.Alerts }}{{ .Annotations.summary }}{{ end }}'
+        text: |
+          :rotating_light: *ML Engine Critical Alert*
+          *Alert:* {{ range.Alerts }}{{ .Annotations.summary }}{{ end }}
+          *Service:* {{ range.Alerts }}{{ .Labels.service }}{{ end }}
+          *Severity:* {{ range.Alerts }}{{ .Labels.severity }}{{ end }}
+          *Description:* {{ range.Alerts }}{{ .Annotations.description }}{{ end }}
+          *Time:* {{ .StartsAt }}
+          *Dashboard:* <http://grafana:3001|Grafana>
+          *Prometheus:* <http://prometheus:9090|Prometheus>
+        footer: 'Alertmanager | TradersApp Production'
+        color: '{{ if eq .Status "firing" }}danger{{ else }}good{{ end }}'
+        send_resolved: true
 
-# Inhibition rules: suppress warnings when critical fires for same service
+  # ── Slack — Warning ─────────────────────────────────────────────────────
+  - name: slack-warning
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#alerts'
+        username: 'Alertmanager Bot'
+        icon_emoji: ':warning:'
+        title: '[WARNING] {{ range.Alerts }}{{ .Annotations.summary }}{{ end }}'
+        text: |
+          :warning: *Warning Alert*
+          *Alert:* {{ range.Alerts }}{{ .Annotations.summary }}{{ end }}
+          *Service:* {{ range.Alerts }}{{ .Labels.service }}{{ end }}
+          *Description:* {{ range.Alerts }}{{ .Annotations.description }}{{ end }}
+          *Time:* {{ .StartsAt }}
+        footer: 'Alertmanager | TradersApp'
+        color: '{{ if eq .Status "firing" }}warning{{ else }}good{{ end }}'
+        send_resolved: true
+
+  # ── Slack — Info ────────────────────────────────────────────────────────
+  - name: slack-info
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#monitoring'
+        username: 'Alertmanager Bot'
+        icon_emoji: ':information_source:'
+        title: '[INFO] {{ range.Alerts }}{{ .Annotations.summary }}{{ end }}'
+        text: |
+          :information_source: *Info Alert*
+          *Alert:* {{ range.Alerts }}{{ .Annotations.summary }}{{ end }}
+          *Service:* {{ range.Alerts }}{{ .Labels.service }}{{ end }}
+          *Description:* {{ range.Alerts }}{{ .Annotations.description }}{{ end }}
+          *Time:* {{ .StartsAt }}
+        footer: 'Alertmanager | TradersApp'
+        color: '{{ if eq .Status "firing" }}#439FE0{{ else }}good{{ end }}'
+        send_resolved: true
+
+  # ── Slack — Airflow ────────────────────────────────────────────────────
+  - name: slack-airflow
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#airflow'
+        username: 'Alertmanager Bot'
+        icon_emoji: ':airflow:'
+        title: '[Airflow] {{ range.Alerts }}{{ .Annotations.summary }}{{ end }}'
+        text: |
+          :airflow: *Airflow Alert*
+          *Alert:* {{ range.Alerts }}{{ .Annotations.summary }}{{ end }}
+          *Description:* {{ range.Alerts }}{{ .Annotations.description }}{{ end }}
+          *DAG:* {{ range.Alerts }}{{ .Labels.dag_id }}{{ end }}
+          *Task:* {{ range.Alerts }}{{ .Labels.task_id }}{{ end }}
+          *Time:* {{ .StartsAt }}
+          *Airflow UI:* <http://airflow-webserver:8080|Airflow>
+        footer: 'Alertmanager | Airflow DAG Health'
+        color: '{{ if eq .Status "firing" }}#warning{{ else }}good{{ end }}'
+        send_resolved: true
+
+  # ── Slack — Kafka ──────────────────────────────────────────────────────
+  - name: slack-kafka
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#kafka'
+        username: 'Alertmanager Bot'
+        icon_emoji: ':kafka:'
+        title: '[Kafka] {{ range.Alerts }}{{ .Annotations.summary }}{{ end }}'
+        text: |
+          *Kafka Alert*
+          *Alert:* {{ range.Alerts }}{{ .Annotations.summary }}{{ end }}
+          *Description:* {{ range.Alerts }}{{ .Annotations.description }}{{ end }}
+          *Time:* {{ .StartsAt }}
+        footer: 'Alertmanager | Kafka'
+        color: '{{ if eq .Status "firing" }}#439FE0{{ else }}good{{ end }}'
+        send_resolved: true
+
+# ── Inhibition Rules ─────────────────────────────────────────────────────────────
+# Suppress lower-severity alerts when a critical alert fires for the same service
 inhibit_rules:
+  # Suppress warning when critical fires for same service
   - source_match:
       severity: "critical"
     target_match:
       severity: "warning"
     equal: ["service"]
+
+  # Suppress info when warning fires for same service
+  - source_match:
+      severity: "warning"
+    target_match:
+      severity: "info"
+    equal: ["service"]
+
+  # Suppress alerts from the same service+alertname combination
+  - source_match:
+      alertname: "MLEngineDown"
+    target_match_re:
+      alertname: ".*"
+    equal: ["service"]
+
+  # Only inhibit when the source alert is actually firing (not resolved)
+  - source_match:
+      alertname: ".*"
+    target_match_re:
+      alertname: ".*"
+    equal: ["service", "alertname"]
+    # inhibition is suppressed if the source alert has no "severity" label
