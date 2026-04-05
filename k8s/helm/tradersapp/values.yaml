@@ -246,6 +246,8 @@ feast:
   # Secret reference for optional credentials
   secretRef:
     existingSecret: ""
+  redis:
+    url: "redis://redis:6379"
   volumeMounts: []
 
 # Kafka (event-driven inter-service communication)
