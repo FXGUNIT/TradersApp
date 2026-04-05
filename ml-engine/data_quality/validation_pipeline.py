@@ -29,6 +29,7 @@ if str(ML_ENGINE_ROOT) not in sys.path:
 from data_quality.expectations.candle_expectations import get_candle_suite
 from data_quality.expectations.trade_expectations import get_trade_suite
 from data_quality.expectations.session_expectations import get_session_suite
+from data_quality.expectations.statistical_expectations import get_drift_suite, compute_baseline_stats
 
 DEFAULT_DB_PATH = os.environ.get(
     "DQ_DB_PATH",
@@ -392,17 +393,64 @@ def validate_sessions(db_path: str = DEFAULT_DB_PATH, days: int = 90) -> dict:
     return merged
 
 
+def validate_drift(db_path: str = DEFAULT_DB_PATH, days: int = 30) -> dict:
+    """Run distributional drift detection against stored baselines."""
+    cutoff = pd.Timestamp.now(tz="UTC") - pd.Timedelta(days=days)
+    df = _read_sql(
+        db_path,
+        """
+        SELECT * FROM candles_5min
+        WHERE timestamp >= ?
+        ORDER BY timestamp ASC
+        """,
+        (cutoff.isoformat(),),
+        ["timestamp"],
+    )
+    if df.empty:
+        return {
+            "suite": "drift_expectations",
+            "passed": True,
+            "critical_failures": 0,
+            "warning_failures": 0,
+            "checks_passed": 0,
+            "checks_failed": 0,
+            "checks_warned": 0,
+            "total_checks": 0,
+            "results": [],
+            "n_rows": 0,
+        }
+    return get_drift_suite().validate(df, table="candles_5min", current_days=days)
+
+
 def _record_prometheus_dq_metrics(report: dict) -> None:
     try:
-        from infrastructure.prometheus_exporter import set_data_quality_metrics
+        from infrastructure.prometheus_exporter import (
+            set_data_quality_metrics,
+            set_dq_suite_metrics,
+        )
     except Exception:
         return
 
     suites = report.get("suites", {})
-    checks_passed = sum(int(s.get("checks_passed", 0)) for s in suites.values())
+    total_checks_passed = 0
+    for suite_name, suite in suites.items():
+        checks_passed = int(suite.get("checks_passed", 0))
+        critical = int(suite.get("critical_failures", 0))
+        warnings = int(suite.get("warning_failures", 0))
+        total_checks_passed += checks_passed
+        try:
+            set_dq_suite_metrics(
+                suite=suite_name,
+                critical_failures=critical,
+                warnings=warnings,
+                checks_passed=checks_passed,
+            )
+        except Exception:
+            pass
+
     set_data_quality_metrics(
         critical_failures=int(report.get("critical_failures", 0)),
-        checks_passed=int(checks_passed),
+        checks_passed=int(total_checks_passed),
     )
 
 
