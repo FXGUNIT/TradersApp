@@ -346,21 +346,10 @@ function health(call, callback) {
   callback(null, {
     ok: true,
     service: "analysis-service",
-    version: "1.0.0",
+    version: process.env.SERVICE_VERSION || "1.0.0",
+    status: "healthy",
     timestamp: new Date().toISOString(),
   });
-}
-
-async function getConsensus(call, callback) {
-  try {
-    const prediction = await mlEnginePredict(call.request);
-    callback(null, toGrpcConsensusResponse(prediction));
-  } catch (error) {
-    callback({
-      code: grpc.status.UNAVAILABLE,
-      message: error?.message || "analysis-service unavailable",
-    });
-  }
 }
 
 async function getRegime(call, callback) {
