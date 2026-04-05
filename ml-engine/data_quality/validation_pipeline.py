@@ -304,7 +304,7 @@ def validate_candles(db_path: str = DEFAULT_DB_PATH, days: int = 30) -> dict:
 
     merged = _merge_reports(native, gx_report, len(df))
     if not merged["passed"]:
-        failed = [row["name"] for row in merged["results"] if row["status"] == "fail"]
+        failed = [row["name"] for row in merged["results"] if row["status"] == "fail"]]
         _send_alert(f"Candle validation failed ({merged['critical_failures']} critical): {failed}")
     return merged
 
@@ -346,7 +346,7 @@ def validate_trades(db_path: str = DEFAULT_DB_PATH, days: int = 90) -> dict:
 
     merged = _merge_reports(native, gx_report, len(df))
     if not merged["passed"]:
-        failed = [row["name"] for row in merged["results"] if row["status"] == "fail"]
+        failed = [row["name"] for row in merged["results"] if row["status"] == "fail"]]
         _send_alert(f"Trade validation failed ({merged['critical_failures']} critical): {failed}")
     return merged
 
@@ -388,7 +388,7 @@ def validate_sessions(db_path: str = DEFAULT_DB_PATH, days: int = 90) -> dict:
 
     merged = _merge_reports(native, gx_report, len(df))
     if not merged["passed"]:
-        failed = [row["name"] for row in merged["results"] if row["status"] == "fail"]
+        failed = [row["name"] for row in merged["results"] if row["status"] == "fail"]]
         _send_alert(f"Session validation failed ({merged['critical_failures']} critical): {failed}")
     return merged
 
