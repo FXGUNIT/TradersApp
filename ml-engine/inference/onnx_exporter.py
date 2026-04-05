@@ -48,6 +48,13 @@ except ImportError:
     ONNX_AVAILABLE = False
 
 try:
+    from onnxmltools.convert import convert_lightgbm as onnxml_convert_lightgbm
+    from onnxmltools.convert.common.data_types import FloatTensorType as OnnxMlFloatTensorType
+    ONNXMLTOOLS_AVAILABLE = True
+except ImportError:
+    ONNXMLTOOLS_AVAILABLE = False
+
+try:
     from onnxruntime.transformers import optimizer
     from onnxruntime.transformers.quantize import quantize_dynamic, QuantType
     ORT_TRANSFORMERS_AVAILABLE = True
@@ -84,15 +91,32 @@ def export_lightgbm(pipeline, feature_cols: list[str], model_name: str, version:
     # Get n_features from feature_cols
     n_features = len(feature_cols)
 
-    # Convert sklearn pipeline to ONNX
+    # Convert sklearn pipeline to ONNX when possible.
+    # Fallback to exporting the fitted LightGBM estimator directly when
+    # CalibratedClassifierCV wrappers are not supported by skl2onnx.
     initial_type = [("input", FloatTensorType([None, n_features]))]
+    try:
+        onnx_model = convert_sklearn(
+            pipeline,
+            initial_types=initial_type,
+            target_opset=15,
+            options={type(inner_clf): {"zipmap": False}},
+        )
+    except Exception as exc:
+        if not ONNXMLTOOLS_AVAILABLE:
+            raise RuntimeError(
+                "LightGBM ONNX fallback requires onnxmltools. "
+                "Install with: pip install onnxmltools"
+            ) from exc
 
-    onnx_model = convert_sklearn(
-        pipeline,
-        initial_types=initial_type,
-        target_opset=15,
-        options={type(inner_clf): {"zipmap": False}},
-    )
+        # Use a direct LightGBM export path.
+        # This bypasses sklearn calibration wrapper conversion limitations.
+        onnx_model = onnxml_convert_lightgbm(
+            inner_clf,
+            initial_types=[("input", OnnxMlFloatTensorType([None, n_features]))],
+            target_opset=15,
+            zipmap=False,
+        )
 
     output_dir = get_onnx_output_dir()
     output_path = output_dir / f"{model_name}_{version}.onnx"
