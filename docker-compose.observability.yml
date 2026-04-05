@@ -81,8 +81,6 @@ services:
       - loki-data:/loki
       - ./k8s/observability/loki.yml:/etc/loki/local-config.yaml:ro
     command: -config.file=/etc/loki/local-config.yaml
-    depends_on:
-      - promtail
     restart: unless-stopped
 
   # ── Promtail (Log shipper) ──────────────────────────────────────────────────
@@ -97,8 +95,6 @@ services:
       # Ship BFF logs
       - bff-logs:/var/log/tradersapp/bff:ro
     command: -config.file=/etc/promtail/config.yml
-    depends_on:
-      - loki
     restart: unless-stopped
 
   # ── Jaeger (Distributed tracing) ─────────────────────────────────────────
