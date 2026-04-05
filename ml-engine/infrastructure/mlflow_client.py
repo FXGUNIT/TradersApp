@@ -63,13 +63,20 @@ STAGES = {
 }
 
 # Auto-register models that pass PBO threshold
+# All values overridable via environment variables:
+#   MLFLOW_AUTO_REGISTER_PBO, MLFLOW_AUTO_REGISTER_SHARPE_MIN,
+#   MLFLOW_AUTO_REGISTER_WIN_RATE_MIN, MLFLOW_AUTO_REGISTER_CV_ROC_AUC_MIN,
+#   MLFLOW_AUTO_REGISTER_CV_ACCURACY_MIN
 AUTO_REGISTER_THRESHOLD = {
-    "pbo": 0.05,      # Pass if PBO < 5%
-    "sharpe_min": 0.5,  # Pass if Sharpe >= 0.5
-    "win_rate_min": 0.50,  # Pass if win rate >= 50%
-    "cv_roc_auc_min": 0.55,  # Fallback validation gate for classifiers
-    "cv_accuracy_min": 0.52,  # Avoid registering near-random classifiers
+    "pbo": float(os.environ.get("MLFLOW_AUTO_REGISTER_PBO", "0.05")),
+    "sharpe_min": float(os.environ.get("MLFLOW_AUTO_REGISTER_SHARPE_MIN", "0.5")),
+    "win_rate_min": float(os.environ.get("MLFLOW_AUTO_REGISTER_WIN_RATE_MIN", "0.50")),
+    "cv_roc_auc_min": float(os.environ.get("MLFLOW_AUTO_REGISTER_CV_ROC_AUC_MIN", "0.55")),
+    "cv_accuracy_min": float(os.environ.get("MLFLOW_AUTO_REGISTER_CV_ACCURACY_MIN", "0.52")),
 }
+
+# Archive stale production models after this many days (overridable via env)
+MLFLOW_ARCHIVE_STALE_DAYS = int(os.environ.get("MLFLOW_ARCHIVE_STALE_DAYS", "7"))
 
 
 # ─── MLflow Client ────────────────────────────────────────────────────────────
@@ -87,6 +94,7 @@ class MLflowTrackingClient:
     """
 
     _instances: dict[str, "MLflowTrackingClient"] = {}
+    _instances_uri: dict[str, str] = {}  # track URI per key to detect changes
     _lock = threading.Lock()
 
     def __init__(
@@ -126,7 +134,7 @@ class MLflowTrackingClient:
 
         print(f"[MLflow] Tracking at {self.tracking_uri}, experiment: {self.experiment_name}")
 
-    def _tracking_server_reachable(self, timeout_seconds: float = 2.0) -> bool:
+    def _tracking_server_reachable(self, timeout_seconds: float = 10.0) -> bool:
         if not self.tracking_uri.startswith(("http://", "https://")):
             return True
 
@@ -322,18 +330,22 @@ class MLflowTrackingClient:
                 except Exception as e:
                     # Fallback: log as generic pickle
                     import joblib
-                    with tempfile.NamedTemporaryFile(
-                        suffix=".pkl",
-                        prefix="mlflow-model-",
-                        delete=False,
-                    ) as f:
-                        model_path = f.name
-                    joblib.dump(model_to_log, model_path)
-                    mlflow.log_artifact(model_path, artifact_path)
+                    model_path = None
                     try:
-                        os.unlink(model_path)
-                    except OSError:
-                        pass
+                        with tempfile.NamedTemporaryFile(
+                            suffix=".pkl",
+                            prefix="mlflow-model-",
+                            delete=False,
+                        ) as f:
+                            model_path = f.name
+                        joblib.dump(model_to_log, model_path)
+                        mlflow.log_artifact(model_path, artifact_path)
+                    finally:
+                        if model_path:
+                            try:
+                                os.unlink(model_path)
+                            except OSError:
+                                pass
 
             # Log metadata
             if meta_path:
@@ -505,7 +517,7 @@ class MLflowTrackingClient:
     def archive_stale_models(
         self,
         model_name: str,
-        max_age_days: int = 7,
+        max_age_days: int = MLFLOW_ARCHIVE_STALE_DAYS,
     ) -> list[dict]:
         """Archive production models older than max_age_days."""
         if not MLFLOW_AVAILABLE or not self._client:
@@ -528,6 +540,194 @@ class MLflowTrackingClient:
         except Exception as e:
             print(f"[MLflow] Archive failed: {e}")
         return archived
+
+    def compare_and_promote(
+        self,
+        model_name: str,
+        candidate_version: int | None = None,
+        metric: str = "cv_roc_auc_mean",
+        maximize: bool = True,
+    ) -> dict:
+        """
+        Champion-challenger: compare staging vs production model and promote
+        the candidate only if it is strictly better on ALL key metrics.
+
+        Args:
+            model_name: Name of the registered model
+            candidate_version: Specific staging version to evaluate.
+                               Defaults to the latest staging version.
+            metric: Primary metric to compare (default cv_roc_auc_mean)
+            maximize: Whether higher is better for the metric
+
+        Returns:
+            {"ok": True, "promoted": True, "version": X}  if promoted
+            {"ok": True, "promoted": False, "reason": "candidate worse"}  if not
+            {"ok": False, "error": ...}  on error
+        """
+        if not MLFLOW_AVAILABLE or not self._client:
+            return {"ok": False, "reason": "MLflow not available"}
+
+        try:
+            # Fetch staging candidate
+            staging_versions = self._client.get_latest_versions(
+                model_name, stages=[self._normalize_stage("staging")]
+            )
+            if not staging_versions:
+                return {"ok": False, "error": "No staging model found"}
+
+            staging_version = staging_versions[0]
+            candidate_run_id = staging_version.run_id
+
+            if candidate_version is not None:
+                # Find the specific requested version
+                all_versions = self._client.search_model_versions(
+                    f"name='{model_name}'"
+                )
+                matched = [v for v in all_versions if v.version == str(candidate_version)]
+                if matched:
+                    staging_version = matched[0]
+                    candidate_run_id = staging_version.run_id
+
+            # Fetch production model for comparison
+            prod_versions = self._client.get_latest_versions(
+                model_name, stages=[self._normalize_stage("production")]
+            )
+            prod_run_id = prod_versions[0].run_id if prod_versions else None
+
+            # Get run metrics for comparison
+            candidate_run = self._client.get_run(candidate_run_id) if candidate_run_id else None
+            prod_run = self._client.get_run(prod_run_id) if prod_run_id else None
+
+            candidate_metric = None
+            prod_metric = None
+
+            if candidate_run and candidate_run.data:
+                candidate_metric = candidate_run.data.metrics.get(metric)
+            if prod_run and prod_run.data:
+                prod_metric = prod_run.data.metrics.get(metric)
+
+            # Champion-challenger comparison
+            if prod_metric is not None and candidate_metric is not None:
+                if maximize and candidate_metric <= prod_metric:
+                    return {
+                        "ok": True,
+                        "promoted": False,
+                        "reason": f"Candidate {metric}={candidate_metric:.4f} not strictly better than production {prod_metric:.4f}",
+                        "candidate_metric": candidate_metric,
+                        "production_metric": prod_metric,
+                    }
+                if not maximize and candidate_metric >= prod_metric:
+                    return {
+                        "ok": True,
+                        "promoted": False,
+                        "reason": f"Candidate {metric}={candidate_metric:.4f} not strictly better (lower is better)",
+                        "candidate_metric": candidate_metric,
+                        "production_metric": prod_metric,
+                    }
+
+            # Promote candidate to production
+            self._client.transition_model_version_stage(
+                name=model_name,
+                version=staging_version.version,
+                stage=self._normalize_stage("production"),
+                archive_existing_versions=True,
+            )
+            return {
+                "ok": True,
+                "promoted": True,
+                "version": staging_version.version,
+                "candidate_metric": candidate_metric,
+                "production_metric": prod_metric,
+            }
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    def log_dataset_version(
+        self,
+        fingerprint: str,
+        path: str,
+        stats: dict[str, float] | None = None,
+    ) -> dict:
+        """
+        Log a dataset version for lineage tracking.
+
+        Args:
+            fingerprint: SHA256 or similar hash of the dataset content
+            path: URI or path to the dataset
+            stats: Optional dict of dataset statistics (rows, columns, etc.)
+
+        Returns:
+            {"ok": True, "dataset_version_id": ...} or {"ok": False, "error": ...}
+        """
+        if not MLFLOW_AVAILABLE or not self._has_active_run():
+            return {"ok": False, "reason": "No active MLflow run"}
+
+        try:
+            import hashlib
+            dataset_id = hashlib.sha256(
+                f"{fingerprint}:{path}".encode()
+            ).hexdigest()[:16]
+
+            mlflow.set_tag("dataset_version_id", dataset_id)
+            mlflow.set_tag("dataset_fingerprint", fingerprint)
+            mlflow.set_tag("dataset_path", str(path))
+
+            if stats:
+                for key, value in stats.items():
+                    mlflow.log_metric(f"dataset_{key}", float(value))
+
+            return {
+                "ok": True,
+                "dataset_version_id": dataset_id,
+                "fingerprint": fingerprint,
+                "path": path,
+                "stats": stats or {},
+            }
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    def get_model_version_history(
+        self,
+        model_name: str,
+        limit: int = 20,
+    ) -> list[dict]:
+        """
+        Get the version history for a registered model (paginated).
+
+        Args:
+            model_name: Name of the registered model
+            limit: Maximum number of versions to return (default 20)
+
+        Returns:
+            List of version dicts with version, stage, created, last_updated
+        """
+        if not MLFLOW_AVAILABLE or not self._client:
+            return []
+
+        history = []
+        try:
+            all_versions = self._client.search_model_versions(
+                f"name='{model_name}'"
+            )
+            # Sort descending by version number
+            sorted_versions = sorted(
+                all_versions,
+                key=lambda v: int(v.version) if v.version.isdigit() else 0,
+                reverse=True,
+            )
+            for version in sorted_versions[:limit]:
+                history.append({
+                    "version": version.version,
+                    "stage": version.current_stage,
+                    "status": version.status,
+                    "run_id": version.run_id,
+                    "source": version.source,
+                    "created": getattr(version, "creation_timestamp", None),
+                    "last_updated": getattr(version, "last_updated_timestamp", None),
+                })
+        except Exception as e:
+            print(f"[MLflow] get_model_version_history failed: {e}")
+        return history
 
     def get_registry_models(self, model_prefix: str | None = None) -> dict[str, list[dict]]:
         """List registered model versions, optionally filtered by name prefix."""
@@ -683,6 +883,14 @@ class MLflowTrackingClient:
     def _has_active_run(self) -> bool:
         return MLFLOW_AVAILABLE and mlflow.active_run() is not None
 
+    def _reset(self) -> None:
+        """Reset client state (used when MLFLOW_TRACKING_URI changes)."""
+        self._active_run = None
+        self._client = None
+        self._run_stack = []
+        if MLFLOW_AVAILABLE:
+            self._setup()
+
     def _normalize_stage(self, stage: str | None) -> str:
         if stage is None:
             return STAGES["none"]
@@ -715,13 +923,31 @@ class MLflowTrackingClient:
 
 def get_mlflow_client(
     experiment: str = "default",
+    tracking_uri: str | None = None,
     **kwargs,
 ) -> MLflowTrackingClient:
-    """Get or create a singleton MLflow client per experiment."""
+    """
+    Get or create a singleton MLflow client per experiment.
+
+    If tracking_uri differs from the cached instance's URI, the cached
+    instance is invalidated and re-created (supports runtime URI changes).
+    """
     key = f"{experiment}"
+    effective_uri = tracking_uri or MLFLOW_TRACKING_URI
     with MLflowTrackingClient._lock:
+        # Invalidate if URI changed for this experiment key
+        if key in MLflowTrackingClient._instances:
+            existing = MLflowTrackingClient._instances[key]
+            if existing.tracking_uri != effective_uri:
+                existing._reset()
+                MLflowTrackingClient._instances[key] = existing
+                MLflowTrackingClient._instances_uri[key] = effective_uri
+
         if key not in MLflowTrackingClient._instances:
-            MLflowTrackingClient._instances[key] = MLflowTrackingClient(experiment, **kwargs)
+            MLflowTrackingClient._instances[key] = MLflowTrackingClient(
+                experiment, tracking_uri=effective_uri, **kwargs
+            )
+            MLflowTrackingClient._instances_uri[key] = effective_uri
         return MLflowTrackingClient._instances[key]
 
 

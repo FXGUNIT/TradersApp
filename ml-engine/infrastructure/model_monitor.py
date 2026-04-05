@@ -15,6 +15,15 @@ import pandas as pd
 from features.feature_pipeline import engineer_features
 from infrastructure.performance import get_sla_monitor
 
+# TTL cache — avoid redundant snapshot computation between DAG runs (5-min schedule)
+try:
+    from cachetools import TTLCache
+    _snapshot_cache: TTLCache | None = None
+    _CACHE_AVAILABLE = True
+except ImportError:
+    _snapshot_cache = None
+    _CACHE_AVAILABLE = False
+
 try:
     from infrastructure.mlflow_client import get_mlflow_client
     MLFLOW_CLIENT_AVAILABLE = True

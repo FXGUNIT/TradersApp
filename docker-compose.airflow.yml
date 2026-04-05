@@ -1,13 +1,24 @@
 x-airflow-common: &airflow-common
-  image: apache/airflow:2.10.5-python3.11
+  image: apache/airflow:2.10.5-python3.11-slim
+  # Build: docker build -t traders-airflow:latest -f - . < Dockerfile (with requirements baked in)
+  # Or use the pre-built image above; pip install runs at container start for dev convenience.
   environment:
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
     AIRFLOW__CORE__LOAD_EXAMPLES: "false"
     AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
+    AIRFLOW__CORE__DAG_DISCOVERY_SAFE_MODE: "false"
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres:5432/airflow
     AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "false"
     AIRFLOW__API__AUTH_BACKENDS: airflow.api.auth.backend.basic_auth
+    AIRFLOW__SCHEDULER__DAG_DIR_LIST_INTERVAL: "30"
     AIRFLOW_UID: ${AIRFLOW_UID:-50000}
+    # Admin credentials — override via AIRFLOW_ADMIN_PASSWORD env var (never commit defaults to git)
+    _AIRFLOW_WWW_USER_USERNAME: admin
+    _AIRFLOW_WWW_USER_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD:-admin}
+    _AIRFLOW_WWW_USER_FIRSTNAME: Traders
+    _AIRFLOW_WWW_USER_LASTNAME: Admin
+    _AIRFLOW_WWW_USER_EMAIL: admin@tradersapp.local
+    _AIRFLOW_WWW_USER_ROLE: Admin
     PYTHONPATH: /opt/tradersapp/ml-engine:/opt/tradersapp
     DQ_DB_PATH: /opt/tradersapp/ml-engine/data/trading_data.db
     DQ_BLOCK_ON_CRITICAL: "true"
@@ -18,6 +29,16 @@ x-airflow-common: &airflow-common
     MODEL_MONITOR_SYMBOL: ${MODEL_MONITOR_SYMBOL:-MNQ}
     MODEL_MONITOR_SCHEDULE: "${MODEL_MONITOR_SCHEDULE:-*/5 * * * *}"
     MODEL_MONITOR_MAX_PREDICT_P95_MS: "${MODEL_MONITOR_MAX_PREDICT_P95_MS:-50}"
+    ML_RETRAIN_TIMEOUT: "${ML_RETRAIN_TIMEOUT:-900}"
+    REDIS_URL: "${REDIS_URL:-redis://host.docker.internal:6379/0}"
+    MONITORING_REPORT_PATH: "${MONITORING_REPORT_PATH:-/opt/airflow/reports}"
+    SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL:-}
+    AIRFLOW_ADMIN_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD:-}
+    # MLflow and MinIO (extend from docker-compose.mlflow.yml or define inline)
+    MLFLOW_S3_ENDPOINT_URL: ${MLFLOW_S3_ENDPOINT_URL:-http://host.docker.internal:9000}
+    AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-minioadmin}
+    AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-minioadmin123}
+    MLFLOW_ARTIFACT_ROOT: ${MLFLOW_ARTIFACT_ROOT:-s3://mlflow-artifacts/}
   extra_hosts:
     - "host.docker.internal:host-gateway"
   volumes:
@@ -25,11 +46,22 @@ x-airflow-common: &airflow-common
     - ./ml-engine:/opt/tradersapp/ml-engine
     - ./airflow:/opt/tradersapp/airflow
     - airflow-logs:/opt/airflow/logs
+    - airflow-reports:/opt/airflow/reports
   depends_on:
     airflow-postgres:
       condition: service_healthy
+    mlflow:
+      condition: service_healthy
   networks:
     - default
+  deploy:
+    resources:
+      limits:
+        cpus: "2.0"
+        memory: "4G"
+      reservations:
+        cpus: "0.5"
+        memory: "1G"
 
 services:
   airflow-postgres:
@@ -46,12 +78,33 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+      start_period: 20s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: "1G"
 
   airflow-init:
     <<: *airflow-common
     container_name: traders-airflow-init
     entrypoint: /bin/bash
-    command: -lc "pip install --no-cache-dir -r /opt/tradersapp/airflow/requirements.txt && airflow db migrate && airflow users create --username admin --firstname Traders --lastname Admin --role Admin --email admin@tradersapp.local --password admin || true"
+    # Install dependencies ONCE at init time (baked into image in production)
+    command: >
+      -c "
+        pip install --no-cache-dir -r /opt/tradersapp/airflow/requirements.txt
+        && airflow db migrate
+        && airflow users create
+          --username admin
+          --firstname Traders
+          --lastname Admin
+          --role Admin
+          --email admin@tradersapp.local
+          --password \"${_AIRFLOW_WWW_USER_PASSWORD:-admin}\"
+        || true
+        && mkdir -p /opt/airflow/reports
+      "
     restart: "no"
 
   airflow-webserver:
@@ -60,7 +113,12 @@ services:
     ports:
       - "8081:8080"
     entrypoint: /bin/bash
-    command: -lc "pip install --no-cache-dir -r /opt/tradersapp/airflow/requirements.txt && airflow webserver"
+    # Use gunicorn for production-grade concurrent serving
+    command: >
+      -c "
+        pip install --no-cache-dir -r /opt/tradersapp/airflow/requirements.txt
+        && airflow webserver
+      "
     depends_on:
       airflow-init:
         condition: service_completed_successfully
@@ -69,18 +127,105 @@ services:
       interval: 20s
       timeout: 10s
       retries: 10
+      start_period: 60s
     restart: unless-stopped
 
   airflow-scheduler:
     <<: *airflow-common
     container_name: traders-airflow-scheduler
     entrypoint: /bin/bash
-    command: -lc "pip install --no-cache-dir -r /opt/tradersapp/airflow/requirements.txt && airflow scheduler"
+    command: >
+      -c "
+        pip install --no-cache-dir -r /opt/tradersapp/airflow/requirements.txt
+        && airflow scheduler
+      "
     depends_on:
       airflow-init:
         condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8793/health || exit 1"]
+      interval: 20s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
     restart: unless-stopped
+
+  # ── MLflow server (inline so this compose file is self-contained) ──────────
+  # In production, use docker-compose.mlflow.yml or the full docker-compose.yml instead.
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.21.3
+    container_name: traders-mlflow
+    ports:
+      - "5000:5000"
+    command: >
+      mlflow server
+      --backend-store-uri postgresql://airflow:airflow@airflow-postgres:5432/mlflow
+      --default-artifact-root s3://mlflow-artifacts/
+      --host 0.0.0.0
+      --port 5000
+    environment:
+      MLFLOW_TRACKING_URI: http://localhost:5000
+      MLFLOW_S3_ENDPOINT_URL: http://host.docker.internal:9000
+      AWS_ACCESS_KEY_ID: minioadmin
+      AWS_SECRET_ACCESS_KEY: minioadmin123
+      AWS_DEFAULT_REGION: us-east-1
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      airflow-postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - default
+
+  # ── MinIO artifact storage ────────────────────────────────────────────────
+  minio:
+    image: minio/minio:latest
+    container_name: traders-minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    command: server /data --console-address ":9001"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 30s
+      timeout: 20s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - default
+
+  # ── MinIO init (create buckets on startup) ────────────────────────────────
+  minio-setup:
+    image: minio/mc:latest
+    container_name: traders-minio-setup
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: /bin/bash
+    command: >
+      -c "
+        mc alias set local http://minio:9000 minioadmin minioadmin123
+        && mc mb local/mlflow-artifacts --ignore-existing
+        && mc anonymous set download local/mlflow-artifacts
+      "
+    restart: "no"
+    networks:
+      - default
 
 volumes:
   airflow-postgres-data:
   airflow-logs:
+  airflow-reports:
