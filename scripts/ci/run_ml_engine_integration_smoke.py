@@ -12,6 +12,7 @@ import httpx
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ML_ENGINE_DIR = REPO_ROOT / "ml-engine"
+TMP_ROOT = REPO_ROOT / ".tmp_ci"
 
 
 def wait_for_health(url: str, proc: subprocess.Popen, timeout_seconds: int = 120):
@@ -47,7 +48,8 @@ def build_env(tmp_dir: str) -> dict[str, str]:
 
 
 def main() -> int:
-    with tempfile.TemporaryDirectory(prefix="ml-engine-integration-") as tmp_dir:
+    TMP_ROOT.mkdir(exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="ml-engine-integration-", dir=TMP_ROOT) as tmp_dir:
         log_path = Path(tmp_dir) / "ml-engine.log"
         env = build_env(tmp_dir)
 
