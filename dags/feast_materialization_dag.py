@@ -79,6 +79,40 @@ def feast_materialization():
     Nightly Feast feature materialization pipeline.
     """
 
+    @task(task_id="validate_data_quality_gate")
+    def validate_data_quality_gate() -> dict:
+        """
+        Run full data quality validation before materializing features.
+        This gate ensures only clean, validated data enters the feature store.
+        Blocks all downstream materialization if critical failures are found.
+        """
+        from data_quality.validation_pipeline import run_full_validation
+
+        db_path = os.environ.get(
+            "DQ_DB_PATH",
+            str(ML_ENGINE_ROOT / "data" / "trading_data.db"),
+        )
+        report = run_full_validation(db_path=db_path, block=False)
+
+        structural_passed = all(
+            report["suites"].get(s, {}).get("passed", False)
+            for s in ("candles", "trades", "sessions")
+        )
+
+        if not structural_passed:
+            failed = [
+                name for name, suite in report["suites"].items()
+                if name != "drift" and not suite.get("passed", False)
+            ]
+            raise AirflowException(
+                f"Data quality gate failed: {report.get('critical_failures', 0)} critical failures "
+                f"in suites {failed}. Feast materialization blocked — fix data quality first."
+            )
+
+        print(f"[DQ Gate] Passed. Critical failures: {report.get('critical_failures', 0)}, "
+              f"Warnings: {report.get('warning_failures', 0)}")
+        return report
+
     @task(task_id="export_features_to_parquet")
     def export_parquet() -> dict:
         import pandas as pd
@@ -286,8 +320,10 @@ def feast_materialization():
         return "logged_to_mlflow"
 
     # ── Task dependencies ─────────────────────────────────────────────────────────
-
+    # DQ gate must pass before any data export or materialization
+    dq_gate = validate_data_quality_gate()
     export = export_parquet()
+    export.set_upstream(dq_gate)  # export depends on dq_gate passing
 
     # Registry must be applied before any materialization
     registry = apply_registry()
