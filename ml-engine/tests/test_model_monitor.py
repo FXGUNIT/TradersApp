@@ -112,8 +112,8 @@ class _FakeMLflowClient:
 def _sample_trades(count: int) -> pd.DataFrame:
     return pd.DataFrame(
         {
-            "entry_time": pd.date_range("2026-01-01", periods=count, freq="H").astype(str),
-            "exit_time": pd.date_range("2026-01-01", periods=count, freq="H").astype(str),
+            "entry_time": pd.date_range("2026-01-01", periods=count, freq="h").astype(str),
+            "exit_time": pd.date_range("2026-01-01", periods=count, freq="h").astype(str),
             "result": ["win" if i % 2 == 0 else "loss" for i in range(count)],
         }
     )

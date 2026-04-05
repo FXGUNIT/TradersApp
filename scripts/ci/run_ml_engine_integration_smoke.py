@@ -32,6 +32,7 @@ def wait_for_health(url: str, proc: subprocess.Popen, timeout_seconds: int = 120
 
 
 def build_env(tmp_dir: str) -> dict[str, str]:
+    port = os.environ.get("ML_ENGINE_SMOKE_PORT", "8011")
     env = os.environ.copy()
     env.update(
         {
@@ -40,7 +41,8 @@ def build_env(tmp_dir: str) -> dict[str, str]:
             "KAFKA_ENABLE": "false",
             "OTEL_ENABLED": "false",
             "MLFLOW_TRACKING_URI": "http://127.0.0.1:5999",
-            "ML_ENGINE_BASE_URL": "http://127.0.0.1:8001",
+            "ML_ENGINE_BASE_URL": f"http://127.0.0.1:{port}",
+            "MPLCONFIGDIR": str(Path(tmp_dir) / "mpl"),
         }
     )
     return env
@@ -51,6 +53,7 @@ def main() -> int:
     run_dir = TMP_ROOT / f"ml-engine-integration-{int(time.time() * 1000)}"
     run_dir.mkdir(parents=True, exist_ok=True)
     log_path = run_dir / "ml-engine.log"
+    port = os.environ.get("ML_ENGINE_SMOKE_PORT", "8011")
     env = build_env(str(run_dir))
 
     with log_path.open("w", encoding="utf-8") as log_handle:
@@ -63,7 +66,7 @@ def main() -> int:
                 "--host",
                 "127.0.0.1",
                 "--port",
-                "8001",
+                str(port),
             ],
             cwd=ML_ENGINE_DIR,
             env=env,
@@ -72,7 +75,7 @@ def main() -> int:
         )
 
         try:
-            wait_for_health("http://127.0.0.1:8001/health", proc)
+            wait_for_health(f"http://127.0.0.1:{port}/health", proc)
             subprocess.run(
                 [
                     sys.executable,
@@ -87,7 +90,7 @@ def main() -> int:
             )
             return 0
         except Exception:
-            print(log_path.read_text(encoding="utf-8"))
+            print(log_path.read_text(encoding="utf-8", errors="ignore"))
             raise
         finally:
             proc.terminate()

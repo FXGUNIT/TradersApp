@@ -28,6 +28,8 @@ import threading
 from pathlib import Path
 from typing import Any, Optional
 
+import httpx
+
 # Optional: only load MLflow if available
 MLFLOW_AVAILABLE = False
 try:
@@ -105,15 +107,35 @@ class MLflowTrackingClient:
 
     def _setup(self):
         """Configure MLflow URI and ensure experiment exists."""
+        if not self._tracking_server_reachable():
+            print(f"[MLflow] Tracking server unreachable at {self.tracking_uri} — running without registry sync")
+            self._client = None
+            return
+
         mlflow.set_tracking_uri(self.tracking_uri)
-        mlflow.set_experiment(f"{MLFLOW_EXPERIMENT_PREFIX}{self.experiment_name}")
-        self._client = MlflowClient(self.tracking_uri)
+        try:
+            mlflow.set_experiment(f"{MLFLOW_EXPERIMENT_PREFIX}{self.experiment_name}")
+            self._client = MlflowClient(self.tracking_uri)
+        except Exception as e:
+            print(f"[MLflow] Setup failed: {e}")
+            self._client = None
 
         endpoint_url = os.environ.get("MLFLOW_S3_ENDPOINT_URL")
         if endpoint_url:
             os.environ["MLFLOW_S3_ENDPOINT_URL"] = endpoint_url
 
         print(f"[MLflow] Tracking at {self.tracking_uri}, experiment: {self.experiment_name}")
+
+    def _tracking_server_reachable(self, timeout_seconds: float = 2.0) -> bool:
+        if not self.tracking_uri.startswith(("http://", "https://")):
+            return True
+
+        health_url = f"{self.tracking_uri.rstrip('/')}/health"
+        try:
+            response = httpx.get(health_url, timeout=timeout_seconds)
+            return response.status_code < 500
+        except Exception:
+            return False
 
     # ── Run Management ─────────────────────────────────────────────────────────
 
@@ -585,7 +607,7 @@ class MLflowTrackingClient:
 
     def get_experiment_summary(self) -> dict:
         """Get summary of all experiments."""
-        if not MLFLOW_AVAILABLE:
+        if not MLFLOW_AVAILABLE or not self._client:
             return {"available": False}
 
         try:
@@ -616,7 +638,7 @@ class MLflowTrackingClient:
         - active experiment count
         - active (RUNNING) run count across active experiments
         """
-        if not MLFLOW_AVAILABLE:
+        if not MLFLOW_AVAILABLE or not self._client:
             return {"available": False}
 
         try:

@@ -32,6 +32,7 @@ def wait_for_health(url: str, proc: subprocess.Popen, timeout_seconds: int = 120
 
 
 def build_env(tmp_dir: str) -> dict[str, str]:
+    port = os.environ.get("ML_ENGINE_SMOKE_PORT", "8012")
     env = os.environ.copy()
     env.update(
         {
@@ -40,6 +41,8 @@ def build_env(tmp_dir: str) -> dict[str, str]:
             "KAFKA_ENABLE": "false",
             "OTEL_ENABLED": "false",
             "MLFLOW_TRACKING_URI": "http://127.0.0.1:5999",
+            "MPLCONFIGDIR": str(Path(tmp_dir) / "mpl"),
+            "ML_ENGINE_BASE_URL": f"http://127.0.0.1:{port}",
         }
     )
     return env
@@ -50,6 +53,7 @@ def main() -> int:
     run_dir = TMP_ROOT / f"ml-engine-locust-{int(time.time() * 1000)}"
     run_dir.mkdir(parents=True, exist_ok=True)
     log_path = run_dir / "ml-engine.log"
+    port = os.environ.get("ML_ENGINE_SMOKE_PORT", "8012")
     env = build_env(str(run_dir))
     sla_p95_ms = os.environ.get("CI_LOCUST_SLA_P95_MS", "500")
     max_fail_ratio = os.environ.get("CI_LOCUST_MAX_FAIL_RATIO", "0.05")
@@ -64,7 +68,7 @@ def main() -> int:
                 "--host",
                 "127.0.0.1",
                 "--port",
-                "8001",
+                str(port),
             ],
             cwd=ML_ENGINE_DIR,
             env=env,
@@ -73,7 +77,7 @@ def main() -> int:
         )
 
         try:
-            wait_for_health("http://127.0.0.1:8001/health", proc)
+            wait_for_health(f"http://127.0.0.1:{port}/health", proc)
             subprocess.run(
                 [
                     sys.executable,
@@ -84,7 +88,7 @@ def main() -> int:
                     "MLEngineUser",
                     "--headless",
                     "--host",
-                    "http://127.0.0.1:8001",
+                    f"http://127.0.0.1:{port}",
                     "--users",
                     "8",
                     "--spawn-rate",
@@ -104,7 +108,7 @@ def main() -> int:
             )
             return 0
         except Exception:
-            print(log_path.read_text(encoding="utf-8"))
+            print(log_path.read_text(encoding="utf-8", errors="ignore"))
             raise
         finally:
             proc.terminate()
