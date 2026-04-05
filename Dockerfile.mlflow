@@ -2,4 +2,15 @@ FROM ghcr.io/mlflow/mlflow:v2.21.3
 
 RUN python -m pip install --no-cache-dir \
     psycopg2-binary==2.9.10 \
-    boto3==1.37.38
+    boto3==1.37.38 \
+    prometheus-flask-exporter==0.26.1
+
+# Custom entrypoint: patches the MLflow Flask app to expose /metrics
+# Prometheus-flask-exporter auto-discovers the active WSGI app and exposes:
+#   - ml_http_request_duration_seconds (histogram)
+#   - ml_http_request_total (counter)
+#   - ml_http_requests_in_progress (gauge)
+# Plus custom: mlflow_registry_operations_total, mlflow_runs_total
+COPY mlflow_metrics_wrapper.py /mlflow_metrics_wrapper.py
+
+ENTRYPOINT ["python", "/mlflow_metrics_wrapper.py"]

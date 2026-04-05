@@ -128,6 +128,73 @@ scrape_configs:
       - targets: ["host.docker.internal:9091"]
     honor_labels: true
 
+  # MLflow Server — experiment tracking + model registry
+  # MLflow exposes Prometheus metrics at /metrics (via prometheus_flask_exporter)
+  - job_name: "mlflow"
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names:
+            - tradersapp
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_label_app]
+        regex: mlflow
+        action: keep
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+        regex: "true"
+        action: keep
+      - action: labelmap
+        regex: __meta_kubernetes_pod_label_(.+)
+    static_configs:
+      - targets: ["host.docker.internal:5000"]
+        labels:
+          app: mlflow
+          tier: mlops
+    metrics_path: /metrics
+    scrape_interval: 30s
+    scrape_timeout: 10s
+
+  # MLflow PostgreSQL backend store
+  - job_name: "mlflow-postgres"
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names:
+            - tradersapp
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_label_app]
+        regex: mlflow-postgres
+        action: keep
+      - action: labelmap
+        regex: __meta_kubernetes_pod_label_(.+)
+    static_configs:
+      - targets: ["host.docker.internal:5433"]
+        labels:
+          app: mlflow-postgres
+          tier: data
+    scrape_interval: 60s
+
+  # MinIO — S3-compatible artifact store for MLflow
+  - job_name: "minio"
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names:
+            - tradersapp
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_label_app]
+        regex: minio
+        action: keep
+      - action: labelmap
+        regex: __meta_kubernetes_pod_label_(.+)
+    static_configs:
+      - targets: ["host.docker.internal:9000"]
+        labels:
+          app: minio
+          tier: storage
+    metrics_path: /minio/v2/metrics/cluster
+    scrape_interval: 60s
+
   # Node exporter (host machine metrics)
   - job_name: "node"
     static_configs:
