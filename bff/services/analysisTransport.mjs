@@ -39,6 +39,18 @@ function normalizeCandles(candles) {
   }));
 }
 
+function normalizeTrades(trades) {
+  return (trades || []).map((trade) => ({
+    symbol: String(trade.symbol || "MNQ"),
+    direction: String(trade.direction || ""),
+    entry_time: String(trade.entry_time || trade.entryTime || ""),
+    exit_time: String(trade.exit_time || trade.exitTime || ""),
+    pnl_ticks: Number(trade.pnl_ticks || trade.pnlTicks || 0),
+    pnl_dollars: Number(trade.pnl_dollars || trade.pnlDollars || 0),
+    result: String(trade.result || ""),
+  }));
+}
+
 function transformGrpcConsensusResponse(response) {
   const votes = {};
   for (const [modelName, confidence] of Object.entries(
@@ -155,10 +167,10 @@ export async function predictConsensusTransport(payload, timeoutMs = 30_000) {
     const client = await getGrpcAnalysisClient();
     const request = {
       symbol: String(payload?.symbol || "MNQ"),
-      session_id: Number(payload?.session || 1),
+      session_id: Number(payload?.session_id || 1),
       features: normalizeFeatureMap(payload?.features || {}),
       candles: normalizeCandles(payload?.candles || []),
-      trades: [],
+      trades: normalizeTrades(payload?.trades || []),
     };
     const response = await callGrpcGetConsensus(client, request, timeoutMs);
     return transformGrpcConsensusResponse(response);

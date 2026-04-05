@@ -399,7 +399,10 @@ export async function getMlConsensus({
     const mlResult = await mlRequest("/predict", {
       features,
       candles: recentCandles.slice(-50),
-      session: sessionId,
+      trades: [],
+      session_id: sessionId,
+      math_engine_snapshot: mathEngine,
+      key_levels: keyLevels,
       symbol,
     });
 

@@ -4,6 +4,8 @@
   "type": "module",
   "main": "server.mjs",
   "scripts": {
+    "analysis:start": "node analysis-server.mjs",
+    "analysis:dev": "node analysis-server.mjs",
     "start": "node server.mjs",
     "dev": "node server.mjs"
   },
