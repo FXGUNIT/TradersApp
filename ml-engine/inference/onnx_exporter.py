@@ -33,7 +33,9 @@ from typing import Literal
 import numpy as np
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
+ML_ENGINE_ROOT = PROJECT_ROOT / "ml-engine"
 sys.path.insert(0, str(PROJECT_ROOT))
+sys.path.insert(0, str(ML_ENGINE_ROOT))
 
 import config
 from training.model_store import ModelStore
@@ -41,8 +43,9 @@ from training.model_store import ModelStore
 
 try:
     import onnx
-    from skl2onnx import convert_sklearn
+    from skl2onnx import convert_sklearn, update_registered_converter
     from skl2onnx.common.data_types import FloatTensorType
+    from skl2onnx.common.shape_calculator import calculate_linear_classifier_output_shapes
     ONNX_AVAILABLE = True
 except ImportError:
     ONNX_AVAILABLE = False
@@ -50,9 +53,16 @@ except ImportError:
 try:
     from onnxmltools.convert import convert_lightgbm as onnxml_convert_lightgbm
     from onnxmltools.convert.common.data_types import FloatTensorType as OnnxMlFloatTensorType
+    from onnxmltools.convert.lightgbm.operator_converters.LightGbm import convert_lightgbm
     ONNXMLTOOLS_AVAILABLE = True
 except ImportError:
     ONNXMLTOOLS_AVAILABLE = False
+
+try:
+    from lightgbm import LGBMClassifier
+    LIGHTGBM_AVAILABLE = True
+except ImportError:
+    LIGHTGBM_AVAILABLE = False
 
 try:
     from onnxruntime.transformers import optimizer
@@ -74,6 +84,27 @@ def get_onnx_output_dir() -> Path:
     return out
 
 
+_LGBM_CONVERTER_REGISTERED = False
+
+
+def _ensure_lightgbm_converter_registered() -> None:
+    """Register LightGBM converter so skl2onnx can handle calibrated wrappers."""
+    global _LGBM_CONVERTER_REGISTERED
+    if _LGBM_CONVERTER_REGISTERED:
+        return
+    if not (LIGHTGBM_AVAILABLE and ONNXMLTOOLS_AVAILABLE and ONNX_AVAILABLE):
+        return
+
+    update_registered_converter(
+        LGBMClassifier,
+        "LightGbmLGBMClassifier",
+        calculate_linear_classifier_output_shapes,
+        convert_lightgbm,
+        options={"zipmap": [True, False], "nocl": [True, False]},
+    )
+    _LGBM_CONVERTER_REGISTERED = True
+
+
 def export_lightgbm(pipeline, feature_cols: list[str], model_name: str, version: str) -> Path:
     """
     Export a sklearn pipeline (StandardScaler + CalibratedClassifierCV wrapping LightGBM)
@@ -84,8 +115,9 @@ def export_lightgbm(pipeline, feature_cols: list[str], model_name: str, version:
             "ONNX export requires: pip install onnx onnxruntime scikit-learn>=1.3 lightgbm>=4.0"
         )
 
-    # Extract the underlying LGBMClassifier from the pipeline
-    inner_clf = pipeline.named_steps["clf"].estimator
+    # Extract underlying LGBM estimator references from pipeline.
+    clf = pipeline.named_steps["clf"]
+    inner_clf = getattr(clf, "estimator", None)
     scaler = pipeline.named_steps["scaler"]
 
     # Get n_features from feature_cols
@@ -95,12 +127,14 @@ def export_lightgbm(pipeline, feature_cols: list[str], model_name: str, version:
     # Fallback to exporting the fitted LightGBM estimator directly when
     # CalibratedClassifierCV wrappers are not supported by skl2onnx.
     initial_type = [("input", FloatTensorType([None, n_features]))]
+    _ensure_lightgbm_converter_registered()
     try:
+        options = {type(inner_clf): {"zipmap": False}} if inner_clf is not None else None
         onnx_model = convert_sklearn(
             pipeline,
             initial_types=initial_type,
-            target_opset=15,
-            options={type(inner_clf): {"zipmap": False}},
+            target_opset={"": 15, "ai.onnx.ml": 3},
+            options=options,
         )
     except Exception as exc:
         if not ONNXMLTOOLS_AVAILABLE:
@@ -111,8 +145,18 @@ def export_lightgbm(pipeline, feature_cols: list[str], model_name: str, version:
 
         # Use a direct LightGBM export path.
         # This bypasses sklearn calibration wrapper conversion limitations.
+        fallback_estimator = inner_clf
+        calibrated = getattr(clf, "calibrated_classifiers_", None)
+        if calibrated:
+            fitted_estimator = getattr(calibrated[0], "estimator", None)
+            if fitted_estimator is not None:
+                fallback_estimator = fitted_estimator
+
+        if fallback_estimator is None:
+            raise RuntimeError("Unable to locate fitted LightGBM estimator for ONNX export.") from exc
+
         onnx_model = onnxml_convert_lightgbm(
-            inner_clf,
+            fallback_estimator,
             initial_types=[("input", OnnxMlFloatTensorType([None, n_features]))],
             target_opset=15,
             zipmap=False,
