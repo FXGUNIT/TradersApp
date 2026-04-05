@@ -16,7 +16,7 @@ class SessionExpectations:
     """Data-quality expectations for `session_aggregates`."""
 
     REQUIRED_COLUMNS = ("trade_date", "symbol", "direction", "gap_pct", "session_range", "range_vs_atr")
-    VALID_DIRECTIONS = {"LONG", "SHORT", "long", "short"}
+    VALID_DIRECTIONS = {"LONG", "SHORT", "NEUTRAL"}
 
     def __init__(self) -> None:
         self.results: list[dict] = []
@@ -55,12 +55,26 @@ class SessionExpectations:
             self._pass("required_columns", "All required columns present")
 
     def _check_direction_values(self, df: pd.DataFrame) -> None:
-        values = df["direction"].astype(str).str.upper().str.strip()
+        mapping = {
+            1: "LONG",
+            "1": "LONG",
+            -1: "SHORT",
+            "-1": "SHORT",
+            0: "NEUTRAL",
+            "0": "NEUTRAL",
+            "long": "LONG",
+            "LONG": "LONG",
+            "short": "SHORT",
+            "SHORT": "SHORT",
+            "neutral": "NEUTRAL",
+            "NEUTRAL": "NEUTRAL",
+        }
+        values = df["direction"].map(lambda value: mapping.get(value, value)).astype(str).str.upper().str.strip()
         bad = int((~values.isin(self.VALID_DIRECTIONS)).sum())
         if bad > 0:
             self._fail("direction_values", f"{bad} invalid direction values", "critical")
         else:
-            self._pass("direction_values", "All direction values are LONG or SHORT")
+            self._pass("direction_values", "All direction values are LONG, SHORT, or NEUTRAL")
 
     def _check_gap_pct_range(self, df: pd.DataFrame) -> None:
         gap = pd.to_numeric(df["gap_pct"], errors="coerce")

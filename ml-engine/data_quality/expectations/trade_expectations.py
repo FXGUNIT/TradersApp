@@ -71,7 +71,17 @@ class TradeExpectations:
             self._pass("result_values", "All result values valid")
 
     def _check_direction_values(self, df: pd.DataFrame) -> None:
-        values = df["direction"].astype(str).str.lower().str.strip()
+        mapping = {
+            1: "long",
+            "1": "long",
+            -1: "short",
+            "-1": "short",
+            "long": "long",
+            "short": "short",
+            "LONG": "long",
+            "SHORT": "short",
+        }
+        values = df["direction"].map(lambda value: mapping.get(value, value)).astype(str).str.lower().str.strip()
         bad = int((~values.isin(self.VALID_DIRECTIONS)).sum())
         if bad > 0:
             self._fail("direction_values", f"{bad} invalid direction values", "critical")
@@ -179,4 +189,3 @@ class TradeExpectations:
 
 def get_trade_suite() -> TradeExpectations:
     return TradeExpectations()
-

@@ -17,7 +17,7 @@ import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import pandas as pd
 
@@ -37,6 +37,12 @@ DEFAULT_DB_PATH = os.environ.get(
 )
 BLOCK_ON_CRITICAL = os.environ.get("DQ_BLOCK_ON_CRITICAL", "true").lower() == "true"
 REQUIRE_GX = os.environ.get("DQ_REQUIRE_GX", "true").lower() == "true"
+DQ_QUARANTINE_DIR = Path(
+    os.environ.get(
+        "DQ_QUARANTINE_DIR",
+        str(PROJECT_ROOT / "airflow" / "reports" / "dq_rejections"),
+    )
+)
 
 
 def _send_alert(message: str, severity: str = "critical") -> None:
@@ -137,7 +143,7 @@ def _run_gx_trade_checks(df: pd.DataFrame) -> dict:
             "gx_direction_valid",
             validator.expect_column_values_to_be_in_set(
                 "direction",
-                value_set=["long", "short", "LONG", "SHORT"],
+                value_set=["long", "short", "LONG", "SHORT", 1, -1, "1", "-1"],
             ),
         ),
         _gx_result(
@@ -165,7 +171,7 @@ def _run_gx_session_checks(df: pd.DataFrame) -> dict:
             "gx_direction_valid",
             validator.expect_column_values_to_be_in_set(
                 "direction",
-                value_set=["LONG", "SHORT", "long", "short"],
+                value_set=["LONG", "SHORT", "NEUTRAL", "long", "short", "neutral", 1, -1, 0, "1", "-1", "0"],
             ),
         ),
     ]
@@ -213,6 +219,144 @@ def _merge_reports(primary: dict, secondary: dict, n_rows: int) -> dict:
         "n_rows": int(n_rows),
     }
     return merged
+
+
+def _normalize_direction_values(df: pd.DataFrame, column: str, positive: str, negative: str, neutral: str | None = None) -> pd.DataFrame:
+    if column not in df.columns:
+        return df
+
+    normalized = df.copy()
+    mapping = {
+        1: positive,
+        "1": positive,
+        "long": positive,
+        "LONG": positive,
+        -1: negative,
+        "-1": negative,
+        "short": negative,
+        "SHORT": negative,
+    }
+    if neutral is not None:
+        mapping.update({
+            0: neutral,
+            "0": neutral,
+            "neutral": neutral,
+            "NEUTRAL": neutral,
+        })
+
+    normalized[column] = normalized[column].map(lambda value: mapping.get(value, value))
+    return normalized
+
+
+def _quarantine_failed_dataset(
+    dataset_type: str,
+    source: str,
+    report: dict,
+    df: pd.DataFrame,
+) -> dict:
+    DQ_QUARANTINE_DIR.mkdir(parents=True, exist_ok=True)
+    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    source_slug = "".join(ch if ch.isalnum() else "_" for ch in source)[:60] or "unknown"
+    bundle_dir = DQ_QUARANTINE_DIR / f"{dataset_type}_{source_slug}_{ts}"
+    bundle_dir.mkdir(parents=True, exist_ok=True)
+
+    report_path = bundle_dir / "dq_report.json"
+    sample_path = bundle_dir / "rejected_rows_sample.csv"
+    report_path.write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")
+    df.head(2000).to_csv(sample_path, index=False)
+
+    return {
+        "bundle_dir": str(bundle_dir),
+        "report_path": str(report_path),
+        "sample_path": str(sample_path),
+        "sample_rows": int(min(len(df), 2000)),
+    }
+
+
+def validate_incoming_dataset(
+    df: pd.DataFrame,
+    dataset_type: Literal["candles", "trades", "sessions"],
+    source: str = "unknown",
+    block: bool = True,
+    persist_rejected: bool = True,
+) -> dict:
+    """
+    Validate an incoming in-memory dataset before writing it to persistent storage.
+
+    This gate is intended for:
+    - API ingestion endpoints
+    - DVC/ETL ingestion scripts
+    - any pre-model input guardrail
+    """
+    if df is None:
+        raise ValueError("Incoming dataset is None")
+
+    normalized = df.copy()
+    if dataset_type == "trades":
+        normalized = _normalize_direction_values(
+            normalized,
+            column="direction",
+            positive="long",
+            negative="short",
+        )
+        if "result" in normalized.columns:
+            normalized["result"] = normalized["result"].astype(str).str.lower().str.strip()
+    elif dataset_type == "sessions":
+        normalized = _normalize_direction_values(
+            normalized,
+            column="direction",
+            positive="LONG",
+            negative="SHORT",
+            neutral="NEUTRAL",
+        )
+
+    if dataset_type == "candles":
+        native = get_candle_suite().validate(normalized)
+        try:
+            gx_report = _run_gx_candle_checks(normalized)
+        except Exception as exc:
+            gx_report = _gx_or_policy_failure("candle_expectations", exc)
+    elif dataset_type == "trades":
+        native = get_trade_suite().validate(normalized)
+        try:
+            gx_report = _run_gx_trade_checks(normalized)
+        except Exception as exc:
+            gx_report = _gx_or_policy_failure("trade_expectations", exc)
+    elif dataset_type == "sessions":
+        native = get_session_suite().validate(normalized)
+        try:
+            gx_report = _run_gx_session_checks(normalized)
+        except Exception as exc:
+            gx_report = _gx_or_policy_failure("session_expectations", exc)
+    else:
+        raise ValueError(f"Unsupported dataset_type: {dataset_type}")
+
+    report = _merge_reports(native, gx_report, len(normalized))
+    report["dataset_type"] = dataset_type
+    report["source"] = source
+
+    if report.get("passed", False):
+        return report
+
+    failed = [row["name"] for row in report.get("results", []) if row.get("status") == "fail"]
+    quarantine = None
+    if persist_rejected:
+        quarantine = _quarantine_failed_dataset(dataset_type, source, report, normalized)
+        report["quarantine"] = quarantine
+
+    _send_alert(
+        f"Rejected incoming {dataset_type} dataset from {source}. "
+        f"critical_failures={report.get('critical_failures', 0)}, "
+        f"failed_checks={failed}"
+    )
+    if block:
+        suffix = f" quarantine={quarantine['bundle_dir']}" if quarantine else ""
+        raise ValueError(
+            f"Incoming {dataset_type} dataset rejected by data quality gate; "
+            f"critical_failures={report.get('critical_failures', 0)}.{suffix}"
+        )
+
+    return report
 
 
 def _gx_or_policy_failure(suite_name: str, exc: Exception | None) -> dict:

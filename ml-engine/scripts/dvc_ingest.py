@@ -6,6 +6,7 @@ Reads: CSV file (params: data.csv_path)
 Writes: ml-engine/data/trading_data.db
 """
 import sys, os
+import json
 from pathlib import Path
 
 ML_DIR = Path(__file__).parent.parent
@@ -14,6 +15,7 @@ sys.path.insert(0, str(ML_DIR))
 import config
 from data.candle_db import CandleDatabase
 from data.load_ninjatrader_csv import load_ninjatrader_csv, compute_session_aggregates
+from data_quality.validation_pipeline import validate_incoming_dataset
 import pandas as pd
 
 
