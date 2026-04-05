@@ -31,6 +31,7 @@ from infrastructure.performance import (
 from infrastructure.drift_detector import (
     DriftMonitor, DriftThresholds,
 )
+from infrastructure.model_monitor import build_monitoring_snapshot
 from feedback.feedback_logger import FeedbackLogger
 
 # ── Event-driven: Kafka producer + consumer ──────────────────────────────────────
@@ -58,6 +59,7 @@ try:
         record_retrain as record_prometheus_retrain,
         set_models_loaded as set_prometheus_models_loaded,
         set_active_runs as set_prometheus_active_runs,
+        set_drift_monitoring_snapshot as set_prometheus_drift_monitoring_snapshot,
         set_mlflow_experiment_count as set_prometheus_mlflow_experiment_count,
         sync_mlflow_registry as sync_prometheus_mlflow_registry,
     )
@@ -70,6 +72,7 @@ except ImportError:
     record_prometheus_retrain = None
     set_prometheus_models_loaded = None
     set_prometheus_active_runs = None
+    set_prometheus_drift_monitoring_snapshot = None
     set_prometheus_mlflow_experiment_count = None
     sync_prometheus_mlflow_registry = None
 
@@ -804,15 +807,13 @@ async def drift_status():
     if drift_monitor is None:
         return {"ok": False, "error": "DriftMonitor not initialized"}
     try:
-        features_df = pd.DataFrame()
-        trades_df = pd.DataFrame()
-        if db is not None:
-            try:
-                trades_df = db.get_trade_log(limit=500)
-            except Exception:
-                pass
-        result = drift_monitor.check_all(features_df, trades_df)
-        return {"ok": True, **result}
+        snapshot = build_monitoring_snapshot(
+            db,
+            drift_monitor,
+            retrain_config=(retrain_pipeline.config if retrain_pipeline else None),
+            sync_prometheus_metrics=True,
+        )
+        return {"ok": True, **snapshot["drift"]}
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
@@ -844,6 +845,8 @@ async def drift_detect(request: DriftDetectRequest):
             current_regime=request.current_regime,
             regime_confidence=request.regime_confidence,
         )
+        if PROMETHEUS_AVAILABLE and set_prometheus_drift_monitoring_snapshot:
+            set_prometheus_drift_monitoring_snapshot(result)
 
         return {"ok": True, **result}
     except Exception as e:
@@ -868,6 +871,16 @@ async def drift_record_prediction(request: RecordPredictionRequest):
             confidence=request.confidence,
         )
         concept_result = drift_monitor.concept_drift.detect()
+        if PROMETHEUS_AVAILABLE and set_prometheus_drift_monitoring_snapshot:
+            set_prometheus_drift_monitoring_snapshot(
+                {
+                    "overall_status": concept_result.get("status", "ok"),
+                    "should_retrain": drift_monitor.concept_drift.should_retrain(),
+                    "feature_drift": {"status": "ok", "psi_scores": {}, "drifted_features": []},
+                    "concept_drift": concept_result,
+                    "regime_drift": drift_monitor.regime_drift.detect(),
+                }
+            )
         return {
             "ok": True,
             "recorded": True,
@@ -931,6 +944,36 @@ async def drift_thresholds():
         "min_baseline_trades": t.min_baseline_trades,
         "min_current_trades": t.min_current_trades,
     }
+
+
+@app.get("/monitoring/status", tags=["monitoring"])
+async def monitoring_status(
+    symbol: str = Query(default="MNQ"),
+    sync_metrics: bool = Query(default=True),
+):
+    """
+    Unified model-monitoring snapshot used by Airflow and Prometheus refreshes.
+
+    Includes:
+    - drift status and retrain recommendation
+    - latency/SLA report for live inference
+    - MLflow registry freshness and active-run state
+    """
+    if drift_monitor is None or db is None:
+        raise HTTPException(status_code=503, detail="Monitoring components not initialized")
+
+    try:
+        snapshot = build_monitoring_snapshot(
+            db,
+            drift_monitor,
+            retrain_config=(retrain_pipeline.config if retrain_pipeline else None),
+            symbol=symbol,
+            sync_prometheus_metrics=sync_metrics,
+        )
+        return {"ok": True, **snapshot}
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # -------------------------------------------------------------------------

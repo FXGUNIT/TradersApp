@@ -532,6 +532,8 @@ class MLflowTrackingClient:
                         "run_id": version.run_id,
                         "status": version.status,
                         "source": version.source,
+                        "created": getattr(version, "creation_timestamp", None),
+                        "last_updated": getattr(version, "last_updated_timestamp", None),
                     }
                     for version in versions
                 ]

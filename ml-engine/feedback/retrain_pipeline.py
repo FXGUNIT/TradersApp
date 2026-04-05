@@ -21,6 +21,17 @@ from datetime import datetime, timezone
 from dataclasses import dataclass, field
 from typing import Optional
 
+try:
+    from infrastructure.prometheus_exporter import (
+        record_retrain as record_prometheus_retrain,
+        record_retrain_result,
+    )
+    PROMETHEUS_AVAILABLE = True
+except ImportError:
+    PROMETHEUS_AVAILABLE = False
+    record_prometheus_retrain = None
+    record_retrain_result = None
+
 
 @dataclass
 class RetrainConfig:
@@ -209,6 +220,8 @@ class RetrainPipeline:
 
         if not should_retrain_decision["should_run"]:
             duration = time.time() - started
+            if PROMETHEUS_AVAILABLE and record_prometheus_retrain:
+                record_prometheus_retrain(triggered=False, in_progress=False)
             if verbose:
                 print(f"\n  → Skipped: {should_retrain_decision['reason']}")
                 print(f"\n{'='*60}")
@@ -229,6 +242,8 @@ class RetrainPipeline:
 
         training_result = None
         error = None
+        if PROMETHEUS_AVAILABLE and record_prometheus_retrain:
+            record_prometheus_retrain(triggered=True, in_progress=True)
 
         try:
             training_result = self.trainer.train_direction_models(
@@ -243,6 +258,15 @@ class RetrainPipeline:
             if verbose:
                 print(f"  ✗ Retrain failed: {error}")
                 traceback.print_exc()
+        finally:
+            if PROMETHEUS_AVAILABLE and record_prometheus_retrain:
+                record_prometheus_retrain(triggered=False, in_progress=False)
+
+        if PROMETHEUS_AVAILABLE and record_retrain_result:
+            record_retrain_result(
+                success=(training_result is not None and error is None),
+                duration_seconds=time.time() - started,
+            )
 
         duration = time.time() - started
         if verbose:
