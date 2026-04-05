@@ -15,6 +15,9 @@ x-airflow-common: &airflow-common
     MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI:-http://host.docker.internal:5000}
     DQ_ALERT_WEBHOOK: ${DQ_ALERT_WEBHOOK:-}
     ML_ENGINE_URL: ${ML_ENGINE_URL:-http://host.docker.internal:8001}
+    MODEL_MONITOR_SYMBOL: ${MODEL_MONITOR_SYMBOL:-MNQ}
+    MODEL_MONITOR_SCHEDULE: "${MODEL_MONITOR_SCHEDULE:-*/5 * * * *}"
+    MODEL_MONITOR_MAX_PREDICT_P95_MS: "${MODEL_MONITOR_MAX_PREDICT_P95_MS:-50}"
   extra_hosts:
     - "host.docker.internal:host-gateway"
   volumes:
