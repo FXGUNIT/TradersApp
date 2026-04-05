@@ -1,0 +1,265 @@
+# TradersApp — vLLM Deployment for Mamba SSM Models
+#
+# Serves Mamba-1.4b+ models via vLLM OpenAI-compatible + Triton gRPC APIs.
+# Requires GPU node (nvidia.com/gpu).
+#
+# Prerequisites:
+#   1. GPU node pool with nvidia.com/gpu=true taint
+#   2. Model artifacts in PVC: tradersapp-mamba-models
+#
+# Deploy:
+#   helm upgrade --install tradersapp ./k8s/helm/tradersapp \
+#     --set vllm.enabled=true \
+#     --set vllm.modelStorage.existingClaim=models-mamba-claim \
+#     -f values.prod.yaml
+#
+{{- if .Values.vllm.enabled }}
+---
+# PVC for Mamba model artifacts
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "tradersapp.fullname" . }}-mamba-models
+  namespace: {{ include "tradersapp.namespace" . }}
+  labels:
+    app: vllm-mamba
+    tier: inference
+    {{- include "tradersapp.labels" . | nindent 4 }}
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: {{ .Values.vllm.modelStorage.size | default "10Gi" }}
+  storageClassName: {{ .Values.vllm.modelStorage.storageClass | default "standard" }}
+
+---
+# vLLM Service — OpenAI-compatible HTTP + gRPC + Metrics
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "tradersapp.fullname" . }}-vllm
+  namespace: {{ include "tradersapp.namespace" . }}
+  labels:
+    app: vllm-mamba
+    tier: inference
+    {{- include "tradersapp.labels" . | nindent 4 }}
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8002"
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+      protocol: TCP
+    - name: grpc
+      port: 8001
+      targetPort: 8001
+      protocol: TCP
+    - name: metrics
+      port: 8002
+      targetPort: 8002
+      protocol: TCP
+  selector:
+    app: vllm-mamba
+    tier: inference
+
+---
+# vLLM Deployment — GPU-accelerated Mamba serving
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "tradersapp.fullname" . }}-vllm
+  namespace: {{ include "tradersapp.namespace" . }}
+  labels:
+    app: vllm-mamba
+    tier: inference
+    {{- include "tradersapp.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.vllm.replicaCount | default 1 }}
+  selector:
+    matchLabels:
+      app: vllm-mamba
+      tier: inference
+  template:
+    metadata:
+      labels:
+        app: vllm-mamba
+        tier: inference
+        version: "{{ .Values.vllm.image.tag | default "latest" }}"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8002"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: {{ include "tradersapp.fullname" . }}-sa
+
+      # GPU node requirement
+      nodeSelector:
+        {{- if .Values.vllm.nodeSelector }}
+        {{- toYaml .Values.vllm.nodeSelector | nindent 8 }}
+        {{- else }}
+        nvidia.com/gpu: "true"
+        {{- end }}
+
+      # GPU toleration
+      tolerations:
+        {{- if .Values.vllm.tolerations }}
+        {{- toYaml .Values.vllm.tolerations | nindent 8 }}
+        {{- else }}
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+        {{- end }}
+
+      # Pod disruption budget
+      {{- if .Values.security.podDisruptionBudgets }}
+      podDisruptionBudget:
+        minAvailable: 1
+        selector:
+          matchLabels:
+            app: vllm-mamba
+      {{- end }}
+
+      containers:
+        - name: vllm
+          image: "{{ .Values.vllm.image.repository }}:{{ .Values.vllm.image.tag }}"
+          imagePullPolicy: {{ .Values.vllm.image.pullPolicy | default "IfNotPresent" }}
+
+          # vLLM OpenAI-compatible API server
+          command:
+            - python3
+            - -m
+            - vllm.entrypoints.openai.api_server
+          args:
+            - --model
+            - /model/mamba-1.4b
+            - --dtype
+            - half
+            - --enforce-eager
+            - --trust-remote-code
+            - --gpu-memory-utilization
+            - "{{ .Values.vllm.gpuMemoryUtilization | default "0.90" }}"
+            - --max-model-len
+            - "{{ .Values.vllm.maxModelLen | default "2048" }}"
+            - --tensor-parallel-size
+            - "{{ .Values.vllm.tensorParallelSize | default "1" }}"
+            - --port
+            - "8000"
+            - --host
+            - "0.0.0.0"
+            {{- if .Values.vllm.quantization }}
+            - --quantization
+            - {{ .Values.vllm.quantization }}
+            {{- end }}
+            {{- if .Values.vllm.additionalArgs }}
+            {{- range .Values.vllm.additionalArgs }}
+            - {{ . }}
+            {{- end }}
+            {{- end }}
+
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+            - name: grpc
+              containerPort: 8001
+              protocol: TCP
+            - name: metrics
+              containerPort: 8002
+              protocol: TCP
+
+          env:
+            - name: HF_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "tradersapp.fullname" . }}-secrets
+                  key: HF_TOKEN
+                  optional: true
+            - name: VLLM_LOGGING_LEVEL
+              value: "{{ .Values.vllm.logLevel | default "INFO" }}"
+            - name: VLLM_WORKER_MULTIPROC_METHOD
+              value: spawn
+            - name: CUDA_VISIBLE_DEVICES
+              value: "{{ .Values.vllm.cudaVisibleDevices | default "0" }}"
+
+          # Health check
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 20
+            failureThreshold: 30
+
+          resources:
+            {{- toYaml .Values.vllm.resources | nindent 12 }}
+
+          volumeMounts:
+            - name: mamba-models
+              mountPath: /model
+              readOnly: true
+
+          securityContext:
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 1000
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+
+      volumes:
+        - name: mamba-models
+          persistentVolumeClaim:
+            claimName: {{ include "tradersapp.fullname" . }}-mamba-models
+
+      {{- if .Values.security.networkPolicies }}
+      # Network policy: allow ingress only from tradersapp namespace
+      hostNetwork: false
+      {{- end }}
+
+---
+# HorizontalPodAutoscaler for vLLM (scales on GPU utilization)
+{{- if .Values.vllm.autoscaling.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "tradersapp.fullname" . }}-vllm-hpa
+  namespace: {{ include "tradersapp.namespace" . }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "tradersapp.fullname" . }}-vllm
+  minReplicas: {{ .Values.vllm.autoscaling.minReplicas | default 1 }}
+  maxReplicas: {{ .Values.vllm.autoscaling.maxReplicas | default 4 }}
+  metrics:
+    - type: External
+      external:
+        metric:
+          name: vllm_gpu_utilization
+          selector:
+            matchLabels:
+              model: mamba-1.4b
+        target:
+          type: AverageValue
+          averageValue: "{{ .Values.vllm.autoscaling.targetGPUUtilization | default "80" }}m"
+{{- end }}
+{{- end }}
