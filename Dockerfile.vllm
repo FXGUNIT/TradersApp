@@ -53,7 +53,7 @@ ENV VLLM_LOGGING_LEVEL=INFO
 # Runtime deps
 RUN apt-get update && apt-get install -y \
     python3.10 python3-pip curl \
-    && rm -rf /var/lib/apt/lays /var/cache/apt/archives/* \
+    && rm -rf /var/lib/apt/lists /var/cache/apt/archives/* \
     && ln -sf /usr/bin/python3.10 /usr/local/bin/python3 \
     && ln -sf /usr/bin/python3 /usr/local/bin/python
 

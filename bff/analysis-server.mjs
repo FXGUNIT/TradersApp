@@ -5,12 +5,76 @@ import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import grpc from "@grpc/grpc-js";
-import protoLoader from "@grpc/proto-loader";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const REPO_ROOT = resolve(__dirname, "..");
+
+// ─── gRPC Service Definition ───────────────────────────────────────────────────
+//
+// Strategy: Use generated stubs when available (npm run generate-grpc),
+// fall back to runtime proto loading for local development.
+//
+// Generated stubs path:  bff/generated/ddd/v1/analysis_pb2_grpc.js
+// Proto source path:     proto/ddd/v1/analysis.proto
+//
+// To regenerate stubs:
+//   cd bff && npm run generate-grpc
+//
+// Generated stubs export (CommonJS):
+//   exports.AnalysisServiceClient  — for making outbound gRPC calls
+//   exports.AnalysisServiceService — for server-side service definition
+//     └── .service property gives the ServiceDefinition for addService()
+// ───────────────────────────────────────────────────────────────────────────────
+
 const PROTO_PATH = resolve(REPO_ROOT, "proto", "ddd", "v1", "analysis.proto");
+const GENERATED_STUB_PATH = resolve(__dirname, "generated", "ddd", "v1", "analysis_pb2_grpc.js");
+
+let analysisServiceDef = null;  // The grpc.ServiceDefinition
+
+async function loadGrpcDefinition() {
+  // Path 1: Use pre-generated stubs (faster, validated at build time)
+  // Try the ESM wrapper first, fall back to CJS stub
+  const stubPaths = [
+    "./generated/ddd/v1/analysis_pb2_grpc.mjs",
+    "./generated/ddd/v1/analysis_pb2_grpc.js",
+  ];
+  for (const stubPath of stubPaths) {
+    if (existsSync(resolve(__dirname, stubPath.replace("./", "")))) {
+      try {
+        const mod = await import(stubPath);
+        // Generated stubs export AnalysisServiceService with .service property
+        analysisServiceDef = mod.AnalysisServiceService?.service;
+        if (analysisServiceDef) {
+          console.log("[analysis-server] Using pre-generated gRPC stubs");
+          return;
+        }
+      } catch (err) {
+        console.warn(`[analysis-server] Stub load failed (${stubPath}): ${err.message}`);
+      }
+    }
+  }
+
+  // Path 2: Runtime proto loading (fallback for development)
+  const protoLoader = (await import("@grpc/proto-loader")).default;
+  const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
+    keepCase: true,
+    longs: String,
+    enums: String,
+    defaults: true,
+    oneofs: true,
+    includeDirs: [REPO_ROOT],
+  });
+  const grpcDef = grpc.loadPackageDefinition(packageDefinition);
+  analysisServiceDef = grpcDef?.traders?.ddd?.v1?.analysis?.AnalysisService?.service;
+  if (!analysisServiceDef) {
+    throw new Error(
+      "Failed to load AnalysisService gRPC definition.\n" +
+      "Run: npm run generate-grpc  (cd bff && npm run generate-grpc)"
+    );
+  }
+  console.log("[analysis-server] Using runtime proto loading (stubs not generated)");
+}
 
 function loadEnvFiles() {
   const cwd = process.cwd();
@@ -329,6 +393,19 @@ async function mlEngineTrain(mode) {
   return await mlEngineRequest("/train", { mode }, 5_000);
 }
 
+async function getConsensus(call, callback) {
+  try {
+    const request = call.request || {};
+    const result = await mlEnginePredict(request);
+    callback(null, toGrpcConsensusResponse(result));
+  } catch (error) {
+    callback({
+      code: grpc.status.UNAVAILABLE,
+      message: error?.message || "consensus unavailable",
+    });
+  }
+}
+
 // Periodic ML Engine health check
 setInterval(async () => {
   try {
@@ -450,7 +527,7 @@ async function triggerTraining(call, callback) {
 
 function startGrpcServer() {
   const server = new grpc.Server();
-  server.addService(analysisPackage.AnalysisService.service, {
+  server.addService(analysisServiceDef, {
     Health: health,
     GetConsensus: getConsensus,
     GetRegime: getRegime,
@@ -565,8 +642,15 @@ function startHealthServer() {
   return server;
 }
 
-const grpcServer = startGrpcServer();
-const healthServer = startHealthServer();
+// ─── Startup ──────────────────────────────────────────────────────────────────
+
+loadGrpcDefinition().then(() => {
+  startGrpcServer();
+  startHealthServer();
+}).catch((err) => {
+  console.error("[analysis-server] Failed to initialize gRPC:", err.message);
+  process.exit(1);
+});
 
 function shutdown(signal) {
   console.log(`[analysis-service] shutting down on ${signal}`);

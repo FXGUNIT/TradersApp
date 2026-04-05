@@ -236,6 +236,46 @@ triton:
       inputDims: [50]
       eagerBatching: false
 
+# vLLM — serves Mamba SSM models (>= 1.4B params) via OpenAI-compatible API
+# Requires GPU node with nvidia.com/gpu=true
+vllm:
+  enabled: false  # Enable when GPU nodes available
+  replicaCount: 1
+  image:
+    repository: tradersapp/vllm-mamba
+    tag: latest
+    pullPolicy: IfNotPresent
+  modelStorage:
+    size: 10Gi
+    storageClass: standard
+  nodeSelector:
+    # nvidia.com/gpu: "true"
+  tolerations:
+    # - key: nvidia.com/gpu
+    #   operator: Exists
+    #   effect: NoSchedule
+  gpuMemoryUtilization: "0.90"
+  maxModelLen: "2048"
+  tensorParallelSize: "1"
+  quantization: ""  # "" | "awq" | "gptq" | "squeezellm"
+  additionalArgs: []
+  logLevel: INFO
+  resources:
+    requests:
+      cpu: "1"
+      memory: "4Gi"
+      nvidia.com/gpu: 1
+    limits:
+      cpu: "4"
+      memory: "16Gi"
+      nvidia.com/gpu: 1
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 4
+    targetGPUUtilization: "80"
+  cudaVisibleDevices: "0"
+
 # Redis (in-cluster) — shared between Feast online store and ML Engine cache
 redis:
   enabled: true
