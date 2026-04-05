@@ -315,7 +315,7 @@ def model_lifecycle_dag():
         return {"archived": archived}
 
     # ── Step 6: Log lifecycle events to MLflow ────────────────────────────────
-    @task(task_id="log_lifecycle", task_id_log_message="log_lifecycle")
+    @task(task_id="log_lifecycle")
     def log_lifecycle(sync_result: dict, staging: list, qualified: list,
                       promote_result: dict, archive_result: dict):
         """Record lifecycle run as an MLflow experiment."""
