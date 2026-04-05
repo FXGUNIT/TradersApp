@@ -16,6 +16,7 @@ from __future__ import annotations
 import os
 import sys
 import time
+import math
 from pathlib import Path
 from typing import Optional
 
@@ -26,8 +27,6 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 try:
     import tritonclient.grpc as grpcclient
-    import tritonclient.http as httpclient
-    from tritonclient.utils import np_to_triton_dtype
     TRITON_AVAILABLE = True
 except ImportError:
     TRITON_AVAILABLE = False
@@ -75,6 +74,7 @@ class TritonInferenceClient:
     ):
         self.url = url or os.environ.get("TRITON_URL", "localhost:8001")
         self.default_model = model_name
+        self.use_ssl = use_ssl
         self._grpc_client = None
         self._ort_sessions: dict[str, ort.InferenceSession] = {}
         self._onnx_dir = PROJECT_ROOT / "ml-engine" / "models" / "onnx"
@@ -90,10 +90,14 @@ class TritonInferenceClient:
             self._grpc_client = grpcclient.InferenceServerClient(
                 url=self.url,
                 verbose=self._verbose,
-                ssl=False,
+                ssl=self.use_ssl,
             )
             if self._grpc_client.is_server_live():
-                model_count = len(self._grpc_client.get_model_config().config.name)
+                try:
+                    index = self._grpc_client.get_model_repository_index()
+                    model_count = len(index)
+                except Exception:
+                    model_count = 0
                 print(f"[Triton] Connected to {self.url}, {model_count} models available")
             else:
                 print(f"[Triton] Warning: server at {self.url} not live, falling back to local")
@@ -235,7 +239,11 @@ class TritonInferenceClient:
                 grpcclient.InferRequestedOutput("signal"),
             ]
 
+            triton_t0 = time.perf_counter()
             response = self._grpc_client.infer(model_name, inputs, outputs=outputs)
+            triton_roundtrip_sec = time.perf_counter() - triton_t0
+            if record_triton_roundtrip and _PROM_AVAILABLE:
+                record_triton_roundtrip(triton_roundtrip_sec)
 
             p_long = response.as_numpy("prob_long")
             p_short = response.as_numpy("prob_short")
@@ -341,9 +349,12 @@ class TritonInferenceClient:
             if conf < 0.52:
                 signal = "NEUTRAL"
             else:
-                signal = str(signals[i]) if signals.dtype.kind == 'U' else (
-                    "LONG" if float(p_long[i]) >= float(p_short[i]) else "SHORT"
-                )
+                raw_signal = signals[i]
+                if isinstance(raw_signal, bytes):
+                    raw_signal = raw_signal.decode("utf-8", errors="ignore")
+                signal = str(raw_signal).upper()
+                if signal not in {"LONG", "SHORT", "NEUTRAL"}:
+                    signal = "LONG" if float(p_long[i]) >= float(p_short[i]) else "SHORT"
 
             results.append({
                 "signal": signal,
@@ -369,8 +380,24 @@ class TritonInferenceClient:
 
         try:
             models = []
-            for m in self._grpc_client.get_model_config().config:
-                models.append({"name": m.name, "version": m.version})
+            index = self._grpc_client.get_model_repository_index()
+            for model in index:
+                if isinstance(model, dict):
+                    models.append(
+                        {
+                            "name": model.get("name", ""),
+                            "version": str(model.get("version", "")),
+                            "state": model.get("state", ""),
+                        }
+                    )
+                else:
+                    models.append(
+                        {
+                            "name": getattr(model, "name", ""),
+                            "version": str(getattr(model, "version", "")),
+                            "state": getattr(model, "state", ""),
+                        }
+                    )
 
             return {
                 "connected": True,
@@ -398,32 +425,60 @@ class TritonInferenceClient:
         model = model_name or self.default_model
         feature_cols = self._get_feature_cols(model)
         n_features = len(feature_cols) or 50
+        target_p99_ms = float(os.environ.get("INFERENCE_P99_TARGET_MS", "100"))
 
         # Generate synthetic features
         features = [[0.0] * n_features for _ in range(n_samples)]
 
-        t0 = time.perf_counter()
+        total_t0 = time.perf_counter()
         latencies = []
+        sources = set()
 
         for i in range(0, n_samples, batch_size):
             batch = features[i : i + batch_size]
-            _ = self.predict(batch, model_name=model)
-            lat = (time.perf_counter() - t0) * 1000 / ((i // batch_size) + 1)
-            latencies.append(lat)
+            call_t0 = time.perf_counter()
+            result = self.predict(batch, model_name=model)
+            latencies.append((time.perf_counter() - call_t0) * 1000)
+            if isinstance(result, dict) and result.get("source"):
+                sources.add(result["source"])
 
-        total_ms = (time.perf_counter() - t0) * 1000
+        total_ms = (time.perf_counter() - total_t0) * 1000
 
-        latencies.sort()
+        if not latencies:
+            return {
+                "model": model,
+                "source": "unknown",
+                "n_samples": n_samples,
+                "batch_size": batch_size,
+                "total_ms": round(total_ms, 2),
+                "p50_ms": 0.0,
+                "p95_ms": 0.0,
+                "p99_ms": 0.0,
+                "throughput_samples_per_sec": 0.0,
+                "target_p99_ms": target_p99_ms,
+                "meets_p99_target": True,
+            }
+
+        sorted_lat = sorted(latencies)
+        def percentile(p: float) -> float:
+            idx = max(0, min(len(sorted_lat) - 1, math.ceil(len(sorted_lat) * p) - 1))
+            return sorted_lat[idx]
+
+        p50 = percentile(0.50)
+        p95 = percentile(0.95)
+        p99 = percentile(0.99)
         return {
             "model": model,
-            "source": self._grpc_client is not None and "triton" or "onnx_local",
+            "source": next(iter(sources)) if len(sources) == 1 else ("mixed" if sources else "unknown"),
             "n_samples": n_samples,
             "batch_size": batch_size,
             "total_ms": round(total_ms, 2),
-            "p50_ms": round(latencies[int(len(latencies) * 0.50)], 2),
-            "p95_ms": round(latencies[int(len(latencies) * 0.95)], 2),
-            "p99_ms": round(latencies[int(len(latencies) * 0.99)], 2),
+            "p50_ms": round(p50, 2),
+            "p95_ms": round(p95, 2),
+            "p99_ms": round(p99, 2),
             "throughput_samples_per_sec": round(n_samples / (total_ms / 1000), 1),
+            "target_p99_ms": round(target_p99_ms, 2),
+            "meets_p99_target": bool(p99 <= target_p99_ms),
         }
 
 
