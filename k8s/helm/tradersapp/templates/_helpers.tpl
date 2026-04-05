@@ -47,3 +47,27 @@ helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version }}
 {{- define "tradersapp.imagePullPolicy" -}}
 {{- .pullPolicy | default "IfNotPresent" }}
 {{- end }}
+
+{{/* Optional imagePullSecrets block */}}
+{{- define "tradersapp.imagePullSecrets" -}}
+{{- with .Values.imagePullSecrets }}
+imagePullSecrets:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+{{- end }}
+
+{{/* Optional tolerations block */}}
+{{- define "tradersapp.tolerations" -}}
+{{- with .Values.tolerations }}
+tolerations:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+{{- end }}
+
+{{/* Optional nodeSelector block */}}
+{{- define "tradersapp.nodeSelector" -}}
+{{- with .Values.nodeSelector }}
+nodeSelector:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+{{- end }}
