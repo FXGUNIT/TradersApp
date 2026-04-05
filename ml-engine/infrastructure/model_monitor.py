@@ -137,26 +137,60 @@ def _safe_sla_report(endpoint: str) -> dict[str, Any]:
         return {"error": str(exc)}
 
 
-def build_monitoring_snapshot(
+def _get_snapshot_cache(maxsize: int = 1, ttl: int = 240) -> TTLCache | dict:
+    """Get or create the TTL snapshot cache (max 4-min TTL per 5-min DAG schedule)."""
+    global _snapshot_cache
+    if not _CACHE_AVAILABLE:
+        return {}
+    if _snapshot_cache is None:
+        _snapshot_cache = TTLCache(maxsize=maxsize, ttl=ttl)
+    return _snapshot_cache
+
+
+def _raw_concept_drift_values(concept_drift) -> dict[str, Any]:
+    """Extract raw numeric values from concept drift detector (not just status strings)."""
+    if concept_drift is None:
+        return {}
+    try:
+        return {
+            "baseline_win_rate": getattr(concept_drift, "_baseline_win_rate", None),
+            "current_win_rate": getattr(concept_drift, "_current_win_rate", None),
+            "win_rate_drop_pct": getattr(concept_drift, "_win_rate_drop_pct", None),
+            "rolling_window_size": getattr(concept_drift, "_window_size", None),
+        }
+    except Exception:
+        return {}
+
+
+def _raw_regime_drift_values(regime_drift) -> dict[str, Any]:
+    """Extract raw numeric values from regime drift detector."""
+    if regime_drift is None:
+        return {}
+    try:
+        return {
+            "baseline_regime_probs": getattr(regime_drift, "_baseline_probs", None),
+            "current_regime_probs": getattr(regime_drift, "_current_probs", None),
+            "max_prob_shift": getattr(regime_drift, "_max_prob_shift", None),
+        }
+    except Exception:
+        return {}
+
+
+def _build_snapshot_uncached(
     db,
     drift_monitor,
-    retrain_config=None,
-    *,
-    symbol: str | None = None,
-    sync_prometheus_metrics: bool = True,
-    config: MonitoringConfig | None = None,
+    retrain_config,
+    cfg: MonitoringConfig,
 ) -> dict[str, Any]:
-    """Build a unified monitoring snapshot for drift, SLA, and MLflow."""
-    cfg = config or MonitoringConfig()
-    symbol = symbol or cfg.symbol
-
+    """Core snapshot building logic (no caching — called by build_monitoring_snapshot)."""
+    symbol = cfg.symbol
     last_training = db.get_last_training("direction_ensemble") if db else None
     drift_snapshot: dict[str, Any] = {
         "overall_status": "ok",
         "should_retrain": False,
         "feature_drift": {"status": "ok", "psi_scores": {}, "drifted_features": []},
-        "concept_drift": drift_monitor.concept_drift.detect() if drift_monitor else {"status": "ok"},
-        "regime_drift": drift_monitor.regime_drift.detect() if drift_monitor else {"status": "ok"},
+        "concept_drift": {"status": "ok"},
+        "regime_drift": {"status": "ok"},
         "reason": "Monitoring snapshot not yet computed",
     }
     trades_df = pd.DataFrame()
@@ -173,14 +207,68 @@ def build_monitoring_snapshot(
                 symbol,
                 limit=cfg.candle_limit,
             )
-            feature_df = engineer_features(candles_df, trades_df, None, None, None)
+
+            # Timeout wrapper on feature engineering (60s max)
+            import signal
+
+            def _engineer_with_timeout():
+                def _handler(signum, frame):
+                    raise TimeoutError("Feature engineering exceeded 60s")
+                signal.signal(signal.SIGALRM, _handler)
+                signal.alarm(60)
+                try:
+                    return engineer_features(candles_df, trades_df, None, None, None)
+                finally:
+                    signal.alarm(0)
+
+            try:
+                feature_df = _engineer_with_timeout()
+            except TimeoutError:
+                drift_snapshot = {
+                    "overall_status": "error",
+                    "should_retrain": False,
+                    "feature_drift": {"status": "error", "psi_scores": {}, "drifted_features": []},
+                    "concept_drift": {"status": "error", "error": "Feature engineering timed out after 60s"},
+                    "regime_drift": {"status": "error", "error": "Feature engineering timed out after 60s"},
+                    "error": "Feature engineering timeout",
+                }
+                return _finalize_snapshot(
+                    db, drift_monitor, retrain_config, cfg, symbol, last_training,
+                    drift_snapshot, last_training, None, None,
+                )
 
             if not getattr(drift_monitor.feature_drift, "_baselines", {}):
                 drift_monitor.feature_drift.update_baseline(feature_df, trades_df)
             if getattr(drift_monitor.concept_drift, "_baseline_win_rate", None) is None:
                 drift_monitor.concept_drift.set_baseline(trades_df)
 
-            drift_snapshot = drift_monitor.check_all(feature_df, trades_df)
+            drift_result = drift_monitor.check_all(feature_df, trades_df)
+
+            # Inject raw numeric values (not just status strings)
+            concept_detector = getattr(drift_monitor, "concept_drift", None)
+            regime_detector = getattr(drift_monitor, "regime_drift", None)
+            feature_detector = getattr(drift_monitor, "feature_drift", None)
+
+            concept_raw = _raw_concept_drift_values(concept_detector)
+            regime_raw = _raw_regime_drift_values(regime_detector)
+
+            # Merge raw values into concept and regime drift snapshots
+            if concept_detector:
+                concept_result = drift_result.get("concept_drift", {})
+                drift_result["concept_drift"] = {**concept_result, **concept_raw}
+            if regime_detector:
+                regime_result = drift_result.get("regime_drift", {})
+                drift_result["regime_drift"] = {**regime_result, **regime_raw}
+
+            drift_snapshot = drift_result
+
+            # Inject raw PSI scores per feature (not just max)
+            if feature_detector:
+                feature_result = drift_snapshot.get("feature_drift", {})
+                raw_psi = getattr(feature_detector, "_current_psi_scores", {})
+                if raw_psi:
+                    feature_result = {**feature_result, "psi_scores_raw": raw_psi}
+                    drift_snapshot["feature_drift"] = feature_result
         else:
             drift_snapshot = {
                 **drift_snapshot,
@@ -196,22 +284,30 @@ def build_monitoring_snapshot(
             "error": str(exc),
         }
 
+    return _finalize_snapshot(
+        db, drift_monitor, retrain_config, cfg, symbol, last_training,
+        drift_snapshot, last_training, None, None,
+    )
+
+
+def _finalize_snapshot(
+    db,
+    drift_monitor,
+    retrain_config,
+    cfg: MonitoringConfig,
+    symbol: str,
+    last_training,
+    drift_snapshot: dict,
+    mlflow_overview: dict,
+    registry_snapshot: dict | None,
+) -> dict[str, Any]:
+    """Compute SLA, MLflow, and retrain recommendation, then return full snapshot."""
     predict_sla = _safe_sla_report("/predict")
     overall_sla = _safe_sla_report("ALL")
     predict_p95_ms = float(predict_sla.get("p95_ms", 0.0) or 0.0)
     latency_breached = bool(predict_p95_ms and predict_p95_ms > cfg.max_predict_p95_ms)
 
-    mlflow_overview: dict[str, Any] = {"available": False}
-    registry_snapshot: dict[str, list[dict]] = {}
-    if MLFLOW_CLIENT_AVAILABLE and get_mlflow_client:
-        try:
-            client = get_mlflow_client("direction")
-            mlflow_overview = client.get_tracking_overview()
-            registry_snapshot = client.get_registry_models(cfg.model_prefix)
-        except Exception as exc:
-            mlflow_overview = {"available": False, "error": str(exc)}
-
-    registry_summary = _registry_summary(registry_snapshot)
+    registry_summary = _registry_summary(registry_snapshot or {})
     new_trades_since_last_training = _count_new_trades_since_last_training(db, last_training)
     min_trades_for_retrain = getattr(retrain_config, "min_trades_before_retrain", 20)
     retrain_recommended = bool(
@@ -219,7 +315,8 @@ def build_monitoring_snapshot(
         and new_trades_since_last_training >= min_trades_for_retrain
     )
 
-    if sync_prometheus_metrics and PROMETHEUS_SYNC_AVAILABLE:
+    # Prometheus sync
+    if PROMETHEUS_SYNC_AVAILABLE:
         if set_drift_monitoring_snapshot:
             set_drift_monitoring_snapshot(drift_snapshot)
         if mlflow_overview.get("available"):
@@ -227,7 +324,7 @@ def build_monitoring_snapshot(
                 set_mlflow_experiment_count(int(mlflow_overview.get("experiments", 0)))
             if set_active_runs:
                 set_active_runs(int(mlflow_overview.get("active_runs", 0)))
-        if sync_mlflow_registry:
+        if sync_mlflow_registry and registry_snapshot:
             sync_mlflow_registry(registry_snapshot)
 
     return {
@@ -251,4 +348,102 @@ def build_monitoring_snapshot(
             "recommended": retrain_recommended,
             "recommended_by_drift_only": bool(drift_snapshot.get("should_retrain", False)),
         },
+    }
+
+
+def build_monitoring_snapshot(
+    db,
+    drift_monitor,
+    retrain_config=None,
+    *,
+    symbol: str | None = None,
+    sync_prometheus_metrics: bool = True,
+    config: MonitoringConfig | None = None,
+    wait_for_baseline: bool = False,
+) -> dict[str, Any]:
+    """
+    Build a unified monitoring snapshot for drift, SLA, and MLflow.
+
+    Uses a 4-minute TTL cache to avoid redundant computation between DAG runs
+    (DAG runs every 5 minutes).
+
+    Args:
+        db: Database instance
+        drift_monitor: DriftMonitor instance
+        retrain_config: Optional retrain configuration
+        symbol: Trading symbol (default: MNQ)
+        sync_prometheus_metrics: Whether to sync metrics to Prometheus
+        config: MonitoringConfig instance (overrides env-var defaults)
+        wait_for_baseline: If True, block until baseline is established.
+                           Useful for initial setup; not needed in steady state.
+
+    Returns:
+        Full monitoring snapshot dict with drift, SLA, MLflow, and retrain info.
+    """
+    cfg = config or MonitoringConfig()
+    symbol = symbol or cfg.symbol
+
+    # Check if baseline is established
+    min_baseline = getattr(drift_monitor.thresholds, "min_baseline_trades", 50)
+    trades_df = db.get_trade_log(limit=cfg.trade_limit, symbol=symbol) if db else pd.DataFrame()
+    baseline_ready = len(trades_df) >= min_baseline
+
+    if wait_for_baseline and not baseline_ready:
+        # Poll until baseline is ready (max 5 minutes)
+        import time as _time
+        for _ in range(60):  # 60 x 5s = 5 minutes
+            _time.sleep(5)
+            trades_df = db.get_trade_log(limit=cfg.trade_limit, symbol=symbol) if db else pd.DataFrame()
+            if len(trades_df) >= min_baseline:
+                break
+
+    # Try to serve from TTL cache (keyed on symbol for multi-symbol support)
+    cache = _get_snapshot_cache()
+    cache_key = f"snapshot:{symbol}"
+    if cache and cache_key in cache:
+        # Refresh Prometheus sync even when serving from cache
+        if sync_prometheus_metrics and PROMETHEUS_SYNC_AVAILABLE:
+            if set_drift_monitoring_snapshot:
+                cached = cache[cache_key]
+                set_drift_monitoring_snapshot(cached.get("drift", {}))
+        return cache[cache_key]
+
+    # Build fresh snapshot
+    mlflow_overview: dict[str, Any] = {"available": False}
+    registry_snapshot: dict[str, list[dict]] = {}
+    if MLFLOW_CLIENT_AVAILABLE and get_mlflow_client:
+        try:
+            client = get_mlflow_client("direction")
+            mlflow_overview = client.get_tracking_overview()
+            registry_snapshot = client.get_registry_models(cfg.model_prefix)
+        except Exception as exc:
+            mlflow_overview = {"available": False, "error": str(exc)}
+
+    snapshot = _build_snapshot_uncached(db, drift_monitor, retrain_config, cfg)
+    snapshot["mlflow"] = {
+        "overview": mlflow_overview,
+        "registry": _registry_summary(registry_snapshot),
+    }
+
+    # Cache the result (4-min TTL)
+    if cache is not None:
+        cache[cache_key] = snapshot
+
+    return snapshot
+
+
+def get_monitoring_config() -> dict[str, Any]:
+    """
+    Return the current monitoring thresholds and configuration.
+    Used by Airflow to self-document what thresholds are active.
+    """
+    cfg = MonitoringConfig()
+    return {
+        "symbol": cfg.symbol,
+        "model_prefix": cfg.model_prefix,
+        "trade_limit": cfg.trade_limit,
+        "candle_limit": cfg.candle_limit,
+        "lookback_days": cfg.lookback_days,
+        "max_predict_p95_ms": cfg.max_predict_p95_ms,
+        "min_baseline_trades": 50,  # from drift_monitor default
     }
