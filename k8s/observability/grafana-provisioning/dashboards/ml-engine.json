@@ -974,7 +974,7 @@
       },
       "targets": [
         {
-          "expr": "sum(ml_training_runs_total)",
+          "expr": "sum(mlflow_runs_total)",
           "legendFormat": "total runs"
         }
       ],
@@ -1002,7 +1002,7 @@
       },
       "targets": [
         {
-          "expr": "sum(ml_models_registered)",
+          "expr": "sum(mlflow_registry_models_total)",
           "legendFormat": "models"
         }
       ],
@@ -1013,6 +1013,61 @@
             "steps": [
               {"value": 0, "color": "yellow"},
               {"value": 1, "color": "green"}
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Registry by Stage",
+      "description": "Registered models broken down by lifecycle stage (Staging / Production / Archived)",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 36
+      },
+      "targets": [
+        {
+          "expr": "sum by(stage) (mlflow_registry_models_total)",
+          "legendFormat": "{{ stage }}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 30
+          }
+        }
+      }
+    },
+    {
+      "title": "Total Experiments",
+      "description": "Number of MLflow experiments",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 36
+      },
+      "targets": [
+        {
+          "expr": "mlflow_experiments_total",
+          "legendFormat": "experiments"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"value": 0, "color": "green"},
+              {"value": 1, "color": "blue"},
+              {"value": 10, "color": "yellow"}
             ]
           }
         }
@@ -1030,8 +1085,8 @@
       },
       "targets": [
         {
-          "expr": "ml_training_duration_seconds",
-          "legendFormat": "{{ experiment }}/{{ run }}"
+          "expr": "mlflow_run_duration_seconds",
+          "legendFormat": "{{ experiment }}"
         }
       ],
       "fieldConfig": {
@@ -1081,7 +1136,7 @@
       },
       "targets": [
         {
-          "expr": "ml_active_runs",
+          "expr": "mlflow_runs_active",
           "legendFormat": "active"
         }
       ],
