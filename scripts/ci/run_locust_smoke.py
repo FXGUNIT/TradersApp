@@ -3,7 +3,6 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
-import tempfile
 import time
 from pathlib import Path
 
@@ -48,71 +47,72 @@ def build_env(tmp_dir: str) -> dict[str, str]:
 
 def main() -> int:
     TMP_ROOT.mkdir(exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix="ml-engine-locust-", dir=TMP_ROOT) as tmp_dir:
-        log_path = Path(tmp_dir) / "ml-engine.log"
-        env = build_env(tmp_dir)
-        sla_p95_ms = os.environ.get("CI_LOCUST_SLA_P95_MS", "500")
-        max_fail_ratio = os.environ.get("CI_LOCUST_MAX_FAIL_RATIO", "0.05")
+    run_dir = TMP_ROOT / f"ml-engine-locust-{int(time.time() * 1000)}"
+    run_dir.mkdir(parents=True, exist_ok=True)
+    log_path = run_dir / "ml-engine.log"
+    env = build_env(str(run_dir))
+    sla_p95_ms = os.environ.get("CI_LOCUST_SLA_P95_MS", "500")
+    max_fail_ratio = os.environ.get("CI_LOCUST_MAX_FAIL_RATIO", "0.05")
 
-        with log_path.open("w", encoding="utf-8") as log_handle:
-            proc = subprocess.Popen(
+    with log_path.open("w", encoding="utf-8") as log_handle:
+        proc = subprocess.Popen(
+            [
+                sys.executable,
+                "-m",
+                "uvicorn",
+                "main:app",
+                "--host",
+                "127.0.0.1",
+                "--port",
+                "8001",
+            ],
+            cwd=ML_ENGINE_DIR,
+            env=env,
+            stdout=log_handle,
+            stderr=subprocess.STDOUT,
+        )
+
+        try:
+            wait_for_health("http://127.0.0.1:8001/health", proc)
+            subprocess.run(
                 [
                     sys.executable,
                     "-m",
-                    "uvicorn",
-                    "main:app",
+                    "locust",
+                    "-f",
+                    str(REPO_ROOT / "tests" / "load" / "locustfile.py"),
+                    "MLEngineUser",
+                    "--headless",
                     "--host",
-                    "127.0.0.1",
-                    "--port",
-                    "8001",
+                    "http://127.0.0.1:8001",
+                    "--users",
+                    "8",
+                    "--spawn-rate",
+                    "2",
+                    "--run-time",
+                    "20s",
+                    "--stop-timeout",
+                    "5",
+                    "--sla-p95-ms",
+                    str(sla_p95_ms),
+                    "--max-fail-ratio",
+                    str(max_fail_ratio),
                 ],
-                cwd=ML_ENGINE_DIR,
+                cwd=REPO_ROOT,
                 env=env,
-                stdout=log_handle,
-                stderr=subprocess.STDOUT,
+                check=True,
             )
-
+            return 0
+        except Exception:
+            print(log_path.read_text(encoding="utf-8"))
+            raise
+        finally:
+            proc.terminate()
             try:
-                wait_for_health("http://127.0.0.1:8001/health", proc)
-                subprocess.run(
-                    [
-                        sys.executable,
-                        "-m",
-                        "locust",
-                        "-f",
-                        str(REPO_ROOT / "tests" / "load" / "locustfile.py"),
-                        "MLEngineUser",
-                        "--headless",
-                        "--host",
-                        "http://127.0.0.1:8001",
-                        "--users",
-                        "8",
-                        "--spawn-rate",
-                        "2",
-                        "--run-time",
-                        "20s",
-                        "--stop-timeout",
-                        "5",
-                        "--sla-p95-ms",
-                        str(sla_p95_ms),
-                        "--max-fail-ratio",
-                        str(max_fail_ratio),
-                    ],
-                    cwd=REPO_ROOT,
-                    env=env,
-                    check=True,
-                )
-                return 0
-            except Exception:
-                print(log_path.read_text(encoding="utf-8"))
-                raise
-            finally:
-                proc.terminate()
-                try:
-                    proc.wait(timeout=15)
-                except subprocess.TimeoutExpired:
-                    proc.kill()
-                    proc.wait(timeout=5)
+                proc.wait(timeout=15)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.wait(timeout=5)
 
 
 if __name__ == "__main__":
