@@ -182,6 +182,38 @@ groups:
           summary: "MLflow API latency > 5s p95"
           description: "MLflow search runs API is slow. May indicate heavy query or database congestion."
 
+      - alert: MLflowNoProductionModel
+        expr: sum(mlflow_registry_models_total{stage="Production"}) == 0
+        for: 1h
+        labels:
+          severity: warning
+          service: mlflow
+        annotations:
+          summary: "No models in MLflow Production stage"
+          description: "No model has been promoted to Production for over an hour. Verify the retrain pipeline is running and models are being validated."
+
+      - alert: MLflowStaleProductionModel
+        expr: |
+          (time() - mlflow_experiments_total) > 604800
+          and sum(mlflow_registry_models_total{stage="Production"}) > 0
+        for: 10m
+        labels:
+          severity: warning
+          service: mlflow
+        annotations:
+          summary: "Production model may be stale"
+          description: "Check if the production model needs refreshing. Archive it if older than 7 days."
+
+      - alert: MLflowExperimentsOverflow
+        expr: mlflow_experiments_total > 50
+        for: 5m
+        labels:
+          severity: info
+          service: mlflow
+        annotations:
+          summary: "MLflow has >50 experiments"
+          description: "Consider archiving old experiments to keep MLflow clean. Use: mlflow gc or cleanup experiments."
+
       - alert: MLflowPostgresDown
         expr: up{job="mlflow-postgres"} == 0
         for: 1m
