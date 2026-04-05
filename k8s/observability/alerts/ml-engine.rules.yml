@@ -1,16 +1,11 @@
 # k8s/observability/alerts/ml-engine.rules.yml
 # Prometheus alerting rules for TradersApp ML Engine
-#
-# Deploy:
-#   Docker: mount into prometheus container
-#   k8s: apply via Prometheus Operator PrometheusRule CRD
 groups:
   - name: ml-engine-availability
     interval: 30s
     rules:
-      # ML Engine is down
       - alert: MLEngineDown
-        expr: up{job="ml-engine"} == 0
+        expr: sum(up{job=~"ml-engine($|-k8s$)"}) < 1
         for: 1m
         labels:
           severity: critical
@@ -19,56 +14,51 @@ groups:
           summary: "ML Engine is down"
           description: "ML Engine has been unreachable for more than 1 minute."
 
-      # BFF cannot reach ML Engine
       - alert: BFFCannotReachMLEngine
-        expr: rate(bff_ml_engine_errors_total[5m]) > 0
+        expr: sum(rate(bff_ml_engine_errors_total[5m])) > 0
         for: 2m
         labels:
           severity: warning
           service: bff
         annotations:
           summary: "BFF cannot reach ML Engine"
-          description: "BFF is experiencing errors reaching ML Engine."
+          description: "The BFF is observing outbound failures while calling the ML Engine."
 
-      # High ML Engine error rate
       - alert: MLEngineHighErrorRate
-        expr: rate(ml_http_requests_total{status=~"5.."}[5m]) / rate(ml_http_requests_total[5m]) > 0.05
+        expr: sum(rate(ml_http_requests_total{status=~"5.."}[5m])) / clamp_min(sum(rate(ml_http_requests_total[5m])), 1) > 0.05
         for: 3m
         labels:
           severity: critical
           service: ml-engine
         annotations:
           summary: "ML Engine error rate > 5%"
-          description: "ML Engine is returning 5%+ errors."
+          description: "ML Engine is returning 5%+ errors over the last 5 minutes."
 
   - name: ml-engine-latency
     interval: 30s
     rules:
-      # SLA: Critical path must complete under 50ms (p95)
-      # Alert if /ml/consensus p95 > 50ms
       - alert: MLSLACriticalPathBreach
-        expr: histogram_quantile(0.95, sum(rate(bff_http_request_duration_seconds_bucket{route="/ml/consensus"}[5m])) by (le)) > 0.050
+        expr: histogram_quantile(0.95, sum(rate(bff_http_request_duration_seconds_bucket{route="/api/consensus"}[5m])) by (le)) > 0.050
         for: 5m
         labels:
           severity: critical
           service: bff
           sla: "50ms"
         annotations:
-          summary: "Consensus SLA breach - /ml/consensus p95 > 50ms"
-          description: "The /ml/consensus critical path has exceeded the 50ms target for 5 minutes. Current p95: {{ $value | humanizeDuration }}"
+          summary: "Consensus SLA breach - /api/consensus p95 > 50ms"
+          description: "The BFF consensus critical path has exceeded the 50ms target for 5 minutes."
 
-      # SLA: p50 should be well under 50ms
-      - alert: MLPredictionP50High
-        expr: histogram_quantile(0.50, sum(rate(ml_prediction_latency_seconds_bucket[5m])) by (le)) > 0.050
+      - alert: MLPredictCriticalPathBreach
+        expr: histogram_quantile(0.95, sum(rate(ml_http_request_duration_seconds_bucket{endpoint="/predict"}[5m])) by (le)) > 0.050
         for: 10m
         labels:
           severity: warning
           service: ml-engine
           sla: "50ms"
         annotations:
-          summary: "Prediction p50 > 50ms"
-          description: "Median prediction latency has exceeded 50ms."
-      # Prediction latency SLA breach (p99 > 200ms)
+          summary: "Predict endpoint p95 > 50ms"
+          description: "ML Engine /predict has exceeded the 50ms p95 target."
+
       - alert: MLPredictionLatencyHigh
         expr: histogram_quantile(0.99, sum(rate(ml_prediction_latency_seconds_bucket[5m])) by (le)) > 0.2
         for: 5m
@@ -77,9 +67,8 @@ groups:
           service: ml-engine
         annotations:
           summary: "Prediction latency p99 > 200ms"
-          description: "ML prediction latency has exceeded 200ms for 5 minutes."
+          description: "Model prediction latency has exceeded 200ms over the last 5 minutes."
 
-      # Prediction latency critical (> 500ms)
       - alert: MLPredictionLatencyCritical
         expr: histogram_quantile(0.99, sum(rate(ml_prediction_latency_seconds_bucket[5m])) by (le)) > 0.5
         for: 2m
@@ -87,24 +76,22 @@ groups:
           severity: critical
           service: ml-engine
         annotations:
-          summary: "Prediction latency p99 > 500ms (CRITICAL)"
-          description: "ML prediction latency has exceeded 500ms — SLA breached."
+          summary: "Prediction latency p99 > 500ms"
+          description: "Model prediction latency has exceeded 500ms over the last 2 minutes."
 
-      # BFF → ML Engine round-trip high
       - alert: BFFToMLEngineLatencyHigh
-        expr: histogram_quantile(0.95, sum(rate(bff_http_request_duration_seconds_bucket{route="/ml/consensus"}[5m])) by (le)) > 1
+        expr: histogram_quantile(0.95, sum(rate(bff_ml_engine_latency_seconds_bucket{endpoint="/predict"}[5m])) by (le)) > 0.25
         for: 5m
         labels:
           severity: warning
           service: bff
         annotations:
-          summary: "BFF → ML Engine round-trip > 1s (p95)"
-          description: "End-to-end consensus endpoint latency exceeds 1 second."
+          summary: "BFF → ML Engine latency p95 > 250ms"
+          description: "The BFF is observing elevated ML Engine round-trip latency on /predict."
 
   - name: ml-engine-drift
     interval: 60s
     rules:
-      # Feature drift detected (PSI > 0.2)
       - alert: MLFeatureDriftDetected
         expr: ml_feature_drift_psi > 0.2
         for: 10m
@@ -113,20 +100,48 @@ groups:
           service: ml-engine
         annotations:
           summary: "Feature drift detected (PSI > 0.2)"
-          description: "Feature distribution has drifted — PSI exceeds threshold."
+          description: "Feature distribution has drifted enough to require review."
 
-      # Concept drift (win rate change)
-      - alert: MLConceptDriftWinRate
-        expr: abs(ml_concept_drift_win_rate - 0.5) > 0.15
-        for: 30m
+      - alert: MLConceptDriftDetected
+        expr: ml_concept_drift_win_rate_drop_pct > 0.05
+        for: 15m
         labels:
           severity: warning
           service: ml-engine
         annotations:
-          summary: "Concept drift: win rate deviation > 15%"
-          description: "Historical win rate has deviated significantly from baseline."
+          summary: "Concept drift detected (accuracy drop > 5%)"
+          description: "The rolling win-rate degradation exceeds the retrain threshold."
 
-      # Drift alert storm (too many drift alerts)
+      - alert: MLOverallDriftAlert
+        expr: ml_drift_status{detector="overall"} >= 2
+        for: 10m
+        labels:
+          severity: critical
+          service: ml-engine
+        annotations:
+          summary: "Overall drift monitor is in alert/critical state"
+          description: "The unified drift monitor recommends retraining based on production data."
+
+      - alert: MLAutoRetrainRecommended
+        expr: ml_drift_should_retrain == 1
+        for: 15m
+        labels:
+          severity: warning
+          service: ml-engine
+        annotations:
+          summary: "Automatic retraining is recommended"
+          description: "The monitoring snapshot indicates drift thresholds have been breached."
+
+      - alert: MLMonitoringStale
+        expr: time() - ml_monitoring_last_check_timestamp > 900
+        for: 10m
+        labels:
+          severity: critical
+          service: ml-engine
+        annotations:
+          summary: "Model monitoring snapshot is stale"
+          description: "The monitoring DAG or endpoint has not refreshed model health metrics in the last 15 minutes."
+
       - alert: MLDriftAlertStorm
         expr: increase(ml_concept_drift_detected_total[15m]) + increase(ml_feature_drift_detected_total[15m]) + increase(ml_regime_drift_detected_total[15m]) > 5
         for: 5m
@@ -135,12 +150,11 @@ groups:
           service: ml-engine
         annotations:
           summary: "Drift alert storm — 5+ alerts in 15 minutes"
-          description: "Multiple drift alerts detected — possible regime change or data quality issue."
+          description: "Multiple drift alerts were recorded in a short window. This often points to regime change or data corruption."
 
   - name: ml-engine-training
     interval: 60s
     rules:
-      # Retraining triggered
       - alert: MLRetrainingTriggered
         expr: increase(ml_retrain_triggered_total[30m]) > 0
         for: 1m
@@ -149,9 +163,8 @@ groups:
           service: ml-engine
         annotations:
           summary: "ML model retraining triggered"
-          description: "Automatic retraining has been triggered by drift detection."
+          description: "An automatic retraining workflow has started."
 
-      # Retraining stuck (takes too long)
       - alert: MLRetrainingStuck
         expr: ml_retrain_in_progress == 1
         for: 30m
@@ -160,26 +173,44 @@ groups:
           service: ml-engine
         annotations:
           summary: "ML retraining is taking too long (>30min)"
-          description: "Model retraining has been running for over 30 minutes."
+          description: "A retrain run has been in progress for longer than 30 minutes."
+
+      - alert: MLRetrainingFailedRecently
+        expr: ml_retrain_last_failure_timestamp > 0 and (time() - ml_retrain_last_failure_timestamp) < 3600
+        for: 5m
+        labels:
+          severity: critical
+          service: ml-engine
+        annotations:
+          summary: "Recent retraining failure detected"
+          description: "The most recent retrain attempt failed within the last hour."
+
+      - alert: MLRetrainNotTriggeredAfterDrift
+        expr: ml_drift_should_retrain == 1 and increase(ml_retrain_triggered_total[1h]) == 0
+        for: 30m
+        labels:
+          severity: warning
+          service: ml-engine
+        annotations:
+          summary: "Drift recommends retraining but no retrain has started"
+          description: "Monitoring recommends retraining, but no retrain trigger has been observed in the last hour."
 
   - name: ml-engine-cache
     interval: 60s
     rules:
-      # Cache hit ratio too low (cold cache after warmup)
       - alert: MLCacheHitRatioLow
-        expr: ml_cache_hits_total / (ml_cache_hits_total + ml_cache_misses_total) < 0.3
+        expr: ml_cache_hits_total / clamp_min(ml_cache_hits_total + ml_cache_misses_total, 1) < 0.3
         for: 15m
         labels:
           severity: warning
           service: ml-engine
         annotations:
           summary: "Cache hit ratio < 30%"
-          description: "Cache is not being used effectively — possible cache eviction issue."
+          description: "Cache efficiency is too low and may be impacting inference latency."
 
   - name: ml-engine-circuit-breaker
     interval: 30s
     rules:
-      # Circuit breaker open
       - alert: MLCircuitBreakerOpen
         expr: ml_circuit_breaker_state == 2
         for: 1m
@@ -188,9 +219,8 @@ groups:
           service: ml-engine
         annotations:
           summary: "Circuit breaker OPEN — ML Engine rejecting requests"
-          description: "Circuit breaker has opened due to repeated failures. System in degraded mode."
+          description: "The circuit breaker is open due to repeated downstream failures."
 
-      # Circuit breaker half-open (recovering)
       - alert: MLCircuitBreakerHalfOpen
         expr: ml_circuit_breaker_state == 1
         for: 2m
@@ -199,4 +229,4 @@ groups:
           service: ml-engine
         annotations:
           summary: "Circuit breaker HALF-OPEN — testing recovery"
-          description: "Circuit breaker is testing if ML Engine has recovered."
+          description: "The circuit breaker is probing whether the service has recovered."

@@ -117,7 +117,7 @@ groups:
     interval: 30s
     rules:
       - alert: BFFDown
-        expr: up{job="bff"} == 0
+        expr: sum(up{job=~"bff($|-k8s$)"}) < 1
         for: 1m
         labels:
           severity: critical
@@ -163,7 +163,7 @@ groups:
     interval: 60s
     rules:
       - alert: MLflowDown
-        expr: up{job="mlflow"} == 0
+        expr: sum(up{job=~"mlflow($|-k8s$)"}) < 1
         for: 2m
         labels:
           severity: critical
@@ -172,18 +172,18 @@ groups:
           summary: "MLflow tracking server is down"
           description: "MLflow has been unreachable for 2+ minutes. Experiment tracking and model registry unavailable."
 
-      - alert: MLflowHighLatency
-        expr: histogram_quantile(0.95, sum(rate(ml_http_request_duration_seconds_bucket{endpoint="/api/2.0/mlflow/runs/search"}[5m])) by (le)) > 5
-        for: 5m
+      - alert: MLflowActiveRunsBacklog
+        expr: ml_active_runs > 10
+        for: 15m
         labels:
           severity: warning
           service: mlflow
         annotations:
-          summary: "MLflow API latency > 5s p95"
-          description: "MLflow search runs API is slow. May indicate heavy query or database congestion."
+          summary: "MLflow active run backlog is high"
+          description: "More than 10 MLflow runs are active. Tracking storage may be congested or jobs may be stuck."
 
       - alert: MLflowNoProductionModel
-        expr: sum(mlflow_registry_models_total{stage="Production"}) == 0
+        expr: sum(ml_models_registered{stage="Production"}) == 0
         for: 1h
         labels:
           severity: warning
@@ -193,19 +193,17 @@ groups:
           description: "No model has been promoted to Production for over an hour. Verify the retrain pipeline is running and models are being validated."
 
       - alert: MLflowStaleProductionModel
-        expr: |
-          (time() - mlflow_experiments_total) > 604800
-          and sum(mlflow_registry_models_total{stage="Production"}) > 0
+        expr: max(ml_model_stage_age_seconds{stage="Production"}) > 604800
         for: 10m
         labels:
           severity: warning
           service: mlflow
         annotations:
           summary: "Production model may be stale"
-          description: "Check if the production model needs refreshing. Archive it if older than 7 days."
+          description: "The newest production model is older than 7 days. Review drift state and retrain cadence."
 
       - alert: MLflowExperimentsOverflow
-        expr: mlflow_experiments_total > 50
+        expr: ml_mlflow_experiments > 50
         for: 5m
         labels:
           severity: info
@@ -215,7 +213,7 @@ groups:
           description: "Consider archiving old experiments to keep MLflow clean. Use: mlflow gc or cleanup experiments."
 
       - alert: MLflowPostgresDown
-        expr: up{job="mlflow-postgres"} == 0
+        expr: sum(up{job=~"mlflow-postgres($|-k8s$)"}) < 1
         for: 1m
         labels:
           severity: critical
@@ -225,7 +223,7 @@ groups:
           description: "MLflow cannot store experiment metadata. All new runs will fail."
 
       - alert: MinIODown
-        expr: up{job="minio"} == 0
+        expr: sum(up{job=~"minio($|-k8s$)"}) < 1
         for: 2m
         labels:
           severity: warning
@@ -296,4 +294,3 @@ groups:
         annotations:
           summary: "Inference error rate > 1%"
           description: "More than 1% of inference requests are failing. Check Triton logs and model availability."
-

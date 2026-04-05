@@ -25,8 +25,11 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from locust import (
-    HttpUser, task, between, events, stats as locust_stats
+    HttpUser, task, between, events
 )
+
+SLA_P95_MS = 200.0
+MAX_FAIL_RATIO = 0.01
 
 
 # ─── Test Data Helpers ─────────────────────────────────────────────────────────
@@ -230,7 +233,19 @@ class MLEngineUser(HttpUser):
 @events.init_command_line_parser.add_listener
 def _(parser):
     """Add custom command line arguments."""
-    parser.add_argument("-- sla-p95-ms", type=int, default=200, help="SLA p95 threshold in ms")
+    parser.add_argument("--sla-p95-ms", type=float, default=200.0, help="SLA p95 threshold in ms")
+    parser.add_argument("--max-fail-ratio", type=float, default=0.01, help="Maximum acceptable failure ratio")
+
+
+@events.init.add_listener
+def on_init(environment, **kwargs):
+    """Load SLA options from Locust parsed arguments."""
+    global SLA_P95_MS, MAX_FAIL_RATIO
+    parsed = getattr(environment, "parsed_options", None)
+    if parsed is None:
+        return
+    SLA_P95_MS = float(getattr(parsed, "sla_p95_ms", 200.0))
+    MAX_FAIL_RATIO = float(getattr(parsed, "max_fail_ratio", 0.01))
 
 
 @events.request.add_listener
@@ -239,21 +254,27 @@ def on_request(request_type, name, response_time, response_length, exception, **
     if exception:
         return
 
-    sla_p95 = float(getattr(locust_stats, '_sla_p95_ms', 200))
-    if response_time > sla_p95:
-        print(f"[SLA BREACH] {name}: {response_time:.1f}ms > {sla_p95}ms")
+    if response_time > SLA_P95_MS:
+        print(f"[SLA BREACH] {name}: {response_time:.1f}ms > {SLA_P95_MS}ms")
 
 
 @events.quitting.add_listener
 def on_quitting(environment, **kwargs):
     """Print summary on quit."""
     stats = environment.stats
+    fail_ratio = stats.total.fail_ratio
+    p95 = stats.total.get_response_time_percentile(0.95)
     print(f"\n{'='*60}")
     print(f"Load Test Summary")
     print(f"  Total requests: {stats.total.num_requests}")
     print(f"  Failures: {stats.total.num_failures}")
     print(f"  p50: {stats.total.get_response_time_percentile(0.5):.1f}ms")
-    print(f"  p95: {stats.total.get_response_time_percentile(0.95):.1f}ms")
+    print(f"  p95: {p95:.1f}ms")
     print(f"  p99: {stats.total.get_response_time_percentile(0.99):.1f}ms")
     print(f"  RPS: {stats.total.total_rps:.1f}")
+    print(f"  Failure ratio: {fail_ratio:.3f}")
     print(f"{'='*60}")
+    if p95 > SLA_P95_MS or fail_ratio > MAX_FAIL_RATIO:
+        environment.process_exit_code = 1
+    else:
+        environment.process_exit_code = 0
