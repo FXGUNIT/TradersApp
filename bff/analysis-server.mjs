@@ -451,8 +451,11 @@ async function triggerTraining(call, callback) {
 function startGrpcServer() {
   const server = new grpc.Server();
   server.addService(analysisPackage.AnalysisService.service, {
-    GetConsensus: getConsensus,
     Health: health,
+    GetConsensus: getConsensus,
+    GetRegime: getRegime,
+    GetModelStatus: getModelStatus,
+    TriggerTraining: triggerTraining,
   });
 
   server.bindAsync(
@@ -472,20 +475,39 @@ function startGrpcServer() {
 
 function startHealthServer() {
   const server = createHttpServer(async (req, res) => {
-    if (!req.url || req.url === "/") {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(
-        JSON.stringify({
-          ok: true,
-          service: "analysis-service",
-          grpc_port: GRPC_PORT,
-          ml_engine_url: ML_ENGINE_URL,
-        }),
-      );
+    const url = req.url || "";
+
+    if (url === "/metrics") {
+      // Prometheus metrics
+      res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
+      res.end(getPrometheusMetrics());
       return;
     }
 
-    if (req.url === "/health") {
+    if (url === "/ready") {
+      // Readiness: ML Engine must be healthy
+      if (mlHealthy && cb.state !== "OPEN") {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ready: true, ml_engine: "up", cb_state: cb.state }));
+      } else {
+        res.writeHead(503, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({
+          ready: false,
+          ml_engine: mlHealthy ? "up" : "down",
+          cb_state: cb.state,
+        }));
+      }
+      return;
+    }
+
+    if (url === "/live") {
+      // Liveness: process is alive
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ live: true, uptime_s: process.uptime() }));
+      return;
+    }
+
+    if (url === "/health" || url === "/") {
       try {
         const upstream = await mlEngineHealth();
         res.writeHead(200, { "Content-Type": "application/json" });
@@ -493,7 +515,17 @@ function startHealthServer() {
           JSON.stringify({
             ok: true,
             service: "analysis-service",
-            upstream,
+            version: process.env.SERVICE_VERSION || "1.0.0",
+            grpc_port: GRPC_PORT,
+            ml_engine_url: ML_ENGINE_URL,
+            ml_engine_healthy: true,
+            circuit_breaker: {
+              state: cb.state,
+              failures: cb.failures,
+              last_failure_age_ms: cb.lastFailure > 0 ? Date.now() - cb.lastFailure : null,
+            },
+            uptime_s: process.uptime().toFixed(0),
+            timestamp: new Date().toISOString(),
           }),
         );
       } catch (error) {
@@ -502,7 +534,16 @@ function startHealthServer() {
           JSON.stringify({
             ok: false,
             service: "analysis-service",
+            version: process.env.SERVICE_VERSION || "1.0.0",
+            grpc_port: GRPC_PORT,
+            ml_engine_url: ML_ENGINE_URL,
+            ml_engine_healthy: false,
+            circuit_breaker: {
+              state: cb.state,
+              failures: cb.failures,
+            },
             error: error?.message || "health check failed",
+            timestamp: new Date().toISOString(),
           }),
         );
       }
@@ -515,6 +556,10 @@ function startHealthServer() {
 
   server.listen(HEALTH_PORT, "0.0.0.0", () => {
     console.log(`[analysis-service] health HTTP listening on 0.0.0.0:${HEALTH_PORT}`);
+    console.log(`[analysis-service]   /health  — full health check`);
+    console.log(`[analysis-service]   /ready   — readiness probe`);
+    console.log(`[analysis-service]   /live    — liveness probe`);
+    console.log(`[analysis-service]   /metrics — Prometheus metrics`);
   });
 
   return server;
