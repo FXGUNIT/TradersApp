@@ -58,12 +58,16 @@ spec:
               value: "ml-engine"
             - name: DQ_VALIDATE_BEFORE_TRAIN
               value: {{ ternary "true" "false" .Values.mlEngine.dataQuality.validateBeforeTrain | quote }}
+            - name: DQ_VALIDATE_BEFORE_PREDICT
+              value: "true"
             - name: DQ_BLOCK_ON_CRITICAL
               value: {{ ternary "true" "false" .Values.mlEngine.dataQuality.blockOnCritical | quote }}
             - name: DQ_REQUIRE_GX
               value: {{ ternary "true" "false" .Values.mlEngine.dataQuality.requireGreatExpectations | quote }}
             - name: DQ_VALIDATE_DAYS
               value: {{ .Values.mlEngine.dataQuality.lookbackDays | quote }}
+            - name: INFERENCE_P99_TARGET_MS
+              value: {{ .Values.triton.inferenceLatencyTargetMs | default 100 | quote }}
             {{- if .Values.mlEngine.dataQuality.alertWebhook }}
             - name: DQ_ALERT_WEBHOOK
               value: {{ .Values.mlEngine.dataQuality.alertWebhook | quote }}

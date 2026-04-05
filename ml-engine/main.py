@@ -1053,7 +1053,7 @@ async def predict(request: PredictRequest):
         if request.trades:
             trade_df = pd.DataFrame([t.model_dump() for t in request.trades])
 
-        if os.environ.get("DQ_VALIDATE_BEFORE_PREDICT", "true").lower() == "true":
+        if request.candles and os.environ.get("DQ_VALIDATE_BEFORE_PREDICT", "true").lower() == "true":
             validate_incoming_dataset(
                 df=df,
                 dataset_type="candles",

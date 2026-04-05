@@ -1,24 +1,11 @@
-{{- /*
-Triton Inference Server — GPU-accelerated ONNX model serving.
-
-Requires:
-  - GPU node with nvidia.com/gpu label (set nodeSelector below)
-  - NVIDIA device plugin installed in k3s
-  - ml-models PVC mounted at /models (populated by ml-engine export pipeline)
-
-Optimization features enabled:
-  - Dynamic batching (preferred_batch_size: [1, 8, 16, 32, 64])
-  - CUDA async execution
-  - Pinned memory for input/output tensors
-  - gRPC + HTTP + Metrics ports exposed
+﻿{{- /*
+Triton Inference Server - GPU-accelerated ONNX model serving.
 */ -}}
-{{- $namespace := include "tradersapp.namespace" . }}
+{{- $namespace := include "tradersapp.namespace" . -}}
 {{- $triton := .Values.triton -}}
-{{- $gpuResource := "nvidia.com/gpu" -}}
 
 {{- if $triton.enabled }}
 ---
-# PVC for ONNX model artifacts
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -40,8 +27,6 @@ spec:
 
 {{- if and $triton.enabled $triton.autoscaling.enabled }}
 ---
-# HPA for Triton — scales inference pods by custom metric (inference queue depth)
-# Note: Prometheus Adapter must be configured to expose triton_inference_queue_depth
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
@@ -140,7 +125,6 @@ spec:
         runAsUser: 2000
         fsGroup: 2000
       {{- end }}
-      # Anti-affinity: prefer spreading across GPU nodes
       affinity:
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
@@ -168,30 +152,18 @@ spec:
             - tritonserver
             - --model-repository=/models/triton
             - --backend-config=onnxruntime,allow-async-execution=true
-            {{- if $triton.strictModelConfig | default false }}
-            - --strict-model-config=true
-            {{- else }}
-            - --strict-model-config=false
-            {{- end }}
-            {{- if $triton.logging.verbose | default false }}
-            - --log-verbose=1
-            {{- else }}
-            - --log-verbo se=0
-            {{- end }}
+            - --strict-model-config={{ ternary "true" "false" ($triton.strictModelConfig | default false) }}
+            - --log-verbose={{ ternary "1" "0" ($triton.logging.verbose | default false) }}
             - --http-server-address=0.0.0.0
             - --grpc-server-address=0.0.0.0
             - --metrics-port=8002
             - --allow-grpc=true
             - --allow-http=true
             - --allow-metrics=true
-            {{- if $triton.inferenceStagingSeconds }}
-            - --inference-warmup={{ $triton.inferenceStagingSeconds }}
-            {{- end }}
+            - --strict-readiness=true
           env:
             - name: CUDA_VISIBLE_DEVICES
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.annotations['triton.cuda.device']
+              value: {{ $triton.cudaVisibleDevices | default "0" | quote }}
             - name: NVIDIA_DRIVER_CAPABILITIES
               value: "all"
             {{- if $triton.env }}
@@ -260,7 +232,6 @@ spec:
       {{- end }}
 
 ---
-# ClusterIP Service — only exposed within the cluster
 apiVersion: v1
 kind: Service
 metadata:
@@ -290,8 +261,9 @@ spec:
       targetPort: 8002
       protocol: TCP
 
-{{- /* Per-model config: generate config.pbtxt for each ONNX model */ -}}
 {{- range $modelName, $modelConfig := $triton.models }}
+{{- $preferred := $modelConfig.preferredBatchSizes | default (list 1 8 16 32 64) -}}
+{{- $versionPolicy := $modelConfig.versionPolicy | default "specific" -}}
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -303,16 +275,15 @@ data:
     name: "{{ $modelName }}"
     platform: "onnxruntime_onnx"
     max_batch_size: {{ $modelConfig.maxBatchSize | default 64 }}
-    version_policy: {{
-      if eq ($modelConfig.versionPolicy | default "specific") "specific" }}
-      specific: { versions: [{{ $modelConfig.version | default 1 }}] }
-      {{- else if eq ($modelConfig.versionPolicy | default "specific") "latest" }}
-      latest: { num_versions: 1 }
-      {{- else }}
-      all: {}
-      {{- end }}
+    {{- if eq $versionPolicy "latest" }}
+    version_policy: { latest: { num_versions: 1 } }
+    {{- else if eq $versionPolicy "all" }}
+    version_policy: { all: {} }
+    {{- else }}
+    version_policy: { specific: { versions: [{{ $modelConfig.version | default 1 }}] } }
+    {{- end }}
     dynamic_batching: {
-      preferred_batch_size: [{{ $modelConfig.preferredBatchSizes | default "1, 8, 16, 32, 64" }}],
+      preferred_batch_size: [{{- range $idx, $size := $preferred }}{{ if $idx }}, {{ end }}{{ $size }}{{- end }}],
       max_queue_delay_microseconds: {{ $modelConfig.maxQueueDelayUs | default 100 }}
     }
     instance_group: [
@@ -322,19 +293,14 @@ data:
       }
     ]
     optimization: {
-      input_pinned_memory: { enable: true }
+      input_pinned_memory: { enable: true },
       output_pinned_memory: { enable: true }
-      eager_batching: { enable: {{ $modelConfig.eagerBatching | default false }} }
-    }
-    parameters: {
-      "execute_window_size": { string_value: "{{ $modelConfig.executeWindowSize | default "2" }}" }
-      "preferred_batch_size": { string_value: "{{ $modelConfig.preferredBatchSizes | default "1,8,16,32,64" }}" }
     }
     input: [
       {
         name: "input"
         data_type: TYPE_FP32
-        dims: [{{ $modelConfig.inputDims | default (join "," (seq 1 $modelConfig.nFeatures | list)) }}]
+        dims: [{{ $modelConfig.nFeatures | default 50 }}]
       }
     ]
     output: [

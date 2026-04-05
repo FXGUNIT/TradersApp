@@ -96,6 +96,8 @@ frontend:
 triton:
   enabled: false  # Requires GPU node, set to true if GPU available
   replicaCount: 1
+  cudaVisibleDevices: "0"
+  inferenceLatencyTargetMs: 100
   image:
     repository: nvcr.io/nvidia/tritonserver
     tag: "24.04-py3"
