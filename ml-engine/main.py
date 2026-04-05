@@ -1225,6 +1225,10 @@ async def predict(request: PredictRequest):
         output["_latency_ms"] = round(latency_ms, 1)
         return output
 
+    except ValueError as e:
+        latency_ms = (time.time() - start) * 1000
+        monitor.record("/predict", latency_ms, 422)
+        raise HTTPException(status_code=422, detail=str(e))
     except HTTPException:
         raise
     except Exception as e:
@@ -2303,10 +2307,6 @@ async def parse_csv(file_content: str = Query(...)):
         }
 
     except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e))
-    except ValueError as e:
-        latency_ms = (time.time() - start) * 1000
-        monitor.record("/predict", latency_ms, 422)
         raise HTTPException(status_code=422, detail=str(e))
     except HTTPException:
         raise
