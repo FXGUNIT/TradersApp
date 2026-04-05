@@ -58,6 +58,44 @@ spec:
     - to:
         - podSelector:
             matchLabels:
+              app: analysis-service
+      ports:
+        - protocol: TCP
+          port: 50051
+    - to:
+        - podSelector:
+            matchLabels:
+              app: ml-engine
+      ports:
+        - protocol: TCP
+          port: 8001
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: analysis-service-netpol
+  namespace: {{ include "tradersapp.namespace" . }}
+spec:
+  podSelector:
+    matchLabels:
+      app: analysis-service
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: bff
+      ports:
+        - protocol: TCP
+          port: 50051
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
               app: ml-engine
       ports:
         - protocol: TCP

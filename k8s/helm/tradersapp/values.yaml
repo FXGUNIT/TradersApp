@@ -65,9 +65,24 @@ bff:
     maxReplicas: 8
     targetCPUUtilizationPercentage: 60
   analysisTransport:
-    mode: http
+    mode: grpc
     grpcAddress: analysis-service:50051
     grpcStrict: false
+
+analysisService:
+  enabled: true
+  replicaCount: 2
+  service:
+    port: 50051
+    healthPort: 8082
+    type: ClusterIP
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
 
 # Frontend
 frontend:

@@ -16,6 +16,7 @@
       "service": "analysis-service",
       "owned_paths": [
         "proto/ddd/v1/analysis.proto",
+        "bff/analysis-server.mjs",
         "ml-engine/inference",
         "ml-engine/features",
         "ml-engine/models",
@@ -49,4 +50,3 @@
     }
   ]
 }
-

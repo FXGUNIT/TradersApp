@@ -16,6 +16,7 @@ Adopt Domain-Driven Design boundaries in a monorepo with gRPC-first service cont
 - Contracts: `proto/ddd/v1/*.proto`
 - Boundary manifest: `architecture/ddd/bounded-contexts.json`
 - BFF prediction path supports `grpc` transport with HTTP fallback
+- `analysis-service` is deployed as the first extracted bounded-context runtime
 
 ## Consequences
 
@@ -25,9 +26,9 @@ Adopt Domain-Driven Design boundaries in a monorepo with gRPC-first service cont
 - Lower latency path available with gRPC where needed.
 - Safer incremental migration from existing HTTP flows.
 - CI boundary checks prevent accidental architecture drift.
+- Existing ML analysis logic can be extracted behind a stable service contract instead of by big-bang rewrite
 
 ### Tradeoffs
 
 - Additional operational complexity (contract/version management).
 - During migration, transport mode must be managed per environment.
-

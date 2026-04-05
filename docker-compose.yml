@@ -86,6 +86,30 @@ services:
       retries: 3
       start_period: 60s
 
+  analysis-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.bff
+    container_name: traders-analysis-service
+    command: ["node", "analysis-server.mjs"]
+    ports:
+      - "50051:50051"
+    environment:
+      ML_ENGINE_URL: http://ml-engine:8001
+      ANALYSIS_SERVICE_GRPC_PORT: 50051
+      ANALYSIS_SERVICE_HEALTH_PORT: 8082
+      NODE_ENV: production
+    depends_on:
+      ml-engine:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8082/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
   # ── BFF ───────────────────────────────────────────────────────────────────
   bff:
     build:
@@ -96,12 +120,17 @@ services:
       - "8788:8788"
     environment:
       ML_ENGINE_URL: http://ml-engine:8001
+      ML_ANALYSIS_TRANSPORT: ${ML_ANALYSIS_TRANSPORT:-grpc}
+      ML_ANALYSIS_GRPC_ADDR: analysis-service:50051
+      ML_ANALYSIS_GRPC_STRICT: "false"
       REDIS_HOST: redis
       REDIS_PORT: 6379
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       NODE_ENV: production
     depends_on:
       ml-engine:
+        condition: service_healthy
+      analysis-service:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
