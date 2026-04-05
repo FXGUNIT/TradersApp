@@ -96,6 +96,7 @@ from inference.consensus_aggregator import ConsensusAggregator
 from inference.triton_client import TritonInferenceClient, get_inference_client
 from inference.onnx_exporter import export_model, export_all as export_all_models, list_onnx_models, get_onnx_output_dir
 from inference.triton_server import TRITON_REPO
+from data_quality.validation_pipeline import validate_incoming_dataset
 
 ONNX_DIR = get_onnx_output_dir()
 from optimization.pso_optimizer import run_alpha_discovery, NichingPSO, PSOOptimizer
@@ -1051,6 +1052,15 @@ async def predict(request: PredictRequest):
         trade_df = None
         if request.trades:
             trade_df = pd.DataFrame([t.model_dump() for t in request.trades])
+
+        if os.environ.get("DQ_VALIDATE_BEFORE_PREDICT", "true").lower() == "true":
+            validate_incoming_dataset(
+                df=df,
+                dataset_type="candles",
+                source="api:/predict:candles",
+                block=True,
+                persist_rejected=True,
+            )
 
         # Build feature dict from math engine snapshot
         me = request.math_engine_snapshot or {}
@@ -2125,6 +2135,13 @@ async def upload_candles(request: UploadCandlesRequest):
 
         df = pd.DataFrame(rows)
         df["timestamp"] = pd.to_datetime(df["timestamp"])
+        dq_report = validate_incoming_dataset(
+            df=df,
+            dataset_type="candles",
+            source="api:/candles/upload",
+            block=True,
+            persist_rejected=True,
+        )
 
         inserted = db.insert_candles(df)
 
@@ -2132,7 +2149,14 @@ async def upload_candles(request: UploadCandlesRequest):
             "status": "success",
             "candles_inserted": inserted,
             "total_candles": db.get_candle_count(request.symbol),
+            "dq": {
+                "passed": bool(dq_report.get("passed", False)),
+                "critical_failures": int(dq_report.get("critical_failures", 0)),
+                "warning_failures": int(dq_report.get("warning_failures", 0)),
+            },
         }
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -2147,7 +2171,17 @@ async def upload_trades(request: UploadTradesRequest):
         rows = []
         for t in request.trades:
             row = t.model_dump()
+            row["symbol"] = request.symbol
             rows.append(row)
+
+        trade_df = pd.DataFrame(rows)
+        dq_report = validate_incoming_dataset(
+            df=trade_df,
+            dataset_type="trades",
+            source="api:/trades/upload",
+            block=True,
+            persist_rejected=True,
+        )
 
         for row in rows:
             db.upsert_trade(row)
@@ -2160,7 +2194,14 @@ async def upload_trades(request: UploadTradesRequest):
             "total_trades": total,
             "min_for_training": 100,
             "ready": total >= 100,
+            "dq": {
+                "passed": bool(dq_report.get("passed", False)),
+                "critical_failures": int(dq_report.get("critical_failures", 0)),
+                "warning_failures": int(dq_report.get("warning_failures", 0)),
+            },
         }
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -2231,6 +2272,13 @@ async def parse_csv(file_content: str = Query(...)):
         # Engineer features
         from features.feature_pipeline import assign_session_ids
         df = assign_session_ids(df)
+        dq_report = validate_incoming_dataset(
+            df=df,
+            dataset_type="candles",
+            source="api:/candles/parse-csv",
+            block=True,
+            persist_rejected=True,
+        )
 
         inserted = db.insert_candles(df)
 
@@ -2247,8 +2295,19 @@ async def parse_csv(file_content: str = Query(...)):
                 "main": int((df["session_id"] == 1).sum()),
                 "post": int((df["session_id"] == 2).sum()),
             },
+            "dq": {
+                "passed": bool(dq_report.get("passed", False)),
+                "critical_failures": int(dq_report.get("critical_failures", 0)),
+                "warning_failures": int(dq_report.get("warning_failures", 0)),
+            },
         }
 
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except ValueError as e:
+        latency_ms = (time.time() - start) * 1000
+        monitor.record("/predict", latency_ms, 422)
+        raise HTTPException(status_code=422, detail=str(e))
     except HTTPException:
         raise
     except Exception as e:
