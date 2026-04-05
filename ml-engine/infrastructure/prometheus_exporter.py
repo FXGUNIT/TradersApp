@@ -52,6 +52,13 @@ except ImportError:
 
 
 _metrics: Optional[dict] = None
+_STATUS_VALUES = {
+    "ok": 0,
+    "warning": 1,
+    "alert": 2,
+    "critical": 3,
+    "error": 4,
+}
 
 
 # ─── Metric Definitions ─────────────────────────────────────────────────────────
@@ -97,6 +104,37 @@ def get_metrics(registry=DEFAULT_REGISTRY) -> dict:
         documentation="Rolling win rate for concept drift detection",
         registry=registry,
     )
+    metrics["concept_drift_baseline_win_rate"] = Gauge(
+        name="ml_concept_drift_baseline_win_rate",
+        documentation="Training-time baseline win rate for concept drift monitoring",
+        registry=registry,
+    )
+    metrics["concept_drift_current_win_rate"] = Gauge(
+        name="ml_concept_drift_current_win_rate",
+        documentation="Current rolling win rate for concept drift monitoring",
+        registry=registry,
+    )
+    metrics["concept_drift_win_rate_drop_pct"] = Gauge(
+        name="ml_concept_drift_win_rate_drop_pct",
+        documentation="Relative win-rate degradation vs baseline",
+        registry=registry,
+    )
+    metrics["drift_status"] = Gauge(
+        name="ml_drift_status",
+        documentation="Drift severity by detector: 0=ok, 1=warning, 2=alert, 3=critical, 4=error",
+        labelnames=["detector"],
+        registry=registry,
+    )
+    metrics["drift_should_retrain"] = Gauge(
+        name="ml_drift_should_retrain",
+        documentation="Whether the current monitoring snapshot recommends retraining",
+        registry=registry,
+    )
+    metrics["monitoring_last_check"] = Gauge(
+        name="ml_monitoring_last_check_timestamp",
+        documentation="Unix timestamp of the most recent model-monitoring sync",
+        registry=registry,
+    )
 
     # ── Drift Counters ─────────────────────────────────────────────────
     metrics["concept_drift_detected"] = Counter(
@@ -126,6 +164,21 @@ def get_metrics(registry=DEFAULT_REGISTRY) -> dict:
         documentation="Whether a retrain is currently in progress (1=yes, 0=no)",
         registry=registry,
     )
+    metrics["retrain_last_success_timestamp"] = Gauge(
+        name="ml_retrain_last_success_timestamp",
+        documentation="Unix timestamp of the last successful retrain run",
+        registry=registry,
+    )
+    metrics["retrain_last_failure_timestamp"] = Gauge(
+        name="ml_retrain_last_failure_timestamp",
+        documentation="Unix timestamp of the last failed retrain run",
+        registry=registry,
+    )
+    metrics["retrain_last_duration_seconds"] = Gauge(
+        name="ml_retrain_last_duration_seconds",
+        documentation="Wall-clock duration of the last retrain run",
+        registry=registry,
+    )
 
     # ── Model Status ───────────────────────────────────────────────────
     metrics["models_loaded"] = Gauge(
@@ -136,6 +189,12 @@ def get_metrics(registry=DEFAULT_REGISTRY) -> dict:
     metrics["model_last_trained"] = Gauge(
         name="ml_model_last_trained_timestamp",
         documentation="Unix timestamp of last successful model training",
+        registry=registry,
+    )
+    metrics["model_stage_age_seconds"] = Gauge(
+        name="ml_model_stage_age_seconds",
+        documentation="Age in seconds of the newest model version in a registry stage",
+        labelnames=["model_name", "stage"],
         registry=registry,
     )
 
@@ -337,16 +396,19 @@ def get_metrics(registry=DEFAULT_REGISTRY) -> dict:
     metrics["gpu_utilization"] = Gauge(
         name="ml_gpu_utilization_percent",
         documentation="GPU utilization percentage (0-100)",
+        labelnames=["device"],
         registry=registry,
     )
     metrics["gpu_memory_used_bytes"] = Gauge(
         name="ml_gpu_memory_used_bytes",
         documentation="GPU memory used in bytes",
+        labelnames=["device"],
         registry=registry,
     )
     metrics["gpu_memory_total_bytes"] = Gauge(
         name="ml_gpu_memory_total_bytes",
         documentation="Total GPU memory in bytes",
+        labelnames=["device"],
         registry=registry,
     )
 
@@ -396,6 +458,66 @@ def record_drift(
             _metrics["regime_drift_detected"].inc()
 
 
+def _status_value(status: str | None) -> int:
+    return _STATUS_VALUES.get(str(status or "ok").lower(), _STATUS_VALUES["error"])
+
+
+def set_monitoring_check_timestamp(timestamp: float | None = None):
+    """Record the time of the latest monitoring snapshot refresh."""
+    global _metrics
+    if _metrics is None:
+        _metrics = get_metrics()
+
+    if not PROMETHEUS_AVAILABLE:
+        return
+
+    _metrics["monitoring_last_check"].set(float(timestamp or time.time()))
+
+
+def set_drift_monitoring_snapshot(drift_result: dict | None):
+    """Synchronize Prometheus gauges from the latest drift-monitor snapshot."""
+    global _metrics
+    if _metrics is None:
+        _metrics = get_metrics()
+
+    if not PROMETHEUS_AVAILABLE or not drift_result:
+        return
+
+    feature = drift_result.get("feature_drift", {}) or {}
+    concept = drift_result.get("concept_drift", {}) or {}
+    regime = drift_result.get("regime_drift", {}) or {}
+
+    statuses = {
+        "overall": drift_result.get("overall_status", "ok"),
+        "feature": feature.get("status", "ok"),
+        "concept": concept.get("status", "ok"),
+        "regime": regime.get("status", "ok"),
+    }
+    for detector, status in statuses.items():
+        _metrics["drift_status"].labels(detector=detector).set(_status_value(status))
+
+    _metrics["drift_should_retrain"].set(
+        1 if drift_result.get("should_retrain", False) else 0
+    )
+
+    psi_scores = feature.get("psi_scores", {}) or {}
+    max_psi = max((float(value) for value in psi_scores.values()), default=0.0)
+    _metrics["feature_drift_psi"].set(max_psi)
+
+    baseline = concept.get("baseline_win_rate")
+    current = concept.get("current_win_rate")
+    drop_pct = concept.get("win_rate_drop_pct")
+    if baseline is not None:
+        _metrics["concept_drift_baseline_win_rate"].set(float(baseline))
+    if current is not None:
+        _metrics["concept_drift_current_win_rate"].set(float(current))
+        _metrics["concept_drift_win_rate"].set(float(current))
+    if drop_pct is not None:
+        _metrics["concept_drift_win_rate_drop_pct"].set(float(drop_pct))
+
+    set_monitoring_check_timestamp()
+
+
 def record_cache(hit: bool):
     """Record cache hit/miss."""
     global _metrics
@@ -430,6 +552,29 @@ def record_retrain(triggered: bool, in_progress: bool = False):
     if triggered:
         _metrics["retrain_triggered"].inc()
     _metrics["retrain_in_progress"].set(1 if in_progress else 0)
+
+
+def record_retrain_result(
+    success: bool,
+    duration_seconds: float = 0.0,
+    completed_at: float | None = None,
+):
+    """Persist the outcome of the latest retrain run."""
+    global _metrics
+    if _metrics is None:
+        _metrics = get_metrics()
+
+    if not PROMETHEUS_AVAILABLE:
+        return
+
+    completed = float(completed_at or time.time())
+    _metrics["retrain_in_progress"].set(0)
+    _metrics["retrain_last_duration_seconds"].set(max(0.0, float(duration_seconds or 0.0)))
+    if success:
+        _metrics["retrain_last_success_timestamp"].set(completed)
+        _metrics["model_last_trained"].set(completed)
+    else:
+        _metrics["retrain_last_failure_timestamp"].set(completed)
 
 
 def record_kafka_published(topic: str):
@@ -570,7 +715,6 @@ def set_dq_suite_metrics(
     _metrics["dq_suite_critical_failures"].labels(suite=str(suite)).set(max(0, int(critical_failures)))
     _metrics["dq_suite_warnings"].labels(suite=str(suite)).set(max(0, int(warnings)))
     _metrics["dq_suite_checks_passed"].labels(suite=str(suite)).set(max(0, int(checks_passed)))
-    _metrics["dq_suite_checks_passed"].labels(suite=str(suite)).set(max(0, int(checks_passed)))
 
 
 def sync_mlflow_registry(registry_models: dict[str, list[dict]]):
@@ -592,11 +736,23 @@ def sync_mlflow_registry(registry_models: dict[str, list[dict]]):
         return
 
     counts: dict[tuple[str, str], int] = {}
+    max_stage_age: dict[tuple[str, str], float] = {}
+    now = time.time()
     for model_name, versions in (registry_models or {}).items():
         for version in versions or []:
             stage = str(version.get("stage") or "None")
             key = (str(model_name), stage)
             counts[key] = counts.get(key, 0) + 1
+            created_raw = version.get("created") or version.get("creation_timestamp")
+            if created_raw in (None, ""):
+                continue
+            created = float(created_raw)
+            if created > 1e12:
+                created /= 1000.0
+            age_seconds = max(0.0, now - created)
+            previous_age = max_stage_age.get(key)
+            if previous_age is None or age_seconds > previous_age:
+                max_stage_age[key] = age_seconds
 
     gauge = _metrics["models_registered"]
     try:
@@ -605,8 +761,18 @@ def sync_mlflow_registry(registry_models: dict[str, list[dict]]):
         # Older prometheus-client versions may not support clear().
         pass
 
+    age_gauge = _metrics["model_stage_age_seconds"]
+    try:
+        age_gauge.clear()
+    except Exception:
+        pass
+
     for (model_name, stage), count in counts.items():
         gauge.labels(model_name=model_name, stage=stage).set(count)
+        if (model_name, stage) in max_stage_age:
+            age_gauge.labels(model_name=model_name, stage=stage).set(
+                max_stage_age[(model_name, stage)]
+            )
 
 
 # ─── Inference + GPU Metrics ──────────────────────────────────────────────────────
