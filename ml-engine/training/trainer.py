@@ -178,12 +178,18 @@ class Trainer:
                 )
 
             # Step 2: Load candles for feature engineering
-            start_date = trade_log["entry_time"].min()
-            end_date = trade_log["entry_time"].max()
-            candles = self.db.get_candles(start_date, end_date, symbol=symbol, limit=200000)
+            start_date = pd.to_datetime(trade_log["entry_time"].min())
+            end_date = pd.to_datetime(trade_log["entry_time"].max())
+            start_date_str = start_date.isoformat()
+            end_date_str = end_date.isoformat()
+            candles = self.db.get_candles(start_date_str, end_date_str, symbol=symbol, limit=200000)
 
             if verbose:
-                print(f"Candles loaded: {len(candles)} rows from {start_date[:10]} to {end_date[:10]}")
+                print(
+                    "Candles loaded: "
+                    f"{len(candles)} rows from {start_date.strftime('%Y-%m-%d')} "
+                    f"to {end_date.strftime('%Y-%m-%d')}"
+                )
 
             if len(candles) < 500:
                 raise ValueError(f"Need at least 500 candles, got {len(candles)}")
@@ -191,7 +197,9 @@ class Trainer:
             # Step 3: Load session aggregates
             try:
                 session_agg = self.db.get_session_aggregates(
-                    start_date[:10], end_date[:10], symbol=symbol
+                    start_date.strftime("%Y-%m-%d"),
+                    end_date.strftime("%Y-%m-%d"),
+                    symbol=symbol,
                 )
             except Exception:
                 session_agg = pd.DataFrame()

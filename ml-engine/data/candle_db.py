@@ -337,11 +337,11 @@ class CandleDatabase:
 
     def start_training(self, model_name: str, mode: str) -> int:
         with self.conn() as c:
-            c.execute(
+            cursor = c.execute(
                 "INSERT INTO training_log (model_name, train_mode, status) VALUES (?, ?, 'running')",
                 (model_name, mode),
             )
-            return c.lastrowid
+            return int(cursor.lastrowid)
 
     def complete_training(self, id: int, rows: int, duration: float, status: str = "success"):
         with self.conn() as c:
