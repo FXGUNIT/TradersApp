@@ -36,11 +36,26 @@ def main() -> None:
     os.environ["INFERENCE_P99_TARGET_MS"] = str(args.target_p99_ms)
 
     client = TritonInferenceClient(url=os.environ.get("TRITON_URL", "localhost:8001"))
-    result = client.benchmark(
-        n_samples=max(1, args.samples),
-        batch_size=max(1, args.batch_size),
-        model_name=args.model,
-    )
+    try:
+        result = client.benchmark(
+            n_samples=max(1, args.samples),
+            batch_size=max(1, args.batch_size),
+            model_name=args.model,
+        )
+    except Exception as exc:
+        result = {
+            "model": args.model,
+            "ok": False,
+            "error": str(exc),
+            "target_p99_ms": args.target_p99_ms,
+            "meets_p99_target": False,
+        }
+        print(json.dumps(result, indent=2))
+        if args.json_out:
+            out_path = Path(args.json_out)
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            out_path.write_text(json.dumps(result, indent=2), encoding="utf-8")
+        raise SystemExit(2)
 
     print(json.dumps(result, indent=2))
 
