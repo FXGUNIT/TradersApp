@@ -1,5 +1,9 @@
 # Prometheus configuration for TradersApp ML Engine
 # Used by both Docker Compose and k8s (via ConfigMap)
+#
+# IMPORTANT: relabel_configs inside kubernetes_sd_configs ONLY apply to
+# k8s-discovered targets. Job-level relabel_configs apply to ALL targets
+# (including static fallbacks), which causes static targets to be dropped.
 
 global:
   scrape_interval: 15s
@@ -30,39 +34,39 @@ scrape_configs:
     static_configs:
       - targets: ["localhost:9090"]
 
-  # ML Engine — FastAPI with Prometheus client
-  - job_name: "ml-engine"
+  # ── ML Engine — FastAPI with Prometheus client ────────────────────────────
+  # k8s: uses kubernetes_sd_configs with relabel_configs (below)
+  # Docker Compose: uses static_configs fallback (no relabel_configs)
+  - job_name: "ml-engine-k8s"
     kubernetes_sd_configs:
-      # k8s native: discover pods with app=ml-engine label
       - role: pod
         namespaces:
           names:
             - tradersapp
     relabel_configs:
-      # Only pick pods with ml-engine app label
       - source_labels: [__meta_kubernetes_pod_label_app]
         regex: ml-engine
         action: keep
-      # Only pick pods with prometheus.io/scrape=true
       - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
         regex: "true"
         action: keep
-      # Use the metrics port from annotation (default 9091)
       - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_port]
         action: replace
         target_label: __param_port
         regex: (.+)
         replacement: $1
-      # Fallback to container port 8001
       - source_labels: [__meta_kubernetes_pod_container_port_number]
         action: replace
         target_label: __param_port
         regex: (.+)
         replacement: $1
-      # Preserve labels
       - action: labelmap
         regex: __meta_kubernetes_pod_label_(.+)
-    # Fallback static config for Docker Compose (no k8s API)
+    metrics_path: /metrics
+    scrape_interval: 10s
+    scrape_timeout: 5s
+
+  - job_name: "ml-engine"
     static_configs:
       - targets: ["host.docker.internal:8001"]
         labels:
@@ -72,8 +76,8 @@ scrape_configs:
     scrape_interval: 10s
     scrape_timeout: 5s
 
-  # BFF — Node.js with Prometheus client
-  - job_name: "bff"
+  # ── BFF — Node.js with Prometheus client ──────────────────────────────────
+  - job_name: "bff-k8s"
     kubernetes_sd_configs:
       - role: pod
         namespaces:
@@ -93,6 +97,10 @@ scrape_configs:
         replacement: $1
       - action: labelmap
         regex: __meta_kubernetes_pod_label_(.+)
+    metrics_path: /metrics
+    scrape_interval: 10s
+
+  - job_name: "bff"
     static_configs:
       - targets: ["host.docker.internal:8788"]
         labels:
@@ -101,8 +109,8 @@ scrape_configs:
     metrics_path: /metrics
     scrape_interval: 10s
 
-  # Triton Inference Server
-  - job_name: "triton"
+  # ── Triton Inference Server ───────────────────────────────────────────────
+  - job_name: "triton-k8s"
     kubernetes_sd_configs:
       - role: pod
         namespaces:
@@ -114,6 +122,10 @@ scrape_configs:
         action: keep
       - action: labelmap
         regex: __meta_kubernetes_pod_label_(.+)
+    metrics_path: /metrics
+    scrape_interval: 30s
+
+  - job_name: "triton"
     static_configs:
       - targets: ["host.docker.internal:8002"]
         labels:
@@ -128,9 +140,10 @@ scrape_configs:
       - targets: ["host.docker.internal:9091"]
     honor_labels: true
 
-  # MLflow Server — experiment tracking + model registry
-  # MLflow exposes Prometheus metrics at /metrics (via prometheus_flask_exporter)
-  - job_name: "mlflow"
+  # ── MLflow Server — experiment tracking + model registry ──────────────────
+  # k8s: kubernetes_sd_configs with pod label filtering
+  # Docker Compose: static_configs fallback
+  - job_name: "mlflow-k8s"
     kubernetes_sd_configs:
       - role: pod
         namespaces:
@@ -145,6 +158,11 @@ scrape_configs:
         action: keep
       - action: labelmap
         regex: __meta_kubernetes_pod_label_(.+)
+    metrics_path: /metrics
+    scrape_interval: 30s
+    scrape_timeout: 10s
+
+  - job_name: "mlflow"
     static_configs:
       - targets: ["host.docker.internal:5001"]
         labels:
@@ -154,8 +172,8 @@ scrape_configs:
     scrape_interval: 30s
     scrape_timeout: 10s
 
-  # MLflow PostgreSQL backend store
-  - job_name: "mlflow-postgres"
+  # ── MLflow PostgreSQL backend store ──────────────────────────────────────
+  - job_name: "mlflow-postgres-k8s"
     kubernetes_sd_configs:
       - role: pod
         namespaces:
@@ -167,6 +185,9 @@ scrape_configs:
         action: keep
       - action: labelmap
         regex: __meta_kubernetes_pod_label_(.+)
+    scrape_interval: 60s
+
+  - job_name: "mlflow-postgres"
     static_configs:
       - targets: ["host.docker.internal:5433"]
         labels:
@@ -174,8 +195,8 @@ scrape_configs:
           tier: data
     scrape_interval: 60s
 
-  # MinIO — S3-compatible artifact store for MLflow
-  - job_name: "minio"
+  # ── MinIO — S3-compatible artifact store for MLflow ─────────────────────
+  - job_name: "minio-k8s"
     kubernetes_sd_configs:
       - role: pod
         namespaces:
@@ -187,6 +208,10 @@ scrape_configs:
         action: keep
       - action: labelmap
         regex: __meta_kubernetes_pod_label_(.+)
+    metrics_path: /minio/v2/metrics/cluster
+    scrape_interval: 60s
+
+  - job_name: "minio"
     static_configs:
       - targets: ["host.docker.internal:9000"]
         labels:
