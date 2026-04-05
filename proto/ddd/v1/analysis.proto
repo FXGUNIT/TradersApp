@@ -7,27 +7,153 @@ option java_package = "com.tradersapp.ddd.v1.analysis";
 
 import "proto/ddd/v1/common.proto";
 
-service AnalysisService {
-  rpc GetConsensus(GetConsensusRequest) returns (GetConsensusResponse);
-  rpc Health(traders.ddd.v1.HealthRequest) returns (traders.ddd.v1.HealthResponse);
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// Analysis Service — Inference Bounded Context
+//
+// Owner: ml-engine
+// Consumers: bff (analysis-service), portfolio-service
+//
+// Services:
+//   - AnalysisService: consensus prediction, regime detection, model status
+//   - LearningService: training triggers, drift detection
+//   - IngestionService: candle and trade ingestion
+//
+// Versioning:
+//   - All breaking changes require a new proto package (v1 → v2)
+//   - Non-breaking additions are allowed in existing packages
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ─── Consensus Prediction ────────────────────────────────────────────────────
 
 message GetConsensusRequest {
-  string symbol = 1;
-  int32 session_id = 2;
-  map<string, double> features = 3;
-  repeated traders.ddd.v1.Candle candles = 4;
-  repeated traders.ddd.v1.Trade trades = 5;
+  string symbol = 1;                           // e.g. "MNQ"
+  int32 session_id = 2;                       // 0=pre, 1=main, 2=post
+  map<string, double> features = 3;            // 44-feature canonical vector
+  repeated traders.ddd.v1.Candle candles = 4; // Last N candles (max 50)
+  repeated traders.ddd.v1.Trade trades = 5;    // Recent trade log (optional)
+  string trace_id = 6;                         // OpenTelemetry trace ID
+  string span_id = 7;                           // OpenTelemetry span ID
+  traders.ddd.v1.MathEngineSnapshot math_engine_snapshot = 8; // MathEngine indicators
+  traders.ddd.v1.KeyLevels key_levels = 9;    // PDH, PDL, PWH, PWL
 }
 
 message GetConsensusResponse {
-  string signal = 1;
-  double confidence = 2;
-  uint32 models_used = 3;
-  uint32 data_trades_analyzed = 4;
-  string model_freshness = 5;
-  map<string, string> timing = 6;
-  map<string, double> vote_confidences = 7;
-  string regime = 8;
+  bool ok = 1;
+  string error = 2;
+  string signal = 3;                            // "LONG", "SHORT", "NEUTRAL"
+  double confidence = 4;
+  int32 models_used = 5;
+  int32 data_trades_analyzed = 6;
+  string model_freshness = 7;                    // ISO8601 of last training
+
+  // Model votes
+  map<string, double> vote_confidences = 8;     // model_name → confidence
+  map<string, double> vote_prob_long = 9;        // model_name → P(LONG)
+  map<string, double> vote_prob_short = 10;      // model_name → P(SHORT)
+
+  // Sub-system outputs
+  traders.ddd.v1.RegimeOutput regime = 11;
+  traders.ddd.v1.TimingOutput timing = 12;
+  traders.ddd.v1.AlphaOutput alpha = 13;
+  traders.ddd.v1.ExitOutput exit_plan = 14;
+  traders.ddd.v1.PositionSizingOutput position_sizing = 15;
+  traders.ddd.v1.ExpectedMoveOutput expected_move = 16;
+
+  // Infrastructure metadata
+  double latency_ms = 17;
+  string timestamp = 18;
+  string trace_id = 19;
+  string transport = 20;                       // "grpc", "http_fallback"
+}
+
+// ─── Regime Analysis ──────────────────────────────────────────────────────────
+
+message GetRegimeRequest {
+  repeated traders.ddd.v1.Candle candles = 1; // Min 50 candles required
+  string symbol = 2;
+  string trace_id = 3;
+  string span_id = 4;
+}
+
+message GetRegimeResponse {
+  bool ok = 1;
+  string error = 2;
+  traders.ddd.v1.RegimeOutput regime = 3;
+  double latency_ms = 4;
+  string timestamp = 5;
+  string trace_id = 6;
+}
+
+// ─── Model Status ─────────────────────────────────────────────────────────────
+
+message GetModelStatusRequest {
+  bool include_feature_importance = 1;
+}
+
+message ModelInfo {
+  string model_name = 1;
+  string version = 2;
+  string last_trained = 3;               // ISO8601
+  double cv_roc_auc = 4;
+  double cv_accuracy = 5;
+  int32 feature_count = 6;
+  string framework = 7;
+  string serving_path = 8;               // "triton", "fastapi"
+  repeated traders.ddd.v1.FeatureImportance feature_importance = 9;
+}
+
+message GetModelStatusResponse {
+  bool ok = 1;
+  string error = 2;
+  int32 total_models = 3;
+  repeated ModelInfo models = 4;
+  string mlflow_run_id = 5;
+  string timestamp = 6;
+}
+
+// ─── Training ──────────────────────────────────────────────────────────────────
+
+message TriggerTrainingRequest {
+  string mode = 1;                         // "incremental" or "full"
+  string symbol = 2;
+  int32 min_trades = 3;
+  string trigger = 4;                      // "scheduled", "manual", "drift", "signal"
+  bool auto_promote = 5;                   // Auto-promote to Staging if thresholds met
+  string trace_id = 6;
+}
+
+message TrainingJobStatus {
+  string job_id = 1;
+  string status = 2;                       // "queued", "running", "completed", "failed"
+  string started_at = 3;
+  string completed_at = 4;
+  double progress_pct = 5;
+  string error = 6;
+  ModelInfo promoted_model = 7;
+}
+
+message TriggerTrainingResponse {
+  bool ok = 1;
+  string error = 2;
+  TrainingJobStatus job = 3;
+}
+
+// ─── Analysis Service ──────────────────────────────────────────────────────────
+
+service AnalysisService {
+  // Health
+  rpc Health(traders.ddd.v1.HealthRequest) returns (traders.ddd.v1.HealthResponse);
+
+  // Consensus prediction — primary inference endpoint
+  rpc GetConsensus(GetConsensusRequest) returns (GetConsensusResponse);
+
+  // Regime analysis — HMM + FP-FK + Anomalous Diffusion ensemble
+  rpc GetRegime(GetRegimeRequest) returns (GetRegimeResponse);
+
+  // Model status and feature importance
+  rpc GetModelStatus(GetModelStatusRequest) returns (GetModelStatusResponse);
+
+  // Trigger model training
+  rpc TriggerTraining(TriggerTrainingRequest) returns (TriggerTrainingResponse);
 }
 
