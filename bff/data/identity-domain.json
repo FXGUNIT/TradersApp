@@ -189,7 +189,7 @@
       "passwordLastChanged": "2026-04-03T09:09:14.489Z",
       "failedAttempts": 0,
       "isLocked": false,
-      "updatedAt": "2026-04-03T09:09:14.506Z",
+      "updatedAt": "2026-04-06T09:17:20.594Z",
       "approvedAt": null,
       "approvedBy": null,
       "blockedAt": null,
@@ -375,6 +375,18 @@
   },
   "sessions": {
     "8ba41228-0033-4a94-849c-2271fc071241": {},
-    "audit-user-001": {}
+    "audit-user-001": {},
+    "vfNHXXRlVWeU5rnM0BkslQat2mj1": {
+      "session_1775467040100_c4z9lm5ku": {
+        "sessionId": "session_1775467040100_c4z9lm5ku",
+        "device": "Windows PC",
+        "city": "Meerut",
+        "country": "India",
+        "createdAt": "2026-04-06T09:17:20.588Z",
+        "expiresAt": "2026-05-06T09:17:20.588Z",
+        "lastActive": "2026-04-06T09:17:20.588Z",
+        "updatedAt": "2026-04-06T09:17:20.594Z"
+      }
+    }
   }
 }
