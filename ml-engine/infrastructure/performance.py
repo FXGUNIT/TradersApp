@@ -75,19 +75,22 @@ class RedisCache:
     High-performance Redis cache for ML predictions.
 
     Features:
-    - LRU eviction when memory is high
     - Per-endpoint TTL (shorter for live data, longer for regime)
     - Compression for large payloads
     - Automatic reconnection on failure
-    - Fallback to in-memory LRU when Redis unavailable
     - Request coalescing: identical concurrent requests share one computation
     - Shared connection pool: all instances reuse the same process-level pool,
       enabling horizontal pod scaling without connection pool fragmentation.
+    - PURE REDIS: no local in-process LRU — ensures all pods see consistent
+      cache state. With horizontal scaling, local LRU causes cache inconsistency
+      across pods. If Redis is unavailable, requests compute without caching.
+
+    For horizontal scaling: all pods share one Redis cluster. Cache invalidation,
+    stampede protection, and hit/miss stats are consistent across the entire fleet.
     """
 
     # Process-level connection pools keyed by (host, port, db).
     # All RedisCache instances sharing the same host/port/db share one pool.
-    # Type: dict[tuple, Any] — guarded by REDIS_AVAILABLE at runtime.
     _global_pools: dict[tuple, Any] = {}
     _pools_lock = threading.Lock()
     _instances: dict[str, "RedisCache"] = {}
@@ -96,8 +99,6 @@ class RedisCache:
     def __init__(self, config: CacheConfig):
         self.config = config
         self._client: redis.Redis | None = None
-        self._local_cache: dict[str, tuple[Any, float]] = {}  # key → (value, expiry)
-        self._local_lock = threading.Lock()
         self._coalescing: dict[str, asyncio.Future] = {}
         self._coalescing_lock = threading.Lock()
         self._stats = {"hits": 0, "misses": 0, "errors": 0}
@@ -106,7 +107,7 @@ class RedisCache:
             self._connect()
 
     def _pool_key(self) -> tuple:
-        """Pool identity — (host, port, db). Password excluded so same Redis instance shares the pool."""
+        """Pool identity — (host, port, db)."""
         return (self.config.host, self.config.port, self.config.db)
 
     def _connect(self):
@@ -136,7 +137,7 @@ class RedisCache:
             self._client.ping()
             print(f"[RedisCache] Instance connected to {self.config.host}:{self.config.port}")
         except Exception as e:
-            print(f"[RedisCache] Redis unavailable ({e}) — falling back to in-memory LRU")
+            print(f"[RedisCache] Redis unavailable ({e}) — caching disabled for this pod")
             self._client = None
 
     def _make_key(self, endpoint: str, params: dict) -> str:
@@ -146,93 +147,65 @@ class RedisCache:
         return f"{self.config.key_prefix}{CACHE_KEY_VERSION}:{endpoint}:{param_hash}"
 
     def get(self, key: str) -> Any | None:
-        """Get value from cache. Tries Redis first, then local LRU."""
-        # Try Redis
-        if self._client:
-            try:
-                val = self._client.get(key)
-                if val is not None:
-                    self._stats["hits"] += 1
-                    if self.config.compression:
-                        import zlib
-                        return json.loads(zlib.decompress(val))
-                    return json.loads(val)
-            except Exception:
-                self._stats["errors"] += 1
-
-        # Fallback to local LRU
-        with self._local_lock:
-            if key in self._local_cache:
-                val, expiry = self._local_cache[key]
-                if time.time() < expiry:
-                    self._stats["hits"] += 1
-                    return val
-                del self._local_cache[key]
-
-        self._stats["misses"] += 1
-        return None
-
-    def set(self, key: str, value: Any, ttl: int | None = None):
-        """Set value in cache."""
-        ttl = ttl or self.config.default_ttl
-        expiry = time.time() + ttl
-
-        # Store in local LRU (always available)
-        with self._local_lock:
-            self._local_cache[key] = (value, expiry)
-            # Prune expired
-            now = time.time()
-            self._local_cache = {
-                k: v for k, v in self._local_cache.items() if v[1] > now
-            }
-
-        # Try Redis
-        if self._client:
-            try:
-                serialized = json.dumps(value, default=str)
+        """Get value from Redis. Returns None if Redis unavailable or key missing."""
+        if not self._client:
+            self._stats["misses"] += 1
+            return None
+        try:
+            val = self._client.get(key)
+            if val is not None:
+                self._stats["hits"] += 1
                 if self.config.compression:
                     import zlib
-                    serialized = zlib.compress(serialized.encode())
-                self._client.setex(key, ttl, serialized)
-            except Exception:
-                self._stats["errors"] += 1
+                    return json.loads(zlib.decompress(val))
+                return json.loads(val)
+            self._stats["misses"] += 1
+            return None
+        except Exception:
+            self._stats["errors"] += 1
+            self._stats["misses"] += 1
+            return None
+
+    def set(self, key: str, value: Any, ttl: int | None = None):
+        """Set value in Redis only. No local LRU — pure Redis for horizontal consistency."""
+        ttl = ttl or self.config.default_ttl
+        if not self._client:
+            return
+        try:
+            serialized = json.dumps(value, default=str)
+            if self.config.compression:
+                import zlib
+                serialized = zlib.compress(serialized.encode())
+            self._client.setex(key, ttl, serialized)
+        except Exception:
+            self._stats["errors"] += 1
 
     def invalidate(self, pattern: str):
         """
-        Invalidate all keys matching pattern.
-        Clears both Redis AND the local LRU cache.
+        Invalidate all Redis keys matching pattern.
+        Pattern is relative to the versioned prefix.
         """
         full_pattern = f"{self.config.key_prefix}{CACHE_KEY_VERSION}:{pattern}"
-        if self._client:
-            try:
-                keys = list(self._client.scan_iter(full_pattern))
-                if keys:
-                    self._client.delete(*keys)
-            except Exception:
-                self._stats["errors"] += 1
-
-        # Also clear from local LRU
-        import fnmatch
-        with self._local_lock:
-            self._local_cache = {
-                k: v for k, v in self._local_cache.items()
-                if not fnmatch.fnmatch(k, full_pattern)
-            }
+        if not self._client:
+            return
+        try:
+            keys = list(self._client.scan_iter(full_pattern))
+            if keys:
+                self._client.delete(*keys)
+        except Exception:
+            self._stats["errors"] += 1
 
     def invalidate_all(self):
-        """Invalidate ALL keys in this prefix namespace. Clears both Redis AND local LRU."""
+        """Invalidate ALL Redis keys in this prefix namespace."""
         full_pattern = f"{self.config.key_prefix}{CACHE_KEY_VERSION}:*"
-        if self._client:
-            try:
-                keys = list(self._client.scan_iter(full_pattern))
-                if keys:
-                    self._client.delete(*keys)
-            except Exception:
-                self._stats["errors"] += 1
-
-        # Also clear local LRU
-        with self._local_lock:
-            self._local_cache.clear()
+        if not self._client:
+            return
+        try:
+            keys = list(self._client.scan_iter(full_pattern))
+            if keys:
+                self._client.delete(*keys)
+        except Exception:
+            self._stats["errors"] += 1
 
     def acquire_stampede_lock(self, key: str) -> bool:
         """
