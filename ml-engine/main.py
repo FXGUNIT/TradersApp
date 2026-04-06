@@ -223,6 +223,7 @@ async def lifespan(app: FastAPI):
 
     # Cleanup
     print("ML Engine shutting down...")
+    RedisCache.close_pools()
     if kafka_consumer:
         kafka_consumer.stop()
     if kafka_producer:

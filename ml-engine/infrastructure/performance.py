@@ -25,7 +25,7 @@ import asyncio
 import logging
 from datetime import datetime, timezone, timedelta
 from dataclasses import dataclass, field
-from typing import Callable, Any, Optional, Literal
+from typing import Callable, Any, Optional, Literal, TYPE_CHECKING
 from collections import defaultdict, deque
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
@@ -81,14 +81,21 @@ class RedisCache:
     - Automatic reconnection on failure
     - Fallback to in-memory LRU when Redis unavailable
     - Request coalescing: identical concurrent requests share one computation
+    - Shared connection pool: all instances reuse the same process-level pool,
+      enabling horizontal pod scaling without connection pool fragmentation.
     """
 
+    # Process-level connection pools keyed by (host, port, db).
+    # All RedisCache instances sharing the same host/port/db share one pool.
+    # Type: dict[tuple, Any] — guarded by REDIS_AVAILABLE at runtime.
+    _global_pools: dict[tuple, Any] = {}
+    _pools_lock = threading.Lock()
     _instances: dict[str, "RedisCache"] = {}
     _lock = threading.Lock()
 
     def __init__(self, config: CacheConfig):
         self.config = config
-        self._client = None
+        self._client: redis.Redis | None = None
         self._local_cache: dict[str, tuple[Any, float]] = {}  # key → (value, expiry)
         self._local_lock = threading.Lock()
         self._coalescing: dict[str, asyncio.Future] = {}
@@ -98,23 +105,36 @@ class RedisCache:
         if REDIS_AVAILABLE:
             self._connect()
 
+    def _pool_key(self) -> tuple:
+        """Pool identity — (host, port, db). Password excluded so same Redis instance shares the pool."""
+        return (self.config.host, self.config.port, self.config.db)
+
     def _connect(self):
-        """Connect to Redis with automatic reconnection."""
+        """Connect using a process-level shared ConnectionPool."""
+        pool_key = self._pool_key()
         try:
-            self._client = redis.Redis(
-                host=self.config.host,
-                port=self.config.port,
-                db=self.config.db,
-                password=self.config.password,
-                socket_timeout=self.config.socket_timeout,
-                socket_connect_timeout=self.config.socket_connect_timeout,
-                max_connections=self.config.max_connections,
-                decode_responses=False,  # We handle bytes ourselves
-                retry_on_timeout=True,
-                health_check_interval=30,
-            )
+            with self._pools_lock:
+                if pool_key not in self._global_pools:
+                    self._global_pools[pool_key] = redis.ConnectionPool(
+                        host=self.config.host,
+                        port=self.config.port,
+                        db=self.config.db,
+                        password=self.config.password,
+                        socket_timeout=self.config.socket_timeout,
+                        socket_connect_timeout=self.config.socket_connect_timeout,
+                        max_connections=self.config.max_connections,
+                        decode_responses=False,
+                        retry_on_timeout=True,
+                        health_check_interval=30,
+                    )
+                    print(
+                        f"[RedisCache] Created shared pool for {self.config.host}:{self.config.port}"
+                        f" (max_connections={self.config.max_connections})"
+                    )
+
+            self._client = redis.Redis(connection_pool=self._global_pools[pool_key])
             self._client.ping()
-            print(f"[RedisCache] Connected to {self.config.host}:{self.config.port}")
+            print(f"[RedisCache] Instance connected to {self.config.host}:{self.config.port}")
         except Exception as e:
             print(f"[RedisCache] Redis unavailable ({e}) — falling back to in-memory LRU")
             self._client = None
@@ -338,7 +358,35 @@ class RedisCache:
             **self._stats,
             "hit_rate": round(hit_rate, 4),
             "total_requests": total,
+            "pool_key": self._pool_key(),
         }
+
+    # ── Class-level pool management ──────────────────────────────────────────
+
+    @classmethod
+    def close_pools(cls) -> None:
+        """
+        Close ALL process-level connection pools.
+        Call this during application shutdown to cleanly release connections.
+        """
+        with cls._pools_lock:
+            for key, pool in list(cls._global_pools.items()):
+                pool.disconnect()
+                del cls._global_pools[key]
+                print(f"[RedisCache] Closed pool for {key}")
+
+    @classmethod
+    def get_pool_info(cls) -> dict:
+        """Return information about all active connection pools."""
+        with cls._pools_lock:
+            return {
+                str(key): {
+                    "max_connections": pool.max_connections,
+                    "current_connections": pool.current_connections,
+                    "in_use_connections": pool.in_use_connection_count(),
+                }
+                for key, pool in cls._global_pools.items()
+            }
 
 
 # ─── Circuit Breaker ─────────────────────────────────────────────────────────
