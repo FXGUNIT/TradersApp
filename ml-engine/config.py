@@ -1,6 +1,7 @@
 """
 ML Engine Configuration — All hyperparameters in one place.
 """
+import os
 from pathlib import Path
 
 BASE_DIR = Path(__file__).parent
@@ -11,6 +12,13 @@ SCHEMA_PATH = DATA_DIR / "schema.sql"
 DB_PATH = str(DATA_DIR / "trading_data.db")
 MODEL_STORE = str(MODELS_DIR / "store")
 SCHEMA_PATH_STR = str(SCHEMA_PATH)
+
+# ── MLflow Model Registry (stateless horizontal scaling) ─────────────────────
+# When MLFLOW_USE_REGISTRY=true, ModelStore.load() queries MLflow for the
+# production model version and downloads from S3/MinIO if newer than local.
+# All pods converge to the same MLflow production model — the single source of truth.
+MLFLOW_USE_REGISTRY = os.getenv("MLFLOW_USE_REGISTRY", "false").lower() in ("true", "1", "yes")
+MLFLOW_REGISTRY_CHECK_INTERVAL = int(os.getenv("MLFLOW_REGISTRY_CHECK_INTERVAL", "60"))  # seconds
 
 # Session definitions (Eastern Time)
 SESSION_CONFIG = {
