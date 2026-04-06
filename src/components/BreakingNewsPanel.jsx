@@ -12,6 +12,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Radio, TrendingUp, TrendingDown, Minus, AlertTriangle, ChevronDown, ChevronUp, ExternalLink, Zap } from 'lucide-react';
+import { hasBff } from '../services/gateways/base.js';
 
 const BFF_BASE = import.meta.env.VITE_BFF_URL || '';
 
@@ -47,6 +48,7 @@ function NewsItem({ item, isNew, onReactionLogged }) {
 
   const logReaction = useCallback(async (interval) => {
     if (loggingReaction) return;
+    if (!hasBff()) return;
     setLoggingReaction(true);
     try {
       const res = await fetch(`${BFF_BASE}/news/reactions`, {
@@ -224,6 +226,14 @@ export default function BreakingNewsPanel({ mathEngine, recentCandles }) {
   const fetchNews = useCallback(async () => {
     setLoading(true);
     try {
+      if (!hasBff()) {
+        setNews([]);
+        setBreakingCount(0);
+        setHighImpactCount(0);
+        setNewsSentiment(null);
+        return;
+      }
+
       // Try /ml/consensus first (has breaking news embedded)
       let res = await fetch(`${BFF_BASE}/ml/consensus?session=1`, {
         signal: AbortSignal.timeout(8000),

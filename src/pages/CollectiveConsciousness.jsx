@@ -4,6 +4,7 @@ import ThemeSwitcher from '../components/ThemeSwitcher.jsx';
 import AiEnginesStatus from '../components/AiEnginesStatus.jsx';
 import BreakingNewsPanel from '../components/BreakingNewsPanel.jsx';
 import { runDeliberation, councilStage, MASTER_INTELLIGENCE_SYSTEM_PROMPT } from '../services/ai-router.js';
+import { hasBff } from '../services/gateways/base.js';
 import { getISTState } from '../utils/tradingUtils.js';
 import {
   Brain,           // 🧠 Collective Consciousness header
@@ -384,6 +385,12 @@ const MlConsensusTab = React.memo(function MlConsensusTab({ theme, normalizedThe
     setLoading(true);
     setError(null);
     try {
+      if (!hasBff()) {
+        setConsensus(null);
+        setError('ML Engine unavailable');
+        return;
+      }
+
       const res = await fetch(`${BFF_BASE}/ml/consensus?session=1`, {
         signal: AbortSignal.timeout(15000),
       });

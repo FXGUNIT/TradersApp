@@ -1,4 +1,5 @@
 import { checkInputForPrivilegeEscalation } from "./leakagePreventionModule.js";
+import { hasBff } from "./gateways/base.js";
 
 const AI_ENGINE_DEFINITIONS = [
   { key: "gemini", name: "Gemini" },
@@ -132,6 +133,10 @@ function syncFailureState(engine, err) {
 }
 
 async function callBffJson(path, payload) {
+  if (!hasBff()) {
+    throw new Error("BFF unavailable.");
+  }
+
   const response = await fetch(apiUrl(path), {
     method: "POST",
     headers: {
@@ -202,6 +207,13 @@ function getNextIntervalMs() {
 let statusCheckInterval = null;
 
 export async function checkAllAIStatus() {
+  if (!hasBff()) {
+    AI_ENGINES.forEach((engine) =>
+      syncFailureState(engine, "BFF unavailable."),
+    );
+    return getAIStatusesDetailed();
+  }
+
   const response = await fetch(apiUrl("/ai/status"), {
     method: "GET",
     headers: {

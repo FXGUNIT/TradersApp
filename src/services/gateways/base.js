@@ -9,6 +9,14 @@ function isAuditRuntime() {
     return false;
   }
 
+  try {
+    if (localStorage.getItem("TradersApp_AuditMode") === "true") {
+      return true;
+    }
+  } catch {
+    // Ignore storage access errors in restricted environments.
+  }
+
   return Boolean(
     window.__TRADERS_AUDIT_DATA?.active || window.__TradersAppAudit,
   );
