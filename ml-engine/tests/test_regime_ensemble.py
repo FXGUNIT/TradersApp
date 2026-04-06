@@ -169,14 +169,14 @@ from models.regime.regime_ensemble import RegimeEnsemble
 import pytest
 
 
-@pytest.fixture(scope="module", autouse=True)
+@pytest.fixture(scope="session", autouse=True)
 def cleanup_regime_mocks():
-    """Remove mock regime modules from sys.modules after this file's tests run."""
+    """Remove mock regime modules from sys.modules after ALL tests run."""
     import sys
-    yield  # run tests first
-    # Remove mock entries so subsequent test files get real modules
+    yield  # run all tests first
+    # Remove mock entries after the entire test session so subsequent files get real modules
     for key in list(sys.modules.keys()):
-        if key.startswith("models.regime.") and key in (
+        if key in (
             "models.regime.hmm_regime",
             "models.regime.fp_fk_regime",
             "models.regime.anomalous_diffusion",
