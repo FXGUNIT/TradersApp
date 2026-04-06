@@ -15,10 +15,13 @@ import numpy as np
 import pandas as pd
 import pytest
 
-# Add ml-engine to path (conftest.py is at ml-engine/tests/conftest.py → 2 levels up)
+# Add ml-engine to path (conftest.py is at ml-engine/tests/conftest.py -> 2 levels up)
 ML_ENGINE_ROOT = Path(__file__).parent.parent
 if str(ML_ENGINE_ROOT) not in sys.path:
     sys.path.insert(0, str(ML_ENGINE_ROOT))
+
+# Track whether mock regime modules have been cleaned up after test_regime_ensemble
+_cleanup_done = False
 
 
 # ─── Database Fixtures ─────────────────────────────────────────────────────────
@@ -223,7 +226,6 @@ def drift_monitor():
     """Pre-configured DriftMonitor with baseline established."""
     from infrastructure.drift_detector import DriftMonitor
     monitor = DriftMonitor()
-    # Set up a minimal baseline
     return monitor
 
 
@@ -235,22 +237,36 @@ def seeded_db(temp_db, sample_candles, sample_trades):
     temp_db.insert_candles_df(sample_candles, "MNQ", "5min")
     for _, row in sample_trades.iterrows():
         temp_db.insert_trade(row.to_dict())
-def pytest_runtest_teardown(item, nextitem):
-    """After test_regime_ensemble.py teardown, clear mock regime modules from sys.modules.
+    return temp_db
 
-    test_regime_ensemble.py uses sys.modules mocking to inject fake regime model classes.
-    These mock entries must be removed before test_phase1.py runs (alphabetically after),
-    otherwise phase1 regime tests get the mock classes with empty train() returns.
-    """
-    import sys
-    if item.fspath.basename == "test_regime_ensemble.py":
-        if nextitem and nextitem.fspath.basename == "test_phase1.py":
-            for key in list(sys.modules.keys()):
-                if key in (
-                    "models.regime.hmm_regime",
-                    "models.regime.fp_fk_regime",
-                    "models.regime.anomalous_diffusion",
-                ):
-                    del sys.modules[key]
-            print(f"[CONFTEST] Cleaned mock regime modules, nextitem={nextitem.fspath.basename}")
 
+# ─── Hooks ──────────────────────────────────────────────────────────────────
+
+def pytest_collection_modifyitems(session, config, items):
+    """After test_regime_ensemble.py runs (alphabetically before test_phase1.py),
+    clear the mock regime modules from sys.modules so subsequent test files
+    (test_phase1.py etc.) get real regime model classes."""
+    global _cleanup_done
+    if _cleanup_done:
+        return
+
+    test_file_names = [item.fspath.basename for item in items]
+    regime_ensemble_idx = -1
+    phase1_idx = -1
+    for i, fname in enumerate(test_file_names):
+        if fname == "test_regime_ensemble.py":
+            regime_ensemble_idx = i
+        elif fname == "test_phase1.py" and phase1_idx < 0:
+            phase1_idx = i
+
+    if regime_ensemble_idx >= 0 and phase1_idx >= 0 and regime_ensemble_idx < phase1_idx and not _cleanup_done:
+        import sys
+        for key in list(sys.modules.keys()):
+            if key in (
+                "models.regime.hmm_regime",
+                "models.regime.fp_fk_regime",
+                "models.regime.anomalous_diffusion",
+            ):
+                del sys.modules[key]
+        _cleanup_done = True
+        print(f"[CONFTEST] Cleaned mock regime modules before test_phase1.py")
