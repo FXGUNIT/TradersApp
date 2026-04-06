@@ -305,6 +305,7 @@ export default function TradersRegiment() {
   const [showAdminPwd, setShowAdminPwd] = useState(false);
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const authBootstrapCompleteRef = useRef(false);
   // Last-resort timeout if both admin restore and auth bootstrap stall.
   // This is intentionally slower than the hook-level auth timeout so it only
   // catches truly stuck startup states.
@@ -396,7 +397,6 @@ export default function TradersRegiment() {
   const [googleUser, setGoogleUser] = useState(() => readPendingGoogleSignup());
   const [, _setActiveSessions] = useState([]);
   const [currentSessionId, setCurrentSessionId] = useState(null);
-  const authBootstrapCompleteRef = useRef(false);
   const {
     maintenanceModeActive,
     handleToggleMaintenanceMode,
@@ -747,4 +747,3 @@ export default function TradersRegiment() {
     </AppShellProvider>
   );
 }
-
