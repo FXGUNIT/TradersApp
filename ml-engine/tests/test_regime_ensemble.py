@@ -4,28 +4,28 @@ Tests regime ensemble vote aggregation, confidence, and deleverage logic.
 """
 
 import pytest
-import sys
-from pathlib import Path
-
-ML_ENGINE = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(ML_ENGINE))
-
 import numpy as np
 
-# Mock regime sub-models before importing
+# Mock regime sub-models before importing regime_ensemble.
+# regime_ensemble.py does 'from models.regime.hmm_regime import HMMRegimeDetector' etc.
+# If these entries already exist in sys.modules, Python uses them directly.
+# So we must populate sys.modules with ModuleType objects that expose the mock classes
+# as their attributes — this way 'from X import Y' works AND the class is accessible.
 import sys
-sys.modules.setdefault("models.regime.hmm_regime", type(sys)("hmm_regime"))
-sys.modules.setdefault("models.regime.fp_fk_regime", type(sys)("fp_fk_regime"))
-sys.modules.setdefault("models.regime.anomalous_diffusion", type(sys)("anomalous_diffusion"))
+import types
 
 
-class MockHMM:
+class MockHMMRegimeDetector:
     """Mock HMMRegimeDetector for testing."""
+    name = "hmm_regime"
+    model_type = "regime"
+    state_names = ["COMPRESSION", "NORMAL", "EXPANSION"]
+
     def __init__(self, *args, **kwargs):
-        self._trained = False
+        self._is_trained = False
 
     def train(self, *args, **kwargs):
-        self._trained = True
+        self._is_trained = True
         return {}
 
     def predict_current(self, df):
@@ -38,11 +38,26 @@ class MockHMM:
             "confidence": 0.8,
         }
 
+    def predict(self, *args, **kwargs):
+        import numpy as np
+        return np.array([1])
 
-class MockFPFK:
+    def predict_proba(self, *args, **kwargs):
+        import numpy as np
+        return np.array([[0.1, 0.8, 0.1]])
+
+    def get_metrics(self):
+        return {"trained": self._is_trained}
+
+
+class MockFPFKRegimeDetector:
     """Mock FPFKRegimeDetector for testing."""
+    name = "fp_fk_regime"
+    model_type = "regime"
+
     def __init__(self, *args, **kwargs):
         self.is_trained = True
+        self._f_current = None
 
     def train(self, *args, **kwargs):
         return {}
@@ -64,13 +79,41 @@ class MockFPFK:
             "current_vr": 1.0,
             "reaction_rate": 0.02,
             "diffusion_coeff": 0.05,
+            "front_direction": "STABLE",
+            "diffusion_exponent": 1.8,
         }
 
-
-class MockAnom:
-    """Mock AnomalousDiffusionModel for testing."""
-    def __init__(self, *args, **kwargs):
+    def _estimate_parameters(self, *args, **kwargs):
         pass
+
+    def _build_drift_field(self, *args, **kwargs):
+        return [0.0], [0.0]
+
+    def _build_diffusion_field(self, *args, **kwargs):
+        import numpy as np
+        return np.array([0.05])
+
+    def _get_reaction_rate(self, *args, **kwargs):
+        return 0.02
+
+    def _build_equilibrium(self, *args, **kwargs):
+        return 0.0
+
+    def solve_fp_fk_pde(self, *args, **kwargs):
+        return None, None, None
+
+    def get_metrics(self):
+        return {"trained": self.is_trained}
+
+
+class MockAnomalousDiffusionModel:
+    """Mock AnomalousDiffusionModel for testing."""
+    name = "anomalous_diffusion"
+    model_type = "regime"
+
+    def __init__(self, *args, **kwargs):
+        self.window_size = 100
+        self._recent_returns = []
 
     def train(self, *args, **kwargs):
         return {}
@@ -84,13 +127,38 @@ class MockAnom:
             "position_adjustment": 0.0,
         }
 
+    def get_metrics(self):
+        return {}
 
-# Inject mocks before importing
-import models.regime.regime_ensemble as re_module
-re_module.HMMRegimeDetector = MockHMM
-re_module.FPFKRegimeDetector = MockFPFK
-re_module.AnomalousDiffusionModel = MockAnom
 
+def _q_to_regime(q):
+    if q < 0.9:
+        return "COMPRESSION"
+    elif q > 1.7:
+        return "EXPANSION"
+    return "NORMAL"
+
+
+# Create mock module objects (ModuleType) with mock classes as attributes
+# This allows: from models.regime.hmm_regime import HMMRegimeDetector
+# to resolve correctly via sys.modules lookup
+_hmm_mock_module = types.ModuleType("models.regime.hmm_regime")
+_hmm_mock_module.HMMRegimeDetector = MockHMMRegimeDetector
+
+_fp_fk_mock_module = types.ModuleType("models.regime.fp_fk_regime")
+_fp_fk_mock_module.FPFKRegimeDetector = MockFPFKRegimeDetector
+_fp_fk_mock_module.q_to_regime = _q_to_regime
+
+_anom_mock_module = types.ModuleType("models.regime.anomalous_diffusion")
+_anom_mock_module.AnomalousDiffusionModel = MockAnomalousDiffusionModel
+
+# Place mock modules in sys.modules BEFORE regime_ensemble.py's import runs
+sys.modules["models.regime.hmm_regime"] = _hmm_mock_module
+sys.modules["models.regime.fp_fk_regime"] = _fp_fk_mock_module
+sys.modules["models.regime.anomalous_diffusion"] = _anom_mock_module
+
+
+# Now import regime_ensemble — it finds our mock modules in sys.modules
 from models.regime.regime_ensemble import RegimeEnsemble
 
 

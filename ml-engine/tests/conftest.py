@@ -15,8 +15,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-# Add ml-engine to path
-ML_ENGINE_ROOT = Path(__file__).parent.parent.parent
+# Add ml-engine to path (conftest.py is at ml-engine/tests/conftest.py → 2 levels up)
+ML_ENGINE_ROOT = Path(__file__).parent.parent
 if str(ML_ENGINE_ROOT) not in sys.path:
     sys.path.insert(0, str(ML_ENGINE_ROOT))
 

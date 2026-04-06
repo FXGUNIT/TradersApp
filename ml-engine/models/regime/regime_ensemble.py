@@ -10,7 +10,10 @@ import pandas as pd
 import sys, os
 from typing import Optional
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+# ml-engine/ is already on sys.path via conftest.py; avoid inserting TradersApp/
+# which would create a conflicting models/ namespace lookup.
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import config
 from models.regime.hmm_regime import HMMRegimeDetector
 from models.regime.fp_fk_regime import FPFKRegimeDetector, q_to_regime
