@@ -1983,8 +1983,29 @@ async def run_mc_backtest(request: MCBacktestRequest):
     and evaluates PBO across N simulated market paths.
 
     Pass if PBO < 0.05.
+
+    Cached in Redis (300s TTL) — deterministic for same parameters.
     """
     try:
+        monitor = get_sla_monitor()
+        start = time.time()
+
+        cache = get_cache()
+        cache_key = (
+            f"backtest:mc:{request.symbol}:{request.strategy_name}:"
+            f"{request.strategy_type}:{request.n_simulations}:{request.n_trials}:"
+            f"{request.block_size}:{request.min_trades}"
+        )
+
+        cached = cache.get(cache_key)
+        if cached is not None:
+            if PROMETHEUS_AVAILABLE and record_prometheus_cache:
+                record_prometheus_cache(hit=True)
+            cached["_cached"] = True
+            cached["_cache_age_ms"] = round((time.time() - start) * 1000, 1)
+            monitor.record("/backtest/mc", (time.time() - start) * 1000, 200)
+            return cached
+
         returns = _build_returns(request.symbol, None, None, request.min_trades)
 
         param_grid = {
@@ -2011,7 +2032,7 @@ async def run_mc_backtest(request: MCBacktestRequest):
             verbose=True,
         )
 
-        return {
+        output = {
             "ok": True,
             "mode": "monte_carlo_pbo",
             "strategy_name": request.strategy_name,
@@ -2025,9 +2046,19 @@ async def run_mc_backtest(request: MCBacktestRequest):
                           for k, v in result["aggregate"].items()},
         }
 
+        cache.set(cache_key, output, ttl=300)
+
+        latency_ms = (time.time() - start) * 1000
+        monitor.record("/backtest/mc", latency_ms, 200)
+        if PROMETHEUS_AVAILABLE and record_prometheus_cache:
+            record_prometheus_cache(hit=False)
+
+        return output
+
     except HTTPException:
         raise
     except Exception as e:
+        monitor.record("/backtest/mc", (time.time() - start) * 1000, 500)
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
