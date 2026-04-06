@@ -45,6 +45,7 @@ export default function DiamondNavigationLattice({
     registerArrowRef,
     getArrowOpacity,
     getArrowTransform,
+    hasArrowCollision,
     onArrowActivate,
   } = useDiamondNavigationLattice({
     screen,
@@ -83,6 +84,7 @@ export default function DiamondNavigationLattice({
         const feedbackType = feedbackMap[arrowId];
         const opacity = getArrowOpacity(arrowId);
         const transform = getArrowTransform(arrowId);
+        const isColliding = hasArrowCollision(arrowId);
         const classNames = [
           "aura-smart-arrow",
           `aura-smart-arrow--${NAV_ARROW_POSITIONS[arrowId]}`,
@@ -103,6 +105,7 @@ export default function DiamondNavigationLattice({
             style={{
               opacity,
               transform,
+              pointerEvents: isColliding ? "none" : "auto",
             }}
           >
             <ArrowGlyph direction={directionByArrow[arrowId]} />

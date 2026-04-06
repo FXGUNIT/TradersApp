@@ -256,6 +256,11 @@ export function useDiamondNavigationLattice({
     [collisionMap],
   );
 
+  const hasArrowCollision = useCallback(
+    (arrowId) => Boolean(collisionMap[arrowId]),
+    [collisionMap],
+  );
+
   const runBackNavigation = useCallback(() => {
     if (!isAuthenticated) {
       triggerFeedback(NAV_ARROW_IDS.ANCHOR, "restricted");
@@ -344,6 +349,7 @@ export function useDiamondNavigationLattice({
     registerArrowRef,
     getArrowOpacity,
     getArrowTransform,
+    hasArrowCollision,
     onArrowActivate,
   };
 }

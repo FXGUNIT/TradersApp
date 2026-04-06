@@ -228,7 +228,7 @@ export default function OfficersBriefingFooter({
             textTransform: "uppercase",
           }}
         >
-          System Status
+          AI System Status
         </span>
         <span
           style={{
