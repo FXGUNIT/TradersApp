@@ -28,6 +28,7 @@ from data.candle_db import CandleDatabase
 from infrastructure.performance import (
     get_cache, get_sla_monitor, RedisCache, CacheConfig, SLAMonitor,
 )
+from infrastructure.request_context import RequestIdMiddleware
 from infrastructure.drift_detector import (
     DriftMonitor, DriftThresholds,
 )
@@ -249,6 +250,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Request ID middleware — must come before Prometheus/Tracing to capture all requests
+app.add_middleware(RequestIdMiddleware)
 
 # ── Observability middleware ───────────────────────────────────────────────────
 # Prometheus HTTP metrics (must be outermost to capture all requests)
