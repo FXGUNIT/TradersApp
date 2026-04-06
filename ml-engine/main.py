@@ -1889,11 +1889,36 @@ async def run_pbo_backtest(request: PBOBacktestRequest):
 
     Returns per-model votes + consensus signal.
     Pass if PBO < confidence_level (default 0.05).
+
+    Cached in Redis (300s TTL) — same inputs produce identical outputs.
     """
     try:
+        monitor = get_sla_monitor()
+        start = time.time()
+
+        # ── Cache key from deterministic request params ─────────────────────
+        cache = get_cache()
+        lb_hash = hashlib.sha256(json.dumps(request.lookback, sort_keys=True).encode()).hexdigest()[:8]
+        th_hash = hashlib.sha256(json.dumps(request.threshold, sort_keys=True).encode()).hexdigest()[:8]
+        cache_key = (
+            f"backtest:pbo:{request.symbol}:{request.strategy_name}:"
+            f"{request.strategy_type}:{request.n_trials}:{request.n_permutations}:"
+            f"{request.n_train_splits}:{request.purge_pct}:{request.embargo_pct}:"
+            f"{request.confidence_level}:{request.min_trades}:{lb_hash}:{th_hash}"
+        )
+
+        cached = cache.get(cache_key)
+        if cached is not None:
+            if PROMETHEUS_AVAILABLE and record_prometheus_cache:
+                record_prometheus_cache(hit=True)
+            cached["_cached"] = True
+            cached["_cache_age_ms"] = round((time.time() - start) * 1000, 1)
+            monitor.record("/backtest/pbo", (time.time() - start) * 1000, 200)
+            return cached
+
+        # ── Compute ─────────────────────────────────────────────────────────
         returns = _build_returns(request.symbol, None, None, request.min_trades)
 
-        # Build param grid
         param_grid = {
             "lookback": request.lookback,
             "threshold": request.threshold,
@@ -1920,7 +1945,7 @@ async def run_pbo_backtest(request: PBOBacktestRequest):
             verbose=True,
         )
 
-        return {
+        output = {
             "ok": True,
             "mode": "cpcv_pbo",
             "strategy_name": request.strategy_name,
@@ -1930,9 +1955,21 @@ async def run_pbo_backtest(request: PBOBacktestRequest):
             **_serialize_pbo_result(result),
         }
 
+        # ── Cache (300s — backtest results change only when trade log changes) ─
+        cache.set(cache_key, output, ttl=300)
+
+        # ── SLA recording ───────────────────────────────────────────────────
+        latency_ms = (time.time() - start) * 1000
+        monitor.record("/backtest/pbo", latency_ms, 200)
+        if PROMETHEUS_AVAILABLE and record_prometheus_cache:
+            record_prometheus_cache(hit=False)
+
+        return output
+
     except HTTPException:
         raise
     except Exception as e:
+        monitor.record("/backtest/pbo", (time.time() - start) * 1000, 500)
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
