@@ -235,4 +235,20 @@ def seeded_db(temp_db, sample_candles, sample_trades):
     temp_db.insert_candles_df(sample_candles, "MNQ", "5min")
     for _, row in sample_trades.iterrows():
         temp_db.insert_trade(row.to_dict())
-    return temp_db
+def pytest_runtest_teardown(item, nextitem):
+    """After test_regime_ensemble.py teardown, clear mock regime modules from sys.modules.
+
+    test_regime_ensemble.py uses sys.modules mocking to inject fake regime model classes.
+    These mock entries must be removed before test_phase1.py runs (alphabetically after),
+    otherwise phase1 regime tests get the mock classes with empty train() returns.
+    """
+    import sys
+    if item.fspath.basename == "test_regime_ensemble.py":
+        if nextitem and nextitem.fspath.basename == "test_phase1.py":
+            for key in list(sys.modules.keys()):
+                if key in (
+                    "models.regime.hmm_regime",
+                    "models.regime.fp_fk_regime",
+                    "models.regime.anomalous_diffusion",
+                ):
+                    del sys.modules[key]
