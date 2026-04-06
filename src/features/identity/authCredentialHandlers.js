@@ -549,7 +549,8 @@ export const executeStructuredSignup = async ({
     emailVerified: activeUser.emailVerified,
   });
 
-  await submitOnboardingApplication({
+  await Promise.all([
+    submitOnboardingApplication({
     uid: activeUser.uid,
     fullName,
     email: cleanEmail,
@@ -564,13 +565,9 @@ export const executeStructuredSignup = async ({
       termsAccepted: Boolean(formData.agreedToTerms),
       privacyAccepted: Boolean(formData.agreedToTerms),
     },
-  });
-  await provisionIdentityUserRecord(
-    activeUser.uid,
-    profileData,
-    authData.token,
-  );
-  await sendWelcomeEmail(cleanEmail, fullName);
+    }),
+    provisionIdentityUserRecord(activeUser.uid, profileData, authData.token),
+  ]);
 
   sendTelegramAlert(
     `👤 <b>NEW TRADER APPLICATION</b>\nEmail: <code>${cleanEmail}</code>\nStatus: 🟡 PENDING`,
