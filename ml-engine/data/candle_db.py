@@ -1312,3 +1312,12 @@ class CandleDatabase:
     def _get_backend(self) -> DatabaseBackend:
         """Expose backend for test introspection."""
         return self._backend
+
+    @contextmanager
+    def conn(self):
+        """Context manager proxy — delegates to backend. SQLite only."""
+        ctx = self._backend.conn()
+        try:
+            yield ctx.__enter__()
+        finally:
+            ctx.__exit__(None, None, None)
