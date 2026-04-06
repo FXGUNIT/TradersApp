@@ -2552,9 +2552,17 @@ async def mamba_predict(request: MambaRequest):
     Also Mamba-2 hybrid: mamba2-130m, mamba2-370m, mamba2-2.7b
 
     Install: pip install torch transformers accelerate
+
+    Cached in Redis (30s TTL) to avoid expensive GPU inference on repeat calls.
     """
     try:
+        # ── SLA Monitor start ─────────────────────────────────────────────
+        monitor = get_sla_monitor()
+        start = time.time()
+
         if not MAMBA_AVAILABLE:
+            latency_ms = (time.time() - start) * 1000
+            monitor.record("/mamba/predict", latency_ms, 200)
             return {
                 "ok": False,
                 "available": False,
@@ -2564,6 +2572,8 @@ async def mamba_predict(request: MambaRequest):
             }
 
         if request.model_size not in MODEL_SIZES:
+            latency_ms = (time.time() - start) * 1000
+            monitor.record("/mamba/predict", latency_ms, 400)
             return {
                 "ok": False,
                 "error": f"Unknown model: {request.model_size}. Available: {list(MODEL_SIZES.keys())}",
@@ -2576,15 +2586,45 @@ async def mamba_predict(request: MambaRequest):
             df_candles = df.to_dict("records")
 
         if not df_candles:
+            monitor.record("/mamba/predict", (time.time() - start) * 1000, 400)
             raise HTTPException(status_code=400, detail="No candles available")
 
+        # ── Cache check (Redis or in-memory LRU) ────────────────────────────
+        cache = get_cache()
+        candle_hash = hashlib.sha256(
+            json.dumps(df_candles[-20:], sort_keys=True, default=str).encode()
+        ).hexdigest()[:16]
+        cache_key = f"mamba:{request.symbol}:{request.model_size}:{request.task}:{candle_hash}"
+
+        cached = cache.get(cache_key)
+        if cached is not None:
+            if PROMETHEUS_AVAILABLE and record_prometheus_cache:
+                record_prometheus_cache(hit=True)
+            cached["_cached"] = True
+            cached["_cache_age_ms"] = round((time.time() - start) * 1000, 1)
+            latency_ms = (time.time() - start) * 1000
+            monitor.record("/mamba/predict", latency_ms, 200)
+            return cached
+
+        # ── Compute ────────────────────────────────────────────────────────
         result = get_mamba_prediction(df_candles, request.model_size, request.task)
         result["model_info"] = MODEL_SIZES.get(request.model_size, {})
+
+        # ── Cache result (30s TTL — Mamba inference is expensive) ──────────
+        cache.set(cache_key, result, ttl=30)
+
+        # ── SLA recording ────────────────────────────────────────────────────
+        latency_ms = (time.time() - start) * 1000
+        monitor.record("/mamba/predict", latency_ms, 200)
+        if PROMETHEUS_AVAILABLE and record_prometheus_cache:
+            record_prometheus_cache(hit=False)
+
         return result
 
     except HTTPException:
         raise
     except Exception as e:
+        monitor.record("/mamba/predict", (time.time() - start) * 1000, 500)
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
