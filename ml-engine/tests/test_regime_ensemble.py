@@ -26,7 +26,7 @@ class MockHMMRegimeDetector:
 
     def train(self, *args, **kwargs):
         self._is_trained = True
-        return {}
+        return {"model": "hmm_regime"}
 
     def predict_current(self, df):
         return self._default_regime()
