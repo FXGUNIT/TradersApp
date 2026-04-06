@@ -250,8 +250,10 @@ export default function AdminDashboardScreen({
       setDbError("");
     };
 
-    const loadUsers = async () => {
-      setLoading(true);
+    const loadUsers = async ({ background = false } = {}) => {
+      if (!background) {
+        setLoading(true);
+      }
       setDbError("");
 
       if (listAdminUsers) {
@@ -272,14 +274,16 @@ export default function AdminDashboardScreen({
       }
 
       if (!active) return;
-      setUsers({});
+      if (!background) {
+        setUsers({});
+      }
       setLoading(false);
       setDbError("Admin user list unavailable.");
     };
 
     void loadUsers();
     intervalId = window.setInterval(() => {
-      void loadUsers();
+      void loadUsers({ background: true });
     }, 10000);
 
     return () => {
@@ -422,32 +426,39 @@ export default function AdminDashboardScreen({
   };
 
   const statusColor = { ACTIVE: T.green, PENDING: T.gold, BLOCKED: T.red };
-  const userList = Object.entries(users);
+  const userList = Object.entries(users || {});
+  const getUserSortTimestamp = (userData) => {
+    const candidates = [
+      userData?.updatedAt,
+      userData?.submittedAt,
+      userData?.createdAt,
+      userData?.approvedAt,
+      userData?.blockedAt,
+      userData?.lastLoginAt,
+      userData?.lastLoginAttempt,
+    ];
 
-  // Deduplicate users by email, keeping only the most recent entry (by createdAt)
-  const uniqueUserMap = {};
-  userList.forEach(([uid, userData]) => {
-    if (!userData || !userData.email) return; // Skip invalid entries
-    const email = userData.email.toLowerCase().trim();
-
-    // If email not seen before, add it
-    if (!uniqueUserMap[email]) {
-      uniqueUserMap[email] = [uid, userData];
-    } else {
-      // If email exists, compare createdAt and keep the newer one
-      const existingCreatedAt = new Date(
-        uniqueUserMap[email][1].createdAt || 0,
-      ).getTime();
-      const currentCreatedAt = new Date(userData.createdAt || 0).getTime();
-
-      if (currentCreatedAt > existingCreatedAt) {
-        uniqueUserMap[email] = [uid, userData];
+    for (const candidate of candidates) {
+      const timestamp = Date.parse(candidate || "");
+      if (Number.isFinite(timestamp)) {
+        return timestamp;
       }
     }
-  });
 
-  // Convert back to array format
-  const deduplicatedUserList = Object.values(uniqueUserMap);
+    return 0;
+  };
+
+  const sortedUserList = [...userList].sort(
+    ([leftUid, leftUser], [rightUid, rightUser]) => {
+      const timestampDelta =
+        getUserSortTimestamp(rightUser) - getUserSortTimestamp(leftUser);
+      if (timestampDelta !== 0) {
+        return timestampDelta;
+      }
+
+      return String(rightUid || "").localeCompare(String(leftUid || ""));
+    },
+  );
 
   // Normalize status comparison: case-insensitive
   const normalizeStatus = (status) => {
@@ -461,11 +472,11 @@ export default function AdminDashboardScreen({
           : status.toUpperCase();
   };
 
-  // Filter users by status with proper case-insensitive logic (using deduplicated list)
+  // Filter users by status with proper case-insensitive logic
   const filteredUsers =
     filterStatus === "ALL"
-      ? deduplicatedUserList
-      : deduplicatedUserList.filter(
+      ? sortedUserList
+      : sortedUserList.filter(
           ([, u]) => normalizeStatus(u.status) === filterStatus,
         );
 
@@ -508,24 +519,24 @@ export default function AdminDashboardScreen({
   if (
     filterStatus !== "ALL" &&
     filteredUsers.length === 0 &&
-    deduplicatedUserList.length > 0
+    sortedUserList.length > 0
   ) {
     console.warn(
       `Filter '${filterStatus}' returned 0 results. User statuses in DB:`,
-      deduplicatedUserList.map(([, d]) => d.status).filter(Boolean),
+      sortedUserList.map(([, d]) => d.status).filter(Boolean),
     );
   }
 
-  // Calculate status counts using the deduplicated list
+  // Calculate status counts using the full sorted list
   const statusCounts = {
-    ALL: deduplicatedUserList.length,
-    ACTIVE: deduplicatedUserList.filter(
+    ALL: sortedUserList.length,
+    ACTIVE: sortedUserList.filter(
       ([, u]) => normalizeStatus(u.status) === "ACTIVE",
     ).length,
-    PENDING: deduplicatedUserList.filter(
+    PENDING: sortedUserList.filter(
       ([, u]) => normalizeStatus(u.status) === "PENDING",
     ).length,
-    BLOCKED: deduplicatedUserList.filter(
+    BLOCKED: sortedUserList.filter(
       ([, u]) => normalizeStatus(u.status) === "BLOCKED",
     ).length,
   };
