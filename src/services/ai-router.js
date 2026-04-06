@@ -1,6 +1,8 @@
 import { checkInputForPrivilegeEscalation } from "./leakagePreventionModule.js";
 import { hasBff } from "./gateways/base.js";
 
+export const AI_STATUS_REFRESH_MS = 5 * 60 * 1000;
+
 const AI_ENGINE_DEFINITIONS = [
   { key: "gemini", name: "Gemini" },
   { key: "groq", name: "Groq" },
@@ -189,21 +191,6 @@ export function getAIStatusesDetailed() {
   }));
 }
 
-function getISTHour() {
-  const now = new Date();
-  const istOffset = 5.5 * 60 * 60 * 1000;
-  const istTime = new Date(now.getTime() + istOffset);
-  return istTime.getUTCHours();
-}
-
-function getNextIntervalMs() {
-  const hour = getISTHour();
-  if (hour >= 8 && hour < 22) {
-    return 15 * 60 * 1000;
-  }
-  return 60 * 60 * 1000;
-}
-
 let statusCheckInterval = null;
 
 export async function checkAllAIStatus() {
@@ -235,40 +222,26 @@ export async function checkAllAIStatus() {
 export function startAIStatusScheduler(onStatusChange) {
   if (statusCheckInterval) {
     clearInterval(statusCheckInterval);
+    statusCheckInterval = null;
   }
 
-  const runCheck = async (forceCheck = false) => {
-    const hour = getISTHour();
-    if (
-      forceCheck ||
-      (hour >= 8 && hour < 22) ||
-      new Date().getMinutes() === 0
-    ) {
-      try {
-        await checkAllAIStatus();
-      } catch (error) {
-        AI_ENGINES.forEach((engine) =>
-          syncFailureState(engine, error?.message || "BFF unavailable."),
-        );
-      }
-      if (onStatusChange) {
-        onStatusChange(getAIStatusesDetailed());
-      }
+  const runCheck = async () => {
+    try {
+      await checkAllAIStatus();
+    } catch (error) {
+      AI_ENGINES.forEach((engine) =>
+        syncFailureState(engine, error?.message || "BFF unavailable."),
+      );
+    }
+    if (onStatusChange) {
+      onStatusChange(getAIStatusesDetailed());
     }
   };
 
-  void runCheck(true);
-
-  const scheduleNextCheck = () => {
-    const interval = getNextIntervalMs();
-    statusCheckInterval = setInterval(() => {
-      void runCheck();
-      scheduleNextCheck();
-      clearInterval(statusCheckInterval);
-    }, interval);
-  };
-
-  scheduleNextCheck();
+  void runCheck();
+  statusCheckInterval = setInterval(() => {
+    void runCheck();
+  }, AI_STATUS_REFRESH_MS);
 }
 
 export function stopAIStatusScheduler() {
