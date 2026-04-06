@@ -554,25 +554,22 @@ export const executeStructuredSignup = async ({
     emailVerified: activeUser.emailVerified,
   });
 
-  await Promise.all([
-    submitOnboardingApplication({
-      uid: activeUser.uid,
-      fullName,
-      email: cleanEmail,
-      country,
-      city,
-      instagram,
-      linkedin,
-      proficiency,
-      authProvider,
-      emailVerified: activeUser.emailVerified,
-      consentState: {
-        termsAccepted: Boolean(formData.agreedToTerms),
-        privacyAccepted: Boolean(formData.agreedToTerms),
-      },
-    }),
-    provisionIdentityUserRecord(activeUser.uid, profileData, authData.token),
-  ]);
+  const onboardingPayload = {
+    uid: activeUser.uid,
+    fullName,
+    email: cleanEmail,
+    country,
+    city,
+    instagram,
+    linkedin,
+    proficiency,
+    authProvider,
+    emailVerified: activeUser.emailVerified,
+    consentState: {
+      termsAccepted: Boolean(formData.agreedToTerms),
+      privacyAccepted: Boolean(formData.agreedToTerms),
+    },
+  };
 
   sendTelegramAlert(
     `👤 <b>NEW TRADER APPLICATION</b>\nEmail: <code>${cleanEmail}</code>\nStatus: 🟡 PENDING`,
@@ -586,6 +583,22 @@ export const executeStructuredSignup = async ({
     token: authData.token,
   });
   setScreen("waiting");
+  void Promise.allSettled([
+    submitOnboardingApplication(onboardingPayload),
+    provisionIdentityUserRecord(activeUser.uid, profileData, authData.token),
+  ]).then((results) => {
+    const hasSyncIssue = results.some(
+      (result) =>
+        result.status === "rejected" ||
+        (result.value &&
+          typeof result.value === "object" &&
+          result.value.success === false),
+    );
+    if (hasSyncIssue) {
+      console.warn("Signup persistence completed with fallback behavior.", results);
+    }
+  });
+  void verificationLinkPromise;
   void sendWelcomeEmail(cleanEmail, fullName);
 };
 
