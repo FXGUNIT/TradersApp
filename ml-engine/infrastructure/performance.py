@@ -42,6 +42,12 @@ except ImportError:
     redis = None
 
 
+# ─── Cache Key Versioning ───────────────────────────────────────────────────────
+# Bump this when cache schema changes to automatically invalidate all cached keys.
+# Format: v{N} — appended to all cache key prefixes.
+CACHE_KEY_VERSION = "v1"
+
+
 @dataclass
 class CacheConfig:
     host: str = "localhost"
@@ -51,11 +57,16 @@ class CacheConfig:
     socket_timeout: float = 0.5
     socket_connect_timeout: float = 0.5
     max_connections: int = 20
-    default_ttl: int = 30        # seconds
-    prediction_ttl: int = 10     # ML predictions cached for 10s (live data)
+    default_ttl: int = 30        # seconds — generic cached data
+    prediction_ttl: int = 10    # ML predictions cached for 10s (live data)
     regime_ttl: int = 60        # Regime predictions cached for 60s
     mamba_ttl: int = 30         # Mamba predictions cached for 30s
+    feature_ttl: int = 60      # Feature engineering cached for 60s
+    alpha_ttl: int = 300       # Alpha engine metrics cached for 5min
+    exit_ttl: int = 300        # Exit strategy predictions cached for 5min
+    position_ttl: int = 60     # Position sizing cached for 60s
     key_prefix: str = "tradersapp:"
+    stampede_lock_ttl: int = 30  # Lock TTL for cache stampede protection
     compression: bool = True   # Compress cached values
 
 
