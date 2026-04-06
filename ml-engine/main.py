@@ -76,7 +76,9 @@ except ImportError:
     set_prometheus_mlflow_experiment_count = None
     sync_prometheus_mlflow_registry = None
 
-# ── Observability: Jaeger tracing ─────────────────────────────────────────────
+# ── Observability: Profiler ─────────────────────────────────────────────────────
+from infrastructure.profiler import init_profiler, profile_endpoint, profile_function
+from infrastructure.profiler import LatencyBreakdown, MemorySnapshot ─────────────────────────────────────────────
 try:
     from infrastructure.tracing import init_tracing, add_jaeger_middleware
     TRACING_AVAILABLE = True
@@ -156,6 +158,9 @@ async def lifespan(app: FastAPI):
     store = ModelStore(config.MODEL_STORE)
     regime_ensemble = RegimeEnsemble(random_state=42)
     drift_monitor = DriftMonitor()
+
+    # ── Profiler init (Pyroscope + cProfile) ────────────────────────────────
+    init_profiler()
 
     # Feedback loop — closed-loop retraining pipeline
     feedback_logger = FeedbackLogger(db)
