@@ -37,6 +37,59 @@ spec:
         runAsUser: 1000
         runAsGroup: 1000
         fsGroup: 1000
+      # Init container: pre-loads the latest MLflow Production model into the
+      # shared PVC before the main container starts. Ensures all pods start
+      # with the correct model even on fresh PVC mounts.
+      initContainers:
+        - name: model-sync
+          image: tradersapp/ml-engine:latest
+          imagePullPolicy: Always
+          command:
+            - python
+            - -c
+            - |
+              import os, sys
+              sys.path.insert(0, '/app')
+              from training.model_store import ModelStore
+              from infrastructure.mlflow_client import get_mlflow_client
+              store = ModelStore()
+              ml_client = get_mlflow_client("direction")
+              if ml_client:
+                  for model_name in store.list_all_models():
+                      try:
+                          prod = ml_client.get_production_model(model_name)
+                          if prod and prod.get("version"):
+                              import mlflow
+                              ver = str(prod["version"])
+                              print(f"Pre-loading {model_name}@{ver} into PVC...")
+                              pipeline = mlflow.sklearn.load_model(f"models:/{model_name}/{ver}")
+                              store.save(model_name, pipeline, prod.get("metrics", {}),
+                                         prod.get("feature_cols", []), version=ver,
+                                         extra={"source": "init_sync", "run_id": prod.get("run_id")})
+                              print(f"  {model_name}@{ver} synced to PVC")
+                      except Exception as e:
+                          print(f"  Skipped {model_name}: {e}")
+              print("Model sync complete.")
+          env:
+            - name: MLFLOW_USE_REGISTRY
+              value: "true"
+            - name: MODEL_STORE_PVC_MOUNT
+              value: /models/store
+          volumeMounts:
+            - name: models
+              mountPath: /models
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
       containers:
         - name: ml-engine
           image: tradersapp/ml-engine:latest
@@ -50,6 +103,12 @@ spec:
             - configMapRef:
                 name: ml-engine-env
           env:
+            # Model store: use shared PVC mount for horizontal pod scaling
+            # All pods share the same ml-models-pvc → same model artifacts
+            - name: MODEL_STORE_PVC_MOUNT
+              value: /models/store
+            - name: MLFLOW_USE_REGISTRY
+              value: "true"
             - name: DB_PATH
               valueFrom:
                 configMapKeyRef:

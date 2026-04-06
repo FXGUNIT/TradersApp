@@ -10,7 +10,13 @@ MODELS_DIR = BASE_DIR / "models"
 SCHEMA_PATH = DATA_DIR / "schema.sql"
 
 DB_PATH = str(DATA_DIR / "trading_data.db")
-MODEL_STORE = str(MODELS_DIR / "store")
+# ── Model store path ─────────────────────────────────────────────────────────
+# Local dev:   ml-engine/models/store (default)
+# Kubernetes:  /models/store (PVC mount, set via MODEL_STORE_PVC_MOUNT)
+# When MODEL_STORE_PVC_MOUNT is set, MODEL_STORE uses that path instead.
+# All pods sharing the same PVC see the same model artifacts.
+MODEL_STORE_PVC_MOUNT = os.getenv("MODEL_STORE_PVC_MOUNT", "")
+MODEL_STORE = MODEL_STORE_PVC_MOUNT or str(MODELS_DIR / "store")
 SCHEMA_PATH_STR = str(SCHEMA_PATH)
 
 # ── MLflow Model Registry (stateless horizontal scaling) ─────────────────────

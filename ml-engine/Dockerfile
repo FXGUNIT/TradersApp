@@ -30,6 +30,11 @@ COPY . .
 # Create data directory and model store
 RUN mkdir -p /app/data /app/model_store
 
+# Model store PVC mount path (set by k8s deployment when ml-models-pvc is mounted)
+# In k8s: the PVC is mounted at /models, so MODEL_STORE=/models/store
+# Local dev: not set, falls back to ml-engine/models/store
+ENV MODEL_STORE_PVC_MOUNT=${MODEL_STORE_PVC_MOUNT:-}
+
 # Environment — use build args if present, otherwise Railway/Infisical will set at runtime
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
