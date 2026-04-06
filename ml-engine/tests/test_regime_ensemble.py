@@ -60,7 +60,7 @@ class MockFPFKRegimeDetector:
         self._f_current = None
 
     def train(self, *args, **kwargs):
-        return {}
+        return {"model": "fp_fk_regime"}
 
     def predict_current(self, df):
         return self._default_output()
@@ -116,7 +116,7 @@ class MockAnomalousDiffusionModel:
         self._recent_returns = []
 
     def train(self, *args, **kwargs):
-        return {}
+        return {"model": "anomalous_diffusion"}
 
     def predict_current(self, df):
         return {

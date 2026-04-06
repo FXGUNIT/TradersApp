@@ -246,27 +246,27 @@ def pytest_collection_modifyitems(session, config, items):
     global _cleanup_done
     if _cleanup_done:
         return
-    # Mark that we should clean up AFTER collection is complete
     config._should_cleanup_regime_mocks = True
 
 
-def pytest_runtest_teardown(item, nextitem):
-    """After test_regime_ensemble.py teardown, clear mock regime modules from sys.modules."""
-    global _cleanup_done
-    config = item.config
+def pytest_collection_finish(session):
+    """After all tests are collected, clear mock regime modules from sys.modules.
 
-    # Check if collection flagged that we should clean up
-    if getattr(config, "_should_cleanup_regime_mocks", False):
-        if item.fspath.basename == "test_regime_ensemble.py":
-            if not _cleanup_done:
-                import sys
-                for key in list(sys.modules.keys()):
-                    if key in (
-                        "models.regime.hmm_regime",
-                        "models.regime.fp_fk_regime",
-                        "models.regime.anomalous_diffusion",
-                    ):
-                        del sys.modules[key]
-                _cleanup_done = True
-                config._should_cleanup_regime_mocks = False
-                print(f"[CONFTEST] Cleaned mock regime modules before test_phase1.py")
+    test_regime_ensemble.py sets mocks at collection time (module-level sys.modules patching).
+    We clean up here so subsequent imports get real modules.
+    This runs after ALL test modules have been imported.
+    """
+    import sys
+    global _cleanup_done
+    if not _cleanup_done:
+        for key in list(sys.modules.keys()):
+            if key in (
+                "models.regime.hmm_regime",
+                "models.regime.fp_fk_regime",
+                "models.regime.anomalous_diffusion",
+            ):
+                del sys.modules[key]
+        _cleanup_done = True
+        print("[CONFTEST] Cleared mock regime modules at collection finish")
+
+
