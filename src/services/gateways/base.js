@@ -1,8 +1,33 @@
 const BFF_BASE_URL = String(import.meta.env.VITE_BFF_URL || "").trim();
 const ADMIN_TOKEN_KEY = "TradersApp_AdminToken";
+const BFF_FAILURE_COOLDOWN_MS = 2 * 60 * 1000;
+
+let bffUnavailableUntil = 0;
+
+function isAuditRuntime() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  return Boolean(
+    window.__TRADERS_AUDIT_DATA?.active || window.__TradersAppAudit,
+  );
+}
+
+function markBffUnavailable() {
+  bffUnavailableUntil = Date.now() + BFF_FAILURE_COOLDOWN_MS;
+}
+
+function clearBffUnavailable() {
+  bffUnavailableUntil = 0;
+}
 
 export function hasBff() {
-  return Boolean(BFF_BASE_URL);
+  return (
+    Boolean(BFF_BASE_URL) &&
+    !isAuditRuntime() &&
+    Date.now() >= bffUnavailableUntil
+  );
 }
 
 export function createBffUnavailableResult(operation, extra = {}) {
@@ -48,6 +73,7 @@ export async function bffFetch(path, options = {}) {
 
   try {
     const response = await fetch(buildUrl(path), { ...options, headers });
+    clearBffUnavailable();
     // 404 = endpoint may not exist — treat as null
     if (response.status === 404) {
       return null;
@@ -59,10 +85,14 @@ export async function bffFetch(path, options = {}) {
       return { success: false, error: data?.error || "Unauthorized", _authError: true };
     }
     if (!response.ok) {
+      if (response.status >= 500) {
+        markBffUnavailable();
+      }
       return null;
     }
     return await response.json();
   } catch {
+    markBffUnavailable();
     return null;
   }
 }
