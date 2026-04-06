@@ -120,10 +120,10 @@ class RedisCache:
             self._client = None
 
     def _make_key(self, endpoint: str, params: dict) -> str:
-        """Create a deterministic cache key."""
+        """Create a deterministic cache key with version prefix."""
         param_str = json.dumps(params, sort_keys=True, default=str)
         param_hash = hashlib.sha256(param_str.encode()).hexdigest()[:16]
-        return f"{self.config.key_prefix}{endpoint}:{param_hash}"
+        return f"{self.config.key_prefix}{CACHE_KEY_VERSION}:{endpoint}:{param_hash}"
 
     def get(self, key: str) -> Any | None:
         """Get value from cache. Tries Redis first, then local LRU."""
@@ -181,11 +181,55 @@ class RedisCache:
         """Invalidate all keys matching pattern."""
         if self._client:
             try:
-                keys = list(self._client.scan_iter(f"{self.config.key_prefix}{pattern}"))
+                keys = list(self._client.scan_iter(f"{self.config.key_prefix}{CACHE_KEY_VERSION}:{pattern}"))
                 if keys:
                     self._client.delete(*keys)
             except Exception:
                 self._stats["errors"] += 1
+
+    def invalidate_all(self):
+        """Invalidate ALL keys in this prefix namespace."""
+        if self._client:
+            try:
+                keys = list(self._client.scan_iter(f"{self.config.key_prefix}{CACHE_KEY_VERSION}:*"))
+                if keys:
+                    self._client.delete(*keys)
+            except Exception:
+                self._stats["errors"] += 1
+
+    def acquire_stampede_lock(self, key: str) -> bool:
+        """
+        Acquire a mutex lock for cache stampede protection.
+
+        Uses Redis SETNX to ensure only ONE process computes a cold cache entry
+        while others wait. Returns True if lock acquired (you're the leader),
+        False if another process is already computing.
+
+        Lock auto-expires after stampede_lock_ttl seconds.
+        """
+        if not self._client:
+            return True  # No Redis — skip lock, allow compute
+        try:
+            lock_key = f"{key}:__lock__"
+            acquired = self._client.set(
+                lock_key, "1",
+                nx=True,  # Only set if not exists
+                ex=self.config.stampede_lock_ttl,
+            )
+            return bool(acquired)
+        except Exception:
+            self._stats["errors"] += 1
+            return True  # On error, allow compute
+
+    def release_stampede_lock(self, key: str):
+        """Release the stampede lock after computation is done."""
+        if not self._client:
+            return
+        try:
+            lock_key = f"{key}:__lock__"
+            self._client.delete(lock_key)
+        except Exception:
+            self._stats["errors"] += 1
 
     async def get_or_compute(
         self,
@@ -226,6 +270,49 @@ class RedisCache:
                 if key in self._coalescing and self._coalescing[key] is future:
                     self._coalescing[key].set_result(None)
                     del self._coalescing[key]
+
+    def get_or_compute_sync(
+        self,
+        key: str,
+        compute_fn: Callable[[], Any],
+        ttl: int | None = None,
+    ) -> Any:
+        """
+        Stampede-protected synchronous get-or-compute.
+
+        Uses Redis SETNX mutex so only ONE process computes a cold cache entry.
+        Others that fail to acquire the lock poll until the result is ready.
+        Falls back to in-memory LRU if Redis unavailable.
+        """
+        # Check cache first
+        cached = self.get(key)
+        if cached is not None:
+            return cached
+
+        # Try to acquire stampede lock
+        lock_acquired = self.acquire_stampede_lock(key)
+        if not lock_acquired:
+            # Another process is computing — wait and poll
+            for _ in range(30):  # max 30 * 0.2s = 6s wait
+                import time as _time
+                _time.sleep(0.2)
+                cached = self.get(key)
+                if cached is not None:
+                    return cached
+            # Timeout — compute anyway (fallback)
+            return compute_fn()
+
+        try:
+            # Double-check after acquiring lock (another thread may have just finished)
+            cached = self.get(key)
+            if cached is not None:
+                return cached
+            # Compute and cache
+            result = compute_fn()
+            self.set(key, result, ttl)
+            return result
+        finally:
+            self.release_stampede_lock(key)
 
     def get_stats(self) -> dict:
         total = self._stats["hits"] + self._stats["misses"]
