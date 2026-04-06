@@ -2077,8 +2077,31 @@ async def run_full_pbo(request: FullPBOBacktestRequest):
 
     This is the primary backtest endpoint for model self-validation.
     Each ML model should call this after training to verify it passes PBO.
+
+    Cached in Redis (300s TTL) — deterministic for same parameters.
     """
     try:
+        monitor = get_sla_monitor()
+        start = time.time()
+
+        cache = get_cache()
+        lb_hash = hashlib.sha256(json.dumps(request.lookback, sort_keys=True).encode()).hexdigest()[:8]
+        th_hash = hashlib.sha256(json.dumps(request.threshold, sort_keys=True).encode()).hexdigest()[:8]
+        cache_key = (
+            f"backtest:full:{request.symbol}:{request.strategy_name}:"
+            f"{request.strategy_type}:{request.n_trials}:{request.n_simulations}:"
+            f"{request.min_trades}:{lb_hash}:{th_hash}"
+        )
+
+        cached = cache.get(cache_key)
+        if cached is not None:
+            if PROMETHEUS_AVAILABLE and record_prometheus_cache:
+                record_prometheus_cache(hit=True)
+            cached["_cached"] = True
+            cached["_cache_age_ms"] = round((time.time() - start) * 1000, 1)
+            monitor.record("/backtest/full", (time.time() - start) * 1000, 200)
+            return cached
+
         returns = _build_returns(request.symbol, None, None, request.min_trades)
 
         param_grid = {
@@ -2147,11 +2170,19 @@ async def run_full_pbo(request: FullPBOBacktestRequest):
                 "passing": mc["passing"],
             }
 
+        cache.set(cache_key, output, ttl=300)
+
+        latency_ms = (time.time() - start) * 1000
+        monitor.record("/backtest/full", latency_ms, 200)
+        if PROMETHEUS_AVAILABLE and record_prometheus_cache:
+            record_prometheus_cache(hit=False)
+
         return output
 
     except HTTPException:
         raise
     except Exception as e:
+        monitor.record("/backtest/full", (time.time() - start) * 1000, 500)
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
