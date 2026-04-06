@@ -178,24 +178,41 @@ class RedisCache:
                 self._stats["errors"] += 1
 
     def invalidate(self, pattern: str):
-        """Invalidate all keys matching pattern."""
+        """
+        Invalidate all keys matching pattern.
+        Clears both Redis AND the local LRU cache.
+        """
+        full_pattern = f"{self.config.key_prefix}{CACHE_KEY_VERSION}:{pattern}"
         if self._client:
             try:
-                keys = list(self._client.scan_iter(f"{self.config.key_prefix}{CACHE_KEY_VERSION}:{pattern}"))
+                keys = list(self._client.scan_iter(full_pattern))
                 if keys:
                     self._client.delete(*keys)
             except Exception:
                 self._stats["errors"] += 1
 
+        # Also clear from local LRU
+        import fnmatch
+        with self._local_lock:
+            self._local_cache = {
+                k: v for k, v in self._local_cache.items()
+                if not fnmatch.fnmatch(k, full_pattern)
+            }
+
     def invalidate_all(self):
-        """Invalidate ALL keys in this prefix namespace."""
+        """Invalidate ALL keys in this prefix namespace. Clears both Redis AND local LRU."""
+        full_pattern = f"{self.config.key_prefix}{CACHE_KEY_VERSION}:*"
         if self._client:
             try:
-                keys = list(self._client.scan_iter(f"{self.config.key_prefix}{CACHE_KEY_VERSION}:*"))
+                keys = list(self._client.scan_iter(full_pattern))
                 if keys:
                     self._client.delete(*keys)
             except Exception:
                 self._stats["errors"] += 1
+
+        # Also clear local LRU
+        with self._local_lock:
+            self._local_cache.clear()
 
     def acquire_stampede_lock(self, key: str) -> bool:
         """
