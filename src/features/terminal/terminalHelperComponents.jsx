@@ -14,6 +14,20 @@ import {
   CheckCircle2,     // Success indicator
 } from "lucide-react";
 
+const REACT_FORWARD_REF = typeof Symbol !== "undefined" && Symbol.for
+  ? Symbol.for("react.forward_ref")
+  : 0;
+
+function isRenderableIcon(icon) {
+  if (typeof icon === "function") return true;
+  return Boolean(
+    icon &&
+    typeof icon === "object" &&
+    icon.$$typeof === REACT_FORWARD_REF &&
+    typeof icon.render === "function"
+  );
+}
+
 const getCSSVar = (varName, fallback) => {
   if (typeof document === "undefined") return fallback;
   return getComputedStyle(document.documentElement).getPropertyValue(varName).trim() || fallback;
@@ -198,7 +212,7 @@ export function Tag({ label, color }) {
 // SHead Component - Section Header
 // `icon` prop accepts either a string (fallback) or a Lucide icon component with `size` prop
 export function SHead({ icon, title, color, sub, right }) {
-  const IconComp = typeof icon === "function" ? icon : null;
+  const IconComp = isRenderableIcon(icon) ? icon : null;
   return (
     <div style={{
       display: "flex",

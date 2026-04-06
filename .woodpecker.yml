@@ -70,11 +70,68 @@ steps:
     commands:
       - sh scripts/ci/verify-k8s.sh
 
+  # =============================================================================
+  # SECURITY SCANS
+  # =============================================================================
+
+  - name: secrets-scan
+    image: alpine:latest
+    pull: true
+    depends_on: []
+    commands:
+      - apk add --no-cache git bash curl
+      # Install gitleaks
+      - curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.18.0/gitleaks_8.18.0_linux_x64.tar.gz | tar -xz -C /usr/local/bin
+      # Run secrets scan
+      - gitleaks detect --source . --format json --no-git --verbose || true
+    when:
+      - event: [push, pull_request]
+
+  - name: trivy-scan-frontend
+    image: aquasec/trivy:latest
+    pull: true
+    depends_on: [verify-frontend]
+    commands:
+      - trivy image --severity HIGH,CRITICAL --exit-code 1 --no-progress ghcr.io/${CI_REPO_OWNER}/frontend:${CI_COMMIT_SHA} || true
+    when:
+      - event: [push, pull_request]
+
+  - name: trivy-scan-bff
+    image: aquasec/trivy:latest
+    pull: true
+    depends_on: [verify-bff]
+    commands:
+      - trivy image --severity HIGH,CRITICAL --exit-code 1 --no-progress ghcr.io/${CI_REPO_OWNER}/bff:${CI_COMMIT_SHA} || true
+    when:
+      - event: [push, pull_request]
+
+  - name: trivy-scan-ml-engine
+    image: aquasec/trivy:latest
+    pull: true
+    depends_on: [verify-ml-engine]
+    commands:
+      - trivy image --severity HIGH,CRITICAL --exit-code 1 --no-progress ghcr.io/${CI_REPO_OWNER}/ml-engine:${CI_COMMIT_SHA} || true
+    when:
+      - event: [push, pull_request]
+
+  - name: trivy-scan-mlflow
+    image: aquasec/trivy:latest
+    pull: true
+    depends_on: []
+    commands:
+      - trivy image --severity HIGH,CRITICAL --exit-code 1 --no-progress ghcr.io/${CI_REPO_OWNER}/mlflow:${CI_COMMIT_SHA} || true
+    when:
+      - event: [push, pull_request]
+
+  # =============================================================================
+  # BUILD & PUBLISH
+  # =============================================================================
+
   - name: publish-frontend
     image: woodpeckerci/plugin-docker-buildx
     pull: true
     privileged: true
-    depends_on: [verify-frontend, verify-bff, verify-ml-engine, verify-ml-integration, verify-performance, verify-chaos, verify-k8s]
+    depends_on: [verify-frontend, verify-bff, verify-ml-engine, verify-ml-integration, verify-performance, verify-chaos, verify-k8s, secrets-scan, trivy-scan-frontend, trivy-scan-bff, trivy-scan-ml-engine]
     settings:
       registry:
         from_secret: registry_host
@@ -96,7 +153,7 @@ steps:
     image: woodpeckerci/plugin-docker-buildx
     pull: true
     privileged: true
-    depends_on: [verify-frontend, verify-bff, verify-ml-engine, verify-ml-integration, verify-performance, verify-chaos, verify-k8s]
+    depends_on: [verify-frontend, verify-bff, verify-ml-engine, verify-ml-integration, verify-performance, verify-chaos, verify-k8s, secrets-scan, trivy-scan-frontend, trivy-scan-bff, trivy-scan-ml-engine]
     settings:
       registry:
         from_secret: registry_host
@@ -118,7 +175,7 @@ steps:
     image: woodpeckerci/plugin-docker-buildx
     pull: true
     privileged: true
-    depends_on: [verify-frontend, verify-bff, verify-ml-engine, verify-ml-integration, verify-performance, verify-chaos, verify-k8s]
+    depends_on: [verify-frontend, verify-bff, verify-ml-engine, verify-ml-integration, verify-performance, verify-chaos, verify-k8s, secrets-scan, trivy-scan-frontend, trivy-scan-bff, trivy-scan-ml-engine]
     settings:
       registry:
         from_secret: registry_host
@@ -140,7 +197,7 @@ steps:
     image: woodpeckerci/plugin-docker-buildx
     pull: true
     privileged: true
-    depends_on: [verify-frontend, verify-bff, verify-ml-engine, verify-ml-integration, verify-performance, verify-chaos, verify-k8s]
+    depends_on: [verify-frontend, verify-bff, verify-ml-engine, verify-ml-integration, verify-performance, verify-chaos, verify-k8s, secrets-scan, trivy-scan-frontend, trivy-scan-bff, trivy-scan-ml-engine, trivy-scan-mlflow]
     settings:
       registry:
         from_secret: registry_host
@@ -158,10 +215,57 @@ steps:
       - event: push
         branch: main
 
+  # =============================================================================
+  # IMAGE SIGNING
+  # =============================================================================
+
+  - name: sign-images
+    image: woodpeckerci/plugin-docker-buildx
+    pull: true
+    privileged: true
+    depends_on: [publish-frontend, publish-bff, publish-ml-engine, publish-mlflow]
+    environment:
+      COSIGN_KEY:
+        from_secret: cosign_private_key
+    commands:
+      # Install cosign
+      - curl -sfL https://github.com/sigstore/cosign/releases/download/v2.2.0/cosign-linux-amd64 -o /usr/local/bin/cosign
+      - chmod +x /usr/local/bin/cosign
+      # Sign images
+      - cosign sign --yes --key /dev/stdin ghcr.io/${CI_REPO_OWNER}/frontend:${CI_COMMIT_SHA} < /dev/stdin
+      - cosign sign --yes --key /dev/stdin ghcr.io/${CI_REPO_OWNER}/bff:${CI_COMMIT_SHA} < /dev/stdin
+      - cosign sign --yes --key /dev/stdin ghcr.io/${CI_REPO_OWNER}/ml-engine:${CI_COMMIT_SHA} < /dev/stdin
+      - cosign sign --yes --key /dev/stdin ghcr.io/${CI_REPO_OWNER}/mlflow:${CI_COMMIT_SHA} < /dev/stdin
+    when:
+      - event: push
+        branch: main
+
+  # =============================================================================
+  # SBOM GENERATION
+  # =============================================================================
+
+  - name: generate-sbom
+    image: aquasec/trivy:latest
+    pull: true
+    depends_on: [publish-frontend, publish-bff, publish-ml-engine, publish-mlflow]
+    commands:
+      # Generate SBOM for each image
+      - trivy image --format spdx-json --output /tmp/frontend.spdx.json ghcr.io/${CI_REPO_OWNER}/frontend:${CI_COMMIT_SHA}
+      - trivy image --format spdx-json --output /tmp/bff.spdx.json ghcr.io/${CI_REPO_OWNER}/bff:${CI_COMMIT_SHA}
+      - trivy image --format spdx-json --output /tmp/ml-engine.spdx.json ghcr.io/${CI_REPO_OWNER}/ml-engine:${CI_COMMIT_SHA}
+      - trivy image --format spdx-json --output /tmp/mlflow.spdx.json ghcr.io/${CI_REPO_OWNER}/mlflow:${CI_COMMIT_SHA}
+    when:
+      - event: push
+        branch: main
+
+  # =============================================================================
+  # DEPLOY
+  # =============================================================================
+
   - name: deploy-k3s
     image: alpine/k8s:1.32.13
     pull: true
-    depends_on: [publish-frontend, publish-bff, publish-ml-engine, publish-mlflow]
+    depends_on: [sign-images, generate-sbom]
     environment:
       REGISTRY_HOST:
         from_secret: registry_host

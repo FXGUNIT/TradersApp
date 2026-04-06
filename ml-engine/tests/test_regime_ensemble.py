@@ -162,6 +162,28 @@ sys.modules["models.regime.anomalous_diffusion"] = _anom_mock_module
 from models.regime.regime_ensemble import RegimeEnsemble
 
 
+# Restore real regime modules after all tests in this file run.
+# Use pytest_runtest_teardown (per-test) to clean up after each test,
+# but since the mocks are module-level (set at import time), we clean up
+# after the LAST test class runs using a finalizer.
+import pytest
+
+
+@pytest.fixture(scope="module", autouse=True)
+def cleanup_regime_mocks():
+    """Remove mock regime modules from sys.modules after this file's tests run."""
+    import sys
+    yield  # run tests first
+    # Remove mock entries so subsequent test files get real modules
+    for key in list(sys.modules.keys()):
+        if key.startswith("models.regime.") and key in (
+            "models.regime.hmm_regime",
+            "models.regime.fp_fk_regime",
+            "models.regime.anomalous_diffusion",
+        ):
+            del sys.modules[key]
+
+
 class TestRegimeEnsembleInit:
     """Test RegimeEnsemble initialization."""
 

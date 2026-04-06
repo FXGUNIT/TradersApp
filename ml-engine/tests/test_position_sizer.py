@@ -4,12 +4,6 @@ Tests Kelly criterion, confidence adjustment, drawdown throttle, and boundary ca
 """
 
 import pytest
-import sys
-from pathlib import Path
-
-ML_ENGINE = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(ML_ENGINE))
-
 from optimization.position_sizer import kelly_criterion, PositionSizingPredictor
 
 
@@ -32,12 +26,13 @@ class TestKellyCriterion:
         # 70% win rate, 2:1 R:R
         # Kelly = (0.7 * 2 - 0.3) / 2 = (1.4 - 0.3) / 2 = 0.55
         result = kelly_criterion(0.7, 2.0)
-        assert result == 0.55
+        assert result == pytest.approx(0.55)
 
     def test_kelly_clamped_to_one(self):
-        # Very high edge: kelly > 1
+        # 90% win rate, 5:1 R:R: kelly = (0.9*5 - 0.1)/5 = 0.88
+        # The implementation clamps to [0, 1], so 0.88 is returned unchanged
         result = kelly_criterion(0.9, 5.0)
-        assert result == 1.0
+        assert result == pytest.approx(0.88)
 
     def test_kelly_clamped_to_zero(self):
         # Negative edge

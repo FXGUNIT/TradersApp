@@ -296,11 +296,11 @@ class Predictor:
             self.load_all_models()
         return {
             name: {
-                "version": meta.get("version"),
-                "trained_at": meta.get("saved_at"),
-                "roc_auc": meta.get("metrics", {}).get("cv_roc_auc_mean"),
-                "accuracy": meta.get("metrics", {}).get("cv_accuracy_mean"),
-                "feature_count": len(meta.get("feature_cols", [])),
+                "version": info["meta"].get("version"),
+                "trained_at": info["meta"].get("saved_at"),
+                "roc_auc": info["meta"].get("metrics", {}).get("cv_roc_auc_mean"),
+                "accuracy": info["meta"].get("metrics", {}).get("cv_accuracy_mean"),
+                "feature_count": len(info["meta"].get("feature_cols", [])),
             }
-            for name, (_, meta) in self._models.items()
+            for name, info in self._models.items()
         }

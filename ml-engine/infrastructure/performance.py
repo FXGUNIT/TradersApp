@@ -30,6 +30,7 @@ from collections import defaultdict, deque
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 import functools
+import inspect
 
 # ─── Redis Cache ───────────────────────────────────────────────────────────────
 
@@ -267,9 +268,9 @@ class CircuitBreaker:
 
     @property
     def state(self) -> str:
+        """Return current circuit state. Triggers OPEN→HALF_OPEN transition if recovery timeout passed."""
         with self._lock:
             if self._state == CircuitState.OPEN:
-                # Check if recovery timeout passed
                 if self._last_failure_time and \
                    time.time() - self._last_failure_time > self.recovery_timeout:
                     self._state = CircuitState.HALF_OPEN
@@ -278,11 +279,12 @@ class CircuitBreaker:
 
     def _try_transition_to_half_open(self):
         """Idempotent OPEN→HALF_OPEN transition. Call at start of public methods."""
-        if self._state == CircuitState.OPEN:
-            if self._last_failure_time and \
-               time.time() - self._last_failure_time > self.recovery_timeout:
-                self._state = CircuitState.HALF_OPEN
-                self._half_open_calls = 0
+        with self._lock:
+            if self._state == CircuitState.OPEN:
+                if self._last_failure_time and \
+                   time.time() - self._last_failure_time > self.recovery_timeout:
+                    self._state = CircuitState.HALF_OPEN
+                    self._half_open_calls = 0
 
     def record_success(self):
         with self._lock:
@@ -293,7 +295,9 @@ class CircuitBreaker:
                     self._state = CircuitState.CLOSED
                     self._failure_count = 0
                     self._success_count = 0
-                    print(f"[CircuitBreaker:{self.name}] CLOSED → recovery successful")
+                    self._half_open_calls = 0
+                    self._last_failure_time = None  # prevent state property from re-triggering transition
+                    print(f"[CircuitBreaker:{self.name}] CLOSED -> recovery successful")
 
     def record_failure(self):
         with self._lock:
@@ -302,27 +306,21 @@ class CircuitBreaker:
             if self._state == CircuitState.HALF_OPEN:
                 self._state = CircuitState.OPEN
                 self._success_count = 0
-                print(f"[CircuitBreaker:{self.name}] HALF_OPEN → OPEN (still failing)")
+                print(f"[CircuitBreaker:{self.name}] HALF_OPEN -> OPEN (still failing)")
             elif self._failure_count >= self.failure_threshold:
                 self._state = CircuitState.OPEN
-                print(f"[CircuitBreaker:{self.name}] CLOSED → OPEN ({self._failure_count} failures)")
+                print(f"[CircuitBreaker:{self.name}] CLOSED -> OPEN ({self._failure_count} failures)")
 
     def is_available(self) -> bool:
         """Returns True if circuit allows requests. Idempotent OPEN→HALF_OPEN transition."""
+        self._try_transition_to_half_open()
         with self._lock:
-            self._try_transition_to_half_open()
-            print(f"DEBUG: _state={self._state} HALF_OPEN={CircuitState.HALF_OPEN} eq={self._state == CircuitState.HALF_OPEN}")
             if self._state == CircuitState.OPEN:
-                print("DEBUG: returning False (OPEN)")
                 return False
             if self._state == CircuitState.HALF_OPEN:
-                print(f"DEBUG: HALF_OPEN, _half_open_calls={self._half_open_calls} max={self.half_open_max_calls}")
                 if self._half_open_calls >= self.half_open_max_calls:
-                    print("DEBUG: returning False (limit reached)")
                     return False
                 self._half_open_calls += 1
-                print(f"DEBUG: incremented to {self._half_open_calls}")
-            print(f"DEBUG: returning True")
             return True
 
     @contextmanager
@@ -334,6 +332,7 @@ class CircuitBreaker:
             with cb.call(fallback={"ok": False}):
                 result = external_api_call()
         """
+        # state property triggers OPEN→HALF_OPEN if timeout passed
         if self.state == CircuitState.OPEN:
             print(f"[CircuitBreaker:{self.name}] OPEN — rejecting request")
             yield fallback
@@ -346,6 +345,23 @@ class CircuitBreaker:
             raise
         else:
             self.record_success()
+
+    def get_state(self) -> dict:
+        """Return a snapshot of the circuit breaker state."""
+        with self._lock:
+            return {
+                "name": self.name,
+                "state": self._state,
+                "failure_count": self._failure_count,
+                "success_count": self._success_count,
+                "failure_threshold": self.failure_threshold,
+                "recovery_timeout": self.recovery_timeout,
+                "half_open_max_calls": self.half_open_max_calls,
+                "half_open_calls_used": self._half_open_calls,
+            }
+
+    def __repr__(self) -> str:
+        return f"CircuitBreaker(name={self.name!r}, state={self.state!r})"
 
 
 # ─── SLA Monitor ──────────────────────────────────────────────────────────────
@@ -403,6 +419,13 @@ class SLAMonitor:
         metric = SLAMetric(endpoint, latency_ms, status_code, now)
 
         with self._lock:
+            # Lazily initialize bucket for unknown endpoints
+            if endpoint not in self._buckets:
+                self._buckets[endpoint] = {
+                    window: deque(maxlen=self.max_samples // len(self.WINDOWS))
+                    for window in self.WINDOWS
+                }
+
             for window_name, window_sec in self.WINDOWS.items():
                 cutoff = now - window_sec
                 # Prune old entries
@@ -544,29 +567,48 @@ def cached_endpoint(ttl: int = 10, key_prefix: str = ""):
 
 
 def sla_monitored(endpoint: str):
-    """Decorator to track endpoint SLA metrics."""
+    """Decorator to track endpoint SLA metrics. Works for sync and async functions."""
     def decorator(fn):
-        @functools.wraps(fn)
-        async def wrapper(*args, **kwargs):
-            monitor = get_sla_monitor()
-            start = time.time()
-            status = 200
-            try:
-                result = await fn(*args, **kwargs)
-                return result
-            except Exception as e:
-                status = 500
-                raise
-            finally:
-                latency_ms = (time.time() - start) * 1000
-                monitor.record(endpoint, latency_ms, status)
-
-                # Log SLA violations
-                target = SLAMonitor.SLA_TARGETS.get(endpoint, SLAMonitor.SLA_TARGETS["ALL"])
-                if latency_ms > target["p99_ms"]:
-                    print(f"[SLA VIOLATION] {endpoint}: {latency_ms:.0f}ms > {target['p99_ms']}ms (P99)")
-                elif latency_ms > target["p95_ms"]:
-                    print(f"[SLA WARNING] {endpoint}: {latency_ms:.0f}ms > {target['p95_ms']}ms (P95)")
-
-        return wrapper
+        if inspect.iscoroutinefunction(fn):
+            @functools.wraps(fn)
+            async def async_wrapper(*args, **kwargs):
+                monitor = get_sla_monitor()
+                start = time.time()
+                status = 200
+                try:
+                    return await fn(*args, **kwargs)
+                except Exception:
+                    status = 500
+                    raise
+                finally:
+                    latency_ms = (time.time() - start) * 1000
+                    monitor.record(endpoint, latency_ms, status)
+                    # Log SLA violations
+                    target = SLAMonitor.SLA_TARGETS.get(endpoint, SLAMonitor.SLA_TARGETS["ALL"])
+                    if latency_ms > target["p99_ms"]:
+                        print(f"[SLA VIOLATION] {endpoint}: {latency_ms:.0f}ms > {target['p99_ms']}ms (P99)")
+                    elif latency_ms > target["p95_ms"]:
+                        print(f"[SLA WARNING] {endpoint}: {latency_ms:.0f}ms > {target['p95_ms']}ms (P95)")
+            return async_wrapper
+        else:
+            @functools.wraps(fn)
+            def sync_wrapper(*args, **kwargs):
+                monitor = get_sla_monitor()
+                start = time.time()
+                status = 200
+                try:
+                    return fn(*args, **kwargs)
+                except Exception:
+                    status = 500
+                    raise
+                finally:
+                    latency_ms = (time.time() - start) * 1000
+                    monitor.record(endpoint, latency_ms, status)
+                    # Log SLA violations
+                    target = SLAMonitor.SLA_TARGETS.get(endpoint, SLAMonitor.SLA_TARGETS["ALL"])
+                    if latency_ms > target["p99_ms"]:
+                        print(f"[SLA VIOLATION] {endpoint}: {latency_ms:.0f}ms > {target['p99_ms']}ms (P99)")
+                    elif latency_ms > target["p95_ms"]:
+                        print(f"[SLA WARNING] {endpoint}: {latency_ms:.0f}ms > {target['p95_ms']}ms (P95)")
+            return sync_wrapper
     return decorator

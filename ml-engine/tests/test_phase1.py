@@ -2,16 +2,11 @@
 Phase 1 Tests — verify all foundation components work correctly.
 Run with: pytest ml-engine/tests/ -v
 """
-import os, sys, tempfile, time
-from pathlib import Path
-
+import os
+import tempfile
 import pytest
 import pandas as pd
 import numpy as np
-
-# Add ml-engine to path
-ML_ENGINE = Path(__file__).parent.parent
-sys.path.insert(0, str(ML_ENGINE))
 
 import config
 from data.candle_db import CandleDatabase

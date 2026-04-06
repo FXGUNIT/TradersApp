@@ -1,5 +1,7 @@
 # ADR-002: Redis Cache with In-Memory LRU Fallback
 
+**ADR ID:** ADR-002
+**Title:** Redis Cache with In-Memory LRU Fallback
 **Status:** Accepted
 **Date:** 2026-04-02
 **Author:** FXGUNIT
@@ -14,36 +16,93 @@ The ML Engine serves predictions via `/predict` and regime analysis via `/regime
 
 ## Decision
 
-Implement a two-tier caching strategy in `ml-engine/infrastructure/performance.py`:
+Implement a **two-tier caching strategy** in `ml-engine/infrastructure/performance.py`:
 
-1. **Tier 1: Redis** — Primary cache for production. TTL: 10s (predictions), 60s (regime).
-2. **Tier 2: In-memory LRU** — Fallback when Redis unavailable. Same TTL semantics.
+### Tier 1: Redis (Primary)
+- **Purpose:** Production cache with distributed sharing
+- **TTL:** 10s for predictions, 60s for regime
+- **Compression:** Values compressed with zlib before storage
 
-Key design decisions:
-- **Cache key:** SHA-256 hash of the last 20 candles (stable, deterministic)
-- **Compression:** Values compressed with zlib before Redis storage (reduces memory)
-- **Graceful degradation:** If Redis connection fails on startup, silently falls back to in-memory LRU
-- **No cache stampede:** Request coalescing via asyncio.Future — concurrent identical requests share one computation
+### Tier 2: In-Memory LRU (Fallback)
+- **Purpose:** Works when Redis unavailable
+- **Same TTL semantics** as Redis tier
+- **Graceful degradation:** Silently falls back on Redis connection failure
 
-Implementation:
-- `RedisCache.get_cache()` — singleton factory
-- `cache.set(key, value, ttl)` / `cache.get(key)` — dual-tier API
-- `cache.get_or_compute(key, async_fn, ttl)` — coalescing wrapper
-- Decorators: `@cached_endpoint(ttl=10, key_prefix="predict")`
+### Key Design Decisions
+
+**Cache Key Strategy:**
+```python
+# SHA-256 hash of last 20 candles (stable, deterministic)
+cache_key = hashlib.sha256(
+    json.dumps(candles[-20:], sort_keys=True).encode()
+).hexdigest()
+```
+
+**Request Coalescing:**
+```python
+# Concurrent identical requests share one computation
+async def get_or_compute(key, async_fn, ttl):
+    if key in pending_futures:
+        return await pending_futures[key]
+    future = asyncio.Future()
+    pending_futures[key] = future
+    try:
+        result = await async_fn()
+        await cache.set(key, result, ttl)
+        future.set_result(result)
+    finally:
+        del pending_futures[key]
+    return result
+```
+
+**API:**
+```python
+@cached_endpoint(ttl=10, key_prefix="predict")
+async def predict(candles, features, regime):
+    ...
+
+@cached_endpoint(ttl=60, key_prefix="regime")
+async def regime_analysis(candles):
+    ...
+```
 
 ## Consequences
 
 ### Positive
-- Sub-millisecond cache hits for repeated requests
-- No thundering herd: concurrent identical requests coalesce into one
-- Works in all environments (Redis optional)
-- SLA monitoring integrated: every request records P50/P95/P99 latency
+- **Sub-millisecond cache hits** for repeated requests
+- **No thundering herd:** Concurrent identical requests coalesce into one
+- **Works in all environments:** Redis optional
+- **SLA monitoring integrated:** Every request records P50/P95/P99 latency
 
 ### Negative
-- In-memory LRU is per-process — no cross-instance sharing
-- 10s TTL may return slightly stale predictions during fast regime transitions
-- Redis connection timeout (500ms) may still cause delays on network issues
+- **In-memory LRU is per-process:** No cross-instance sharing
+- **10s TTL may return stale predictions** during fast regime transitions
+- **Redis connection timeout (500ms)** may cause delays on network issues
 
 ### Neutral
 - BFF does NOT cache (keeps BFF stateless per CLAUDE.md rule #1)
-- Frontend caching is a separate concern handled by React Query
+- Frontend caching handled separately by React Query
+
+## Alternatives Considered
+
+### Redis-Only Caching
+- **Pros:** Simple, single implementation
+- **Cons:** Fails completely when Redis unavailable
+- **Why rejected:** Need graceful degradation for local dev and CI
+
+### LocalStorage/Cache API (Browser)
+- **Pros:** No server infrastructure needed
+- **Cons:** Security risk exposing ML predictions, no server-side control
+- **Why rejected:** Not appropriate for server-side ML predictions
+
+### Memcached
+- **Pros:** Battle-tested, simple protocol
+- **Cons:** No native Python async support, separate infrastructure
+- **Why rejected:** Redis has better async Python support and additional features
+
+## References
+
+- [Redis Documentation](https://redis.io/docs/)
+- [Redis TTL Best Practices](https://redis.io/docs/manual/keyspace-notifications/)
+- [Python asyncio caching patterns](https://docs.python.org/3/library/asyncio-queue.html)
+- Related ADRs: [ADR-015 Keycloak](ADR-015-keycloak-sso.md) (Redis for session storage)

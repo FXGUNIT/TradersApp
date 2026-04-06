@@ -1,13 +1,9 @@
 import os
-import sys
 import time
 from contextlib import contextmanager
 from types import SimpleNamespace
 
 import pandas as pd
-
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from infrastructure import model_monitor
 
@@ -81,7 +77,7 @@ class _FakeDriftMonitor:
         self.regime_drift = _FakeRegimeDrift()
         self._result = result
 
-    def check_all(self, features_df, trades_df):
+    def check_all(self, features_df=None, trades_df=None):
         return self._result
 
 
@@ -149,6 +145,8 @@ def test_build_monitoring_snapshot_recommends_retrain_and_syncs_metrics(monkeypa
     )
     monitor = _FakeDriftMonitor(drift_result)
 
+    # Clear TTL snapshot cache between tests (avoids stale cached results)
+    monkeypatch.setattr(model_monitor, "_snapshot_cache", None)
     monkeypatch.setattr(model_monitor, "engineer_features", lambda candles, trades, *_: pd.DataFrame({"feature_a": [0.1] * len(trades)}))
     monkeypatch.setattr(model_monitor, "get_sla_monitor", lambda: _FakeSLAMonitor())
     monkeypatch.setattr(model_monitor, "MLFLOW_CLIENT_AVAILABLE", True)
@@ -166,7 +164,7 @@ def test_build_monitoring_snapshot_recommends_retrain_and_syncs_metrics(monkeypa
         sync_prometheus_metrics=True,
     )
 
-    assert snapshot["retrain"]["recommended"] is True
+    assert snapshot["retrain"]["recommended"] is True, f"recommended={snapshot['retrain']['recommended']}"
     assert snapshot["sla"]["predict_p95_breached"] is False
     assert snapshot["mlflow"]["registry"]["production_model_count"] == 1
     assert captured["drift"] == drift_result

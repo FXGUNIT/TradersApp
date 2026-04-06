@@ -1,0 +1,375 @@
+# Falco Runtime Security Rules
+# Version: 1.0.0
+# Updated: 2026-04-06
+# Documentation: https://falco.org/docs/rules/
+
+# Required plugins for Falco
+required_plugins:
+  - falco_rules_loader
+
+# Load existing rules
+- macro: falco_builtin_rules
+  condition: evt.num > 0
+
+# Include additional rule files
+- required_engine_version: 17
+
+# ============================================================================
+# MACRO DEFINITIONS
+# ============================================================================
+
+# Macro: Shell binary
+- macro: shell_procs
+  condition: >
+    (proc.name in (shell_binaries))
+
+# Macro: Trusted shell image containers
+- macro: trusted_container
+  condition: >
+    (container.image.repository in (trusted_images) or
+     container.image.tag = "latest" and container.image.repository startswith "ghcr.io/tradersapp/")
+
+# Macro: Shell spawned by remote SSH
+- macro: remote_sshd
+  condition: >
+    (proc.name = sshd and evt.arg contains "sshd")
+
+# Macro: System binaries
+- macro: system_binaries
+  condition: >
+    (proc.name in (system_binaries))
+
+# Macro: Database containers
+- macro: database_container
+  condition: >
+    (container.image.repository in (postgres_images, redis_images))
+
+# Macro: ML container
+- macro: ml_container
+  condition: >
+    (container.image.repository startswith "ghcr.io/tradersapp/ml-engine" or
+     container.name contains "ml-engine")
+
+# Macro: BFF container
+- macro: bff_container
+  condition: >
+    (container.image.repository startswith "ghcr.io/tradersapp/bff" or
+     container.name contains "bff")
+
+# Macro: Kubernetes components
+- macro: k8s_deployment_api
+  condition: >
+    (k8s.deployment.name = "api" or k8s.deployment.name = "frontend")
+
+# ============================================================================
+# RULE: Detect Reverse Shell
+# ============================================================================
+
+- rule: Reverse Shell
+  desc: >
+    Detect reverse shell spawned from a container.
+    This is a critical indicator of compromise.
+  condition: >
+    evt.type = execve and
+    evt.arg contains "sh" and
+    shell_procs and
+    container and
+    not trusted_container and
+    not remote_sshd
+  output: >
+    Reverse shell detected
+    (user=%user.name container=%container.id
+     image=%container.image.repository
+     proc=%proc.name cmdline=%proc.cmdline)
+  priority: CRITICAL
+  tags: [network, shell, container]
+
+# ============================================================================
+# RULE: Detect Privilege Escalation
+# ============================================================================
+
+- rule: Terminal Shell in Container
+  desc: >
+    A shell was spawned in a container with an attached terminal.
+    This is an unusual event and could indicate unauthorized access.
+  condition: >
+    evt.type = execve and
+    proc.name = bash and
+    container and
+    (evt.arg contains "-i" or evt.arg contains "interactive")
+  output: >
+    Terminal shell spawned in container
+    (user=%user.name container=%container.id
+     image=%container.image.repository
+     proc=%proc.name cmdline=%proc.cmdline)
+  priority: WARNING
+  tags: [network, shell, container]
+
+# ============================================================================
+# RULE: Detect Privilege Escalation via su/sudo
+# ============================================================================
+
+- rule: Privilege Escalation via su/sudo
+  desc: >
+    Detect su or sudo execution in containers.
+    This could indicate privilege escalation attempt.
+  condition: >
+    evt.type = execve and
+    (proc.name = "su" or proc.name = "sudo") and
+    container
+  output: >
+    Privilege escalation attempt detected
+    (user=%user.name container=%container.id
+     image=%container.image.repository
+     proc=%proc.name cmdline=%proc.cmdline
+     user_suid=%user.uid)
+  priority: CRITICAL
+  tags: [network, container]
+
+# ============================================================================
+# RULE: Detect File Tampering
+# ============================================================================
+
+- rule: Write to Binary Directory
+  desc: >
+    Detect writes to system binary directories.
+    This could indicate malicious binary installation.
+  condition: >
+    evt.type = open_write and
+    (fd.directory in (/bin, /sbin, /usr/bin, /usr/sbin, /lib) or
+     fd.name startswith /bin/ or fd.name startswith /sbin/ or
+     fd.name startswith /usr/bin/ or fd.name startswith /usr/sbin/) and
+    container and
+    not trusted_container
+  output: >
+    Binary directory write detected
+    (user=%user.name container=%container.id
+     image=%container.image.repository
+     file=%fd.name proc=%proc.name cmdline=%proc.cmdline)
+  priority: WARNING
+  tags: [filesystem, container]
+
+# ============================================================================
+# RULE: Detect Suspicious Network Activity
+# ============================================================================
+
+- rule: Outbound Connection to External IP
+  desc: >
+    Detect outbound connections from containers to external IPs.
+    Containers should only communicate with internal services.
+  condition: >
+    outbound and
+    container and
+    not trusted_container and
+    not ml_container and
+    not bff_container and
+    fd.sip.name != ""
+
+  output: >
+    Suspicious outbound connection
+    (user=%user.name container=%container.id
+     image=%container.image.repository
+     dest_ip=%fd.rip dest_port=%fd.rport
+     proc=%proc.name cmdline=%proc.cmdline)
+  priority: WARNING
+  tags: [network, container]
+
+# ============================================================================
+# RULE: Detect Unauthorized Config Changes
+# ============================================================================
+
+- rule: Config File Modified
+  desc: >
+    Detect modification of configuration files in containers.
+  condition: >
+    evt.type = open_write and
+    (fd.name contains "/etc/passwd" or
+     fd.name contains "/etc/shadow" or
+     fd.name contains "/etc/sudoers" or
+     fd.name contains ".env") and
+    container and
+    not trusted_container
+  output: >
+    Critical config file modified
+    (user=%user.name container=%container.id
+     image=%container.image.repository
+     file=%fd.name proc=%proc.name cmdline=%proc.cmdline)
+  priority: CRITICAL
+  tags: [filesystem, container]
+
+# ============================================================================
+# RULE: Detect Cryptocurrency Mining
+# ============================================================================
+
+- rule: Cryptomining Related Activity
+  desc: >
+    Detect potential cryptocurrency mining activity.
+  condition: >
+    evt.type = execve and
+    (proc.cmdline contains "stratum" or
+     proc.cmdline contains "miner" or
+     proc.cmdline contains "crypto" or
+     proc.name contains "xmrig" or
+     proc.name contains "minerd") and
+    container
+  output: >
+    Potential cryptomining activity detected
+    (user=%user.name container=%container.id
+     image=%container.image.repository
+     proc=%proc.name cmdline=%proc.cmdline)
+  priority: CRITICAL
+  tags: [network, process, container]
+
+# ============================================================================
+# RULE: Detect Kubernetes Secret Access
+# ============================================================================
+
+- rule: Access to Kubernetes Secrets
+  desc: >
+    Detect access to Kubernetes secrets from containers.
+  condition: >
+    (evt.type = open_read or evt.type = open_write) and
+    (fd.name startswith "/var/run/secrets/kubernetes.io/serviceaccount" or
+     fd.name contains "/etc/kubernetes/" or
+     fd.name contains "/run/secrets/") and
+    container
+  output: >
+    Kubernetes secret access detected
+    (user=%user.name container=%container.id
+     image=%container.image.repository
+     file=%fd.name proc=%proc.name)
+  priority: WARNING
+  tags: [filesystem, kubernetes, container]
+
+# ============================================================================
+# RULE: Detect Process Outside Container
+# ============================================================================
+
+- rule: Program Running with Different GID
+  desc: >
+    Detect processes running with a different GID than expected.
+  condition: >
+    evt.type = execve and
+    container.state.exists and
+    container.state.gid != evt.arg.gid
+  output: >
+    Process running with unexpected GID
+    (user=%user.name container=%container.id
+     image=%container.image.repository
+     expected_gid=%container.state.gid actual_gid=%evt.arg.gid
+     proc=%proc.name)
+  priority: WARNING
+  tags: [process, container]
+
+# ============================================================================
+# RULE: Detect Execution from /tmp
+# ============================================================================
+
+- rule: Execution from /tmp or /var/tmp
+  desc: >
+    Detect execution of scripts from /tmp or /var/tmp directories.
+    These directories are often used for malicious scripts.
+  condition: >
+    evt.type = execve and
+    (proc.args contains "/tmp/" or proc.args contains "/var/tmp/") and
+    container
+  output: >
+    Execution from temporary directory
+    (user=%user.name container=%container.id
+     image=%container.image.repository
+     proc=%proc.name cmdline=%proc.cmdline)
+  priority: WARNING
+  tags: [filesystem, container]
+
+# ============================================================================
+# RULE: Sensitive Mount Detection
+# ============================================================================
+
+- rule: Sensitive Mount
+  desc: >
+    Detect containers with sensitive mounts (host filesystem, docker socket).
+  condition: >
+    container.mounts and
+    (container.mounts contains "/host" or
+     container.mounts contains "/var/run/docker.sock" or
+     container.mounts contains "/etc/passwd" or
+     container.mounts contains "/etc/shadow")
+  output: >
+    Sensitive mount detected
+    (user=%user.name container=%container.id
+     image=%container.image.repository
+     mounts=%container.mounts)
+  priority: WARNING
+  tags: [container]
+
+# ============================================================================
+# RULE: Non-Root Container Running as Root
+# ============================================================================
+
+- rule: Non-root Container Running as Root
+  desc: >
+    Container image is configured to run as non-root user but is running as root.
+  condition: >
+    container.state.exists and
+    container.image.tag != "latest" and
+    container.state.running and
+    evt.type = execve and
+    user.uid = 0 and
+    not contains(container.image.tag, "root")
+  output: >
+    Non-root container running as root
+    (user=%user.name container=%container.id
+     image=%container.image.repository)
+  priority: WARNING
+  tags: [container]
+
+# ============================================================================
+# RULE: Network Behavior Detection
+# ============================================================================
+
+- rule: Suspicious DNS Resolution
+  desc: >
+    Detect suspicious DNS queries from containers.
+    Could indicate command and control communication.
+  condition: >
+    (dns_query.response or
+     (network.dns.query and container)) and
+    container and
+    not trusted_container and
+    (dns_query.name contains "pastebin" or
+     dns_query.name contains "gist" or
+     dns_query.name contains ".tk" or
+     dns_query.name contains ".ml" or
+     dns_query.name contains ".ga")
+  output: >
+    Suspicious DNS query
+    (user=%user.name container=%container.id
+     image=%container.image.repository
+     query=%dns.query.name)
+  priority: WARNING
+  tags: [network, dns, container]
+
+# ============================================================================
+# ALERT OUTPUT
+# ============================================================================
+
+# Alert outputs
+- rule: System alert
+  desc: Any
+  condition: evt.num > 0
+  output: >
+    Priority: %priority.desc
+    Rule: %rule.name
+    Time: %evt.time
+    Container: %container.id (%container.image.repository)
+    User: %user.name
+    Command: %proc.cmdline
+  priority: emergency
+  tags: []
+
+# ============================================================================
+# TAG-BASED ALERT ROUTING
+# ============================================================================
+
+# These tags are used for routing alerts to different channels
+# in the Falco configuration

@@ -1,13 +1,8 @@
 ﻿from __future__ import annotations
 
 from pathlib import Path
-import sys
-
 import pandas as pd
 import pytest
-
-ML_ENGINE = Path(__file__).parent.parent
-sys.path.insert(0, str(ML_ENGINE))
 
 import data_quality.validation_pipeline as dq_mod
 

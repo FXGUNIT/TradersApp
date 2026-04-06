@@ -197,6 +197,24 @@
         }
       ],
       "updatedAt": "2026-03-29T02:31:54.686Z"
+    },
+    "audit-user-001": {
+      "uid": "audit-user-001",
+      "threadId": "audit-user-001",
+      "status": "open",
+      "messages": [
+        {
+          "id": "f156b8a7-7f95-489f-914f-6dcea750faa2",
+          "text": "Welcome to TradersApp Support. Your account: audit.user@example.com\n\nHow can we help you today?",
+          "sender": "admin",
+          "senderName": null,
+          "email": "audit.user@example.com",
+          "type": "welcome",
+          "timestamp": 1775463686920,
+          "read": false
+        }
+      ],
+      "updatedAt": "2026-04-06T08:21:27.020Z"
     }
   }
 }

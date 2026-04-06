@@ -10,6 +10,8 @@ import {
 import { createBffUnavailableResult, hasBff } from "../gateways/base.js";
 import { sendSecurityAlert } from "../telegramService.js";
 
+const AUDIT_MODE_KEY = "TradersApp_AuditMode";
+
 function normalizeUsers(users) {
   if (!users) {
     return {};
@@ -39,7 +41,68 @@ function normalizeResponse(result, fallback = {}) {
   };
 }
 
+function clone(value) {
+  if (value == null) {
+    return value;
+  }
+
+  return JSON.parse(JSON.stringify(value));
+}
+
+function isAuditMode() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  if (window.__TRADERS_AUDIT_DATA?.active === true) {
+    return true;
+  }
+
+  try {
+    return localStorage.getItem(AUDIT_MODE_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function getAuditData() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  return window.__TRADERS_AUDIT_DATA || null;
+}
+
+function writeAuditData(nextData) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.__TRADERS_AUDIT_DATA = {
+    ...(window.__TRADERS_AUDIT_DATA || {}),
+    ...nextData,
+    active: true,
+  };
+}
+
 export async function approveUser(uid, adminUid) {
+  if (isAuditMode()) {
+    const users = normalizeUsers(clone(getAuditData()?.users));
+    const user = {
+      ...(users[uid] || {}),
+      uid,
+      status: "ACTIVE",
+      approvedBy: adminUid,
+    };
+    writeAuditData({
+      users: {
+        ...users,
+        [uid]: user,
+      },
+    });
+    return { success: true, user };
+  }
+
   if (!hasBff()) {
     return createBffUnavailableResult("approveUser", {
       user: null,
@@ -72,6 +135,23 @@ export async function approveUser(uid, adminUid) {
 }
 
 export async function blockUser(uid, adminUid) {
+  if (isAuditMode()) {
+    const users = normalizeUsers(clone(getAuditData()?.users));
+    const user = {
+      ...(users[uid] || {}),
+      uid,
+      status: "BLOCKED",
+      blockedBy: adminUid,
+    };
+    writeAuditData({
+      users: {
+        ...users,
+        [uid]: user,
+      },
+    });
+    return { success: true, user };
+  }
+
   if (!hasBff()) {
     return createBffUnavailableResult("blockUser", {
       user: null,
@@ -94,6 +174,23 @@ export async function blockUser(uid, adminUid) {
 }
 
 export async function lockUser(uid, adminUid) {
+  if (isAuditMode()) {
+    const users = normalizeUsers(clone(getAuditData()?.users));
+    const user = {
+      ...(users[uid] || {}),
+      uid,
+      isLocked: true,
+      lockedBy: adminUid,
+    };
+    writeAuditData({
+      users: {
+        ...users,
+        [uid]: user,
+      },
+    });
+    return { success: true, user };
+  }
+
   if (!hasBff()) {
     return createBffUnavailableResult("lockUser", {
       user: null,
@@ -116,6 +213,13 @@ export async function lockUser(uid, adminUid) {
 }
 
 export async function listUsers() {
+  if (isAuditMode()) {
+    return {
+      success: true,
+      users: normalizeUsers(clone(getAuditData()?.users)),
+    };
+  }
+
   if (!hasBff()) {
     return createBffUnavailableResult("listUsers", { users: {} });
   }
@@ -135,6 +239,13 @@ export async function listUsers() {
 }
 
 export async function fetchMaintenanceState() {
+  if (isAuditMode()) {
+    return {
+      success: true,
+      maintenanceActive: Boolean(getAuditData()?.maintenanceActive),
+    };
+  }
+
   if (!hasBff()) {
     return createBffUnavailableResult("fetchMaintenanceState", {
       maintenanceActive: false,
@@ -160,6 +271,16 @@ export async function fetchMaintenanceState() {
 }
 
 export async function toggleMaintenanceState(enabled) {
+  if (isAuditMode()) {
+    writeAuditData({
+      maintenanceActive: Boolean(enabled),
+    });
+    return {
+      success: true,
+      maintenanceActive: Boolean(enabled),
+    };
+  }
+
   if (!hasBff()) {
     return createBffUnavailableResult("toggleMaintenanceState", {
       maintenanceActive: Boolean(enabled),

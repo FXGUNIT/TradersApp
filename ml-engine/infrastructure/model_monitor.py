@@ -110,11 +110,71 @@ def _registry_summary(registry: dict[str, list[dict]]) -> dict[str, Any]:
     }
 
 
+def _safe_check_all(
+    drift_monitor,
+    *,
+    features_df=None,
+    trades_df=None,
+) -> dict[str, Any]:
+    """Call drift monitor check_all with whichever calling convention it supports."""
+    check_all = getattr(drift_monitor, "check_all", None)
+    if not callable(check_all):
+        return {}
+
+    try:
+        return check_all(features_df=features_df, trades_df=trades_df)
+    except TypeError:
+        try:
+            return check_all(features_df, trades_df)
+        except TypeError:
+            return check_all(trades_df=trades_df)
+
+
+def _get_last_training_record(db, cfg: MonitoringConfig) -> dict | None:
+    """Resolve the most recent training record without assuming one DB API shape."""
+    if not db:
+        return None
+
+    prefix = (cfg.model_prefix or "").strip()
+    candidates = []
+    if prefix:
+        if prefix.endswith("_"):
+            candidates.extend([f"{prefix}ensemble", prefix.rstrip("_")])
+        else:
+            candidates.extend([prefix, f"{prefix}_ensemble"])
+    candidates.append("direction_ensemble")
+    candidates = [name for idx, name in enumerate(candidates) if name and name not in candidates[:idx]]
+
+    getter = getattr(db, "get_last_training", None)
+    if callable(getter):
+        for model_name in candidates:
+            try:
+                record = getter(model_name)
+            except TypeError:
+                try:
+                    record = getter()
+                except TypeError:
+                    record = None
+            if record:
+                return record
+
+    for attr_name in ("last_training", "_last_training"):
+        attr = getattr(db, attr_name, None)
+        if attr:
+            return attr() if callable(attr) else attr
+
+    return None
+
+
 def _count_new_trades_since_last_training(db, last_training: dict | None) -> int:
     if not db or not last_training:
         return 0
 
-    completed_at = last_training.get("completed_at")
+    completed_at = (
+        last_training.get("completed_at")
+        if isinstance(last_training, dict)
+        else getattr(last_training, "completed_at", None)
+    )
     if not completed_at:
         return 0
 
@@ -184,7 +244,7 @@ def _build_snapshot_uncached(
 ) -> dict[str, Any]:
     """Core snapshot building logic (no caching — called by build_monitoring_snapshot)."""
     symbol = cfg.symbol
-    last_training = db.get_last_training("direction_ensemble") if db else None
+    last_training = _get_last_training_record(db, cfg)
     drift_snapshot: dict[str, Any] = {
         "overall_status": "ok",
         "should_retrain": False,
@@ -194,10 +254,11 @@ def _build_snapshot_uncached(
         "reason": "Monitoring snapshot not yet computed",
     }
     trades_df = pd.DataFrame()
+    drift_result: dict = {}
 
     try:
         trades_df = db.get_trade_log(limit=cfg.trade_limit, symbol=symbol) if db else pd.DataFrame()
-        min_baseline = getattr(drift_monitor.thresholds, "min_baseline_trades", 50)
+        min_baseline = getattr(getattr(drift_monitor, "thresholds", None), "min_baseline_trades", 50)
         if len(trades_df) >= min_baseline:
             end_dt = datetime.now(timezone.utc)
             start_dt = end_dt - timedelta(days=cfg.lookback_days)
@@ -208,67 +269,74 @@ def _build_snapshot_uncached(
                 limit=cfg.candle_limit,
             )
 
+            # Check drift BEFORE feature engineering (so should_retrain is always computed)
+            drift_result = _safe_check_all(drift_monitor, features_df=None, trades_df=trades_df)
+
             # Timeout wrapper on feature engineering (60s max)
+            # Guard SIGALRM availability (Unix-only; not available on Windows)
             import signal
+            _SIGALRM_AVAILABLE = hasattr(signal, "SIGALRM")
 
             def _engineer_with_timeout():
-                def _handler(signum, frame):
-                    raise TimeoutError("Feature engineering exceeded 60s")
-                signal.signal(signal.SIGALRM, _handler)
-                signal.alarm(60)
-                try:
+                if _SIGALRM_AVAILABLE:
+                    def _handler(signum, frame):
+                        raise TimeoutError("Feature engineering exceeded 60s")
+                    signal.signal(signal.SIGALRM, _handler)
+                    signal.alarm(60)
+                    try:
+                        return engineer_features(candles_df, trades_df, None, None, None)
+                    finally:
+                        signal.alarm(0)
+                else:
                     return engineer_features(candles_df, trades_df, None, None, None)
-                finally:
-                    signal.alarm(0)
 
+            _feature_timeout = False
             try:
                 feature_df = _engineer_with_timeout()
             except TimeoutError:
+                _feature_timeout = True
                 drift_snapshot = {
                     "overall_status": "error",
-                    "should_retrain": False,
+                    **drift_result,  # preserve should_retrain from check_all()
                     "feature_drift": {"status": "error", "psi_scores": {}, "drifted_features": []},
                     "concept_drift": {"status": "error", "error": "Feature engineering timed out after 60s"},
                     "regime_drift": {"status": "error", "error": "Feature engineering timed out after 60s"},
                     "error": "Feature engineering timeout",
                 }
-                return _finalize_snapshot(
-                    db, drift_monitor, retrain_config, cfg, symbol, last_training,
-                    drift_snapshot, last_training, None, None,
-                )
 
-            if not getattr(drift_monitor.feature_drift, "_baselines", {}):
-                drift_monitor.feature_drift.update_baseline(feature_df, trades_df)
-            if getattr(drift_monitor.concept_drift, "_baseline_win_rate", None) is None:
-                drift_monitor.concept_drift.set_baseline(trades_df)
+            if not _feature_timeout:
+                if not getattr(drift_monitor.feature_drift, "_baselines", {}):
+                    drift_monitor.feature_drift.update_baseline(feature_df, trades_df)
+                if getattr(drift_monitor.concept_drift, "_baseline_win_rate", None) is None:
+                    drift_monitor.concept_drift.set_baseline(trades_df)
 
-            drift_result = drift_monitor.check_all(feature_df, trades_df)
+                drift_result = _safe_check_all(drift_monitor, features_df=feature_df, trades_df=trades_df)
 
-            # Inject raw numeric values (not just status strings)
-            concept_detector = getattr(drift_monitor, "concept_drift", None)
-            regime_detector = getattr(drift_monitor, "regime_drift", None)
-            feature_detector = getattr(drift_monitor, "feature_drift", None)
+                # Inject raw numeric values (not just status strings)
+                concept_detector = getattr(drift_monitor, "concept_drift", None)
+                regime_detector = getattr(drift_monitor, "regime_drift", None)
+                feature_detector = getattr(drift_monitor, "feature_drift", None)
 
-            concept_raw = _raw_concept_drift_values(concept_detector)
-            regime_raw = _raw_regime_drift_values(regime_detector)
+                concept_raw = _raw_concept_drift_values(concept_detector)
+                regime_raw = _raw_regime_drift_values(regime_detector)
 
-            # Merge raw values into concept and regime drift snapshots
-            if concept_detector:
-                concept_result = drift_result.get("concept_drift", {})
-                drift_result["concept_drift"] = {**concept_result, **concept_raw}
-            if regime_detector:
-                regime_result = drift_result.get("regime_drift", {})
-                drift_result["regime_drift"] = {**regime_result, **regime_raw}
+                # Merge raw values into concept and regime drift snapshots
+                if concept_detector:
+                    concept_result = drift_result.get("concept_drift", {})
+                    drift_result["concept_drift"] = {**concept_result, **concept_raw}
+                if regime_detector:
+                    regime_result = drift_result.get("regime_drift", {})
+                    drift_result["regime_drift"] = {**regime_result, **regime_raw}
 
-            drift_snapshot = drift_result
+                drift_snapshot = drift_result
 
-            # Inject raw PSI scores per feature (not just max)
-            if feature_detector:
-                feature_result = drift_snapshot.get("feature_drift", {})
-                raw_psi = getattr(feature_detector, "_current_psi_scores", {})
-                if raw_psi:
-                    feature_result = {**feature_result, "psi_scores_raw": raw_psi}
-                    drift_snapshot["feature_drift"] = feature_result
+                # Inject raw PSI scores per feature (not just max)
+                if feature_detector:
+                    feature_result = drift_snapshot.get("feature_drift", {})
+                    raw_psi = getattr(feature_detector, "_current_psi_scores", {})
+                    if raw_psi:
+                        feature_result = {**feature_result, "psi_scores_raw": raw_psi}
+                        drift_snapshot["feature_drift"] = feature_result
         else:
             drift_snapshot = {
                 **drift_snapshot,
@@ -277,7 +345,7 @@ def _build_snapshot_uncached(
     except Exception as exc:
         drift_snapshot = {
             "overall_status": "error",
-            "should_retrain": False,
+            **drift_result,  # preserve should_retrain if already computed
             "feature_drift": {"status": "error", "psi_scores": {}, "drifted_features": []},
             "concept_drift": {"status": "error", "error": str(exc)},
             "regime_drift": {"status": "error", "error": str(exc)},
@@ -286,7 +354,7 @@ def _build_snapshot_uncached(
 
     return _finalize_snapshot(
         db, drift_monitor, retrain_config, cfg, symbol, last_training,
-        drift_snapshot, last_training, None, None,
+        drift_snapshot, None, None,
     )
 
 
@@ -319,13 +387,6 @@ def _finalize_snapshot(
     if PROMETHEUS_SYNC_AVAILABLE:
         if set_drift_monitoring_snapshot:
             set_drift_monitoring_snapshot(drift_snapshot)
-        if mlflow_overview.get("available"):
-            if set_mlflow_experiment_count:
-                set_mlflow_experiment_count(int(mlflow_overview.get("experiments", 0)))
-            if set_active_runs:
-                set_active_runs(int(mlflow_overview.get("active_runs", 0)))
-        if sync_mlflow_registry and registry_snapshot:
-            sync_mlflow_registry(registry_snapshot)
 
     return {
         "symbol": symbol,
@@ -384,7 +445,7 @@ def build_monitoring_snapshot(
     symbol = symbol or cfg.symbol
 
     # Check if baseline is established
-    min_baseline = getattr(drift_monitor.thresholds, "min_baseline_trades", 50)
+    min_baseline = getattr(getattr(drift_monitor, "thresholds", None), "min_baseline_trades", 50)
     trades_df = db.get_trade_log(limit=cfg.trade_limit, symbol=symbol) if db else pd.DataFrame()
     baseline_ready = len(trades_df) >= min_baseline
 
@@ -424,6 +485,16 @@ def build_monitoring_snapshot(
         "overview": mlflow_overview,
         "registry": _registry_summary(registry_snapshot),
     }
+
+    # Sync MLflow metrics to Prometheus (after mlflow_overview is populated)
+    if sync_prometheus_metrics and PROMETHEUS_SYNC_AVAILABLE:
+        if mlflow_overview and mlflow_overview.get("available"):
+            if set_mlflow_experiment_count:
+                set_mlflow_experiment_count(int(mlflow_overview.get("experiments", 0)))
+            if set_active_runs:
+                set_active_runs(int(mlflow_overview.get("active_runs", 0)))
+        if sync_mlflow_registry and registry_snapshot:
+            sync_mlflow_registry(registry_snapshot)
 
     # Cache the result (4-min TTL)
     if cache is not None:

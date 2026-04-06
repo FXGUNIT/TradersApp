@@ -196,6 +196,68 @@ class ExitStrategyPredictor:
 
         return df
 
+    @staticmethod
+    def _normalize_tp_pcts(tp1: float, tp2: float, tp3: float) -> tuple[float, float, float]:
+        """
+        Normalize take-profit weights to exact 2dp percentages that sum to 1.0.
+        This keeps trained predictions consistent with the fallback/default split.
+        """
+        mins = np.array([0.05, 0.05, 0.05], dtype=float)
+        maxs = np.array([0.60, 0.50, 0.50], dtype=float)
+
+        weights = np.array([tp1, tp2, tp3], dtype=float)
+        weights = np.nan_to_num(weights, nan=0.0, posinf=0.0, neginf=0.0)
+        weights = np.clip(weights, mins, maxs)
+
+        if weights.sum() <= 0:
+            weights = np.array([0.25, 0.25, 0.50], dtype=float)
+        elif weights.sum() > 1.0:
+            excess = weights.sum() - 1.0
+            while excess > 1e-9:
+                reducible = weights - mins
+                idxs = np.where(reducible > 1e-12)[0]
+                if len(idxs) == 0:
+                    break
+                reduction = np.minimum(excess * (reducible[idxs] / reducible[idxs].sum()), reducible[idxs])
+                weights[idxs] -= reduction
+                excess = weights.sum() - 1.0
+                if reduction.sum() <= 1e-12:
+                    break
+        elif weights.sum() < 1.0:
+            deficit = 1.0 - weights.sum()
+            while deficit > 1e-9:
+                capacity = maxs - weights
+                idxs = np.where(capacity > 1e-12)[0]
+                if len(idxs) == 0:
+                    break
+                basis = weights[idxs]
+                shares = basis / basis.sum() if basis.sum() > 1e-12 else np.full(len(idxs), 1 / len(idxs))
+                addition = np.minimum(deficit * shares, capacity[idxs])
+                weights[idxs] += addition
+                deficit = 1.0 - weights.sum()
+                if addition.sum() <= 1e-12:
+                    break
+
+        min_hundredths = np.array([5, 5, 5], dtype=int)
+        max_hundredths = np.array([60, 50, 50], dtype=int)
+        hundredths = np.floor(weights * 100).astype(int)
+        hundredths = np.clip(hundredths, min_hundredths, max_hundredths)
+
+        remainder = int(100 - hundredths.sum())
+        if remainder > 0:
+            fractional = weights * 100 - hundredths
+            growable = [idx for idx in np.argsort(-fractional) if hundredths[idx] < max_hundredths[idx]]
+            for idx in growable[:remainder]:
+                hundredths[idx] += 1
+        elif remainder < 0:
+            fractional = weights * 100 - hundredths
+            shrinkable = [idx for idx in np.argsort(fractional) if hundredths[idx] > min_hundredths[idx]]
+            for idx in shrinkable[: abs(remainder)]:
+                hundredths[idx] -= 1
+
+        normalized = hundredths / 100.0
+        return float(normalized[0]), float(normalized[1]), float(normalized[2])
+
     def _get_feature_cols(self) -> list[str]:
         """Return the feature columns used for exit strategy prediction."""
         return [
@@ -288,16 +350,21 @@ class ExitStrategyPredictor:
             if target in self._models:
                 preds[target] = float(self._models[target].predict(X)[0])
 
+        raw_tp1 = max(0.05, min(0.60, preds.get("tp1_pct", 0.25)))
+        raw_tp2 = max(0.05, min(0.50, preds.get("tp2_pct", 0.25)))
+        raw_tp3 = max(0.05, min(0.50, 1 - preds.get("tp1_pct", 0.25) - preds.get("tp2_pct", 0.25)))
+        tp1_pct, tp2_pct, tp3_pct = self._normalize_tp_pcts(raw_tp1, raw_tp2, raw_tp3)
+
         # Post-process and clamp
         exit_plan = {
             "strategy": "ML-DETERMINED",
             "confidence": 0.8,
             "stop_loss_ticks": round(max(5, min(50, preds.get("sl_ticks", 20)))),
-            "tp1_pct": round(max(0.05, min(0.60, preds.get("tp1_pct", 0.25))) * 100) / 100,
+            "tp1_pct": tp1_pct,
             "tp1_ticks": round(max(5, min(60, preds.get("tp1_ticks", 10)))),
-            "tp2_pct": round(max(0.05, min(0.50, preds.get("tp2_pct", 0.25))) * 100) / 100,
+            "tp2_pct": tp2_pct,
             "tp2_ticks": round(max(5, min(80, preds.get("tp2_ticks", 20)))),
-            "tp3_pct": round(max(0.05, min(0.50, 1 - preds.get("tp1_pct", 0.25) - preds.get("tp2_pct", 0.25))) * 100) / 100,
+            "tp3_pct": tp3_pct,
             "trailing_distance_ticks": round(max(4, min(20, preds.get("trail_dist", 8)))),
             "trailing_activate_at_ticks": round(max(5, min(40, preds.get("trail_activate_ticks", 15)))),
             "max_hold_minutes": round(max(15, min(240, preds.get("max_hold_minutes", 90)))),

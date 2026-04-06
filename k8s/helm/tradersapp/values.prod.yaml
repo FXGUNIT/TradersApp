@@ -1,5 +1,9 @@
 # Production Helm values for TradersApp
 # Usage: helm upgrade --install tradersapp ./k8s/helm/tradersapp -f values.prod.yaml
+#
+# IMPORTANT: All secrets are managed via External Secrets Operator.
+# See k8s/base/external-secrets.yaml for secret definitions.
+# Do NOT put real credentials in this file.
 
 namespace: tradersapp
 
@@ -38,6 +42,14 @@ mlEngine:
     enabled: true
     size: 5Gi
     storageClass: standard  # Use local-path on k3s
+  # Security context - managed by OPA policies
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+  envFrom:
+    - secretRef:
+        name: ml-engine-secrets
 
 # BFF — production resources
 bff:
@@ -66,6 +78,12 @@ bff:
     mode: grpc
     grpcAddress: analysis-service:50051
     grpcStrict: false
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1001
+  envFrom:
+    - secretRef:
+        name: bff-secrets
 
 analysisService:
   enabled: true
@@ -81,6 +99,9 @@ analysisService:
     limits:
       cpu: 500m
       memory: 512Mi
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1002
 
 # Frontend — production resources
 frontend:
@@ -117,6 +138,9 @@ triton:
     - key: nvidia.com/gpu
       operator: Exists
       effect: NoSchedule
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
 
 # Redis
 redis:
@@ -134,21 +158,21 @@ redis:
     limits:
       cpu: 200m
       memory: 256Mi
+  # Redis AUTH is enabled via external secrets
+  # See ml-engine-secrets for Redis password
 
 # MLflow + MinIO
 mlflow:
   enabled: true
   replicaCount: 1
   trackingUri: http://mlflow:5000
-  # In production, credentials should come from a runtime secret
-  # created from Infisical values during deploy.
+  # Secrets are managed via External Secrets Operator
   secretRef:
-    existingSecret: mlflow-runtime-secret
+    existingSecret: mlflow-secrets
     postgresDbKey: POSTGRES_DB
     postgresUserKey: POSTGRES_USER
     postgresPasswordKey: POSTGRES_PASSWORD
-    minioUserKey: MINIO_ROOT_USER
-    minioPasswordKey: MINIO_ROOT_PASSWORD
+    # MinIO credentials managed via mlflow-secrets
   gunicornOptions: --workers 2 --timeout=300
   service:
     type: ClusterIP
@@ -164,6 +188,7 @@ mlflow:
       pullPolicy: IfNotPresent
     database: mlflow
     user: mlflow
+    # Password managed via mlflow-secrets (key: POSTGRES_PASSWORD)
     password: ""
     persistence:
       enabled: true
@@ -185,6 +210,8 @@ mlflow:
       repository: minio/mc
       tag: RELEASE.2025-08-13T08-35-41Z
       pullPolicy: IfNotPresent
+    # Credentials managed via mlflow-secrets
+    # (keys: MINIO_ROOT_USER, MINIO_ROOT_PASSWORD)
     user: ""
     password: ""
     persistence:
@@ -216,3 +243,47 @@ security:
   podDisruptionBudgets: true
   runAsNonRoot: true
   readOnlyRootFilesystem: true
+  # Secrets management
+  externalSecrets: true
+  # Runtime security
+  falco: true
+  # Vulnerability scanning
+  trivyOperator: true
+  # OPA policies
+  opaPolicies: true
+
+# Observability
+observability:
+  prometheus: true
+  grafana: true
+  loki: true
+  jaeger: true
+  # External secrets for observability
+  secretsRef:
+    grafanaAdminPassword: observability-secrets/GRAFANA_ADMIN_PASSWORD
+    alertmanagerWebhook: observability-secrets/ALERTMANAGER_WEBHOOK_URL
+    slackWebhook: observability-secrets/SLACK_WEBHOOK_URL
+
+# Keycloak
+keycloak:
+  enabled: true
+  replicaCount: 3
+  # Admin credentials managed via keycloak-admin-secret
+  secretRef:
+    adminPassword: keycloak-admin-secret/KEYCLOAK_ADMIN_PASSWORD
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+
+# Certificate management
+certificates:
+  enabled: true
+  # mTLS certificates managed via mtls-certificates
+  certSecretRef: mtls-certificates
+  caCertRef: mtls-certificates/CA_CERT
+  autoRotation: true
+  rotationPeriodDays: 90

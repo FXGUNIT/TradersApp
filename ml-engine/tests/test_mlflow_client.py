@@ -1,12 +1,4 @@
-import sys
-from pathlib import Path
-
 import pytest
-
-
-ML_ENGINE = Path(__file__).parent.parent
-sys.path.insert(0, str(ML_ENGINE))
-
 from infrastructure import mlflow_client as mlflow_mod
 
 

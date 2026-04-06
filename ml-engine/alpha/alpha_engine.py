@@ -12,6 +12,19 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import config
 
 
+def _normalized_results(trade_log_df: pd.DataFrame) -> pd.Series:
+    """Normalize result labels so metrics are insensitive to input casing/spacing."""
+    if "result" not in trade_log_df.columns:
+        return pd.Series("", index=trade_log_df.index, dtype=object)
+    return (
+        trade_log_df["result"]
+        .fillna("")
+        .astype(str)
+        .str.strip()
+        .str.lower()
+    )
+
+
 def calculate_alpha_metrics(trade_log_df: pd.DataFrame) -> dict:
     """
     Full alpha analysis from trade log.
@@ -20,8 +33,9 @@ def calculate_alpha_metrics(trade_log_df: pd.DataFrame) -> dict:
     if trade_log_df.empty:
         return _empty_alpha()
 
-    wins = trade_log_df[trade_log_df["result"] == "win"]
-    losses = trade_log_df[trade_log_df["result"] == "loss"]
+    results = _normalized_results(trade_log_df)
+    wins = trade_log_df[results == "win"]
+    losses = trade_log_df[results == "loss"]
 
     # Core alpha
     alpha_raw = trade_log_df.get("alpha_raw", pd.Series(dtype=float))
@@ -47,11 +61,12 @@ def calculate_alpha_metrics(trade_log_df: pd.DataFrame) -> dict:
         sub = trade_log_df[trade_log_df.get("session_id", pd.Series([1]*len(trade_log_df))) == sid]
         if len(sub) > 0:
             ar = sub.get("alpha_raw", pd.Series([0.0]*len(sub)))
+            sub_results = _normalized_results(sub)
             alpha_by_session[config.SESSION_CONFIG[sid]["name"]] = {
                 "alpha": round(float(ar.mean()), 2) if len(ar) > 0 else 0.0,
                 "std": round(float(ar.std()), 2) if len(ar) > 0 else 0.0,
                 "trades": len(sub),
-                "win_rate": round(float((sub["result"] == "win").mean()), 3) if "result" in sub.columns else 0.5,
+                "win_rate": round(float((sub_results == "win").mean()), 3) if "result" in sub.columns else 0.5,
             }
 
     # By time bucket (30-min buckets)
@@ -69,9 +84,10 @@ def calculate_alpha_metrics(trade_log_df: pd.DataFrame) -> dict:
             m = bucket % 60
             label = f"{h:02d}:{m:02d}-{(h*60+m+30)//60:02d}:{(h*60+m+30)%60:02d}"
             ar = grp.get("alpha_raw", pd.Series([0.0]*len(grp)))
+            grp_results = _normalized_results(grp)
             alpha_by_time[label] = {
                 "alpha": round(float(ar.mean()), 2) if len(ar) > 0 else 0.0,
-                "win_rate": round(float((grp["result"] == "win").mean()), 3) if "result" in grp.columns else 0.5,
+                "win_rate": round(float((grp_results == "win").mean()), 3) if "result" in grp.columns else 0.5,
                 "trades": len(grp),
             }
 
@@ -165,6 +181,6 @@ def compute_trade_alpha(
         "expected_move_ticks": round(float(expected_move_ticks), 4),
         "actual_move_ticks": round(float(actual_move_ticks), 4),
         "alpha_raw": round(float(alpha_raw), 4),
-        "edge_exists": alpha_raw > 0,
+        "edge_exists": bool(alpha_raw > 0),
         "edge_direction": "LONG" if direction > 0 else "SHORT",
     }

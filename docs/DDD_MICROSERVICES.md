@@ -1,64 +1,85 @@
-# DDD Microservices Architecture (gRPC First)
+# DDD Microservices Architecture
 
-This repo now supports a Domain-Driven Design boundary model with gRPC contracts for low-latency service-to-service communication.
+![Architecture overview](./assets/architecture-3d-overview.svg)
 
-## Bounded contexts
+Asset variants: [PNG export](./assets/architecture-3d-overview.png) | [Print-friendly SVG](./assets/architecture-3d-overview-print.svg)
 
-| Context | Service | Owns capability | Owns data/code |
+This repo is no longer using DDD only as a naming convention. It now has explicit bounded-context ownership, versioned gRPC contracts, and one live extracted service boundary on the critical path.
+
+The important nuance is this: the platform is in an incremental extraction phase, not a finished microservice split. That is the correct shape for the current codebase. Stable contracts are already in place, but only the analysis boundary is deployed as its own runtime today.
+
+## What is extracted today vs. what is still internal
+
+| Context | Runtime status | Owns capability | Current implementation state |
 |---|---|---|---|
-| Ingestion | `ingestion-service` | Market data ingestion + persistence | `ml-engine/data`, `ml-engine/kafka` |
-| Analysis | `analysis-service` | Real-time scoring + consensus | `ml-engine/inference`, `ml-engine/features`, `ml-engine/models`, `ml-engine/session` |
-| Learning | `learning-service` | Retraining + drift + quality gates | `ml-engine/training`, `ml-engine/feedback`, `ml-engine/data_quality` |
-| BFF Orchestration | `bff` | Frontend orchestration + anti-corruption layer | `bff/routes`, `bff/services`, `bff/domains` |
+| BFF orchestration | Separate runtime | Frontend orchestration, auth boundary, translation layer | Live and stable |
+| Analysis | Separate runtime | Low-latency consensus and scoring API | `analysis-service` is live over gRPC, but still proxies ML Engine internals |
+| Ingestion | Logical bounded context | Market data ingestion and persistence | Contracts and ownership exist; runtime remains in `ml-engine/data` and `ml-engine/kafka` |
+| Learning | Logical bounded context | Retraining, drift control, DQ gate | Contracts and ownership exist; runtime remains in `ml-engine/training`, `ml-engine/feedback`, and Airflow DAGs |
 
-Source of truth manifest: `architecture/ddd/bounded-contexts.json`
+Source-of-truth manifest: `architecture/ddd/bounded-contexts.json`
 
-## gRPC contracts
+## Why this split is defensible
 
-Contracts are versioned under `proto/ddd/v1/`:
+- The low-latency request path needed a stable seam first, so analysis was extracted before the rest.
+- Ingestion and learning are higher blast-radius domains because they touch persistence, orchestration, and long-running jobs.
+- Keeping those two contexts logically bounded before physically extracting them avoids premature service sprawl and keeps the migration reversible.
+
+## Versioned service contracts
+
+Contracts live in `proto/ddd/v1/`:
 
 - `common.proto`
-- `ingestion.proto`
 - `analysis.proto`
+- `ingestion.proto`
 - `learning.proto`
 
-These define inter-service APIs so each context can evolve independently without leaking internal models.
+These contracts are the boundary, not the internal package layout. Internal Python and Node implementations can change as long as the service contracts stay compatible.
 
-## Running service boundary
+## Live analysis boundary
 
-`analysis-service` now exists as a separate runtime process:
+`analysis-service` is the active extraction seam on the consensus path.
+
+Runtime details:
 
 - gRPC port: `50051`
 - health port: `8082`
-- implementation entrypoint: `bff/analysis-server.mjs`
+- entrypoint: `bff/analysis-server.mjs`
 
-Today it acts as the extraction seam for the analysis context:
+Current behavior:
 
-- BFF calls `analysis-service` over gRPC.
-- `analysis-service` proxies the request into the existing ML Engine `/predict` endpoint.
-- This keeps the public service contract stable while analysis logic is pulled out of the legacy HTTP monolith incrementally.
+1. The BFF sends consensus requests to `AnalysisService.GetConsensus`.
+2. `analysis-service` validates and normalizes the request contract.
+3. The service proxies the call into the existing ML Engine `/predict` path.
+4. The response comes back through the stable gRPC contract.
 
-## BFF transport behavior
+This keeps the frontend and BFF stable while analysis logic is moved out of the monolith in controlled slices.
 
-`bff/services/consensusEngine.mjs` now supports gRPC for prediction calls via `bff/services/analysisTransport.mjs`.
+## Transport and fallback policy
+
+`bff/services/consensusEngine.mjs` uses `bff/services/analysisTransport.mjs` to choose the transport.
 
 Environment variables:
 
-- `ML_ANALYSIS_TRANSPORT=http|grpc` (code default: `http`)
-- `ML_ANALYSIS_GRPC_ADDR` (default: `127.0.0.1:50051`)
-- `ML_ANALYSIS_GRPC_STRICT=true|false` (default: `false`)
+- `ML_ANALYSIS_TRANSPORT=http|grpc`
+- `ML_ANALYSIS_GRPC_ADDR`
+- `ML_ANALYSIS_GRPC_STRICT=true|false`
 
-In the repo deployment manifests, the default is now `grpc` because `analysis-service` is wired into compose and Helm.
+Current intended operating mode:
+
+- `grpc` in compose and Helm
+- `grpcStrict=false` during extraction and soak testing
 
 Behavior:
 
-- `http`: BFF calls existing ML Engine HTTP `/predict`.
-- `grpc`: BFF attempts gRPC `AnalysisService.GetConsensus`.
-- If gRPC fails and strict mode is `false`, BFF falls back to HTTP automatically.
+- `http`: BFF calls ML Engine `/predict` directly.
+- `grpc`: BFF calls `analysis-service`.
+- If gRPC fails and strict mode is `false`, the BFF falls back to HTTP.
+- When the analysis service is fully hardened, strict mode can be turned on to remove fallback.
 
-## Boundary enforcement
+## Boundary rules that matter now
 
-A CI-safe verifier is added:
+The boundary verifier is intentionally small and CI-safe:
 
 ```bash
 node scripts/architecture/verify-ddd-boundaries.mjs
@@ -66,14 +87,23 @@ node scripts/architecture/verify-ddd-boundaries.mjs
 
 It enforces:
 
-- Manifest-owned paths exist.
-- `bff/domains` cannot import from `bff/services` or `bff/routes`.
-- `bff/services` cannot import from `bff/routes`.
+- manifest-owned paths exist
+- `bff/domains` does not import from `bff/services` or `bff/routes`
+- `bff/services` does not import from `bff/routes`
 
-## Migration path (safe for beginners)
+That is not full architecture linting, but it is enough to stop the most common boundary regressions while the repo is still moving.
 
-1. Run with `ML_ANALYSIS_TRANSPORT=grpc` and `ML_ANALYSIS_GRPC_STRICT=false` first.
-2. If the gRPC service is unhealthy, BFF falls back to the legacy HTTP path automatically.
-3. Turn on `ML_ANALYSIS_GRPC_STRICT=true` only after stability tests.
-4. Replace the proxy internals of `analysis-service` with direct domain logic next.
-5. Repeat the same extraction pattern for ingestion and learning services.
+## How DDD connects to the rest of the platform
+
+- MLflow, MinIO, and PostgreSQL give the learning context a stable control plane even before the service is physically extracted.
+- Airflow DAGs already act as the operational shell around the learning context.
+- Prometheus, Grafana, Loki, and Jaeger provide cross-service visibility without coupling domain logic together.
+- Gitea and Woodpecker enforce the same boundaries in CI before Helm deploys to k3s.
+
+## Practical migration order
+
+1. Keep the BFF on gRPC with fallback enabled.
+2. Move analysis logic from the ML Engine into `analysis-service` behind the existing proto contract.
+3. Extract ingestion around Kafka and feature materialization once ownership is clean.
+4. Extract learning only after retraining and DQ orchestration are stable enough to move without breaking operational controls.
+5. Turn on strict gRPC enforcement after the analysis path has enough soak time.

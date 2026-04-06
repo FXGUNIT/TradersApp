@@ -1,2609 +1,760 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TradersApp - Complete Architecture Guide</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        :root {
-            --bg-dark: #0d1117;
-            --bg-card: #161b22;
-            --border: #30363d;
-            --text-main: #e6edf3;
-            --text-muted: #8b949e;
-            --accent-blue: #58a6ff;
-            --accent-orange: #f0883e;
-            --accent-purple: #a371f7;
-            --accent-green: #3fb950;
-            --accent-yellow: #d29922;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-            background: var(--bg-dark);
-            color: var(--text-main);
-            line-height: 1.6;
-            padding: 0;
-        }
-
-        /* Sidebar Navigation */
-        .sidebar {
-            position: fixed;
-            left: 0;
-            top: 0;
-            bottom: 0;
-            width: 260px;
-            background: var(--bg-card);
-            border-right: 1px solid var(--border);
-            padding: 24px 0;
-            overflow-y: auto;
-        }
-
-        .logo {
-            padding: 0 24px 24px;
-            font-size: 20px;
-            font-weight: 700;
-            color: var(--accent-blue);
-            margin-bottom: 32px;
-        }
-
-        .logo span {
-            display: block;
-            font-size: 12px;
-            color: var(--text-muted);
-            font-weight: 400;
-            margin-top: 4px;
-        }
-
-        .nav-section {
-            margin-bottom: 24px;
-        }
-
-        .nav-title {
-            padding: 8px 24px;
-            font-size: 11px;
-            font-weight: 600;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        .nav-item {
-            display: block;
-            padding: 12px 24px;
-            color: var(--text-muted);
-            text-decoration: none;
-            font-size: 14px;
-            transition: all 0.15s;
-            cursor: pointer;
-        }
-
-        .nav-item:hover {
-            background: rgba(110, 118, 129, 0.1);
-            color: var(--text-main);
-        }
-
-        .nav-item.active {
-            background: rgba(88, 166, 255, 0.1);
-            color: var(--accent-blue);
-            border-right: 2px solid var(--accent-blue);
-        }
-
-        /* Main Content */
-        .main {
-            margin-left: 260px;
-            padding: 40px 60px;
-            max-width: 1200px;
-        }
-
-        .page {
-            display: none;
-        }
-
-        .page.active {
-            display: block;
-        }
-
-        h1 {
-            font-size: 36px;
-            font-weight: 700;
-            margin-bottom: 12px;
-        }
-
-        .subtitle {
-            font-size: 16px;
-            color: var(--text-muted);
-            margin-bottom: 48px;
-        }
-
-        h2 {
-            font-size: 24px;
-            font-weight: 600;
-            margin: 48px 0 20px;
-            padding-bottom: 12px;
-            border-bottom: 1px solid var(--border);
-        }
-
-        h3 {
-            font-size: 18px;
-            font-weight: 600;
-            margin: 24px 0 12px;
-        }
-
-        p {
-            color: var(--text-muted);
-            margin-bottom: 16px;
-        }
-
-        /* Cards */
-        .card {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 24px;
-            margin-bottom: 16px;
-        }
-
-        .card-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-            gap: 16px;
-        }
-
-        .card h4 {
-            font-size: 16px;
-            font-weight: 600;
-            margin-bottom: 8px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .card p {
-            font-size: 14px;
-            margin: 0;
-        }
-
-        .tag {
-            display: inline-block;
-            background: rgba(110, 118, 129, 0.2);
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: 11px;
-            margin-right: 4px;
-            margin-bottom: 4px;
-        }
-
-        /* Architecture Diagram */
-        .arch-diagram {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 12px;
-            flex-wrap: wrap;
-            padding: 40px 20px;
-            background: var(--bg-card);
-            border-radius: 16px;
-            margin: 24px 0;
-        }
-
-        .arch-box {
-            background: var(--bg-dark);
-            border: 2px solid var(--border);
-            border-radius: 12px;
-            padding: 20px 24px;
-            text-align: center;
-            min-width: 160px;
-        }
-
-        .arch-box.blue { border-color: var(--accent-blue); }
-        .arch-box.orange { border-color: var(--accent-orange); }
-        .arch-box.purple { border-color: var(--accent-purple); }
-        .arch-box.green { border-color: var(--accent-green); }
-        .arch-box.yellow { border-color: var(--accent-yellow); }
-
-        .arch-box h5 {
-            font-size: 14px;
-            font-weight: 600;
-            margin-bottom: 4px;
-        }
-
-        .arch-box .desc {
-            font-size: 11px;
-            color: var(--text-muted);
-        }
-
-        .arch-arrow {
-            font-size: 24px;
-            color: var(--text-muted);
-        }
-
-        /* NEW MAIN CHART STYLES */
-        .main-chart {
-            background: linear-gradient(180deg, #12181f 0%, #0d1117 100%);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 32px;
-            margin: 24px 0 40px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .chart-row {
-            display: flex;
-            gap: 16px;
-            justify-content: center;
-            flex-wrap: wrap;
-        }
-
-        .chart-box {
-            background: var(--bg-card);
-            border: 2px solid var(--border);
-            border-radius: 12px;
-            padding: 16px 24px;
-            min-width: 140px;
-            text-align: center;
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-
-        .chart-box:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
-        }
-
-        .chart-box.user-box {
-            border-color: #e3b341;
-            background: linear-gradient(135deg, #1a1810, #161b22);
-        }
-
-        .chart-box.frontend-box {
-            border-color: #58a6ff;
-            background: linear-gradient(135deg, #102030, #161b22);
-            min-width: 280px;
-        }
-
-        .chart-box.bff-box {
-            border-color: #f0883e;
-            background: linear-gradient(135deg, #2a1810, #161b22);
-            min-width: 260px;
-        }
-
-        .chart-box.ml-box {
-            border-color: #a371f7;
-            background: linear-gradient(135deg, #2a1020, #161b22);
-            min-width: 260px;
-        }
-
-        .chart-box.external-box {
-            border-color: #3fb950;
-            background: linear-gradient(135deg, #102a15, #161b22);
-            min-width: 100px;
-        }
-
-        .box-icon {
-            font-size: 28px;
-            margin-bottom: 8px;
-        }
-
-        .box-title {
-            font-size: 14px;
-            font-weight: 700;
-            margin-bottom: 4px;
-        }
-
-        .box-sub {
-            font-size: 11px;
-            color: var(--text-muted);
-            margin-top: 4px;
-        }
-
-        .box-files {
-            font-size: 10px;
-            color: #6e7681;
-            font-family: monospace;
-            margin-top: 8px;
-            padding-top: 8px;
-            border-top: 1px solid var(--border);
-        }
-
-        .chart-arrow-down {
-            font-size: 14px;
-            color: #484f58;
-            padding: 4px 0;
-        }
-
-        /* COMPLETE DATA FLOW CHART */
-        .flow-chart {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 24px;
-            margin: 20px 0;
-        }
-
-        .flow-level {
-            margin-bottom: 8px;
-        }
-
-        .level-label {
-            font-size: 11px;
-            font-weight: 600;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 12px;
-        }
-
-        .flow-box-group {
-            display: flex;
-            gap: 12px;
-            justify-content: center;
-            flex-wrap: wrap;
-        }
-
-        .flow-box {
-            background: var(--bg-dark);
-            border: 2px solid var(--border);
-            border-radius: 10px;
-            padding: 14px 18px;
-            min-width: 160px;
-            text-align: center;
-        }
-
-        .flow-box.blue { border-color: #58a6ff; background: linear-gradient(135deg, #102030, #161b22); }
-        .flow-box.orange { border-color: #f0883e; background: linear-gradient(135deg, #2a1810, #161b22); }
-        .flow-box.purple { border-color: #a371f7; background: linear-gradient(135deg, #2a1020, #161b22); }
-        .flow-box.green { border-color: #3fb950; background: linear-gradient(135deg, #102a15, #161b22); }
-
-        .flow-icon {
-            font-size: 22px;
-            display: block;
-            margin-bottom: 6px;
-        }
-
-        .flow-name {
-            font-size: 13px;
-            font-weight: 600;
-            margin-bottom: 4px;
-        }
-
-        .flow-detail {
-            font-size: 10px;
-            color: var(--text-muted);
-        }
-
-        .flow-connector {
-            text-align: center;
-            padding: 8px 0;
-            font-size: 11px;
-            color: var(--text-muted);
-            font-family: monospace;
-        }
-
-        /* SIDE CONNECTIONS */
-        .side-flow {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 20px;
-        }
-
-        .side-row {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 16px;
-            padding: 10px 0;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .side-row:last-child {
-            border-bottom: none;
-        }
-
-        .side-box {
-            background: var(--bg-dark);
-            border: 1px solid var(--border);
-            padding: 8px 14px;
-            border-radius: 6px;
-            font-size: 12px;
-            min-width: 100px;
-            text-align: center;
-        }
-
-        /* SYSTEM CHART STYLES */
-        .system-chart {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 24px;
-            margin: 20px 0;
-        }
-
-        .system-layer {
-            margin-bottom: 20px;
-            padding: 16px;
-            border-radius: 12px;
-        }
-
-        .system-layer.frontend-layer {
-            background: linear-gradient(135deg, #102030, #161b22);
-            border: 1px solid #58a6ff;
-        }
-
-        .system-layer.bff-layer {
-            background: linear-gradient(135deg, #2a1810, #161b22);
-            border: 1px solid #f0883e;
-        }
-
-        .system-layer.ml-layer {
-            background: linear-gradient(135deg, #2a1020, #161b22);
-            border: 1px solid #a371f7;
-        }
-
-        .system-layer.external-layer {
-            background: linear-gradient(135deg, #102a15, #161b22);
-            border: 1px solid #3fb950;
-        }
-
-        .layer-header {
-            font-size: 14px;
-            font-weight: 700;
-            margin-bottom: 16px;
-            text-align: center;
-        }
-
-        .frontend-layer .layer-header { color: #58a6ff; }
-        .bff-layer .layer-header { color: #f0883e; }
-        .ml-layer .layer-header { color: #a371f7; }
-        .external-layer .layer-header { color: #3fb950; }
-
-        .component-row {
-            display: flex;
-            gap: 12px;
-            justify-content: center;
-            flex-wrap: wrap;
-        }
-
-        .comp-box {
-            background: var(--bg-dark);
-            border: 2px solid var(--border);
-            border-radius: 10px;
-            padding: 12px 16px;
-            min-width: 100px;
-            text-align: center;
-            font-size: 12px;
-        }
-
-        .comp-box span {
-            font-size: 18px;
-            display: block;
-            margin-bottom: 4px;
-        }
-
-        .comp-box small {
-            display: block;
-            font-size: 10px;
-            color: var(--text-muted);
-            margin-top: 4px;
-        }
-
-        .comp-box.page-comp { border-color: #58a6ff; }
-        .comp-box.route-comp { border-color: #f0883e; }
-        .comp-box.inference-comp { border-color: #a371f7; }
-        .comp-box.ext-box { border-color: #3fb950; }
-
-        .internal-arrows {
-            text-align: center;
-            padding: 12px 0 0;
-            font-size: 11px;
-            color: var(--text-muted);
-        }
-
-        .arrow-h {
-            font-family: monospace;
-            background: rgba(255,255,255,0.05);
-            padding: 4px 12px;
-            border-radius: 4px;
-        }
-
-        /* CONNECTION MAP */
-        .connection-map {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 20px;
-            margin: 20px 0;
-        }
-
-        .conn-row {
-            display: flex;
-            align-items: center;
-            gap: 20px;
-            padding: 12px 0;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .conn-row:last-child {
-            border-bottom: none;
-        }
-
-        .conn-label {
-            width: 140px;
-            font-size: 11px;
-            font-weight: 600;
-            color: var(--text-muted);
-        }
-
-        .conn-arrow {
-            flex: 1;
-            font-size: 11px;
-            color: var(--text-muted);
-            font-family: monospace;
-            text-align: center;
-        }
-
-        .conn-box {
-            width: 280px;
-            font-size: 11px;
-            font-family: monospace;
-        }
-
-        /* FILE REFERENCE GRID */
-        .file-ref-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 16px;
-            margin: 20px 0;
-        }
-
-        .file-ref {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            padding: 16px;
-        }
-
-        .ref-title {
-            font-size: 13px;
-            font-weight: 600;
-            color: var(--accent-blue);
-            margin-bottom: 10px;
-        }
-
-        .file-ref code {
-            display: block;
-            font-size: 10px;
-            color: var(--text-muted);
-            font-family: monospace;
-            padding: 3px 0;
-        }
-
-        /* DIAGRAM STYLES */
-        .d-layer {
-            border-radius: 16px;
-            padding: 20px;
-            margin-bottom: 8px;
-        }
-
-        .d-title {
-            font-size: 14px;
-            font-weight: 700;
-            text-align: center;
-            margin-bottom: 16px;
-        }
-
-        .d-content {
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-            flex-wrap: wrap;
-        }
-
-        .d-box {
-            background: #0d1117;
-            border: 2px solid;
-            border-radius: 10px;
-            padding: 12px 16px;
-            min-width: 90px;
-            text-align: center;
-        }
-
-        .d-box span {
-            font-size: 20px;
-            display: block;
-            margin-bottom: 4px;
-        }
-
-        .d-box b {
-            font-size: 12px;
-            display: block;
-        }
-
-        .d-box small {
-            font-size: 9px;
-            color: #8b949e;
-            display: block;
-            margin-top: 2px;
-        }
-
-        .d-arrow {
-            text-align: center;
-            padding: 8px;
-            color: #484f58;
-            font-size: 12px;
-        }
-
-        .d-conn {
-            background: #161b22;
-            border: 1px solid #30363d;
-            border-radius: 10px;
-            padding: 16px;
-        }
-
-        .d-conn-row {
-            padding: 8px 0;
-            border-bottom: 1px solid #21262d;
-            font-size: 12px;
-            font-family: monospace;
-        }
-
-        .d-conn-row:last-child {
-            border-bottom: none;
-        }
-
-        .d-conn-row span {
-            color: #58a6ff;
-            margin: 0 8px;
-        }
-
-        .d-files {
-            background: #161b22;
-            border: 1px solid #30363d;
-            border-radius: 10px;
-            padding: 16px;
-            font-size: 11px;
-            font-family: monospace;
-            color: #8b949e;
-        }
-
-        .d-files code {
-            color: #58a6ff;
-        }
-
-        .d-files span {
-            color: #f0883e;
-            margin: 0 4px;
-        }
-
-        /* Table */
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 16px 0;
-        }
-
-        th, td {
-            text-align: left;
-            padding: 14px 16px;
-            border-bottom: 1px solid var(--border);
-            font-size: 14px;
-        }
-
-        th {
-            background: var(--bg-card);
-            font-weight: 600;
-            color: var(--text-muted);
-            font-size: 12px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        /* Code */
-        code {
-            background: rgba(110, 118, 129, 0.2);
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-size: 12px;
-            font-family: 'Monaco', 'Consolas', monospace;
-        }
-
-        /* Flow Steps */
-        .steps {
-            counter-reset: step;
-        }
-
-        .step {
-            display: flex;
-            gap: 16px;
-            padding: 16px 0;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .step:last-child {
-            border-bottom: none;
-        }
-
-        .step-num {
-            width: 32px;
-            height: 32px;
-            background: var(--accent-blue);
-            color: white;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 14px;
-            font-weight: 600;
-            flex-shrink: 0;
-        }
-
-        .step-content h4 {
-            font-size: 15px;
-            font-weight: 600;
-            margin-bottom: 4px;
-        }
-
-        .step-content p {
-            font-size: 13px;
-            margin: 0;
-        }
-
-        .step-content code {
-            display: block;
-            margin-top: 8px;
-        }
-
-        /* File Tree */
-        .file-tree {
-            font-family: 'Monaco', 'Consolas', monospace;
-            font-size: 13px;
-            line-height: 1.8;
-        }
-
-        .folder {
-            color: var(--accent-blue);
-        }
-
-        .file {
-            color: var(--text-main);
-        }
-
-        .indent {
-            padding-left: 24px;
-        }
-
-        .indent-2 {
-            padding-left: 48px;
-        }
-
-        .indent-3 {
-            padding-left: 72px;
-        }
-
-        /* Legend */
-        .legend {
-            display: flex;
-            gap: 24px;
-            margin-top: 24px;
-            flex-wrap: wrap;
-        }
-
-        .legend-item {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 13px;
-        }
-
-        .legend-dot {
-            width: 16px;
-            height: 16px;
-            border-radius: 4px;
-        }
-
-        /* ML Details Page */
-        #mldetail .card {
-            page-break-inside: avoid;
-            margin-bottom: 12px;
-        }
-        
-        #mldetail table {
-            margin-bottom: 16px;
-            width: 100%;
-        }
-        
-        #mldetail th, #mldetail td {
-            page-break-inside: avoid;
-            padding: 10px 12px;
-        }
-        
-        .dir-tree {
-            background: #0d1117 !important;
-            padding: 20px !important;
-            font-family: 'Monaco', 'Consolas', monospace !important;
-            font-size: 11px !important;
-            line-height: 1.5 !important;
-            white-space: pre !important;
-            overflow-x: auto !important;
-            max-height: none !important;
-        }
-        
-        .dir-tree div {
-            margin: 1px 0;
-        }
-
-        /* TREE DIAGRAM STYLES */
-        .tree-container {
-            display: flex;
-            justify-content: center;
-            padding: 40px 20px;
-            background: var(--bg-card);
-            border-radius: 16px;
-            margin: 24px 0;
-        }
-
-        .tree-node {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
-        .node-content {
-            border-radius: 12px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
-            position: relative;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
-            transition: transform 0.2s;
-        }
-
-        .node-content:hover {
-            transform: translateY(-2px);
-        }
-
-        .node-icon {
-            font-size: 24px;
-            margin-bottom: 4px;
-        }
-
-        .node-title {
-            font-size: 14px;
-            font-weight: 700;
-            color: white;
-            margin-bottom: 4px;
-        }
-
-        .node-metrics {
-            font-size: 9px;
-            color: #8b949e;
-            line-height: 1.2;
-        }
-
-        .tree-branches {
-            display: flex;
-            gap: 40px;
-            margin-top: 30px;
-            position: relative;
-        }
-
-        .tree-branch {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            position: relative;
-        }
-
-        .branch-line {
-            width: 3px;
-            height: 30px;
-            background: var(--text-muted);
-            border-radius: 2px;
-        }
-
-        .tree-subbranches {
-            display: flex;
-            gap: 20px;
-            margin-top: 25px;
-        }
-
-        .sub-branch {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
-        .sub-line {
-            width: 2px;
-            height: 20px;
-            background: var(--text-muted);
-            border-radius: 1px;
-        }
-
-        .leaf-node {
-            margin-top: 10px;
-        }
-
-        .node-content.leaf {
-            opacity: 0.9;
-        }
-
-        .node-content.leaf:hover {
-            opacity: 1;
-        }
-
-        /* TREE LEGEND */
-        .tree-legend {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 24px;
-            margin: 24px 0;
-        }
-
-        .tree-legend h3 {
-            margin-bottom: 16px;
-            color: var(--accent-blue);
-        }
-
-        .legend-items {
-            display: flex;
-            gap: 20px;
-            flex-wrap: wrap;
-            margin-bottom: 24px;
-        }
-
-        .legend-item {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 13px;
-        }
-
-        .legend-color {
-            width: 20px;
-            height: 20px;
-            border-radius: 4px;
-        }
-
-        .legend-metrics h4 {
-            margin: 16px 0 8px 0;
-            font-size: 14px;
-            color: var(--accent-green);
-        }
-
-        .legend-metrics p {
-            margin: 4px 0;
-            font-size: 12px;
-            color: var(--text-muted);
-        }
-
-        /* Quick Ref */
-        .quick-ref {
-            background: var(--bg-card);
-            border-radius: 12px;
-            padding: 24px;
-            margin: 24px 0;
-        }
-
-        .quick-ref h4 {
-            margin-bottom: 16px;
-        }
-
-        .ref-row {
-            display: flex;
-            padding: 10px 0;
-            border-bottom: 1px solid var(--border);
-            font-size: 14px;
-        }
-
-        .ref-row:last-child {
-            border-bottom: none;
-        }
-
-        .ref-from {
-            width: 180px;
-            color: var(--accent-orange);
-        }
-
-        .ref-arrow {
-            width: 40px;
-            color: var(--text-muted);
-        }
-
-        .ref-to {
-            flex: 1;
-            color: var(--accent-green);
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TradersApp Architecture Presentation</title>
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --surface: #ffffff;
+      --surface-alt: #f9fbff;
+      --border: #d6deeb;
+      --text: #0e2248;
+      --muted: #536b97;
+      --accent: #2563eb;
+      --accent-soft: #dbeafe;
+      --success: #0f9d58;
+      --warning: #d97706;
+      --shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+      --radius: 20px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      background:
+        radial-gradient(circle at top right, rgba(37, 99, 235, 0.08), transparent 28%),
+        linear-gradient(180deg, #f8fbff 0%, #eef4fb 100%);
+      color: var(--text);
+      line-height: 1.55;
+    }
+
+    .shell {
+      width: min(1360px, calc(100vw - 48px));
+      margin: 0 auto;
+      padding: 28px 0 64px;
+    }
+
+    .nav {
+      position: sticky;
+      top: 16px;
+      z-index: 20;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 20px;
+      padding: 14px 20px;
+      margin-bottom: 24px;
+      background: rgba(255, 255, 255, 0.88);
+      border: 1px solid rgba(214, 222, 235, 0.9);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(14px);
+    }
+
+    .brand {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .brand strong {
+      font-size: 20px;
+      letter-spacing: 0.01em;
+    }
+
+    .brand span {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .nav-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .nav-links a {
+      text-decoration: none;
+      color: var(--text);
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: 1.35fr 0.9fr;
+      gap: 22px;
+      margin-bottom: 24px;
+    }
+
+    .hero-card,
+    .status-card,
+    .section,
+    .diagram-card,
+    .callout-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .hero-card {
+      padding: 34px;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 12px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-weight: 700;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 16px;
+    }
+
+    h1 {
+      margin: 0 0 12px;
+      font-size: clamp(36px, 5vw, 56px);
+      line-height: 1.03;
+      letter-spacing: -0.03em;
+    }
+
+    .hero-card p {
+      margin: 0;
+      font-size: 18px;
+      color: var(--muted);
+      max-width: 62ch;
+    }
+
+    .status-card {
+      padding: 28px;
+      display: grid;
+      gap: 16px;
+      align-content: start;
+    }
+
+    .status-card h2 {
+      margin: 0;
+      font-size: 24px;
+    }
+
+    .status-grid {
+      display: grid;
+      gap: 12px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .pill.live {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    .pill.partial {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .pill.ops {
+      background: #e0e7ff;
+      color: #4338ca;
+    }
+
+    .status-item {
+      padding: 14px 16px;
+      border-radius: 16px;
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+    }
+
+    .status-item strong {
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    .section {
+      padding: 28px;
+      margin-bottom: 24px;
+      scroll-margin-top: 112px;
+    }
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: end;
+      margin-bottom: 18px;
+    }
+
+    .section h2 {
+      margin: 0;
+      font-size: 28px;
+      letter-spacing: -0.02em;
+    }
+
+    .section p.lead {
+      margin: 8px 0 0;
+      color: var(--muted);
+      max-width: 80ch;
+    }
+
+    .diagram-card {
+      padding: 20px;
+      background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+      overflow: hidden;
+    }
+
+    .diagram-card img {
+      width: 100%;
+      height: auto;
+      display: block;
+      border-radius: 14px;
+    }
+
+    .asset-links {
+      margin-top: 12px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .asset-links a,
+    .docs-list a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .cards-3,
+    .cards-2,
+    .loop-grid {
+      display: grid;
+      gap: 16px;
+    }
+
+    .cards-3 {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .cards-2 {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .loop-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .card {
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 18px;
+    }
+
+    .card h3 {
+      margin: 0 0 10px;
+      font-size: 22px;
+    }
+
+    .card p,
+    .card li,
+    td,
+    th {
+      font-size: 15px;
+    }
+
+    .card p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      overflow: hidden;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      background: var(--surface-alt);
+    }
+
+    th,
+    td {
+      text-align: left;
+      padding: 15px 16px;
+      vertical-align: top;
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      background: #edf4ff;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    .loop-card ol,
+    .docs-list,
+    .truth-list {
+      margin: 0;
+      padding-left: 20px;
+    }
+
+    .loop-card li,
+    .truth-list li,
+    .docs-list li {
+      margin-bottom: 10px;
+    }
+
+    .callout-card {
+      padding: 24px;
+      background: linear-gradient(135deg, #eff6ff 0%, #ffffff 100%);
+    }
+
+    .truth-list {
+      color: var(--muted);
+    }
+
+    .footer-note {
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    @media (max-width: 1100px) {
+      .hero,
+      .cards-3,
+      .cards-2,
+      .loop-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .section-header,
+      .nav {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .shell {
+        width: min(100vw - 24px, 1360px);
+      }
+    }
+  </style>
 </head>
 <body>
-    <!-- SIDEBAR -->
-    <nav class="sidebar">
-        <div class="logo">
-            🗺️ TradersApp
-            <span>Architecture Guide</span>
+  <div class="shell">
+    <div class="nav">
+      <div class="brand">
+        <strong>TradersApp Architecture</strong>
+        <span>Current runtime, DDD boundaries, MLOps loops, and platform controls</span>
+      </div>
+      <div class="nav-links">
+        <a href="#overview">Overview</a>
+        <a href="#system-design">System Design</a>
+        <a href="#operating-map">5W1H Map</a>
+        <a href="#bird-roadmap">Roadmap</a>
+        <a href="#runtime">Runtime Layers</a>
+        <a href="#contexts">Bounded Contexts</a>
+        <a href="#loops">Control Loops</a>
+        <a href="#deploy">Deployment</a>
+      </div>
+    </div>
+
+    <div class="hero">
+      <div class="hero-card">
+        <div class="eyebrow">Current architecture presentation</div>
+        <h1>One place to read the system as it actually exists today.</h1>
+        <p>
+          TradersApp is no longer a simple app. It is a self-hosted trading ML platform with a live low-latency request path,
+          an extracted `analysis-service` seam, automated learning and data-quality loops, full observability, and self-hosted delivery.
+        </p>
+      </div>
+      <div class="status-card">
+        <h2>Reality snapshot</h2>
+        <div class="status-grid">
+          <div class="status-item">
+            <span class="pill live">Live runtime seam</span>
+            <strong>`analysis-service` is the only extracted domain service on the critical path.</strong>
+            Everything else still stabilizes behind that seam instead of being broken into premature microservices.
+          </div>
+          <div class="status-item">
+            <span class="pill partial">Partial extraction</span>
+            <strong>Learning and ingestion are defined as bounded contexts, but most logic still runs in ML Engine + Airflow.</strong>
+            That is intentional risk control, not an architecture gap.
+          </div>
+          <div class="status-item">
+            <span class="pill ops">Ops already live</span>
+            <strong>Observability, MLflow, CI/CD, and secrets are part of the current platform.</strong>
+            The supporting systems are already self-hosted and wired into the operating model.
+          </div>
         </div>
+      </div>
+    </div>
 
-        <div class="nav-section">
-            <div class="nav-title">Getting Started</div>
-            <a class="nav-item active" onclick="show('overview')">📖 Overview</a>
-            <a class="nav-item" onclick="show('diagram')">📊 Diagram</a>
-            <a class="nav-item" onclick="show('dataflow')">🔄 How Data Flows</a>
+    <section class="section" id="overview">
+      <div class="section-header">
+        <div>
+          <h2>Architecture overview</h2>
+          <p class="lead">Read this diagram first. It shows the request path, supporting systems, and current extraction reality at a glance.</p>
         </div>
+      </div>
+      <div class="diagram-card">
+        <img src="docs/assets/architecture-3d-overview.svg" alt="TradersApp architecture overview" />
+      </div>
+      <div class="asset-links">
+        <span>Variants:</span>
+        <a href="docs/assets/architecture-3d-overview.svg">SVG</a>
+        <a href="docs/assets/architecture-3d-overview.png">PNG</a>
+        <a href="docs/assets/architecture-3d-overview-print.svg">Print SVG</a>
+      </div>
+    </section>
 
-        <div class="nav-section">
-            <div class="nav-title">The Parts</div>
-            <a class="nav-item" onclick="show('frontend')">⚛️ Frontend</a>
-            <a class="nav-item" onclick="show('consensus')">🧠 Consensus</a>
-            <a class="nav-item" onclick="show('news')">📰 News</a>
-            <a class="nav-item" onclick="show('bff')">🔷 BFF</a>
-            <a class="nav-item" onclick="show('ml')">🐍 ML</a>
-            <a class="nav-item" onclick="show('mldetail')">⚙️ ML Details</a>
-            <a class="nav-item" onclick="show('telegram')">📱 Telegram</a>
+    <section class="section" id="system-design">
+      <div class="section-header">
+        <div>
+          <h2>System design board</h2>
+          <p class="lead">This is the detailed board view in the style of a classic system-design map. It shows actors, service boundaries, stateful systems, event flow, observability, and delivery controls on one canvas.</p>
         </div>
+      </div>
+      <div class="diagram-card">
+        <img src="docs/assets/architecture-system-design-board.svg" alt="TradersApp detailed system design board" />
+      </div>
+      <div class="asset-links">
+        <span>Variants:</span>
+        <a href="docs/assets/architecture-system-design-board.svg">SVG</a>
+        <a href="docs/assets/architecture-system-design-board.png">PNG</a>
+        <a href="docs/assets/architecture-system-design-board-print.svg">Print SVG</a>
+      </div>
+    </section>
 
-        <div class="nav-section">
-            <div class="nav-title">Details</div>
-            <a class="nav-item" onclick="show('files')">📁 All Files</a>
-            <a class="nav-item" onclick="show('features')">🎯 Features</a>
-            <a class="nav-item" onclick="show('security')">🔐 Security</a>
-            <a class="nav-item" onclick="show('quick')">⚡ Quick Ref</a>
+    <section class="section" id="operating-map">
+      <div class="section-header">
+        <div>
+          <h2>Operating map</h2>
+          <p class="lead">This is the single chart for what / how / why / where / whom across request serving, learning, observability, delivery, and the extraction strategy.</p>
         </div>
-    </nav>
+      </div>
+      <div class="diagram-card">
+        <img src="docs/assets/architecture-5w1h-map.svg" alt="TradersApp 5W1H operating map" />
+      </div>
+      <div class="asset-links">
+        <span>Variants:</span>
+        <a href="docs/assets/architecture-5w1h-map.svg">SVG</a>
+        <a href="docs/assets/architecture-5w1h-map.png">PNG</a>
+        <a href="docs/assets/architecture-5w1h-map-print.svg">Print SVG</a>
+      </div>
+    </section>
 
-    <!-- MAIN CONTENT -->
-    <main class="main">
-        <!-- PAGE 1: OVERVIEW -->
-        <div id="overview" class="page active">
-            <h1>🗺️ TradersApp - Complete Connection Map</h1>
-            <p class="subtitle">Every function, feature, and how they connect - the complete picture</p>
-
-            <!-- INTERCONNECTED SYSTEM CHART -->
-            <div class="system-chart">
-                
-                <!-- === FRONTEND LAYER === -->
-                <div class="system-layer frontend-layer">
-                    <div class="layer-header">⚛️ FRONTEND (React)</div>
-                    
-                    <div class="component-row">
-                        <div class="comp-box page-comp">
-                            <span>📊</span> Pages
-                            <small>CollectiveConsciousness</small>
-                        </div>
-                        <div class="comp-box">
-                            <span>🧠</span> Features
-                            <small>consensus, terminal</small>
-                        </div>
-                        <div class="comp-box">
-                            <span>🧩</span> Components
-                            <small>BreakingNewsPanel</small>
-                        </div>
-                        <div class="comp-box">
-                            <span>🔌</span> Services
-                            <small>clients, gateways</small>
-                        </div>
-                        <div class="comp-box">
-                            <span>⚓</span> Hooks
-                            <small>useAuth, useTheme</small>
-                        </div>
-                    </div>
-                    
-                    <div class="internal-arrows">
-                        <span class="arrow-h">Pages → Features → Components → Services → Hooks</span>
-                    </div>
-                </div>
-                
-                <!-- === BFF LAYER === -->
-                <div class="system-layer bff-layer">
-                    <div class="layer-header">🔷 BFF (Node.js)</div>
-                    
-                    <div class="component-row">
-                        <div class="comp-box route-comp">
-                            <span>🛤️</span> Routes
-                            <small>consensus</small>
-                        </div>
-                        <div class="comp-box">
-                            <span>⚙️</span> Services
-                            <small>consensusEngine</small>
-                        </div>
-                        <div class="comp-box">
-                            <span>🔐</span> Security
-                            <small>security.mjs</small>
-                        </div>
-                        <div class="comp-box">
-                            <span>📰</span> News
-                            <small>breakingNews</small>
-                        </div>
-                        <div class="comp-box">
-                            <span>📊</span> Analytics
-                            <small>terminalAnalytics</small>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- === ML ENGINE LAYER === -->
-                <div class="system-layer ml-layer">
-                    <div class="layer-header">🐍 ML ENGINE (Python)</div>
-                    
-                    <div class="component-row">
-                        <div class="comp-box inference-comp">
-                            <span>🔮</span> Inference
-                            <small>predictor</small>
-                        </div>
-                        <div class="comp-box">
-                            <span>🗳️</span> Aggregator
-                            <small>consensus</small>
-                        </div>
-                        <div class="comp-box">
-                            <span>🧠</span> Models
-                            <small>direction</small>
-                        </div>
-                        <div class="comp-box">
-                            <span>📈</span> Regime
-                            <small>hmm_regime</small>
-                        </div>
-                        <div class="comp-box">
-                            <span>⏰</span> Session
-                            <small>time_prob</small>
-                        </div>
-                        <div class="comp-box">
-                            <span>📊</span> Features
-                            <small>RSI, MACD</small>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- === EXTERNAL LAYER === -->
-                <div class="system-layer external-layer">
-                    <div class="layer-header">💾 EXTERNAL SERVICES</div>
-                    
-                    <div class="component-row">
-                        <div class="comp-box ext-box">
-                            <span>🔥</span> Firebase
-                            <small>Auth, DB</small>
-                        </div>
-                        <div class="comp-box ext-box">
-                            <span>📰</span> News API
-                            <small>Market data</small>
-                        </div>
-                        <div class="comp-box ext-box">
-                            <span>📦</span> Redis
-                            <small>Cache</small>
-                        </div>
-                        <div class="comp-box ext-box">
-                            <span>🗄️</span> Database
-                            <small>Candles</small>
-                        </div>
-                        <div class="comp-box ext-box">
-                            <span>📱</span> Telegram
-                            <small>Bot API</small>
-                        </div>
-                        <div class="comp-box ext-box">
-                            <span>🔐</span> Infisical
-                            <small>Secrets</small>
-                        </div>
-                    </div>
-                </div>
-                
-            </div>
-
-            <!-- CONNECTIONS MAP -->
-            <h2 style="margin-top:30px;">📌 How Everything Connects</h2>
-            
-            <div class="connection-map">
-                
-                <div class="conn-row">
-                    <div class="conn-label">USER → FRONTEND</div>
-                    <div class="conn-arrow">───────── HTTPS ─────────</div>
-                    <div class="conn-box">Browser ←→ Telegram</div>
-                </div>
-                
-                <div class="conn-row">
-                    <div class="conn-label">FRONTEND → BFF</div>
-                    <div class="conn-arrow">────── HTTP API ──────</div>
-                    <div class="conn-box">consensusGateway → consensusRoutes</div>
-                </div>
-                
-                <div class="conn-row">
-                    <div class="conn-label">BFF → ML</div>
-                    <div class="conn-arrow">────── REST ──────</div>
-                    <div class="conn-box">consensusEngine → predictor</div>
-                </div>
-                
-                <div class="conn-row">
-                    <div class="conn-label">ML → MODELS</div>
-                    <div class="conn-arrow">─ predict() ─</div>
-                    <div class="conn-box">predictor → direction + regime + session</div>
-                </div>
-                
-                <div class="conn-row">
-                    <div class="conn-label">MODELS → RESULT</div>
-                    <div class="conn-arrow">─ aggregate() ─</div>
-                    <div class="conn-box">votes → consensus_aggregator</div>
-                </div>
-                
-            </div>
-
-            <!-- COMPLETE FILE REFERENCE -->
-            <h2 style="margin-top:30px;">📁 Key Files Reference</h2>
-            <div class="file-ref-grid">
-                <div class="file-ref">
-                    <div class="ref-title">Frontend → BFF</div>
-                    <code>src/services/gateways/consensusGateway.js</code>
-                    <code>→ bff/routes/consensusRoutes.mjs</code>
-                    <code>→ bff/services/consensusEngine.mjs</code>
-                </div>
-                <div class="file-ref">
-                    <div class="ref-title">BFF → ML Engine</div>
-                    <code>bff/services/consensusEngine.mjs</code>
-                    <code>→ ml-engine/inference/predictor.py</code>
-                    <code>→ ml-engine/inference/consensus_aggregator.py</code>
-                </div>
-                <div class="file-ref">
-                    <div class="ref-title">News Flow</div>
-                    <code>src/components/BreakingNewsPanel.jsx</code>
-                    <code>→ bff/services/breakingNewsService.mjs</code>
-                    <code>→ External News API</code>
-                </div>
-                <div class="file-ref">
-                    <div class="ref-title">Telegram</div>
-                    <code>telegram-bridge/index.js</code>
-                    <code>→ telegram-bridge/aiConversation.js</code>
-                    <code>→ Firebase Auth</code>
-                </div>
-            </div>
-
-            <h2>👥 Who Uses What?</h2>
-            <div class="card-grid">
-                <div class="card">
-                    <h4>👤 Traders</h4>
-                    <p>Use the <strong>Frontend</strong> (React app) to see trading signals, analytics, and news</p>
-                </div>
-                <div class="card">
-                    <h4>📱 Telegram Users</h4>
-                    <p>Use the <strong>Telegram Bot</strong> to get signals on their phone</p>
-                </div>
-                <div class="card">
-                    <h4>🖥️ Developers</h4>
-                    <p>Work on all 4 parts: Frontend, BFF, ML Engine, and External services</p>
-                </div>
-                <div class="card">
-                    <h4>🤖 The App Itself</h4>
-                    <p>Uses <strong>ML Engine</strong> to make trading predictions automatically</p>
-                </div>
-            </div>
-
-            <h2>🎯 What Does Each Part Do?</h2>
-            <table>
-                <tr>
-                    <th>Part</th>
-                    <th>Job</th>
-                    <th>Tech</th>
-                </tr>
-                <tr>
-                    <td>Frontend</td>
-                    <td>Shows UI, takes user input, displays data</td>
-                    <td><span class="tag">React</span><span class="tag">Vite</span></td>
-                </tr>
-                <tr>
-                    <td>BFF</td>
-                    <td>Routes requests, business logic, security</td>
-                    <td><span class="tag">Node.js</span><span class="tag">Express</span></td>
-                </tr>
-                <tr>
-                    <td>ML Engine</td>
-                    <td>Runs AI models, makes predictions</td>
-                    <td><span class="tag">Python</span><span class="tag">FastAPI</span></td>
-                </tr>
-                <tr>
-                    <td>Telegram</td>
-                    <td>Bot commands, alerts</td>
-                    <td><span class="tag">Node.js</span></td>
-                </tr>
-            </table>
+    <section class="section" id="bird-roadmap">
+      <div class="section-header">
+        <div>
+          <h2>Bird's-eye roadmap</h2>
+          <p class="lead">This is the evolution view of the same platform. Read it left to right as current reality, hardening, extraction, and long-run operating state.</p>
         </div>
+      </div>
+      <div class="diagram-card">
+        <img src="docs/assets/architecture-birdview-roadmap.svg" alt="TradersApp bird's-eye architecture roadmap" />
+      </div>
+      <div class="asset-links">
+        <span>Variants:</span>
+        <a href="docs/assets/architecture-birdview-roadmap.svg">SVG</a>
+        <a href="docs/assets/architecture-birdview-roadmap.png">PNG</a>
+        <a href="docs/assets/architecture-birdview-roadmap-print.svg">Print SVG</a>
+      </div>
+    </section>
 
-        <!-- PAGE 2: DATA FLOW -->
-        <div id="dataflow" class="page">
-            <h1>🔄 How Data Flows</h1>
-            <p class="subtitle">Step by step: from user click to trading signal</p>
-
-            <h2>📊 Trading Signal Flow</h2>
-            <div class="steps">
-                <div class="step">
-                    <div class="step-num">1</div>
-                    <div class="step-content">
-                        <h4>Trader opens app</h4>
-                        <p>User visits CollectiveConsciousness.jsx page</p>
-                        <code>src/pages/CollectiveConsciousness.jsx</code>
-                    </div>
-                </div>
-                <div class="step">
-                    <div class="step-num">2</div>
-                    <div class="step-content">
-                        <h4>App fetches candle data</h4>
-                        <p>Gets price history from database</p>
-                        <code>candles[] from ml-engine/data</code>
-                    </div>
-                </div>
-                <div class="step">
-                    <div class="step-num">3</div>
-                    <div class="step-content">
-                        <h4>Request goes to BFF</h4>
-                        <p>Frontend calls BFF API</p>
-                        <code>POST /api/consensus</code>
-                    </div>
-                </div>
-                <div class="step">
-                    <div class="step-num">4</div>
-                    <div class="step-content">
-                        <h4>BFF calls ML Engine</h4>
-                        <p>Forwards to Python ML service</p>
-                        <code>bff/services/consensusEngine.mjs</code>
-                    </div>
-                </div>
-                <div class="step">
-                    <div class="step-num">5</div>
-                    <div class="step-content">
-                        <h4>ML runs predictions</h4>
-                        <p>Direction, magnitude, regime models run</p>
-                        <code>ml-engine/inference/predictor.py</code>
-                    </div>
-                </div>
-                <div class="step">
-                    <div class="step-num">6</div>
-                    <div class="step-content">
-                        <h4>Results returned</h4>
-                        <p>Signal, confidence, RRR sent back</p>
-                        <code>{signal: "LONG", confidence: 0.78}</code>
-                    </div>
-                </div>
-            </div>
-
-            <h2>🔐 Security Flow</h2>
-            <div class="steps">
-                <div class="step">
-                    <div class="step-num">1</div>
-                    <div class="step-content">
-                        <h4>User logs in</h4>
-                        <p>Email/password via Firebase</p>
-                        <code>src/services/firebase.js</code>
-                    </div>
-                </div>
-                <div class="step">
-                    <div class="step-num">2</div>
-                    <div class="step-content">
-                        <h4>AI Router assesses</h4>
-                        <p>Decides security level needed</p>
-                        <code>src/services/ai-router.js</code>
-                    </div>
-                </div>
-                <div class="step">
-                    <div class="step-num">3</div>
-                    <div class="step-content">
-                        <h4>Rate limiting</h4>
-                        <p>Prevents abuse</p>
-                        <code>bff/services/security.mjs</code>
-                    </div>
-                </div>
-            </div>
+    <section class="section">
+      <div class="section-header">
+        <div>
+          <h2>Current system shape</h2>
+          <p class="lead">These are the runtime truths that matter when reading the rest of the platform.</p>
         </div>
-
-        <!-- PAGE 3: FRONTEND -->
-        <div id="frontend" class="page">
-            <h1>⚛️ Frontend (React)</h1>
-            <p class="subtitle">The face of the app - what users see and interact with</p>
-
-            <h2>📁 Folder Structure</h2>
-            <div class="file-tree">
-                <div class="folder">src/</div>
-                <div class="indent"><span class="folder">pages/</span> - Full page components</div>
-                <div class="indent-2">CollectiveConsciousness.jsx - Main trading page</div>
-                <div class="indent-2">RegimentHub.jsx - Analytics page</div>
-                <div class="indent-2">CleanOnboarding.jsx - New user welcome</div>
-                <div class="indent"><span class="folder">features/</span> - Feature modules</div>
-                <div class="indent-2">consensus/ - Trading signals</div>
-                <div class="indent-2">terminal/ - Trading journal</div>
-                <div class="indent-2">identity/ - Auth & sessions</div>
-                <div class="indent-2">admin-security/ - Admin dashboard</div>
-                <div class="indent-2">support/ - Help chat</div>
-                <div class="indent-2">shell/ - App navigation</div>
-                <div class="indent-2">onboarding/ - Welcome flow</div>
-                <div class="indent"><span class="folder">components/</span> - Reusable UI</div>
-                <div class="indent-2">BreakingNewsPanel.jsx</div>
-                <div class="indent-2">FloatingChatWidget.jsx</div>
-                <div class="indent-2">ThemeSwitcher.jsx</div>
-                <div class="indent-2">(24 more components...)</div>
-                <div class="indent"><span class="folder">services/</span> - API clients</div>
-                <div class="indent-2">clients/ - API calls</div>
-                <div class="indent-2">gateways/ - Data fetching</div>
-                <div class="indent"><span class="folder">hooks/</span> - Custom hooks</div>
-                <div class="folder">utils/</div>
-            </div>
-
-            <h2>🎯 Key Pages</h2>
-            <div class="card-grid">
-                <div class="card">
-                    <h4>📊 CollectiveConsciousness</h4>
-                    <p>Main trading dashboard showing signals, news countdown, model votes</p>
-                </div>
-                <div class="card">
-                    <h4>📈 RegimentHub</h4>
-                    <p>Trading journal and performance analytics</p>
-                </div>
-                <div class="card">
-                    <h4>🔐 AdminDashboard</h4>
-                    <p>Admin panel for user management and broadcasting</p>
-                </div>
-            </div>
-
-            <h2>🔧 Key Services</h2>
-            <table>
-                <tr>
-                    <th>File</th>
-                    <th>Job</th>
-                </tr>
-                <tr>
-                    <td>firebase.js</td>
-                    <td>Authentication</td>
-                </tr>
-                <tr>
-                    <td>ai-router.js</td>
-                    <td>Security routing</td>
-                </tr>
-                <tr>
-                    <td>sessionManager.js</td>
-                    <td>Session handling</td>
-                </tr>
-                <tr>
-                    <td>telegramService.js</td>
-                    <td>Telegram integration</td>
-                </tr>
-            </table>
+      </div>
+      <div class="cards-3">
+        <div class="card">
+          <h3>User flow</h3>
+          <p>User traffic enters through the React frontend, lands at the Node.js BFF, crosses the gRPC seam into `analysis-service`, and resolves through the Python ML Engine.</p>
         </div>
-
-        <!-- PAGE 2: DIAGRAM (TREE) -->
-        <div id="diagram" class="page">
-            <h1>🌳 Architecture Tree</h1>
-            <p class="subtitle">Proportional system architecture with size, speed, and use case metrics</p>
-
-            <svg id="tree-svg" width="100%" height="950" style="background: #0a0e14; border-radius: 16px; margin: 20px 0;">
-                <defs>
-                    <linearGradient id="rootGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" style="stop-color:#1a1a2e"/>
-                        <stop offset="100%" style="stop-color:#16213e"/>
-                    </linearGradient>
-                    <linearGradient id="frontendGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" style="stop-color:#0d2137"/>
-                        <stop offset="100%" style="stop-color:#102a4a"/>
-                    </linearGradient>
-                    <linearGradient id="bffGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" style="stop-color:#1a1208"/>
-                        <stop offset="100%" style="stop-color:#2a1a0a"/>
-                    </linearGradient>
-                    <linearGradient id="mlGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" style="stop-color:#1a0a1a"/>
-                        <stop offset="100%" style="stop-color:#2a1030"/>
-                    </linearGradient>
-                    <linearGradient id="mlSubGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" style="stop-color:#150a15"/>
-                        <stop offset="100%" style="stop-color:#250a25"/>
-                    </linearGradient>
-                    <linearGradient id="extGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" style="stop-color:#0a1a0d"/>
-                        <stop offset="100%" style="stop-color:#102a15"/>
-                    </linearGradient>
-                    <filter id="shadow">
-                        <feDropShadow dx="0" dy="4" stdDeviation="6" flood-opacity="0.4"/>
-                    </filter>
-                </defs>
-
-                <!-- MAIN CONNECTIONS -->
-                <g stroke="#3d4f5f" stroke-width="2" fill="none">
-                    <!-- Root to Frontend -->
-                    <path d="M 150 80 Q 150 120 100 150 Q 80 165 60 190" stroke="#58a6ff" stroke-width="2.5"/>
-                    <!-- Root to BFF -->
-                    <path d="M 150 80 Q 150 120 180 150 Q 200 165 230 190" stroke="#f0883e" stroke-width="2.5"/>
-                    <!-- Root to ML -->
-                    <path d="M 150 80 Q 150 120 350 150 Q 400 165 450 190" stroke="#a371f7" stroke-width="2.5"/>
-                    <!-- Root to External -->
-                    <path d="M 150 80 Q 150 120 650 150 Q 700 165 780 190" stroke="#3fb950" stroke-width="2.5"/>
-                    
-                    <!-- Frontend sub-branches -->
-                    <line x1="60" y1="240" x2="20" y2="300" stroke="#58a6ff" stroke-width="1.5"/>
-                    <line x1="60" y1="240" x2="60" y2="300" stroke="#58a6ff" stroke-width="1.5"/>
-                    <line x1="60" y1="240" x2="100" y2="300" stroke="#58a6ff" stroke-width="1.5"/>
-                    
-                    <!-- BFF sub-branches -->
-                    <line x1="230" y1="240" x2="190" y2="300" stroke="#f0883e" stroke-width="1.5"/>
-                    <line x1="230" y1="240" x2="270" y2="300" stroke="#f0883e" stroke-width="1.5"/>
-                    
-                    <!-- ML sub-branches - MORE DETAILED -->
-                    <line x1="450" y1="240" x2="350" y2="320" stroke="#a371f7" stroke-width="1.5"/>
-                    <line x1="450" y1="240" x2="420" y2="320" stroke="#a371f7" stroke-width="1.5"/>
-                    <line x1="450" y1="240" x2="490" y2="320" stroke="#a371f7" stroke-width="1.5"/>
-                    <line x1="450" y1="240" x2="560" y2="320" stroke="#a371f7" stroke-width="1.5"/>
-                    
-                    <!-- ML Level 2 branches -->
-                    <line x1="350" y1="370" x2="320" y2="420" stroke="#a371f7" stroke-width="1"/>
-                    <line x1="350" y1="370" x2="350" y2="420" stroke="#a371f7" stroke-width="1"/>
-                    <line x1="350" y1="370" x2="380" y2="420" stroke="#a371f7" stroke-width="1"/>
-                    
-                    <line x1="420" y1="370" x2="400" y2="420" stroke="#a371f7" stroke-width="1"/>
-                    <line x1="420" y1="370" x2="440" y2="420" stroke="#a371f7" stroke-width="1"/>
-                    
-                    <line x1="490" y1="370" x2="470" y2="420" stroke="#a371f7" stroke-width="1"/>
-                    <line x1="490" y1="370" x2="490" y2="420" stroke="#a371f7" stroke-width="1"/>
-                    <line x1="490" y1="370" x2="510" y2="420" stroke="#a371f7" stroke-width="1"/>
-                    
-                    <line x1="560" y1="370" x2="540" y2="420" stroke="#a371f7" stroke-width="1"/>
-                    <line x1="560" y1="370" x2="560" y2="420" stroke="#a371f7" stroke-width="1"/>
-                    <line x1="560" y1="370" x2="580" y2="420" stroke="#a371f7" stroke-width="1"/>
-                    
-                    <!-- External sub-branches -->
-                    <line x1="780" y1="240" x2="720" y2="300" stroke="#3fb950" stroke-width="1.5"/>
-                    <line x1="780" y1="240" x2="780" y2="300" stroke="#3fb950" stroke-width="1.5"/>
-                    <line x1="780" y1="240" x2="840" y2="300" stroke="#3fb950" stroke-width="1.5"/>
-                </g>
-
-                <!-- ROOT NODE -->
-                <g filter="url(#shadow)" transform="translate(150, 50)">
-                    <rect x="-60" y="-20" width="120" height="50" rx="8" fill="url(#rootGrad)" stroke="#0f3460" stroke-width="2"/>
-                    <text x="0" y="-2" text-anchor="middle" fill="#fff" font-size="13" font-weight="bold">🗺️ TradersApp</text>
-                    <text x="0" y="15" text-anchor="middle" fill="#8b949e" font-size="9">100% | Variable</text>
-                </g>
-
-                <!-- FRONTEND BRANCH -->
-                <g transform="translate(60, 190)">
-                    <rect x="-50" y="-20" width="100" height="45" rx="6" fill="url(#frontendGrad)" stroke="#58a6ff" stroke-width="2"/>
-                    <text x="0" y="-2" text-anchor="middle" fill="#58a6ff" font-size="11" font-weight="bold">⚛️ Frontend</text>
-                    <text x="0" y="14" text-anchor="middle" fill="#8b949e" font-size="8">35% | &lt;50ms</text>
-                </g>
-                <!-- Frontend children -->
-                <g transform="translate(20, 300)">
-                    <rect x="-35" y="-15" width="70" height="30" rx="4" fill="#0d2137" stroke="#58a6ff" stroke-width="1"/>
-                    <text x="0" y="4" text-anchor="middle" fill="#8cb4d9" font-size="9">Pages</text>
-                </g>
-                <g transform="translate(60, 300)">
-                    <rect x="-35" y="-15" width="70" height="30" rx="4" fill="#0d2137" stroke="#58a6ff" stroke-width="1"/>
-                    <text x="0" y="4" text-anchor="middle" fill="#8cb4d9" font-size="9">Components</text>
-                </g>
-                <g transform="translate(100, 300)">
-                    <rect x="-35" y="-15" width="70" height="30" rx="4" fill="#0d2137" stroke="#58a6ff" stroke-width="1"/>
-                    <text x="0" y="4" text-anchor="middle" fill="#8cb4d9" font-size="9">Services</text>
-                </g>
-
-                <!-- BFF BRANCH -->
-                <g transform="translate(230, 190)">
-                    <rect x="-45" y="-20" width="90" height="45" rx="6" fill="url(#bffGrad)" stroke="#f0883e" stroke-width="2"/>
-                    <text x="0" y="-2" text-anchor="middle" fill="#f0883e" font-size="11" font-weight="bold">🔷 BFF</text>
-                    <text x="0" y="14" text-anchor="middle" fill="#8b949e" font-size="8">20% | &lt;200ms</text>
-                </g>
-                <!-- BFF children -->
-                <g transform="translate(190, 300)">
-                    <rect x="-35" y="-15" width="70" height="30" rx="4" fill="#1a1208" stroke="#f0883e" stroke-width="1"/>
-                    <text x="0" y="4" text-anchor="middle" fill="#d9a888" font-size="9">Routes</text>
-                </g>
-                <g transform="translate(270, 300)">
-                    <rect x="-35" y="-15" width="70" height="30" rx="4" fill="#1a1208" stroke="#f0883e" stroke-width="1"/>
-                    <text x="0" y="4" text-anchor="middle" fill="#d9a888" font-size="9">Security</text>
-                </g>
-
-                <!-- ML ENGINE BRANCH -->
-                <g transform="translate(450, 190)">
-                    <rect x="-55" y="-22" width="110" height="48" rx="8" fill="url(#mlGrad)" stroke="#a371f7" stroke-width="2"/>
-                    <text x="0" y="-4" text-anchor="middle" fill="#a371f7" font-size="12" font-weight="bold">🐍 ML Engine</text>
-                    <text x="0" y="14" text-anchor="middle" fill="#8b949e" font-size="8">45% | &lt;2s | AI</text>
-                </g>
-                
-                <!-- ML CHILDREN - 4 main sub-branches -->
-                <!-- Models -->
-                <g transform="translate(350, 320)">
-                    <rect x="-40" y="-18" width="80" height="36" rx="5" fill="url(#mlSubGrad)" stroke="#a371f7" stroke-width="1.5"/>
-                    <text x="0" y="-4" text-anchor="middle" fill="#c8a8d9" font-size="10" font-weight="bold">🧠 Models</text>
-                    <text x="0" y="10" text-anchor="middle" fill="#8b949e" font-size="7">45%</text>
-                </g>
-                <!-- Inference -->
-                <g transform="translate(420, 320)">
-                    <rect x="-40" y="-18" width="80" height="36" rx="5" fill="url(#mlSubGrad)" stroke="#a371f7" stroke-width="1.5"/>
-                    <text x="0" y="-4" text-anchor="middle" fill="#c8a8d9" font-size="10" font-weight="bold">🔮 Inference</text>
-                    <text x="0" y="10" text-anchor="middle" fill="#8b949e" font-size="7">25%</text>
-                </g>
-                <!-- Features -->
-                <g transform="translate(490, 320)">
-                    <rect x="-40" y="-18" width="80" height="36" rx="5" fill="url(#mlSubGrad)" stroke="#a371f7" stroke-width="1.5"/>
-                    <text x="0" y="-4" text-anchor="middle" fill="#c8a8d9" font-size="10" font-weight="bold">📊 Features</text>
-                    <text x="0" y="10" text-anchor="middle" fill="#8b949e" font-size="7">15%</text>
-                </g>
-                <!-- Training -->
-                <g transform="translate(560, 320)">
-                    <rect x="-40" y="-18" width="80" height="36" rx="5" fill="url(#mlSubGrad)" stroke="#a371f7" stroke-width="1.5"/>
-                    <text x="0" y="-4" text-anchor="middle" fill="#c8a8d9" font-size="10" font-weight="bold">🎓 Training</text>
-                    <text x="0" y="10" text-anchor="middle" fill="#8b949e" font-size="7">15%</text>
-                </g>
-                
-                <!-- ML Level 3 - Model Types -->
-                <g transform="translate(320, 420)">
-                    <rect x="-30" y="-14" width="60" height="28" rx="4" fill="#1a0a15" stroke="#a371f7" stroke-width="1"/>
-                    <text x="0" y="4" text-anchor="middle" fill="#c8a8d9" font-size="8">Direction</text>
-                </g>
-                <g transform="translate(350, 420)">
-                    <rect x="-30" y="-14" width="60" height="28" rx="4" fill="#1a0a15" stroke="#a371f7" stroke-width="1"/>
-                    <text x="0" y="4" text-anchor="middle" fill="#c8a8d9" font-size="8">Regime</text>
-                </g>
-                <g transform="translate(380, 420)">
-                    <rect x="-30" y="-14" width="60" height="28" rx="4" fill="#1a0a15" stroke="#a371f7" stroke-width="1"/>
-                    <text x="0" y="4" text-anchor="middle" fill="#c8a8d9" font-size="8">Session</text>
-                </g>
-                
-                <!-- ML Level 3 - Inference Types -->
-                <g transform="translate(400, 420)">
-                    <rect x="-30" y="-14" width="60" height="28" rx="4" fill="#1a0a15" stroke="#a371f7" stroke-width="1"/>
-                    <text x="0" y="4" text-anchor="middle" fill="#c8a8d9" font-size="8">Predictor</text>
-                </g>
-                <g transform="translate(440, 420)">
-                    <rect x="-30" y="-14" width="60" height="28" rx="4" fill="#1a0a15" stroke="#a371f7" stroke-width="1"/>
-                    <text x="0" y="4" text-anchor="middle" fill="#c8a8d9" font-size="8">Aggregator</text>
-                </g>
-                
-                <!-- ML Level 3 - Feature Types -->
-                <g transform="translate(470, 420)">
-                    <rect x="-30" y="-14" width="60" height="28" rx="4" fill="#1a0a15" stroke="#a371f7" stroke-width="1"/>
-                    <text x="0" y="4" text-anchor="middle" fill="#c8a8d9" font-size="8">RSI/MACD</text>
-                </g>
-                <g transform="translate(510, 420)">
-                    <rect x="-30" y="-14" width="60" height="28" rx="4" fill="#1a0a15" stroke="#a371f7" stroke-width="1"/>
-                    <text x="0" y="4" text-anchor="middle" fill="#c8a8d9" font-size="8">Candle</text>
-                </g>
-                
-                <!-- ML Level 3 - Training Types -->
-                <g transform="translate(540, 420)">
-                    <rect x="-30" y="-14" width="60" height="28" rx="4" fill="#1a0a15" stroke="#a371f7" stroke-width="1"/>
-                    <text x="0" y="4" text-anchor="middle" fill="#c8a8d9" font-size="8">Trainer</text>
-                </g>
-                <g transform="translate(580, 420)">
-                    <rect x="-30" y="-14" width="60" height="28" rx="4" fill="#1a0a15" stroke="#a371f7" stroke-width="1"/>
-                    <text x="0" y="4" text-anchor="middle" fill="#c8a8d9" font-size="8">CV</text>
-                </g>
-
-                <!-- EXTERNAL BRANCH -->
-                <g transform="translate(780, 190)">
-                    <rect x="-50" y="-20" width="100" height="45" rx="6" fill="url(#extGrad)" stroke="#3fb950" stroke-width="2"/>
-                    <text x="0" y="-2" text-anchor="middle" fill="#3fb950" font-size="11" font-weight="bold">💾 External</text>
-                    <text x="0" y="14" text-anchor="middle" fill="#8b949e" font-size="8">10% | Variable</text>
-                </g>
-                <!-- External children -->
-                <g transform="translate(720, 300)">
-                    <rect x="-35" y="-15" width="70" height="30" rx="4" fill="#0a1a0d" stroke="#3fb950" stroke-width="1"/>
-                    <text x="0" y="4" text-anchor="middle" fill="#88c8a0" font-size="9">Firebase</text>
-                </g>
-                <g transform="translate(780, 300)">
-                    <rect x="-35" y="-15" width="70" height="30" rx="4" fill="#0a1a0d" stroke="#3fb950" stroke-width="1"/>
-                    <text x="0" y="4" text-anchor="middle" fill="#88c8a0" font-size="9">Redis</text>
-                </g>
-                <g transform="translate(840, 300)">
-                    <rect x="-35" y="-15" width="70" height="30" rx="4" fill="#0a1a0d" stroke="#3fb950" stroke-width="1"/>
-                    <text x="0" y="4" text-anchor="middle" fill="#88c8a0" font-size="9">News API</text>
-                </g>
-
-                <!-- DATA FLOW SECTION -->
-                <g transform="translate(450, 490)">
-                    <text x="0" y="0" text-anchor="middle" fill="#484f58" font-size="11">═══════════════ DATA FLOW ═══════════════</text>
-                </g>
-                
-                <g transform="translate(250, 540)">
-                    <rect x="-50" y="-16" width="100" height="32" rx="5" fill="#0d2137" stroke="#58a6ff" stroke-width="1.5"/>
-                    <text x="0" y="5" text-anchor="middle" fill="#58a6ff" font-size="10">1. User Input</text>
-                </g>
-                <g transform="translate(400, 540)">
-                    <rect x="-50" y="-16" width="100" height="32" rx="5" fill="#1a1208" stroke="#f0883e" stroke-width="1.5"/>
-                    <text x="0" y="5" text-anchor="middle" fill="#f0883e" font-size="10">2. BFF Route</text>
-                </g>
-                <g transform="translate(550, 540)">
-                    <rect x="-50" y="-16" width="100" height="32" rx="5" fill="#1a0a1a" stroke="#a371f7" stroke-width="1.5"/>
-                    <text x="0" y="5" text-anchor="middle" fill="#a371f7" font-size="10">3. ML Models</text>
-                </g>
-                <g transform="translate(700, 540)">
-                    <rect x="-50" y="-16" width="100" height="32" rx="5" fill="#0a1a0d" stroke="#3fb950" stroke-width="1.5"/>
-                    <text x="0" y="5" text-anchor="middle" fill="#3fb950" font-size="10">4. Signal Out</text>
-                </g>
-                
-                <!-- Flow arrows -->
-                <path d="M 300 540 L 350 540" stroke="#484f58" stroke-width="2" marker-end="url(#arrow)"/>
-                <path d="M 450 540 L 500 540" stroke="#484f58" stroke-width="2"/>
-                <path d="M 600 540 L 650 540" stroke="#484f58" stroke-width="2"/>
-            </svg>
-
-            <!-- LEGEND & METRICS -->
-            <div class="card-grid" style="margin-top: 20px;">
-                <div class="card" style="border-left: 4px solid #58a6ff;">
-                    <h4 style="color:#58a6ff">⚛️ Frontend (35%)</h4>
-                    <p>React UI | &lt;50ms</p>
-                    <p style="font-size:11px">Pages, Components, Services, Hooks</p>
-                </div>
-                <div class="card" style="border-left: 4px solid #f0883e;">
-                    <h4 style="color:#f0883e">🔷 BFF (20%)</h4>
-                    <p>API Gateway | &lt;200ms</p>
-                    <p style="font-size:11px">Routes, Security, Business Logic</p>
-                </div>
-                <div class="card" style="border-left: 4px solid #a371f7;">
-                    <h4 style="color:#a371f7">🐍 ML Engine (45%)</h4>
-                    <p>Python AI | &lt;2s</p>
-                    <p style="font-size:11px">Models → Inference → Features → Training</p>
-                </div>
-                <div class="card" style="border-left: 4px solid #3fb950;">
-                    <h4 style="color:#3fb950">💾 External (10%)</h4>
-                    <p>Data Sources | Variable</p>
-                    <p style="font-size:11px">Firebase, Redis, News API</p>
-                </div>
-            </div>
+        <div class="card">
+          <h3>Data + learning flow</h3>
+          <p>Redis and Feast back the low-latency feature path, Kafka carries event streams, MLflow owns model history, and Airflow enforces scheduled quality and retraining workflows.</p>
         </div>
-
-        <!-- PAGE 3: CONSENSUS -->
-        <div id="consensus" class="page">
-            <h1>🧠 Collective Consciousness</h1>
-            <p class="subtitle">The main trading dashboard - where traders get their signals</p>
-
-            <h2>📊 What is Collective Consciousness?</h2>
-            <div class="card">
-                <h4>🏠 The Trading Hub</h4>
-                <p>It's the MAIN page where traders see everything:<br>
-                - Trading signals (BUY/SELL/NEUTRAL)<br>
-                - Confidence level<br>
-                - Model votes from all AI models<br>
-                - News countdown<br>
-                - Regime detection<br>
-                - RRR recommendations<br>
-                - Position sizing</p>
-                <code>src/pages/CollectiveConsciousness.jsx</code>
-            </div>
-
-            <h2>🔄 How It Gets Signals</h2>
-            <div class="steps">
-                <div class="step">
-                    <div class="step-num">1</div>
-                    <div class="step-content">
-                        <h4>Page loads</h4>
-                        <p>User visits CollectiveConsciousness page</p>
-                    </div>
-                </div>
-                <div class="step">
-                    <div class="step-num">2</div>
-                    <div class="step-content">
-                        <h4>Fetch candles</h4>
-                        <p>Gets price history from database</p>
-                    </div>
-                </div>
-                <div class="step">
-                    <div class="step-num">3</div>
-                    <div class="step-content">
-                        <h4>Call BFF</h4>
-                        <p>POST ${BFF_BASE}/ml/consensus?session=1</p>
-                    </div>
-                </div>
-                <div class="step">
-                    <div class="step-num">4</div>
-                    <div class="step-content">
-                        <h4>BFF calls ML</h4>
-                        <p>Forwards to Python ML Engine</p>
-                    </div>
-                </div>
-                <div class="step">
-                    <div class="step-num">5</div>
-                    <div class="step-content">
-                        <h4>ML predicts</h4>
-                        <p>Runs direction, magnitude, regime, session models</p>
-                    </div>
-                </div>
-                <div class="step">
-                    <div class="step-num">6</div>
-                    <div class="step-content">
-                        <h4>Return signal</h4>
-                        <p>{signal: "LONG", confidence: 0.78}</p>
-                    </div>
-                </div>
-            </div>
-
-            <h2>🖥️ Panel Components</h2>
-            <table>
-                <tr>
-                    <th>Component</th>
-                    <th>Job</th>
-                </tr>
-                <tr>
-                    <td>ConsensusSignal</td>
-                    <td>Shows BUY/SELL with confidence</td>
-                </tr>
-                <tr>
-                    <td>SessionProbabilityPanel</td>
-                    <td>Trading session probability</td>
-                </tr>
-                <tr>
-                    <td>AlphaDisplay</td>
-                    <td>Alpha score visualization</td>
-                </tr>
-                <tr>
-                    <td>ExitStrategyPanel</td>
-                    <td>Exit strategy recommendations</td>
-                </tr>
-                <tr>
-                    <td>RRRRecommendation</td>
-                    <td>Risk:Reward ratio</td>
-                </tr>
-                <tr>
-                    <td>PositionSizingPanel</td>
-                    <td>Position size calculator</td>
-                </tr>
-                <tr>
-                    <td>ModelVotesPanel</td>
-                    <td>Shows each model's vote</td>
-                </tr>
-                <tr>
-                    <td>NewsCountdown</td>
-                    <td>Countdown to next news event</td>
-                </tr>
-            </table>
-
-            <h2>📡 API Call</h2>
-            <div class="card">
-                <code>POST http://localhost:8788/ml/consensus?session=1</code><br><br>
-                <strong>Request:</strong><br>
-                <code>{ symbol: "NIFTY", candles: [...], regime: "trending" }</code><br><br>
-                <strong>Response:</strong><br>
-                <code>{ signal: "LONG", confidence: 0.78, alpha: 0.65, rrr: 2.5 }</code>
-            </div>
+        <div class="card">
+          <h3>Platform flow</h3>
+          <p>Prometheus, Grafana, Loki, and Jaeger provide live visibility, while Gitea, Woodpecker, Helm, k3s, and Infisical form the self-hosted delivery and secrets path.</p>
         </div>
+      </div>
+    </section>
 
-        <!-- PAGE: NEWS & FUNDAMENTALS -->
-        <div id="news" class="page">
-            <h1>📰 News & Fundamental Bias</h1>
-            <p class="subtitle">How live news impacts trading signals</p>
-
-            <h2>📺 Live News System</h2>
-            <div class="card">
-                <h4>📡 BreakingNewsPanel.jsx</h4>
-                <p>Live news bar that shows breaking news at the top of the trading dashboard. Real-time updates every few seconds.</p>
-                <code>src/components/BreakingNewsPanel.jsx</code>
-            </div>
-
-            <h2>🔴 How News Affects Trading</h2>
-            <div class="steps">
-                <div class="step">
-                    <div class="step-num">1</div>
-                    <div class="step-content">
-                        <h4>News detected</h4>
-                        <p>Breaking news service detects high-impact news</p>
-                        <code>bff/services/breakingNewsService.mjs</code>
-                    </div>
-                </div>
-                <div class="step">
-                    <div class="step-num">2</div>
-                    <div class="step-content">
-                        <h4>Tagged & classified</h4>
-                        <p>News tagged with: source, timestamp, keywords, sentiment</p>
-                    </div>
-                </div>
-                <div class="step">
-                    <div class="step-num">3</div>
-                    <div class="step-content">
-                        <h4>Sent to ML Engine</h4>
-                        <p>Sent to ALL models for fundamental bias</p>
-                    </div>
-                </div>
-                <div class="step">
-                    <div class="step-num">4</div>
-                    <div class="step-content">
-                        <h4>Models re-predict</h4>
-                        <p>Each model combines technical + fundamental bias</p>
-                    </div>
-                </div>
-                <div class="step">
-                    <div class="step-num">5</div>
-                    <div class="step-content">
-                        <h4>Adjusted signal</h4>
-                        <p>Final signal reflects news impact</p>
-                    </div>
-                </div>
-            </div>
-
-            <h2>🧠 Fundamental Bias (NEWS)</h2>
-            <div class="card">
-                <h4>Each ML Model Has TWO Biases:</h4>
-                <p>
-                <strong>1. Technical Bias</strong> - Based on price charts, indicators (RSI, MACD, etc)<br>
-                <strong>2. Fundamental Bias</strong> - Based on news, events, market sentiment
-                </p>
-            </div>
-
-            <h2>📡 News Routes</h2>
-            <table>
-                <tr>
-                    <th>Route</th>
-                    <th>Job</th>
-                </tr>
-                <tr>
-                    <td>GET /api/news</td>
-                    <td>Get market news</td>
-                </tr>
-                <tr>
-                    <td>GET /api/news/breaking</td>
-                    <td>Get breaking news</td>
-                </tr>
-                <tr>
-                    <td>POST /api/news/react</td>
-                    <td>Record market reaction</td>
-                </tr>
-            </table>
-
-            <h2>📰 News Services</h2>
-            <table>
-                <tr>
-                    <th>Service</th>
-                    <th>Job</th>
-                </tr>
-                <tr>
-                    <td>newsService.mjs</td>
-                    <td>Regular market news</td>
-                </tr>
-                <tr>
-                    <td>breakingNewsService.mjs</td>
-                    <td>Breaking news - real-time, high-impact</td>
-                </tr>
-            </table>
+    <section class="section" id="runtime">
+      <div class="section-header">
+        <div>
+          <h2>Runtime layers</h2>
+          <p class="lead">This table maps the platform by responsibility instead of by repo folder.</p>
         </div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Layer</th>
+            <th>Components</th>
+            <th>What it does now</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Experience</td>
+            <td>Frontend (`React`, `Vite`)</td>
+            <td>Trading UI, dashboards, and operator workflows.</td>
+          </tr>
+          <tr>
+            <td>Edge + orchestration</td>
+            <td>BFF (`Node.js`)</td>
+            <td>Authentication, session control, anti-corruption layer, and API composition.</td>
+          </tr>
+          <tr>
+            <td>Domain service</td>
+            <td>`analysis-service` (`gRPC`)</td>
+            <td>Stable consensus contract and extraction seam for the first bounded context.</td>
+          </tr>
+          <tr>
+            <td>Core ML runtime</td>
+            <td>ML Engine (`Python`)</td>
+            <td>Inference, training, drift detection, feedback, and monitoring endpoints.</td>
+          </tr>
+          <tr>
+            <td>Low-latency data plane</td>
+            <td>Redis, Feast</td>
+            <td>Online features and cache-backed reads for critical request paths.</td>
+          </tr>
+          <tr>
+            <td>Event plane</td>
+            <td>Kafka</td>
+            <td>Market data, model signals, and feedback topics.</td>
+          </tr>
+          <tr>
+            <td>MLOps plane</td>
+            <td>MLflow, MinIO, PostgreSQL</td>
+            <td>Experiment tracking, model registry, artifacts, and lineage metadata.</td>
+          </tr>
+          <tr>
+            <td>Control plane</td>
+            <td>Airflow, Great Expectations</td>
+            <td>Data validation, scheduled monitoring, and retraining orchestration.</td>
+          </tr>
+          <tr>
+            <td>Observability plane</td>
+            <td>Prometheus, Grafana, Loki, Jaeger</td>
+            <td>Metrics, dashboards, logs, traces, and alerts.</td>
+          </tr>
+          <tr>
+            <td>Delivery plane</td>
+            <td>Gitea, Woodpecker, Helm, k3s, Infisical</td>
+            <td>Build, test, sign, deploy, and inject runtime secrets.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
 
-        <!-- PAGE 4: BFF -->
-        <div id="bff" class="page">
-            <h1>🔷 BFF (Backend for Frontend)</h1>
-            <p class="subtitle">The bridge between frontend and ML engine</p>
-
-            <h2>📁 Folder Structure</h2>
-            <div class="file-tree">
-                <div class="folder">bff/</div>
-                <div class="indent"><span class="file">server.mjs</span> - Main entry point</div>
-                <div class="indent"><span class="folder">routes/</span> - API endpoints</div>
-                <div class="indent-2">consensusRoutes.mjs</div>
-                <div class="indent-2">identityRoutes.mjs</div>
-                <div class="indent-2">newsRoutes.mjs</div>
-                <div class="indent-2">adminRoutes.mjs</div>
-                <div class="indent-2">terminalRoutes.mjs</div>
-                <div class="indent-2">supportRoutes.mjs</div>
-                <div class="indent-2">onboardingRoutes.mjs</div>
-                <div class="indent"><span class="folder">services/</span> - Business logic</div>
-                <div class="indent-2">consensusEngine.mjs</div>
-                <div class="indent-2">newsService.mjs</div>
-                <div class="indent-2">breakingNewsService.mjs</div>
-                <div class="indent-2">security.mjs</div>
-                <div class="indent-2">terminalAnalyticsService.mjs</div>
-                <div class="indent"><span class="folder">domains/</span> - State management</div>
-            </div>
-
-            <h2>🚦 Routes (API Endpoints)</h2>
-            <table>
-                <tr>
-                    <th>Route</th>
-                    <th>Job</th>
-                </tr>
-                <tr>
-                    <td>GET /api/consensus</td>
-                    <td>Get trading signal</td>
-                </tr>
-                <tr>
-                    <td>POST /api/news</td>
-                    <td>Fetch market news</td>
-                </tr>
-                <tr>
-                    <td>POST /api/identity/*</td>
-                    <td>Auth operations</td>
-                </tr>
-                <tr>
-                    <td>GET /api/terminal/*</td>
-                    <td>Analytics data</td>
-                </tr>
-                <tr>
-                    <td>POST /api/support/*</td>
-                    <td>Help chat</td>
-                </tr>
-            </table>
+    <section class="section" id="contexts">
+      <div class="section-header">
+        <div>
+          <h2>Bounded contexts and extraction status</h2>
+          <p class="lead">This is the important DDD truth: there are contracts for multiple contexts, but only one is fully extracted on the live request path today.</p>
         </div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Context</th>
+            <th>Service boundary</th>
+            <th>Status</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>BFF orchestration</td>
+            <td>`bff`</td>
+            <td>Live</td>
+            <td>Owns frontend-facing contracts and translation logic.</td>
+          </tr>
+          <tr>
+            <td>Analysis</td>
+            <td>`analysis-service`</td>
+            <td>Live extraction seam</td>
+            <td>gRPC is implemented and deployed; internals still proxy ML Engine `/predict`.</td>
+          </tr>
+          <tr>
+            <td>Ingestion</td>
+            <td>`ingestion-service` contract</td>
+            <td>Logical only</td>
+            <td>Ownership is defined, but runtime still lives inside `ml-engine` packages.</td>
+          </tr>
+          <tr>
+            <td>Learning</td>
+            <td>`learning-service` contract</td>
+            <td>Logical only</td>
+            <td>Retraining, drift, and DQ loops are live, but still run inside ML Engine and Airflow DAGs.</td>
+          </tr>
+          <tr>
+            <td>Platform ops</td>
+            <td>Infra stack</td>
+            <td>Live</td>
+            <td>Observability, CI/CD, secrets, and Helm rollout are already wired.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
 
-        <!-- PAGE 5: ML ENGINE -->
-        <div id="ml" class="page">
-            <h1>🐍 ML Engine (Python)</h1>
-            <p class="subtitle">The brain - AI predictions and machine learning</p>
-
-            <h2>📁 Folder Structure</h2>
-            <div class="file-tree">
-                <div class="folder">ml-engine/</div>
-                <div class="indent"><span class="file">main.py</span> - FastAPI entry</div>
-                <div class="indent"><span class="file">config.py</span> - Settings</div>
-                <div class="indent"><span class="folder">models/</span> - ML model families</div>
-                <div class="indent-2">direction/ - Buy/Sell predictors</div>
-                <div class="indent-2">magnitude/ - Price movement</div>
-                <div class="indent-2">regime/ - Market regime detection</div>
-                <div class="indent-2">session/ - Trading session probability</div>
-                <div class="indent-2">mamba/ - Sequential models</div>
-                <div class="indent"><span class="folder">inference/</span> - Making predictions</div>
-                <div class="indent-2">predictor.py</div>
-                <div class="indent-2">consensus_aggregator.py</div>
-                <div class="indent-2">explainer.py</div>
-                <div class="indent-2">triton_client.py</div>
-                <div class="indent"><span class="folder">features/</span> - Feature engineering</div>
-                <div class="indent"><span class="folder">training/</span> - Model training</div>
-                <div class="indent"><span class="folder">optimization/</span> - Parameter tuning</div>
-                <div class="indent"><span class="folder">data/</span> - Database</div>
-                <div class="indent"><span class="folder">infrastructure/</span> - Performance</div>
-            </div>
-
-            <h2>🤖 ML Models (What Predicts)</h2>
-            <div class="card-grid">
-                <div class="card">
-                    <h4>📈 Direction</h4>
-                    <p>Predicts BUY or SELL<br><span class="tag">LightGBM</span><span class="tag">XGBoost</span><span class="tag">Neural Net</span></p>
-                </div>
-                <div class="card">
-                    <h4>📊 Magnitude</h4>
-                    <p>Predicts price movement size</p>
-                </div>
-                <div class="card">
-                    <h4>🌀 Regime</h4>
-                    <p>Detects market regime (trending, ranging)</p>
-                </div>
-                <div class="card">
-                    <h4>⏰ Session</h4>
-                    <p>Predicts best trading time</p>
-                </div>
-            </div>
-
-            <h2>🔮 How Predictions Work</h2>
-            <div class="steps">
-                <div class="step">
-                    <div class="step-num">1</div>
-                    <div class="step-content">
-                        <h4>Get candle data</h4>
-                        <p>Price history from database</p>
-                    </div>
-                </div>
-                <div class="step">
-                    <div class="step-num">2</div>
-                    <div class="step-content">
-                        <h4>Extract features</h4>
-                        <p>Technical indicators (RSI, MACD, etc)</p>
-                    </div>
-                </div>
-                <div class="step">
-                    <div class="step-num">3</div>
-                    <div class="step-content">
-                        <h4>Run all models</h4>
-                        <p>Direction, Magnitude, Regime, Session</p>
-                    </div>
-                </div>
-                <div class="step">
-                    <div class="step-num">4</div>
-                    <div class="step-content">
-                        <h4>Aggregate votes</h4>
-                        <p>Combine predictions into final signal</p>
-                    </div>
-                </div>
-            </div>
+    <section class="section" id="loops">
+      <div class="section-header">
+        <div>
+          <h2>Critical paths and control loops</h2>
+          <p class="lead">These are the sequences that matter operationally: request path, learning, observability, and delivery.</p>
         </div>
-
-        <!-- PAGE 6: TELEGRAM -->
-        <div id="telegram" class="page">
-            <h1>📱 Telegram Bridge</h1>
-            <p class="subtitle">Mobile bot for traders on the go</p>
-
-            <h2>📁 Files</h2>
-            <div class="file-tree">
-                <div class="folder">telegram-bridge/</div>
-                <div class="indent"><span class="file">index.js</span> - Bot main</div>
-                <div class="indent"><span class="file">aiConversation.js</span> - AI responses</div>
-                <div class="indent"><span class="file">firebaseAdmin.js</span> - Auth</div>
-                <div class="indent"><span class="file">invitesService.js</span> - Invite handling</div>
-            </div>
-
-            <h2>🤖 Bot Commands</h2>
-            <table>
-                <tr>
-                    <th>Command</th>
-                    <th>What it does</th>
-                </tr>
-                <tr>
-                    <td>/start</td>
-                    <td>Start the bot</td>
-                </tr>
-                <tr>
-                    <td>/signal</td>
-                    <td>Get current trading signal</td>
-                </tr>
-                <tr>
-                    <td>/news</td>
-                    <td>Get latest news</td>
-                </tr>
-                <tr>
-                    <td>/help</td>
-                    <td>Show help</td>
-                </tr>
-            </table>
-
-            <h2>📨 How Messages Work</h2>
-            <div class="steps">
-                <div class="step">
-                    <div class="step-num">1</div>
-                    <div class="step-content">
-                        <h4>User sends command</h4>
-                        <p>Via Telegram app</p>
-                    </div>
-                </div>
-                <div class="step">
-                    <div class="step-num">2</div>
-                    <div class="step-content">
-                        <h4>Webhook received</h4>
-                        <p>telegram-bridge/index.js</p>
-                    </div>
-                </div>
-                <div class="step">
-                    <div class="step-num">3</div>
-                    <div class="step-content">
-                        <h4>Process with AI</h4>
-                        <p>aiConversation.js</p>
-                    </div>
-                </div>
-                <div class="step">
-                    <div class="step-num">4</div>
-                    <div class="step-content">
-                        <h4>Send response</h4>
-                        <p>Back to user's phone</p>
-                    </div>
-                </div>
-            </div>
+      </div>
+      <div class="loop-grid">
+        <div class="card loop-card">
+          <h3>1. Request path</h3>
+          <ol>
+            <li>Browser hits the frontend.</li>
+            <li>Frontend sends requests to the BFF.</li>
+            <li>BFF calls `analysis-service` over gRPC.</li>
+            <li>`analysis-service` resolves consensus through the ML Engine.</li>
+            <li>Feature lookups come from Redis and Feast where available.</li>
+          </ol>
+          <p class="footer-note">This path carries the 50ms SLA target for critical operations.</p>
         </div>
-
-        <!-- PAGE 7: ALL FILES -->
-        <div id="files" class="page">
-            <h1>📁 Complete File List</h1>
-            <p class="subtitle">Every file in the project organized by type</p>
-
-            <h2>⚛️ Frontend (src/)</h2>
-            <div class="card">
-                <h3>Pages</h3>
-                <code>src/pages/CollectiveConsciousness.jsx</code><br>
-                <code>src/pages/RegimentHub.jsx</code><br>
-                <code>src/pages/CleanOnboarding.jsx</code>
-            </div>
-            <div class="card">
-                <h3>Features</h3>
-                <code>src/features/consensus/</code><br>
-                <code>src/features/terminal/</code><br>
-                <code>src/features/identity/</code><br>
-                <code>src/features/admin-security/</code><br>
-                <code>src/features/support/</code><br>
-                <code>src/features/shell/</code><br>
-                <code>src/features/onboarding/</code><br>
-                <code>src/features/hub-content/</code><br>
-                <code>src/features/auth/</code><br>
-                <code>src/features/compliance/</code>
-            </div>
-            <div class="card">
-                <h3>Components (26 files)</h3>
-                <code>src/components/AdminMessagePanel.jsx</code><br>
-                <code>src/components/BreakingNewsPanel.jsx</code><br>
-                <code>src/components/FloatingChatWidget.jsx</code><br>
-                <code>...and 23 more</code>
-            </div>
-            <div class="card">
-                <h3>Services</h3>
-                <code>src/services/firebase.js</code><br>
-                <code>src/services/sessionManager.js</code><br>
-                <code>src/services/ai-router.js</code><br>
-                <code>src/services/adminService.js</code><br>
-                <code>src/services/telegramService.js</code>
-            </div>
-
-            <h2>🔷 BFF (bff/)</h2>
-            <div class="card">
-                <code>bff/server.mjs</code><br>
-                <code>bff/routes/consensusRoutes.mjs</code><br>
-                <code>bff/routes/identityRoutes.mjs</code><br>
-                <code>bff/routes/newsRoutes.mjs</code><br>
-                <code>bff/routes/adminRoutes.mjs</code><br>
-                <code>bff/routes/terminalRoutes.mjs</code><br>
-                <code>bff/services/consensusEngine.mjs</code><br>
-                <code>bff/services/security.mjs</code>
-            </div>
+        <div class="card loop-card">
+          <h3>2. Learning loop</h3>
+          <ol>
+            <li>ML Engine logs training and registry activity to MLflow.</li>
+            <li>MinIO stores artifacts; PostgreSQL stores run and registry metadata.</li>
+            <li>Airflow runs model monitoring and retraining DAGs.</li>
+            <li>Great Expectations gates dirty data before retraining is allowed.</li>
+            <li>Approved versions remain in MLflow for rollback and promotion control.</li>
+          </ol>
         </div>
-
-        <!-- DETAILED ML ENGINE PAGE -->
-        <div id="mldetail" class="page">
-                <h1>⚙️ ML Engine - Complete Reference</h1>
-                <p class="subtitle">Every model, function, file, and use case in the ML engine</p>
-
-                <h2>📂 Directory Structure</h2>
-                <div class="card dir-tree">
-<div style="color:#58a6ff;">ml-engine/</div>
-<div style="color:#8b949e;">├── <span style="color:#f0883e;">main.py</span>              - FastAPI entry point</div>
-<div style="color:#8b949e;">├── <span style="color:#f0883e;">config.py</span>            - All hyperparameters</div>
-<div style="color:#8b949e;">├── <span style="color:#a371f7;">models/</span></div>
-<div style="color:#8b949e;">│   ├── <span style="color:#a371f7;">direction/</span>           - BUY/SELL classifiers</div>
-<div style="color:#8b949e;">│   │   ├── lightgbm_classifier.py</div>
-<div style="color:#8b949e;">│   │   ├── xgboost_classifier.py</div>
-<div style="color:#8b949e;">│   │   ├── neural_net.py</div>
-<div style="color:#8b949e;">│   │   ├── random_forest.py</div>
-<div style="color:#8b949e;">│   │   ├── svm_classifier.py</div>
-<div style="color:#8b949e;">│   │   └── amd_classifier.py</div>
-<div style="color:#8b949e;">│   ├── <span style="color:#a371f7;">magnitude/</span>          - Price movement</div>
-<div style="color:#8b949e;">│   │   └── move_magnitude.py</div>
-<div style="color:#8b949e;">│   ├── <span style="color:#a371f7;">regime/</span>              - Market regime detection</div>
-<div style="color:#8b949e;">│   │   ├── hmm_regime.py</div>
-<div style="color:#8b949e;">│   │   ├── fp_fk_regime.py</div>
-<div style="color:#8b949e;">│   │   ├── anomalous_diffusion.py</div>
-<div style="color:#8b949e;">│   │   └── regime_ensemble.py</div>
-<div style="color:#8b949e;">│   ├── <span style="color:#a371f7;">session/</span>             - Trading time prediction</div>
-<div style="color:#8b949e;">│   │   └── time_probability.py</div>
-<div style="color:#8b949e;">│   └── <span style="color:#a371f7;">mamba/</span>              - Sequential models</div>
-<div style="color:#8b949e;">│       └── mamba_sequence_model.py</div>
-<div style="color:#8b949e;">├── <span style="color:#3fb950;">inference/</span></div>
-<div style="color:#8b949e;">│   ├── predictor.py           - Main prediction engine</div>
-<div style="color:#8b949e;">│   ├── consensus_aggregator.py - Vote aggregation</div>
-<div style="color:#8b949e;">│   ├── explainer.py           - SHAP explanations</div>
-<div style="color:#8b949e;">│   ├── triton_client.py       - Triton inference</div>
-<div style="color:#8b949e;">│   └── onnx_exporter.py       - Model export</div>
-<div style="color:#8b949e;">├── <span style="color:#d29922;">features/</span></div>
-<div style="color:#8b949e;">│   ├── feature_pipeline.py   - Feature engineering</div>
-<div style="color:#8b949e;">│   └── feast_client.py        - Feature store</div>
-<div style="color:#8b949e;">├── <span style="color:#f0883e;">training/</span></div>
-<div style="color:#8b949e;">│   ├── trainer.py             - Model training</div>
-<div style="color:#8b949e;">│   ├── cross_validator.py     - TimeSeries CV</div>
-<div style="color:#8b949e;">│   └── model_store.py         - Model persistence</div>
-<div style="color:#8b949e;">├── <span style="color:#58a6ff;">optimization/</span></div>
-<div style="color:#8b949e;">│   ├── pso_optimizer.py      - Particle Swarm</div>
-<div style="color:#8b949e;">│   ├── rrr_optimizer.py      - Risk:Reward</div>
-<div style="color:#8b949e;">│   ├── exit_optimizer.py     - Exit strategy</div>
-<div style="color:#8b949e;">│   └── position_sizer.py     - Position sizing</div>
-<div style="color:#8b949e;">├── <span style="color:#3fb950;">data/</span></div>
-<div style="color:#8b949e;">│   ├── candle_db.py          - Candle storage</div>
-<div style="color:#8b949e;">│   └── load_ninjatrader_csv.py</div>
-<div style="color:#8b949e;">├── <span style="color:#a371f7;">session/</span></div>
-<div style="color:#8b949e;">│   └── session_probability.py</div>
-<div style="color:#8b949e;">├── <span style="color:#a371f7;">alpha/</span></div>
-<div style="color:#8b949e;">│   └── alpha_engine.py</div>
-<div style="color:#8b949e;">├── <span style="color:#a371f7;">backtest/</span></div>
-<div style="color:#8b949e;">│   └── pbo_engine.py</div>
-<div style="color:#8b949e;">├── <span style="color:#a371f7;">feedback/</span></div>
-<div style="color:#8b949e;">│   ├── feedback_logger.py</div>
-<div style="color:#8b949e;">│   ├── trade_log_processor.py</div>
-<div style="color:#8b949e;">│   └── retrain_pipeline.py</div>
-<div style="color:#8b949e;">├── <span style="color:#a371f7;">infrastructure/</span></div>
-<div style="color:#8b949e;">│   ├── performance.py        - Circuit breaker</div>
-<div style="color:#8b949e;">│   ├── drift_detector.py     - Model drift</div>
-<div style="color:#8b949e;">│   ├── evaluation.py        - Metrics</div>
-<div style="color:#8b949e;">│   ├── continual_learning.py - EWC, replay</div>
-<div style="color:#8b949e;">   ├── mlflow_client.py</div>
-<div style="color:#8b949e;">   └── prometheus_exporter.py</div>
-<div style="color:#8b949e;">└── <span style="color:#a371f7;">kafka/</span></div>
-<div style="color:#8b949e;">    ├── producer.py</div>
-<div style="color:#8b949e;">    └── consumer.py</div>
-                </div>
-
-                <h2>🤖 Model Families</h2>
-                <div class="card-grid">
-                    <div class="card" style="border-left: 4px solid #a371f7;">
-                        <h4 style="color:#a371f7;">📈 Direction (6 models)</h4>
-                        <code style="font-size:10px;">lightgbm, xgboost, neural_net, random_forest, svm, amd</code>
-                        <p>Predicts BUY/SELL with probability</p>
-                    </div>
-                    <div class="card" style="border-left: 4px solid #a371f7;">
-                        <h4 style="color:#a371f7;">📊 Magnitude (1 model)</h4>
-                        <code style="font-size:10px;">move_magnitude</code>
-                        <p>Predicts price movement size</p>
-                    </div>
-                    <div class="card" style="border-left: 4px solid #a371f7;">
-                        <h4 style="color:#a371f7;">🌀 Regime (4 models)</h4>
-                        <code style="font-size:10px;">hmm, fp_fk, anomalous, ensemble</code>
-                        <p>Detects trending/ranging markets</p>
-                    </div>
-                    <div class="card" style="border-left: 4px solid #a371f7;">
-                        <h4 style="color:#a371f7;">⏰ Session (1 model)</h4>
-                        <code style="font-size:10px;">time_probability</code>
-                        <p>Predicts best trading time</p>
-                    </div>
-                </div>
-
-                <h2>🔮 Core Inference Functions</h2>
-                <table>
-                    <tr><th>File</th><th>Function</th><th>Input</th><th>Output</th></tr>
-                    <tr><td>predictor.py</td><td>predict_signals(candles, regime)</td><td>OHLCV array</td><td>{signal, confidence, votes}</td></tr>
-                    <tr><td>consensus_aggregator.py</td><td>aggregate_votes(votes[])</td><td>Model votes</td><td>{signal, alpha, rrr}</td></tr>
-                    <tr><td>explainer.py</td><td>explain_prediction()</td><td>Prediction</td><td>SHAP values</td></tr>
-                    <tr><td>triton_client.py</td><td>Predictor.predict()</td><td>Tensor</td><td>Inference result</td></tr>
-                    <tr><td>onnx_exporter.py</td><td>export_to_onnx(model)</td><td>Model</td><td>ONNX file</td></tr>
-                </table>
-
-                <h2>⚙️ Training Functions</h2>
-                <table>
-                    <tr><th>File</th><th>Function</th><th>Purpose</th></tr>
-                    <tr><td>trainer.py</td><td>train_model(X, y)</td><td>Train any ML model</td></tr>
-                    <tr><td>trainer.py</td><td>cross_validate(X, y)</td><td>TimeSeries CV</td></tr>
-                    <tr><td>cross_validator.py</td><td>TimeSeriesSplit(n_splits)</td><td>Split data</td></tr>
-                    <tr><td>model_store.py</td><td>save_model(model, name)</td><td>Save to disk/MLflow</td></tr>
-                    <tr><td>model_store.py</td><td>load_model(name)</td><td>Load model</td></tr>
-                </table>
-
-                <h2>📊 Optimization Modules</h2>
-                <table>
-                    <tr><th>File</th><th>Function</th><th>Output</th></tr>
-                    <tr><td>pso_optimizer.py</td><td>optimize_pso(objective, bounds)</td><td>Best params</td></tr>
-                    <tr><td>rrr_optimizer.py</td><td>optimize_rrr(trades[])</td><td>Optimal RRR</td></tr>
-                    <tr><td>exit_optimizer.py</td><td>optimize_exit(entry, candles)</td><td>Exit levels</td></tr>
-                    <tr><td>position_sizer.py</td><td>calculate_position(account, risk)</td><td>Position size</td></tr>
-                </table>
-
-                <h2>🎯 Special Modules</h2>
-                <table>
-                    <tr><th>Module</th><th>File</th><th>Purpose</th></tr>
-                    <tr><td>session/</td><td>session_probability.py</td><td>Predict session success rate</td></tr>
-                    <tr><td>alpha/</td><td>alpha_engine.py</td><td>Generate alpha signals</td></tr>
-                    <tr><td>backtest/</td><td>pbo_engine.py</td><td>Probability-based backtest</td></tr>
-                    <tr><td>feedback/</td><td>feedback_logger.py</td><td>Log trade outcomes</td></tr>
-                    <tr><td>feedback/</td><td>retrain_pipeline.py</td><td>Auto-retrain models</td></tr>
-                    <tr><td>kafka/</td><td>producer.py</td><td>Stream predictions</td></tr>
-                    <tr><td>kafka/</td><td>consumer.py</td><td>Consume events</td></tr>
-                </table>
-
-                <h2>📈 Infrastructure</h2>
-                <table>
-                    <tr><th>File</th><th>Purpose</th></tr>
-                    <tr><td>performance.py</td><td>Circuit breaker, caching, Redis</td></tr>
-                    <tr><td>drift_detector.py</td><td>Model drift detection</td></tr>
-                    <tr><td>evaluation.py</td><td>Precision, recall, F1 metrics</td></tr>
-                    <tr><td>continual_learning.py</td><td>EWC, replay buffer</td></tr>
-                    <tr><td>mlflow_client.py</td><td>MLflow tracking</td></tr>
-                    <tr><td>prometheus_exporter.py</td><td>Prometheus metrics</td></tr>
-                    <tr><td>tracing.py</td><td>Distributed tracing</td></tr>
-                </table>
-
-                <h2>🐞 Data Flow</h2>
-                <div class="card">
-                    <code style="font-size:12px;">candles → feature_pipeline → predictor → [direction, regime, magnitude, session] models → consensus_aggregator → {signal, confidence, alpha, rrr}</code>
-                </div>
-            </div>
-
-            <!-- PAGE: FILES - TELEGRAM SECTION -->
-            <h2>📱 Telegram</h2>
-            <div class="card">
-                <code>telegram-bridge/index.js</code><br>
-                <code>telegram-bridge/aiConversation.js</code>
-            </div>
+        <div class="card loop-card">
+          <h3>3. Observability loop</h3>
+          <ol>
+            <li>Prometheus scrapes `/metrics` from runtime services.</li>
+            <li>Grafana visualizes latency, drift, resource, and SLA dashboards.</li>
+            <li>Loki centralizes logs; Jaeger collects traces.</li>
+            <li>Alert rules cover SLA breaches, retrain failures, stale monitoring, and infra regressions.</li>
+          </ol>
         </div>
-
-        <!-- PAGE 8: FEATURES -->
-        <div id="features" class="page">
-            <h1>🎯 All Features</h1>
-            <p class="subtitle">What the app can do</p>
-
-            <h2>🛒 Core Features</h2>
-            <div class="card-grid">
-                <div class="card">
-                    <h4>📊 Trading Signals</h4>
-                    <p>Get BUY/SELL recommendations with confidence levels</p>
-                </div>
-                <div class="card">
-                    <h4>🧠 AI Predictions</h4>
-                    <p>Multiple ML models predict market direction</p>
-                </div>
-                <div class="card">
-                    <h4>📰 Market News</h4>
-                    <p>Breaking news with sentiment analysis</p>
-                </div>
-                <div class="card">
-                    <h4>📈 Analytics</h4>
-                    <p>Track performance, win rate, RRR</p>
-                </div>
-                <div class="card">
-                    <h4>📓 Trading Journal</h4>
-                    <p>Log and analyze trades</p>
-                </div>
-                <div class="card">
-                    <h4>📱 Telegram Bot</h4>
-                    <p>Get signals on your phone</p>
-                </div>
-                <div class="card">
-                    <h4>💬 Support Chat</h4>
-                    <p>AI-powered help chat</p>
-                </div>
-                <div class="card">
-                    <h4>🔐 Security</h4>
-                    <p>Rate limiting, fraud detection</p>
-                </div>
-            </div>
-
-            <h2>🔐 Admin Features</h2>
-            <div class="card-grid">
-                <div class="card">
-                    <h4>📢 Broadcast</h4>
-                    <p>Send messages to all users</p>
-                </div>
-                <div class="card">
-                    <h4>👥 User Management</h4>
-                    <p>View and manage users</p>
-                </div>
-                <div class="card">
-                    <h4>📊 Analytics Dashboard</h4>
-                    <p>System-wide metrics</p>
-                </div>
-            </div>
+        <div class="card loop-card">
+          <h3>4. Delivery loop</h3>
+          <ol>
+            <li>Gitea hosts the source of truth.</li>
+            <li>Woodpecker runs unit, integration, performance, chaos, and k8s verification.</li>
+            <li>Images are built, scanned, signed, and deployed through Helm to k3s.</li>
+            <li>Secrets are expected to come from Infisical instead of static manifests.</li>
+          </ol>
         </div>
+      </div>
+    </section>
 
-        <!-- PAGE 9: SECURITY -->
-        <div id="security" class="page">
-            <h1>🔐 Security & Monitoring</h1>
-            <p class="subtitle">How the app protects itself and users</p>
-
-            <h2>🛡️ Security Services</h2>
-            <div class="card-grid">
-                <div class="card">
-                    <h4>🔐 securitySentinel.js</h4>
-                    <p>Main security monitoring - detects threats, blocks malicious users</p>
-                    <code>src/services/securitySentinel.js</code>
-                </div>
-                <div class="card">
-                    <h4>🚫 leakagePreventionModule.js</h4>
-                    <p>Prevents AI prompt/response leakage attacks</p>
-                    <code>src/services/leakagePreventionModule.js</code>
-                </div>
-                <div class="card">
-                    <h4>🎭 socialEngineeringDetection.js</h4>
-                    <p>Detects social engineering attempts in chat</p>
-                    <code>src/services/socialEngineeringDetectionModule.js</code>
-                </div>
-                <div class="card">
-                    <h4>📡 ai-router.js</h4>
-                    <p>Routes user requests to appropriate security checks</p>
-                    <code>src/services/ai-router.js</code>
-                </div>
-            </div>
-
-            <h2>📊 Monitoring Services</h2>
-            <div class="card-grid">
-                <div class="card">
-                    <h4>📈 performanceTestRunner.js</h4>
-                    <p>Runs performance benchmarks</p>
-                    <code>src/services/performanceTestRunner.js</code>
-                </div>
-                <div class="card">
-                    <h4>🌐 networkMonitor.js</h4>
-                    <p>Monitors network requests and Latency</p>
-                    <code>src/services/networkMonitor.js</code>
-                </div>
-                <div class="card">
-                    <h4>⏱️ ttiTracker.js</h4>
-                    <p>Tracks Time To Interactive metrics</p>
-                    <code>src/services/ttiTracker.js</code>
-                </div>
-                <div class="card">
-                    <h4>📱 telegramMonitor.js</h4>
-                    <p>Monitors Telegram bot health</p>
-                    <code>src/services/telegramMonitor.js</code>
-                </div>
-            </div>
-
-            <h2>🔒 BFF Security</h2>
-            <table>
-                <tr>
-                    <th>File</th>
-                    <th>Job</th>
-                </tr>
-                <tr>
-                    <td>bff/services/security.mjs</td>
-                    <td>Rate limiting, JWT validation, CORS, helmet</td>
-                </tr>
-            </table>
+    <section class="section" id="deploy">
+      <div class="section-header">
+        <div>
+          <h2>Deployment modes</h2>
+          <p class="lead">Use the right entry path depending on whether you are validating local end-to-end behavior, control planes, or cluster rollout.</p>
         </div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Mode</th>
+            <th>Entry point</th>
+            <th>Use case</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Full local stack</td>
+            <td>`docker-compose.yml`</td>
+            <td>End-to-end local bring-up with frontend, BFF, ML Engine, MLflow, Kafka, and observability.</td>
+          </tr>
+          <tr>
+            <td>MLOps-only local stack</td>
+            <td>`docker-compose.mlflow.yml`</td>
+            <td>Dedicated MLflow + MinIO + PostgreSQL workflow and registry testing.</td>
+          </tr>
+          <tr>
+            <td>Airflow control plane</td>
+            <td>`docker-compose.airflow.yml`</td>
+            <td>Data-quality, monitoring, and retraining DAG validation.</td>
+          </tr>
+          <tr>
+            <td>Cluster deploy</td>
+            <td>`k8s/helm/tradersapp`</td>
+            <td>k3s production-style rollout with Helm.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
 
-        <!-- PAGE 10: QUICK REF -->
-        <div id="quick" class="page">
-            <h1>⚡ Quick Reference</h1>
-            <p class="subtitle">Common questions answered fast</p>
-
-            <h2>🔄 Who Talks to Whom?</h2>
-            <div class="quick-ref">
-                <div class="ref-row">
-                    <span class="ref-from">Frontend</span>
-                    <span class="ref-arrow">→</span>
-                    <span class="ref-to">BFF</span>
-                </div>
-                <div class="ref-row">
-                    <span class="ref-from">BFF</span>
-                    <span class="ref-arrow">→</span>
-                    <span class="ref-to">ML Engine</span>
-                </div>
-                <div class="ref-row">
-                    <span class="ref-from">Frontend</span>
-                    <span class="ref-arrow">→</span>
-                    <span class="ref-to">Firebase</span>
-                </div>
-                <div class="ref-row">
-                    <span class="ref-from">Telegram</span>
-                    <span class="ref-arrow">→</span>
-                    <span class="ref-to">Firebase</span>
-                </div>
-            </div>
-
-            <h2>🐛 Common Terms</h2>
-            <table>
-                <tr>
-                    <th>Term</th>
-                    <th>Meaning</th>
-                </tr>
-                <tr>
-                    <td>Frontend</td>
-                    <td>React app - what users see</td>
-                </tr>
-                <tr>
-                    <td>BFF</td>
-                    <td>Backend for Frontend - API gateway</td>
-                </tr>
-                <tr>
-                    <td>ML</td>
-                    <td>Machine Learning - AI predictions</td>
-                </tr>
-                <tr>
-                    <td>Consensus</td>
-                    <td>Combined signal from all models</td>
-                </tr>
-                <tr>
-                    <td>Regime</td>
-                    <td>Market state (trending/ ranging)</td>
-                </tr>
-                <tr>
-                    <td>RRR</td>
-                    <td>Risk:Reward Ratio</td>
-                </tr>
-            </table>
-
-            <h2>🚀 Port Numbers</h2>
-            <table>
-                <tr>
-                    <th>Service</th>
-                    <th>Port</th>
-                </tr>
-                <tr>
-                    <td>Frontend (Vite)</td>
-                    <td>5173</td>
-                </tr>
-                <tr>
-                    <td>BFF</td>
-                    <td>8788</td>
-                </tr>
-                <tr>
-                    <td>ML Engine</td>
-                    <td>8001</td>
-                </tr>
-            </table>
-        </div>
-    </main>
-
-    <script>
-        function show(pageId) {
-            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-            
-            document.getElementById(pageId).classList.add('active');
-            
-            event.target.classList.add('active');
-        }
-    </script>
+    <section class="section cards-2">
+      <div class="callout-card">
+        <h2>Canonical docs</h2>
+        <ol class="docs-list">
+          <li><a href="docs/index.md">Front-page architecture doc</a></li>
+          <li><a href="docs/DDD_MICROSERVICES.md">DDD Microservices + gRPC</a></li>
+          <li><a href="docs/MLOPS_MLFLOW.md">MLflow MLOps lifecycle</a></li>
+          <li><a href="docs/MODEL_MONITORING_RETRAINING.md">Continuous model monitoring + auto-retraining</a></li>
+          <li><a href="docs/DATA_QUALITY_AIRFLOW.md">Data Quality + Airflow</a></li>
+          <li><a href="docs/AUTOMATED_TESTING.md">Automated testing + chaos</a></li>
+          <li><a href="docs/CICD_GITEA_WOODPECKER.md">CI/CD with Gitea + Woodpecker</a></li>
+        </ol>
+      </div>
+      <div class="callout-card">
+        <h2>Architectural truth to keep in mind</h2>
+        <ol class="truth-list">
+          <li>The repo is no longer a simple three-box app.</li>
+          <li>The first real DDD runtime extraction is complete around `analysis-service`.</li>
+          <li>Ingestion and learning are defined as bounded contexts, but they are not fully deployed as separate services yet.</li>
+          <li>That is intentional. The current architecture prioritizes stable contracts and safe extraction over premature service sprawl.</li>
+        </ol>
+      </div>
+    </section>
+  </div>
 </body>
 </html>

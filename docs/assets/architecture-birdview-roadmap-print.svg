@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1800 1040" role="img" aria-labelledby="title desc">
+  <title id="title">TradersApp bird view roadmap</title>
+  <desc id="desc">Birds-eye roadmap that shows today, stabilization, extraction, and operating state for the main TradersApp architecture lanes.</desc>
+  <defs>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="160%">
+      <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#10233d" flood-opacity="0.10"/>
+    </filter>
+    <style>
+      .title { font: 700 42px 'Segoe UI', Arial, sans-serif; fill: #10233d; }
+      .subtitle { font: 500 18px 'Segoe UI', Arial, sans-serif; fill: #536f8c; }
+      .header { font: 700 24px 'Segoe UI', Arial, sans-serif; fill: #10233d; }
+      .rowtitle { font: 700 20px 'Segoe UI', Arial, sans-serif; fill: #10233d; }
+      .cell { font: 500 15px 'Segoe UI', Arial, sans-serif; fill: #425d7b; }
+    </style>
+  </defs>
+
+  <rect width="1800" height="1040" fill="#f8fbff"/>
+  <text x="70" y="74" class="title">Bird&apos;s-eye architecture roadmap</text>
+  <text x="70" y="106" class="subtitle">Read left to right: current reality -> next hardening -> service extraction -> long-run operating state</text>
+
+  <g filter="url(#shadow)">
+    <rect x="70" y="150" width="1660" height="822" rx="28" fill="#ffffff" stroke="#d9e2eb" stroke-width="2"/>
+  </g>
+  <g>
+    <rect x="70" y="150" width="220" height="92" fill="#edf2f7" stroke="#d9e2eb" stroke-width="2"/>
+    <text x="98" y="206" class="header">Lane</text>
+    <rect x="290" y="150" width="360" height="92" fill="#eaf2ff" stroke="#d9e2eb" stroke-width="2"/>
+    <text x="318" y="206" class="header">Today</text>
+    <rect x="650" y="150" width="360" height="92" fill="#fff4df" stroke="#d9e2eb" stroke-width="2"/>
+    <text x="678" y="206" class="header">Stabilize</text>
+    <rect x="1010" y="150" width="360" height="92" fill="#f3ecff" stroke="#d9e2eb" stroke-width="2"/>
+    <text x="1038" y="206" class="header">Extract</text>
+    <rect x="1370" y="150" width="360" height="92" fill="#e8f7ee" stroke="#d9e2eb" stroke-width="2"/>
+    <text x="1398" y="206" class="header">Operate</text>
+    <rect x="70" y="242" width="1660" height="146" fill="#ffffff" stroke="#d9e2eb" stroke-width="2"/>
+    <line x1="290" y1="242" x2="290" y2="388" stroke="#d9e2eb" stroke-width="2"/>
+    <line x1="650" y1="242" x2="650" y2="388" stroke="#d9e2eb" stroke-width="2"/>
+    <line x1="1010" y1="242" x2="1010" y2="388" stroke="#d9e2eb" stroke-width="2"/>
+    <line x1="1370" y1="242" x2="1370" y2="388" stroke="#d9e2eb" stroke-width="2"/>
+    <text x="94" y="294" class="rowtitle">Request path</text>
+    <text x="312" y="286" class="cell">Frontend, BFF, analysis-service, and ML Engine</text>
+    <text x="312" y="310" class="cell">already form the live low-latency path.</text>
+    <text x="672" y="286" class="cell">Keep the gRPC seam strict, protect the 50ms</text>
+    <text x="672" y="310" class="cell">SLA, and reduce fallback drift.</text>
+    <text x="1032" y="286" class="cell">Move more analysis logic out of ML Engine and</text>
+    <text x="1032" y="310" class="cell">behind analysis-service contracts.</text>
+    <text x="1392" y="286" class="cell">Independent request-path runtime with</text>
+    <text x="1392" y="310" class="cell">predictable latency and bounded ownership.</text>
+    <rect x="70" y="388" width="1660" height="146" fill="#fbfdff" stroke="#d9e2eb" stroke-width="2"/>
+    <line x1="290" y1="388" x2="290" y2="534" stroke="#d9e2eb" stroke-width="2"/>
+    <line x1="650" y1="388" x2="650" y2="534" stroke="#d9e2eb" stroke-width="2"/>
+    <line x1="1010" y1="388" x2="1010" y2="534" stroke="#d9e2eb" stroke-width="2"/>
+    <line x1="1370" y1="388" x2="1370" y2="534" stroke="#d9e2eb" stroke-width="2"/>
+    <text x="94" y="440" class="rowtitle">Domain services</text>
+    <text x="312" y="432" class="cell">Only analysis is extracted today; ingestion and</text>
+    <text x="312" y="456" class="cell">learning still mostly live inside ML Engine.</text>
+    <text x="672" y="432" class="cell">Lock the contracts first so service extraction</text>
+    <text x="672" y="456" class="cell">does not break user-facing behavior.</text>
+    <text x="1032" y="432" class="cell">Pull ingestion and learning into their own</text>
+    <text x="1032" y="456" class="cell">runtimes one slice at a time.</text>
+    <text x="1392" y="432" class="cell">Each bounded context owns one capability with</text>
+    <text x="1392" y="456" class="cell">clear APIs and team ownership.</text>
+    <rect x="70" y="534" width="1660" height="146" fill="#ffffff" stroke="#d9e2eb" stroke-width="2"/>
+    <line x1="290" y1="534" x2="290" y2="680" stroke="#d9e2eb" stroke-width="2"/>
+    <line x1="650" y1="534" x2="650" y2="680" stroke="#d9e2eb" stroke-width="2"/>
+    <line x1="1010" y1="534" x2="1010" y2="680" stroke="#d9e2eb" stroke-width="2"/>
+    <line x1="1370" y1="534" x2="1370" y2="680" stroke="#d9e2eb" stroke-width="2"/>
+    <text x="94" y="586" class="rowtitle">Learning + data</text>
+    <text x="312" y="578" class="cell">Airflow, Great Expectations, MLflow, Kafka,</text>
+    <text x="312" y="602" class="cell">MinIO, and Postgres already support the</text>
+    <text x="312" y="626" class="cell">learning loop.</text>
+    <text x="672" y="578" class="cell">Make validated data mandatory before</text>
+    <text x="672" y="602" class="cell">retraining or model promotion can happen.</text>
+    <text x="1032" y="578" class="cell">Shift retraining, registry, and feedback flow into</text>
+    <text x="1032" y="602" class="cell">a dedicated learning boundary.</text>
+    <text x="1392" y="578" class="cell">Closed-loop retraining with versioned rollback,</text>
+    <text x="1392" y="602" class="cell">promotion gates, and clean lineage.</text>
+    <rect x="70" y="680" width="1660" height="146" fill="#fbfdff" stroke="#d9e2eb" stroke-width="2"/>
+    <line x1="290" y1="680" x2="290" y2="826" stroke="#d9e2eb" stroke-width="2"/>
+    <line x1="650" y1="680" x2="650" y2="826" stroke="#d9e2eb" stroke-width="2"/>
+    <line x1="1010" y1="680" x2="1010" y2="826" stroke="#d9e2eb" stroke-width="2"/>
+    <line x1="1370" y1="680" x2="1370" y2="826" stroke="#d9e2eb" stroke-width="2"/>
+    <text x="94" y="732" class="rowtitle">Observability</text>
+    <text x="312" y="724" class="cell">Prometheus, Grafana, Loki, and Jaeger are</text>
+    <text x="312" y="748" class="cell">already live across the platform.</text>
+    <text x="672" y="724" class="cell">Keep alerts tight for SLA breach, drift, retrain</text>
+    <text x="672" y="748" class="cell">failure, and service regressions.</text>
+    <text x="1032" y="724" class="cell">Add domain-level dashboards and traces as</text>
+    <text x="1032" y="748" class="cell">new services are pulled out.</text>
+    <text x="1392" y="724" class="cell">Every service is observable by default, with fast</text>
+    <text x="1392" y="748" class="cell">diagnosis from one control plane.</text>
+    <rect x="70" y="826" width="1660" height="146" fill="#ffffff" stroke="#d9e2eb" stroke-width="2"/>
+    <line x1="290" y1="826" x2="290" y2="972" stroke="#d9e2eb" stroke-width="2"/>
+    <line x1="650" y1="826" x2="650" y2="972" stroke="#d9e2eb" stroke-width="2"/>
+    <line x1="1010" y1="826" x2="1010" y2="972" stroke="#d9e2eb" stroke-width="2"/>
+    <line x1="1370" y1="826" x2="1370" y2="972" stroke="#d9e2eb" stroke-width="2"/>
+    <text x="94" y="878" class="rowtitle">Delivery + secrets</text>
+    <text x="312" y="870" class="cell">Gitea, Woodpecker, Helm, k3s, and Infisical</text>
+    <text x="312" y="894" class="cell">form the current self-hosted release path.</text>
+    <text x="672" y="870" class="cell">Make build, test, deploy, and secret injection</text>
+    <text x="672" y="894" class="cell">mandatory on every change.</text>
+    <text x="1032" y="870" class="cell">Add cleaner release promotion and</text>
+    <text x="1032" y="894" class="cell">environment-specific secret governance.</text>
+    <text x="1392" y="870" class="cell">Zero-manual-drift delivery where releases are</text>
+    <text x="1392" y="894" class="cell">repeatable, auditable, and safe.</text>
+  </g>
+</svg>

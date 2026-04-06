@@ -4,12 +4,6 @@ Tests alpha calculation, expected move computation, and edge detection.
 """
 
 import pytest
-import sys
-from pathlib import Path
-
-ML_ENGINE = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(ML_ENGINE))
-
 from alpha.alpha_engine import (
     calculate_alpha_metrics,
     compute_expected_move,
@@ -57,7 +51,7 @@ class TestComputeTradeAlpha:
             direction=1,
             holding_minutes=5.0,
         )
-        assert result["edge_exists"] is True
+        assert result["edge_exists"] == True
         assert result["edge_direction"] == "LONG"
         assert result["actual_move_ticks"] == 10.0
         assert result["expected_move_ticks"] > 0
@@ -70,7 +64,7 @@ class TestComputeTradeAlpha:
             direction=1,
             holding_minutes=5.0,
         )
-        assert result["edge_exists"] is False
+        assert result["edge_exists"] == False
         assert result["alpha_raw"] < 0
 
     def test_short_win_trade(self):
@@ -93,7 +87,8 @@ class TestComputeTradeAlpha:
             holding_minutes=5.0,
         )
         expected_move = compute_expected_move(10.0, 5.0)
-        assert result["alpha_raw"] == pytest.approx(result["actual_move_ticks"] - expected_move, rel=1e-6)
+        # alpha_raw = round(actual_move - expected_move, 4); compare with same rounding applied
+        assert result["alpha_raw"] == pytest.approx(round(result["actual_move_ticks"] - expected_move, 4), rel=1e-3)
 
 
 class TestCalculateAlphaMetrics:
@@ -198,6 +193,7 @@ class TestCalculateAlphaMetrics:
         })
         result = calculate_alpha_metrics(df)
         assert "alpha_by_session" in result
-        assert "PRE-MARKET" in result["alpha_by_session"]
-        assert "MAIN" in result["alpha_by_session"]
-        assert "AFTER-HOURS" in result["alpha_by_session"]
+        # SESSION_CONFIG keys: 0=pre_market, 1=main_trading, 2=post_market
+        assert "pre_market" in result["alpha_by_session"]
+        assert "main_trading" in result["alpha_by_session"]
+        assert "post_market" in result["alpha_by_session"]

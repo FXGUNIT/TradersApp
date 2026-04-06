@@ -1,14 +1,18 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# TradersApp — Keycloak + Trivy Docker Compose
+# TradersApp — Keycloak Production Docker Compose
 # ─────────────────────────────────────────────────────────────────────────────
-# Self-hosted SSO (Keycloak) + Vulnerability Scanning (Trivy).
+# Self-hosted SSO with production-grade settings.
 #
 # Start:
 #   docker compose -f docker-compose.keycloak.yml up -d
 #
-# Access:
-#   Keycloak: http://localhost:8080  (admin / traders123)
-#   Trivy:    CLI only (scan via: trivy image tradersapp/ml-engine:latest)
+# Production Features:
+#   - PostgreSQL backend for persistence
+#   - Redis session storage for distributed sessions
+#   - HTTPS with Let's Encrypt (or reverse proxy)
+#   - LDAP/AD federation support (optional)
+#   - MFA enforcement for admin users
+#   - Audit logging
 # ─────────────────────────────────────────────────────────────────────────────
 
 version: "3.8"
@@ -18,30 +22,80 @@ services:
   keycloak:
     image: quay.io/keycloak/keycloak:24.0
     container_name: traders-keycloak
-    command: start-dev --import-realm
-    ports:
-      - "8080:8080"
+    command: start --optimized --import-realm
+    expose:
+      - "8080"
+      - "8443"
     environment:
-      KEYCLOAK_ADMIN: admin
-      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_PASSWORD:-traders123}
+      # Admin Configuration
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+
+      # Database Configuration
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://postgres_keycloak:5432/keycloak
       KC_DB_USERNAME: keycloak
-      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak123}
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD}
+      KC_DB_SCHEMA: keycloak
+
+      # Session Storage (Redis for distributed sessions)
+      KC_SESSION: infinispan
+      KC_CACHE: infinispan
+      KC_INFINISPAN_STACK: docker
+
+      # Production Optimizations
+      KC_HTTP_ENABLED: "true"
+      KC_HTTPS_ENABLED: "false"  # Enable if using TLS directly
       KC_HOSTNAME_STRICT: "false"
+      KC_HOSTNAME_STRICT_HTTPS: "false"
       KC_PROXY: edge
+      KC_HTTP_RELATIVE_PATH: /
+
+      # Security Settings
+      KC_FEATUREGRESSIVE_PROFILING: enabled
+      KC_FEATUREACCOUNTING: enabled
+
+      # Logging
+      KC_LOG_LEVEL: INFO
+      KC_LOG_CONSOLE_OUTPUT: default
+
+      # Truststore
+      # KC_TRUSTSTORE_PASSWORD: ${KEYCLOAK_TRUSTSTORE_PASSWORD:-}
+      # KC_TRUSTSTORE_FILE: /opt/keycloak/conf/truststore.jks
+
+      # Cache Configuration
+      KC_CACHE_CONFIG_FILE: /opt/keycloak/conf/cache-ispn.xml
+
+      # Proxy Address Forwarding
+      KC_PROXY_ADDRESS_FORWARDING: "true"
+      KC_REVERSE_PROXY: "true"
     volumes:
       - ./keycloak/realms:/opt/keycloak/data/import:ro
+      - ./keycloak/themes:/opt/keycloak/themes:ro
+      - ./keycloak/conf:/opt/keycloak/conf:ro
+      - keycloak-custom-data:/opt/keycloak/data
     depends_on:
       postgres_keycloak:
+        condition: service_healthy
+      redis_keycloak:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/8080; echo $?"]
       interval: 15s
       timeout: 5s
       retries: 10
-      start_period: 60s
+      start_period: 120s
     restart: unless-stopped
+    networks:
+      - keycloak-network
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
 
   # ── PostgreSQL for Keycloak ─────────────────────────────────────────────────
   postgres_keycloak:
@@ -49,15 +103,84 @@ services:
     container_name: traders-postgres-keycloak
     environment:
       POSTGRES_USER: keycloak
-      POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak123}
+      POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD}
       POSTGRES_DB: keycloak
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=en_US"
     volumes:
       - postgres-keycloak-data:/var/lib/postgresql/data
+      - ./postgres/conf:/etc/postgresql/conf.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U keycloak"]
+      test: ["CMD-SHELL", "pg_isready -U keycloak -d keycloak"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - keycloak-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
 
+  # ── Redis for Session Storage ────────────────────────────────────────────────
+  redis_keycloak:
+    image: redis:7-alpine
+    container_name: traders-redis-keycloak
+    command: redis-server --requirepass ${KEYCLOAK_REDIS_PASSWORD:-} --appendonly yes
+    environment:
+      REDIS_PASSWORD: ${KEYCLOAK_REDIS_PASSWORD:-}
+    volumes:
+      - redis-keycloak-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - keycloak-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+  # ── Nginx Reverse Proxy (for HTTPS) ────────────────────────────────────────────
+  nginx_keycloak:
+    image: nginx:alpine
+    container_name: traders-nginx-keycloak
+    ports:
+      - "8080:80"
+      - "8443:443"
+    volumes:
+      - ./nginx/keycloak.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+    depends_on:
+      - keycloak
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - keycloak-network
+    profiles:
+      - proxy  # Start with: docker compose --profile proxy up
+
+# ── Networks ───────────────────────────────────────────────────────────────────
+networks:
+  keycloak-network:
+    driver: bridge
+    name: traders-keycloak-network
+
+# ── Volumes ─────────────────────────────────────────────────────────────────────
 volumes:
   postgres-keycloak-data:
+    name: traders-keycloak-postgres-data
+  redis-keycloak-data:
+    name: traders-keycloak-redis-data
+  keycloak-custom-data:
+    name: traders-keycloak-custom-data

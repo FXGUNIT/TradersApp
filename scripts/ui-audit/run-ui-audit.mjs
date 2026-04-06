@@ -13,6 +13,7 @@ const SCREENSHOT_DIR = path.join(OUTPUT_DIR, "screens");
 const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
 const REPORT_PATH = path.join(OUTPUT_DIR, `report-${timestamp}.json`);
 const DESKTOP_VIEWPORT = { width: 1440, height: 1800 };
+const AUDIT_MODE_KEY = "TradersApp_AuditMode";
 const CHROME_CANDIDATES = [
   "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
   "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
@@ -795,7 +796,7 @@ async function runAdminAudit(page, scenario) {
   await page.waitForTimeout(800);
   await genericSweep(page, scenario, {
     excludePatterns: ["logout", "connect", "linkedin"],
-    passes: 4,
+    maxInteractions: 16,
   });
 
   await page.evaluate(() => {
@@ -804,7 +805,7 @@ async function runAdminAudit(page, scenario) {
   await page.waitForTimeout(400);
   await genericSweep(page, scenario, {
     excludePatterns: ["logout", "connect", "linkedin"],
-    passes: 3,
+    maxInteractions: 8,
   });
 }
 
@@ -877,6 +878,14 @@ async function main() {
   });
 
   const page = await context.newPage();
+  await page.addInitScript((auditModeKey) => {
+    window.__TRADERS_UI_AUDIT__ = true;
+    try {
+      localStorage.setItem(auditModeKey, "true");
+    } catch {
+      // Ignore storage errors in browser audit bootstrap.
+    }
+  }, AUDIT_MODE_KEY);
   await installNetworkMocks(page, report);
 
   page.on("console", (message) => {

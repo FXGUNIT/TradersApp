@@ -44,6 +44,12 @@ from collections import deque
 import joblib
 import tempfile
 
+try:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(errors="replace")
+except Exception:
+    pass
+
 # ─── Paths ─────────────────────────────────────────────────────────────────────
 
 BASE_DIR = Path(__file__).parent.parent

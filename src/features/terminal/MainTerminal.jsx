@@ -1757,8 +1757,8 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
         {[
           { id: 'premarket', label: 'MORNING BRIEFING', sub: 'AMD · Macro · Fuel', color: T.blue },
           { id: 'trade', label: 'TRADE EXECUTION', sub: 'AMD-Exec · Compliance', color: T.orange },
-          { id: 'journal', label: 'TRADE JOURNAL', sub: 'AMD Stats · P&L', color: T.purple },
-          { id: 'account', label: 'MY ACCOUNT', sub: 'T&C · Drawdown · Rules', color: T.green }
+          { id: 'journal', label: 'JOURNAL', sub: 'AMD Stats · P&L', color: T.purple },
+          { id: 'account', label: 'ACCOUNT', sub: 'T&C · Drawdown · Rules', color: T.green }
         ].map(p => (
           <button 
             key={p.id} 
@@ -1768,8 +1768,17 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
               setErr('');
               if (p.id === 'journal') setShowForm(true);
             }} 
-            aria-label={p.label}
-            aria-labelledby={`tab-${p.id}-label`}
+            aria-label={
+              p.id === "premarket"
+                ? "Premarket"
+                : p.id === "trade"
+                  ? "Trade"
+                  : p.id === "journal"
+                    ? "Journal"
+                    : p.id === "account"
+                      ? "Account"
+                      : p.label
+            }
             style={{ 
               background: "transparent", 
               border: "none", 
@@ -2003,7 +2012,7 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
             jf={jf}
             sjf={sjf}
             showForm={journalFormOpen}
-            setShowForm={setJournalFormOpen}
+            setShowForm={setShowForm}
             metrics={metrics}
             isJournalMetricsPending={isJournalMetricsPending}
             equityCurveView={equityCurveView}

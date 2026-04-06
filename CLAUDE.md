@@ -385,18 +385,6 @@ class BaseResponse(BaseModel):
 
 ---
 
-## Performance Rules
-
-1. **No blocking operations on the main thread** in React
-2. **All external calls are concurrent** in BFF (Promise.all)
-3. **ML prediction is cached** with Redis (TTL per endpoint type)
-4. **Heavy ML operations** run in thread pool or separate worker
-5. **React renders** use `React.memo` + `useMemo` + `useCallback` aggressively
-6. **No inline styles** â€” use CSS classes or CSS-in-JS with `styled()`
-7. **Images and heavy assets** lazy-loaded with `React.lazy()`
-
----
-
 ## Data Versioning (DVC)
 
 **Every dataset, model, and experiment is versioned with DVC + Git.** No exception â€” reproducibility is non-negotiable.
@@ -576,11 +564,14 @@ When a bug appears, follow this order. Human does steps 1-3 first:
 | Cache TTL (consensus) | 60s | Redis or in-memory |
 | Cache TTL (regime) | 300s | Redis or in-memory |
 
-Rules:
+**General Rules:**
+- No blocking operations on the main thread in React
+- All external calls are concurrent in BFF (Promise.all)
 - ML predictions: cache with Redis (TTL per endpoint type)
-- Heavy operations: thread pool or worker process, never block main thread
-- In React: use `React.memo` + `useMemo` + `useCallback` aggressively
-- No inline styles â€” CSS classes only
+- Heavy ML operations: thread pool or worker process, never block main thread
+- React renders: use `React.memo` + `useMemo` + `useCallback` aggressively
+- No inline styles — CSS classes only
+- Images and heavy assets lazy-loaded with `React.lazy()`
 - Candle data loading: max 10k rows per request, paginate larger queries
 - Model inference: lazy-load models, unload after 5 min inactivity
 - Feature computation: precompute on load, cache per symbol/timeframe

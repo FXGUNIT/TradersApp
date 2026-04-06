@@ -1107,7 +1107,7 @@ User Question: ${trimmed}`;
             flexShrink: 0,
           }}
         >
-          <span style={{ fontSize: 16 }}>←</span> Back
+          <span style={{ fontSize: 16 }}>←</span> Back to Hub
         </button>
 
         {/* Tab Switcher */}

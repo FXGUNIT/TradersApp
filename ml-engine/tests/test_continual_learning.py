@@ -4,14 +4,10 @@ Tests replay buffer, anti-forgetting validator, and rollback logic.
 """
 
 import pytest
-import sys
 import tempfile
 import os
 from pathlib import Path
 from unittest.mock import patch
-
-ML_ENGINE = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(ML_ENGINE))
 
 
 class TestExperienceReplayBuffer:
@@ -198,9 +194,10 @@ class TestAntiForgettingValidator:
                 config = ContinualLearningConfig(max_sharpe_drop=0.1)
                 validator = AntiForgettingValidator(config)
 
-                # High sharpe before, near-zero after
-                before = [{"result": "win", "pnl_ticks": 10.0 + i} for i in range(50)]
-                after = [{"result": "win", "pnl_ticks": 0.1} for _ in range(50)]
+                # Keep win rate constant while making the post-training distribution
+                # much noisier relative to its mean so the Sharpe drop is unambiguous.
+                before = [{"result": "win", "pnl_ticks": 10.0 + (i % 5)} for i in range(50)]
+                after = [{"result": "win", "pnl_ticks": 0.01 if i % 2 == 0 else 0.5} for i in range(50)]
 
                 with tempfile.NamedTemporaryFile(suffix=".pkl", delete=False) as f:
                     ckpt = Path(f.name)
@@ -211,7 +208,10 @@ class TestAntiForgettingValidator:
                     models, report = validator.validate_training_round(
                         before, after, {}, ckpt.stem, 3
                     )
+                    assert report.passed is False
                     assert report.sharpe_ok is False
+                    assert report.rollback_triggered is True
+                    assert "sharpe_drop" in (report.rollback_reason or "")
                 finally:
                     ckpt.unlink(missing_ok=True)
 

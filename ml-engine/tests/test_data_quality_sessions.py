@@ -4,14 +4,10 @@ Tests for data quality expectation suites.
 from __future__ import annotations
 
 import sqlite3
-import sys
 from pathlib import Path
 
 import pandas as pd
 import pytest
-
-ML_ENGINE = Path(__file__).parent.parent
-sys.path.insert(0, str(ML_ENGINE))
 
 from data_quality.expectations.candle_expectations import CandleExpectations, get_candle_suite
 from data_quality.expectations.trade_expectations import TradeExpectations, get_trade_suite

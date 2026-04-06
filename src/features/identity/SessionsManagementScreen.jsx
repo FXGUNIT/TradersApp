@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { listUserSessions as listIdentityUserSessions } from "../../services/clients/IdentityClient.js";
-import { logoutOtherDevices } from "../../utils/sessionUtils.js";
+import { logoutOtherDevices, normalizeSessionMap } from "../../utils/sessionUtils.js";
 
 const COLORS = {
   background: "var(--surface-base, #F9FAFB)",
@@ -60,6 +60,18 @@ export default function SessionsManagementScreen({
   const [loading, setLoading] = useState(true);
   const [logoutLoading, setLogoutLoading] = useState(false);
 
+  const getFallbackSessions = () => {
+    const auditSessions =
+      typeof window !== "undefined" ? window.__TRADERS_AUDIT_DATA?.sessions : null;
+
+    return (
+      profile?.sessions ||
+      profile?.fullData?.sessions ||
+      auditSessions ||
+      {}
+    );
+  };
+
   useEffect(() => {
     let active = true;
 
@@ -73,11 +85,14 @@ export default function SessionsManagementScreen({
       }
 
       try {
+        const fetchedSessions = await listIdentityUserSessions(auth.uid, auth.token);
+        const normalizedFetchedSessions = normalizeSessionMap(fetchedSessions);
+        const fallbackSessions = normalizeSessionMap(getFallbackSessions());
+
         const sessionsDataRaw =
-          (await listIdentityUserSessions(auth.uid, auth.token)) ||
-          profile?.sessions ||
-          profile?.fullData?.sessions ||
-          {};
+          Object.keys(normalizedFetchedSessions).length > 0
+            ? normalizedFetchedSessions
+            : fallbackSessions;
 
         const sessionsData = Array.isArray(sessionsDataRaw)
           ? sessionsDataRaw.reduce((accumulator, session, index) => {

@@ -1,42 +1,29 @@
 """
 Unit tests for infrastructure.evaluation.Guardrails.
-Tests input validation, output bounds, and signal normalization.
+Tests output validation and sanitization via validate_output().
 """
 
 import pytest
-import sys
-from pathlib import Path
-
-ML_ENGINE = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(ML_ENGINE))
 
 
 class TestGuardrailsSignalValidation:
-    """Test signal normalization and validation."""
-
-    def test_guardrails_normalizes_lowercase_signal(self):
-        from infrastructure.evaluation import Guardrails
-        g = Guardrails()
-        normalized = g.normalize_signal("long")
-        assert normalized == "LONG"
-
-    def test_guardrails_normalizes_uppercase_signal(self):
-        from infrastructure.evaluation import Guardrails
-        g = Guardrails()
-        normalized = g.normalize_signal("SHORT")
-        assert normalized == "SHORT"
-
-    def test_guardrails_rejects_invalid_signal(self):
-        from infrastructure.evaluation import Guardrails
-        g = Guardrails()
-        result = g.normalize_signal("BUY")
-        assert result == "NEUTRAL"
+    """Test signal validation and normalization."""
 
     def test_guardrails_accepts_valid_signals(self):
         from infrastructure.evaluation import Guardrails
         g = Guardrails()
         for signal in ("LONG", "SHORT", "NEUTRAL"):
-            assert g.normalize_signal(signal) == signal
+            result = g.validate_output({"signal": signal})
+            assert result.sanitized_output["signal"] == signal
+            assert len(result.violations) == 0
+
+    def test_guardrails_invalid_signal_forced_to_neutral(self):
+        from infrastructure.evaluation import Guardrails
+        g = Guardrails()
+        result = g.validate_output({"signal": "BUY"})
+        assert result.sanitized_output["signal"] == "NEUTRAL"
+        assert len(result.violations) == 1
+        assert "Invalid signal" in result.violations[0]
 
 
 class TestGuardrailsConfidenceBounds:
@@ -45,24 +32,29 @@ class TestGuardrailsConfidenceBounds:
     def test_confidence_above_max_clamped(self):
         from infrastructure.evaluation import Guardrails
         g = Guardrails()
-        clamped = g.clamp_confidence(1.5)
-        assert clamped <= 0.9999
+        result = g.validate_output({"signal": "LONG", "confidence": 1.5})
+        assert result.sanitized_output["confidence"] <= 0.9999
+        assert len(result.warnings) > 0
 
     def test_confidence_negative_clamped(self):
         from infrastructure.evaluation import Guardrails
         g = Guardrails()
-        clamped = g.clamp_confidence(-0.5)
-        assert clamped >= 0.0
+        result = g.validate_output({"signal": "LONG", "confidence": -0.5})
+        assert result.sanitized_output["confidence"] >= 0.0
+        assert len(result.warnings) > 0
 
     def test_confidence_within_range_unchanged(self):
         from infrastructure.evaluation import Guardrails
         g = Guardrails()
-        assert g.clamp_confidence(0.75) == pytest.approx(0.75)
+        result = g.validate_output({"signal": "LONG", "confidence": 0.75})
+        assert result.sanitized_output["confidence"] == pytest.approx(0.75)
+        assert len(result.violations) == 0
 
     def test_confidence_exactly_max_allowed(self):
         from infrastructure.evaluation import Guardrails
         g = Guardrails()
-        assert g.clamp_confidence(0.9999) == pytest.approx(0.9999)
+        result = g.validate_output({"signal": "LONG", "confidence": 0.9999})
+        assert result.sanitized_output["confidence"] == pytest.approx(0.9999)
 
 
 class TestGuardrailsOutputBounds:
@@ -71,88 +63,100 @@ class TestGuardrailsOutputBounds:
     def test_alpha_positive_clamped(self):
         from infrastructure.evaluation import Guardrails
         g = Guardrails()
-        clamped = g.clamp_alpha(50.0)
-        assert clamped <= 20.0
+        result = g.validate_output({"signal": "LONG", "alpha": 50.0})
+        assert result.sanitized_output["alpha"] <= 20.0
+        assert len(result.violations) > 0
 
     def test_alpha_negative_clamped(self):
         from infrastructure.evaluation import Guardrails
         g = Guardrails()
-        clamped = g.clamp_alpha(-50.0)
-        assert clamped >= -20.0
+        result = g.validate_output({"signal": "LONG", "alpha": -50.0})
+        assert abs(result.sanitized_output["alpha"]) <= 20.0
+        assert len(result.violations) > 0
 
     def test_alpha_within_bounds_unchanged(self):
         from infrastructure.evaluation import Guardrails
         g = Guardrails()
-        assert g.clamp_alpha(5.0) == pytest.approx(5.0)
+        result = g.validate_output({"signal": "LONG", "alpha": 5.0})
+        assert result.sanitized_output["alpha"] == pytest.approx(5.0)
+        assert len(result.violations) == 0
 
     def test_position_size_exceeds_max_clamped(self):
         from infrastructure.evaluation import Guardrails
         g = Guardrails()
-        clamped = g.clamp_position_size(50)
-        assert clamped <= 8
+        result = g.validate_output({"signal": "LONG", "contracts": 50})
+        assert result.sanitized_output["contracts"] <= 8
+        assert len(result.violations) > 0
 
-    def test_position_size_negative_clamped(self):
+    def test_position_size_negative_unchanged(self):
+        # GuardRails does not enforce a minimum position size
         from infrastructure.evaluation import Guardrails
         g = Guardrails()
-        clamped = g.clamp_position_size(-2)
-        assert clamped >= 1
+        result = g.validate_output({"signal": "LONG", "contracts": -2})
+        assert result.sanitized_output["contracts"] == -2
+        assert len(result.violations) == 0
 
     def test_rr_ratio_below_minimum_rejected(self):
         from infrastructure.evaluation import Guardrails
         g = Guardrails()
-        result = g.validate_rr_ratio(0.5)
-        assert result is False
+        result = g.validate_output({"signal": "LONG", "recommended_rr": 0.5})
+        # Low R:R causes violation and gets forced to 1.0
+        assert result.sanitized_output["recommended_rr"] >= 1.0
+        assert len(result.violations) > 0
 
     def test_rr_ratio_above_minimum_accepted(self):
         from infrastructure.evaluation import Guardrails
         g = Guardrails()
-        result = g.validate_rr_ratio(2.0)
-        assert result is True
+        result = g.validate_output({"signal": "LONG", "recommended_rr": 2.0})
+        assert result.sanitized_output["recommended_rr"] == pytest.approx(2.0)
+        assert len(result.violations) == 0
 
-    def test_stop_loss_out_of_range_rejected(self):
+    def test_stop_loss_too_tight_records_warning(self):
         from infrastructure.evaluation import Guardrails
         g = Guardrails()
-        # Too small
-        assert g.validate_stop_loss(1) is False
-        # Too large
-        assert g.validate_stop_loss(200) is False
+        result = g.validate_output({"signal": "LONG", "stop_loss_ticks": 1})
+        assert result.sanitized_output["stop_loss_ticks"] >= 5
+        assert any("tight" in w for w in result.warnings)
 
-    def test_stop_loss_valid_accepted(self):
+    def test_stop_loss_valid_no_warning(self):
         from infrastructure.evaluation import Guardrails
         g = Guardrails()
-        assert g.validate_stop_loss(50) is True
+        result = g.validate_output({"signal": "LONG", "stop_loss_ticks": 50})
+        assert result.sanitized_output["stop_loss_ticks"] == 50
+        assert len(result.warnings) == 0
 
 
 class TestGuardrailsGuardMethod:
-    """Test the full guard() method that wraps a prediction dict."""
+    """Test the full validate_output() method with a complete prediction dict."""
 
-    def test_guard_passes_valid_prediction(self):
+    def test_validate_output_passes_valid_prediction(self):
         from infrastructure.evaluation import Guardrails
         g = Guardrails()
         pred = {
             "signal": "LONG",
             "confidence": 0.75,
             "alpha": 5.0,
-            "position_size": 4,
-            "rr_ratio": 2.5,
+            "contracts": 4,
+            "recommended_rr": 2.5,
         }
-        guarded = g.guard(pred)
-        assert guarded["signal"] == "LONG"
-        assert guarded["confidence"] == pytest.approx(0.75)
+        result = g.validate_output(pred)
+        assert result.passed is True
+        assert result.sanitized_output["signal"] == "LONG"
+        assert result.sanitized_output["confidence"] == pytest.approx(0.75)
 
-    def test_guard_fixes_all_violations(self):
+    def test_validate_output_fixes_all_violations(self):
         from infrastructure.evaluation import Guardrails
         g = Guardrails()
         pred = {
-            "signal": "buy",        # lowercase → fixed
-            "confidence": 1.5,       # > 0.9999 → clamped
+            "signal": "buy",         # invalid → NEUTRAL
+            "confidence": 1.5,        # > 0.9999 → clamped
             "alpha": 100.0,          # > 20 → clamped
-            "position_size": 20,    # > 8 → clamped
-            "rr_ratio": 0.1,         # < 1 → fixed
+            "contracts": 20,         # > 8 → clamped
+            "recommended_rr": 0.1,  # < 1 → forced to 1.0
         }
-        guarded = g.guard(pred)
-        assert guarded["signal"] == "LONG"
-        assert guarded["confidence"] <= 0.9999
-        assert abs(guarded["alpha"]) <= 20.0
-        assert guarded["position_size"] <= 8
-        assert guarded["rr_ratio"] >= 1.0
+        result = g.validate_output(pred)
+        assert result.sanitized_output["signal"] == "NEUTRAL"
+        assert result.sanitized_output["confidence"] <= 0.9999
+        assert abs(result.sanitized_output["alpha"]) <= 20.0
+        assert result.sanitized_output["contracts"] <= 8
+        assert result.sanitized_output["recommended_rr"] >= 1.0

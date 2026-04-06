@@ -4,12 +4,6 @@ Tests exit strategy prediction, default fallback, and boundary conditions.
 """
 
 import pytest
-import sys
-from pathlib import Path
-
-ML_ENGINE = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(ML_ENGINE))
-
 from optimization.exit_optimizer import ExitStrategyPredictor
 
 
@@ -101,7 +95,8 @@ class TestExitStrategyPredictor:
         ep = ExitStrategyPredictor()
         result = ep.predict({})
         total = result["tp1_pct"] + result["tp2_pct"] + result["tp3_pct"]
-        assert total <= 0.95  # p1 + p2 constraint in grid
+        # Default: tp1=0.25, tp2=0.25, tp3=0.50 → sum = 1.0
+        assert total == pytest.approx(1.0)
 
     def test_predict_max_hold_clamped(self):
         ep = ExitStrategyPredictor()

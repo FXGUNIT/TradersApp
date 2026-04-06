@@ -1,0 +1,241 @@
+{
+  "id": "tradersapp",
+  "realm": "tradersapp",
+  "enabled": true,
+  "displayName": "TradersApp",
+  "displayNameHtml": "<div class=\"kc-logo-text\"><span>TradersApp</span></div>",
+  "accessTokenLifespan": 3600,
+  "accessTokenLifespanForImplicitFlow": 900,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 28800,
+  "offlineSessionIdleTimeout": 2592000,
+  "offlineSessionMaxLifespan": 5184000,
+  "accessCodeLifespan": 300,
+  "accessCodeLifespanUserAction": 300,
+  "accessCodeLifespanLogin": 1800,
+  "actionTokenGeneratedByAdminLifespan": 43200,
+  "actionTokenGeneratedByUserLifespan": 300,
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "registrationEmailAsUsername": false,
+  "rememberMe": true,
+  "verifyEmail": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": true,
+  "bruteForceLockoutTime": 1800,
+  "bruteForceMaxLoginFailures": 5,
+  "passwordPolicy": "length(12) and specialChars(1) and digits(1) and upperCase(1) and lowerCase(1) and notUsername",
+  "permanentLockout": false,
+  "maxFailureWaitSeconds": 900,
+  "minimumQuickLoginWaitSeconds": 60,
+  "waitIncrementSeconds": 60,
+  "quickLoginCheckMilliSeconds": 1000,
+  "maxDeltaTimeSeconds": 43200,
+  "failureFactor": 30,
+  "roles": {
+    "realm": [
+      {
+        "name": "TRADER",
+        "description": "Standard trader with access to trading dashboard",
+        "composite": false,
+        "clientRole": false
+      },
+      {
+        "name": "MENTOR",
+        "description": "Mentor with teaching tools access",
+        "composite": false,
+        "clientRole": false
+      },
+      {
+        "name": "ADMIN",
+        "description": "Full administrative access",
+        "composite": false,
+        "clientRole": false
+      }
+    ]
+  },
+  "defaultRoles": ["TRADER"],
+  "roleHierarchy": {
+    "roleHierarchyEntry": [
+      {"superiorRole": "ADMIN", "inferiorRole": "MENTOR"},
+      {"superiorRole": "MENTOR", "inferiorRole": "TRADER"}
+    ]
+  },
+  "defaultDefaultClientScopes": [
+    "role_list",
+    "profile",
+    "email",
+    "web-origins"
+  ],
+  "clientScopeMappings": {
+    "tradersapp-bff": [
+      {
+        "client": "tradersapp-bff",
+        "roles": ["TRADER", "MENTOR", "ADMIN"]
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "tradersapp-frontend",
+      "name": "TradersApp Frontend",
+      "description": "Frontend SPA Application",
+      "enabled": true,
+      "publicClient": true,
+      "protocol": "openid-connect",
+      "redirectUris": [
+        "http://localhost:5173/*",
+        "https://tradersapp.com/*"
+      ],
+      "webOrigins": [
+        "http://localhost:5173",
+        "https://tradersapp.com"
+      ],
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "frontchannelLogout": true,
+      "attributes": {
+        "access.token.lifespan": "3600",
+        "pkce.code.challenge.method": "S256",
+        "oauth2.device.authorization.grant.enabled": "false"
+      }
+    },
+    {
+      "clientId": "tradersapp-bff",
+      "name": "TradersApp BFF",
+      "description": "Backend for Frontend Service",
+      "enabled": true,
+      "publicClient": false,
+      "protocol": "openid-connect",
+      "redirectUris": [],
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": true,
+      "authorizationServicesEnabled": true,
+      "attributes": {
+        "access.token.lifespan": "3600",
+        "client.secret.creation.time": "0"
+      }
+    },
+    {
+      "clientId": "tradersapp-ml-engine",
+      "name": "TradersApp ML Engine",
+      "description": "ML Engine Service Account",
+      "enabled": true,
+      "publicClient": false,
+      "protocol": "openid-connect",
+      "redirectUris": [],
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": true,
+      "attributes": {
+        "access.token.lifespan": "3600",
+        "client.secret.creation.time": "0"
+      }
+    },
+    {
+      "clientId": "tradersapp-telegram",
+      "name": "TradersApp Telegram Bridge",
+      "description": "Telegram Bridge Service Account",
+      "enabled": true,
+      "publicClient": false,
+      "protocol": "openid-connect",
+      "redirectUris": [],
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": true,
+      "attributes": {
+        "access.token.lifespan": "86400"
+      }
+    },
+    {
+      "clientId": "tradersapp-admin-console",
+      "name": "TradersApp Admin Console",
+      "description": "Keycloak Admin Console",
+      "enabled": true,
+      "publicClient": false,
+      "protocol": "openid-connect",
+      "redirectUris": [
+        "http://localhost:8080/admin/*"
+      ],
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "attributes": {
+        "access.token.lifespan": "3600"
+      }
+    }
+  ],
+  "authenticationFlows": [
+    {
+      "alias": "first broker login",
+      "description": "Handle existing account with external IdP",
+      "providerId": "basic-flow",
+      "authenticationExecutions": [
+        {
+          "authenticator": "idp-review-profile",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "userSetupAllowed": false,
+          "autheticatorFlow": false
+        }
+      ]
+    },
+    {
+      "alias": "Browser - MFA Required",
+      "description": "Browser flow with mandatory MFA for admins",
+      "providerId": "basic-flow",
+      "authenticationExecutions": [
+        {
+          "authenticator": "auth-cookie",
+          "requirement": "ALTERNATIVE",
+          "priority": 0,
+          "userSetupAllowed": false,
+          "autheticatorFlow": false
+        },
+        {
+          "authenticator": "auth-password",
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "userSetupAllowed": false,
+          "autheticatorFlow": false
+        },
+        {
+          "authenticator": "auth-otp-totp",
+          "requirement": "REQUIRED",
+          "priority": 20,
+          "userSetupAllowed": false,
+          "autheticatorFlow": false
+        }
+      ]
+    }
+  ],
+  "securityHeaders": {
+    "contentSecurityPolicy": "frame-src 'self'; frame-ancestors 'self'; object-src 'none';",
+    "xContentTypeOptions": "nosniff",
+    "xRobotsTag": "none",
+    "xFrameOptions": "SAMEORIGIN",
+    "xxssProtection": "1; mode=block"
+  },
+  "attributes": {
+    "cibaBackchannelTokenDeliveryMode": "poll",
+    "cibaExpiresIn": "120",
+    "cibaAuthRequestedUserHint": "login_hint",
+    "oauth2DeviceAuthorizationGrantEnabled": "false",
+    "clientOfflineSessionMaxLifespan": "86400",
+    "clientSessionIdleTimeout": "0",
+    "clientSessionMaxLifespan": "86400",
+    "endpointsNotBefore": "0"
+  }
+}

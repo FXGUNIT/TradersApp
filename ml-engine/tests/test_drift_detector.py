@@ -9,9 +9,6 @@ import time
 from datetime import datetime, timezone
 
 import pytest
-import sys, os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 from infrastructure.drift_detector import (
     calculate_psi,
     DriftThresholds,

@@ -4,14 +4,9 @@ Tests Predictor class: model loading, consensus computation, fallback behavior.
 """
 
 import pytest
-import sys
-from pathlib import Path
 from unittest.mock import patch, MagicMock
 import pandas as pd
 import numpy as np
-
-ML_ENGINE = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(ML_ENGINE))
 
 
 class TestPredictorConsensus:
@@ -99,7 +94,7 @@ class TestPredictorConsensus:
         conf = {"model_a": 0.4, "model_b": 0.1}
         result = p._compute_consensus(votes, conf)
         assert "score_margin" in result
-        assert result["score_margin"] == abs(result["long_score"] - result["short_score"])
+        assert result["score_margin"] == pytest.approx(abs(result["long_score"] - result["short_score"]), rel=1e-9)
 
 
 class TestPredictorEmptyResponse:

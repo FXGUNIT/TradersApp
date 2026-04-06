@@ -1,12 +1,7 @@
 import sqlite3
-import sys
 from pathlib import Path
 
 import pandas as pd
-
-
-ML_ENGINE = Path(__file__).parent.parent
-sys.path.insert(0, str(ML_ENGINE))
 
 from data_quality.expectations.candle_expectations import get_candle_suite
 from data_quality.validation_pipeline import run_full_validation

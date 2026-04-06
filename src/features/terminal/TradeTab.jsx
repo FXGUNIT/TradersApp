@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   T,
   AMD_PHASES,
@@ -247,7 +247,7 @@ export default function TradeTab({
             currentBalance={accountState?.currentBalance}
             startingBalance={accountState?.startingBalance}
             highWaterMark={accountState?.highWaterMark}
-            maxDrawdown={maxDrawdown ?? 0}
+            maxDrawdown={maxDD ?? 0}
             drawdownType={drawdownType ?? "trailing"}
             slPts={slPts ?? 0}
             ptVal={ptVal ?? 1}

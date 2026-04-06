@@ -1,5 +1,19 @@
 import React from 'react';
 
+const REACT_FORWARD_REF = typeof Symbol !== "undefined" && Symbol.for
+  ? Symbol.for("react.forward_ref")
+  : 0;
+
+function isRenderableIcon(icon) {
+  if (typeof icon === "function") return true;
+  return Boolean(
+    icon &&
+    typeof icon === "object" &&
+    icon.$$typeof === REACT_FORWARD_REF &&
+    typeof icon.render === "function"
+  );
+}
+
 const Breadcrumbs = ({ items, onNavigate }) => {
   return (
     <div style={{
@@ -43,7 +57,13 @@ const Breadcrumbs = ({ items, onNavigate }) => {
             }}
             title={item.label}
           >
-            {item.icon} {item.label}
+            {isRenderableIcon(item.icon)
+              ? (() => {
+                  const Icon = item.icon;
+                  return <Icon size={12} />;
+                })()
+              : item.icon}{" "}
+            {item.label}
           </button>
           {idx < items.length - 1 && (
             <span style={{ color: '#3A3A3C', fontSize: 10 }}>›</span>
