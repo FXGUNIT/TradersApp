@@ -551,20 +551,20 @@ export const executeStructuredSignup = async ({
 
   await Promise.all([
     submitOnboardingApplication({
-    uid: activeUser.uid,
-    fullName,
-    email: cleanEmail,
-    country,
-    city,
-    instagram,
-    linkedin,
-    proficiency,
-    authProvider,
-    emailVerified: activeUser.emailVerified,
-    consentState: {
-      termsAccepted: Boolean(formData.agreedToTerms),
-      privacyAccepted: Boolean(formData.agreedToTerms),
-    },
+      uid: activeUser.uid,
+      fullName,
+      email: cleanEmail,
+      country,
+      city,
+      instagram,
+      linkedin,
+      proficiency,
+      authProvider,
+      emailVerified: activeUser.emailVerified,
+      consentState: {
+        termsAccepted: Boolean(formData.agreedToTerms),
+        privacyAccepted: Boolean(formData.agreedToTerms),
+      },
     }),
     provisionIdentityUserRecord(activeUser.uid, profileData, authData.token),
   ]);
@@ -581,6 +581,7 @@ export const executeStructuredSignup = async ({
     token: authData.token,
   });
   setScreen("waiting");
+  void sendWelcomeEmail(cleanEmail, fullName);
 };
 
 export const executeStructuredGoogleAuth = async ({
