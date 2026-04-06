@@ -2262,24 +2262,50 @@ async def compute_returns_for_backtest(request: BacktestTradesRequest):
     """
     Convert uploaded trades into returns array for backtesting.
     Returns the PnL sequence that can be passed to /backtest/full.
+
+    Cached in Redis (300s TTL) — same trades always produce identical stats.
     """
     try:
+        monitor = get_sla_monitor()
+        start = time.time()
+
         if not request.trades:
+            monitor.record("/backtest/returns", (time.time() - start) * 1000, 400)
             raise HTTPException(status_code=400, detail="No trades provided")
+
+        # ── Cache key from trades PnL hash ─────────────────────────────────
+        cache = get_cache()
+        pnl_vals = [t.get("pnl_ticks", 0.0) or 0.0 for t in request.trades]
+        pnl_hash = hashlib.sha256(
+            json.dumps(pnl_vals, sort_keys=True).encode()
+        ).hexdigest()[:16]
+        override_hash = hashlib.sha256(
+            json.dumps(request.returns_override or [], sort_keys=True).encode()
+        ).hexdigest()[:8]
+        cache_key = f"backtest:returns:{pnl_hash}:{override_hash}"
+
+        cached = cache.get(cache_key)
+        if cached is not None:
+            if PROMETHEUS_AVAILABLE and record_prometheus_cache:
+                record_prometheus_cache(hit=True)
+            cached["_cached"] = True
+            cached["_cache_age_ms"] = round((time.time() - start) * 1000, 1)
+            monitor.record("/backtest/returns", (time.time() - start) * 1000, 200)
+            return cached
 
         if request.returns_override:
             arr = np.array(request.returns_override, dtype=float)
         else:
-            pnl = [t.get("pnl_ticks", 0.0) or 0.0 for t in request.trades]
-            arr = np.array(pnl, dtype=float)
+            arr = np.array(pnl_vals, dtype=float)
 
         if len(arr) < 50:
+            monitor.record("/backtest/returns", (time.time() - start) * 1000, 400)
             raise HTTPException(
                 status_code=400,
                 detail=f"Need at least 50 trades/returns, got {len(arr)}"
             )
 
-        return {
+        output = {
             "ok": True,
             "count": len(arr),
             "mean_return": round(float(np.mean(arr)), 4),
@@ -2292,9 +2318,19 @@ async def compute_returns_for_backtest(request: BacktestTradesRequest):
             "returns_preview": arr[:20].tolist(),
         }
 
+        cache.set(cache_key, output, ttl=300)
+
+        latency_ms = (time.time() - start) * 1000
+        monitor.record("/backtest/returns", latency_ms, 200)
+        if PROMETHEUS_AVAILABLE and record_prometheus_cache:
+            record_prometheus_cache(hit=False)
+
+        return output
+
     except HTTPException:
         raise
     except Exception as e:
+        monitor.record("/backtest/returns", (time.time() - start) * 1000, 500)
         raise HTTPException(status_code=500, detail=str(e))
 
 

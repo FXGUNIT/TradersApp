@@ -492,16 +492,17 @@ class SLAMonitor:
     }
 
     SLA_TARGETS = {
-        "/predict":            {"p50_ms": 50,   "p95_ms": 200,   "p99_ms": 500,   "max_err_rate": 0.01},
-        "/mamba/predict":      {"p50_ms": 2000, "p95_ms": 5000,  "p99_ms": 10000, "max_err_rate": 0.05},
-        "/inference/predict": {"p50_ms": 20,   "p95_ms": 50,    "p99_ms": 100,   "max_err_rate": 0.01},
-        "/regime":            {"p50_ms": 100,  "p95_ms": 500,   "p99_ms": 1000,  "max_err_rate": 0.02},
-        "/consensus":         {"p50_ms": 100,  "p95_ms": 500,   "p99_ms": 1000,  "max_err_rate": 0.02},
-        "/pso/discover":      {"p50_ms": 5000, "p95_ms": 30000, "p99_ms": 60000, "max_err_rate": 0.05},
-        "/backtest/pbo":      {"p50_ms": 2000, "p95_ms": 10000, "p99_ms": 30000, "max_err_rate": 0.05},
-        "/backtest/mc":       {"p50_ms": 3000, "p95_ms": 15000, "p99_ms": 45000, "max_err_rate": 0.05},
-        "/backtest/full":     {"p50_ms": 5000, "p95_ms": 30000, "p99_ms": 90000, "max_err_rate": 0.05},
-        "ALL":                {"p50_ms": 100,  "p95_ms": 500,    "p99_ms": 1000,  "max_err_rate": 0.01},
+        "/predict":             {"p50_ms": 50,   "p95_ms": 200,    "p99_ms": 500,    "max_err_rate": 0.01},
+        "/mamba/predict":       {"p50_ms": 2000, "p95_ms": 5000,  "p99_ms": 10000,  "max_err_rate": 0.05},
+        "/inference/predict":   {"p50_ms": 20,   "p95_ms": 50,    "p99_ms": 100,    "max_err_rate": 0.01},
+        "/regime":             {"p50_ms": 100,  "p95_ms": 500,    "p99_ms": 1000,   "max_err_rate": 0.02},
+        "/consensus":          {"p50_ms": 100,  "p95_ms": 500,    "p99_ms": 1000,   "max_err_rate": 0.02},
+        "/pso/discover":       {"p50_ms": 5000, "p95_ms": 30000, "p99_ms": 60000,  "max_err_rate": 0.05},
+        "/backtest/pbo":       {"p50_ms": 2000, "p95_ms": 10000, "p99_ms": 30000,  "max_err_rate": 0.05},
+        "/backtest/mc":        {"p50_ms": 3000, "p95_ms": 15000, "p99_ms": 45000,  "max_err_rate": 0.05},
+        "/backtest/full":      {"p50_ms": 5000, "p95_ms": 30000, "p99_ms": 90000,  "max_err_rate": 0.05},
+        "/backtest/returns":    {"p50_ms": 50,   "p95_ms": 200,   "p99_ms": 500,    "max_err_rate": 0.01},
+        "ALL":                 {"p50_ms": 100,  "p95_ms": 500,    "p99_ms": 1000,   "max_err_rate": 0.01},
     }
 
     def __init__(self, max_samples: int = 100_000):
