@@ -2607,19 +2607,44 @@ async def pso_alpha_discovery(request: PSORequest):
     - Position sizing parameters
 
     Returns optimal parameters per market regime (COMPRESSION/NORMAL/EXPANSION).
+
+    Cached in Redis (300s TTL) — useful for autotune loops that repeatedly
+    evaluate the same parameter space without waiting for fresh optimization.
     """
     try:
+        monitor = get_sla_monitor()
+        start = time.time()
+
+        cache = get_cache()
+
         if request.candles:
             df = pd.DataFrame([c.model_dump() for c in request.candles])
             df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
+            candle_hash = hashlib.sha256(
+                json.dumps(request.candles[-20:], sort_keys=True, default=str).encode()
+            ).hexdigest()[:16]
         else:
             df = db.get_latest_candles(request.symbol, n=2000)
+            candle_hash = "from_db"
 
         if df.empty:
+            monitor.record("/pso/discover", (time.time() - start) * 1000, 400)
             raise HTTPException(
                 status_code=400,
                 detail="No candles available. Upload historical data first."
             )
+
+        # ── Cache key (short TTL — PSO is stochastic) ────────────────────────
+        cache_key = f"pso:discover:{request.symbol}:{request.regime}:{request.n_particles}:{request.max_iterations}:{candle_hash}"
+
+        cached = cache.get(cache_key)
+        if cached is not None:
+            if PROMETHEUS_AVAILABLE and record_prometheus_cache:
+                record_prometheus_cache(hit=True)
+            cached["_cached"] = True
+            cached["_cache_age_ms"] = round((time.time() - start) * 1000, 1)
+            monitor.record("/pso/discover", (time.time() - start) * 1000, 200)
+            return cached
 
         trade_df = db.get_trade_log(limit=5000)
         feat_df = engineer_features(df, trade_df, None, {}, {})
@@ -2628,10 +2653,11 @@ async def pso_alpha_discovery(request: PSORequest):
             # Run single-regime PSO
             niche_config = NichingPSO.REGIME_NICHES.get(request.regime.upper())
             if not niche_config:
+                monitor.record("/pso/discover", (time.time() - start) * 1000, 400)
                 raise HTTPException(status_code=400, detail=f"Unknown regime: {request.regime}")
             pso = PSOOptimizer(n_particles=request.n_particles, max_iterations=request.max_iterations)
             result = pso.optimize(df, trade_df, feat_df, regime=request.regime.upper())
-            return {
+            output = {
                 "regimes_found": 1,
                 "best_regime": request.regime.upper(),
                 "best_regime_alpha": float(result.alpha_contribution),
@@ -2660,11 +2686,21 @@ async def pso_alpha_discovery(request: PSORequest):
                 n_particles=request.n_particles,
                 max_iterations=request.max_iterations,
             )
-            return result
+            output = result
+
+        cache.set(cache_key, output, ttl=300)
+
+        latency_ms = (time.time() - start) * 1000
+        monitor.record("/pso/discover", latency_ms, 200)
+        if PROMETHEUS_AVAILABLE and record_prometheus_cache:
+            record_prometheus_cache(hit=False)
+
+        return output
 
     except HTTPException:
         raise
     except Exception as e:
+        monitor.record("/pso/discover", (time.time() - start) * 1000, 500)
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
