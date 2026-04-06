@@ -28,7 +28,7 @@ from data.candle_db import CandleDatabase
 from infrastructure.performance import (
     get_cache, get_sla_monitor, RedisCache, CacheConfig, SLAMonitor,
 )
-from infrastructure.request_context import RequestIdMiddleware
+from infrastructure.request_context import RequestIdMiddleware, get_request_id
 from infrastructure.drift_detector import (
     DriftMonitor, DriftThresholds,
 )
@@ -402,6 +402,7 @@ async def health():
 
     return {
         "status": "healthy",
+        "request_id": get_request_id(),
         "uptime_sec": round(uptime, 1),
         "db_candles": stats.get("candles", 0),
         "db_trades": stats.get("trades", 0),
@@ -2935,7 +2936,11 @@ async def mamba_finetune(request: MambaRequest):
 async def global_exception_handler(request, exc):
     return JSONResponse(
         status_code=500,
-        content={"error": str(exc), "type": type(exc).__name__},
+        content={
+            "error": str(exc),
+            "type": type(exc).__name__,
+            "request_id": get_request_id(),
+        },
     )
 
 
