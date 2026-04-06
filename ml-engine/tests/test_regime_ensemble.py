@@ -26,19 +26,7 @@ class MockHMMRegimeDetector:
 
     def train(self, *args, **kwargs):
         self._is_trained = True
-        import numpy as np
-        return {
-            "model": "hmm_regime",
-            "n_states": 3,
-            "n_samples": len(args[0]) if args else 0,
-            "log_likelihood": 0.0,
-            "bic": 0.0,
-            "aic": 0.0,
-            "transition_matrix": np.eye(3).tolist(),
-            "state_order": ["COMPRESSION", "NORMAL", "EXPANSION"],
-            "state_map": {"0": 0, "1": 1, "2": 2},
-            "state_stats": {},
-        }
+        return {}
 
     def predict_current(self, df):
         return self._default_regime()
