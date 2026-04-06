@@ -25,8 +25,11 @@ export function useAuthBootstrap({
   setGoogleUser,
   setScreen,
   setIsInitialLoading,
+  authBootstrapCompleteRef: externalAuthBootstrapCompleteRef,
 }) {
-  const authBootstrapCompleteRef = useRef(false);
+  const internalAuthBootstrapCompleteRef = useRef(false);
+  const authBootstrapCompleteRef =
+    externalAuthBootstrapCompleteRef || internalAuthBootstrapCompleteRef;
 
   useEffect(() => {
     if (!auth) {
@@ -127,7 +130,16 @@ export function useAuthBootstrap({
       clearTimeout(authTimeout);
       unsubscribe();
     };
-  }, [checkUserStatus, isAdminAuthenticated, setAuth, setProfile, setGoogleUser, setScreen, setIsInitialLoading]);
+  }, [
+    authBootstrapCompleteRef,
+    checkUserStatus,
+    isAdminAuthenticated,
+    setAuth,
+    setProfile,
+    setGoogleUser,
+    setScreen,
+    setIsInitialLoading,
+  ]);
 }
 
 export default useAuthBootstrap;

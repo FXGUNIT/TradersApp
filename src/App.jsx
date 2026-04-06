@@ -305,21 +305,28 @@ export default function TradersRegiment() {
   const [showAdminPwd, setShowAdminPwd] = useState(false);
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
-  // HARD SAFETY TIMEOUT: If Firebase auth hasn't resolved within 10s, force to login.
-  // This is outside useAuthBootstrap so it survives React StrictMode unmount/remount cycles.
-  // authBootstrapCompleteRef ensures this doesn't fire if auth already completed.
+  // Last-resort timeout if both admin restore and auth bootstrap stall.
+  // This is intentionally slower than the hook-level auth timeout so it only
+  // catches truly stuck startup states.
   const hardTimeoutRef = useRef(false);
   useEffect(() => {
-    if (hardTimeoutRef.current) return;
+    if (hardTimeoutRef.current || !isInitialLoading) return;
     const timer = setTimeout(() => {
-      if (hardTimeoutRef.current) return;
+      if (
+        hardTimeoutRef.current ||
+        authBootstrapCompleteRef.current ||
+        !isInitialLoading
+      ) {
+        return;
+      }
       hardTimeoutRef.current = true;
+      authBootstrapCompleteRef.current = true;
       console.warn("[App] Auth hard timeout — forcing to login screen");
       setScreen("login");
       setIsInitialLoading(false);
-    }, 10000);
+    }, 20000);
     return () => clearTimeout(timer);
-  }, []);
+  }, [authBootstrapCompleteRef, isInitialLoading]);
   const [isAudioMuted, setIsAudioMuted] = useState(() => {
     try { return localStorage.getItem("audio_muted") === "true"; } catch { return false; }
   });
@@ -534,6 +541,7 @@ export default function TradersRegiment() {
     setGoogleUser,
     setScreen,
     setIsInitialLoading,
+    authBootstrapCompleteRef,
   });
 
   useTerminalWorkspaceHydration({
@@ -739,5 +747,4 @@ export default function TradersRegiment() {
     </AppShellProvider>
   );
 }
-
 
