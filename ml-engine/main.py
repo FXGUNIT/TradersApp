@@ -2068,6 +2068,7 @@ async def run_mc_backtest(request: MCBacktestRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@profile_endpoint("/backtest/full", threshold_ms=5000)
 @app.post("/backtest/full", tags=["backtest"])
 async def run_full_pbo(request: FullPBOBacktestRequest):
     """
@@ -2636,6 +2637,7 @@ class PSOResult(BaseModel):
     timestamp: str
 
 
+@profile_endpoint("/pso/discover", threshold_ms=5000)
 @app.post("/pso/discover")
 async def pso_alpha_discovery(request: PSORequest):
     """
@@ -2757,6 +2759,7 @@ class MambaRequest(BaseModel):
     task: str = Field(default="full")  # direction, regime, pattern, full
 
 
+@profile_endpoint("/mamba/predict", threshold_ms=1000)
 @app.post("/mamba/predict")
 async def mamba_predict(request: MambaRequest):
     """
