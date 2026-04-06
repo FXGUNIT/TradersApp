@@ -70,6 +70,7 @@ export function useAuthSessionHandlers({
     async (authData) => {
       await executeCheckUserStatus({
         authData,
+        currentProfile: profile,
         loadUserProfile,
         readPendingGoogleSignup,
         persistPendingGoogleSignup,
@@ -96,6 +97,7 @@ export function useAuthSessionHandlers({
       resolveRestorableScreen,
       setConsciousnessReturnScreen,
       setGoogleUser,
+      profile,
       setProfile,
       setScreen,
       showToast,

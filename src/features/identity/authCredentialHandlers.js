@@ -481,6 +481,7 @@ export const executeStructuredSignup = async ({
   }
 
   let activeUser = firebaseAuth.currentUser;
+  let verificationLinkPromise = Promise.resolve(null);
 
   if (authProvider === "google") {
     if (!activeUser) {
@@ -506,15 +507,19 @@ export const executeStructuredSignup = async ({
         formData.password,
       );
       activeUser = userCredential.user;
-      try {
-        await sendVerificationLink();
-      } catch (verificationError) {
-        console.warn("Verification email send failed after signup:", verificationError);
-        showToast?.(
-          "Account created. Verification email can be resent from the waiting screen.",
-          "warning",
-        );
-      }
+      verificationLinkPromise = Promise.resolve(sendVerificationLink()).catch(
+        (verificationError) => {
+          console.warn(
+            "Verification email send failed after signup:",
+            verificationError,
+          );
+          showToast?.(
+            "Account created. Verification email can be resent from the waiting screen.",
+            "warning",
+          );
+          return null;
+        },
+      );
     } catch (signupError) {
       const errorCode = signupError?.code || "";
       if (errorCode === "auth/email-already-in-use") {

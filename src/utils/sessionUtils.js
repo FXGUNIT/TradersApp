@@ -21,6 +21,8 @@ export const generateSessionId = () => {
   return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 };
 
+const SESSION_GEO_TIMEOUT_MS = 1200;
+
 export const getDeviceInfo = () => {
   const ua = navigator.userAgent;
   let device = "Unknown Device";
@@ -41,8 +43,20 @@ export const getDeviceInfo = () => {
 };
 
 export const getSessionGeoData = async () => {
+  const controller =
+    typeof AbortController !== "undefined" ? new AbortController() : null;
+  const timeoutId =
+    controller !== null
+      ? setTimeout(() => controller.abort(), SESSION_GEO_TIMEOUT_MS)
+      : null;
+
   try {
-    const geoRes = await fetch("https://ipapi.co/json/");
+    const geoRes = await fetch("https://ipapi.co/json/", {
+      signal: controller?.signal,
+    });
+    if (!geoRes.ok) {
+      return { city: "Unknown", country: "Unknown" };
+    }
     const geoData = await geoRes.json();
     return {
       city: geoData.city || "Unknown",
@@ -50,6 +64,10 @@ export const getSessionGeoData = async () => {
     };
   } catch {
     return { city: "Unknown", country: "Unknown" };
+  } finally {
+    if (timeoutId !== null) {
+      clearTimeout(timeoutId);
+    }
   }
 };
 

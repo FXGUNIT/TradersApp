@@ -1,7 +1,9 @@
+import { isPasswordExpired } from "../../utils/securityUtils.js";
 import { auth as firebaseAuth } from "../../services/firebase.js";
 
 export const executeCheckUserStatus = async ({
   authData,
+  currentProfile = null,
   loadUserProfile: suppliedLoadUserProfile,
   readPendingGoogleSignup,
   persistPendingGoogleSignup,
@@ -57,6 +59,14 @@ export const executeCheckUserStatus = async ({
         return;
       }
 
+      if (
+        auditProfile?.passwordLastChanged &&
+        isPasswordExpired(auditProfile.passwordLastChanged)
+      ) {
+        setScreen(SCREEN_IDS.FORCE_PASSWORD_RESET);
+        return;
+      }
+
       const restoreUid = authData?.uid || auditProfile.uid;
       const restoredScreen = resolveRestorableScreen(restoreUid, SCREEN_IDS.HUB);
       setConsciousnessReturnScreen(
@@ -76,22 +86,29 @@ export const executeCheckUserStatus = async ({
 
     if (success === false && !userData && !nextProfile) {
       const fallbackScreen =
-        authData?.uid === ADMIN_UID
+        authData?.uid === ADMIN_UID || currentProfile?.role === "admin"
           ? SCREEN_IDS.ADMIN
-          : authData?.emailVerified === false
+          : authData?.emailVerified === false ||
+              currentProfile?.status === "PENDING"
             ? SCREEN_IDS.WAITING
-            : resolveRestorableScreen(authData.uid, SCREEN_IDS.WAITING);
+            : currentProfile?.passwordLastChanged &&
+                isPasswordExpired(currentProfile.passwordLastChanged)
+              ? SCREEN_IDS.FORCE_PASSWORD_RESET
+              : resolveRestorableScreen(authData.uid, SCREEN_IDS.HUB);
 
       setGoogleUser(null);
-      setProfile((currentProfile) =>
-        currentProfile || {
+      setProfile((existingProfile) =>
+        existingProfile || {
           uid: authData.uid,
           token: authData.token,
           email: authData.email,
           emailVerified: authData.emailVerified,
           status:
             fallbackScreen === SCREEN_IDS.WAITING ? "PENDING" : "ACTIVE",
-          role: authData?.uid === ADMIN_UID ? "admin" : "user",
+          role:
+            currentProfile?.role ||
+            (authData?.uid === ADMIN_UID ? "admin" : "user"),
+          passwordLastChanged: currentProfile?.passwordLastChanged,
         },
       );
       console.warn(
@@ -157,6 +174,14 @@ export const executeCheckUserStatus = async ({
 
     if (userData.status === "PENDING" || authData.emailVerified === false) {
       setScreen(SCREEN_IDS.WAITING);
+      return;
+    }
+
+    if (
+      userData.passwordLastChanged &&
+      isPasswordExpired(userData.passwordLastChanged)
+    ) {
+      setScreen(SCREEN_IDS.FORCE_PASSWORD_RESET);
       return;
     }
 
