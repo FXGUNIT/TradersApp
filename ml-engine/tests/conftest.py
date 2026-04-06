@@ -252,3 +252,4 @@ def pytest_runtest_teardown(item, nextitem):
                     "models.regime.anomalous_diffusion",
                 ):
                     del sys.modules[key]
+            print(f"[CONFTEST] Cleaned mock regime modules, nextitem={nextitem.fspath.basename}")
