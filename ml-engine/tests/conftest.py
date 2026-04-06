@@ -243,6 +243,7 @@ def seeded_db(temp_db, sample_candles, sample_trades):
 # ─── Hooks ──────────────────────────────────────────────────────────────────
 
 def pytest_collection_modifyitems(session, config, items):
+    print(f"[CONFTEST] pytest_collection_modifyitems called, n_items={len(items)}")
     """After test_regime_ensemble.py runs (alphabetically before test_phase1.py),
     clear the mock regime modules from sys.modules so subsequent test files
     (test_phase1.py etc.) get real regime model classes."""
