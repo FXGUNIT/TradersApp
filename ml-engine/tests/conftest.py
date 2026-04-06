@@ -267,6 +267,5 @@ def pytest_collection_finish(session):
             ):
                 del sys.modules[key]
         _cleanup_done = True
-        print("[CONFTEST] Cleared mock regime modules at collection finish")
 
 
