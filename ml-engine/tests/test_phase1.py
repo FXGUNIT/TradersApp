@@ -693,8 +693,9 @@ def test_redis_cache_key_generation():
     assert key1 == key2
     # Different params → different key
     assert key1 != key3
-    # Key has prefix
-    assert key1.startswith("test:predict:")
+    # Key has prefix with version (e.g. "test:v1:predict:")
+    from infrastructure.performance import CACHE_KEY_VERSION
+    assert key1.startswith(f"test:{CACHE_KEY_VERSION}:predict:")
 
 
 # -------------------------------------------------------------------------
