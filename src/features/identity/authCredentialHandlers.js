@@ -58,7 +58,7 @@ export const executeLogin = async ({
   setCurrentSessionId,
   setProfile,
   setScreen,
-  showToast,
+  showToast: _showToast,
   checkUserStatus,
   provisionIdentityUserRecord,
   ADMIN_UID,
@@ -263,14 +263,17 @@ export const executeLogin = async ({
     }
   }
 
-  const signedInUser = firebaseAuth.currentUser;
-  if (!signedInUser) {
+  const activeSessionUser = firebaseAuth.currentUser;
+  if (!activeSessionUser) {
     throw new Error("We could not restore your session. Try again.");
   }
 
-  const authData = await syncAuthSessionFromUser(signedInUser, stayLoggedIn);
+  const authData = await syncAuthSessionFromUser(
+    activeSessionUser,
+    stayLoggedIn,
+  );
 
-  if (signedInUser.uid === ADMIN_UID) {
+  if (activeSessionUser.uid === ADMIN_UID) {
     sendTelegramAlert(
       "🔓 <b>GOD MODE ACTIVATED</b>\nMaster Admin has entered the terminal.",
     );
@@ -279,10 +282,10 @@ export const executeLogin = async ({
     const userData = adminRecord?.userData || {};
     setProfile({
       ...userData,
-      uid: signedInUser.uid,
+      uid: activeSessionUser.uid,
       token: authData.token,
-      email: signedInUser.email,
-      emailVerified: signedInUser.emailVerified,
+      email: activeSessionUser.email,
+      emailVerified: activeSessionUser.emailVerified,
     });
     setScreen("admin");
     return;
@@ -292,15 +295,15 @@ export const executeLogin = async ({
     (await loadUserProfile(authData))?.userData || null;
   if (!userDataFinal) {
     const initProfile = buildPendingProfile({
-      fullName: signedInUser.displayName,
-      email: signedInUser.email,
+      fullName: activeSessionUser.displayName,
+      email: activeSessionUser.email,
       country: "",
       city: "",
       authProvider: "password",
-      emailVerified: signedInUser.emailVerified,
+      emailVerified: activeSessionUser.emailVerified,
     });
     await provisionIdentityUserRecord(
-      signedInUser.uid,
+      activeSessionUser.uid,
       initProfile,
       authData.token,
     );
@@ -313,10 +316,10 @@ export const executeLogin = async ({
   ) {
     setProfile({
       ...userDataFinal,
-      uid: signedInUser.uid,
+      uid: activeSessionUser.uid,
       token: authData.token,
-      email: signedInUser.email,
-      emailVerified: signedInUser.emailVerified,
+      email: activeSessionUser.email,
+      emailVerified: activeSessionUser.emailVerified,
     });
     setScreen("forcePasswordReset");
     return;
