@@ -183,43 +183,8 @@ import pytest
 
 @pytest.fixture(scope="session", autouse=True)
 def cleanup_regime_mocks():
-    """Clear mock regime modules from sys.modules after session setup.
-
-    test_regime_ensemble.py sets mocks at module level (before collection).
-    We use pytest_collection_modifyitems to clean up at the right time (see below).
-    This fixture just ensures the cleanup hook is registered.
-    """
-    yield  # tests run
-
-
-def pytest_collection_modifyitems(session, config, items):
-    """After test_regime_ensemble.py runs (alphabetically before test_phase1.py),
-    clear the mock regime modules from sys.modules so subsequent test files
-    (test_phase1.py etc.) get real regime model classes."""
-    import sys
-    test_file_names = {item.fspath.basename for item in items}
-    regime_ensemble_ran = "test_regime_ensemble.py" in test_file_names
-
-    if regime_ensemble_ran:
-        # Mark when cleanup should happen — right before phase1 tests
-        session._cleanup_regime_mocks = True
-
-
-def pytest_runtest_teardown(item, nextitem):
-    """After test_regime_ensemble.py teardown, clear mock modules from sys.modules."""
-    import sys
-    if getattr(item.config, "_cleanup_regime_mocks", False):
-        if item.fspath.basename == "test_regime_ensemble.py":
-            # Clean up after regime_ensemble, before phase1
-            for key in list(sys.modules.keys()):
-                if key in (
-                    "models.regime.hmm_regime",
-                    "models.regime.fp_fk_regime",
-                    "models.regime.anomalous_diffusion",
-                ):
-                    del sys.modules[key]
-            # Mark cleanup done
-            item.config._cleanup_regime_mocks = False
+    """No-op — we use local mocks in regime_ensemble tests only."""
+    yield
 
 
 class TestRegimeEnsembleInit:
