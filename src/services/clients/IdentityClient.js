@@ -296,7 +296,13 @@ export async function getUserStatusByUid(uid, authDataOrToken = "") {
   }
 
   const response = await fetchIdentityUserStatus(uid);
-  return response?.status || response?.data?.status || response || null;
+  const status =
+    typeof response?.status === "string"
+      ? response.status
+      : typeof response?.data?.status === "string"
+        ? response.data.status
+        : null;
+  return status;
 }
 
 export default {

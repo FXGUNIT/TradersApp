@@ -126,11 +126,11 @@ export const executeLogin = async ({
 
   const currentEmail = firebaseAuth.currentUser?.email?.toLowerCase();
   if (currentEmail && currentEmail !== sanitizedEmail) {
-    showToast(
-      "Session collision detected. Previous timeline still active.",
-      "error",
-    );
-    return;
+    try {
+      await signOut(firebaseAuth);
+    } catch (error) {
+      console.warn("Failed to clear previous Firebase session:", error);
+    }
   }
 
   try {
@@ -146,47 +146,14 @@ export const executeLogin = async ({
     );
   }
 
+  let signedInUser = null;
   try {
     const userCredential = await signInWithEmailAndPassword(
       firebaseAuth,
       sanitizedEmail,
       password,
     );
-    const signedInUser = userCredential.user;
-
-    clearLoginFailures(sanitizedEmail);
-
-    const token = await signedInUser.getIdToken(true);
-    const signedInRecord = await loadUserProfile({
-      uid: signedInUser.uid,
-      token,
-      email: signedInUser.email,
-      emailVerified: signedInUser.emailVerified,
-    });
-
-    if (signedInRecord?.userData?.isLocked) {
-      try {
-        await signOut(firebaseAuth);
-      } catch {
-        // Ignore sign-out failures during locked-account recovery.
-      }
-      throw new Error(
-        "Account Locked: Too many failed attempts. Contact Master Admin.",
-      );
-    }
-
-    if (signedInUser?.uid) {
-      await updateLoginSecurityCounters(
-        signedInUser.uid,
-        {
-          failedAttempts: 0,
-          isLocked: false,
-          lastLoginAttempt: new Date().toISOString(),
-          emailVerified: signedInUser.emailVerified,
-        },
-        token,
-      );
-    }
+    signedInUser = userCredential.user;
   } catch (error) {
     recordLoginFailure(sanitizedEmail);
 
@@ -239,6 +206,61 @@ export const executeLogin = async ({
     }
 
     throw error;
+  }
+
+  clearLoginFailures(sanitizedEmail);
+
+  if (!signedInUser) {
+    throw new Error("We could not restore your session. Try again.");
+  }
+
+  let signedInToken = "";
+  try {
+    signedInToken = await signedInUser.getIdToken(true);
+  } catch (error) {
+    console.warn("Failed to refresh token after login:", error);
+  }
+
+  try {
+    const signedInRecord = await loadUserProfile({
+      uid: signedInUser.uid,
+      token: signedInToken,
+      email: signedInUser.email,
+      emailVerified: signedInUser.emailVerified,
+    });
+
+    if (signedInRecord?.userData?.isLocked) {
+      try {
+        await signOut(firebaseAuth);
+      } catch {
+        // Ignore sign-out failures during locked-account recovery.
+      }
+      throw new Error(
+        "Account Locked: Too many failed attempts. Contact Master Admin.",
+      );
+    }
+  } catch (error) {
+    if (error?.message?.includes("Account Locked")) {
+      throw error;
+    }
+    console.warn("Profile check after login failed:", error);
+  }
+
+  if (signedInUser.uid) {
+    try {
+      await updateLoginSecurityCounters(
+        signedInUser.uid,
+        {
+          failedAttempts: 0,
+          isLocked: false,
+          lastLoginAttempt: new Date().toISOString(),
+          emailVerified: signedInUser.emailVerified,
+        },
+        signedInToken,
+      );
+    } catch (error) {
+      console.warn("Failed to reset login security counters:", error);
+    }
   }
 
   const signedInUser = firebaseAuth.currentUser;
@@ -326,6 +348,7 @@ export const executeStructuredSignup = async ({
   setScreen,
   ADMIN_EMAIL,
   sendForensicAlert,
+  showToast,
 }) => {
   const antiSpamShield = new AntiSpamShield(window.sendTelegramAlert);
   if (antiSpamShield.isBotDetected(formData)) {
@@ -480,7 +503,15 @@ export const executeStructuredSignup = async ({
         formData.password,
       );
       activeUser = userCredential.user;
-      await sendVerificationLink();
+      try {
+        await sendVerificationLink();
+      } catch (verificationError) {
+        console.warn("Verification email send failed after signup:", verificationError);
+        showToast?.(
+          "Account created. Verification email can be resent from the waiting screen.",
+          "warning",
+        );
+      }
     } catch (signupError) {
       const errorCode = signupError?.code || "";
       if (errorCode === "auth/email-already-in-use") {

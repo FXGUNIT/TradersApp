@@ -67,10 +67,40 @@ export const executeCheckUserStatus = async ({
     }
 
     const {
+      success,
+      error: profileLoadError,
       profile: nextProfile,
       screen: nextScreen,
       userData,
     } = await loadUserProfile(authData);
+
+    if (success === false && !userData && !nextProfile) {
+      const fallbackScreen =
+        authData?.uid === ADMIN_UID
+          ? SCREEN_IDS.ADMIN
+          : authData?.emailVerified === false
+            ? SCREEN_IDS.WAITING
+            : resolveRestorableScreen(authData.uid, SCREEN_IDS.WAITING);
+
+      setGoogleUser(null);
+      setProfile((currentProfile) =>
+        currentProfile || {
+          uid: authData.uid,
+          token: authData.token,
+          email: authData.email,
+          emailVerified: authData.emailVerified,
+          status:
+            fallbackScreen === SCREEN_IDS.WAITING ? "PENDING" : "ACTIVE",
+          role: authData?.uid === ADMIN_UID ? "admin" : "user",
+        },
+      );
+      console.warn(
+        "Profile load unavailable during status check:",
+        profileLoadError || "Unknown error",
+      );
+      setScreen(fallbackScreen);
+      return;
+    }
 
     if (!userData || !nextProfile) {
       const currentUser = firebaseAuth?.currentUser;
