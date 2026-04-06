@@ -450,6 +450,49 @@ async def get_cache_stats():
     }
 
 
+class CacheInvalidateRequest(BaseModel):
+    pattern: str | None = Field(default=None, description="Key pattern to invalidate (e.g. 'mamba:*'). If None, invalidates all.")
+    endpoint: str | None = Field(default=None, description="Known endpoint to invalidate (e.g. 'predict', 'mamba').")
+
+
+@app.post("/cache/invalidate", tags=["cache"])
+async def invalidate_cache(request: CacheInvalidateRequest):
+    """
+    Manually invalidate cache entries.
+
+    Use this after retraining models, updating features, or when you need
+    to force fresh computation on the next request.
+
+    Examples:
+      POST /cache/invalidate   → invalidate ALL cache entries
+      POST /cache/invalidate?pattern=mamba:*  → invalidate mamba predictions
+      POST /cache/invalidate?endpoint=predict → invalidate all predict entries
+    """
+    cache = get_cache()
+
+    if request.pattern:
+        count = 0
+        if cache._client:
+            try:
+                keys = list(cache._client.scan_iter(
+                    f"{cache.config.key_prefix}{CACHE_KEY_VERSION}:{request.pattern}"
+                ))
+                if keys:
+                    count = len(keys)
+                    cache._client.delete(*keys)
+            except Exception as e:
+                return {"ok": False, "error": str(e)}
+        return {"ok": True, "invalidated": count, "pattern": request.pattern}
+
+    if request.endpoint:
+        cache.invalidate(f"{request.endpoint}:*")
+        return {"ok": True, "invalidated_endpoint": request.endpoint}
+
+    # Invalidate all
+    cache.invalidate_all()
+    return {"ok": True, "message": "All cache entries invalidated"}
+
+
 # -------------------------------------------------------------------------
 # Feast Feature Store
 # -------------------------------------------------------------------------
@@ -3004,14 +3047,43 @@ async def triton_predict(request: TritonInferenceRequest):
     Request body:
       features: list of feature vectors (flat list[float] or dict with named features)
       model_name: Triton model name (default: lightgbm_direction)
+
+    Cached in Redis (10s TTL) for sub-50ms repeat predictions.
     """
     t0 = time.time()
+    monitor = get_sla_monitor()
 
+    # ── Cache check ──────────────────────────────────────────────────────────
+    cache = get_cache()
+    features_str = json.dumps(request.features, sort_keys=True, default=str)
+    features_hash = hashlib.sha256(features_str.encode()).hexdigest()[:16]
+    cache_key = f"inference:{request.symbol}:{request.model_name}:{features_hash}"
+
+    cached = cache.get(cache_key)
+    if cached is not None:
+        if PROMETHEUS_AVAILABLE and record_prometheus_cache:
+            record_prometheus_cache(hit=True)
+        cached["_cached"] = True
+        cached["_cache_age_ms"] = round((time.time() - t0) * 1000, 1)
+        latency_ms = (time.time() - t0) * 1000
+        monitor.record("/inference/predict", latency_ms, 200)
+        return cached
+
+    # ── Compute ──────────────────────────────────────────────────────────────
     client = triton_client or get_inference_client()
     result = client.predict(features=request.features, model_name=request.model_name)
 
     result["latency_ms"] = round((time.time() - t0) * 1000, 2)
     result["symbol"] = request.symbol
+
+    # ── Cache result (10s TTL) ──────────────────────────────────────────────
+    cache.set(cache_key, result, ttl=10)
+
+    # ── SLA recording ───────────────────────────────────────────────────────
+    latency_ms = (time.time() - t0) * 1000
+    monitor.record("/inference/predict", latency_ms, 200)
+    if PROMETHEUS_AVAILABLE and record_prometheus_cache:
+        record_prometheus_cache(hit=False)
 
     return result
 

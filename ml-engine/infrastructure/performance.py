@@ -492,11 +492,12 @@ class SLAMonitor:
     }
 
     SLA_TARGETS = {
-        "/predict":         {"p50_ms": 50,   "p95_ms": 200,  "p99_ms": 500,  "max_err_rate": 0.01},
-        "/mamba/predict":   {"p50_ms": 2000, "p95_ms": 5000, "p99_ms": 10000, "max_err_rate": 0.05},
-        "/regime":          {"p50_ms": 100,  "p95_ms": 500,  "p99_ms": 1000,  "max_err_rate": 0.02},
-        "/consensus":       {"p50_ms": 100,  "p95_ms": 500,  "p99_ms": 1000,  "max_err_rate": 0.02},
-        "ALL":             {"p50_ms": 100,  "p95_ms": 500,  "p99_ms": 1000,  "max_err_rate": 0.01},
+        "/predict":            {"p50_ms": 50,   "p95_ms": 200,  "p99_ms": 500,   "max_err_rate": 0.01},
+        "/mamba/predict":      {"p50_ms": 2000, "p95_ms": 5000, "p99_ms": 10000, "max_err_rate": 0.05},
+        "/inference/predict": {"p50_ms": 20,   "p95_ms": 50,   "p99_ms": 100,   "max_err_rate": 0.01},
+        "/regime":            {"p50_ms": 100,  "p95_ms": 500,  "p99_ms": 1000,  "max_err_rate": 0.02},
+        "/consensus":         {"p50_ms": 100,  "p95_ms": 500,  "p99_ms": 1000,  "max_err_rate": 0.02},
+        "ALL":                {"p50_ms": 100,  "p95_ms": 500,  "p99_ms": 1000,  "max_err_rate": 0.01},
     }
 
     def __init__(self, max_samples: int = 100_000):
