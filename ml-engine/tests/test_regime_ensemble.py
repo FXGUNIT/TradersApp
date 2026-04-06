@@ -171,10 +171,15 @@ import pytest
 
 @pytest.fixture(scope="session", autouse=True)
 def cleanup_regime_mocks():
-    """Remove mock regime modules from sys.modules after ALL tests run."""
+    """Clear mock regime modules from sys.modules during session setup.
+
+    test_regime_ensemble.py sets mocks at module level (before collection).
+    By clearing them in session setup, test_regime_ensemble.py re-sets them
+    correctly while other files get real modules.
+    """
     import sys
-    yield  # run all tests first
-    # Remove mock entries after the entire test session so subsequent files get real modules
+    # CLEAN UP ON SETUP (not teardown) — so regime_ensemble re-populates its mocks
+    # and other test files (test_phase1.py etc.) get the real modules
     for key in list(sys.modules.keys()):
         if key in (
             "models.regime.hmm_regime",
@@ -182,6 +187,7 @@ def cleanup_regime_mocks():
             "models.regime.anomalous_diffusion",
         ):
             del sys.modules[key]
+    yield  # tests run
 
 
 class TestRegimeEnsembleInit:
