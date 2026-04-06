@@ -243,28 +243,8 @@ def seeded_db(temp_db, sample_candles, sample_trades):
 # ─── Hooks ──────────────────────────────────────────────────────────────────
 
 def pytest_collection_modifyitems(session, config, items):
-    print(f"[CONFTEST] pytest_collection_modifyitems called, n_items={len(items)}, test_dir={items[0].fspath.dirname if items else 'none'}")
     global _cleanup_done
     if _cleanup_done:
         return
-
-    test_file_names = [item.fspath.basename for item in items]
-    regime_ensemble_idx = -1
-    phase1_idx = -1
-    for i, fname in enumerate(test_file_names):
-        if fname == "test_regime_ensemble.py":
-            regime_ensemble_idx = i
-        elif fname == "test_phase1.py" and phase1_idx < 0:
-            phase1_idx = i
-
-    if regime_ensemble_idx >= 0 and phase1_idx >= 0 and regime_ensemble_idx < phase1_idx and not _cleanup_done:
-        import sys
-        for key in list(sys.modules.keys()):
-            if key in (
-                "models.regime.hmm_regime",
-                "models.regime.fp_fk_regime",
-                "models.regime.anomalous_diffusion",
-            ):
-                del sys.modules[key]
-        _cleanup_done = True
-        print(f"[CONFTEST] Cleaned mock regime modules before test_phase1.py")
+    # Mark that we should clean up AFTER collection is complete
+    config._should_cleanup_regime_mocks = True
