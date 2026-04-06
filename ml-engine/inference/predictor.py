@@ -1,11 +1,17 @@
 """
 Inference Predictor — runs all trained models and returns their votes.
 Loads models from model store and generates directional predictions.
+
+Stateless mode (MLFLOW_USE_REGISTRY=true):
+    Checks MLflow Production stage on each predict() call (throttled).
+    If the remote production version differs from the loaded version,
+    the model is hot-reloaded — all pods converge to the same production model.
 """
 from typing import Optional
 import numpy as np
 import pandas as pd
 import sys, os
+import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import config
@@ -17,12 +23,19 @@ class Predictor:
     """
     Loads all trained models from model store and runs inference.
     Returns per-model votes + consensus.
+
+    Hot-reload: when MLFLOW_USE_REGISTRY=true, checks MLflow registry on
+    every predict() (throttled by MLFLOW_REGISTRY_CHECK_INTERVAL) and reloads
+    models whose Production version has changed. All pods converge to the
+    same MLflow production model — the single source of truth.
     """
 
     def __init__(self, store_dir: str | None = None):
         self.store = ModelStore(store_dir)
-        self._models: dict[str, tuple] = {}  # name -> (pipeline, meta)
+        self._models: dict[str, dict] = {}  # name -> {pipeline, meta, feature_cols, version}
         self._loaded = False
+        self._last_reload_check: float = 0
+        self._check_interval = getattr(config, "MLFLOW_REGISTRY_CHECK_INTERVAL", 60)
 
     def load_all_models(self) -> dict[str, dict]:
         """
@@ -39,6 +52,7 @@ class Predictor:
                     "pipeline": pipeline,
                     "meta": meta,
                     "feature_cols": meta.get("feature_cols", []),
+                    "version": meta.get("version"),
                 }
             except FileNotFoundError:
                 pass
@@ -46,12 +60,44 @@ class Predictor:
         self._loaded = len(self._models) > 0
         return {
             name: {
-                "version": meta.get("version"),
-                "trained_at": meta.get("saved_at"),
-                "metrics": meta.get("metrics", {}),
+                "version": m.get("version"),
+                "trained_at": m.get("saved_at"),
+                "metrics": m.get("meta", {}).get("metrics", {}),
             }
-            for name, (_, meta) in self._models.items()
+            for name, m in self._models.items()
         }
+
+    def _check_and_reload(self):
+        """
+        Check MLflow registry for newer Production versions and hot-reload.
+        Throttled by MLFLOW_REGISTRY_CHECK_INTERVAL seconds.
+        """
+        if not getattr(config, "MLFLOW_USE_REGISTRY", False):
+            return
+
+        now = time.time()
+        if now - self._last_reload_check < self._check_interval:
+            return
+        self._last_reload_check = now
+
+        reloaded = []
+        for name in list(self._models.keys()):
+            if self.store.needs_reload(name):
+                try:
+                    pipeline, meta = self.store.load(name, version="latest")
+                    self._models[name] = {
+                        "pipeline": pipeline,
+                        "meta": meta,
+                        "feature_cols": meta.get("feature_cols", []),
+                        "version": meta.get("version"),
+                    }
+                    reloaded.append(f"{name}@{meta.get('version')}")
+                    print(f"[Predictor] Hot-reloaded {name} → {meta.get('version')}")
+                except Exception as e:
+                    print(f"[Predictor] Hot-reload failed for {name}: {e}")
+
+        if reloaded:
+            print(f"[Predictor] Hot-reloaded models: {', '.join(reloaded)}")
 
     def predict(
         self,
@@ -66,6 +112,9 @@ class Predictor:
         """
         if not self._loaded:
             self.load_all_models()
+
+        # Hot-reload check on every prediction (throttled by registry check interval)
+        self._check_and_reload()
 
         if not self._models:
             return self._empty_response("No trained models available")
@@ -154,6 +203,9 @@ class Predictor:
         """
         if not self._loaded:
             self.load_all_models()
+
+        # Hot-reload check (throttled)
+        self._check_and_reload()
 
         if not self._models:
             return self._empty_response("No trained models available")
