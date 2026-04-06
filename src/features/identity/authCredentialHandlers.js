@@ -65,6 +65,9 @@ export const executeLogin = async ({
   sendTelegramAlert,
 }) => {
   const loadUserProfile = suppliedLoadUserProfile;
+  const auditData =
+    typeof window !== "undefined" ? window.__TRADERS_AUDIT_DATA : null;
+  const auditMode = Boolean(auditData?.active);
 
   const sanitizedEmail = String(email || "")
     .trim()
@@ -92,13 +95,8 @@ export const executeLogin = async ({
     );
   }
 
-  if (!firebaseAuth || !FB_KEY) {
-    const auditProfile =
-      typeof window !== "undefined"
-        ? window.__TRADERS_AUDIT_DATA?.userProfile ||
-          window.__TRADERS_AUDIT_DATA?.adminProfile ||
-          null
-        : null;
+  if (auditMode || !firebaseAuth || !FB_KEY) {
+    const auditProfile = auditData?.userProfile || auditData?.adminProfile || null;
     const simulatedUid =
       auditProfile?.uid ||
       `audit-${sanitizedEmail.replace(/[^a-z0-9]/gi, "") || "user"}`;
@@ -386,6 +384,9 @@ export const executeStructuredSignup = async ({
   const proficiency = String(formData.proficiency || "").trim();
   const stayLoggedIn = Boolean(formData.stayLoggedIn);
   const blockedEmails = ["arkgproductions@gmail.com", "starg.unit@gmail.com"];
+  const auditData =
+    typeof window !== "undefined" ? window.__TRADERS_AUDIT_DATA : null;
+  const auditMode = Boolean(auditData?.active);
 
   if (!fullName) {
     throw new Error("Full name is required.");
@@ -415,6 +416,38 @@ export const executeStructuredSignup = async ({
     String(formData.password || "").length < 8
   ) {
     throw new Error("Password must be at least 8 characters.");
+  }
+
+  if (auditMode) {
+    const simulatedUid = `audit-signup-${Date.now()}`;
+    const simulatedToken = `audit-token-${simulatedUid}`;
+    const profileData = buildPendingProfile({
+      fullName,
+      email: cleanEmail,
+      country,
+      city,
+      instagram,
+      linkedin,
+      proficiency,
+      authProvider,
+      emailVerified: authProvider === "google",
+    });
+    setAuth({
+      uid: simulatedUid,
+      token: simulatedToken,
+      refreshToken: `audit-refresh-${simulatedUid}`,
+      email: cleanEmail,
+      emailVerified: profileData.emailVerified,
+    });
+    setProfile({
+      ...profileData,
+      uid: simulatedUid,
+      token: simulatedToken,
+    });
+    setGoogleUser(null);
+    clearPendingGoogleSignup();
+    setScreen("waiting");
+    return;
   }
 
   if (!firebaseAuth || !FB_KEY) {
