@@ -175,6 +175,72 @@ spec:
               # Graceful drain: stop accepting new requests before termination
               exec:
                 command: ["/bin/sh", "-c", "sleep 5"]
+        - name: model-registry
+          image: tradersapp/ml-engine:latest
+          imagePullPolicy: Always
+          command:
+            - python
+            - -m
+            - uvicorn
+            - infrastructure.model_registry_sidecar:app
+            - --host
+            - 0.0.0.0
+            - --port
+            - "8010"
+          ports:
+            - containerPort: 8010
+              name: registry
+          envFrom:
+            - configMapRef:
+                name: ml-engine-config
+            - configMapRef:
+                name: ml-engine-env
+            - secretRef:
+                name: ml-engine-secrets
+          env:
+            - name: MODEL_STORE_PVC_MOUNT
+              value: /models/store
+            - name: MODEL_STORE_READ_ONLY
+              value: "true"
+            - name: MODEL_REGISTRY_WARMUP
+              value: "true"
+            - name: MODEL_REGISTRY_MAX_CACHED_INSTANCES
+              value: "4"
+            - name: MODEL_REGISTRY_PORT
+              value: "8010"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8010
+            failureThreshold: 3
+            periodSeconds: 10
+            initialDelaySeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8010
+            failureThreshold: 3
+            periodSeconds: 20
+            initialDelaySeconds: 20
+          volumeMounts:
+            - name: models
+              mountPath: /models
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
       volumes:
         - name: data
           emptyDir: {}

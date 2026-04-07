@@ -8,6 +8,11 @@ metadata:
   namespace: tradersapp
 data:
   MODEL_STORE: "/models/store"
+  MODEL_STORE_READ_ONLY: "true"
+  MODEL_REGISTRY_MODE: "sidecar"
+  MODEL_REGISTRY_URL: "http://127.0.0.1:8010"
+  MODEL_REGISTRY_PORT: "8010"
+  MODEL_REGISTRY_MAX_CACHED_INSTANCES: "4"
   REDIS_HOST: "redis"
   REDIS_PORT: "6379"
   KAFKA_BOOTSTRAP_SERVERS: "kafka:29092"
