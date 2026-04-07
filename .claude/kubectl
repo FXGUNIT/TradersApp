@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# TradersApp kubectl wrapper — routes kubectl calls through WSL Ubuntu k3s
+#
+# Usage: Same as kubectl
+#   ./kubectl get nodes
+#   ./kubectl get pods -n tradersapp
+#
+# This is needed because k3s runs inside WSL Ubuntu, and kubectl on Windows
+# cannot reach 127.0.0.1:6443 (the k3s API server binds to WSL's loopback,
+# not Windows'). The WSL virtual switch (172.21.224.1) does not forward
+# port 6443. WSL kubectl works because it routes through WSL's internal
+# network stack.
+
+set -euo pipefail
+
+WSL_KUBECTL="sudo k3s kubectl"
+
+# Forward all arguments to k3s kubectl inside WSL Ubuntu
+wsl.exe -d Ubuntu -- bash -c "${WSL_KUBECTL} $*"
