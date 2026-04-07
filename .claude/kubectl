@@ -13,7 +13,5 @@
 
 set -euo pipefail
 
-WSL_KUBECTL="sudo k3s kubectl"
-
 # Forward all arguments to k3s kubectl inside WSL Ubuntu
-wsl.exe -d Ubuntu -- bash -c "${WSL_KUBECTL} $*"
+wsl.exe -d Ubuntu -- bash -c "sudo k3s kubectl $*"
