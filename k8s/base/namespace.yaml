@@ -1,0 +1,8 @@
+# k8s/namespace.yaml — TradersApp k3s namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tradersapp
+  labels:
+    name: tradersapp
+    environment: production
