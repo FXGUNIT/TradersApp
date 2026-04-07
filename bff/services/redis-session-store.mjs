@@ -1,459 +1,345 @@
 /**
- * Redis-Backed Session Store
- * Provides distributed session management for the BFF.
- * Falls back to in-memory if Redis is unavailable.
+ * Redis-backed session and rate-limit store.
  *
- * Features:
- * - Session persistence across BFF restarts
- * - Automatic session expiry
- * - Distributed rate limiting
- * - Session data encryption
+ * No in-process session fallback is used. When Redis is unavailable:
+ * - session operations fail closed
+ * - rate limiting fails open
  */
 
 import { createClient } from "redis";
 
-// ---------------------------------------------------------------------------
-// Configuration
-// ---------------------------------------------------------------------------
-
 const REDIS_URL = process.env.REDIS_URL || "redis://redis:6379";
-const SESSION_PREFIX = "session:";
+const SESSION_TTL_SECONDS = Number.parseInt(process.env.SESSION_TTL_SECONDS || "28800", 10);
 const RATE_LIMIT_PREFIX = "ratelimit:";
-const SESSION_TTL_SECONDS = parseInt(process.env.SESSION_TTL_SECONDS || "28800", 10); // 8 hours
-const RATE_LIMIT_TTL_SECONDS = 60;
-
-// ---------------------------------------------------------------------------
-// Redis Client
-// ---------------------------------------------------------------------------
+const DEFAULT_SESSION_PREFIX = "session:";
+export const ADMIN_SESSION_PREFIX = "admin-session:";
+export const KEYCLOAK_SESSION_PREFIX = "keycloak-session:";
 
 let redisClient = null;
+let redisConnectPromise = null;
 let isConnected = false;
 
-/**
- * Get or create Redis client.
- * @returns {Promise<object>} Redis client
- */
+function buildKey(prefix, id) {
+  return `${prefix}${id}`;
+}
+
+function resolveOptions(options = {}) {
+  return {
+    prefix: options.prefix || DEFAULT_SESSION_PREFIX,
+    ttlSeconds: Number.parseInt(String(options.ttlSeconds || SESSION_TTL_SECONDS), 10),
+    touch: options.touch !== false,
+    userIdField: options.userIdField || "userId",
+  };
+}
+
 export async function getRedisClient() {
-  if (redisClient && isConnected) {
+  if (redisClient?.isOpen && isConnected) {
     return redisClient;
   }
 
-  try {
+  if (!redisClient) {
     redisClient = createClient({ url: REDIS_URL });
 
-    redisClient.on("error", (err) => {
-      console.error("[Redis] Client error:", err.message);
+    redisClient.on("error", (error) => {
+      console.error("[Redis] Client error:", error.message);
       isConnected = false;
     });
 
     redisClient.on("connect", () => {
-      console.log("[Redis] Connected");
       isConnected = true;
+      console.log("[Redis] Connected");
+    });
+
+    redisClient.on("end", () => {
+      isConnected = false;
     });
 
     redisClient.on("reconnecting", () => {
       console.log("[Redis] Reconnecting...");
     });
+  }
 
-    await redisClient.connect();
-    isConnected = true;
-    return redisClient;
+  if (!redisConnectPromise) {
+    redisConnectPromise = redisClient.connect()
+      .then(() => {
+        isConnected = true;
+        return redisClient;
+      })
+      .catch((error) => {
+        console.error("[Redis] Connection failed:", error.message);
+        isConnected = false;
+        return null;
+      })
+      .finally(() => {
+        redisConnectPromise = null;
+      });
+  }
+
+  return redisConnectPromise;
+}
+
+export async function createSession(sessionData, options = {}) {
+  const { prefix, ttlSeconds } = resolveOptions(options);
+  const sessionId = crypto.randomUUID();
+  const now = Date.now();
+  const session = {
+    id: sessionId,
+    ...sessionData,
+    createdAt: sessionData?.createdAt || now,
+    lastActiveAt: sessionData?.lastActiveAt || now,
+  };
+
+  const client = await getRedisClient();
+  if (!client) {
+    return null;
+  }
+
+  try {
+    await client.setEx(buildKey(prefix, sessionId), ttlSeconds, JSON.stringify(session));
+    return sessionId;
   } catch (error) {
-    console.error("[Redis] Connection failed:", error.message);
-    isConnected = false;
+    console.error("[Redis] Failed to create session:", error.message);
     return null;
   }
 }
 
-// ---------------------------------------------------------------------------
-// Session Management
-// ---------------------------------------------------------------------------
-
-/**
- * Create a new session in Redis.
- * @param {object} sessionData - Session data to store
- * @returns {Promise<string>} Session ID
- */
-export async function createSession(sessionData) {
-  const sessionId = crypto.randomUUID();
-  const now = Date.now();
-
-  const session = {
-    id: sessionId,
-    ...sessionData,
-    createdAt: now,
-    lastActiveAt: now,
-  };
-
-  const client = await getRedisClient();
-  if (client) {
-    try {
-      await client.setEx(
-        `${SESSION_PREFIX}${sessionId}`,
-        SESSION_TTL_SECONDS,
-        JSON.stringify(session)
-      );
-      console.log(`[Redis] Session created: ${sessionId}`);
-      return sessionId;
-    } catch (error) {
-      console.error("[Redis] Failed to create session:", error.message);
-    }
+export async function getSession(sessionId, options = {}) {
+  if (!sessionId) {
+    return null;
   }
 
-  // Fallback to in-memory
-  return createInMemorySession(sessionData);
-}
-
-/**
- * Get session by ID.
- * @param {string} sessionId - Session ID
- * @returns {Promise<object|null>} Session data or null
- */
-export async function getSession(sessionId) {
-  if (!sessionId) return null;
-
+  const { prefix, ttlSeconds, touch } = resolveOptions(options);
   const client = await getRedisClient();
-  if (client) {
-    try {
-      const data = await client.get(`${SESSION_PREFIX}${sessionId}`);
-      if (data) {
-        const session = JSON.parse(data);
-        // Refresh TTL on access
-        await client.expire(`${SESSION_PREFIX}${sessionId}`, SESSION_TTL_SECONDS);
-        session.lastActiveAt = Date.now();
-        return session;
-      }
+  if (!client) {
+    return null;
+  }
+
+  try {
+    const key = buildKey(prefix, sessionId);
+    const data = await client.get(key);
+    if (!data) {
       return null;
-    } catch (error) {
-      console.error("[Redis] Failed to get session:", error.message);
     }
-  }
 
-  // Fallback to in-memory
-  return getInMemorySession(sessionId);
+    const session = JSON.parse(data);
+    if (touch) {
+      const updatedSession = {
+        ...session,
+        lastActiveAt: Date.now(),
+      };
+      await client.setEx(key, ttlSeconds, JSON.stringify(updatedSession));
+      return updatedSession;
+    }
+
+    return session;
+  } catch (error) {
+    console.error("[Redis] Failed to get session:", error.message);
+    return null;
+  }
 }
 
-/**
- * Update session data.
- * @param {string} sessionId - Session ID
- * @param {object} updates - Data to update
- * @returns {Promise<boolean>} Success status
- */
-export async function updateSession(sessionId, updates) {
-  const session = await getSession(sessionId);
-  if (!session) return false;
+export async function updateSession(sessionId, updates, options = {}) {
+  const { prefix, ttlSeconds } = resolveOptions(options);
+  const existing = await getSession(sessionId, { ...options, touch: false });
+  if (!existing) {
+    return false;
+  }
+
+  const client = await getRedisClient();
+  if (!client) {
+    return false;
+  }
 
   const updatedSession = {
-    ...session,
+    ...existing,
     ...updates,
     lastActiveAt: Date.now(),
   };
 
-  const client = await getRedisClient();
-  if (client) {
-    try {
-      await client.setEx(
-        `${SESSION_PREFIX}${sessionId}`,
-        SESSION_TTL_SECONDS,
-        JSON.stringify(updatedSession)
-      );
-      return true;
-    } catch (error) {
-      console.error("[Redis] Failed to update session:", error.message);
-    }
+  try {
+    await client.setEx(buildKey(prefix, sessionId), ttlSeconds, JSON.stringify(updatedSession));
+    return true;
+  } catch (error) {
+    console.error("[Redis] Failed to update session:", error.message);
+    return false;
   }
-
-  // Fallback to in-memory
-  return updateInMemorySession(sessionId, updates);
 }
 
-/**
- * Delete a session.
- * @param {string} sessionId - Session ID
- * @returns {Promise<boolean>} Success status
- */
-export async function deleteSession(sessionId) {
-  const client = await getRedisClient();
-  if (client) {
-    try {
-      await client.del(`${SESSION_PREFIX}${sessionId}`);
-      console.log(`[Redis] Session deleted: ${sessionId}`);
-      return true;
-    } catch (error) {
-      console.error("[Redis] Failed to delete session:", error.message);
-    }
+export async function deleteSession(sessionId, options = {}) {
+  if (!sessionId) {
+    return false;
   }
 
-  // Fallback to in-memory
-  return deleteInMemorySession(sessionId);
+  const { prefix } = resolveOptions(options);
+  const client = await getRedisClient();
+  if (!client) {
+    return false;
+  }
+
+  try {
+    return (await client.del(buildKey(prefix, sessionId))) > 0;
+  } catch (error) {
+    console.error("[Redis] Failed to delete session:", error.message);
+    return false;
+  }
 }
 
-/**
- * Delete all sessions for a user.
- * @param {string} userId - User ID
- * @returns {Promise<number>} Number of sessions deleted
- */
-export async function deleteUserSessions(userId) {
+export async function listSessions(options = {}) {
+  const { prefix } = resolveOptions(options);
   const client = await getRedisClient();
-  if (client) {
-    try {
-      // Find all sessions for this user
-      const keys = await client.keys(`${SESSION_PREFIX}*`);
-      let deletedCount = 0;
+  if (!client) {
+    return [];
+  }
 
-      for (const key of keys) {
-        const data = await client.get(key);
-        if (data) {
-          const session = JSON.parse(data);
-          if (session.userId === userId) {
-            await client.del(key);
-            deletedCount++;
-          }
+  try {
+    const keys = await client.keys(`${prefix}*`);
+    if (keys.length === 0) {
+      return [];
+    }
+
+    const values = await client.mGet(keys);
+    return values
+      .filter(Boolean)
+      .map((value) => {
+        try {
+          return JSON.parse(value);
+        } catch {
+          return null;
         }
-      }
-
-      console.log(`[Redis] Deleted ${deletedCount} sessions for user: ${userId}`);
-      return deletedCount;
-    } catch (error) {
-      console.error("[Redis] Failed to delete user sessions:", error.message);
-    }
+      })
+      .filter(Boolean);
+  } catch (error) {
+    console.error("[Redis] Failed to list sessions:", error.message);
+    return [];
   }
-
-  return 0;
 }
 
-// ---------------------------------------------------------------------------
-// Rate Limiting (Distributed)
-// ---------------------------------------------------------------------------
+export async function deleteUserSessions(userId, options = {}) {
+  if (!userId) {
+    return 0;
+  }
 
-/**
- * Check and update rate limit for a client.
- * Uses Redis sorted sets for sliding window algorithm.
- *
- * @param {string} clientKey - Identifier for rate limiting (e.g., IP, user ID)
- * @param {number} maxRequests - Maximum requests allowed
- * @param {number} windowMs - Time window in milliseconds
- * @returns {Promise<object>} {allowed, remaining, resetMs}
- */
+  const { prefix, userIdField } = resolveOptions(options);
+  const client = await getRedisClient();
+  if (!client) {
+    return 0;
+  }
+
+  try {
+    const sessions = await listSessions({ prefix });
+    const matchingIds = sessions
+      .filter((session) => session?.[userIdField] === userId)
+      .map((session) => buildKey(prefix, session.id))
+      .filter(Boolean);
+
+    if (matchingIds.length === 0) {
+      return 0;
+    }
+
+    return await client.del(matchingIds);
+  } catch (error) {
+    console.error("[Redis] Failed to delete user sessions:", error.message);
+    return 0;
+  }
+}
+
 export async function checkRateLimit(clientKey, maxRequests, windowMs) {
-  const redisKey = `${RATE_LIMIT_PREFIX}${clientKey}`;
-  const now = Date.now();
-  const windowStart = now - windowMs;
-
   const client = await getRedisClient();
-  if (client) {
-    try {
-      // Use Redis transaction for atomicity
-      const multi = client.multi();
-
-      // Remove old entries
-      multi.zRemRangeByScore(redisKey, 0, windowStart);
-
-      // Count current requests in window
-      multi.zCard(redisKey);
-
-      // Add current request
-      multi.zAdd(redisKey, { score: now, value: `${now}:${Math.random()}` });
-
-      // Set expiry
-      multi.expire(redisKey, Math.ceil(windowMs / 1000) + 1);
-
-      const results = await multi.exec();
-      const currentCount = results[1]; // zCard result
-
-      if (currentCount >= maxRequests) {
-        // Get oldest entry to calculate reset time
-        const oldest = await client.zRange(redisKey, 0, 0, { BY: "SCORE" });
-        const oldestTs = oldest.length > 0 ? parseFloat(oldest[0]) : now;
-        const resetMs = Math.max(0, oldestTs + windowMs - now);
-
-        return {
-          allowed: false,
-          remaining: 0,
-          resetMs,
-          total: maxRequests,
-          current: currentCount,
-        };
-      }
-
-      return {
-        allowed: true,
-        remaining: maxRequests - currentCount - 1,
-        resetMs: windowMs,
-        total: maxRequests,
-        current: currentCount + 1,
-      };
-    } catch (error) {
-      console.error("[Redis] Rate limit check failed:", error.message);
-    }
-  }
-
-  // Fallback to in-memory rate limiting
-  return checkInMemoryRateLimit(clientKey, maxRequests, windowMs);
-}
-
-/**
- * Get rate limit status without incrementing.
- * @param {string} clientKey - Client identifier
- * @param {number} maxRequests - Maximum requests allowed
- * @param {number} windowMs - Time window
- * @returns {Promise<object>} Current rate limit status
- */
-export async function getRateLimitStatus(clientKey, maxRequests, windowMs) {
-  const redisKey = `${RATE_LIMIT_PREFIX}${clientKey}`;
-  const now = Date.now();
-  const windowStart = now - windowMs;
-
-  const client = await getRedisClient();
-  if (client) {
-    try {
-      // Clean old entries first
-      await client.zRemRangeByScore(redisKey, 0, windowStart);
-
-      // Count current requests
-      const count = await client.zCard(redisKey);
-
-      return {
-        remaining: Math.max(0, maxRequests - count),
-        total: maxRequests,
-        current: count,
-        resetMs: windowMs,
-      };
-    } catch (error) {
-      console.error("[Redis] Rate limit status failed:", error.message);
-    }
-  }
-
-  return {
-    remaining: maxRequests,
-    total: maxRequests,
-    current: 0,
-    resetMs: windowMs,
-  };
-}
-
-// ---------------------------------------------------------------------------
-// In-Memory Fallback
-// ---------------------------------------------------------------------------
-
-const _memorySessions = new Map();
-const _memoryRateLimits = new Map();
-
-function createInMemorySession(sessionData) {
-  const sessionId = crypto.randomUUID();
-  const now = Date.now();
-
-  const session = {
-    id: sessionId,
-    ...sessionData,
-    createdAt: now,
-    lastActiveAt: now,
-    _memoryOnly: true,
-  };
-
-  _memorySessions.set(sessionId, session);
-  console.log(`[InMemory] Session created: ${sessionId}`);
-  return sessionId;
-}
-
-function getInMemorySession(sessionId) {
-  return _memorySessions.get(sessionId) || null;
-}
-
-function updateInMemorySession(sessionId, updates) {
-  const session = _memorySessions.get(sessionId);
-  if (!session) return false;
-
-  const updated = { ...session, ...updates, lastActiveAt: Date.now() };
-  _memorySessions.set(sessionId, updated);
-  return true;
-}
-
-function deleteInMemorySession(sessionId) {
-  return _memorySessions.delete(sessionId);
-}
-
-function checkInMemoryRateLimit(clientKey, maxRequests, windowMs) {
-  const now = Date.now();
-  const windowStart = now - windowMs;
-  const entry = _memoryRateLimits.get(clientKey);
-
-  if (!entry || entry.length === 0) {
-    _memoryRateLimits.set(clientKey, [{ ts: now }]);
+  if (!client) {
     return {
       allowed: true,
-      remaining: maxRequests - 1,
+      remaining: maxRequests,
       resetMs: windowMs,
       total: maxRequests,
-      current: 1,
+      current: 0,
+      degraded: true,
     };
   }
 
-  // Filter to window
-  const valid = entry.filter((r) => r.ts > windowStart);
-
-  if (valid.length >= maxRequests) {
-    const oldestTs = valid[0].ts;
-    const resetMs = Math.max(0, oldestTs + windowMs - now);
-    return {
-      allowed: false,
-      remaining: 0,
-      resetMs,
-      total: maxRequests,
-      current: valid.length,
-    };
-  }
-
-  // Add current request
-  valid.push({ ts: now });
-  _memoryRateLimits.set(clientKey, valid);
-
-  return {
-    allowed: true,
-    remaining: maxRequests - valid.length,
-    resetMs: windowMs,
-    total: maxRequests,
-    current: valid.length,
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Cleanup
-// ---------------------------------------------------------------------------
-
-/**
- * Clean up expired sessions (for in-memory fallback).
- * Call periodically.
- */
-export function cleanupExpiredSessions() {
+  const redisKey = `${RATE_LIMIT_PREFIX}${clientKey}`;
   const now = Date.now();
-  const ttl = SESSION_TTL_SECONDS * 1000;
+  const windowStart = now - windowMs;
 
-  for (const [sessionId, session] of _memorySessions.entries()) {
-    if (now - session.lastActiveAt > ttl) {
-      _memorySessions.delete(sessionId);
-    }
-  }
+  try {
+    await client.zRemRangeByScore(redisKey, 0, windowStart);
+    const currentCount = await client.zCard(redisKey);
 
-  // Clean up rate limit entries
-  for (const [clientKey, entries] of _memoryRateLimits.entries()) {
-    const valid = entries.filter((r) => r.ts > now - RATE_LIMIT_TTL_SECONDS * 1000);
-    if (valid.length === 0) {
-      _memoryRateLimits.delete(clientKey);
-    } else {
-      _memoryRateLimits.set(clientKey, valid);
+    if (currentCount >= maxRequests) {
+      const oldest = await client.zRangeWithScores(redisKey, 0, 0);
+      const oldestTs = oldest.length > 0 ? Number(oldest[0].score) : now;
+      return {
+        allowed: false,
+        remaining: 0,
+        resetMs: Math.max(0, oldestTs + windowMs - now),
+        total: maxRequests,
+        current: currentCount,
+      };
     }
+
+    await client.zAdd(redisKey, { score: now, value: `${now}:${Math.random()}` });
+    await client.expire(redisKey, Math.ceil(windowMs / 1000) + 1);
+
+    return {
+      allowed: true,
+      remaining: Math.max(0, maxRequests - currentCount - 1),
+      resetMs: windowMs,
+      total: maxRequests,
+      current: currentCount + 1,
+    };
+  } catch (error) {
+    console.error("[Redis] Rate limit check failed:", error.message);
+    return {
+      allowed: true,
+      remaining: maxRequests,
+      resetMs: windowMs,
+      total: maxRequests,
+      current: 0,
+      degraded: true,
+    };
   }
 }
 
-// ---------------------------------------------------------------------------
-// Health Check
-// ---------------------------------------------------------------------------
+export async function getRateLimitStatus(clientKey, maxRequests, windowMs) {
+  const client = await getRedisClient();
+  if (!client) {
+    return {
+      remaining: maxRequests,
+      total: maxRequests,
+      current: 0,
+      resetMs: windowMs,
+      degraded: true,
+    };
+  }
 
-/**
- * Check Redis connection health.
- * @returns {Promise<object>} Health status
- */
+  const redisKey = `${RATE_LIMIT_PREFIX}${clientKey}`;
+  const now = Date.now();
+  const windowStart = now - windowMs;
+
+  try {
+    await client.zRemRangeByScore(redisKey, 0, windowStart);
+    const count = await client.zCard(redisKey);
+    return {
+      remaining: Math.max(0, maxRequests - count),
+      total: maxRequests,
+      current: count,
+      resetMs: windowMs,
+    };
+  } catch (error) {
+    console.error("[Redis] Rate limit status failed:", error.message);
+    return {
+      remaining: maxRequests,
+      total: maxRequests,
+      current: 0,
+      resetMs: windowMs,
+      degraded: true,
+    };
+  }
+}
+
+export function cleanupExpiredSessions() {
+  // Redis TTL handles expiry automatically. Kept for compatibility.
+}
+
 export async function checkRedisHealth() {
   const client = await getRedisClient();
   if (!client) {
@@ -467,11 +353,9 @@ export async function checkRedisHealth() {
   try {
     const start = Date.now();
     await client.ping();
-    const latency = Date.now() - start;
-
     return {
       healthy: true,
-      latency,
+      latency: Date.now() - start,
       mode: "redis",
       url: REDIS_URL,
     };
@@ -484,15 +368,12 @@ export async function checkRedisHealth() {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Export
-// ---------------------------------------------------------------------------
-
 export const sessionStore = {
   createSession,
   getSession,
   updateSession,
   deleteSession,
+  listSessions,
   deleteUserSessions,
   checkRateLimit,
   getRateLimitStatus,
