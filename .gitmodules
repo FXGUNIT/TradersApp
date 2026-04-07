@@ -1,3 +1,0 @@
-[submodule "scripts/autoresearch/ml-latency"]
-	path = scripts/autoresearch/ml-latency
-	url = ../ml-latency.git
