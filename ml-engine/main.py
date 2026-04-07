@@ -1224,8 +1224,8 @@ async def predict(request: PredictRequest):
         # Build feature dict from math engine snapshot
         me = request.math_engine_snapshot or {}
 
-        # Get votes from all models
-        votes_result = predictor.predict(
+        # Get votes from the model registry service
+        votes_result = get_model_registry_client().predict(
             candles_df=df,
             trade_log_df=trade_df,
             math_engine_snapshot=me,
@@ -1279,13 +1279,13 @@ async def predict(request: PredictRequest):
 
         # Append physics-based regime from FP-FK + Anomalous Diffusion
         try:
-            if not df.empty and regime_ensemble is not None:
+            if not df.empty:
                 feat_for_regime = engineer_features(df)
                 for col in ["vr", "adx", "atr", "ci", "vwap", "amd_ACCUMULATION",
                             "amd_MANIPULATION", "amd_DISTRIBUTION", "amd_TRANSITION", "amd_UNCLEAR"]:
                     if col not in feat_for_regime.columns:
                         feat_for_regime[col] = 0.0
-                regime_result = regime_ensemble.advance(feat_for_regime)
+                regime_result = get_model_registry_client().advance_regime(feat_for_regime)
                 output["physics_regime"] = {
                     "regime": regime_result["regime"],
                     "regime_id": regime_result["regime_id"],
@@ -1468,8 +1468,8 @@ async def get_regime(request: RegimeRequest):
             if col not in feat_df.columns:
                 feat_df[col] = 0.0
 
-        # Advance the regime ensemble
-        regime_result = regime_ensemble.advance(feat_df)
+        # Advance the regime ensemble via the model registry service
+        regime_result = get_model_registry_client().advance_regime(feat_df)
 
         return {
             "ok": True,
@@ -2393,6 +2393,7 @@ async def compute_returns_for_backtest(request: BacktestTradesRequest):
 async def model_status():
     """Get status of all trained models."""
     try:
+        registry_status = get_model_registry_status()
         models = store.list_all_models()
         status = {}
         for name in models:
@@ -2410,7 +2411,8 @@ async def model_status():
 
         return {
             "models": status,
-            "predictor_ready": predictor.is_ready if predictor else False,
+            "predictor_ready": registry_status.get("predictor", {}).get("ready", False),
+            "model_registry": registry_status,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
