@@ -2,7 +2,7 @@
 Kafka Consumer — subscribes to TradersApp Kafka topics and processes events.
 
 Topics:
-  candle-data         — 5-min OHLCV candles → store in SQLite
+  candle-data         — 5-min OHLCV candles → store in the trading DB
   consensus-signals   — ML consensus → send to BFF
   feedback-loop      — Trade outcomes → update ConceptDriftDetector
   drift-alerts       — Drift alerts → trigger retrain pipeline

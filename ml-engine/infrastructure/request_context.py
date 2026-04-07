@@ -6,7 +6,7 @@ Every HTTP request gets a unique X-Request-ID (UUID4). The ID is:
 2. Stored in contextvars for access anywhere in the call stack
 3. Injected into all log messages automatically
 4. Returned in the response X-Request-ID header
-5. Forwarded to downstream calls (MLflow, Redis, etc.)
+5. Forwarded into Kafka payloads and Kafka message headers
 
 Usage:
     from infrastructure.request_context import get_request_id, request_logger
@@ -17,7 +17,6 @@ Usage:
         logger = request_logger()               # logger with request_id field
         logger.info("Running prediction")
 
-    from starlette.middleware.base import BaseHTTPMiddleware
     app.add_middleware(RequestIdMiddleware)      # register once in main.py
 """
 from __future__ import annotations
@@ -198,12 +197,14 @@ class RequestIdMiddleware:
         path = scope.get("path", "")
         start = time.perf_counter()
         status_code = 500
+        response_started = False
 
         token = _request_id_var.set(request_id)
 
         async def send_with_request_id(message: Message) -> None:
-            nonlocal status_code
+            nonlocal response_started, status_code
             if message["type"] == "http.response.start":
+                response_started = True
                 status_code = int(message["status"])
                 headers = MutableHeaders(scope=message)
                 headers[HEADER_REQUEST_ID] = request_id
@@ -228,7 +229,20 @@ class RequestIdMiddleware:
                 status_code,
                 duration_ms,
             )
-            raise
+            if response_started:
+                raise
+
+            await send(
+                {
+                    "type": "http.response.start",
+                    "status": 500,
+                    "headers": [
+                        (b"content-type", b"text/plain; charset=utf-8"),
+                        (HEADER_REQUEST_ID.lower().encode("latin1"), request_id.encode("utf-8")),
+                    ],
+                }
+            )
+            await send({"type": "http.response.body", "body": b"Internal Server Error"})
         finally:
             _request_id_var.reset(token)
 
