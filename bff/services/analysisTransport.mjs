@@ -1,5 +1,6 @@
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createHash } from "node:crypto";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -49,6 +50,25 @@ function normalizeTrades(trades) {
     pnl_dollars: Number(trade.pnl_dollars || trade.pnlDollars || 0),
     result: String(trade.result || ""),
   }));
+}
+
+function stableStringify(value) {
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => stableStringify(item)).join(",")}]`;
+  }
+
+  if (value && typeof value === "object") {
+    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(",")}}`;
+  }
+
+  return JSON.stringify(value);
+}
+
+function buildPredictIdempotencyKey(payload) {
+  const digest = createHash("sha256")
+    .update(stableStringify(payload || {}))
+    .digest("hex");
+  return `predict:${digest}`;
 }
 
 function transformGrpcConsensusResponse(response) {
@@ -130,14 +150,23 @@ function callGrpcGetConsensus(client, request, timeoutMs) {
   });
 }
 
-async function callHttpPredict(payload, timeoutMs) {
+async function callHttpPredict(payload, timeoutMs, options = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const headers = {
+    "Content-Type": "application/json",
+  };
+  if (options.requestId) {
+    headers["X-Request-ID"] = String(options.requestId);
+  }
+  headers["Idempotency-Key"] = String(
+    options.idempotencyKey || buildPredictIdempotencyKey(payload),
+  );
 
   try {
     const response = await fetch(`${ML_ENGINE_BASE}/predict`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify(payload),
       signal: controller.signal,
     });
@@ -158,9 +187,9 @@ async function callHttpPredict(payload, timeoutMs) {
   }
 }
 
-export async function predictConsensusTransport(payload, timeoutMs = 30_000) {
+export async function predictConsensusTransport(payload, timeoutMs = 30_000, options = {}) {
   if (ANALYSIS_TRANSPORT !== "grpc") {
-    return await callHttpPredict(payload, timeoutMs);
+    return await callHttpPredict(payload, timeoutMs, options);
   }
 
   try {
@@ -179,7 +208,7 @@ export async function predictConsensusTransport(payload, timeoutMs = 30_000) {
       throw error;
     }
 
-    const fallback = await callHttpPredict(payload, timeoutMs);
+    const fallback = await callHttpPredict(payload, timeoutMs, options);
     return {
       ...fallback,
       transport: "http_fallback",
