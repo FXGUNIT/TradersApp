@@ -9,14 +9,17 @@ DATA_DIR = BASE_DIR / "data"
 MODELS_DIR = BASE_DIR / "models"
 SCHEMA_PATH = DATA_DIR / "schema.sql"
 
-DB_PATH = str(DATA_DIR / "trading_data.db")
+DEFAULT_DB_PATH = str(DATA_DIR / "trading_data.db")
+DATABASE_URL = os.getenv("DATABASE_URL", "").strip() or None
+DB_PATH = os.getenv("DB_PATH", DEFAULT_DB_PATH)
 # ── Model store path ─────────────────────────────────────────────────────────
 # Local dev:   ml-engine/models/store (default)
 # Kubernetes:  /models/store (PVC mount, set via MODEL_STORE_PVC_MOUNT)
 # When MODEL_STORE_PVC_MOUNT is set, MODEL_STORE uses that path instead.
 # All pods sharing the same PVC see the same model artifacts.
 MODEL_STORE_PVC_MOUNT = os.getenv("MODEL_STORE_PVC_MOUNT", "")
-MODEL_STORE = MODEL_STORE_PVC_MOUNT or str(MODELS_DIR / "store")
+MODEL_STORE = os.getenv("MODEL_STORE") or MODEL_STORE_PVC_MOUNT or str(MODELS_DIR / "store")
+MODEL_STORE_READ_ONLY = os.getenv("MODEL_STORE_READ_ONLY", "false").lower() in ("true", "1", "yes")
 SCHEMA_PATH_STR = str(SCHEMA_PATH)
 
 # ── MLflow Model Registry (stateless horizontal scaling) ─────────────────────
@@ -25,6 +28,18 @@ SCHEMA_PATH_STR = str(SCHEMA_PATH)
 # All pods converge to the same MLflow production model — the single source of truth.
 MLFLOW_USE_REGISTRY = os.getenv("MLFLOW_USE_REGISTRY", "false").lower() in ("true", "1", "yes")
 MLFLOW_REGISTRY_CHECK_INTERVAL = int(os.getenv("MLFLOW_REGISTRY_CHECK_INTERVAL", "60"))  # seconds
+
+# Model registry sidecar / client configuration
+REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
+REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
+REDIS_URL = os.getenv("REDIS_URL", f"redis://{REDIS_HOST}:{REDIS_PORT}/0")
+MODEL_REGISTRY_MODE = os.getenv("MODEL_REGISTRY_MODE", "direct").strip().lower()
+MODEL_REGISTRY_URL = os.getenv("MODEL_REGISTRY_URL", "http://127.0.0.1:8010")
+MODEL_REGISTRY_PORT = int(os.getenv("MODEL_REGISTRY_PORT", "8010"))
+MODEL_REGISTRY_TIMEOUT_SECONDS = float(os.getenv("MODEL_REGISTRY_TIMEOUT_SECONDS", "10"))
+MODEL_REGISTRY_WARMUP = os.getenv("MODEL_REGISTRY_WARMUP", "true").lower() in ("true", "1", "yes")
+MODEL_REGISTRY_MAX_CACHED_INSTANCES = int(os.getenv("MODEL_REGISTRY_MAX_CACHED_INSTANCES", "4"))
+MODEL_REGISTRY_CACHE_PREFIX = os.getenv("MODEL_REGISTRY_CACHE_PREFIX", "tradersapp:model_registry")
 
 # Session definitions (Eastern Time)
 SESSION_CONFIG = {
