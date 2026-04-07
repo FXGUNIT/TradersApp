@@ -252,8 +252,8 @@ const json = (res, statusCode, payload, origin = "*") => {
     "Content-Type": "application/json; charset=utf-8",
     "Access-Control-Allow-Origin": origin,
     "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization",
-    "Access-Control-Expose-Headers": "Retry-After, X-RateLimit-Remaining, X-RateLimit-Reset",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, Idempotency-Key, X-Request-ID",
+    "Access-Control-Expose-Headers": "Idempotency-Key, Retry-After, X-RateLimit-Remaining, X-RateLimit-Reset, X-Request-ID",
   };
   addSecurityHeaders(headers);
   res.writeHead(statusCode, headers);
