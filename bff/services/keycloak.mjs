@@ -15,6 +15,15 @@
  * - KEYCLOAK_CLIENT_SECRET: Client secret
  */
 
+import {
+  KEYCLOAK_SESSION_PREFIX,
+  createSession,
+  deleteSession,
+  deleteUserSessions,
+  getSession,
+  listSessions,
+} from "./redis-session-store.mjs";
+
 // ---------------------------------------------------------------------------
 // Configuration
 // ---------------------------------------------------------------------------
@@ -265,21 +274,16 @@ export function getHighestRole(roles) {
 // Session Management
 // ---------------------------------------------------------------------------
 
-/** Map of Keycloak session IDs to BFF session data */
-const _keycloakSessions = new Map();
-
 /**
  * Create a session from Keycloak user info.
  * @param {object} userInfo - User info from Keycloak
  * @param {object} device - Device information
  * @returns {object} Session data
  */
-export function createKeycloakSession(userInfo, device = {}) {
-  const sessionId = crypto.randomUUID();
+export async function createKeycloakSession(userInfo, device = {}) {
   const now = Date.now();
 
   const session = {
-    id: sessionId,
     keycloakSubject: userInfo.sub,
     email: userInfo.email,
     name: userInfo.name || userInfo.preferred_username,
@@ -294,8 +298,17 @@ export function createKeycloakSession(userInfo, device = {}) {
     },
   };
 
-  _keycloakSessions.set(sessionId, session);
-  return session;
+  const sessionId = await createSession(session, {
+    prefix: KEYCLOAK_SESSION_PREFIX,
+    userIdField: "keycloakSubject",
+  });
+  if (!sessionId) {
+    return null;
+  }
+  return {
+    id: sessionId,
+    ...session,
+  };
 }
 
 /**
@@ -303,55 +316,48 @@ export function createKeycloakSession(userInfo, device = {}) {
  * @param {string} sessionId - Session ID
  * @returns {object|null} Session data or null
  */
-export function getKeycloakSession(sessionId) {
-  const session = _keycloakSessions.get(sessionId);
-  if (!session) return null;
-
-  // Update last active
-  session.lastActiveAt = Date.now();
-  return session;
+export async function getKeycloakSession(sessionId) {
+  return await getSession(sessionId, {
+    prefix: KEYCLOAK_SESSION_PREFIX,
+  });
 }
 
 /**
  * Revoke a session.
  * @param {string} sessionId - Session ID
  */
-export function revokeKeycloakSession(sessionId) {
-  _keycloakSessions.delete(sessionId);
+export async function revokeKeycloakSession(sessionId) {
+  await deleteSession(sessionId, { prefix: KEYCLOAK_SESSION_PREFIX });
 }
 
 /**
  * Revoke all sessions for a user.
  * @param {string} keycloakSubject - Keycloak subject ID
  */
-export function revokeAllUserSessions(keycloakSubject) {
-  for (const [sessionId, session] of _keycloakSessions.entries()) {
-    if (session.keycloakSubject === keycloakSubject) {
-      _keycloakSessions.delete(sessionId);
-    }
-  }
+export async function revokeAllUserSessions(keycloakSubject) {
+  await deleteUserSessions(keycloakSubject, {
+    prefix: KEYCLOAK_SESSION_PREFIX,
+    userIdField: "keycloakSubject",
+  });
 }
 
 /**
  * List all active sessions (admin only).
  * @returns {object[]} Array of session summaries
  */
-export function listKeycloakSessions() {
-  const sessions = [];
-  for (const [sessionId, session] of _keycloakSessions.entries()) {
-    sessions.push({
-      id: sessionId,
-      email: session.email,
-      name: session.name,
-      roles: session.roles,
-      createdAt: session.createdAt,
-      lastActiveAt: session.lastActiveAt,
-      browser: session.device.browser,
-      os: session.device.os,
-      ip: session.device.ip,
-    });
-  }
-  return sessions;
+export async function listKeycloakSessions() {
+  const sessions = await listSessions({ prefix: KEYCLOAK_SESSION_PREFIX });
+  return sessions.map((session) => ({
+    id: session.id,
+    email: session.email,
+    name: session.name,
+    roles: session.roles,
+    createdAt: session.createdAt,
+    lastActiveAt: session.lastActiveAt,
+    browser: session.device?.browser,
+    os: session.device?.os,
+    ip: session.device?.ip,
+  }));
 }
 
 // ---------------------------------------------------------------------------

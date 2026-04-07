@@ -24,6 +24,8 @@ export function createConsensusRouteHandler({
 }) {
   return async function handleConsensusRoute(req, res, url, origin) {
     const pathname = url.pathname;
+    const requestId = req.id || req.requestId || null;
+    const idempotencyKey = req.headers["idempotency-key"] || null;
 
     // GET /ml/consensus
     if (req.method === "GET" && pathname === "/ml/consensus") {
@@ -42,6 +44,8 @@ export function createConsensusRouteHandler({
             keyLevels,
             sessionId: isNaN(sessionId) ? 1 : sessionId,
             symbol,
+            requestId,
+            idempotencyKey,
           }),
           fetchBreakingNews({ maxItems: 15, minImpact: 'LOW' }).catch(() => ({ items: [], total: 0 })),
         ]);
@@ -119,7 +123,10 @@ export function createConsensusRouteHandler({
       try {
         const body = await readJsonBody(req, 100_000);
         const mode = body?.mode || "incremental";
-        const result = await triggerMlTraining(mode);
+        const result = await triggerMlTraining(mode, {
+          requestId,
+          idempotencyKey,
+        });
         json(res, 200, result, origin);
         return true;
       } catch (err) {
@@ -144,7 +151,9 @@ export function createConsensusRouteHandler({
     if (req.method === "GET" && pathname === "/ml/regime") {
       try {
         const candles = _parseQueryJson(url.searchParams.get("candles")) || [];
-        const result = await getPhysicsRegime(candles);
+        const result = await getPhysicsRegime(candles, {
+          requestId,
+        });
         json(res, result.ok !== false ? 200 : 503, result, origin);
         return true;
       } catch (err) {

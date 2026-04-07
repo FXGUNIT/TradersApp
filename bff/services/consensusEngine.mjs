@@ -114,7 +114,7 @@ syncCircuitBreakerMetric();
 const ML_ENGINE_BASE = process.env.ML_ENGINE_URL || "http://127.0.0.1:8001";
 const ML_REQUEST_TIMEOUT_MS = 30_000;
 
-async function mlRequest(path, body = null, timeout = ML_REQUEST_TIMEOUT_MS) {
+async function mlRequest(path, body = null, timeout = ML_REQUEST_TIMEOUT_MS, options = {}) {
   const isAvailable = _mlCircuitBreaker.isAvailable();
   syncCircuitBreakerMetric();
   if (!isAvailable) {
@@ -131,7 +131,7 @@ async function mlRequest(path, body = null, timeout = ML_REQUEST_TIMEOUT_MS) {
   try {
     // Predict path can use gRPC transport (with HTTP fallback) for low-latency inter-service calls.
     if (path === "/predict" && body) {
-      const result = await predictConsensusTransport(body, timeout);
+      const result = await predictConsensusTransport(body, timeout, options);
       statusCode = 200;
       _mlCircuitBreaker.recordSuccess();
       syncCircuitBreakerMetric();
@@ -140,9 +140,18 @@ async function mlRequest(path, body = null, timeout = ML_REQUEST_TIMEOUT_MS) {
 
     const opts = {
       method: body ? "POST" : "GET",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(options.headers || {}),
+      },
       signal: controller.signal,
     };
+    if (options.requestId) {
+      opts.headers["X-Request-ID"] = String(options.requestId);
+    }
+    if (options.idempotencyKey) {
+      opts.headers["Idempotency-Key"] = String(options.idempotencyKey);
+    }
     if (body) {
       opts.body = JSON.stringify(body);
     }
@@ -391,6 +400,8 @@ export async function getMlConsensus({
   keyLevels = {},
   sessionId = 1,
   symbol = "MNQ",
+  requestId = null,
+  idempotencyKey = null,
 } = {}) {
   const features = buildMlFeatureVector(mathEngine, recentCandles, keyLevels, sessionId);
 
@@ -404,6 +415,9 @@ export async function getMlConsensus({
       math_engine_snapshot: mathEngine,
       key_levels: keyLevels,
       symbol,
+    }, ML_REQUEST_TIMEOUT_MS, {
+      requestId,
+      idempotencyKey,
     });
 
     // Enrich with session context
@@ -524,9 +538,9 @@ export async function getMlModelStatus() {
  * Trigger ML model retraining.
  * Returns immediately (async) — use getMlModelStatus to check progress.
  */
-export async function triggerMlTraining(mode = "incremental") {
+export async function triggerMlTraining(mode = "incremental", options = {}) {
   try {
-    return await mlRequest("/train", { mode }, 5_000);
+    return await mlRequest("/train", { mode }, 5_000, options);
   } catch (err) {
     console.error("[consensusEngine] Training trigger failed:", err.message);
     return { ok: false, error: err.message };
@@ -643,12 +657,12 @@ export async function getMLNewsReactions(limit = 50) {
  * @param {object[]} candles - 5-min candle array (min 50 required)
  * @returns {Promise<object>} full regime analysis
  */
-export async function getPhysicsRegime(candles = []) {
+export async function getPhysicsRegime(candles = [], options = {}) {
   try {
     const res = await mlRequest("/regime", {
       candles: candles.slice(-100),
       symbol: "MNQ",
-    }, 30_000);
+    }, 30_000, options);
     return res;
   } catch (err) {
     console.error("[consensusEngine] Regime analysis unavailable:", err.message);
