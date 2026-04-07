@@ -753,7 +753,7 @@ const server = createServer(async (req, res) => {
   // --- RBAC: Require ADMIN role for admin routes ---
   // Exclude: POST /admin/session (validates password directly in body, no token needed)
   if (pathname.startsWith("/admin") && !(pathname === "/admin/session" && req.method === "POST")) {
-    const auth = authorizeRequest(req);
+    const auth = await authorizeRequest(req);
     if (!auth.authorized) {
       json(res, 403, { ok: false, error: auth.error }, origin);
       return;
@@ -807,7 +807,7 @@ const server = createServer(async (req, res) => {
         ip: req.headers["x-forwarded-for"] || req.headers["x-real-ip"] || "unknown",
         rememberDevice: !!body.rememberDevice,
       };
-      const token = createAdminSession(ROLES.ADMIN, ttlMs, device);
+      const token = await createAdminSession(ROLES.ADMIN, ttlMs, device);
       json(res, 200, {
         ok: true,
         token,
@@ -825,7 +825,7 @@ const server = createServer(async (req, res) => {
   if (req.method === "DELETE" && pathname === "/admin/session") {
     const authHdr = req.headers.authorization || "";
     if (authHdr.startsWith("Bearer ")) {
-      revokeAdminSession(authHdr.slice(7).trim());
+      await revokeAdminSession(authHdr.slice(7).trim());
     }
     json(res, 200, { ok: true, message: "Session revoked." }, origin);
     return;
@@ -835,7 +835,7 @@ const server = createServer(async (req, res) => {
   if (req.method === "GET" && pathname === "/admin/session") {
     const authHeader = req.headers.authorization || "";
     if (authHeader.startsWith("Bearer ")) {
-      const result = validateAdminToken(authHeader.slice(7).trim());
+      const result = await validateAdminToken(authHeader.slice(7).trim());
       if (result.valid) {
         json(res, 200, { ok: true, valid: true, role: result.role }, origin);
         return;
@@ -847,12 +847,12 @@ const server = createServer(async (req, res) => {
 
   // GET /admin/sessions — list all active sessions (admin auth required)
   if (req.method === "GET" && pathname === "/admin/sessions") {
-    const auth = authorizeRequest(req);
+    const auth = await authorizeRequest(req);
     if (!auth.authorized) {
       json(res, 403, { ok: false, error: auth.error }, origin);
       return;
     }
-    const all = listAdminSessions();
+    const all = await listAdminSessions();
     // Strip full tokens from response — only expose short IDs
     const safe = all.map(({ token: _t, ...rest }) => rest);
     json(res, 200, { ok: true, sessions: safe }, origin);
@@ -862,7 +862,7 @@ const server = createServer(async (req, res) => {
   // DELETE /admin/sessions — revoke a specific session (admin auth required)
   // Accepts: { id: "short_id" } (preferred) or { token: "full_token" }
   if (req.method === "DELETE" && pathname === "/admin/sessions") {
-    const auth = authorizeRequest(req);
+    const auth = await authorizeRequest(req);
     if (!auth.authorized) {
       json(res, 403, { ok: false, error: auth.error }, origin);
       return;
@@ -874,7 +874,7 @@ const server = createServer(async (req, res) => {
       // Resolve to full token: prefer id (short), fallback to full token
       let fullToken = revokeToken;
       if (!fullToken && id) {
-        const allSessions = listAdminSessions(); // returns { token, id, device, ... }
+        const allSessions = await listAdminSessions(); // returns { token, id, device, ... }
         const match = allSessions.find((s) => s.id === id);
         if (match) fullToken = match.token;
       }
@@ -886,13 +886,13 @@ const server = createServer(async (req, res) => {
 
       // Prevent revoking your own session (must keep at least one)
       const authToken = (req.headers.authorization || "").replace("Bearer ", "").trim();
-      const allSessions = listAdminSessions();
+      const allSessions = await listAdminSessions();
       if (allSessions.length <= 1 && allSessions[0]?.token === fullToken) {
         json(res, 400, { ok: false, error: "Cannot revoke the only active session." }, origin);
         return;
       }
 
-      const revoked = revokeSessionById(fullToken);
+      const revoked = await revokeSessionById(fullToken);
       if (revoked) {
         json(res, 200, { ok: true, message: "Session revoked." }, origin);
       } else {
