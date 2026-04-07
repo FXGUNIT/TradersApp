@@ -29,5 +29,8 @@
   },
   "ui": {
     "showMemoryIndicators": true
+  },
+  "env": {
+    "KUBECONFIG": "E:\\\\TradersApp\\\\.claude\\\\projects\\\\e--TradersApp\\\\kubeconfig"
   }
 }
