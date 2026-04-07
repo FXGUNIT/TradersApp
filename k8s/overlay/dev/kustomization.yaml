@@ -3,8 +3,8 @@ namespace: tradersapp-dev
 commonLabels:
   environment: dev
 resources:
-  - ../../base/namespace.yaml
-  - ../../base/storage.yaml
+  - ../../namespace.yaml
+  - ../../storage.yaml
   - ../../base/config.yaml
   - ../../base/pdb.yaml
   - ../../base/network-policies.yaml
