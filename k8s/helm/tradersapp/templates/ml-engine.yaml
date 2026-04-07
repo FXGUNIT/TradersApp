@@ -206,6 +206,8 @@ spec:
               value: "/models/store"
             - name: MODEL_STORE_READ_ONLY
               value: "true"
+            - name: REDIS_HOST
+              value: "redis"
             - name: MODEL_REGISTRY_WARMUP
               value: {{ ternary "true" "false" .Values.mlEngine.modelRegistrySidecar.warmup | quote }}
             - name: MODEL_REGISTRY_MAX_CACHED_INSTANCES
