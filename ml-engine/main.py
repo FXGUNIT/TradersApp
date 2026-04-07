@@ -95,9 +95,9 @@ from features.feature_lineage import (
     register_tradersapp_lineage,
     warmup_online_store,
 )
+from infrastructure.model_registry_client import ModelRegistryClient
 from training.trainer import Trainer
 from training.model_store import ModelStore
-from inference.predictor import Predictor
 from inference.consensus_aggregator import ConsensusAggregator
 from inference.triton_client import TritonInferenceClient, get_inference_client
 from inference.onnx_exporter import export_model, export_all as export_all_models, list_onnx_models, get_onnx_output_dir
@@ -107,7 +107,6 @@ from data_quality.validation_pipeline import validate_incoming_dataset
 ONNX_DIR = get_onnx_output_dir()
 from optimization.pso_optimizer import run_alpha_discovery, NichingPSO, PSOOptimizer
 from models.mamba.mamba_sequence_model import get_mamba_prediction, MambaTradingModel, MAMBA_AVAILABLE, MODEL_SIZES
-from models.regime.regime_ensemble import RegimeEnsemble
 from backtest.pbo_engine import (
     PBOConfig,
     WFPBOConfig,
@@ -130,10 +129,8 @@ from backtest.pbo_engine import (
 
 db: CandleDatabase | None = None
 trainer: Trainer | None = None
-predictor: Predictor | None = None
 consensus_agg: ConsensusAggregator | None = None
 store: ModelStore | None = None
-regime_ensemble: RegimeEnsemble | None = None
 drift_monitor: DriftMonitor | None = None
 feedback_logger: FeedbackLogger | None = None
 trade_processor: TradeLogProcessor | None = None
@@ -148,17 +145,16 @@ feast_warmed: bool = False
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global db, trainer, predictor, consensus_agg, store, regime_ensemble, drift_monitor
+    global db, trainer, consensus_agg, store, drift_monitor
     global feedback_logger, trade_processor, retrain_pipeline, triton_client
     global kafka_producer, kafka_consumer, lineage_registry, feast_warmed
 
-    db = CandleDatabase(config.DB_PATH)
+    db = CandleDatabase(db_path=config.DB_PATH, database_url=config.DATABASE_URL)
     trainer = Trainer(db_path=config.DB_PATH, store_dir=config.MODEL_STORE)
-    predictor = Predictor(store_dir=config.MODEL_STORE)
     consensus_agg = ConsensusAggregator()
     store = ModelStore(config.MODEL_STORE)
-    regime_ensemble = RegimeEnsemble(random_state=42)
     drift_monitor = DriftMonitor()
+    app.state.model_registry_client = ModelRegistryClient()
 
     # ── Profiler init (Pyroscope + cProfile) ────────────────────────────────
     init_profiler()
@@ -208,15 +204,19 @@ async def lifespan(app: FastAPI):
         print(f"[Feast] Warmup skipped (online store unavailable): {e}")
         feast_warmed = False
 
-    # Load models on startup
+    # Warm model registry on startup
     try:
-        predictor.load_all_models()
-        print(f"Loaded {len(predictor._models)} models on startup")
+        registry_status = app.state.model_registry_client.warm_models()
+        print(f"[ModelRegistry] Warmed instances: {registry_status.get('cached_instances', [])}")
     except Exception as e:
-        print(f"Warning: could not load models on startup: {e}")
+        registry_status = None
+        print(f"Warning: could not warm model registry on startup: {e}")
     finally:
-        if PROMETHEUS_AVAILABLE and set_prometheus_models_loaded and predictor is not None:
-            set_prometheus_models_loaded(len(predictor._models))
+        if PROMETHEUS_AVAILABLE and set_prometheus_models_loaded:
+            loaded_count = 0
+            if registry_status:
+                loaded_count = registry_status.get("predictor", {}).get("loaded_model_count", 0)
+            set_prometheus_models_loaded(loaded_count)
         if PROMETHEUS_AVAILABLE and record_prometheus_retrain:
             record_prometheus_retrain(triggered=False, in_progress=False)
 
@@ -225,6 +225,9 @@ async def lifespan(app: FastAPI):
     # Cleanup
     print("ML Engine shutting down...")
     RedisCache.close_pools()
+    model_registry_client = getattr(app.state, "model_registry_client", None)
+    if model_registry_client is not None:
+        model_registry_client.close()
     if kafka_consumer:
         kafka_consumer.stop()
     if kafka_producer:
@@ -241,6 +244,33 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+
+
+def get_model_registry_client() -> ModelRegistryClient:
+    client = getattr(app.state, "model_registry_client", None)
+    if client is None:
+        raise RuntimeError("Model registry client is not initialized")
+    return client
+
+
+def get_model_registry_status() -> dict[str, Any]:
+    return get_model_registry_client().status()
+
+
+def sync_model_registry_metrics(status: dict[str, Any] | None = None) -> dict[str, Any]:
+    status = status or get_model_registry_status()
+    if PROMETHEUS_AVAILABLE and set_prometheus_models_loaded:
+        loaded_count = status.get("predictor", {}).get("loaded_model_count", 0)
+        set_prometheus_models_loaded(loaded_count)
+    return status
+
+
+def ensure_training_enabled() -> None:
+    if config.MODEL_STORE_READ_ONLY:
+        raise HTTPException(
+            status_code=409,
+            detail="Training is disabled in the stateless serving deployment. Use a dedicated trainer job or write-enabled pipeline.",
+        )
 
 # CORS — restrict to known origins in production
 app.add_middleware(
@@ -396,19 +426,26 @@ async def health():
     except Exception:
         stats = {}
     try:
-        models = store.list_all_models() if store else []
-    except Exception:
-        models = []
+        registry_status = get_model_registry_status()
+    except Exception as exc:
+        registry_status = {
+            "error": str(exc),
+            "available_models": [],
+            "predictor": {"loaded_model_count": 0},
+        }
+    models = registry_status.get("available_models", [])
 
     return {
         "status": "healthy",
         "request_id": get_request_id(),
         "uptime_sec": round(uptime, 1),
+        "db_backend": db.backend_type if db else "unknown",
         "db_candles": stats.get("candles", 0),
         "db_trades": stats.get("trades", 0),
         "db_sessions": stats.get("sessions", 0),
-        "models_loaded": len(predictor._models) if predictor else 0,
+        "models_loaded": registry_status.get("predictor", {}).get("loaded_model_count", 0),
         "models_available": models,
+        "model_registry": registry_status,
         "last_training": stats.get("last_training"),
         "feast": {
             "lineage_registered": len(lineage_registry.get_all()) if lineage_registry else 0,
@@ -1063,6 +1100,8 @@ async def train(request: TrainRequest, background: BackgroundTasks):
     Trigger model training.
     Runs in background — returns immediately with training job ID.
     """
+    ensure_training_enabled()
+
     def _do_train():
         try:
             result = trainer.train_direction_models(
@@ -1071,10 +1110,9 @@ async def train(request: TrainRequest, background: BackgroundTasks):
                 min_trades=request.min_trades,
                 verbose=True,
             )
-            # Reload models after training
-            predictor.load_all_models()
-            if PROMETHEUS_AVAILABLE and set_prometheus_models_loaded and predictor is not None:
-                set_prometheus_models_loaded(len(predictor._models))
+            registry_client = get_model_registry_client()
+            registry_client.invalidate(["predictor"])
+            sync_model_registry_metrics(registry_client.warm_models(["predictor"]))
             return result
         except Exception as e:
             return {"error": str(e), "traceback": traceback.format_exc()}
@@ -1097,6 +1135,7 @@ async def train(request: TrainRequest, background: BackgroundTasks):
 @app.post("/train-sync")
 async def train_sync(request: TrainRequest):
     """Synchronous training — waits for completion."""
+    ensure_training_enabled()
     try:
         if PROMETHEUS_AVAILABLE and record_prometheus_retrain:
             record_prometheus_retrain(triggered=True, in_progress=True)
@@ -1106,9 +1145,9 @@ async def train_sync(request: TrainRequest):
             min_trades=request.min_trades,
             verbose=True,
         )
-        predictor.load_all_models()
-        if PROMETHEUS_AVAILABLE and set_prometheus_models_loaded and predictor is not None:
-            set_prometheus_models_loaded(len(predictor._models))
+        registry_client = get_model_registry_client()
+        registry_client.invalidate(["predictor"])
+        sync_model_registry_metrics(registry_client.warm_models(["predictor"]))
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
