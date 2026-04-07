@@ -29,6 +29,8 @@ import sys
 import json
 import time
 import signal
+import logging
+import functools
 from pathlib import Path
 from datetime import datetime, timezone
 from typing import Optional, Any
@@ -37,6 +39,22 @@ import pandas as pd
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+try:
+    from infrastructure.request_context import (
+        get_request_id,
+        request_id_context,
+        request_logger,
+        generate_request_id,
+    )
+except ModuleNotFoundError:
+    from ml_engine.infrastructure.request_context import (  # type: ignore
+        get_request_id,
+        request_id_context,
+        request_logger,
+        generate_request_id,
+    )
 
 
 try:
@@ -61,6 +79,8 @@ ALL_TOPICS = [
     TOPIC_FEEDBACK,
     TOPIC_DRIFT,
 ]
+
+KAFKA_REQUEST_ID_HEADER = "x-request-id"
 
 
 class _JsonEncoder(json.JSONEncoder):
@@ -100,16 +120,20 @@ class KafkaProducerClient:
         self._producer: Optional[Producer] = None
         self._delivery_reports: list[dict] = []
         self._closed = False
+        self._logger_name = "ml-engine.kafka.producer"
 
         if self._enable:
             self._connect(**kwargs)
         else:
-            print("[Kafka] Kafka disabled via KAFKA_ENABLE=false — messages logged only")
+            self._log(logging.INFO, "Kafka disabled via KAFKA_ENABLE=false; messages will be skipped")
+
+    def _log(self, level: int, message: str, *args):
+        request_logger(self._logger_name).log(level, message, *args)
 
     def _connect(self, **kwargs):
         """Connect to Kafka broker."""
         if not KAFKA_AVAILABLE:
-            print("[Kafka] confluent-kafka not installed. Install: pip install confluent-kafka")
+            self._log(logging.WARNING, "confluent-kafka not installed. Install: pip install confluent-kafka")
             self._enable = False
             return
 
@@ -129,25 +153,42 @@ class KafkaProducerClient:
 
         try:
             self._producer = Producer(conf)
-            print(f"[Kafka] Producer connected to {self._bootstrap}")
+            self._log(logging.INFO, "Producer connected to %s", self._bootstrap)
         except KafkaException as e:
-            print(f"[Kafka] Failed to connect: {e}")
+            self._log(logging.ERROR, "Failed to connect: %s", e)
             self._enable = False
 
-    def _delivery_callback(self, err, msg):
+    def _delivery_callback(self, err, msg, request_id: str | None = None):
         """Called when message is delivered or failed."""
-        report = {
-            "topic": msg.topic() if msg else None,
-            "partition": msg.partition() if msg else None,
-            "offset": msg.offset() if msg else None,
-            "error": str(err) if err else None,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        }
-        self._delivery_reports.append(report)
-        if err:
-            print(f"[Kafka] Delivery failed: {err}")
-        else:
-            print(f"[Kafka] Delivered to {msg.topic()} [{msg.partition()}]@{msg.offset()}")
+        with request_id_context(request_id):
+            report = {
+                "topic": msg.topic() if msg else None,
+                "partition": msg.partition() if msg else None,
+                "offset": msg.offset() if msg else None,
+                "error": str(err) if err else None,
+                "request_id": request_id,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+            self._delivery_reports.append(report)
+            if err:
+                self._log(logging.ERROR, "Delivery failed topic=%s error=%s", report["topic"], err)
+            else:
+                self._log(
+                    logging.INFO,
+                    "Delivered topic=%s partition=%s offset=%s",
+                    msg.topic(),
+                    msg.partition(),
+                    msg.offset(),
+                )
+
+    def _resolve_request_id(self, value: dict) -> str:
+        return str(value.get("request_id") or get_request_id() or generate_request_id())
+
+    def _build_headers(self, request_id: str, extra_headers: list[tuple[str, bytes]] | None = None) -> list[tuple[str, bytes]]:
+        headers = [(KAFKA_REQUEST_ID_HEADER, request_id.encode("utf-8"))]
+        if extra_headers:
+            headers.extend(extra_headers)
+        return headers
 
     # ─── Public API ─────────────────────────────────────────────────────────────
 
@@ -268,32 +309,41 @@ class KafkaProducerClient:
         Core publish method with delivery callback.
         Returns True if message was accepted by broker, False otherwise.
         """
+        request_id = self._resolve_request_id(value)
+        payload = {**value, "request_id": request_id}
+
         if not self._enable or self._producer is None:
-            print(f"[Kafka] Disabled — would publish to {topic}: {value.get('signal', 'N/A')}")
+            with request_id_context(request_id):
+                self._log(logging.INFO, "Disabled; skipped publish topic=%s key=%s", topic, key)
             return True  # Graceful degradation
 
         try:
             self._producer.produce(
                 topic=topic,
                 key=key.encode("utf-8"),
-                value=_dumps(value),
-                callback=self._delivery_callback,
+                value=_dumps(payload),
+                headers=self._build_headers(request_id),
+                callback=functools.partial(self._delivery_callback, request_id=request_id),
             )
             self._producer.poll(0)  # Trigger delivery callbacks
+            with request_id_context(request_id):
+                self._log(logging.INFO, "Queued publish topic=%s key=%s", topic, key)
             return True
         except BufferError:
-            print("[Kafka] Local queue full — waiting for delivery...")
+            with request_id_context(request_id):
+                self._log(logging.WARNING, "Local queue full; waiting for delivery topic=%s", topic)
             self._producer.flush(timeout=5)
             return False
         except KafkaException as e:
-            print(f"[Kafka] Publish error: {e}")
+            with request_id_context(request_id):
+                self._log(logging.ERROR, "Publish error topic=%s error=%s", topic, e)
             return False
 
     def flush(self, timeout: float = 10.0):
         """Flush pending messages to broker."""
         if self._producer:
             remaining = self._producer.flush(timeout=timeout)
-            print(f"[Kafka] Flush complete — {remaining} messages remaining in queue")
+            self._log(logging.INFO, "Flush complete; %s messages remaining in queue", remaining)
 
     def close(self):
         """Close producer gracefully."""
@@ -303,7 +353,7 @@ class KafkaProducerClient:
         if self._producer:
             self.flush(timeout=10.0)
             self._producer = None
-        print("[Kafka] Producer closed")
+        self._log(logging.INFO, "Producer closed")
 
     def __enter__(self):
         return self

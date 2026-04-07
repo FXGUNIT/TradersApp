@@ -292,7 +292,7 @@ class RedisCache:
 
         Uses Redis SETNX mutex so only ONE process computes a cold cache entry.
         Others that fail to acquire the lock poll until the result is ready.
-        Falls back to in-memory LRU if Redis unavailable.
+        If Redis is unavailable, the request computes without caching.
         """
         # Check cache first
         cached = self.get(key)

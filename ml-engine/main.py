@@ -28,7 +28,7 @@ from data.candle_db import CandleDatabase
 from infrastructure.performance import (
     get_cache, get_sla_monitor, RedisCache, CacheConfig, SLAMonitor,
 )
-from infrastructure.request_context import RequestIdMiddleware, get_request_id
+from infrastructure.request_context import RequestIdMiddleware, get_request_id, install_request_id_logging
 from infrastructure.drift_detector import (
     DriftMonitor, DriftThresholds,
 )
@@ -244,6 +244,8 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+
+install_request_id_logging()
 
 
 def get_model_registry_client() -> ModelRegistryClient:
@@ -490,7 +492,7 @@ async def get_sla_report(endpoint: str | None = None):
 
 @app.get("/cache/stats")
 async def get_cache_stats():
-    """Cache hit/miss statistics for Redis + in-memory LRU."""
+    """Cache hit/miss statistics for the shared Redis cache."""
     cache = get_cache()
     return {
         "cache_stats": cache.get_stats(),
@@ -1172,7 +1174,7 @@ async def predict(request: PredictRequest):
         monitor = get_sla_monitor()
         start = time.time()
 
-        # ── Cache check (Redis or in-memory LRU) ──────────────────────────
+        # ── Cache check (shared Redis) ───────────────────────────────────
         cache = get_cache()
         candle_hash = hashlib.sha256(
             json.dumps(request.candles[-20:], sort_keys=True, default=str).encode()
@@ -2858,7 +2860,7 @@ async def mamba_predict(request: MambaRequest):
             monitor.record("/mamba/predict", (time.time() - start) * 1000, 400)
             raise HTTPException(status_code=400, detail="No candles available")
 
-        # ── Cache check (Redis or in-memory LRU) ────────────────────────────
+        # ── Cache check (shared Redis) ─────────────────────────────────────
         cache = get_cache()
         candle_hash = hashlib.sha256(
             json.dumps(df_candles[-20:], sort_keys=True, default=str).encode()
