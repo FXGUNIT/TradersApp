@@ -64,7 +64,11 @@ class KafkaConsumerClient:
         enable: bool | None = None,
         **kwargs,
     ):
-        self._topics = topics or [TOPIC_FEEDBACK, TOPIC_DRIFT]
+        self._topics = topics or [
+            TOPIC_CANDLES,
+            TOPIC_FEEDBACK,
+            TOPIC_DRIFT,
+        ]
         self._group_id = group_id or os.environ.get("KAFKA_GROUP_ID", "traders-ml-engine")
         self._bootstrap = bootstrap_servers or os.environ.get(
             "KAFKA_BOOTSTRAP_SERVERS", "localhost:9092"
@@ -119,6 +123,35 @@ class KafkaConsumerClient:
 
     def _register_default_handlers(self):
         """Register built-in message handlers."""
+
+        def handle_candles(message: dict):
+            """Process candle data from Kafka → store in SQLite/PostgreSQL."""
+            try:
+                import sys
+                sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent.parent))
+                from ml_engine.data.candle_db import CandleDatabase
+                import pandas as pd
+
+                db = CandleDatabase()
+
+                # Handle batch of candles (published via publish_candles)
+                if "candles" in message:
+                    df = pd.DataFrame(message["candles"])
+                # Handle single candle (published via publish_candle)
+                elif "timestamp" in message:
+                    df = pd.DataFrame([message])
+                else:
+                    print(f"[Kafka] Unrecognized candle-data payload: {list(message.keys())}")
+                    return
+
+                inserted = db.insert_candles(df)
+                if inserted > 0:
+                    print(f"[Kafka] Stored {inserted} candle(s) from candle-data topic")
+                else:
+                    print(f"[Kafka] No new candles inserted (duplicates)")
+
+            except Exception as e:
+                print(f"[Kafka] Error in candle-data handler: {e}")
 
         def handle_feedback(message: dict):
             """Process trade outcome → update ConceptDriftDetector."""
@@ -178,6 +211,7 @@ class KafkaConsumerClient:
             except Exception as e:
                 print(f"[Kafka] Error in drift handler: {e}")
 
+        self.register_handler(TOPIC_CANDLES, handle_candles)
         self.register_handler(TOPIC_FEEDBACK, handle_feedback)
         self.register_handler(TOPIC_DRIFT, handle_drift)
 

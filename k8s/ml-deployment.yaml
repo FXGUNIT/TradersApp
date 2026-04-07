@@ -102,6 +102,8 @@ spec:
                 name: ml-engine-config
             - configMapRef:
                 name: ml-engine-env
+            - secretRef:
+                name: ml-engine-secrets
           env:
             # Model store: use shared PVC mount for horizontal pod scaling
             # All pods share the same ml-models-pvc → same model artifacts

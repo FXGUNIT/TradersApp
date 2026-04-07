@@ -97,6 +97,9 @@ spec:
           ports:
             - name: http
               containerPort: {{ .Values.mlEngine.service.port }}
+          envFrom:
+            - secretRef:
+                name: ml-engine-secrets
           env:
             - name: DB_PATH
               value: "/data/trading_data.db"
