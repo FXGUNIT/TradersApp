@@ -14,7 +14,8 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Query
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Query, Request as FastAPIRequest
+from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse, Response
 from pydantic import BaseModel, Field
@@ -28,7 +29,13 @@ from data.candle_db import CandleDatabase
 from infrastructure.performance import (
     get_cache, get_sla_monitor, RedisCache, CacheConfig, SLAMonitor,
 )
-from infrastructure.request_context import RequestIdMiddleware, get_request_id, install_request_id_logging
+from infrastructure.idempotency import IdempotencyClaim, get_idempotency_service
+from infrastructure.request_context import (
+    RequestIdMiddleware,
+    get_request_id,
+    install_request_id_logging,
+    request_logger,
+)
 from infrastructure.drift_detector import (
     DriftMonitor, DriftThresholds,
 )
@@ -246,6 +253,100 @@ app = FastAPI(
 )
 
 install_request_id_logging()
+
+
+def _resolve_idempotency_key(
+    raw_request: FastAPIRequest,
+    scope: str,
+    payload: dict[str, Any],
+    *,
+    allow_body_fallback: bool,
+) -> str | None:
+    for header_name in ("Idempotency-Key", "X-Idempotency-Key"):
+        header_value = raw_request.headers.get(header_name)
+        if header_value and header_value.strip():
+            return header_value.strip()
+
+    request_id = payload.get("request_id") or raw_request.headers.get("X-Request-ID")
+    if request_id:
+        return str(request_id).strip()
+
+    if not allow_body_fallback:
+        return None
+
+    normalized = json.dumps(jsonable_encoder(payload), sort_keys=True, separators=(",", ":"), default=str)
+    return hashlib.sha256(f"{scope}:{normalized}".encode("utf-8")).hexdigest()
+
+
+def _claim_idempotency(
+    raw_request: FastAPIRequest,
+    response: Response,
+    scope: str,
+    payload: dict[str, Any],
+    *,
+    allow_body_fallback: bool,
+    response_ttl_seconds: int,
+    wait_timeout_seconds: float,
+    lock_ttl_seconds: int,
+) -> tuple[IdempotencyClaim | None, Any | None]:
+    key = _resolve_idempotency_key(
+        raw_request,
+        scope,
+        payload,
+        allow_body_fallback=allow_body_fallback,
+    )
+    if not key:
+        return None, None
+
+    response.headers["Idempotency-Key"] = key
+    try:
+        claim = get_idempotency_service().claim(
+            scope,
+            key,
+            payload,
+            wait_timeout_seconds=wait_timeout_seconds,
+            lock_ttl_seconds=lock_ttl_seconds,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    if claim is None:
+        return None, None
+
+    if claim.replay_response is not None:
+        response.headers["X-Idempotent-Replay"] = "true"
+        request_logger("ml-engine.idempotency").info("Replay scope=%s key=%s", scope, key)
+        return claim, claim.replay_response
+
+    if claim.in_progress:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": "Duplicate request with the same idempotency key is still processing.",
+                "idempotency_key": key,
+                "retryable": True,
+                "retry_after_ms": int(wait_timeout_seconds * 1000),
+            },
+        )
+
+    response.headers["X-Idempotent-Replay"] = "false"
+    return claim, None
+
+
+def _store_idempotent_response(claim: IdempotencyClaim | None, response_payload: Any, ttl_seconds: int) -> None:
+    if claim is None:
+        return
+    get_idempotency_service().store_response(
+        claim,
+        jsonable_encoder(response_payload),
+        ttl_seconds=ttl_seconds,
+    )
+
+
+def _release_idempotency_claim(claim: IdempotencyClaim | None) -> None:
+    if claim is None:
+        return
+    get_idempotency_service().release(claim)
 
 
 def get_model_registry_client() -> ModelRegistryClient:
