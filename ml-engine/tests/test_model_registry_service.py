@@ -1,5 +1,3 @@
-import json
-import shutil
 from pathlib import Path
 
 import pandas as pd
@@ -70,23 +68,17 @@ class DummyRegimeEnsemble:
 @pytest.fixture()
 def registry_service(monkeypatch):
     monkeypatch.setattr(config, "MODEL_STORE_READ_ONLY", False)
-    base_dir = Path.cwd() / "ml-engine" / ".tmp_model_registry_tests"
-    shutil.rmtree(base_dir, ignore_errors=True)
-    store_dir = base_dir / "store"
-    store_dir.mkdir(parents=True)
-    (store_dir / "direction_1.meta.json").write_text(json.dumps({"version": "1"}), encoding="utf-8")
+    store_dir = Path.cwd() / "ml-engine" / "models" / "store"
 
     service = ModelRegistryService(
         store_dir=str(store_dir),
         redis_url="redis://127.0.0.1:6399/0",
         max_cached_instances=1,
     )
+    monkeypatch.setattr(service.store, "list_all_models", lambda: ["direction"])
     monkeypatch.setattr(service, "_load_predictor", lambda: DummyPredictor())
     monkeypatch.setattr(service, "_load_regime_ensemble", lambda: DummyRegimeEnsemble())
-    try:
-        yield service
-    finally:
-        shutil.rmtree(base_dir, ignore_errors=True)
+    return service
 
 
 def test_model_registry_service_eviction_and_status(registry_service):
