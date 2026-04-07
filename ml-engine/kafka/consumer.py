@@ -107,7 +107,7 @@ class KafkaConsumerClient:
         self._logger_name = "ml-engine.kafka.consumer"
 
         if self._enable:
-            self._connect()
+            self._connect(**kwargs)
             self._register_default_handlers()
         else:
             self._log(logging.INFO, "Consumer disabled via KAFKA_ENABLE=false")
@@ -115,7 +115,7 @@ class KafkaConsumerClient:
     def _log(self, level: int, message: str, *args):
         request_logger(self._logger_name).log(level, message, *args)
 
-    def _connect(self):
+    def _connect(self, **kwargs):
         """Connect to Kafka broker."""
         if not KAFKA_AVAILABLE:
             self._log(logging.WARNING, "confluent-kafka not installed")
@@ -222,17 +222,24 @@ class KafkaConsumerClient:
                 threshold = message.get("threshold", 0.0)
 
                 if severity in ("alert", "critical"):
-                    print(f"[Kafka] Drift alert: {alert_type} ({severity}) — triggering retrain check")
+                    self._log(
+                        logging.WARNING,
+                        "Drift alert received alert_type=%s severity=%s metric_value=%s threshold=%s",
+                        alert_type,
+                        severity,
+                        metric_value,
+                        threshold,
+                    )
                     # Check if retraining is warranted
                     try:
                         if pipeline and pipeline.should_retrain():
-                            print("[Kafka] Starting auto-retrain triggered by drift alert")
+                            self._log(logging.INFO, "Auto-retrain triggered by drift alert")
                             # Note: runs async in background
                     except Exception as e:
-                        print(f"[Kafka] Retrain check error: {e}")
+                        self._log(logging.ERROR, "Retrain check error: %s", e)
 
             except Exception as e:
-                print(f"[Kafka] Error in drift handler: {e}")
+                self._log(logging.ERROR, "Error in drift handler: %s", e)
 
         def handle_consensus_signals(message: dict):
             """
@@ -277,10 +284,16 @@ class KafkaConsumerClient:
                     regime=regime,
                     symbol=symbol,
                 )
-                print(f"[Kafka] consensus-signals: logged signal_id={signal_id} ({signal} {confidence:.3f})")
+                self._log(
+                    logging.INFO,
+                    "consensus-signals logged signal_id=%s signal=%s confidence=%.3f",
+                    signal_id,
+                    signal,
+                    confidence,
+                )
 
             except Exception as e:
-                print(f"[Kafka] Error in consensus-signals handler: {e}")
+                self._log(logging.ERROR, "Error in consensus-signals handler: %s", e)
 
         def handle_model_predictions(message: dict):
             """
@@ -311,10 +324,16 @@ class KafkaConsumerClient:
                 except Exception:
                     pass  # Drift monitor may not be initialized yet
 
-                print(f"[Kafka] model-predictions: {model_name} ({signal} p_long={probability_long:.3f})")
+                self._log(
+                    logging.INFO,
+                    "model-predictions model=%s signal=%s probability_long=%.3f",
+                    model_name,
+                    signal,
+                    probability_long,
+                )
 
             except Exception as e:
-                print(f"[Kafka] Error in model-predictions handler: {e}")
+                self._log(logging.ERROR, "Error in model-predictions handler: %s", e)
 
         self.register_handler(TOPIC_CANDLES, handle_candles)
         self.register_handler(TOPIC_CONSENSUS, handle_consensus_signals)
