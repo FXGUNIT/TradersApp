@@ -347,7 +347,7 @@ class KafkaConsumerClient:
         Handler receives the deserialized message dict.
         """
         self._handlers[topic] = handler
-        print(f"[Kafka] Registered handler for topic: {topic}")
+        self._log(logging.INFO, "Registered handler for topic=%s", topic)
 
     # ─── Consumer Loop ─────────────────────────────────────────────────────────
 
@@ -359,7 +359,7 @@ class KafkaConsumerClient:
             blocking: If True, runs in current thread. If False, runs in background thread.
         """
         if not self._enable or self._consumer is None:
-            print("[Kafka] Consumer not enabled — nothing to start")
+            self._log(logging.INFO, "Consumer not enabled; nothing to start")
             return
 
         self._running = True
@@ -369,11 +369,11 @@ class KafkaConsumerClient:
         else:
             self._thread = threading.Thread(target=self._consume_loop, daemon=True)
             self._thread.start()
-            print(f"[Kafka] Consumer running in background thread")
+            self._log(logging.INFO, "Consumer running in background thread")
 
     def _consume_loop(self):
         """Main consumer loop — polls and dispatches messages."""
-        print("[Kafka] Starting consumer loop...")
+        self._log(logging.INFO, "Starting consumer loop")
 
         while self._running:
             try:
@@ -387,53 +387,65 @@ class KafkaConsumerClient:
                         # End of partition — not an error
                         continue
                     else:
-                        print(f"[Kafka] Consumer error: {msg.error()}")
+                        self._log(logging.ERROR, "Consumer error: %s", msg.error())
                         continue
 
                 topic = msg.topic()
                 value = msg.value()
+                request_id = extract_request_id_from_headers(msg.headers()) or generate_request_id()
 
                 try:
                     event = json.loads(value.decode("utf-8")) if isinstance(value, bytes) else json.loads(value)
                 except json.JSONDecodeError as e:
-                    print(f"[Kafka] JSON decode error on {topic}: {e}")
-                    self._messages_failed += 1
+                    with request_id_context(request_id):
+                        self._log(logging.ERROR, "JSON decode error on topic=%s: %s", topic, e)
+                        self._messages_failed += 1
                     continue
+
+                event.setdefault("request_id", request_id)
 
                 # Dispatch to handler
                 handler = self._handlers.get(topic)
-                if handler:
-                    try:
-                        handler(event)
-                        self._messages_processed += 1
-                        self._last_message_time = datetime.now(timezone.utc).isoformat()
-                    except Exception as e:
-                        print(f"[Kafka] Handler error on {topic}: {e}")
-                        self._messages_failed += 1
-                else:
-                    print(f"[Kafka] No handler for topic: {topic}")
+                with request_id_context(request_id):
+                    if handler:
+                        try:
+                            self._log(
+                                logging.INFO,
+                                "Consumed topic=%s partition=%s offset=%s",
+                                topic,
+                                msg.partition(),
+                                msg.offset(),
+                            )
+                            handler(event)
+                            self._messages_processed += 1
+                            self._last_message_time = datetime.now(timezone.utc).isoformat()
+                        except Exception as e:
+                            self._log(logging.ERROR, "Handler error on topic=%s: %s", topic, e)
+                            self._messages_failed += 1
+                    else:
+                        self._log(logging.WARNING, "No handler for topic=%s", topic)
 
-                # Commit offset after successful processing
-                try:
-                    self._consumer.commit(msg, asynchronous=False)
-                except Exception as e:
-                    print(f"[Kafka] Commit error: {e}")
+                    # Commit offset after successful processing
+                    try:
+                        self._consumer.commit(msg, asynchronous=False)
+                    except Exception as e:
+                        self._log(logging.ERROR, "Commit error topic=%s offset=%s: %s", topic, msg.offset(), e)
 
             except Exception as e:
-                print(f"[Kafka] Consumer loop error: {e}")
+                self._log(logging.ERROR, "Consumer loop error: %s", e)
                 time.sleep(1)  # Back off on error
 
-        print("[Kafka] Consumer loop stopped")
+        self._log(logging.INFO, "Consumer loop stopped")
 
     def stop(self):
         """Stop the consumer loop gracefully."""
-        print("[Kafka] Stopping consumer...")
+        self._log(logging.INFO, "Stopping consumer")
         self._running = False
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=5)
         if self._consumer:
             self._consumer.close()
-        print("[Kafka] Consumer stopped")
+        self._log(logging.INFO, "Consumer stopped")
 
     def __enter__(self):
         return self
