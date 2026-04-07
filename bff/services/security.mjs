@@ -196,8 +196,6 @@ export const ROUTE_PERMISSIONS = {
 };
 
 /** Map of valid admin sessions: token → {role, createdAt, expiresAt, device} */
-const _adminSessions = new Map();
-
 /** Generate a cryptographically random session token. */
 function _generateToken() {
   const bytes = new Uint8Array(32);
@@ -212,9 +210,8 @@ function _generateToken() {
  * @param {number} ttlMs - time-to-live in ms
  * @param {object} device - {fingerprint, browser, os, device, ip}
  */
-export function createAdminSession(role = ROLES.ADMIN, ttlMs = 8 * 60 * 60 * 1000, device = {}) {
-  const token = _generateToken();
-  _adminSessions.set(token, {
+export async function createAdminSession(role = ROLES.ADMIN, ttlMs = 8 * 60 * 60 * 1000, device = {}) {
+  const token = await createSession({
     role,
     createdAt: Date.now(),
     expiresAt: Date.now() + ttlMs,
@@ -226,28 +223,37 @@ export function createAdminSession(role = ROLES.ADMIN, ttlMs = 8 * 60 * 60 * 100
       ip: device.ip || "unknown",
       rememberDevice: !!device.rememberDevice,
     },
+  }, {
+    prefix: ADMIN_SESSION_PREFIX,
+    ttlSeconds: Math.max(1, Math.ceil(ttlMs / 1000)),
   });
+  if (!token) {
+    throw new Error("Admin session store unavailable.");
+  }
   return token;
 }
 
 /**
  * Validate an admin token. Returns {valid, role} or {valid: false}.
  */
-export function validateAdminToken(token) {
+export async function validateAdminToken(token) {
   if (!token) return { valid: false };
 
-  const session = _adminSessions.get(token);
+  const session = await getSession(token, {
+    prefix: ADMIN_SESSION_PREFIX,
+    touch: false,
+  });
   if (!session) return { valid: false };
   if (Date.now() > session.expiresAt) {
-    _adminSessions.delete(token);
+    await deleteSession(token, { prefix: ADMIN_SESSION_PREFIX });
     return { valid: false };
   }
   return { valid: true, role: session.role };
 }
 
 /** Revoke an admin session. */
-export function revokeAdminSession(token) {
-  _adminSessions.delete(token);
+export async function revokeAdminSession(token) {
+  await deleteSession(token, { prefix: ADMIN_SESSION_PREFIX });
 }
 
 /**
@@ -255,42 +261,32 @@ export function revokeAdminSession(token) {
  * Returns array of {id, device, createdAt, expiresAt, active}.
  * id = first 8 chars of token for identification.
  */
-export function listAdminSessions() {
-  cleanupExpiredSessions();
-  const sessions = [];
-  for (const [token, session] of _adminSessions.entries()) {
-    sessions.push({
-      id: token.substring(0, 8),
-      token, // full token for revocation
+export async function listAdminSessions() {
+  const now = Date.now();
+  const sessions = await listSessions({ prefix: ADMIN_SESSION_PREFIX });
+  return sessions
+    .filter((session) => session?.id && Number(session.expiresAt || 0) > now)
+    .map((session) => ({
+      id: session.id.substring(0, 8),
+      token: session.id,
       device: session.device,
       createdAt: session.createdAt,
       expiresAt: session.expiresAt,
       active: true,
-    });
-  }
-  return sessions;
+    }));
 }
 
 /**
  * Revoke a session by its full token.
  * Returns true if found and revoked, false if not found.
  */
-export function revokeSessionById(token) {
-  if (_adminSessions.has(token)) {
-    _adminSessions.delete(token);
-    return true;
-  }
-  return false;
+export async function revokeSessionById(token) {
+  return await deleteSession(token, { prefix: ADMIN_SESSION_PREFIX });
 }
 
 /** Clean up expired sessions (call periodically). */
-export function cleanupExpiredSessions() {
-  const now = Date.now();
-  for (const [token, session] of _adminSessions.entries()) {
-    if (now > session.expiresAt) {
-      _adminSessions.delete(token);
-    }
-  }
+export async function cleanupExpiredSessions() {
+  // Redis TTL handles expiry automatically.
 }
 
 /** Check if `grantedRole` satisfies `requiredRole`. */
@@ -334,13 +330,13 @@ const constantTimeMatch = (left, right) => {
  * Authenticate a request using Bearer token, service key, or admin password session.
  * Returns {authenticated: bool, role: string|null}.
  */
-export function authenticateRequest(req) {
+export async function authenticateRequest(req) {
   const authHeader = req.headers.authorization || req.headers.Authorization || "";
 
   // 1. Bearer token (admin session token)
   if (authHeader.startsWith("Bearer ")) {
     const token = authHeader.slice(7).trim();
-    const result = validateAdminToken(token);
+    const result = await validateAdminToken(token);
     if (result.valid) {
       return { authenticated: true, role: result.role };
     }
@@ -363,10 +359,10 @@ export function authenticateRequest(req) {
  * Authorize a request: check that the request's role satisfies the route requirement.
  * Returns {authorized: bool, error: string|null}.
  */
-export function authorizeRequest(req) {
+export async function authorizeRequest(req) {
   const pathname = new URL(req.url || "/", "http://x").pathname;
   const requiredRole = getRequiredRole(pathname);
-  const { authenticated, role } = authenticateRequest(req);
+  const { authenticated, role } = await authenticateRequest(req);
 
   if (requiredRole === null) {
     return { authorized: true, role: role || ROLES.TRADER };
