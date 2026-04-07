@@ -2,11 +2,10 @@ import "dotenv/config";
 import { existsSync, readFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { resolve } from "node:path";
-import { createHash, timingSafeEqual } from "node:crypto";
+import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import { getMetrics, getContentType, recordHttpRequest } from "./metrics.mjs";
 import {
   addSecurityHeaders,
-  RateLimiter,
   ROLES,
   authorizeRequest,
   createAdminSession,
@@ -14,9 +13,9 @@ import {
   revokeAdminSession,
   listAdminSessions,
   revokeSessionById,
-  cleanupExpiredSessions,
   getRateLimitConfig,
 } from "./services/security.mjs";
+import { checkRateLimit } from "./services/redis-session-store.mjs";
 import {
   getDocumentMeta,
   getHubContent,
@@ -150,26 +149,6 @@ const TELEGRAM_CHAT_ID =
   "";
 const ADMIN_ATTEMPT_LIMIT = 3;
 const ADMIN_LOCKOUT_WINDOW_MS = 15 * 60 * 1000;
-
-// ---------------------------------------------------------------------------
-// Security: Rate limiters (one per endpoint class)
-// ---------------------------------------------------------------------------
-const _rateLimiters = new Map();
-
-function getRateLimiter(pathname) {
-  const config = getRateLimitConfig(pathname);
-  if (!_rateLimiters.has(config)) {
-    _rateLimiters.set(config, new RateLimiter({ ...config, name: pathname }));
-  }
-  return _rateLimiters.get(config);
-}
-
-/** Cleanup expired rate limit entries every 10 minutes. */
-const _rlCleanup = setInterval(() => {
-  for (const rl of _rateLimiters.values()) rl._cleanup();
-  cleanupExpiredSessions();
-}, 10 * 60 * 1000);
-_rlCleanup.unref();
 
 const AI_PROVIDER_DEFINITIONS = [
   {
