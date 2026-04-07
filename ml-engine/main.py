@@ -285,7 +285,6 @@ def _claim_idempotency(
     payload: dict[str, Any],
     *,
     allow_body_fallback: bool,
-    response_ttl_seconds: int,
     wait_timeout_seconds: float,
     lock_ttl_seconds: int,
 ) -> tuple[IdempotencyClaim | None, Any | None]:
@@ -1198,12 +1197,29 @@ async def monitoring_config():
 # -------------------------------------------------------------------------
 
 @app.post("/train")
-async def train(request: TrainRequest, background: BackgroundTasks):
+async def train(
+    request: TrainRequest,
+    background: BackgroundTasks,
+    raw_request: FastAPIRequest,
+    response: Response,
+):
     """
     Trigger model training.
     Runs in background — returns immediately with training job ID.
     """
     ensure_training_enabled()
+    payload = request.model_dump(mode="json")
+    claim, replay = _claim_idempotency(
+        raw_request,
+        response,
+        "train",
+        payload,
+        allow_body_fallback=True,
+        wait_timeout_seconds=0.25,
+        lock_ttl_seconds=3600,
+    )
+    if replay is not None:
+        return replay
 
     def _do_train():
         try:
@@ -1227,19 +1243,38 @@ async def train(request: TrainRequest, background: BackgroundTasks):
         record_prometheus_retrain(triggered=True, in_progress=True)
     background.add_task(_do_train)
 
-    return {
+    accepted_response = {
         "status": "training_started",
         "mode": request.mode,
         "symbol": request.symbol,
         "message": "Training running in background. Poll /model-status for results.",
     }
+    _store_idempotent_response(claim, accepted_response, ttl_seconds=3600)
+    return accepted_response
 
 
 @app.post("/train-sync")
-async def train_sync(request: TrainRequest):
+async def train_sync(
+    request: TrainRequest,
+    raw_request: FastAPIRequest,
+    response: Response,
+):
     """Synchronous training — waits for completion."""
     ensure_training_enabled()
+    payload = request.model_dump(mode="json")
+    claim = None
     try:
+        claim, replay = _claim_idempotency(
+            raw_request,
+            response,
+            "train_sync",
+            payload,
+            allow_body_fallback=True,
+            wait_timeout_seconds=2.0,
+            lock_ttl_seconds=3600,
+        )
+        if replay is not None:
+            return replay
         if PROMETHEUS_AVAILABLE and record_prometheus_retrain:
             record_prometheus_retrain(triggered=True, in_progress=True)
         result = trainer.train_direction_models(
@@ -1251,8 +1286,13 @@ async def train_sync(request: TrainRequest):
         registry_client = get_model_registry_client()
         registry_client.invalidate(["predictor"])
         sync_model_registry_metrics(registry_client.warm_models(["predictor"]))
+        _store_idempotent_response(claim, result, ttl_seconds=3600)
         return result
+    except HTTPException:
+        _release_idempotency_claim(claim)
+        raise
     except Exception as e:
+        _release_idempotency_claim(claim)
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         if PROMETHEUS_AVAILABLE and record_prometheus_retrain:
@@ -1264,7 +1304,11 @@ async def train_sync(request: TrainRequest):
 # -------------------------------------------------------------------------
 
 @app.post("/predict")
-async def predict(request: PredictRequest):
+async def predict(
+    request: PredictRequest,
+    raw_request: FastAPIRequest,
+    response: Response,
+):
     """
     Run all loaded models on current market state.
     Returns per-model votes + consensus signal.
@@ -1484,16 +1528,21 @@ async def predict(request: PredictRequest):
                 confidence=float(output.get("confidence") or 0.0),
                 symbol=request.symbol,
             )
+        output["request_id"] = get_request_id()
         output["_latency_ms"] = round(latency_ms, 1)
+        _store_idempotent_response(claim, output, ttl_seconds=60)
         return output
 
     except ValueError as e:
+        _release_idempotency_claim(claim)
         latency_ms = (time.time() - start) * 1000
         monitor.record("/predict", latency_ms, 422)
         raise HTTPException(status_code=422, detail=str(e))
     except HTTPException:
+        _release_idempotency_claim(claim)
         raise
     except Exception as e:
+        _release_idempotency_claim(claim)
         latency_ms = (time.time() - start) * 1000
         monitor.record("/predict", latency_ms, 500)
         traceback.print_exc()
@@ -2495,7 +2544,22 @@ async def compute_returns_for_backtest(request: BacktestTradesRequest):
 @app.get("/model-status")
 async def model_status():
     """Get status of all trained models."""
+    claim = None
+    monitor = get_sla_monitor()
+    start = time.time()
     try:
+        payload = request.model_dump(mode="json")
+        claim, replay = _claim_idempotency(
+            raw_request,
+            response,
+            "predict",
+            payload,
+            allow_body_fallback=True,
+            wait_timeout_seconds=3.0,
+            lock_ttl_seconds=30,
+        )
+        if replay is not None:
+            return replay
         registry_status = get_model_registry_status()
         models = store.list_all_models()
         status = {}
@@ -3113,6 +3177,7 @@ class FeedbackSignalRequest(BaseModel):
     session_phase: str | None = None
     symbol: str = Field(default="MNQ")
     session_id: int = Field(default=1)
+    request_id: str | None = None
 
 
 class FeedbackRetrainRequest(BaseModel):
@@ -3130,7 +3195,11 @@ class FeedbackRetrainRequest(BaseModel):
 
 
 @app.post("/feedback/signal")
-async def log_signal(request: FeedbackSignalRequest):
+async def log_signal(
+    request: FeedbackSignalRequest,
+    raw_request: FastAPIRequest,
+    response: Response,
+):
     """
     Log a consensus signal for later outcome matching.
 
@@ -3141,6 +3210,19 @@ async def log_signal(request: FeedbackSignalRequest):
     """
     if feedback_logger is None:
         raise HTTPException(status_code=503, detail="Feedback logger not initialized")
+
+    payload = request.model_dump(mode="json")
+    claim, replay = _claim_idempotency(
+        raw_request,
+        response,
+        "feedback_signal",
+        payload,
+        allow_body_fallback=True,
+        wait_timeout_seconds=1.5,
+        lock_ttl_seconds=30,
+    )
+    if replay is not None:
+        return replay
 
     try:
         signal_id = feedback_logger.log_signal(
@@ -3155,8 +3237,15 @@ async def log_signal(request: FeedbackSignalRequest):
             symbol=request.symbol,
             session_id=request.session_id,
         )
-        return {"ok": True, "signal_id": signal_id}
+        response_payload = {
+            "ok": True,
+            "signal_id": signal_id,
+            "request_id": request.request_id or get_request_id(),
+        }
+        _store_idempotent_response(claim, response_payload, ttl_seconds=300)
+        return response_payload
     except Exception as e:
+        _release_idempotency_claim(claim)
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
