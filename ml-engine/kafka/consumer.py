@@ -26,6 +26,7 @@ import json
 import time
 import threading
 import signal
+import logging
 from pathlib import Path
 from datetime import datetime, timezone
 from typing import Callable, Optional, Any
@@ -34,6 +35,22 @@ import pandas as pd
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+try:
+    from infrastructure.request_context import (
+        extract_request_id_from_headers,
+        generate_request_id,
+        request_id_context,
+        request_logger,
+    )
+except ModuleNotFoundError:
+    from ml_engine.infrastructure.request_context import (  # type: ignore
+        extract_request_id_from_headers,
+        generate_request_id,
+        request_id_context,
+        request_logger,
+    )
 
 
 try:
@@ -87,17 +104,21 @@ class KafkaConsumerClient:
         self._messages_processed = 0
         self._messages_failed = 0
         self._last_message_time: Optional[str] = None
+        self._logger_name = "ml-engine.kafka.consumer"
 
         if self._enable:
             self._connect()
             self._register_default_handlers()
         else:
-            print("[Kafka] Consumer disabled via KAFKA_ENABLE=false")
+            self._log(logging.INFO, "Consumer disabled via KAFKA_ENABLE=false")
+
+    def _log(self, level: int, message: str, *args):
+        request_logger(self._logger_name).log(level, message, *args)
 
     def _connect(self):
         """Connect to Kafka broker."""
         if not KAFKA_AVAILABLE:
-            print("[Kafka] confluent-kafka not installed")
+            self._log(logging.WARNING, "confluent-kafka not installed")
             self._enable = False
             return
 
@@ -118,9 +139,9 @@ class KafkaConsumerClient:
         try:
             self._consumer = Consumer(conf)
             self._consumer.subscribe(self._topics)
-            print(f"[Kafka] Consumer subscribed to {self._topics} (group: {self._group_id})")
+            self._log(logging.INFO, "Consumer subscribed to %s (group=%s)", self._topics, self._group_id)
         except KafkaException as e:
-            print(f"[Kafka] Consumer connect error: {e}")
+            self._log(logging.ERROR, "Consumer connect error: %s", e)
             self._enable = False
 
     def _register_default_handlers(self):
@@ -143,17 +164,17 @@ class KafkaConsumerClient:
                 elif "timestamp" in message:
                     df = pd.DataFrame([message])
                 else:
-                    print(f"[Kafka] Unrecognized candle-data payload: {list(message.keys())}")
+                    self._log(logging.WARNING, "Unrecognized candle-data payload keys=%s", list(message.keys()))
                     return
 
                 inserted = db.insert_candles(df)
                 if inserted > 0:
-                    print(f"[Kafka] Stored {inserted} candle(s) from candle-data topic")
+                    self._log(logging.INFO, "Stored %s candle(s) from candle-data topic", inserted)
                 else:
-                    print(f"[Kafka] No new candles inserted (duplicates)")
+                    self._log(logging.INFO, "No new candles inserted (duplicates)")
 
             except Exception as e:
-                print(f"[Kafka] Error in candle-data handler: {e}")
+                self._log(logging.ERROR, "Error in candle-data handler: %s", e)
 
         def handle_feedback(message: dict):
             """Process trade outcome → update ConceptDriftDetector."""
@@ -184,10 +205,10 @@ class KafkaConsumerClient:
                             symbol=symbol,
                         )
                     except Exception as e:
-                        print(f"[Kafka] Feedback handler error: {e}")
+                        self._log(logging.ERROR, "Feedback handler error: %s", e)
 
             except Exception as e:
-                print(f"[Kafka] Error in feedback handler: {e}")
+                self._log(logging.ERROR, "Error in feedback handler: %s", e)
 
         def handle_drift(message: dict):
             """Process drift alert → trigger retrain pipeline."""
