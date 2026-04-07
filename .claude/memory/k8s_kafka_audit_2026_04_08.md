@@ -6,10 +6,24 @@ type: reference
 
 # TradersApp k8s + Kafka Audit — 2026-04-08
 
-## k3s Readiness
-- Bootstrap script exists at `k8s/scripts/bootstrap.sh` — supports `--install`, `--deploy`, `--full`, `--destroy`, `--status`
-- k3s NOT confirmed installed on this machine — must validate with `kubectl get nodes` before deployment
-- Bootstrap script only runs on Linux/WSL2 (fails on native Windows)
+## k3s Cluster Status (2026-04-08)
+
+**k3s v1.34.6 running on WSL Ubuntu (hostname: fxg, node IP: 172.21.239.98)**
+- Single-node cluster: `fxg` (control-plane, Ready)
+- k3s service active since ~2026-04-07 21:29 UTC
+- StorageClass: `local-path` (default, Rancher provisioner)
+- Container runtime: containerd 2.2.2
+- Ingress controller: Traefik (v3.6.10) — installed but pods in Error state
+- `metrics-server` pod: 0/1 Ready (restart loop — may need investigation)
+
+**tradersapp namespace:** Created (27h ago), no application workloads deployed yet.
+Only `kube-root-ca.crt` configmap present. TradersApp manifests exist but not applied.
+
+**kubectl access:**
+- kubectl from inside WSL Ubuntu works: `sudo k3s kubectl ...`
+- kubectl from Windows cannot reach k3s API (port 6443 bound to WSL loopback only)
+- kubectl wrapper at `E:\TradersApp\.claude\kubectl` — routes via WSL
+- kubeconfig at `E:\TradersApp\.claude\projects\e--TradersApp\kubeconfig` (UTF-16, needs `netsh portproxy` admin to work from Windows)
 
 ## Persistent Volume Inventory
 
