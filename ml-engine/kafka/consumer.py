@@ -66,6 +66,8 @@ class KafkaConsumerClient:
     ):
         self._topics = topics or [
             TOPIC_CANDLES,
+            TOPIC_CONSENSUS,
+            TOPIC_PREDICTIONS,
             TOPIC_FEEDBACK,
             TOPIC_DRIFT,
         ]
@@ -211,7 +213,91 @@ class KafkaConsumerClient:
             except Exception as e:
                 print(f"[Kafka] Error in drift handler: {e}")
 
+        def handle_consensus_signals(message: dict):
+            """
+            Process consensus signals from Kafka → log to signal_log DB.
+            These are written by ml-engine's /predict endpoint.
+            Wire this consumer when you want the ml-engine to record its own signals.
+            In a multi-pod or multi-service setup, this consumer runs on whichever pod
+            owns the FeedbackLogger DB — typically the primary ml-engine pod.
+            """
+            try:
+                from ml_engine.feedback.feedback_logger import FeedbackLogger
+                from ml_engine.data.candle_db import CandleDatabase
+
+                db = CandleDatabase()
+                logger = FeedbackLogger(db)
+
+                # Payload from KafkaProducerClient.publish_consensus():
+                # {symbol, signal, confidence, long_score, short_score,
+                #  votes, regime, generated_at, published_at}
+                symbol = message.get("symbol", "MNQ")
+                signal = message.get("signal", "NEUTRAL")
+                confidence = float(message.get("confidence", 0.0))
+                votes = message.get("votes", {})
+                regime = message.get("regime")
+
+                # votes is already a serialized dict on the wire
+                # The producer serializes it with _JsonEncoder, so it comes as a dict
+                consensus_data = {
+                    "signal": signal,
+                    "confidence": confidence,
+                    "long_score": message.get("long_score", 0),
+                    "short_score": message.get("short_score", 0),
+                    "regime": regime,
+                    "votes": votes,
+                }
+
+                signal_id = logger.log_signal(
+                    signal=signal,
+                    confidence=confidence,
+                    votes=votes,
+                    consensus=consensus_data,
+                    regime=regime,
+                    symbol=symbol,
+                )
+                print(f"[Kafka] consensus-signals: logged signal_id={signal_id} ({signal} {confidence:.3f})")
+
+            except Exception as e:
+                print(f"[Kafka] Error in consensus-signals handler: {e}")
+
+        def handle_model_predictions(message: dict):
+            """
+            Process per-model predictions from Kafka → update per-model drift tracking.
+            These are written by ml-engine's /predict endpoint for each voting model.
+
+            Payload from KafkaProducerClient.publish_prediction():
+            # {symbol, model_name, signal, probability_long, confidence, published_at}
+            """
+            try:
+                from ml_engine.infrastructure.drift_detector import get_drift_monitor
+
+                monitor = get_drift_monitor()
+                symbol = message.get("symbol", "MNQ")
+                model_name = message.get("model_name", "unknown")
+                signal = message.get("signal", "NEUTRAL")
+                probability_long = float(message.get("probability_long", 0.5))
+                confidence = float(message.get("confidence", 0.0))
+
+                # Record for per-model concept drift detection
+                # ConceptDriftDetector already tracks per-model metrics via _model_stats
+                try:
+                    monitor.record_prediction(
+                        correct=None,  # Unknown at publish time — outcome comes via feedback-loop
+                        confidence=confidence,
+                        symbol=symbol,
+                    )
+                except Exception:
+                    pass  # Drift monitor may not be initialized yet
+
+                print(f"[Kafka] model-predictions: {model_name} ({signal} p_long={probability_long:.3f})")
+
+            except Exception as e:
+                print(f"[Kafka] Error in model-predictions handler: {e}")
+
         self.register_handler(TOPIC_CANDLES, handle_candles)
+        self.register_handler(TOPIC_CONSENSUS, handle_consensus_signals)
+        self.register_handler(TOPIC_PREDICTIONS, handle_model_predictions)
         self.register_handler(TOPIC_FEEDBACK, handle_feedback)
         self.register_handler(TOPIC_DRIFT, handle_drift)
 
