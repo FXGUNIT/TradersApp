@@ -79,7 +79,7 @@ except ImportError:
 
 # ── Observability: Profiler ─────────────────────────────────────────────────────
 from infrastructure.profiler import init_profiler, profile_endpoint, profile_function
-from infrastructure.profiler import LatencyBreakdown, MemorySnapshot ─────────────────────────────────────────────
+from infrastructure.profiler import LatencyBreakdown, MemorySnapshot
 try:
     from infrastructure.tracing import init_tracing, add_jaeger_middleware
     TRACING_AVAILABLE = True
