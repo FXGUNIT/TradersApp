@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TradersApp Architecture Presentation</title>
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --surface: #ffffff;
+      --surface-alt: #f9fbff;
+      --border: #d6deeb;
+      --text: #0e2248;
+      --muted: #536b97;
+      --accent: #2563eb;
+      --accent-soft: #dbeafe;
+      --success: #0f9d58;
+      --warning: #d97706;
+      --shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+      --radius: 20px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      background:
+        radial-gradient(circle at top right, rgba(37, 99, 235, 0.08), transparent 28%),
+        linear-gradient(180deg, #f8fbff 0%, #eef4fb 100%);
+      color: var(--text);
+      line-height: 1.55;
+    }
+
+    .shell {
+      width: min(1360px, calc(100vw - 48px));
+      margin: 0 auto;
+      padding: 28px 0 64px;
+    }
+
+    .nav {
+      position: sticky;
+      top: 16px;
+      z-index: 20;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 20px;
+      padding: 14px 20px;
+      margin-bottom: 24px;
+      background: rgba(255, 255, 255, 0.88);
+      border: 1px solid rgba(214, 222, 235, 0.9);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(14px);
+    }
+
+    .brand {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .brand strong {
+      font-size: 20px;
+      letter-spacing: 0.01em;
+    }
+
+    .brand span {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .nav-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .nav-links a {
+      text-decoration: none;
+      color: var(--text);
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: 1.35fr 0.9fr;
+      gap: 22px;
+      margin-bottom: 24px;
+    }
+
+    .hero-card,
+    .status-card,
+    .section,
+    .diagram-card,
+    .callout-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .hero-card {
+      padding: 34px;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 12px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-weight: 700;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 16px;
+    }
+
+    h1 {
+      margin: 0 0 12px;
+      font-size: clamp(36px, 5vw, 56px);
+      line-height: 1.03;
+      letter-spacing: -0.03em;
+    }
+
+    .hero-card p {
+      margin: 0;
+      font-size: 18px;
+      color: var(--muted);
+      max-width: 62ch;
+    }
+
+    .status-card {
+      padding: 28px;
+      display: grid;
+      gap: 16px;
+      align-content: start;
+    }
+
+    .status-card h2 {
+      margin: 0;
+      font-size: 24px;
+    }
+
+    .status-grid {
+      display: grid;
+      gap: 12px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .pill.live {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    .pill.partial {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .pill.ops {
+      background: #e0e7ff;
+      color: #4338ca;
+    }
+
+    .status-item {
+      padding: 14px 16px;
+      border-radius: 16px;
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+    }
+
+    .status-item strong {
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    .section {
+      padding: 28px;
+      margin-bottom: 24px;
+      scroll-margin-top: 112px;
+    }
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: end;
+      margin-bottom: 18px;
+    }
+
+    .section h2 {
+      margin: 0;
+      font-size: 28px;
+      letter-spacing: -0.02em;
+    }
+
+    .section p.lead {
+      margin: 8px 0 0;
+      color: var(--muted);
+      max-width: 80ch;
+    }
+
+    .diagram-card {
+      padding: 20px;
+      background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+      overflow: hidden;
+    }
+
+    .diagram-card img {
+      width: 100%;
+      height: auto;
+      display: block;
+      border-radius: 14px;
+    }
+
+    .asset-links {
+      margin-top: 12px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .asset-links a,
+    .docs-list a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .cards-3,
+    .cards-2,
+    .loop-grid {
+      display: grid;
+      gap: 16px;
+    }
+
+    .cards-3 {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .cards-2 {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .loop-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .card {
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 18px;
+    }
+
+    .card h3 {
+      margin: 0 0 10px;
+      font-size: 22px;
+    }
+
+    .card p,
+    .card li,
+    td,
+    th {
+      font-size: 15px;
+    }
+
+    .card p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      overflow: hidden;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      background: var(--surface-alt);
+    }
+
+    th,
+    td {
+      text-align: left;
+      padding: 15px 16px;
+      vertical-align: top;
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      background: #edf4ff;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    .loop-card ol,
+    .docs-list,
+    .truth-list {
+      margin: 0;
+      padding-left: 20px;
+    }
+
+    .loop-card li,
+    .truth-list li,
+    .docs-list li {
+      margin-bottom: 10px;
+    }
+
+    .callout-card {
+      padding: 24px;
+      background: linear-gradient(135deg, #eff6ff 0%, #ffffff 100%);
+    }
+
+    .truth-list {
+      color: var(--muted);
+    }
+
+    .footer-note {
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    @media (max-width: 1100px) {
+      .hero,
+      .cards-3,
+      .cards-2,
+      .loop-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .section-header,
+      .nav {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .shell {
+        width: min(100vw - 24px, 1360px);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="nav">
+      <div class="brand">
+        <strong>TradersApp Architecture</strong>
+        <span>Current runtime, DDD boundaries, MLOps loops, and platform controls</span>
+      </div>
+      <div class="nav-links">
+        <a href="#overview">Overview</a>
+        <a href="#system-design">System Design</a>
+        <a href="#operating-map">5W1H Map</a>
+        <a href="#bird-roadmap">Roadmap</a>
+        <a href="#runtime">Runtime Layers</a>
+        <a href="#contexts">Bounded Contexts</a>
+        <a href="#loops">Control Loops</a>
+        <a href="#deploy">Deployment</a>
+      </div>
+    </div>
+
+    <div class="hero">
+      <div class="hero-card">
+        <div class="eyebrow">Current architecture presentation</div>
+        <h1>One place to read the system as it actually exists today.</h1>
+        <p>
+          TradersApp is no longer a simple app. It is a self-hosted trading ML platform with a live low-latency request path,
+          an extracted `analysis-service` seam, automated learning and data-quality loops, full observability, and self-hosted delivery.
+        </p>
+      </div>
+      <div class="status-card">
+        <h2>Reality snapshot</h2>
+        <div class="status-grid">
+          <div class="status-item">
+            <span class="pill live">Live runtime seam</span>
+            <strong>`analysis-service` is the only extracted domain service on the critical path.</strong>
+            Everything else still stabilizes behind that seam instead of being broken into premature microservices.
+          </div>
+          <div class="status-item">
+            <span class="pill partial">Partial extraction</span>
+            <strong>Learning and ingestion are defined as bounded contexts, but most logic still runs in ML Engine + Airflow.</strong>
+            That is intentional risk control, not an architecture gap.
+          </div>
+          <div class="status-item">
+            <span class="pill ops">Ops already live</span>
+            <strong>Observability, MLflow, CI/CD, and secrets are part of the current platform.</strong>
+            The supporting systems are already self-hosted and wired into the operating model.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <section class="section" id="overview">
+      <div class="section-header">
+        <div>
+          <h2>Architecture overview</h2>
+          <p class="lead">Read this diagram first. It shows the request path, supporting systems, and current extraction reality at a glance.</p>
+        </div>
+      </div>
+      <div class="diagram-card">
+        <img src="docs/assets/architecture-3d-overview.svg" alt="TradersApp architecture overview" />
+      </div>
+      <div class="asset-links">
+        <span>Variants:</span>
+        <a href="docs/assets/architecture-3d-overview.svg">SVG</a>
+        <a href="docs/assets/architecture-3d-overview.png">PNG</a>
+        <a href="docs/assets/architecture-3d-overview-print.svg">Print SVG</a>
+      </div>
+    </section>
+
+    <section class="section" id="system-design">
+      <div class="section-header">
+        <div>
+          <h2>System design board</h2>
+          <p class="lead">This is the detailed board view in the style of a classic system-design map. It shows actors, service boundaries, stateful systems, event flow, observability, and delivery controls on one canvas.</p>
+        </div>
+      </div>
+      <div class="diagram-card">
+        <img src="docs/assets/architecture-system-design-board.svg" alt="TradersApp detailed system design board" />
+      </div>
+      <div class="asset-links">
+        <span>Variants:</span>
+        <a href="docs/assets/architecture-system-design-board.svg">SVG</a>
+        <a href="docs/assets/architecture-system-design-board.png">PNG</a>
+        <a href="docs/assets/architecture-system-design-board-print.svg">Print SVG</a>
+      </div>
+    </section>
+
+    <section class="section" id="operating-map">
+      <div class="section-header">
+        <div>
+          <h2>Operating map</h2>
+          <p class="lead">This is the single chart for what / how / why / where / whom across request serving, learning, observability, delivery, and the extraction strategy.</p>
+        </div>
+      </div>
+      <div class="diagram-card">
+        <img src="docs/assets/architecture-5w1h-map.svg" alt="TradersApp 5W1H operating map" />
+      </div>
+      <div class="asset-links">
+        <span>Variants:</span>
+        <a href="docs/assets/architecture-5w1h-map.svg">SVG</a>
+        <a href="docs/assets/architecture-5w1h-map.png">PNG</a>
+        <a href="docs/assets/architecture-5w1h-map-print.svg">Print SVG</a>
+      </div>
+    </section>
+
+    <section class="section" id="bird-roadmap">
+      <div class="section-header">
+        <div>
+          <h2>Bird's-eye roadmap</h2>
+          <p class="lead">This is the evolution view of the same platform. Read it left to right as current reality, hardening, extraction, and long-run operating state.</p>
+        </div>
+      </div>
+      <div class="diagram-card">
+        <img src="docs/assets/architecture-birdview-roadmap.svg" alt="TradersApp bird's-eye architecture roadmap" />
+      </div>
+      <div class="asset-links">
+        <span>Variants:</span>
+        <a href="docs/assets/architecture-birdview-roadmap.svg">SVG</a>
+        <a href="docs/assets/architecture-birdview-roadmap.png">PNG</a>
+        <a href="docs/assets/architecture-birdview-roadmap-print.svg">Print SVG</a>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-header">
+        <div>
+          <h2>Current system shape</h2>
+          <p class="lead">These are the runtime truths that matter when reading the rest of the platform.</p>
+        </div>
+      </div>
+      <div class="cards-3">
+        <div class="card">
+          <h3>User flow</h3>
+          <p>User traffic enters through the React frontend, lands at the Node.js BFF, crosses the gRPC seam into `analysis-service`, and resolves through the Python ML Engine.</p>
+        </div>
+        <div class="card">
+          <h3>Data + learning flow</h3>
+          <p>Redis and Feast back the low-latency feature path, Kafka carries event streams, MLflow owns model history, and Airflow enforces scheduled quality and retraining workflows.</p>
+        </div>
+        <div class="card">
+          <h3>Platform flow</h3>
+          <p>Prometheus, Grafana, Loki, and Jaeger provide live visibility, while Gitea, Woodpecker, Helm, k3s, and Infisical form the self-hosted delivery and secrets path.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="runtime">
+      <div class="section-header">
+        <div>
+          <h2>Runtime layers</h2>
+          <p class="lead">This table maps the platform by responsibility instead of by repo folder.</p>
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Layer</th>
+            <th>Components</th>
+            <th>What it does now</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Experience</td>
+            <td>Frontend (`React`, `Vite`)</td>
+            <td>Trading UI, dashboards, and operator workflows.</td>
+          </tr>
+          <tr>
+            <td>Edge + orchestration</td>
+            <td>BFF (`Node.js`)</td>
+            <td>Authentication, session control, anti-corruption layer, and API composition.</td>
+          </tr>
+          <tr>
+            <td>Domain service</td>
+            <td>`analysis-service` (`gRPC`)</td>
+            <td>Stable consensus contract and extraction seam for the first bounded context.</td>
+          </tr>
+          <tr>
+            <td>Core ML runtime</td>
+            <td>ML Engine (`Python`)</td>
+            <td>Inference, training, drift detection, feedback, and monitoring endpoints.</td>
+          </tr>
+          <tr>
+            <td>Low-latency data plane</td>
+            <td>Redis, Feast</td>
+            <td>Online features and cache-backed reads for critical request paths.</td>
+          </tr>
+          <tr>
+            <td>Event plane</td>
+            <td>Kafka</td>
+            <td>Market data, model signals, and feedback topics.</td>
+          </tr>
+          <tr>
+            <td>MLOps plane</td>
+            <td>MLflow, MinIO, PostgreSQL</td>
+            <td>Experiment tracking, model registry, artifacts, and lineage metadata.</td>
+          </tr>
+          <tr>
+            <td>Control plane</td>
+            <td>Airflow, Great Expectations</td>
+            <td>Data validation, scheduled monitoring, and retraining orchestration.</td>
+          </tr>
+          <tr>
+            <td>Observability plane</td>
+            <td>Prometheus, Grafana, Loki, Jaeger</td>
+            <td>Metrics, dashboards, logs, traces, and alerts.</td>
+          </tr>
+          <tr>
+            <td>Delivery plane</td>
+            <td>Gitea, Woodpecker, Helm, k3s, Infisical</td>
+            <td>Build, test, sign, deploy, and inject runtime secrets.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section" id="contexts">
+      <div class="section-header">
+        <div>
+          <h2>Bounded contexts and extraction status</h2>
+          <p class="lead">This is the important DDD truth: there are contracts for multiple contexts, but only one is fully extracted on the live request path today.</p>
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Context</th>
+            <th>Service boundary</th>
+            <th>Status</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>BFF orchestration</td>
+            <td>`bff`</td>
+            <td>Live</td>
+            <td>Owns frontend-facing contracts and translation logic.</td>
+          </tr>
+          <tr>
+            <td>Analysis</td>
+            <td>`analysis-service`</td>
+            <td>Live extraction seam</td>
+            <td>gRPC is implemented and deployed; internals still proxy ML Engine `/predict`.</td>
+          </tr>
+          <tr>
+            <td>Ingestion</td>
+            <td>`ingestion-service` contract</td>
+            <td>Logical only</td>
+            <td>Ownership is defined, but runtime still lives inside `ml-engine` packages.</td>
+          </tr>
+          <tr>
+            <td>Learning</td>
+            <td>`learning-service` contract</td>
+            <td>Logical only</td>
+            <td>Retraining, drift, and DQ loops are live, but still run inside ML Engine and Airflow DAGs.</td>
+          </tr>
+          <tr>
+            <td>Platform ops</td>
+            <td>Infra stack</td>
+            <td>Live</td>
+            <td>Observability, CI/CD, secrets, and Helm rollout are already wired.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section" id="loops">
+      <div class="section-header">
+        <div>
+          <h2>Critical paths and control loops</h2>
+          <p class="lead">These are the sequences that matter operationally: request path, learning, observability, and delivery.</p>
+        </div>
+      </div>
+      <div class="loop-grid">
+        <div class="card loop-card">
+          <h3>1. Request path</h3>
+          <ol>
+            <li>Browser hits the frontend.</li>
+            <li>Frontend sends requests to the BFF.</li>
+            <li>BFF calls `analysis-service` over gRPC.</li>
+            <li>`analysis-service` resolves consensus through the ML Engine.</li>
+            <li>Feature lookups come from Redis and Feast where available.</li>
+          </ol>
+          <p class="footer-note">This path carries the 50ms SLA target for critical operations.</p>
+        </div>
+        <div class="card loop-card">
+          <h3>2. Learning loop</h3>
+          <ol>
+            <li>ML Engine logs training and registry activity to MLflow.</li>
+            <li>MinIO stores artifacts; PostgreSQL stores run and registry metadata.</li>
+            <li>Airflow runs model monitoring and retraining DAGs.</li>
+            <li>Great Expectations gates dirty data before retraining is allowed.</li>
+            <li>Approved versions remain in MLflow for rollback and promotion control.</li>
+          </ol>
+        </div>
+        <div class="card loop-card">
+          <h3>3. Observability loop</h3>
+          <ol>
+            <li>Prometheus scrapes `/metrics` from runtime services.</li>
+            <li>Grafana visualizes latency, drift, resource, and SLA dashboards.</li>
+            <li>Loki centralizes logs; Jaeger collects traces.</li>
+            <li>Alert rules cover SLA breaches, retrain failures, stale monitoring, and infra regressions.</li>
+          </ol>
+        </div>
+        <div class="card loop-card">
+          <h3>4. Delivery loop</h3>
+          <ol>
+            <li>Gitea hosts the source of truth.</li>
+            <li>Woodpecker runs unit, integration, performance, chaos, and k8s verification.</li>
+            <li>Images are built, scanned, signed, and deployed through Helm to k3s.</li>
+            <li>Secrets are expected to come from Infisical instead of static manifests.</li>
+          </ol>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="deploy">
+      <div class="section-header">
+        <div>
+          <h2>Deployment modes</h2>
+          <p class="lead">Use the right entry path depending on whether you are validating local end-to-end behavior, control planes, or cluster rollout.</p>
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Mode</th>
+            <th>Entry point</th>
+            <th>Use case</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Full local stack</td>
+            <td>`docker-compose.yml`</td>
+            <td>End-to-end local bring-up with frontend, BFF, ML Engine, MLflow, Kafka, and observability.</td>
+          </tr>
+          <tr>
+            <td>MLOps-only local stack</td>
+            <td>`docker-compose.mlflow.yml`</td>
+            <td>Dedicated MLflow + MinIO + PostgreSQL workflow and registry testing.</td>
+          </tr>
+          <tr>
+            <td>Airflow control plane</td>
+            <td>`docker-compose.airflow.yml`</td>
+            <td>Data-quality, monitoring, and retraining DAG validation.</td>
+          </tr>
+          <tr>
+            <td>Cluster deploy</td>
+            <td>`k8s/helm/tradersapp`</td>
+            <td>k3s production-style rollout with Helm.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section cards-2">
+      <div class="callout-card">
+        <h2>Canonical docs</h2>
+        <ol class="docs-list">
+          <li><a href="docs/index.md">Front-page architecture doc</a></li>
+          <li><a href="docs/DDD_MICROSERVICES.md">DDD Microservices + gRPC</a></li>
+          <li><a href="docs/MLOPS_MLFLOW.md">MLflow MLOps lifecycle</a></li>
+          <li><a href="docs/MODEL_MONITORING_RETRAINING.md">Continuous model monitoring + auto-retraining</a></li>
+          <li><a href="docs/DATA_QUALITY_AIRFLOW.md">Data Quality + Airflow</a></li>
+          <li><a href="docs/AUTOMATED_TESTING.md">Automated testing + chaos</a></li>
+          <li><a href="docs/CICD_GITEA_WOODPECKER.md">CI/CD with Gitea + Woodpecker</a></li>
+        </ol>
+      </div>
+      <div class="callout-card">
+        <h2>Architectural truth to keep in mind</h2>
+        <ol class="truth-list">
+          <li>The repo is no longer a simple three-box app.</li>
+          <li>The first real DDD runtime extraction is complete around `analysis-service`.</li>
+          <li>Ingestion and learning are defined as bounded contexts, but they are not fully deployed as separate services yet.</li>
+          <li>That is intentional. The current architecture prioritizes stable contracts and safe extraction over premature service sprawl.</li>
+        </ol>
+      </div>
+    </section>
+  </div>
+</body>
+</html>

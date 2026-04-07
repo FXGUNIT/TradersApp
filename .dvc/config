@@ -1,0 +1,4 @@
+[core]
+    remote = storage
+['remote "storage"']
+    url = c:/Users/Asus/Desktop/TradersApp/ml-engine/dvc-storage

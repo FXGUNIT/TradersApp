@@ -1,0 +1,108 @@
+# TradersApp self-hosted MLflow stack
+# Run: docker compose -f docker-compose.mlflow.yml up -d
+# UI: http://localhost:5000
+# MinIO console: http://localhost:9001
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: traders-postgres-mlflow
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: ${MLFLOW_POSTGRES_DB:-mlflow}
+      POSTGRES_USER: ${MLFLOW_POSTGRES_USER:-mlflow}
+      POSTGRES_PASSWORD: ${MLFLOW_POSTGRES_PASSWORD:-mlflow123}
+    volumes:
+      - postgres-mlflow-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - mlflow-net
+
+  minio:
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    container_name: traders-minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio-data:/data
+    restart: unless-stopped
+    networks:
+      - mlflow-net
+
+  minio-setup:
+    image: minio/mc:RELEASE.2025-08-13T08-35-41Z
+    container_name: traders-minio-setup
+    depends_on:
+      minio:
+        condition: service_started
+    environment:
+      MINIO_ENDPOINT: ${MLFLOW_S3_ENDPOINT_URL:-http://minio:9000}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+      MLFLOW_BUCKET: ${MLFLOW_BUCKET:-mlflow-artifacts}
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        until mc alias set local "$$MINIO_ENDPOINT" "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"; do
+          echo "waiting for minio..."
+          sleep 3
+        done
+        mc mb --ignore-existing "local/$$MLFLOW_BUCKET"
+    restart: "no"
+    networks:
+      - mlflow-net
+
+  mlflow:
+    build:
+      context: .
+      dockerfile: Dockerfile.mlflow
+    image: tradersapp/mlflow:local
+    container_name: traders-mlflow
+    ports:
+      - "5000:5000"
+      - "5001:5001"
+    environment:
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
+      MLFLOW_S3_ENDPOINT_URL: ${MLFLOW_S3_ENDPOINT_URL:-http://minio:9000}
+      MLFLOW_TRACKING_URI: http://localhost:5000
+      BACKEND_STORE_URI: postgresql://${MLFLOW_POSTGRES_USER:-mlflow}:${MLFLOW_POSTGRES_PASSWORD:-mlflow123}@postgres:5432/${MLFLOW_POSTGRES_DB:-mlflow}
+      POSTGRES_USER: ${MLFLOW_POSTGRES_USER:-mlflow}
+      POSTGRES_PASSWORD: ${MLFLOW_POSTGRES_PASSWORD:-mlflow123}
+      POSTGRES_DB: ${MLFLOW_POSTGRES_DB:-mlflow}
+      POSTGRES_HOST: postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio-setup:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+    networks:
+      - mlflow-net
+
+networks:
+  mlflow-net:
+    driver: bridge
+
+volumes:
+  postgres-mlflow-data:
+  minio-data:

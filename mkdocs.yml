@@ -1,0 +1,74 @@
+# TradersApp MkDocs Configuration
+
+site_name: TradersApp Documentation
+site_description: Algorithmic Trading ML Platform — Collective Consciousness System
+site_author: TradersApp Team
+site_url: https://tradersapp.io
+
+repo_name: FXGUNIT/TradersApp
+repo_url: https://github.com/FXGUNIT/TradersApp
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  palette:
+    primary: deep purple
+    accent: amber
+    media: "(prefers-color-scheme: light)"
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.sections
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            show_source: true
+  - gen-files:
+      scripts:
+        - docs/gen_api_ref.py
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.snippets
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.mark
+  - admonition
+  - pydocstyle
+  - attr_list
+  - md_in_html
+  - tables
+
+nav:
+  - Home: index.md
+  - Architecture:
+    - Overview: architecture/overview.md
+    - ML Pipeline: architecture/ml-pipeline.md
+    - Service Topology: architecture/services.md
+  - API Reference:
+    - ML Engine: api/ml-engine.md
+    - BFF: api/bff.md
+    - gRPC: api/grpc.md
+  - Development:
+    - Setup: development/setup.md
+    - Deployment: development/deployment.md
+    - Docker: development/docker.md
+  - Infrastructure:
+    - Kafka: infrastructure/kafka.md
+    - Redis: infrastructure/redis.md
+    - MLflow: infrastructure/mlflow.md
+    - Observability: infrastructure/observability.md
+  - Reference:
+    - Environment Variables: reference/env-vars.md
+    - DVC: reference/dvc.md
