@@ -101,11 +101,21 @@ spec:
             - secretRef:
                 name: ml-engine-secrets
           env:
-            - name: DB_PATH
-              value: "/data/trading_data.db"
             # Shared PVC mount for model store — all pods see the same model artifacts
             - name: MODEL_STORE_PVC_MOUNT
               value: "/models/store"
+            - name: MODEL_STORE_READ_ONLY
+              value: "true"
+            - name: MODEL_REGISTRY_MODE
+              value: "sidecar"
+            - name: MODEL_REGISTRY_URL
+              value: "http://127.0.0.1:{{ .Values.mlEngine.modelRegistrySidecar.port }}"
+            - name: MODEL_REGISTRY_PORT
+              value: {{ .Values.mlEngine.modelRegistrySidecar.port | quote }}
+            - name: MODEL_REGISTRY_WARMUP
+              value: {{ ternary "true" "false" .Values.mlEngine.modelRegistrySidecar.warmup | quote }}
+            - name: MODEL_REGISTRY_MAX_CACHED_INSTANCES
+              value: {{ .Values.mlEngine.modelRegistrySidecar.maxCachedInstances | quote }}
             # Enable MLflow registry: pods consult Production stage and hot-reload
             - name: MLFLOW_USE_REGISTRY
               value: "true"
@@ -168,6 +178,65 @@ spec:
               mountPath: /data
             - name: models
               mountPath: /models
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+        - name: model-registry
+          image: "{{ .Values.mlEngine.image.repository }}:{{ .Values.mlEngine.image.tag }}"
+          imagePullPolicy: {{ include "tradersapp.imagePullPolicy" .Values.mlEngine.image }}
+          command:
+            - python
+            - -m
+            - uvicorn
+            - infrastructure.model_registry_sidecar:app
+            - --host
+            - 0.0.0.0
+            - --port
+            - {{ .Values.mlEngine.modelRegistrySidecar.port | quote }}
+          ports:
+            - name: registry
+              containerPort: {{ .Values.mlEngine.modelRegistrySidecar.port }}
+          envFrom:
+            - secretRef:
+                name: ml-engine-secrets
+          env:
+            - name: MODEL_STORE_PVC_MOUNT
+              value: "/models/store"
+            - name: MODEL_STORE_READ_ONLY
+              value: "true"
+            - name: MODEL_REGISTRY_WARMUP
+              value: {{ ternary "true" "false" .Values.mlEngine.modelRegistrySidecar.warmup | quote }}
+            - name: MODEL_REGISTRY_MAX_CACHED_INSTANCES
+              value: {{ .Values.mlEngine.modelRegistrySidecar.maxCachedInstances | quote }}
+            - name: MODEL_REGISTRY_PORT
+              value: {{ .Values.mlEngine.modelRegistrySidecar.port | quote }}
+          {{- with .Values.mlEngine.modelRegistrySidecar.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.mlEngine.modelRegistrySidecar.port }}
+            failureThreshold: 3
+            periodSeconds: 10
+            initialDelaySeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.mlEngine.modelRegistrySidecar.port }}
+            failureThreshold: 3
+            periodSeconds: 20
+            initialDelaySeconds: 20
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: models
+              mountPath: /models
+              readOnly: true
             - name: tmp
               mountPath: /tmp
       volumes:

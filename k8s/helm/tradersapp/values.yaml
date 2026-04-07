@@ -55,6 +55,17 @@ mlEngine:
     enabled: true
     size: 5Gi
     storageClass: standard
+  modelRegistrySidecar:
+    port: 8010
+    warmup: true
+    maxCachedInstances: 4
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
 
 # BFF
 bff:
