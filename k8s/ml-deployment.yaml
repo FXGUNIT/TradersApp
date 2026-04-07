@@ -55,7 +55,9 @@ spec:
               store = ModelStore()
               ml_client = get_mlflow_client("direction")
               if ml_client:
-                  for model_name in store.list_all_models():
+                  registry_models = ml_client.get_registry_models()
+                  model_names = sorted(registry_models) or store.list_all_models()
+                  for model_name in model_names:
                       try:
                           prod = ml_client.get_production_model(model_name)
                           if prod and prod.get("version"):
