@@ -472,6 +472,13 @@ const sendTelegramMessage = async (message, parseMode = "HTML") => {
 
 const server = createServer(async (req, res) => {
   const requestStartedAt = Date.now();
+  const requestId = String(req.headers["x-request-id"] || randomUUID());
+  req.id = requestId;
+  req.requestId = requestId;
+  if (!req.headers["x-request-id"]) {
+    req.headers["x-request-id"] = requestId;
+  }
+  res.setHeader("X-Request-ID", requestId);
   const origin = resolveOrigin(req);
   const url = new URL(req.url || "/", `http://${req.headers.host || `${HOST}:${PORT}`}`);
   const pathname = url.pathname;
@@ -491,10 +498,18 @@ const server = createServer(async (req, res) => {
   // --- Security: Rate Limiting ---
   if (req.method !== "OPTIONS" && pathname !== "/metrics") {
     const clientKey = getClientKey(req);
-    const limiter = getRateLimiter(pathname);
-    const result = limiter.check(clientKey);
+    const rateLimit = getRateLimitConfig(pathname);
+    const result = await checkRateLimit(
+      clientKey,
+      rateLimit.maxRequests,
+      rateLimit.windowMs,
+    );
+
+    res.setHeader("X-RateLimit-Remaining", String(result.remaining));
+    res.setHeader("X-RateLimit-Reset", String(Math.ceil(result.resetMs / 1000)));
 
     if (!result.allowed) {
+      res.setHeader("Retry-After", String(Math.ceil(result.resetMs / 1000)));
       json(
         res,
         429,
@@ -505,25 +520,8 @@ const server = createServer(async (req, res) => {
         },
         origin,
       );
-      res.writeHead(429, {
-        ...Object.fromEntries(
-          Object.entries({
-            "Retry-After": String(Math.ceil(result.resetMs / 1000)),
-            "X-RateLimit-Remaining": "0",
-            "X-RateLimit-Reset": String(Math.ceil(result.resetMs / 1000)),
-          })
-        ),
-      });
       return;
     }
-
-    // Inform client of remaining budget (non-breaking)
-    res.on("header", () => {
-      res.removeHeader("X-RateLimit-Remaining");
-      res.removeHeader("X-RateLimit-Reset");
-      res.setHeader("X-RateLimit-Remaining", String(result.remaining));
-      res.setHeader("X-RateLimit-Reset", String(Math.ceil(result.resetMs / 1000)));
-    });
   }
 
   if (req.method === "OPTIONS") {
