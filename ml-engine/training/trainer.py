@@ -88,7 +88,7 @@ class Trainer:
     """
 
     def __init__(self, db_path: str | None = None, store_dir: str | None = None):
-        self.db = CandleDatabase(db_path or config.DB_PATH)
+        self.db = CandleDatabase(db_path=db_path or config.DB_PATH, database_url=config.DATABASE_URL)
         self.store = ModelStore(store_dir)
         self._trained_models: list[dict] = []
 
@@ -132,37 +132,41 @@ class Trainer:
                         "Data quality gate is enabled (DQ_VALIDATE_BEFORE_TRAIN=true) but validation pipeline is unavailable."
                     )
 
-                try:
-                    dq_days = max(1, int(os.environ.get("DQ_VALIDATE_DAYS", "90")))
-                except ValueError:
-                    dq_days = 90
+                if self.db.backend_type != "sqlite":
+                    if verbose:
+                        print("[DQ] SQLite-only pre-train validation skipped for PostgreSQL backend")
+                else:
+                    try:
+                        dq_days = max(1, int(os.environ.get("DQ_VALIDATE_DAYS", "90")))
+                    except ValueError:
+                        dq_days = 90
 
-                dq_report = run_full_validation(
-                    db_path=self.db.db_path,
-                    block=False,
-                    candles_days=dq_days,
-                    trades_days=dq_days,
-                    sessions_days=dq_days,
-                )
-                if verbose:
-                    print(
-                        "[DQ] Pre-train gate: "
-                        f"{'PASS' if dq_report.get('passed', False) else 'FAIL'} | "
-                        f"critical_failures={dq_report.get('critical_failures', 0)} | "
-                        f"warning_failures={dq_report.get('warning_failures', 0)}"
+                    dq_report = run_full_validation(
+                        db_path=self.db.db_path,
+                        block=False,
+                        candles_days=dq_days,
+                        trades_days=dq_days,
+                        sessions_days=dq_days,
                     )
+                    if verbose:
+                        print(
+                            "[DQ] Pre-train gate: "
+                            f"{'PASS' if dq_report.get('passed', False) else 'FAIL'} | "
+                            f"critical_failures={dq_report.get('critical_failures', 0)} | "
+                            f"warning_failures={dq_report.get('warning_failures', 0)}"
+                        )
 
-                if not dq_report.get("passed", False):
-                    failed_suites = [
-                        name
-                        for name, suite in dq_report.get("suites", {}).items()
-                        if not suite.get("passed", False)
-                    ]
-                    raise ValueError(
-                        "Data quality gate blocked training. "
-                        f"critical_failures={dq_report.get('critical_failures', 0)}, "
-                        f"failed_suites={failed_suites}"
-                    )
+                    if not dq_report.get("passed", False):
+                        failed_suites = [
+                            name
+                            for name, suite in dq_report.get("suites", {}).items()
+                            if not suite.get("passed", False)
+                        ]
+                        raise ValueError(
+                            "Data quality gate blocked training. "
+                            f"critical_failures={dq_report.get('critical_failures', 0)}, "
+                            f"failed_suites={failed_suites}"
+                        )
 
             # Step 1: Load data
             trade_log = self.db.get_trade_log(limit=10000, symbol=symbol)
@@ -472,4 +476,3 @@ class Trainer:
     def get_last_training_info(self, model_name: str = "direction_ensemble") -> dict:
         """Get the last training log entry for a model."""
         return self.db.get_last_training(model_name) or {}
-

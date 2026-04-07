@@ -1203,6 +1203,8 @@ class CandleDatabase:
     ):
         # DATABASE_URL env var always wins (production override)
         env_url = os.getenv("DATABASE_URL")
+        self.database_url = env_url or database_url
+        self.db_path = db_path or os.getenv("DB_PATH", "trading_data.db")
         if env_url:
             self._backend: DatabaseBackend = PostgresBackend(env_url)
             self._backend_type = "postgresql"
@@ -1210,7 +1212,7 @@ class CandleDatabase:
             self._backend = PostgresBackend(database_url)
             self._backend_type = "postgresql"
         else:
-            self._backend = SQLiteBackend(db_path or os.getenv("DB_PATH", "trading_data.db"))
+            self._backend = SQLiteBackend(self.db_path)
             self._backend_type = "sqlite"
 
     @property

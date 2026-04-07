@@ -53,7 +53,15 @@ class ModelStore:
 
     def __init__(self, store_dir: str | None = None):
         self.store_dir = Path(store_dir or config.MODEL_STORE)
-        self.store_dir.mkdir(parents=True, exist_ok=True)
+        self.read_only = getattr(config, "MODEL_STORE_READ_ONLY", False)
+        if self.store_dir.exists():
+            pass
+        elif self.read_only:
+            raise FileNotFoundError(
+                f"Model store directory '{self.store_dir}' does not exist and MODEL_STORE_READ_ONLY=true"
+            )
+        else:
+            self.store_dir.mkdir(parents=True, exist_ok=True)
         # Track when we last checked MLflow registry (avoid hammering on every call)
         self._last_registry_check: dict[str, float] = {}
         self._check_interval = getattr(config, "MLFLOW_REGISTRY_CHECK_INTERVAL", 60)
@@ -166,6 +174,10 @@ class ModelStore:
         extra: dict | None = None,
     ) -> str:
         """Save a trained model. Returns version string."""
+        if self.read_only:
+            raise PermissionError(
+                f"Model store '{self.store_dir}' is read-only in this serving deployment"
+            )
         version = version or datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
 
         path = self._model_path(model_name, version)
@@ -291,6 +303,10 @@ class ModelStore:
 
     def delete(self, model_name: str, version: str) -> bool:
         """Delete a specific version."""
+        if self.read_only:
+            raise PermissionError(
+                f"Model store '{self.store_dir}' is read-only in this serving deployment"
+            )
         clean_version = version.rstrip(".meta")
         model_deleted = self._model_path(model_name, clean_version).exists()
         self._model_path(model_name, clean_version).unlink(missing_ok=True)

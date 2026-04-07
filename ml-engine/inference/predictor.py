@@ -37,6 +37,10 @@ class Predictor:
         self._last_reload_check: float = 0
         self._check_interval = getattr(config, "MLFLOW_REGISTRY_CHECK_INTERVAL", 60)
 
+    @property
+    def is_ready(self) -> bool:
+        return self._loaded and bool(self._models)
+
     def load_all_models(self) -> dict[str, dict]:
         """
         Load all models from the store.
