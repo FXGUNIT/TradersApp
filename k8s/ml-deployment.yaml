@@ -247,7 +247,8 @@ spec:
                 - ALL
       volumes:
         - name: data
-          emptyDir: {}
+          persistentVolumeClaim:
+            claimName: ml-state-pvc
         - name: models
           persistentVolumeClaim:
             claimName: ml-models-pvc

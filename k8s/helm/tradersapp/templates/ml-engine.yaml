@@ -153,6 +153,10 @@ spec:
               value: {{ .Values.mlEngine.dataQuality.alertWebhook | default "" | quote }}
             - name: DQ_QUARANTINE_DIR
               value: {{ .Values.mlEngine.dataQuality.quarantineDir | default "/data/dq_quarantine" | quote }}
+            - name: CONTINUAL_LEARNING_DIR
+              value: {{ .Values.mlEngine.runtimeState.continualLearningDir | default "/data/continual_learning" | quote }}
+            - name: MAMBA_CACHE_DIR
+              value: {{ .Values.mlEngine.runtimeState.mambaCacheDir | default "/data/mamba_cache" | quote }}
           {{- with .Values.mlEngine.resources }}
           resources:
             {{- toYaml . | nindent 12 }}
@@ -253,7 +257,12 @@ spec:
               mountPath: /tmp
       volumes:
         - name: data
+          {{- if .Values.mlEngine.runtimeState.enabled }}
+          persistentVolumeClaim:
+            claimName: ml-state-pvc
+          {{- else }}
           emptyDir: {}
+          {{- end }}
         - name: models
           {{- if .Values.mlEngine.persistence.enabled }}
           persistentVolumeClaim:

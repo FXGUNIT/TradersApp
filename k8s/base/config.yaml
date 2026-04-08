@@ -25,6 +25,9 @@ data:
   LOG_LEVEL: "INFO"
   CACHE_TTL_SECONDS: "60"
   REGIME_CACHE_TTL_SECONDS: "300"
+  DQ_QUARANTINE_DIR: "/data/dq_quarantine"
+  CONTINUAL_LEARNING_DIR: "/data/continual_learning"
+  MAMBA_CACHE_DIR: "/data/mamba_cache"
 ---
 apiVersion: v1
 kind: ConfigMap

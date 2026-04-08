@@ -172,6 +172,23 @@ spec:
   storageClassName: {{ .Values.mlEngine.persistence.storageClass }}
 {{- end }}
 
+{{- /* PVC for ML runtime state (/data) */ -}}
+{{- if .Values.mlEngine.runtimeState.enabled -}}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ml-state-pvc
+  namespace: {{ include "tradersapp.namespace" . }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.mlEngine.runtimeState.size }}
+  storageClassName: {{ .Values.mlEngine.runtimeState.storageClass }}
+{{- end }}
+
 {{- /* Redis PVC */ -}}
 {{- if and .Values.redis.enabled .Values.redis.persistence.enabled -}}
 ---

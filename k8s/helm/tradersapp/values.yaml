@@ -52,6 +52,12 @@ mlEngine:
     lookbackDays: 90
     alertWebhook: ""
     quarantineDir: "/data/dq_quarantine"
+  runtimeState:
+    enabled: true
+    size: 10Gi
+    storageClass: standard
+    continualLearningDir: "/data/continual_learning"
+    mambaCacheDir: "/data/mamba_cache"
   persistence:
     enabled: true
     size: 5Gi
