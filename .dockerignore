@@ -1,4 +1,5 @@
 # Exclude temp directories with restricted permissions
+.pytest_tmp
 **/.pytest_tmp
 **/__pycache__
 **/*.pyc
