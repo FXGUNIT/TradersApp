@@ -16,7 +16,11 @@ type: reference
 - Ingress controller: Traefik (v3.6.10) — installed but pods in Error state
 - `metrics-server` pod: 0/1 Ready (restart loop — may need investigation)
 
-**tradersapp namespace:** tradersapp-dev deployed via kustomize overlay (see below).
+**tradersapp namespace:** Empty — no workloads deployed yet. ConfigMaps, PDBs, NetworkPolicies applied successfully before WSL crash.
+
+**WSL Ubuntu crashed (2026-04-08)** — Error code 6 (kernel panic). Needs Windows reboot to recover.
+
+**kubectl access:** Via `wsl -d Ubuntu -- bash -c 'sudo k3s kubectl ...'`
 
 **k3s Deploy Status (2026-04-08):**
 - `namespace/tradersapp-dev` created ✅
