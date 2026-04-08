@@ -402,19 +402,19 @@ export const RATE_LIMIT_CONFIGS = {
 /** Determine rate limit config based on request path. */
 export function getRateLimitConfig(pathname) {
   if (pathname.startsWith("/ml/consensus") || pathname.startsWith("/ml/train")) {
-    return RATE_LIMIT_CONFIGS.mlPredict;
+    return { name: "mlPredict", ...RATE_LIMIT_CONFIGS.mlPredict };
   }
   if (pathname.startsWith("/news/")) {
-    return RATE_LIMIT_CONFIGS.news;
+    return { name: "news", ...RATE_LIMIT_CONFIGS.news };
   }
   if (pathname.startsWith("/admin/")) {
-    return RATE_LIMIT_CONFIGS.admin;
+    return { name: "admin", ...RATE_LIMIT_CONFIGS.admin };
   }
   if (pathname.startsWith("/ai/")) {
-    return RATE_LIMIT_CONFIGS.aiChat;
+    return { name: "aiChat", ...RATE_LIMIT_CONFIGS.aiChat };
   }
   if (pathname === "/health" || pathname === "/ai/status") {
-    return RATE_LIMIT_CONFIGS.health;
+    return { name: "health", ...RATE_LIMIT_CONFIGS.health };
   }
-  return RATE_LIMIT_CONFIGS.global;
+  return { name: "global", ...RATE_LIMIT_CONFIGS.global };
 }
