@@ -11,7 +11,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Copy requirements first for caching
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Use Tsinghua PyPI mirror + 300s timeout for slow networks
+RUN pip install --no-cache-dir -r requirements.txt \
+    --timeout=300 \
+    -i https://pypi.tuna.tsinghua.edu.cn/simple \
+    --trusted-host pypi.tuna.tsinghua.edu.cn
 
 # Build args (secrets injected at Docker build time from GitHub Actions)
 ARG AI_GEMINI_PRO_KEY
