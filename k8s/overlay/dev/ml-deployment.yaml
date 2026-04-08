@@ -42,8 +42,8 @@ spec:
       # with the correct model even on fresh PVC mounts.
       initContainers:
         - name: model-sync
-          image: tradersapp/ml-engine:latest
-          imagePullPolicy: Always
+          image: docker.io/tradersapp/ml-engine:dev-latest
+          imagePullPolicy: Never
           command:
             - python
             - -c
@@ -94,8 +94,8 @@ spec:
               drop: ["ALL"]
       containers:
         - name: ml-engine
-          image: tradersapp/ml-engine:latest
-          imagePullPolicy: Always
+          image: docker.io/tradersapp/ml-engine:dev-latest
+          imagePullPolicy: Never
           ports:
             - containerPort: 8001
               name: http
@@ -178,8 +178,8 @@ spec:
               exec:
                 command: ["/bin/sh", "-c", "sleep 5"]
         - name: model-registry
-          image: tradersapp/ml-engine:latest
-          imagePullPolicy: Always
+          image: docker.io/tradersapp/ml-engine:dev-latest
+          imagePullPolicy: Never
           command:
             - python
             - -m

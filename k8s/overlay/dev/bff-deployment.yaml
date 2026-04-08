@@ -35,8 +35,8 @@ spec:
         runAsGroup: 1001
       containers:
         - name: bff
-          image: tradersapp/bff:latest
-          imagePullPolicy: Always
+          image: docker.io/tradersapp/bff:dev-latest
+          imagePullPolicy: Never
           ports:
             - containerPort: 8788
               name: http
