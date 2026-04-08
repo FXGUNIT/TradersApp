@@ -278,10 +278,10 @@ class KafkaProducerClient:
         return False
 
     def _ensure_producer(self) -> bool:
-        if self._producer is not None:
-            return True
         if not self._enable or not self._circuit_allows_attempt():
             return False
+        if self._producer is not None:
+            return True
         self._connect(**self._connect_kwargs)
         return self._producer is not None
 
