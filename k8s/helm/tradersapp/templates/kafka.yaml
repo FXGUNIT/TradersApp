@@ -188,4 +188,53 @@ spec:
       port: 29092
       targetPort: 29092
 
+{{- if .Values.kafka.topics }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kafka-topic-bootstrap
+  namespace: {{ include "tradersapp.namespace" . }}
+  labels:
+    app: kafka
+    tier: messaging
+    job: topic-bootstrap
+    {{- include "tradersapp.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app: kafka
+        job: topic-bootstrap
+        {{- include "tradersapp.labels" . | nindent 8 }}
+    spec:
+      restartPolicy: OnFailure
+      {{- include "tradersapp.imagePullSecrets" . | nindent 6 }}
+      containers:
+        - name: topic-bootstrap
+          image: "{{ .Values.kafka.image.repository }}:{{ .Values.kafka.image.tag }}"
+          command:
+            - sh
+            - -c
+          args:
+            - |
+              set -eu
+              until /opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server kafka:29092 >/dev/null 2>&1; do
+                echo "Waiting for Kafka broker..."
+                sleep 5
+              done
+              {{- range .Values.kafka.topics }}
+              /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic {{ .name | quote }} --partitions {{ .partitions }} --replication-factor {{ .replicationFactor }}
+              {{- end }}
+              /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --list
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+{{- end }}
+
 {{- end }}

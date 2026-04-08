@@ -1,10 +1,10 @@
 {{- /*
-Feast Feature Store — Kubernetes CronJob for materialization.
+Feast Feature Store — Kubernetes CronJobs for feature materialization.
 
 Architecture:
   - Online store: Redis (shared with cache)
-  - Offline store: SQLite → Parquet export → Redis materialization
-  - Materialization: daily CronJob (SQLite → Parquet → Redis)
+  - Source of truth: trading database via DATABASE_URL from Infisical
+  - Offline store: database → Parquet export → Redis materialization
 
 The ML Engine uses Feast SDK directly to retrieve features from Redis
 (get_online_features). No dedicated Feast server needed.
@@ -39,7 +39,7 @@ spec:
 
 {{- if and $feast.enabled $feast.materialization.enabled }}
 ---
-# CronJob: nightly feature materialization (SQLite → Redis)
+# CronJob: nightly feature materialization (database → Parquet → Redis)
 apiVersion: batch/v1
 kind: CronJob
 metadata:
@@ -76,22 +76,26 @@ spec:
           {{- include "tradersapp.tolerations" . | nindent 8 }}
           {{- include "tradersapp.nodeSelector" . | nindent 8 }}
           initContainers:
-            # Step 1: Export SQLite → Parquet (offline feature computation)
+            # Step 1: Export database → Parquet (offline feature computation)
             - name: export-parquet
               image: "{{ .Values.mlEngine.image.repository }}:{{ .Values.mlEngine.image.tag }}"
               imagePullPolicy: {{ include "tradersapp.imagePullPolicy" .Values.mlEngine.image }}
               command: ["python", "-m", "ml_engine.features.export_features_parquet"]
+              envFrom:
+                - secretRef:
+                    name: ml-engine-secrets
+                {{- if and $feast.secretRef.existingSecret (ne $feast.secretRef.existingSecret "ml-engine-secrets") }}
+                - secretRef:
+                    name: {{ $feast.secretRef.existingSecret }}
+                {{- end }}
               env:
-                - name: FEAST_DB_PATH
-                  value: /data/trading_data.db
+                - name: REQUIRE_DATABASE_URL
+                  value: "true"
                 - name: FEAST_SYMBOL
                   value: {{ $feast.symbol | default "MNQ" }}
                 - name: PYTHONPATH
                   value: /app
               volumeMounts:
-                - name: feast-data
-                  mountPath: /app/ml_engine/data
-                  readOnly: true
                 - name: feast-features
                   mountPath: /app/ml_engine/data/feast_features
               resources:
@@ -156,19 +160,18 @@ spec:
               env:
                 - name: FEAST_REDIS_URL
                   value: {{ $feast.redis.url | default "redis://redis:6379" }}
-                - name: FEAST_OFFLINE_PATH
-                  value: /data/trading_data.db
+                - name: REQUIRE_DATABASE_URL
+                  value: "true"
                 - name: PYTHONPATH
                   value: /app
               envFrom:
-                {{- if $feast.secretRef.existingSecret }}
+                - secretRef:
+                    name: ml-engine-secrets
+                {{- if and $feast.secretRef.existingSecret (ne $feast.secretRef.existingSecret "ml-engine-secrets") }}
                 - secretRef:
                     name: {{ $feast.secretRef.existingSecret }}
                 {{- end }}
               volumeMounts:
-                - name: feast-data
-                  mountPath: /app/ml_engine/data
-                  readOnly: true
                 - name: feast-features
                   mountPath: /app/ml_engine/data/feast_features
                 {{- if $feast.volumeMounts }}
@@ -194,9 +197,6 @@ spec:
                 {{- toYaml . | nindent 16 }}
               {{- end }}
           volumes:
-            - name: feast-data
-              persistentVolumeClaim:
-                claimName: {{ include "tradersapp.fullname" . }}-ml-data
             - name: feast-features
               persistentVolumeClaim:
                 claimName: {{ include "tradersapp.fullname" . }}-feast-features
@@ -204,8 +204,8 @@ spec:
 
 {{- if and $feast.enabled $feast.streaming.enabled }}
 ---
-# CronJob: streaming feature materialization (Kafka → Redis, every 5 min)
-# Enables real-time candle features updated every 5 minutes
+# CronJob: incremental feature refresh (database → Redis, every 5 min)
+# Keeps the Feast online store warm between nightly full materializations.
 apiVersion: batch/v1
 kind: CronJob
 metadata:
@@ -245,15 +245,18 @@ spec:
                   import sys, os
                   sys.path.insert(0, '/app')
 
-                  # Read the latest candle from Kafka topic and materialize to Redis
-                  # This is a lightweight operation — just the latest candle features
+                  # Read the latest candle window from the primary database and
+                  # refresh the Redis-backed Feast features for the newest bar.
                   try:
                       from ml_engine.features.feast_repo import candle_features
                       from ml_engine.data.candle_db import CandleDatabase
                       from ml_engine.features.feast_client import get_candle_features
                       import pandas as pd
 
-                      db = CandleDatabase(os.environ.get("FEAST_DB_PATH", "/app/ml_engine/data/trading_data.db"))
+                      db = CandleDatabase(
+                          db_path=os.environ.get("FEAST_DB_PATH", "/app/ml_engine/data/trading_data.db"),
+                          database_url=os.environ.get("DATABASE_URL") or None,
+                      )
                       candles = db.get_candles(
                           start=pd.Timestamp.now(tz="UTC").floor("5min").isoformat(),
                           end=pd.Timestamp.now(tz="UTC").ceil("5min").isoformat(),
@@ -273,18 +276,22 @@ spec:
                           print("[Feast Stream] No new candles to materialize")
                   except Exception as e:
                       print(f"[Feast Stream] Warning: {e}")
+              envFrom:
+                - secretRef:
+                    name: ml-engine-secrets
+                {{- if and $feast.secretRef.existingSecret (ne $feast.secretRef.existingSecret "ml-engine-secrets") }}
+                - secretRef:
+                    name: {{ $feast.secretRef.existingSecret }}
+                {{- end }}
               env:
                 - name: FEAST_REDIS_URL
                   value: {{ $feast.redis.url | default "redis://redis:6379" }}
-                - name: FEAST_DB_PATH
-                  value: /data/trading_data.db
+                - name: REQUIRE_DATABASE_URL
+                  value: "true"
                 - name: FEAST_SYMBOL
                   value: {{ $feast.symbol | default "MNQ" }}
                 - name: PYTHONPATH
                   value: /app
-              volumeMounts:
-                - name: feast-data
-                  mountPath: /app/ml_engine/data
               resources:
                 requests:
                   cpu: 50m
@@ -292,10 +299,6 @@ spec:
                 limits:
                   cpu: 200m
                   memory: 256Mi
-          volumes:
-            - name: feast-data
-              persistentVolumeClaim:
-                claimName: {{ include "tradersapp.fullname" . }}-ml-data
 {{- end }}
 
 {{- if $feast.enabled }}
