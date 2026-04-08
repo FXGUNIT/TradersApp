@@ -96,6 +96,13 @@ spec:
         - name: ml-engine
           image: docker.io/tradersapp/ml-engine:dev-latest
           imagePullPolicy: Never
+          # TEMP: allow writable fs for profiler mkdir (fix in next image build)
+          securityContext:
+            readOnlyRootFilesystem: false
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           ports:
             - containerPort: 8001
               name: http
