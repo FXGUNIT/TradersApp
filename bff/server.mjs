@@ -497,8 +497,8 @@ const server = createServer(async (req, res) => {
 
   // --- Security: Rate Limiting ---
   if (req.method !== "OPTIONS" && pathname !== "/metrics") {
-    const clientKey = getClientKey(req);
     const rateLimit = getRateLimitConfig(pathname);
+    const clientKey = `${rateLimit.name}:${getClientKey(req)}`;
     const result = await checkRateLimit(
       clientKey,
       rateLimit.maxRequests,
