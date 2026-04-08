@@ -17,6 +17,7 @@ COPY bff/domains/ ./domains/
 COPY bff/generated/ ./generated/
 COPY bff/data/ ./data/
 COPY bff/railway.json ./
+COPY src/ ../../src/
 
 # Build args (secrets injected at Docker build time from GitHub Actions)
 ARG AI_GEMINI_PRO_KEY
