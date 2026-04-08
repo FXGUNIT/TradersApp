@@ -123,6 +123,8 @@ spec:
               value: "true"
             - name: MLFLOW_USE_REGISTRY
               value: "true"
+            - name: REQUIRE_DATABASE_URL
+              value: "true"
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:

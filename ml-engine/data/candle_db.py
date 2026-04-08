@@ -4,6 +4,7 @@ Database Layer — Dual-backend: SQLite (local dev) and PostgreSQL (production/k
 Environment variables:
   DATABASE_URL   — PostgreSQL connection string (triggers PG mode)
                   e.g. postgresql://user:pass@localhost:5432/trading
+  REQUIRE_DATABASE_URL — when true, fail fast if DATABASE_URL is missing
   DB_PATH        — SQLite file path (default: trading_data.db)
                   Only used when DATABASE_URL is not set.
 """
@@ -1202,14 +1203,26 @@ class CandleDatabase:
         database_url: Optional[str] = None,
     ):
         # DATABASE_URL env var always wins (production override)
-        env_url = os.getenv("DATABASE_URL")
-        self.database_url = env_url or database_url
+        env_url = (os.getenv("DATABASE_URL") or "").strip() or None
+        explicit_url = (database_url or "").strip() or None
+        require_database_url = os.getenv("REQUIRE_DATABASE_URL", "false").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
+
+        self.database_url = env_url or explicit_url
         self.db_path = db_path or os.getenv("DB_PATH", "trading_data.db")
-        if env_url:
-            self._backend: DatabaseBackend = PostgresBackend(env_url)
-            self._backend_type = "postgresql"
-        elif database_url:
-            self._backend = PostgresBackend(database_url)
+
+        if require_database_url and not self.database_url:
+            raise RuntimeError(
+                "REQUIRE_DATABASE_URL=true but DATABASE_URL is not set. "
+                "Sync ml-engine-secrets from Infisical before starting this workload."
+            )
+
+        if self.database_url:
+            self._backend: DatabaseBackend = PostgresBackend(self.database_url)
             self._backend_type = "postgresql"
         else:
             self._backend = SQLiteBackend(self.db_path)

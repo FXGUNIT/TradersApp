@@ -1,10 +1,10 @@
 """
-Export Features to Parquet — bridges SQLite to Feast offline store.
+Export Features to Parquet — bridges the trading database to Feast offline store.
 
 Usage:
   python -m ml_engine.features.export_features_parquet
 
-Exports from SQLite (trading_data.db):
+Exports from the configured trading database:
   1. candles_5min → candle_features.parquet
   2. trade_log → trade_features.parquet
   3. session_aggregates → session_features.parquet
@@ -13,7 +13,8 @@ Then run:
   feast materialize
 
 Environment:
-  FEAST_DB_PATH: path to SQLite database (default: ml_engine/data/trading_data.db)
+  DATABASE_URL: PostgreSQL connection string for k8s/production
+  FEAST_DB_PATH: fallback SQLite path for local development
 """
 
 import os
@@ -177,10 +178,12 @@ def _rolling_profit_factor(pnl_series: pd.Series, window: int) -> pd.Series:
 
 def main():
     db_path = os.environ.get("FEAST_DB_PATH", str(PROJECT_ROOT / "ml_engine" / "data" / "trading_data.db"))
-    db = CandleDatabase(db_path)
+    database_url = os.environ.get("DATABASE_URL", "").strip() or None
+    db = CandleDatabase(db_path=db_path, database_url=database_url)
 
     symbol = os.environ.get("FEAST_SYMBOL", "MNQ")
-    print(f"[Export] Exporting features for {symbol} from {db_path}")
+    source = "DATABASE_URL" if database_url else db_path
+    print(f"[Export] Exporting features for {symbol} from {source}")
 
     export_candle_features(db, symbol)
     export_trade_features(db, symbol)

@@ -67,16 +67,14 @@ session_agg_parquet_source = FileSource(
 # this source every 5 minutes and materializes new candles to Redis.
 #
 # Environment variables:
-#   KAFKA_BOOTSTRAP_SERVERS — defaults to "kafka:9092" in-cluster
+#   KAFKA_BOOTSTRAP_SERVERS — defaults to "kafka:29092" in-cluster
 #                             set "localhost:9092" for local dev
 kafka_candle_source = KafkaSource(
     name="kafka_candle_source",
-    kafka_bootstrap_server="${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}",
+    kafka_bootstrap_server="${KAFKA_BOOTSTRAP_SERVERS:kafka:29092}",
     topic="candle-data",
     timestamp_field="timestamp",
     batch_source=candles_parquet_source,
-    # Create the topic first if it doesn't exist:
-    #   kubectl exec kafka-0 -- kafka-topics --create --topic candle-data \
-    #     --partitions 6 --replication-factor 1 --bootstrap-server localhost:9092
-    message_format="avro",  # Avro preferred; set "json" if no schema registry
+    # Helm bootstraps topics declaratively; local dev still relies on auto-create.
+    message_format="json",
 )

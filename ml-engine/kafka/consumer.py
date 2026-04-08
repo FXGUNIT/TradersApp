@@ -14,7 +14,8 @@ Usage:
 
 Environment:
   KAFKA_BOOTSTRAP_SERVERS: Broker list (default: localhost:9092)
-  KAFKA_GROUP_ID: Consumer group ID (default: traders-ml-engine)
+  KAFKA_GROUP_ID / KAFKA_CONSUMER_GROUP: Consumer group ID (default: traders-ml-engine)
+  KAFKA_AUTO_OFFSET_RESET: earliest/latest (default: earliest)
   KAFKA_ENABLE: Set to "false" to disable (default: true)
 """
 
@@ -88,10 +89,12 @@ class KafkaConsumerClient:
             TOPIC_FEEDBACK,
             TOPIC_DRIFT,
         ]
-        self._group_id = group_id or os.environ.get("KAFKA_GROUP_ID", "traders-ml-engine")
+        env_group_id = os.environ.get("KAFKA_GROUP_ID") or os.environ.get("KAFKA_CONSUMER_GROUP")
+        self._group_id = group_id or env_group_id or "traders-ml-engine"
         self._bootstrap = bootstrap_servers or os.environ.get(
             "KAFKA_BOOTSTRAP_SERVERS", "localhost:9092"
         )
+        self._auto_offset_reset = os.environ.get("KAFKA_AUTO_OFFSET_RESET", "earliest").strip().lower() or "earliest"
         self._enable = enable if enable is not None else os.environ.get("KAFKA_ENABLE", "true").lower() != "false"
         self._consumer: Optional[Consumer] = None
         self._running = False
@@ -126,8 +129,8 @@ class KafkaConsumerClient:
             "bootstrap.servers": self._bootstrap,
             "group.id": self._group_id,
             "client.id": f"traders-ml-engine-consumer",
-            "auto.offset.reset": "earliest",
-            "enable.auto.commit": False,           # Manual commit for exactly-once
+            "auto.offset.reset": self._auto_offset_reset,
+            "enable.auto.commit": False,           # Manual commit for at-least-once delivery
             "auto.commit.interval.ms": 5000,
             "session.timeout.ms": 30000,
             "max.poll.interval.ms": 300000,
@@ -139,7 +142,13 @@ class KafkaConsumerClient:
         try:
             self._consumer = Consumer(conf)
             self._consumer.subscribe(self._topics)
-            self._log(logging.INFO, "Consumer subscribed to %s (group=%s)", self._topics, self._group_id)
+            self._log(
+                logging.INFO,
+                "Consumer subscribed to %s (group=%s offset_reset=%s)",
+                self._topics,
+                self._group_id,
+                self._auto_offset_reset,
+            )
         except KafkaException as e:
             self._log(logging.ERROR, "Consumer connect error: %s", e)
             self._enable = False
@@ -406,6 +415,7 @@ class KafkaConsumerClient:
 
                 # Dispatch to handler
                 handler = self._handlers.get(topic)
+                should_commit = False
                 with request_id_context(request_id):
                     if handler:
                         try:
@@ -419,17 +429,26 @@ class KafkaConsumerClient:
                             handler(event)
                             self._messages_processed += 1
                             self._last_message_time = datetime.now(timezone.utc).isoformat()
+                            should_commit = True
                         except Exception as e:
                             self._log(logging.ERROR, "Handler error on topic=%s: %s", topic, e)
                             self._messages_failed += 1
                     else:
                         self._log(logging.WARNING, "No handler for topic=%s", topic)
+                        should_commit = True
 
-                    # Commit offset after successful processing
-                    try:
-                        self._consumer.commit(msg, asynchronous=False)
-                    except Exception as e:
-                        self._log(logging.ERROR, "Commit error topic=%s offset=%s: %s", topic, msg.offset(), e)
+                    if should_commit:
+                        try:
+                            self._consumer.commit(msg, asynchronous=False)
+                        except Exception as e:
+                            self._log(logging.ERROR, "Commit error topic=%s offset=%s: %s", topic, msg.offset(), e)
+                    else:
+                        self._log(
+                            logging.WARNING,
+                            "Skipping offset commit after handler failure topic=%s offset=%s",
+                            topic,
+                            msg.offset(),
+                        )
 
             except Exception as e:
                 self._log(logging.ERROR, "Consumer loop error: %s", e)

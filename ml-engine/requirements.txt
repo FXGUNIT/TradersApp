@@ -17,3 +17,5 @@ redis==5.2.1
 mlflow==2.21.3
 great-expectations>=1.7.0
 prometheus-client==0.21.1
+psycopg2-binary>=2.9,<3.0
+confluent-kafka>=2.5,<3.0

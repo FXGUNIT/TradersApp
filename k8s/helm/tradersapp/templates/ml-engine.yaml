@@ -129,6 +129,12 @@ spec:
               value: {{ ternary "true" "false" .Values.mlEngine.kafkaEnabled | quote }}
             - name: KAFKA_BOOTSTRAP_SERVERS
               value: "kafka:29092"
+            - name: KAFKA_GROUP_ID
+              value: "ml-engine-consumers"
+            - name: KAFKA_AUTO_OFFSET_RESET
+              value: "earliest"
+            - name: REQUIRE_DATABASE_URL
+              value: "true"
             - name: OTEL_SERVICE_NAME
               value: "ml-engine"
             - name: DQ_VALIDATE_BEFORE_TRAIN
