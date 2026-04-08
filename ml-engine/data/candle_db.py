@@ -612,6 +612,81 @@ except ImportError:
     pool = None
 
 
+def _translate_sqlite_placeholders(query: str) -> str:
+    """Translate SQLite-style placeholders to psycopg2 placeholders."""
+    return query.replace("?", "%s")
+
+
+class PostgresCompatCursor:
+    """
+    Small DB-API compatibility shim.
+
+    A lot of the codebase still issues SQLite-style SQL via db.conn().
+    This wrapper keeps those call sites working against psycopg2 by
+    translating placeholders and exposing sqlite-like helpers.
+    """
+
+    def __init__(self, cursor):
+        self._cursor = cursor
+        self.lastrowid = None
+
+    def execute(self, query: str, params=None):
+        sql = _translate_sqlite_placeholders(query)
+        self._cursor.execute(sql, params)
+        self.lastrowid = None
+        if sql.lstrip().lower().startswith("insert into"):
+            try:
+                with self._cursor.connection.cursor() as id_cursor:
+                    id_cursor.execute("SELECT LASTVAL()")
+                    row = id_cursor.fetchone()
+                    self.lastrowid = row[0] if row else None
+            except Exception:
+                self.lastrowid = None
+        return self
+
+    def executemany(self, query: str, param_list):
+        sql = _translate_sqlite_placeholders(query)
+        self._cursor.executemany(sql, param_list)
+        return self
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        self.close()
+        return False
+
+    def __getattr__(self, name):
+        return getattr(self._cursor, name)
+
+
+class PostgresCompatConnection:
+    """Expose a sqlite-like connection facade over a pooled psycopg2 connection."""
+
+    def __init__(self, conn):
+        self._conn = conn
+
+    def cursor(self):
+        return PostgresCompatCursor(self._conn.cursor())
+
+    def execute(self, query: str, params=None):
+        cursor = self.cursor()
+        return cursor.execute(query, params)
+
+    def commit(self):
+        return self._conn.commit()
+
+    def rollback(self):
+        return self._conn.rollback()
+
+    def close(self):
+        # Pool lifecycle is managed by PostgresBackend.
+        return None
+
+    def __getattr__(self, name):
+        return getattr(self._conn, name)
+
+
 class PostgresBackend(DatabaseBackend):
     """
     PostgreSQL backend using psycopg2 connection pooling.
@@ -640,8 +715,9 @@ class PostgresBackend(DatabaseBackend):
     @contextmanager
     def conn(self):
         pg_conn = self._pool.getconn()
+        compat_conn = PostgresCompatConnection(pg_conn)
         try:
-            yield pg_conn
+            yield compat_conn
             pg_conn.commit()
         except Exception:
             pg_conn.rollback()
@@ -1329,7 +1405,7 @@ class CandleDatabase:
 
     @contextmanager
     def conn(self):
-        """Context manager proxy — delegates to backend. SQLite only."""
+        """Context manager proxy — exposes a backend-compatible DB-API handle."""
         ctx = self._backend.conn()
         try:
             yield ctx.__enter__()
