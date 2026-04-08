@@ -16,8 +16,18 @@ type: reference
 - Ingress controller: Traefik (v3.6.10) — installed but pods in Error state
 - `metrics-server` pod: 0/1 Ready (restart loop — may need investigation)
 
-**tradersapp namespace:** Created (27h ago), no application workloads deployed yet.
-Only `kube-root-ca.crt` configmap present. TradersApp manifests exist but not applied.
+**tradersapp namespace:** tradersapp-dev deployed via kustomize overlay (see below).
+
+**k3s Deploy Status (2026-04-08):**
+- `namespace/tradersapp-dev` created ✅
+- ConfigMaps: ml-engine-config, bff-config, ml-engine-env, observability-config ✅
+- Services: ml-engine (8001), bff (8788), frontend (80) ✅
+- PVC: ml-models-pvc ✅ **Bound** to `pvc-5e6fd37e-692b-4679-a188-41bc8d967a3b`
+- PVC: mlflow-artifacts-pvc, redis-pvc → Pending (local-path provisioner, will bind when pods schedule)
+- Deployments: ml-engine, bff, frontend → **ImagePullBackOff** (images not built yet)
+- PDBs, HPAs, NetworkPolicies, Ingresses → all applied ✅
+- ⚠️ **CRITICAL:** Docker Desktop crashed during ml-engine image build (I/O error on COPY step). WSL also crashed (shared Hyper-V infra). Requires **full Windows restart** before continuing.
+- ⚠️ Files still need building: `tradersapp/ml-engine:dev-latest`, `tradersapp/bff:dev-latest`, `tradersapp/frontend:dev-latest`
 
 **kubectl access:**
 - kubectl from inside WSL Ubuntu works: `sudo k3s kubectl ...`
