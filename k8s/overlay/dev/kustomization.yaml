@@ -5,14 +5,14 @@ commonLabels:
 resources:
   - namespace.yaml
   - storage.yaml
-  - ../../base/config.yaml
-  - ../../base/pdb.yaml
-  - ../../base/network-policies.yaml
-  - ../../ml-deployment.yaml
-  - ../../bff-deployment.yaml
-  - ../../frontend-deployment.yaml
-  - ../../hpa-ml-engine.yaml
-  - ../../hpa-bff.yaml
+  - config.yaml
+  - pdb.yaml
+  - network-policies.yaml
+  - ml-deployment.yaml
+  - bff-deployment.yaml
+  - frontend-deployment.yaml
+  - hpa-ml-engine.yaml
+  - hpa-bff.yaml
 patches:
   # ML Engine: dev resources
   - target:
