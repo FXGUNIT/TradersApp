@@ -85,12 +85,16 @@ export function createConsensusRouteHandler({
         // Fire-and-forget: trigger ML self-training on HIGH impact news
         // (non-blocking — doesn't delay the consensus response)
         const highImpactItems = newsResult.items?.filter(i => i.impact === 'HIGH') || [];
-        for (const item of highImpactItems.slice(0, 2)) {
-          triggerMLNewsTraining(item).catch(() => {});
+        for (const [index, item] of highImpactItems.slice(0, 2).entries()) {
+          triggerMLNewsTraining(item, {
+            requestId: requestId ? `${requestId}:news:${index}` : null,
+          }).catch(() => {});
         }
 
         // Include recent news reactions for ML training context
-        const newsReactions = await getMLNewsReactions(30).catch(() => ({ ok: false, entries: [] }));
+        const newsReactions = await getMLNewsReactions(30, {
+          requestId,
+        }).catch(() => ({ ok: false, entries: [] }));
         result.news_reactions = {
           entries: newsReactions.entries || [],
           total: newsReactions.total || 0,
