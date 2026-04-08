@@ -2,7 +2,7 @@ import {
   getLocalDocumentMeta,
   getLocalHubContent,
   listLocalDocumentMeta,
-} from "../../src/services/contentCatalog.js";
+} from "../services/contentCatalog.js";
 
 export function getHubContent() {
   return getLocalHubContent();
