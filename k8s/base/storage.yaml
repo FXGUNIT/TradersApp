@@ -1,7 +1,7 @@
 # k8s/base/storage.yaml — PersistentVolumeClaims for TradersApp
 #
 # ML model store needs persistent storage (survives pod restarts).
-# Data directory uses ephemeral (emptyDir) — models are versioned in MLflow.
+# Runtime state PVC backs /data for DQ quarantine + continual-learning artifacts.
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -15,6 +15,21 @@ spec:
   resources:
     requests:
       storage: 5Gi
+  storageClassName: local-path
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ml-state-pvc
+  labels:
+    app: ml-engine
+    type: state
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
   storageClassName: local-path
 ---
 apiVersion: v1
