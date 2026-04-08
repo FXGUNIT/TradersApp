@@ -196,13 +196,6 @@ export const ROUTE_PERMISSIONS = {
 };
 
 /** Map of valid admin sessions: token → {role, createdAt, expiresAt, device} */
-/** Generate a cryptographically random session token. */
-function _generateToken() {
-  const bytes = new Uint8Array(32);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
-}
-
 /**
  * Create an admin session and return the token.
  * Token expires after ADMIN_SESSION_TTL_MS.
