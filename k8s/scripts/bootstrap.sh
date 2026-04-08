@@ -40,6 +40,124 @@ has_cmd() {
     command -v "$1" >/dev/null 2>&1
 }
 
+namespace_for_env() {
+    local env="${1:-dev}"
+    case "$env" in
+        dev)
+            echo "tradersapp-dev"
+            ;;
+        staging)
+            echo "tradersapp-staging"
+            ;;
+        prod|production)
+            echo "tradersapp"
+            ;;
+        *)
+            echo "tradersapp-$env"
+            ;;
+    esac
+}
+
+wait_for_docker() {
+    if ! has_cmd docker; then
+        error "docker not found. Install Docker first."
+    fi
+
+    info "Waiting for Docker to be ready..."
+    local max_attempts=30
+    local attempt=1
+    while ! docker version >/dev/null 2>&1; do
+        if [[ $attempt -ge $max_attempts ]]; then
+            error "Docker did not become ready within ${max_attempts}0 seconds"
+        fi
+        info "  Waiting for Docker... (attempt $attempt/$max_attempts)"
+        sleep 10
+        ((attempt++))
+    done
+    info "Docker is ready"
+}
+
+import_image_to_cluster() {
+    local image="$1"
+    local archive=""
+
+    if ! has_cmd kubectl; then
+        warn "kubectl not found; skipping cluster image import for $image"
+        return 0
+    fi
+
+    local context=""
+    context="$(kubectl config current-context 2>/dev/null || true)"
+
+    if has_cmd kind && [[ "$context" == kind-* ]]; then
+        info "Importing $image into kind..."
+        kind load docker-image "$image"
+        return 0
+    fi
+
+    if has_cmd k3d && [[ "$context" == k3d-* ]]; then
+        info "Importing $image into k3d..."
+        k3d image import "$image"
+        return 0
+    fi
+
+    archive="$(mktemp "${TMPDIR:-/tmp}/tradersapp-image-XXXXXX.tar")"
+    docker save -o "$archive" "$image"
+
+    if has_cmd k3s; then
+        info "Importing $image into k3s containerd..."
+        if ! k3s ctr images import "$archive" >/dev/null 2>&1; then
+            if has_cmd sudo; then
+                sudo k3s ctr images import "$archive"
+            else
+                error "k3s ctr import requires elevated access, but sudo is not available"
+            fi
+        fi
+    elif has_cmd ctr; then
+        info "Importing $image into containerd..."
+        if ! ctr -n k8s.io images import "$archive" >/dev/null 2>&1; then
+            if has_cmd sudo; then
+                sudo ctr -n k8s.io images import "$archive"
+            else
+                error "ctr import requires elevated access, but sudo is not available"
+            fi
+        fi
+    else
+        warn "No supported cluster image importer found; skipping import for $image"
+    fi
+
+    rm -f "$archive"
+}
+
+sync_dev_images_to_cluster() {
+    local images=(
+        "tradersapp/ml-engine:dev-latest"
+        "tradersapp/bff:dev-latest"
+        "tradersapp/frontend:dev-latest"
+    )
+
+    for image in "${images[@]}"; do
+        if docker image inspect "$image" >/dev/null 2>&1; then
+            import_image_to_cluster "$image"
+        else
+            warn "Local image not found, skipping import: $image"
+        fi
+    done
+}
+
+restart_dev_deployments() {
+    local namespace="$1"
+    local deployments=(ml-engine bff frontend)
+
+    for deployment in "${deployments[@]}"; do
+        if kubectl get deployment "$deployment" -n "$namespace" >/dev/null 2>&1; then
+            info "Restarting deployment/$deployment in namespace $namespace..."
+            kubectl rollout restart "deployment/$deployment" -n "$namespace"
+            kubectl rollout status "deployment/$deployment" -n "$namespace" --timeout=180s || true
+        fi
+    done
+}
+
 # Install k3s (single-node)
 install_k3s() {
     info "Installing k3s..."
