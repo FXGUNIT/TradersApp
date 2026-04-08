@@ -18,11 +18,11 @@ Anti-Forgetting Checks (run after every training):
 - If any metric degrades beyond threshold → rollback + alert
 
 Key Files:
-- `data/experience_replay.jsonl` — rolling buffer of all historical trades
-- `data/fisher_matrices/` — one Fisher matrix per training round
-- `data/training_history.jsonl` — every training run's metrics
-- `data/model_checkpoints/` — saved checkpoints before each retrain
-- `data/rollbacks/` — previous checkpoints for emergency rollback
+- `${CONTINUAL_LEARNING_DIR}/experience_replay.jsonl` — rolling buffer of all historical trades
+- `${CONTINUAL_LEARNING_DIR}/fisher_matrices/` — one Fisher matrix per training round
+- `${CONTINUAL_LEARNING_DIR}/training_history.jsonl` — every training run's metrics
+- `${CONTINUAL_LEARNING_DIR}/model_checkpoints/` — saved checkpoints before each retrain
+- `${CONTINUAL_LEARNING_DIR}/rollbacks/` — previous checkpoints for emergency rollback
 
 This is NOT optional. Every training run goes through this pipeline.
 """
@@ -53,12 +53,15 @@ except Exception:
 # ─── Paths ─────────────────────────────────────────────────────────────────────
 
 BASE_DIR = Path(__file__).parent.parent
-DATA_DIR = BASE_DIR / "data"
-EXPERIENCE_REPLAY_PATH = DATA_DIR / "experience_replay.jsonl"
-FISHER_DIR = DATA_DIR / "fisher_matrices"
-CHECKPOINT_DIR = DATA_DIR / "model_checkpoints"
-TRAINING_HISTORY_PATH = DATA_DIR / "training_history.jsonl"
-ROLLBACK_DIR = DATA_DIR / "rollbacks"
+DEFAULT_CONTINUAL_LEARNING_DIR = BASE_DIR / "data" / "continual_learning"
+CONTINUAL_LEARNING_DIR = Path(
+    os.environ.get("CONTINUAL_LEARNING_DIR", str(DEFAULT_CONTINUAL_LEARNING_DIR))
+)
+EXPERIENCE_REPLAY_PATH = CONTINUAL_LEARNING_DIR / "experience_replay.jsonl"
+FISHER_DIR = CONTINUAL_LEARNING_DIR / "fisher_matrices"
+CHECKPOINT_DIR = CONTINUAL_LEARNING_DIR / "model_checkpoints"
+TRAINING_HISTORY_PATH = CONTINUAL_LEARNING_DIR / "training_history.jsonl"
+ROLLBACK_DIR = CONTINUAL_LEARNING_DIR / "rollbacks"
 
 for _d in [EXPERIENCE_REPLAY_PATH.parent, FISHER_DIR, CHECKPOINT_DIR, ROLLBACK_DIR]:
     _d.mkdir(parents=True, exist_ok=True)
