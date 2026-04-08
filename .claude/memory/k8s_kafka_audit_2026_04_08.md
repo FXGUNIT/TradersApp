@@ -39,6 +39,19 @@ type: reference
 - kubectl wrapper at `E:\TradersApp\.claude\kubectl` — routes via WSL
 - kubeconfig at `E:\TradersApp\.claude\projects\e--TradersApp\kubeconfig` (UTF-16, needs `netsh portproxy` admin to work from Windows)
 
+## Deploy Scripts (k8s/scripts/)
+
+- **`bootstrap-docker.sh`** — Installs Docker CE inside WSL Ubuntu (needed because Docker Desktop is slow/error-prone)
+- **`deploy.sh`** — Full deploy: build images → import into k3s → apply all manifests → verify
+
+## Deploy Steps (after WSL reboot)
+
+1. `wsl -d Ubuntu` (or just open a new WSL terminal)
+2. `cd /mnt/e/TradersApp`
+3. `sudo bash k8s/scripts/bootstrap-docker.sh` (first time only — installs Docker in WSL)
+4. `bash k8s/scripts/deploy.sh` (builds images, imports to k3s, deploys everything)
+5. `sudo k3s kubectl get pods -n tradersapp` (watch pods come up)
+
 ## Persistent Volume Inventory
 
 | PVC | Size | Survives Pod Restart? | Notes |
