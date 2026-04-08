@@ -57,6 +57,14 @@ patches:
       - op: replace
         path: /data/KAFKA_ENABLE
         value: "false"
+  # Allow writable root fs for ml-engine (profiler mkdir runs at import time)
+  - target:
+      kind: Deployment
+      name: ml-engine
+    patch: |
+      - op: replace
+        path: /spec/template/spec/containers/0/securityContext/readOnlyRootFilesystem
+        value: false
 images:
   - name: tradersapp/ml-engine
     newTag: dev-latest
