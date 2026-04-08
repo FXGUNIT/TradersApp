@@ -4,7 +4,7 @@
  *
  * Provides:
  * - Security headers (CSP, HSTS, X-Frame, etc.)
- * - Per-IP rate limiting (sliding window, in-memory)
+ * - Per-IP rate limiting configuration
  * - Role-Based Access Control (RBAC)
  * - Admin session token management
  */
