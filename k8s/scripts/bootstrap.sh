@@ -264,6 +264,8 @@ deploy_kustomize() {
 # Deploy TradersApp via Helm
 deploy_helm() {
     local env="${1:-dev}"
+    local namespace
+    namespace="$(namespace_for_env "$env")"
     info "Deploying TradersApp (env=$env) via Helm..."
 
     if ! has_cmd helm; then
@@ -272,8 +274,12 @@ deploy_helm() {
 
     wait_for_k3s
 
-    # Create namespace
-    kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
+    kubectl create namespace "$namespace" --dry-run=client -o yaml | kubectl apply -f -
+
+    if [[ "$env" == "dev" ]]; then
+        wait_for_docker
+        sync_dev_images_to_cluster
+    fi
 
     # Use values override for environment
     local values_file="$K8S_DIR/helm/tradersapp/values.yaml"
@@ -282,19 +288,23 @@ deploy_helm() {
     if [[ -f "$env_values" ]]; then
         info "Using environment values: $env_values"
         helm upgrade --install tradersapp "$K8S_DIR/helm/tradersapp" \
-            --namespace "$NAMESPACE" \
+            --namespace "$namespace" \
             --values "$values_file" \
             --values "$env_values" \
             --wait --timeout 5m \
             --timeout 300s
     else
         helm upgrade --install tradersapp "$K8S_DIR/helm/tradersapp" \
-            --namespace "$NAMESPACE" \
+            --namespace "$namespace" \
             --values "$values_file" \
             --wait --timeout 5m
     fi
 
-    kubectl get pods -n "$NAMESPACE"
+    if [[ "$env" == "dev" ]]; then
+        restart_dev_deployments "$namespace"
+    fi
+
+    kubectl get pods -n "$namespace"
     info "Helm deployment complete!"
 }
 
@@ -302,6 +312,8 @@ deploy_helm() {
 build_images() {
     info "Building Docker images..."
     cd "$K8S_DIR/.."
+
+    wait_for_docker
 
     info "Building ML Engine image..."
     docker build -t tradersapp/ml-engine:latest -f Dockerfile.ml-engine .
@@ -317,30 +329,38 @@ build_images() {
     docker tag tradersapp/bff:latest tradersapp/bff:dev-latest
     docker tag tradersapp/frontend:latest tradersapp/frontend:dev-latest
 
+    sync_dev_images_to_cluster
+
     info "Images built successfully"
 }
 
 # Tear down
 destroy() {
+    local env="${1:-dev}"
+    local namespace
+    namespace="$(namespace_for_env "$env")"
     info "Destroying TradersApp deployment..."
-    kubectl delete namespace "$NAMESPACE" --ignore-not-found=true
-    info "Namespace '$NAMESPACE' deleted"
+    kubectl delete namespace "$namespace" --ignore-not-found=true
+    info "Namespace '$namespace' deleted"
 }
 
 # Show status
 status() {
+    local env="${1:-dev}"
+    local namespace
+    namespace="$(namespace_for_env "$env")"
     info "TradersApp status on k3s:"
     echo ""
-    kubectl get all -n "$NAMESPACE" 2>/dev/null || echo "Namespace not found"
+    kubectl get all -n "$namespace" 2>/dev/null || echo "Namespace not found"
     echo ""
     echo "Pods:"
-    kubectl get pods -n "$NAMESPACE" -o wide 2>/dev/null || true
+    kubectl get pods -n "$namespace" -o wide 2>/dev/null || true
     echo ""
     echo "HPA:"
-    kubectl get hpa -n "$NAMESPACE" 2>/dev/null || true
+    kubectl get hpa -n "$namespace" 2>/dev/null || true
     echo ""
     echo "PVCs:"
-    kubectl get pvc -n "$NAMESPACE" 2>/dev/null || true
+    kubectl get pvc -n "$namespace" 2>/dev/null || true
 }
 
 # Main
@@ -366,10 +386,10 @@ case "${1:-}" in
         build_images
         ;;
     --destroy)
-        destroy
+        destroy "${2:-dev}"
         ;;
     --status)
-        status
+        status "${2:-dev}"
         ;;
     --help|-h)
         echo "Usage: bootstrap.sh [OPTIONS]"
@@ -381,8 +401,8 @@ case "${1:-}" in
         echo "                          env: dev (default), staging, prod"
         echo "  --full              Install k3s + build images + deploy (dev)"
         echo "  --build             Build Docker images only"
-        echo "  --destroy           Tear down entire deployment"
-        echo "  --status            Show current deployment status"
+        echo "  --destroy [env]     Tear down environment namespace"
+        echo "  --status [env]      Show current deployment status"
         echo ""
         echo "Examples:"
         echo "  ./bootstrap.sh --install"
