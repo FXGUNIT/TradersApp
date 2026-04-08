@@ -1,0 +1,7 @@
+# Exclude temp directories with restricted permissions
+**/.pytest_tmp
+**/__pycache__
+**/*.pyc
+**/.venv
+**/node_modules
+**/.git
