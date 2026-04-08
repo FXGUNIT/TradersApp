@@ -2,24 +2,7 @@
   "permissions": {
     "defaultMode": "bypassPermissions",
     "allow": [
-      "Bash(npm run:*)",
-      "Bash(npm test:*)",
-      "Bash(node performanceTestRunner.js)",
-      "Bash(node securityTestRunner.js)",
-      "Bash(node leakagePreventionTestRunner.js)",
-      "Bash(node socialEngineeringTestRunner.js)",
-      "Bash(node factGroundednessTestRunner.js)",
-      "Bash(node numericalIntegrityTestRunner.js)",
-      "Bash(node contextWindowTestRunner.js)",
-      "Bash(git add:*)",
-      "Bash(git commit:*)",
-      "Bash(openclaw)",
-      "Bash(openclaw:*)",
-      "Bash(openclaw *)",
-      "Bash(openclaw **)",
-      "Bash(openclaw) **",
-      "Bash(*openclaw*)",
-      "Bash(*)"
+      "*"
     ],
     "ask": []
   },
