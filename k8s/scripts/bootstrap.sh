@@ -203,6 +203,8 @@ wait_for_k3s() {
 # Deploy TradersApp via Kustomize
 deploy_kustomize() {
     local env="${1:-dev}"
+    local namespace
+    namespace="$(namespace_for_env "$env")"
     info "Deploying TradersApp (env=$env) via Kustomize..."
 
     if ! has_cmd kubectl; then
@@ -211,14 +213,17 @@ deploy_kustomize() {
 
     wait_for_k3s
 
-    # Create namespace
-    kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
-    info "Namespace '$NAMESPACE' ready"
-
-    # Build and apply
     local overlay_dir="$K8S_DIR/overlay/$env"
     if [[ ! -d "$overlay_dir" ]]; then
         error "Overlay not found: $overlay_dir (available: dev, staging, prod)"
+    fi
+
+    kubectl create namespace "$namespace" --dry-run=client -o yaml | kubectl apply -f -
+    info "Namespace '$namespace' ready"
+
+    if [[ "$env" == "dev" ]]; then
+        wait_for_docker
+        sync_dev_images_to_cluster
     fi
 
     info "Building with Kustomize..."
