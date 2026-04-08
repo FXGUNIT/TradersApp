@@ -240,19 +240,25 @@ deploy_kustomize() {
         kubectl apply -f "$K8S_DIR/base/secrets.yaml"
     fi
 
-    info "Verifying deployment..."
-    kubectl rollout status deployment -n "$NAMESPACE" --timeout=120s || true
+    if [[ "$env" == "dev" ]]; then
+        restart_dev_deployments "$namespace"
+    fi
 
-    kubectl get pods -n "$NAMESPACE"
-    kubectl get svc -n "$NAMESPACE"
-    kubectl get hpa -n "$NAMESPACE" || true
+    info "Verifying deployment..."
+    kubectl get deployments -n "$namespace" -o name | while read -r deployment; do
+        kubectl rollout status "$deployment" -n "$namespace" --timeout=180s || true
+    done
+
+    kubectl get pods -n "$namespace"
+    kubectl get svc -n "$namespace"
+    kubectl get hpa -n "$namespace" || true
 
     info "Deployment complete!"
     info "Services:"
-    info "  ML Engine:  http://ml-engine.$NAMESPACE.svc:8001"
-    info "  BFF:        http://bff.$NAMESPACE.svc:8788"
-    info "  Frontend:   http://frontend.$NAMESPACE.svc:80 (via Ingress)"
-    info "  Triton:     http://triton.$NAMESPACE.svc:8000 (GPU only)"
+    info "  ML Engine:  http://ml-engine.$namespace.svc:8001"
+    info "  BFF:        http://bff.$namespace.svc:8788"
+    info "  Frontend:   http://frontend.$namespace.svc:80 (via Ingress)"
+    info "  Triton:     http://triton.$namespace.svc:8000 (GPU only)"
 }
 
 # Deploy TradersApp via Helm
