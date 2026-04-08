@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: tradersapp
+  name: tradersapp-dev
   labels:
-    name: tradersapp
-    environment: production
+    name: tradersapp-dev
+    environment: dev

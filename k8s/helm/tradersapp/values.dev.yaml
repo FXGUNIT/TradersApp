@@ -1,0 +1,30 @@
+# Dev overrides for Helm deployments.
+# Usage: helm upgrade --install tradersapp ./k8s/helm/tradersapp -f values.yaml -f values.dev.yaml
+namespace: tradersapp-dev
+
+mlEngine:
+  image:
+    tag: dev-latest
+  kafkaEnabled: false
+
+bff:
+  replicaCount: 1
+  image:
+    tag: dev-latest
+
+frontend:
+  replicaCount: 1
+  image:
+    tag: dev-latest
+
+redis:
+  persistence:
+    enabled: false
+
+kafka:
+  enabled: false
+
+mlflow:
+  minio:
+    persistence:
+      enabled: false

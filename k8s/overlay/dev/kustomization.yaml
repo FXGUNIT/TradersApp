@@ -41,22 +41,6 @@ patches:
       - op: replace
         path: /spec/replicas
         value: 1
-  # Fix BFF port env var (server.mjs reads BFF_PORT, not PORT)
-  - target:
-      kind: ConfigMap
-      name: bff-config
-    patch: |
-      - op: add
-        path: /data/BFF_PORT
-        value: "8788"
-  # Disable Kafka consumer in dev (no broker deployed)
-  - target:
-      kind: ConfigMap
-      name: ml-engine-config
-    patch: |
-      - op: replace
-        path: /data/KAFKA_ENABLE
-        value: "false"
   # Allow writable root fs for ml-engine (profiler mkdir runs at import time)
   - target:
       kind: Deployment

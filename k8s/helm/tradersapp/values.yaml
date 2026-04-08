@@ -9,6 +9,7 @@ imagePullSecrets: []
 mlEngine:
   enabled: true
   replicaCount: 1
+  kafkaEnabled: true
   image:
     repository: tradersapp/ml-engine
     tag: latest

@@ -33,6 +33,7 @@ metadata:
   namespace: tradersapp
 data:
   ML_ENGINE_URL: "http://ml-engine:8001"
+  BFF_PORT: "8788"
   NODE_ENV: "production"
   LOG_LEVEL: "info"
   CACHE_TTL_MS: "60000"

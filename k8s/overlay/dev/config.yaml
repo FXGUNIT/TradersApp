@@ -16,7 +16,7 @@ data:
   REDIS_HOST: "redis"
   REDIS_PORT: "6379"
   KAFKA_BOOTSTRAP_SERVERS: "kafka:29092"
-  KAFKA_ENABLE: "true"
+  KAFKA_ENABLE: "false"
   MLFLOW_TRACKING_URI: "http://mlflow:5000"
   OTEL_ENABLED: "true"
   OTEL_SERVICE_NAME: "ml-engine"
@@ -33,6 +33,7 @@ metadata:
   namespace: tradersapp
 data:
   ML_ENGINE_URL: "http://ml-engine:8001"
+  BFF_PORT: "8788"
   NODE_ENV: "production"
   LOG_LEVEL: "info"
   CACHE_TTL_MS: "60000"
