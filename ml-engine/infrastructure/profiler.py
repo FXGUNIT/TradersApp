@@ -51,8 +51,9 @@ PYROSCOPE_APP_NAME = os.getenv("PYROSCOPE_APP_NAME", "tradersapp-ml-engine")
 PROFILE_DIR = Path(os.getenv("PROFILE_DIR", "profiles"))
 PROFILE_THRESHOLD_MS = float(os.getenv("PROFILE_THRESHOLD_MS", "100"))  # profile if > 100ms
 
-# Create profile output directory
-PROFILE_DIR.mkdir(exist_ok=True)
+# Create profile output directory only when profiling is enabled (requires writable fs)
+if PROFILER_ENABLED:
+    PROFILE_DIR.mkdir(exist_ok=True)
 
 
 # ─── Pyroscope Init ────────────────────────────────────────────────────────────
