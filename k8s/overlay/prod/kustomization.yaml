@@ -34,6 +34,27 @@ patches:
       - op: replace
         path: /spec/maxReplicas
         value: 4
+  # Production shared storage: replace with the actual RWX-capable StorageClass present in-cluster
+  - target:
+      kind: PersistentVolumeClaim
+      name: ml-models-pvc
+    patch: |
+      - op: replace
+        path: /spec/accessModes/0
+        value: ReadWriteMany
+      - op: replace
+        path: /spec/storageClassName
+        value: shared-rwx
+  - target:
+      kind: PersistentVolumeClaim
+      name: ml-state-pvc
+    patch: |
+      - op: replace
+        path: /spec/accessModes/0
+        value: ReadWriteMany
+      - op: replace
+        path: /spec/storageClassName
+        value: shared-rwx
 images:
   - name: tradersapp/ml-engine
     newTag: v1.0.0  # Semver tags only in prod

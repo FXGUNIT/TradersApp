@@ -165,7 +165,7 @@ metadata:
   namespace: {{ include "tradersapp.namespace" . }}
 spec:
   accessModes:
-    - ReadWriteOnce
+    {{- toYaml .Values.mlEngine.persistence.accessModes | nindent 4 }}
   resources:
     requests:
       storage: {{ .Values.mlEngine.persistence.size }}
@@ -182,7 +182,7 @@ metadata:
   namespace: {{ include "tradersapp.namespace" . }}
 spec:
   accessModes:
-    - ReadWriteOnce
+    {{- toYaml .Values.mlEngine.runtimeState.accessModes | nindent 4 }}
   resources:
     requests:
       storage: {{ .Values.mlEngine.runtimeState.size }}

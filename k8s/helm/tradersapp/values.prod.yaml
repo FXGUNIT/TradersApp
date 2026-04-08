@@ -41,13 +41,15 @@ mlEngine:
   runtimeState:
     enabled: true
     size: 10Gi
-    storageClass: standard  # Use local-path on k3s
+    accessModes: ["ReadWriteMany"]
+    storageClass: shared-rwx  # Replace with your RWX-capable class (NFS/Longhorn/CephFS)
     continualLearningDir: "/data/continual_learning"
     mambaCacheDir: "/data/mamba_cache"
   persistence:
     enabled: true
     size: 5Gi
-    storageClass: standard  # Use local-path on k3s
+    accessModes: ["ReadWriteMany"]
+    storageClass: shared-rwx  # Replace with your RWX-capable class (NFS/Longhorn/CephFS)
   modelRegistrySidecar:
     port: 8010
     warmup: true

@@ -86,9 +86,12 @@ scaleUpStabilization: 15s
 
 | Volume | Storage | Access | Size |
 |--------|---------|--------|------|
-| ML models | ReadOnlyMany | All ML replicas | ~500MB |
-| Candle data | ReadWriteMany | Single ML writer | ~1GB/month |
+| ML models | RWX-capable PVC, mounted read-only in serving pods | All ML replicas | ~500MB |
+| Runtime state (`/data`) | RWX-capable PVC | DQ quarantine + continual learning | ~1GB/month |
 | MLflow artifacts | S3/MinIO | ML + MLflow | ~10GB |
+
+Production manifests use the placeholder StorageClass `shared-rwx`.
+Replace it with the actual RWX-capable class in your cluster, such as NFS, Longhorn share-manager, CephFS, or EFS.
 
 ## Leader Election (Training Lock)
 

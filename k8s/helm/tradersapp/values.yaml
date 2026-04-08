@@ -55,12 +55,14 @@ mlEngine:
   runtimeState:
     enabled: true
     size: 10Gi
+    accessModes: ["ReadWriteOnce"]
     storageClass: standard
     continualLearningDir: "/data/continual_learning"
     mambaCacheDir: "/data/mamba_cache"
   persistence:
     enabled: true
     size: 5Gi
+    accessModes: ["ReadWriteOnce"]
     storageClass: standard
   modelRegistrySidecar:
     port: 8010

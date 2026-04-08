@@ -1,4 +1,4 @@
-# k8s/overlay/dev/storage.yaml — Dev: only ml-models-pvc needed
+# k8s/overlay/dev/storage.yaml — Dev PVCs stay local-path/RWO for single-node k3s
 # mlflow-artifacts-pvc and redis-pvc removed (no Redis/MLflow in dev, would stay Pending)
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -13,4 +13,19 @@ spec:
   resources:
     requests:
       storage: 5Gi
+  storageClassName: local-path
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ml-state-pvc
+  labels:
+    app: ml-engine
+    type: state
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
   storageClassName: local-path
