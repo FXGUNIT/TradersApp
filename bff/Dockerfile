@@ -3,11 +3,11 @@ FROM node:20-slim
 WORKDIR /app
 
 # Install dependencies (BFF uses only Node.js built-ins — no external packages)
-COPY bff/package.json ./
+COPY package.json ./
 RUN npm install --omit=dev --prefer-offline 2>/dev/null || true
 
 # Copy bff source
-COPY bff/ ./
+COPY ./ ./
 
 # Build args (secrets injected at Docker build time from GitHub Actions)
 ARG AI_GEMINI_PRO_KEY
