@@ -1,5 +1,5 @@
-# k8s/base/storage.yaml — PersistentVolumeClaims for TradersApp
-# Namespace set by kustomize overlay; storageClassName = local-path for k3s
+# k8s/overlay/dev/storage.yaml — Dev: only ml-models-pvc needed
+# mlflow-artifacts-pvc and redis-pvc removed (no Redis/MLflow in dev, would stay Pending)
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -13,34 +13,4 @@ spec:
   resources:
     requests:
       storage: 5Gi
-  storageClassName: local-path
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: mlflow-artifacts-pvc
-  labels:
-    app: mlflow
-    type: artifacts
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 20Gi
-  storageClassName: local-path
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: redis-pvc
-  labels:
-    app: redis
-    type: cache
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 1Gi
   storageClassName: local-path
