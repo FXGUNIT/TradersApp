@@ -55,6 +55,17 @@ type: reference
   - `CandleDatabase` facade: `DATABASE_URL` env var wins, falls back to SQLite
 - Files changed: `k8s/helm/tradersapp/templates/ml-engine.yaml`, `k8s/ml-deployment.yaml`
 
+## k8s Kustomization Fixes Applied
+- `k8s/namespace.yaml` copied into `k8s/base/namespace.yaml` (was missing from base/)
+- `k8s/overlay/dev/kustomization.yaml` fixed: namespace.yaml and storage.yaml copied into dev overlay dir (kustomize requires files to be within overlay tree)
+- `k8s/overlay/dev/storage.yaml` fixed: removed hardcoded namespace, changed storageClassName from `standard` → `local-path`
+- `k8s/base/storage.yaml` still has `storageClassName: standard` — needs fixing separately for base non-overlay deployments
+
+## ml-engine Build Fix Applied
+- `ml-engine/requirements.txt`: upgraded `great-expectations==1.2.4` → `>=1.7.0` (resolved pandas conflict: ge 1.2.4 requires `pandas<2.2` but code uses `pandas==2.2.3`)
+- `ml-engine/Dockerfile`: fixed `UndefinedVar` on MODEL_STORE_PVC_MOUNT line
+- `requirements.txt` changed: `great-expectations==1.2.4` → `great-expectations>=1.7.0`
+
 ## Kafka Topics
 
 | Topic | Partitions | Consumer(s) | At-Least-Once? |
@@ -75,10 +86,11 @@ type: reference
 - All secrets sync from Infisical every 1h via External Secrets Operator
 
 ## Remaining Risks
-1. **Kafka replication factor = 1** — single-broker, no fault tolerance for Kafka itself (fine for dev, not prod)
-2. **MLflow image in prod uses `registry.example.com`** — placeholder, must be replaced with real registry
-3. **SQLite backend still exists** — ml-engine falls back to SQLite if `DATABASE_URL` is unset; ensure ESO secret is always populated
-4. **`model-predictions` consumer passes `correct=None`** — outcome comes later via `feedback-loop`; ConceptDriftDetector may need to track unverified predictions separately
+1. **Docker Desktop crashed + WSL crashed** — requires full Windows restart. Docker Desktop's Linux VM had I/O error during ml-engine COPY step. WSL shares Hyper-V infra → both down.
+2. **Docker images not built** — must build after restart: ml-engine, bff, frontend → import into k3s containerd
+3. **`metrics-server` pod 0/1 Ready** — restart loop, needs investigation
+4. **Traefik pods Error state** — ingress controller not healthy
+5. **`base/storage.yaml` still has `storageClassName: standard`** — only dev overlay is fixed
 
 ## How to Run This Audit
 ```bash
@@ -97,4 +109,29 @@ docker compose -f docker-compose.kafka.yml exec kafka kafka-topics --list --boot
 
 # Check ml-engine pod logs for Kafka consumer
 kubectl logs -n tradersapp -l app=ml-engine --tail=50 -f
+```
+
+## Post-Restart Recovery (after Docker Desktop + WSL fix)
+```powershell
+# 1. Verify WSL is back
+wsl -d Ubuntu -- bash -c 'echo WSL OK'
+
+# 2. Verify k3s is still running
+wsl -d Ubuntu -- bash -c 'sudo systemctl is-active k3s'
+
+# 3. Create local-path storage dir if needed
+wsl -d Ubuntu -- bash -c 'sudo mkdir -p /var/lib/rancher/k3s/storage && sudo chmod 777 /var/lib/rancher/k3s/storage'
+
+# 4. Build and load Docker images into k3s
+docker build -t tradersapp/ml-engine:dev-latest -f E:\TradersApp\ml-engine\Dockerfile E:\TradersApp\ml-engine
+docker build -t tradersapp/bff:dev-latest -f E:\TradersApp\bff\Dockerfile E:\TradersApp\bff
+# (frontend has no Dockerfile yet — needs creating)
+
+# 5. Import images into k3s containerd
+wsl -d Ubuntu -- bash -c 'sudo k3s ctr images import <(docker save tradersapp/ml-engine:dev-latest)'
+wsl -d Ubuntu -- bash -c 'sudo k3s ctr images import <(docker save tradersapp/bff:dev-latest)'
+
+# 6. Restart pods to pick up new images
+wsl -d Ubuntu -- bash -c 'sudo k3s kubectl rollout restart deployment/ml-engine -n tradersapp-dev'
+wsl -d Ubuntu -- bash -c 'sudo k3s kubectl rollout restart deployment/bff -n tradersapp-dev'
 ```
