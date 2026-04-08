@@ -602,13 +602,13 @@ export async function getMlCacheStats() {
  * Send HIGH impact breaking news to ML Engine for classification + self-training.
  * Called automatically when breaking news is detected in consensus response.
  */
-export async function triggerMLNewsTraining(newsItem) {
+export async function triggerMLNewsTraining(newsItem, options = {}) {
   if (!newsItem || newsItem.impact !== 'HIGH') return { triggered: false };
   try {
     const res = await mlRequest('/news-trigger', {
       news: newsItem,
       trigger_type: 'breaking_news_high_impact',
-    }, 8000);
+    }, 8000, options);
     return { triggered: true, response: res };
   } catch (err) {
     console.error('[consensusEngine] news-trigger failed:', err.message);
@@ -619,7 +619,7 @@ export async function triggerMLNewsTraining(newsItem) {
 /**
  * Log market reaction to a breaking news item (called at 5/15/30/60 min intervals).
  */
-export async function logNewsReaction(newsId, reactionData) {
+export async function logNewsReaction(newsId, reactionData, options = {}) {
   try {
     const res = await mlRequest('/news/reaction', {
       news_id: newsId,
@@ -629,7 +629,7 @@ export async function logNewsReaction(newsId, reactionData) {
       reaction_60m: reactionData.reaction60m,
       direction: reactionData.direction,
       magnitude: reactionData.magnitude,
-    }, 5000);
+    }, 5000, options);
     return { ok: true, ...res };
   } catch (err) {
     console.error('[consensusEngine] news/reaction failed:', err.message);
@@ -640,9 +640,9 @@ export async function logNewsReaction(newsId, reactionData) {
 /**
  * Fetch recent news reactions from ML Engine (ML training data).
  */
-export async function getMLNewsReactions(limit = 50) {
+export async function getMLNewsReactions(limit = 50, options = {}) {
   try {
-    const res = await mlRequest(`/news/reactions?limit=${limit}`, null, 5000);
+    const res = await mlRequest(`/news/reactions?limit=${limit}`, null, 5000, options);
     return res;
   } catch (err) {
     console.error('[consensusEngine] news/reactions failed:', err.message);
