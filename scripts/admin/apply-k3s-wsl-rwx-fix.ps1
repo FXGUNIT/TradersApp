@@ -14,7 +14,8 @@ function Invoke-WslBash {
 }
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
-$wslRepo = (& wsl.exe -d $Distro -- wslpath -a $repoRoot | Out-String).Trim()
+$repoRootForWsl = ($repoRoot -replace "\\", "/")
+$wslRepo = (& wsl.exe -d $Distro -- bash -lc "wslpath -a '$repoRootForWsl'" | Out-String).Trim()
 
 if (-not $wslRepo) {
   throw "Unable to resolve WSL path for $repoRoot"
