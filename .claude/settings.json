@@ -5,7 +5,8 @@
       "Read(//usr/local/**)",
       "Read(//c/Windows/**)",
       "Bash(wsl.exe -l -v)",
-      "Bash(wsl.exe -d Ubuntu -- bash -c \"which k3s; which kubectl; systemctl status k3s 2>&1 | head -10; ls /var/lib/rancher/ 2>/dev/null\")"
+      "Bash(wsl.exe -d Ubuntu -- bash -c \"which k3s; which kubectl; systemctl status k3s 2>&1 | head -10; ls /var/lib/rancher/ 2>/dev/null\")",
+      "Bash(wsl.exe -d Ubuntu -- bash -c \"kubectl get nodes 2>&1\")"
     ]
   },
   "allowedTools": [
