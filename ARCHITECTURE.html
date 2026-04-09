@@ -762,10 +762,13 @@
     <section class="section" id="runtime">
       <div class="section-header">
         <div>
+          <span class="section-kicker">Responsibility model</span>
           <h2>Runtime layers</h2>
           <p class="lead">This table maps the platform by responsibility instead of by repo folder.</p>
         </div>
+        <p class="section-summary">The point here is ownership clarity. Each layer answers a different operational question even if some code still lives in the same deployable.</p>
       </div>
+      <div class="table-wrap">
       <table>
         <thead>
           <tr>
@@ -777,22 +780,22 @@
         <tbody>
           <tr>
             <td>Experience</td>
-            <td>Frontend (`React`, `Vite`)</td>
+            <td>Frontend (<code>React</code>, <code>Vite</code>)</td>
             <td>Trading UI, dashboards, and operator workflows.</td>
           </tr>
           <tr>
             <td>Edge + orchestration</td>
-            <td>BFF (`Node.js`)</td>
+            <td>BFF (<code>Node.js</code>)</td>
             <td>Authentication, session control, anti-corruption layer, and API composition.</td>
           </tr>
           <tr>
             <td>Domain service</td>
-            <td>`analysis-service` (`gRPC`)</td>
+            <td><code>analysis-service</code> (<code>gRPC</code>)</td>
             <td>Stable consensus contract and extraction seam for the first bounded context.</td>
           </tr>
           <tr>
             <td>Core ML runtime</td>
-            <td>ML Engine (`Python`)</td>
+            <td>ML Engine (<code>Python</code>)</td>
             <td>Inference, training, drift detection, feedback, and monitoring endpoints.</td>
           </tr>
           <tr>
@@ -827,15 +830,19 @@
           </tr>
         </tbody>
       </table>
+      </div>
     </section>
 
     <section class="section" id="contexts">
       <div class="section-header">
         <div>
+          <span class="section-kicker">DDD reality</span>
           <h2>Bounded contexts and extraction status</h2>
           <p class="lead">This is the important DDD truth: there are contracts for multiple contexts, but only one is fully extracted on the live request path today.</p>
         </div>
+        <p class="section-summary">This table shows where the architecture is deliberately conservative. Context boundaries exist before all of them become independent services.</p>
       </div>
+      <div class="table-wrap">
       <table>
         <thead>
           <tr>
@@ -848,25 +855,25 @@
         <tbody>
           <tr>
             <td>BFF orchestration</td>
-            <td>`bff`</td>
+            <td><code>bff</code></td>
             <td>Live</td>
             <td>Owns frontend-facing contracts and translation logic.</td>
           </tr>
           <tr>
             <td>Analysis</td>
-            <td>`analysis-service`</td>
+            <td><code>analysis-service</code></td>
             <td>Live extraction seam</td>
-            <td>gRPC is implemented and deployed; internals still proxy ML Engine `/predict`.</td>
+            <td>gRPC is implemented and deployed; internals still proxy ML Engine <code>/predict</code>.</td>
           </tr>
           <tr>
             <td>Ingestion</td>
-            <td>`ingestion-service` contract</td>
+            <td><code>ingestion-service</code> contract</td>
             <td>Logical only</td>
-            <td>Ownership is defined, but runtime still lives inside `ml-engine` packages.</td>
+            <td>Ownership is defined, but runtime still lives inside <code>ml-engine</code> packages.</td>
           </tr>
           <tr>
             <td>Learning</td>
-            <td>`learning-service` contract</td>
+            <td><code>learning-service</code> contract</td>
             <td>Logical only</td>
             <td>Retraining, drift, and DQ loops are live, but still run inside ML Engine and Airflow DAGs.</td>
           </tr>
@@ -878,6 +885,7 @@
           </tr>
         </tbody>
       </table>
+      </div>
     </section>
 
     <section class="section" id="loops">
