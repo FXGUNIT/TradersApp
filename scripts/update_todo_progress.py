@@ -91,6 +91,10 @@ def make_bar(percent: float, width: int = 40) -> str:
     return "[" + ("#" * filled) + ("-" * (width - filled)) + "]"
 
 
+def format_count(value: float) -> str:
+    return f"{int(value):03d}"
+
+
 def summarize(tasks: list[Task]) -> tuple[str, dict[str, dict[str, float]]]:
     total = len(tasks)
     done = sum(1 for task in tasks if task.status == "Done")
@@ -133,53 +137,56 @@ def summarize(tasks: list[Task]) -> tuple[str, dict[str, dict[str, float]]]:
         "",
         "## Live Progress",
         "",
-        f"Last sync: `{timestamp}`",
+        f"> Last sync: `{timestamp}`",
+        f"> Forecast note: `p95` is a planning forecast, not a guaranteed empirical accuracy level.",
         "",
-        "```text",
-        f"OVERALL     {make_bar(completion_pct)} {format_pct(completion_pct)}",
-        f"REMAINING   {make_bar(remaining_pct)} {format_pct(remaining_pct)}",
-        f"TASKS       done {done:03d} | partial {partial:03d} | todo {todo:03d} | total {total:03d}",
-        f"SCORE       {weighted_done:07.3f}/{float(total):07.3f} weighted units complete",
-        (
-            "TIME LEFT   "
-            f"min {format_days(remaining_min_days)} | "
-            f"p50 {format_days(remaining_mid_days)} | "
-            f"p80 {format_days(remaining_p80_days)} | "
-            f"p95 {format_days(remaining_p95_days)} | "
-            f"max {format_days(remaining_max_days)}"
-        ),
-        "ACCURACY    p95 is a planning forecast, not a guaranteed empirical accuracy level",
-        "```",
+        "<table>",
+        "  <tr>",
+        "    <td valign=\"top\" width=\"25%\">",
+        "      <strong>Overall Complete</strong><br/>",
+        f"      <code>{format_pct(completion_pct)}</code><br/>",
+        f"      <progress value=\"{completion_pct:.3f}\" max=\"100\"></progress><br/>",
+        f"      <sub>{make_bar(completion_pct, width=24)}</sub>",
+        "    </td>",
+        "    <td valign=\"top\" width=\"25%\">",
+        "      <strong>Remaining Work</strong><br/>",
+        f"      <code>{format_pct(remaining_pct)}</code><br/>",
+        f"      <progress value=\"{remaining_pct:.3f}\" max=\"100\"></progress><br/>",
+        f"      <sub>{make_bar(remaining_pct, width=24)}</sub>",
+        "    </td>",
+        "    <td valign=\"top\" width=\"25%\">",
+        "      <strong>Task Mix</strong><br/>",
+        f"      <code>done {done:03d}</code><br/>",
+        f"      <code>partial {partial:03d}</code><br/>",
+        f"      <code>todo {todo:03d}</code><br/>",
+        f"      <sub>total {total:03d}</sub>",
+        "    </td>",
+        "    <td valign=\"top\" width=\"25%\">",
+        "      <strong>Forecast Window</strong><br/>",
+        f"      <code>p50 {format_days(remaining_mid_days)}</code><br/>",
+        f"      <code>p80 {format_days(remaining_p80_days)}</code><br/>",
+        f"      <code>p95 {format_days(remaining_p95_days)}</code><br/>",
+        f"      <sub>min {format_days(remaining_min_days)} | max {format_days(remaining_max_days)}</sub>",
+        "    </td>",
+        "  </tr>",
+        "</table>",
         "",
-        "### Phase Bars",
+        "### Snapshot",
         "",
-        "```text",
+        "| Metric | Value |",
+        "|---|---:|",
+        f"| Weighted Score | `{weighted_done:07.3f}/{float(total):07.3f}` |",
+        f"| Tasks Complete | `{done:03d}` |",
+        f"| Tasks In Progress | `{partial:03d}` |",
+        f"| Tasks Not Started | `{todo:03d}` |",
+        f"| Time Left P50 | `{format_days(remaining_mid_days)}` |",
+        f"| Time Left P95 | `{format_days(remaining_p95_days)}` |",
+        "",
+        "### Phase Dashboard",
+        "",
+        "| Phase | Visual | Progress | Done | Partial | Todo | P50 Left | P95 Left |",
+        "|---|---|---:|---:|---:|---:|---:|---:|",
     ]
-
-    for phase_name, data in per_phase.items():
-        phase_total = data["total"]
-        phase_pct = (data["weighted_done"] / phase_total * 100.0) if phase_total else 0.0
-        lines.append(
-            (
-                f"{phase_name:<38} "
-                f"{make_bar(phase_pct, width=24)} "
-                f"{format_pct(phase_pct)} "
-                f"done {int(data['done']):03d} "
-                f"partial {int(data['partial']):03d} "
-                f"todo {int(data['todo']):03d}"
-            )
-        )
-
-    lines.extend(
-        [
-            "```",
-            "",
-            "### Phase Summary",
-            "",
-            "| Phase | Progress | Done | Partial | Todo | Remaining Min | Remaining Likely | Remaining Max |",
-            "|---|---:|---:|---:|---:|---:|---:|---:|",
-        ]
-    )
 
     for phase_name, data in per_phase.items():
         phase_total = data["total"]
@@ -187,24 +194,42 @@ def summarize(tasks: list[Task]) -> tuple[str, dict[str, dict[str, float]]]:
         phase_min = data["remaining_min_days"]
         phase_max = data["remaining_max_days"]
         phase_mid = (phase_min + phase_max) / 2.0
+        phase_p95 = phase_min + ((phase_max - phase_min) * 0.95)
         lines.append(
             "| "
             + " | ".join(
                 [
                     phase_name,
+                    f"`{make_bar(phase_pct, width=18)}`",
                     format_pct(phase_pct),
-                    f"{int(data['done']):03d}",
-                    f"{int(data['partial']):03d}",
-                    f"{int(data['todo']):03d}",
-                    format_days(phase_min),
+                    format_count(data["done"]),
+                    format_count(data["partial"]),
+                    format_count(data["todo"]),
                     format_days(phase_mid),
-                    format_days(phase_max),
+                    format_days(phase_p95),
                 ]
             )
             + " |"
         )
 
-    lines.extend(["", PROGRESS_END])
+    lines.extend(
+        [
+            "",
+            "### Raw Progress Bars",
+            "",
+            "```text",
+            f"OVERALL   {make_bar(completion_pct)} {format_pct(completion_pct)}",
+            f"REMAINING {make_bar(remaining_pct)} {format_pct(remaining_pct)}",
+            "```",
+        ]
+    )
+
+    for phase_name, data in per_phase.items():
+        phase_total = data["total"]
+        phase_pct = (data["weighted_done"] / phase_total * 100.0) if phase_total else 0.0
+        lines.append(f"{phase_name:<34} {make_bar(phase_pct, width=28)} {format_pct(phase_pct)}")
+
+    lines.extend(["```", "", PROGRESS_END])
     return "\n".join(lines), per_phase
 
 
