@@ -1,15 +1,14 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(/var/lib/rancher/k3s/data/current/bin/ctr -n k8s.io images import /mnt/c/Users/Asus/bff-dev-latest.tar)",
-      "Read(//usr/local/**)",
-      "Read(//c/Windows/**)",
-      "Bash(wsl.exe -l -v)",
-      "Bash(wsl.exe -d Ubuntu -- bash -c \"which k3s; which kubectl; systemctl status k3s 2>&1 | head -10; ls /var/lib/rancher/ 2>/dev/null\")",
-      "Bash(wsl.exe -d Ubuntu -- bash -c \"kubectl get nodes 2>&1\")"
-    ]
-  },
-  "allowedTools": [
-    "Bash(*)"
-  ]
+﻿{
+    "permissions":  {
+                        "defaultMode":  "bypassPermissions",
+                        "allow":  [
+                                      "*"
+                                  ],
+                        "ask":  [
+
+                                ]
+                    },
+    "allowedTools":  [
+                         "Bash(*)"
+                     ]
 }

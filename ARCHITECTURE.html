@@ -589,12 +589,15 @@
       </div>
       <div class="nav-links">
         <a href="#overview">Overview</a>
-        <a href="#system-design">System Design</a>
-        <a href="#operating-map">5W1H Map</a>
-        <a href="#bird-roadmap">Roadmap</a>
+        <a href="#quick-read">Quick Read</a>
+        <a href="#protocols">Ports</a>
+        <a href="#repo-map">Repo Map</a>
         <a href="#runtime">Runtime Layers</a>
         <a href="#contexts">Bounded Contexts</a>
         <a href="#loops">Control Loops</a>
+        <a href="#system-design">System Design</a>
+        <a href="#operating-map">5W1H Map</a>
+        <a href="#bird-roadmap">Roadmap</a>
         <a href="#deploy">Deployment</a>
       </div>
     </div>
@@ -648,9 +651,9 @@
       <div class="orientation-card">
         <h3>How to read this page</h3>
         <ol class="orientation-list">
-          <li>Start with the overview and design board to orient around the hot path.</li>
-          <li>Use the operating map and roadmap to understand why the current shape exists.</li>
-          <li>Read runtime layers, contexts, and loops only after you know the system boundaries.</li>
+          <li>Start with the overview and quick-read cards to orient around the hot path.</li>
+          <li>Use the ports, repo map, and runtime sections before opening the denser diagrams.</li>
+          <li>Read the system board, operating map, and roadmap only after the core boundaries are clear.</li>
         </ol>
       </div>
       <div class="orientation-card">
@@ -672,85 +675,25 @@
         <p class="section-summary">This is the fastest orientation view: who serves traffic, where state lives, and which platform systems surround the request path.</p>
       </div>
       <div class="diagram-card">
-        <img src="docs/assets/architecture-3d-overview.png" alt="TradersApp architecture overview" loading="lazy" />
-      </div>
-      <div class="asset-links">
-        <span>Variants:</span>
-        <a href="docs/assets/architecture-3d-overview.svg">SVG</a>
-        <a href="docs/assets/architecture-3d-overview.png">PNG</a>
-        <a href="docs/assets/architecture-3d-overview-print.svg">Print SVG</a>
-      </div>
-    </section>
-
-    <section class="section" id="system-design">
-      <div class="section-header">
-        <div>
-          <span class="section-kicker">Detailed board</span>
-          <h2>System design board</h2>
-          <p class="lead">This is the detailed board view in the style of a classic system-design map. It shows actors, service boundaries, stateful systems, event flow, observability, and delivery controls on one canvas.</p>
-        </div>
-        <p class="section-summary">Use this when you need the full platform shape in one frame: request path, stateful dependencies, async flow, and platform controls.</p>
-      </div>
-      <div class="diagram-card">
-        <img src="docs/assets/architecture-system-design-board-print.svg" alt="TradersApp detailed system design board" loading="lazy" />
+        <img src="docs/assets/architecture-3d-overview-print.svg" alt="TradersApp architecture overview" loading="lazy" />
       </div>
       <p class="diagram-note">
-        The page preview uses the compact board render so the browser stays readable. Use the full SVG variant only when you need every edge and reference on a single canvas.
+        This light overview is the fastest way to understand the live request path and the support planes around it before opening the denser boards below.
       </p>
       <div class="asset-links">
         <span>Variants:</span>
-        <a href="docs/assets/architecture-system-design-board-print.svg">Compact SVG</a>
-        <a href="docs/assets/architecture-system-design-board.svg">Full SVG</a>
-        <a href="docs/assets/architecture-system-design-board.png">PNG</a>
+        <a href="docs/assets/architecture-3d-overview-print.svg">Light SVG</a>
+        <a href="docs/assets/architecture-3d-overview.svg">SVG</a>
+        <a href="docs/assets/architecture-3d-overview.png">Legacy PNG</a>
       </div>
     </section>
 
-    <section class="section" id="operating-map">
+    <section class="section" id="quick-read">
       <div class="section-header">
         <div>
-          <span class="section-kicker">Who / what / why</span>
-          <h2>Operating map</h2>
-          <p class="lead">This is the single chart for what / how / why / where / whom across request serving, learning, observability, delivery, and the extraction strategy.</p>
-        </div>
-        <p class="section-summary">This section translates the architecture into operating intent so the page is useful for decisions, not just diagrams.</p>
-      </div>
-      <div class="diagram-card">
-        <img src="docs/assets/architecture-5w1h-map.png" alt="TradersApp 5W1H operating map" loading="lazy" />
-      </div>
-      <div class="asset-links">
-        <span>Variants:</span>
-        <a href="docs/assets/architecture-5w1h-map.svg">SVG</a>
-        <a href="docs/assets/architecture-5w1h-map.png">PNG</a>
-        <a href="docs/assets/architecture-5w1h-map-print.svg">Print SVG</a>
-      </div>
-    </section>
-
-    <section class="section" id="bird-roadmap">
-      <div class="section-header">
-        <div>
-          <span class="section-kicker">Evolution view</span>
-          <h2>Bird's-eye roadmap</h2>
-          <p class="lead">This is the evolution view of the same platform. Read it left to right as current reality, hardening, extraction, and long-run operating state.</p>
-        </div>
-        <p class="section-summary">This is the strategic lens: what is already live, what is being hardened now, and what should stay deferred until the seams are stable.</p>
-      </div>
-      <div class="diagram-card">
-        <img src="docs/assets/architecture-birdview-roadmap.png" alt="TradersApp bird's-eye architecture roadmap" loading="lazy" />
-      </div>
-      <div class="asset-links">
-        <span>Variants:</span>
-        <a href="docs/assets/architecture-birdview-roadmap.svg">SVG</a>
-        <a href="docs/assets/architecture-birdview-roadmap.png">PNG</a>
-        <a href="docs/assets/architecture-birdview-roadmap-print.svg">Print SVG</a>
-      </div>
-    </section>
-
-    <section class="section">
-      <div class="section-header">
-        <div>
-          <span class="section-kicker">Runtime truths</span>
+          <span class="section-kicker">Quick Read</span>
           <h2>Current system shape</h2>
-          <p class="lead">These are the runtime truths that matter when reading the rest of the platform.</p>
+          <p class="lead">Read this before the large diagrams. It gives the shortest accurate summary of how the platform behaves today.</p>
         </div>
         <p class="section-summary">If someone only remembers one thing from this page, it should be these three flows: user serving, data and learning, and platform operations.</p>
       </div>
@@ -770,12 +713,12 @@
       </div>
     </section>
 
-    <section class="section">
+    <section class="section" id="protocols">
       <div class="section-header">
         <div>
-          <span class="section-kicker">Protocol Reference</span>
+          <span class="section-kicker">Canonical Reference</span>
           <h2>Ports and service edges</h2>
-          <p class="lead">The browser preview now keeps connection references in native HTML instead of burying them in the giant board SVG.</p>
+          <p class="lead">Keep connection references in native HTML instead of burying them inside a giant board asset.</p>
         </div>
         <p class="section-summary">These are the paths that matter most when debugging traffic, auth, data-plane connectivity, or cluster delivery.</p>
       </div>
@@ -819,7 +762,7 @@
       </div>
     </section>
 
-    <section class="section">
+    <section class="section" id="repo-map">
       <div class="section-header">
         <div>
           <span class="section-kicker">Repo Surface</span>
@@ -885,6 +828,69 @@
             </tr>
           </tbody>
         </table>
+      </div>
+    </section>
+
+    <section class="section" id="system-design">
+      <div class="section-header">
+        <div>
+          <span class="section-kicker">Detailed board</span>
+          <h2>System design board</h2>
+          <p class="lead">Use this for topology only: actors, service boundaries, stateful systems, event flow, observability, and delivery controls on one canvas.</p>
+        </div>
+        <p class="section-summary">Ports, repo ownership, and deployment references are maintained in the HTML sections above so this board can stay focused on platform shape.</p>
+      </div>
+      <div class="diagram-card">
+        <img src="docs/assets/architecture-system-design-board-print.svg" alt="TradersApp detailed system design board" loading="lazy" />
+      </div>
+      <p class="diagram-note">
+        This preview now uses the compact light SVG so the page keeps one visual language end to end. Open the raw board only if you need the topology canvas itself.
+      </p>
+      <div class="asset-links">
+        <span>Variants:</span>
+        <a href="docs/assets/architecture-system-design-board-print.svg">Light SVG</a>
+        <a href="docs/assets/architecture-system-design-board.png">PNG</a>
+        <a href="docs/assets/architecture-system-design-board.svg">Raw Board SVG</a>
+      </div>
+    </section>
+
+    <section class="section" id="operating-map">
+      <div class="section-header">
+        <div>
+          <span class="section-kicker">Who / what / why</span>
+          <h2>Operating map</h2>
+          <p class="lead">This is the single chart for what, how, why, where, and whom across request serving, learning, observability, delivery, and extraction strategy.</p>
+        </div>
+        <p class="section-summary">Read this after the concrete HTML references and the topology board. It translates architecture into operating intent.</p>
+      </div>
+      <div class="diagram-card">
+        <img src="docs/assets/architecture-5w1h-map-print.svg" alt="TradersApp 5W1H operating map" loading="lazy" />
+      </div>
+      <div class="asset-links">
+        <span>Variants:</span>
+        <a href="docs/assets/architecture-5w1h-map-print.svg">Light SVG</a>
+        <a href="docs/assets/architecture-5w1h-map.svg">SVG</a>
+        <a href="docs/assets/architecture-5w1h-map.png">PNG</a>
+      </div>
+    </section>
+
+    <section class="section" id="bird-roadmap">
+      <div class="section-header">
+        <div>
+          <span class="section-kicker">Evolution view</span>
+          <h2>Bird's-eye roadmap</h2>
+          <p class="lead">This is the evolution view of the same platform. Read it left to right as current reality, hardening, extraction, and long-run operating state.</p>
+        </div>
+        <p class="section-summary">This sits last among the big diagrams because it is a planning view, not the fastest way to understand the current runtime.</p>
+      </div>
+      <div class="diagram-card">
+        <img src="docs/assets/architecture-birdview-roadmap-print.svg" alt="TradersApp bird's-eye architecture roadmap" loading="lazy" />
+      </div>
+      <div class="asset-links">
+        <span>Variants:</span>
+        <a href="docs/assets/architecture-birdview-roadmap-print.svg">Light SVG</a>
+        <a href="docs/assets/architecture-birdview-roadmap.svg">SVG</a>
+        <a href="docs/assets/architecture-birdview-roadmap.png">PNG</a>
       </div>
     </section>
 

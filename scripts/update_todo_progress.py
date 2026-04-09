@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_TODO_PATH = ROOT / "docs" / "TODO_MASTER_LIST.md"
 PROGRESS_START = "<!-- progress:start -->"
 PROGRESS_END = "<!-- progress:end -->"
+LAST_UPDATED_RE = re.compile(r"^\*\*Last updated:\*\* .+$", re.MULTILINE)
 STATUS_SCORE = {
     "Done": 1.0,
     "Partial": 0.5,
@@ -261,6 +262,11 @@ def build_updated_markdown(todo_path: Path) -> str:
         re.DOTALL,
     )
     updated = pattern.sub(block, markdown, count=1)
+    updated = LAST_UPDATED_RE.sub(
+        f"**Last updated:** {datetime.now().astimezone().strftime('%Y-%m-%d')}",
+        updated,
+        count=1,
+    )
     return updated + ("" if updated.endswith("\n") else "\n")
 
 
