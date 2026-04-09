@@ -15,7 +15,7 @@ function Invoke-Wsl {
 
 Write-Host "== Longhorn prerequisite check on WSL distro '$Distro' =="
 
-Invoke-Wsl @"
+Invoke-Wsl @'
 set -euo pipefail
 
 status() {
@@ -45,4 +45,4 @@ fi
 status "hostname" "$(hostname)"
 status "node count" "$(sudo -n k3s kubectl get nodes --no-headers 2>/dev/null | wc -l || echo 0)"
 status "longhorn storageclass" "$(sudo -n k3s kubectl get storageclass longhorn --no-headers 2>/dev/null | awk '{print $1}' || echo MISSING)"
-"@
+'@
