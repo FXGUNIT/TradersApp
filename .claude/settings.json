@@ -1,1 +1,10 @@
-﻿{"allowedTools":["Bash(*)"]}
+{
+  "allowedTools": [
+    "Bash(*)"
+  ],
+  "permissions": {
+    "allow": [
+      "Bash(/var/lib/rancher/k3s/data/current/bin/ctr -n k8s.io images import /mnt/c/Users/Asus/bff-dev-latest.tar)"
+    ]
+  }
+}
