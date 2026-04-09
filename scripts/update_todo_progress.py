@@ -28,6 +28,14 @@ class Task:
     estimate_max_days: float
 
 
+@dataclass
+class ExecutionStep:
+    step_id: str
+    stage: str
+    status: str
+    title: str
+
+
 def parse_estimate_days(value: str) -> tuple[float, float]:
     text = value.strip().lower()
     if not text or text == "0d":
@@ -75,6 +83,34 @@ def parse_tasks(markdown: str) -> list[Task]:
         )
 
     return tasks
+
+
+def parse_execution_steps(markdown: str) -> list[ExecutionStep]:
+    steps: list[ExecutionStep] = []
+    current_stage = "Unscoped"
+
+    for line in markdown.splitlines():
+        stage_match = re.match(r"^###\s+(Stage\s+[A-Z]:\s+.+)$", line.strip())
+        if stage_match:
+            current_stage = stage_match.group(1)
+            continue
+
+        step_match = re.match(r"^- \[(?P<mark>[ x-])\]\s+`(?P<id>[A-Z]\d{2})`\s+(?P<title>.+)$", line.strip())
+        if not step_match:
+            continue
+
+        mark = step_match.group("mark")
+        status = {"x": "Done", "-": "Partial", " ": "Todo"}[mark]
+        steps.append(
+            ExecutionStep(
+                step_id=step_match.group("id"),
+                stage=current_stage,
+                status=status,
+                title=step_match.group("title").strip(),
+            )
+        )
+
+    return steps
 
 
 def format_pct(value: float) -> str:
@@ -187,10 +223,38 @@ def summarize(tasks: list[Task]) -> tuple[str, dict[str, dict[str, float]]]:
     return "\n".join(lines), per_phase
 
 
+def summarize_execution(steps: list[ExecutionStep]) -> tuple[float, int, int, int, list[ExecutionStep]]:
+    total = len(steps)
+    done = sum(1 for step in steps if step.status == "Done")
+    partial = sum(1 for step in steps if step.status == "Partial")
+    todo = sum(1 for step in steps if step.status == "Todo")
+    weighted_done = sum(STATUS_SCORE.get(step.status, 0.0) for step in steps)
+    completion_pct = (weighted_done / total * 100.0) if total else 0.0
+    next_steps = [step for step in steps if step.status != "Done"][:5]
+    return completion_pct, done, partial, todo, next_steps
+
+
+def build_progress_block(markdown: str) -> str:
+    tasks = parse_tasks(markdown)
+    steps = parse_execution_steps(markdown)
+    block, _ = summarize(tasks)
+    exec_pct, exec_done, exec_partial, exec_todo, next_steps = summarize_execution(steps)
+    if steps:
+        next_lines = ["", "Execution line:", "```text"]
+        next_lines.append(f"Execution     {format_pct(exec_pct)}  {make_bar(exec_pct, width=28)}")
+        next_lines.append(
+            f"Tracker       done {exec_done:03d} | in progress {exec_partial:03d} | todo {exec_todo:03d} | total {len(steps):03d}"
+        )
+        for index, step in enumerate(next_steps[:3], start=1):
+            next_lines.append(f"Next {index}        {step.step_id}  {step.title}")
+        next_lines.append("```")
+        block = block.replace("### Phase Progress", "\n".join(next_lines) + "\n\n### Phase Progress", 1)
+    return block
+
+
 def build_updated_markdown(todo_path: Path) -> str:
     markdown = todo_path.read_text(encoding="utf-8")
-    tasks = parse_tasks(markdown)
-    block, _ = summarize(tasks)
+    block = build_progress_block(markdown)
 
     pattern = re.compile(
         rf"{re.escape(PROGRESS_START)}.*?{re.escape(PROGRESS_END)}",
@@ -221,8 +285,7 @@ def main() -> None:
     args = parser.parse_args()
     todo_path = args.file.resolve()
     markdown = todo_path.read_text(encoding="utf-8")
-    tasks = parse_tasks(markdown)
-    block, _ = summarize(tasks)
+    block = build_progress_block(markdown)
     updated_markdown = build_updated_markdown(todo_path)
     if args.block_stdout:
         print(block, end="")
