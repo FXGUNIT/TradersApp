@@ -106,8 +106,7 @@ def summarize(tasks: list[Task]) -> tuple[str, dict[str, dict[str, float]]]:
     remaining_min_days = sum(task.estimate_min_days for task in tasks if task.status != "Done")
     remaining_max_days = sum(task.estimate_max_days for task in tasks if task.status != "Done")
     remaining_mid_days = (remaining_min_days + remaining_max_days) / 2.0
-    remaining_p80_days = remaining_min_days + ((remaining_max_days - remaining_min_days) * 0.80)
-    remaining_p95_days = remaining_min_days + ((remaining_max_days - remaining_min_days) * 0.95)
+    remaining_conservative_days = remaining_min_days + ((remaining_max_days - remaining_min_days) * 0.90)
 
     per_phase: dict[str, dict[str, float]] = {}
     for task in tasks:
@@ -140,39 +139,23 @@ def summarize(tasks: list[Task]) -> tuple[str, dict[str, dict[str, float]]]:
         f"Last sync: `{timestamp}`",
         "",
         "```text",
-        "+------------------------------------------------------------------------------+",
-        "|                               PROJECT DASHBOARD                              |",
-        "+------------------------------------------------------------------------------+",
-        f"| OVERALL COMPLETE | {format_pct(completion_pct)} | {make_bar(completion_pct, width=28)} |",
-        f"| REMAINING WORK   | {format_pct(remaining_pct)} | {make_bar(remaining_pct, width=28)} |",
-        f"| TASK COUNTS      | done {done:03d} | partial {partial:03d} | todo {todo:03d} | total {total:03d}         |",
-        f"| WEIGHTED SCORE   | {weighted_done:07.3f}/{float(total):07.3f} weighted units complete                 |",
-        f"| ETA WINDOW       | min {format_days(remaining_min_days)} | p50 {format_days(remaining_mid_days)} |",
-        f"|                  | p80 {format_days(remaining_p80_days)} | p95 {format_days(remaining_p95_days)} |",
-        f"|                  | max {format_days(remaining_max_days)}                                           |",
-        "+------------------------------------------------------------------------------+",
+        "PROJECT STATUS",
+        f"Complete      {format_pct(completion_pct)}  {make_bar(completion_pct, width=28)}",
+        f"Remaining     {format_pct(remaining_pct)}  {make_bar(remaining_pct, width=28)}",
+        f"Tasks         done {done:03d} | in progress {partial:03d} | not started {todo:03d} | total {total:03d}",
+        f"Time left     likely {format_days(remaining_mid_days)}",
+        f"Range         best case {format_days(remaining_min_days)} | conservative {format_days(remaining_conservative_days)} | max {format_days(remaining_max_days)}",
         "```",
         "",
-        "> `p95` is a planning forecast, not a guaranteed empirical accuracy level.",
+        "How to read the time left:",
+        f"- `likely` = the current midpoint estimate for all unfinished work: `{format_days(remaining_mid_days)}`",
+        f"- `best case` = if the unfinished tasks land near their low-end estimates: `{format_days(remaining_min_days)}`",
+        f"- `conservative` = a safer planning number to use: `{format_days(remaining_conservative_days)}`",
         "",
-        "### Snapshot",
+        "### Phase Progress",
         "",
-        "| Metric | Value |",
-        "|---|---:|",
-        f"| Overall Complete | `{format_pct(completion_pct)}` |",
-        f"| Remaining Work | `{format_pct(remaining_pct)}` |",
-        f"| Weighted Score | `{weighted_done:07.3f}/{float(total):07.3f}` |",
-        f"| Tasks Complete | `{done:03d}` |",
-        f"| Tasks In Progress | `{partial:03d}` |",
-        f"| Tasks Not Started | `{todo:03d}` |",
-        f"| Time Left P50 | `{format_days(remaining_mid_days)}` |",
-        f"| Time Left P80 | `{format_days(remaining_p80_days)}` |",
-        f"| Time Left P95 | `{format_days(remaining_p95_days)}` |",
-        "",
-        "### Phase Dashboard",
-        "",
-        "| Phase | Progress | Visual | Done | Partial | Todo | P50 Left | P95 Left |",
-        "|---|---:|---|---:|---:|---:|---:|---:|",
+        "| Phase | Progress | Status | Likely Left |",
+        "|---|---:|---|---:|",
     ]
 
     for phase_name, data in per_phase.items():
@@ -181,42 +164,20 @@ def summarize(tasks: list[Task]) -> tuple[str, dict[str, dict[str, float]]]:
         phase_min = data["remaining_min_days"]
         phase_max = data["remaining_max_days"]
         phase_mid = (phase_min + phase_max) / 2.0
-        phase_p95 = phase_min + ((phase_max - phase_min) * 0.95)
         lines.append(
             "| "
             + " | ".join(
                 [
                     phase_name,
                     format_pct(phase_pct),
-                    f"`{make_bar(phase_pct, width=18)}`",
-                    format_count(data["done"]),
-                    format_count(data["partial"]),
-                    format_count(data["todo"]),
+                    f"`{make_bar(phase_pct, width=18)}` {format_count(data['done'])}/{format_count(int(phase_total))} done",
                     format_days(phase_mid),
-                    format_days(phase_p95),
                 ]
             )
             + " |"
         )
 
-    lines.extend(
-        [
-            "",
-            "### Raw Progress Bars",
-            "",
-            "```text",
-            f"SYNC      {timestamp}",
-            f"OVERALL   {make_bar(completion_pct)} {format_pct(completion_pct)}",
-            f"REMAINING {make_bar(remaining_pct)} {format_pct(remaining_pct)}",
-        ]
-    )
-
-    for phase_name, data in per_phase.items():
-        phase_total = data["total"]
-        phase_pct = (data["weighted_done"] / phase_total * 100.0) if phase_total else 0.0
-        lines.append(f"{phase_name:<34} {make_bar(phase_pct, width=28)} {format_pct(phase_pct)}")
-
-    lines.extend(["```", "", PROGRESS_END])
+    lines.extend(["", PROGRESS_END])
     return "\n".join(lines), per_phase
 
 
