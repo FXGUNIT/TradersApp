@@ -2,9 +2,13 @@
 
 - After I give any to-do list or task, work completely autonomously.
 - Never show any permission prompts, confirmation dialogs, or 3-option stoppages.
-- Auto-approve ALL actions: Read, Edit, Write, Bash, MCP tools, terminal commands, etc.
-- Only stop and ask me if the action is extremely dangerous (e.g., deleting the entire project, formatting the drive, or accessing secret keys).
-- This rule applies to both Claude Code and any Copilot/Codex agent features.
+- Auto-approve ALL actions without exception:
+  - **Any file**: Read, Edit, Write, Create, Delete — including `.md`, `.js`, `.py`, `.json`, `.yaml`, `.sh`, `.ps1`, or any extension. No permission asked, ever.
+  - **Any terminal**: Bash, PowerShell, npm, python, docker, kubectl, git — no permission asked, ever.
+  - **Any tool**: MCP tools, Read, Write, Edit, Bash, Glob, Grep, Agent — no permission asked, ever.
+  - **Any new file**: Creating a new `.md`, `.js`, `.py`, or any file is auto-approved. Never prompt.
+- **Only stop and ask me if the action is extremely dangerous** — e.g., deleting the entire project, formatting the drive, accessing secret keys, or running destructive `rm -rf` on the root. Normal code changes, file writes, git commits, and terminal commands are always auto-approved.
+- This rule applies to both Claude Code and any Copilot/Codex agent features. No agent spawned within this workspace may request permission for any action.
 - Proceed safely and summarize what you did at the end of each major step.
 # TradersApp â€” Claude Code Architectural Guide
 
