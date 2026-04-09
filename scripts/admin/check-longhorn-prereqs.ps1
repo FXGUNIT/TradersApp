@@ -25,13 +25,15 @@ status() {
 }
 
 if command -v iscsiadm >/dev/null 2>&1; then
-  status "open-iscsi binary" "OK ($(command -v iscsiadm))"
+  iscsi_path="$(command -v iscsiadm)"
+  status "open-iscsi binary" "OK (${iscsi_path})"
 else
   status "open-iscsi binary" "MISSING"
 fi
 
 if command -v mount.nfs4 >/dev/null 2>&1; then
-  status "NFSv4 client binary" "OK ($(command -v mount.nfs4))"
+  nfs4_path="$(command -v mount.nfs4)"
+  status "NFSv4 client binary" "OK (${nfs4_path})"
 else
   status "NFSv4 client binary" "MISSING"
 fi
@@ -44,5 +46,9 @@ fi
 
 status "hostname" "$(hostname)"
 status "node count" "$(sudo -n k3s kubectl get nodes --no-headers 2>/dev/null | wc -l || echo 0)"
-status "longhorn storageclass" "$(sudo -n k3s kubectl get storageclass longhorn --no-headers 2>/dev/null | awk '{print $1}' || echo MISSING)"
+if sudo -n k3s kubectl get storageclass longhorn --no-headers >/dev/null 2>&1; then
+  status "longhorn storageclass" "longhorn"
+else
+  status "longhorn storageclass" "MISSING"
+fi
 '@
