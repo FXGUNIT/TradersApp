@@ -360,6 +360,95 @@ These should be done before the broader backlog.
 - 68
 - 70
 
+## Atomic Execution Breakdown
+
+This is the 64-step breakdown of the remaining work. Use it as the execution checklist beneath the higher-level backlog.
+
+### Stage A: Finish the live cluster foundation
+
+1. Check `longhorn-system` pods after the flannel recovery.
+2. Verify `StorageClass/longhorn` exists and is defaulted only if intended.
+3. Create a small RWO Longhorn PVC and verify it binds.
+4. Mount the RWO PVC from a test pod and verify write/read.
+5. Create a small RWX Longhorn PVC and verify it binds.
+6. Mount the RWX PVC from two pods and verify shared read/write.
+7. Restart `k3s` once and verify Longhorn still comes back cleanly.
+8. Restart `k3s` once and verify flannel recreates runtime state correctly.
+9. If flannel still fails, persist the minimum safe runtime fix.
+10. Verify node storage prerequisites remain present after restart.
+11. Verify `local-path` and `longhorn` class behavior is not conflicting.
+12. Record the validated cluster state in docs.
+
+### Stage B: Secrets and deployment reality
+
+13. Verify the in-cluster secret objects expected from Infisical actually exist.
+14. Verify `ml-engine-secrets` contains `DATABASE_URL`.
+15. Verify MLflow runtime secrets exist and match chart expectations.
+16. Verify Redis-related secrets/config exist for the runtime path.
+17. Verify BFF auth-related secrets exist.
+18. Restart `ml-engine` and confirm it starts without SQLite fallback.
+19. Restart BFF and confirm secret-backed startup is healthy.
+20. Document the exact secret contract expected per service.
+
+### Stage C: Database and persistent state
+
+21. Audit every remaining SQLite read/write path in `ml-engine`.
+22. Classify each SQLite usage as `must move`, `may stay dev-only`, or `remove`.
+23. Finalize the PostgreSQL schema needed for live runtime writes.
+24. Add or finish migration scripts for SQLite to PostgreSQL.
+25. Backfill a representative dataset into PostgreSQL.
+26. Verify concurrent write safety under multi-pod assumptions.
+27. Remove or fence off Kubernetes runtime fallback to SQLite anywhere still reachable.
+28. Validate `/data` contents that must survive restart beyond the DB itself.
+29. Verify continual-learning artifacts persist correctly on `ml-state-pvc`.
+30. Verify model storage persists correctly on the model PVC.
+
+### Stage D: Shared state and low-latency runtime
+
+31. Audit all in-process caches in `ml-engine`.
+32. Replace remaining ML in-memory LRU behavior with shared Redis-backed behavior where required.
+33. Standardize Redis connection pooling in Python code.
+34. Audit BFF for any remaining in-process session/cache state.
+35. Standardize Redis client reuse in BFF.
+36. Add or finalize cache invalidation rules for shared data paths.
+37. Add a request ID middleware path across BFF and ML Engine.
+38. Propagate request IDs into logs and Kafka headers.
+39. Add idempotency handling for retry-sensitive POST endpoints.
+40. Validate degraded behavior when Redis is temporarily unavailable.
+
+### Stage E: Kafka done the right way
+
+41. Keep the hot request path synchronous and document that choice explicitly.
+42. Define the exact async domains that should use Kafka.
+43. Normalize Kafka topic schemas and ownership.
+44. Ensure every `ml-engine` consumer group identity is pod-aware.
+45. Validate manual offset commit behavior after successful processing only.
+46. Add a DLQ topic strategy and poison-message handling.
+47. Add consumer lag metrics and alert thresholds.
+48. Define a partitioning strategy by symbol or other domain key.
+49. Add producer-side circuit breaker and fallback buffering.
+50. Verify the broker deployment path beyond a single-broker lab assumption.
+
+### Stage F: Observability and operations
+
+51. Deploy or validate the Prometheus stack in Kubernetes.
+52. Ensure all target services expose scrape-ready metrics.
+53. Validate Grafana datasources and dashboards against live data.
+54. Validate Loki log shipping for BFF and ML Engine.
+55. Validate Jaeger or OTLP traces across at least one full request path.
+56. Add pod/node labels that matter for multi-pod debugging.
+57. Tighten the alert set to the minimum operationally useful set.
+58. Verify restart, latency, Kafka lag, and drift alerts really fire.
+
+### Stage G: MLOps, data quality, and feature platform
+
+59. Verify MLflow artifact persistence and registry behavior end to end.
+60. Verify Feast offline and online stores against real runtime data.
+61. Verify Airflow DAGs run successfully in their intended environment.
+62. Verify Great Expectations gates actually block bad data before retraining.
+63. Verify retraining writes lineage to MLflow and links to data versions.
+64. Verify production feedback data can flow back into retraining safely.
+
 ## Notes
 
 - For secrets, treat Infisical as the upstream source of truth, but still verify the resulting Kubernetes Secrets actually exist and contain the expected keys at runtime.
