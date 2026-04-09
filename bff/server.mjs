@@ -1176,3 +1176,7 @@ server.listen(PORT, HOST, () => {
     )}, aiProvidersConfigured=${aiConfigured})`,
   );
 });
+server.on("error", (err) => {
+  console.error(`[tradersapp-bff] Server error: ${err.message} (code=${err.code})`);
+  process.exit(1);
+});
