@@ -90,8 +90,16 @@ scaleUpStabilization: 15s
 | Runtime state (`/data`) | RWX-capable PVC | DQ quarantine + continual learning | ~1GB/month |
 | MLflow artifacts | S3/MinIO | ML + MLflow | ~10GB |
 
-Production manifests use the placeholder StorageClass `shared-rwx`.
-Replace it with the actual RWX-capable class in your cluster, such as NFS, Longhorn share-manager, CephFS, or EFS.
+For self-hosted production on k3s, the standard backend is Longhorn with StorageClass `longhorn`.
+Longhorn supports RWX through share-manager, so the same class can back both RWO and RWX claims.
+
+WSL/dev keeps using the local `shared-rwx` class created by the k3s override scripts.
+That class is suitable for single-node development, not real multi-node production.
+
+Longhorn prerequisites from the official docs:
+- Nodes need an NFSv4 client for RWX volumes.
+- Nodes need `open-iscsi` available for Longhorn volume operations.
+- Each node hostname must be unique.
 
 ## Leader Election (Training Lock)
 

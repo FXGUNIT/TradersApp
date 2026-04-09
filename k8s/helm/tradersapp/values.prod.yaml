@@ -42,14 +42,14 @@ mlEngine:
     enabled: true
     size: 10Gi
     accessModes: ["ReadWriteMany"]
-    storageClass: shared-rwx  # Replace with your RWX-capable class (NFS/Longhorn/CephFS)
+    storageClass: longhorn
     continualLearningDir: "/data/continual_learning"
     mambaCacheDir: "/data/mamba_cache"
   persistence:
     enabled: true
     size: 5Gi
     accessModes: ["ReadWriteMany"]
-    storageClass: shared-rwx  # Replace with your RWX-capable class (NFS/Longhorn/CephFS)
+    storageClass: longhorn
   modelRegistrySidecar:
     port: 8010
     warmup: true
@@ -151,6 +151,8 @@ triton:
   replicaCount: 1
   cudaVisibleDevices: "0"
   inferenceLatencyTargetMs: 100
+  modelStorage:
+    storageClass: longhorn
   nodeSelector:
     nvidia.com/gpu: "true"
   tolerations:
@@ -170,6 +172,7 @@ redis:
   persistence:
     enabled: true
     size: 1Gi
+    storageClass: longhorn
   resources:
     requests:
       cpu: 50m
@@ -212,7 +215,7 @@ mlflow:
     persistence:
       enabled: true
       size: 10Gi
-      storageClass: standard
+      storageClass: longhorn
     resources:
       requests:
         cpu: 100m
@@ -236,7 +239,7 @@ mlflow:
     persistence:
       enabled: true
       size: 50Gi
-      storageClass: standard
+      storageClass: longhorn
     resources:
       requests:
         cpu: 100m
@@ -255,6 +258,18 @@ mlflow:
     limits:
       cpu: 1000m
       memory: 2Gi
+
+vllm:
+  modelStorage:
+    storageClass: longhorn
+
+feast:
+  featureStorage:
+    storageClass: longhorn
+
+kafka:
+  persistence:
+    storageClass: longhorn
 
 # Security
 security:

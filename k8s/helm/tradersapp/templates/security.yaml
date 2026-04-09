@@ -203,6 +203,9 @@ spec:
   resources:
     requests:
       storage: {{ .Values.redis.persistence.size }}
+  {{- with .Values.redis.persistence.storageClass }}
+  storageClassName: {{ . }}
+  {{- end }}
 ---
 apiVersion: apps/v1
 kind: Deployment
