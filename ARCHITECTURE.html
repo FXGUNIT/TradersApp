@@ -891,9 +891,11 @@
     <section class="section" id="loops">
       <div class="section-header">
         <div>
+          <span class="section-kicker">Sequences that matter</span>
           <h2>Critical paths and control loops</h2>
           <p class="lead">These are the sequences that matter operationally: request path, learning, observability, and delivery.</p>
         </div>
+        <p class="section-summary">Architecture only matters if the key loops are reliable. These are the four sequences that decide latency, learning quality, and deployment safety.</p>
       </div>
       <div class="loop-grid">
         <div class="card loop-card">
@@ -901,8 +903,8 @@
           <ol>
             <li>Browser hits the frontend.</li>
             <li>Frontend sends requests to the BFF.</li>
-            <li>BFF calls `analysis-service` over gRPC.</li>
-            <li>`analysis-service` resolves consensus through the ML Engine.</li>
+            <li>BFF calls <code>analysis-service</code> over gRPC.</li>
+            <li><code>analysis-service</code> resolves consensus through the ML Engine.</li>
             <li>Feature lookups come from Redis and Feast where available.</li>
           </ol>
           <p class="footer-note">This path carries the 50ms SLA target for critical operations.</p>
@@ -920,7 +922,7 @@
         <div class="card loop-card">
           <h3>3. Observability loop</h3>
           <ol>
-            <li>Prometheus scrapes `/metrics` from runtime services.</li>
+            <li>Prometheus scrapes <code>/metrics</code> from runtime services.</li>
             <li>Grafana visualizes latency, drift, resource, and SLA dashboards.</li>
             <li>Loki centralizes logs; Jaeger collects traces.</li>
             <li>Alert rules cover SLA breaches, retrain failures, stale monitoring, and infra regressions.</li>
@@ -941,10 +943,13 @@
     <section class="section" id="deploy">
       <div class="section-header">
         <div>
+          <span class="section-kicker">Operating modes</span>
           <h2>Deployment modes</h2>
           <p class="lead">Use the right entry path depending on whether you are validating local end-to-end behavior, control planes, or cluster rollout.</p>
         </div>
+        <p class="section-summary">Not every workflow should hit the full cluster. These entry points describe the fastest correct environment for each kind of validation.</p>
       </div>
+      <div class="table-wrap">
       <table>
         <thead>
           <tr>
@@ -956,26 +961,27 @@
         <tbody>
           <tr>
             <td>Full local stack</td>
-            <td>`docker-compose.yml`</td>
+            <td><code>docker-compose.yml</code></td>
             <td>End-to-end local bring-up with frontend, BFF, ML Engine, MLflow, Kafka, and observability.</td>
           </tr>
           <tr>
             <td>MLOps-only local stack</td>
-            <td>`docker-compose.mlflow.yml`</td>
+            <td><code>docker-compose.mlflow.yml</code></td>
             <td>Dedicated MLflow + MinIO + PostgreSQL workflow and registry testing.</td>
           </tr>
           <tr>
             <td>Airflow control plane</td>
-            <td>`docker-compose.airflow.yml`</td>
+            <td><code>docker-compose.airflow.yml</code></td>
             <td>Data-quality, monitoring, and retraining DAG validation.</td>
           </tr>
           <tr>
             <td>Cluster deploy</td>
-            <td>`k8s/helm/tradersapp`</td>
+            <td><code>k8s/helm/tradersapp</code></td>
             <td>k3s production-style rollout with Helm.</td>
           </tr>
         </tbody>
       </table>
+      </div>
     </section>
 
     <section class="section cards-2">
@@ -995,7 +1001,7 @@
         <h2>Architectural truth to keep in mind</h2>
         <ol class="truth-list">
           <li>The repo is no longer a simple three-box app.</li>
-          <li>The first real DDD runtime extraction is complete around `analysis-service`.</li>
+          <li>The first real DDD runtime extraction is complete around <code>analysis-service</code>.</li>
           <li>Ingestion and learning are defined as bounded contexts, but they are not fully deployed as separate services yet.</li>
           <li>That is intentional. The current architecture prioritizes stable contracts and safe extraction over premature service sprawl.</li>
         </ol>
