@@ -78,7 +78,7 @@ except ImportError:
 
 
 def get_onnx_output_dir() -> Path:
-    out = PROJECT_ROOT / "ml-engine" / "models" / "onnx"
+    out = PROJECT_ROOT / "models" / "onnx"
     out.mkdir(parents=True, exist_ok=True)
     return out
 

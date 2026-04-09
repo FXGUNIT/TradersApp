@@ -33,8 +33,8 @@ from typing import Optional
 
 import numpy as np
 
-PROJECT_ROOT = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(PROJECT_ROOT / "ml-engine"))
+PROJECT_ROOT = Path(__file__).parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
 
 
 # ─── HMM Regime Model ───────────────────────────────────────────────────────────
@@ -252,7 +252,7 @@ def export_hmm_to_triton(model_name: str = "hmm_regime", version: str | None = N
         scaler_params[f"col_{col}_std"] = 1.0
 
     # Save scaler params
-    triton_repo = PROJECT_ROOT / "ml-engine" / "models" / "triton_repo" / model_name / "1"
+    triton_repo = PROJECT_ROOT / "models" / "triton_repo" / model_name / "1"
     triton_repo.mkdir(parents=True, exist_ok=True)
 
     scaler_file = triton_repo / "scaler_params.json"
