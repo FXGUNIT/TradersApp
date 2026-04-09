@@ -32,8 +32,7 @@ from typing import Literal
 
 import numpy as np
 
-PROJECT_ROOT = Path(__file__).parent.parent.parent
-ML_ENGINE_ROOT = PROJECT_ROOT / "ml-engine"
+PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(ML_ENGINE_ROOT))
 
