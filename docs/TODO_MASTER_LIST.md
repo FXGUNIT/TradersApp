@@ -1,5 +1,268 @@
 # TODO Master List
 
-Task tracking has been moved to [SPEC.md](../SPEC.md) which contains the canonical requirements and blockers list.
+**Last updated:** 2026-04-09
 
-For implementation progress, see the git commit history and project boards.
+This is the current execution backlog for the Kubernetes, persistence, Kafka, scalability, and deployment work discussed in this chat.
+
+## Current State
+
+### What was completed in this chat
+
+- Audited Kubernetes readiness, persistent volumes, and Kafka usage.
+- Confirmed `k3s` is installed in WSL and recovered it from an unhealthy startup state.
+- Identified that Helm is the fuller Kubernetes deployment path; Kustomize covers only part of the stack.
+- Hardened Kubernetes runtime so `ml-engine` expects a real `DATABASE_URL` instead of silently relying on ephemeral SQLite.
+- Added persistence for `/data` runtime state through `ml-state-pvc`.
+- Moved continual-learning runtime artifacts onto persistent `/data`.
+- Standardized production storage on Longhorn.
+- Kept WSL/dev on a separate `shared-rwx` local-path workaround for same-node development.
+- Added Longhorn prerequisite check scripts and updated storage/scalability docs.
+- Fixed a pre-existing Helm template bug so the production chart renders.
+- Installed Longhorn prerequisites inside WSL (`open-iscsi`, `nfs-common`, `iscsid`).
+- Applied the Longhorn chart to the live WSL `k3s` cluster.
+- Persisted the `rshared` root mount fix in the `k3s` systemd drop-in.
+- Diagnosed a flannel runtime-state issue and manually recreated `/run/flannel/subnet.env`, which allowed kube-system pods to start again.
+
+### Current blockers
+
+- Longhorn was applied, but it still needs final live validation after the flannel recovery.
+- `/run/flannel/subnet.env` was restored manually; this may need a persistent fix if `k3s` does not recreate it reliably.
+- PostgreSQL migration is not fully complete end-to-end even though Kubernetes is now wired to require `DATABASE_URL`.
+- `ml-engine` and BFF are not yet fully stateless across all in-process model/cache/session behavior.
+- Kafka is still at-least-once, not exactly-once.
+- Observability, load testing, and deployment automation are incomplete.
+
+## Status Legend
+
+- `Done`: Completed and verified well enough for current scope.
+- `Partial`: Implemented in part, but not fully validated or finished.
+- `Todo`: Not started or not yet sufficient for production.
+
+## Critical Path
+
+These are the highest-value remaining items in execution order.
+
+1. Finish live `k3s` storage validation: Longhorn health, test PVCs, flannel stability.
+2. Finish PostgreSQL cutover and remove remaining SQLite operational dependency.
+3. Make `ml-engine` and BFF truly stateless.
+4. Replace in-process cache/state with Redis-backed shared behavior.
+5. Complete the Kubernetes production path: HPA metrics, ingress, TLS, anti-affinity, topology spread, monitoring.
+6. Harden Kafka semantics: idempotency, DLQ, lag monitoring, partitioning, producer resilience.
+7. Add observability, load testing, chaos testing, and deployment automation.
+
+## Immediate Next Actions
+
+These should be done before the broader backlog.
+
+| Priority | Task | Why | Est |
+|---|---|---|---|
+| P0 | Re-check `longhorn-system` pods and confirm `StorageClass/longhorn` is healthy | Repo is ready, but the live storage backend is not fully validated | 1-2h |
+| P0 | Provision a small Longhorn PVC and verify bind + read/write from a pod | Confirms real storage, not just rendered YAML | 1-2h |
+| P0 | Decide whether the flannel runtime fix must be made persistent | `/run/flannel/subnet.env` may disappear on restart | 2-4h |
+| P0 | Verify Infisical-fed Kubernetes secrets are present in-cluster | `DATABASE_URL` and related app secrets must exist at runtime | 1-2h |
+| P1 | Restart `ml-engine` after deploy and verify `/data`, models, and DB-backed startup survive | End-to-end persistence validation | 2-4h |
+
+## Estimated Time Remaining
+
+- Live cluster closeout: `1-2 days`
+- Core statelessness and shared state conversion: `3-5 weeks`
+- Kubernetes hardening and production readiness: `1-2 weeks`
+- Kafka reliability work: `1-2 weeks`
+- Observability: `1-2 weeks`
+- Load/chaos testing: `1-2 weeks`
+- CI/CD and deployment strategy: `1-2 weeks`
+
+### Realistic project estimate
+
+- First credible horizontally scalable release: `3-5 weeks`
+- Full backlog through chaos, canary, and performance gates: `8-12 weeks`
+
+## Detailed Backlog
+
+### Phase 1: Audits
+
+| ID | Status | Task | Why it matters | Dependencies | Est left |
+|---|---|---|---|---|---|
+| 8 | Done | Audit Kubernetes readiness | Needed to verify whether `k3s` and manifests were real before changing architecture | None | 0d |
+| 9 | Done | Inventory all persistent volumes | Required to separate durable vs ephemeral runtime paths | None | 0d |
+| 10 | Done | Audit Kafka usage | Required to understand consumer/producers, semantics, and multi-pod behavior | None | 0d |
+
+### Phase 2: Stateless Service Layer
+
+| ID | Status | Task | Why it matters | Dependencies | Est |
+|---|---|---|---|---|---|
+| 11 | Todo | Convert `ml-engine` to stateless by moving global model instances to a model registry service backed by Redis for LRU cache | Eliminates pod-local model ownership and allows horizontal scaling without process-local behavior drift | 13, 14, 15 | 4-6d |
+| 12 | Todo | Add Kubernetes model registry sidecar with models loaded from shared PVC (`/models`) mounted read-only across pods | Avoids per-pod model duplication and speeds scaling events | 21, 22, 26 | 2-3d |
+| 13 | Partial | Move SQLite trading DB to PostgreSQL | SQLite is unsafe for concurrent multi-pod writes; Postgres is required for real horizontal scale | 69, 70 | 3-5d |
+| 14 | Todo | Add Redis connection pooling with shared `redis.ConnectionPool` | Cuts connection churn and stabilizes shared Redis usage | 26, 27 | 0.5-1d |
+| 15 | Todo | Replace in-memory LRU cache with Redis | Shared cache is required for consistent multi-pod behavior | 14, 26, 27 | 1-2d |
+| 16 | Todo | Add request ID middleware and propagate `X-Request-ID` through logs and Kafka headers | This is the minimum foundation for distributed tracing and debugging | 36, 45, 46 | 0.5-1d |
+| 17 | Todo | Add idempotency keys for `/predict`, `/train`, and `/feedback/signal` | Makes retries safe and reduces duplicate work | 13, 16, 37, 43 | 1-2d |
+| 18 | Todo | Convert `bff/server.mjs` to fully stateless and move any in-memory session/cache state to Redis | BFF must scale independently without sticky or in-process behavior | 14, 15, 27 | 1-2d |
+| 19 | Todo | Add circuit breaker to Kafka producer | Requests should degrade gracefully if Kafka is down | 38, 44 | 1-2d |
+| 20 | Partial | Add circuit breaker to ML Engine calls | Some protection exists, but cross-pod resilience and routing behavior are not complete | 24, 25, 28, 35 | 1-2d |
+
+### Phase 3: Kubernetes Infrastructure
+
+| ID | Status | Task | Why it matters | Dependencies | Est |
+|---|---|---|---|---|---|
+| 21 | Partial | Set up `k3s` cluster | `k3s` exists, but Longhorn and flannel still need clean validation | Immediate Next Actions | 0.5-1d |
+| 22 | Partial | Create `ml-engine` deployment manifest with `replicas: 3` and `RollingUpdate` | Base manifest exists, but final scaling/rollout tuning remains | 11, 12, 30, 31, 32 | 0.5d |
+| 23 | Partial | Create `ml-engine` HPA scaling on CPU and latency | HPA exists in part, but custom latency metric integration remains | 35, 45, 48, 51 | 0.5-1d |
+| 24 | Partial | Create BFF deployment manifest with `replicas: 2+` | Base manifest exists, but final production tuning remains | 18, 30 | 0.5d |
+| 25 | Partial | Create BFF HPA scaling on request rate or error rate | Separate scaling is needed so BFF and ML Engine do not couple | 35, 45, 48, 51 | 0.5-1d |
+| 26 | Partial | Create Redis deployment | Redis exists, but HA mode and production hardening are not complete | 21, 30 | 1-2d |
+| 27 | Partial | Create Redis service | Service exists, but production verification and HA implications remain | 26 | 0.25d |
+| 28 | Partial | Create `ml-engine` service with `sessionAffinity: None` | Horizontal pods need non-sticky routing | 22 | 0.25d |
+| 29 | Partial | Add PodDisruptionBudget for `ml-engine` | Protects availability during drains and rolling updates | 22 | 0.25d |
+| 30 | Partial | Add resource requests/limits to all deployments | Required for stable scheduling and safe autoscaling | 22, 24, 26 | 0.5-1d |
+| 31 | Todo | Add pod anti-affinity | Prevents all replicas landing on one node | 22, 24, 26 | 0.5d |
+| 32 | Todo | Add topology spread constraints | Prevents zone-level or node-level concentration | 22, 24, 26 | 0.5d |
+| 33 | Todo | Create ingress manifest with rate limiting, TLS, and path-based routing | Needed for a clean production entry point | 28, 24, 34 | 1-2d |
+| 34 | Todo | Add `cert-manager` for TLS | Needed for automated HTTPS certificate management | 33 | 1d |
+| 35 | Todo | Configure `kube-prometheus-stack` | Required for metrics-driven HPA, alerts, and dashboards | 21 | 1-2d |
+
+### Phase 4: Kafka Message Queue Architecture
+
+| ID | Status | Task | Why it matters | Dependencies | Est |
+|---|---|---|---|---|---|
+| 36 | Todo | Add Kafka consumer group ID to every `ml-engine` consumer using pod identity | Makes consumer ownership explicit and avoids ambiguous processing behavior | 21, 22 | 0.5-1d |
+| 37 | Todo | Implement Kafka exactly-once semantics with transactional producers and idempotency keys | Current flow is at-least-once; duplicates are still possible | 16, 17, 43 | 3-5d |
+| 38 | Todo | Add Kafka dead letter queue (DLQ) | Poison messages should not block or retry forever | 42, 43 | 1-2d |
+| 39 | Todo | Add consumer lag monitoring | Needed for backpressure visibility and alerting | 35, 50 | 0.5-1d |
+| 40 | Todo | Add Kafka partition strategy by symbol | Preserves symbol ordering while allowing parallelism | 42 | 1-2d |
+| 41 | Todo | Implement ML Engine backpressure when consumer lag is high | Prevents infinite queueing and runaway latency | 39, 50 | 1-2d |
+| 42 | Partial | Add Kafka topic auto-creation or pre-create topics | Repo-side bootstrap was improved, but live broker validation remains | 21, 26 | 0.5d |
+| 43 | Partial | Add manual consumer offset commit after successful processing | Direction is in place, but tests and production validation remain | 36, 38 | 0.5-1d |
+| 44 | Todo | Add Kafka producer circuit breaker with local buffering and fallback | Prevents request threads from blocking on broker failure | 19, 38 | 1-2d |
+
+### Phase 5: Observability for Distributed System
+
+| ID | Status | Task | Why it matters | Dependencies | Est |
+|---|---|---|---|---|---|
+| 45 | Todo | Add pod-level Prometheus labels (`pod_name`, `pod_namespace`, `node_name`) | Required to understand multi-pod serving behavior | 35 | 0.5d |
+| 46 | Todo | Add `request_id` to logs and correlation-friendly metrics context | Needed to debug distributed request flow | 16, 45 | 0.5-1d |
+| 47 | Todo | Integrate Jaeger distributed tracing with OpenTelemetry | Needed for full request path visibility across FastAPI, BFF, and Kafka | 16, 35, 45, 46 | 2-3d |
+| 48 | Partial | Add Grafana dashboards for horizontal scaling | Some dashboard work exists, but not the complete scaling-focused views | 35, 45 | 1-2d |
+| 49 | Todo | Add pod restart count alert | Needed to catch crash loops and OOMs quickly | 35 | 0.5d |
+| 50 | Todo | Add consumer lag alert | Needed for early backpressure warning | 35, 39 | 0.5d |
+| 51 | Todo | Add SLA breach alert for P99 latency | Needed to page before user-visible degradation becomes severe | 35, 48 | 0.5d |
+| 52 | Todo | Add HPA scaling event log and send to Slack | Helps operators understand why scaling decisions happen | 23, 25, 35 | 1-2d |
+| 53 | Todo | Add cache coherence test after `/cache/invalidate` | Verifies shared Redis behavior across pods | 15, 18 | 0.5-1d |
+
+### Phase 6: Load Testing and Chaos Engineering
+
+| ID | Status | Task | Why it matters | Dependencies | Est |
+|---|---|---|---|---|---|
+| 54 | Todo | Write `k6` load test for `/predict`, `/mamba/predict`, and `/consensus` | Establishes a baseline for performance and scaling | 23, 25, 35 | 1-2d |
+| 55 | Todo | Run load tests with `1/2/4/8` pods | Validates whether horizontal scaling actually helps | 54 | 1-2d |
+| 56 | Todo | Run load tests with cold vs warm cache | Measures cache-stampede risk and warmup behavior | 15, 54 | 1d |
+| 57 | Todo | Chaos test: kill a random `ml-engine` pod | Verifies reroute behavior and data safety | 22, 28, 29, 54 | 0.5-1d |
+| 58 | Todo | Chaos test: network partition one pod for 30s | Verifies recovery and shared-state correctness | 15, 18, 54 | 1d |
+| 59 | Todo | Chaos test: Redis failover | Verifies cache behavior under Redis HA events | 26, 27 | 1-2d |
+| 60 | Todo | Chaos test: Kafka broker failure | Verifies producer/consumer resilience | 38, 44 | 1-2d |
+| 61 | Todo | Add load-test SLOs in CI | Prevents performance regressions from quietly shipping | 54, 55 | 1d |
+| 62 | Todo | Benchmark cold-start time | Critical for HPA scale-from-zero or rapid scale-up | 22, 54 | 0.5d |
+
+### Phase 7: Deployment Pipeline
+
+| ID | Status | Task | Why it matters | Dependencies | Est |
+|---|---|---|---|---|---|
+| 63 | Todo | Add GitHub Actions workflow for Kubernetes deployment | Deployment should be automated and reproducible | 65, 66, 67, 69, 70 | 1-2d |
+| 64 | Todo | Add Docker multi-stage build for `ml-engine` | Reduces image size and startup time | 62 | 1-2d |
+| 65 | Partial | Add Helm chart or Kustomize overlay per environment | Both already exist; what remains is simplifying the primary deployment path | 21 | 0.5d |
+| 66 | Todo | Add pre-deployment smoke test against staging | Catches bad deploys before production rollout | 63, 65 | 0.5-1d |
+| 67 | Todo | Add rollback strategy using `kubectl rollout undo` or Helm rollback | Required for safe recovery after failed rollout | 63, 66 | 0.5d |
+| 68 | Todo | Add canary deployment | Needed for safer progressive delivery | 33, 35, 63, 67 | 2-4d |
+| 69 | Partial | Add secret management using Kubernetes Secrets / Infisical sync | Infisical is the source of truth, but cluster-side sync and verification still need completion | 21 | 0.5-1d |
+| 70 | Partial | Add ConfigMap for non-secret config | Config exists in pieces; it still needs cleanup and standardization | 21, 65 | 0.5-1d |
+
+## Recommended Execution Order
+
+### Stage A: Finish the live cluster
+
+- 21
+- Immediate Next Actions
+- 69
+
+### Stage B: Remove the remaining shared-state blockers
+
+- 13
+- 14
+- 15
+- 16
+- 17
+- 18
+- 11
+- 12
+
+### Stage C: Finish the Kubernetes production path
+
+- 22
+- 23
+- 24
+- 25
+- 26
+- 27
+- 28
+- 29
+- 30
+- 31
+- 32
+- 33
+- 34
+- 35
+
+### Stage D: Harden Kafka semantics and resilience
+
+- 36
+- 42
+- 43
+- 38
+- 39
+- 40
+- 41
+- 19
+- 44
+- 37
+
+### Stage E: Add observability and operational confidence
+
+- 45
+- 46
+- 47
+- 48
+- 49
+- 50
+- 51
+- 52
+- 53
+
+### Stage F: Validate under load and failure
+
+- 54
+- 55
+- 56
+- 57
+- 58
+- 59
+- 60
+- 61
+- 62
+
+### Stage G: Finish deployment automation
+
+- 64
+- 65
+- 63
+- 66
+- 67
+- 68
+- 70
+
+## Notes
+
+- For secrets, treat Infisical as the upstream source of truth, but still verify the resulting Kubernetes Secrets actually exist and contain the expected keys at runtime.
+- For production storage, use Longhorn. The `shared-rwx` local-path setup is for WSL/dev only.
+- For PostgreSQL cutover, do not treat "config exists" as done. Migration, data verification, concurrency validation, and rollback planning still need completion.
+- For Kafka, the current baseline is still at-least-once. Exactly-once is a separate body of work, not a checkbox already satisfied.
