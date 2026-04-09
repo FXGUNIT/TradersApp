@@ -48,6 +48,8 @@ spec:
               value: "http://ml-engine:8001"
             - name: REDIS_HOST
               value: ""
+            - name: REDIS_URL
+              value: "redis://localhost:9999"
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
