@@ -69,12 +69,12 @@
     }
 
     .nav {
-      position: sticky;
-      top: 16px;
-      z-index: 20;
+      position: relative;
+      top: 0;
+      z-index: 2;
       display: flex;
       justify-content: space-between;
-      align-items: center;
+      align-items: flex-start;
       gap: 20px;
       padding: 16px 20px;
       margin-bottom: 24px;
@@ -107,6 +107,7 @@
       display: flex;
       flex-wrap: wrap;
       gap: 10px;
+      align-items: flex-start;
     }
 
     .nav-links a {
@@ -387,6 +388,13 @@
       border: 1px solid rgba(15, 118, 110, 0.12);
     }
 
+    .diagram-note {
+      margin: 14px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
     .cards-3,
     .cards-2,
     .loop-grid,
@@ -664,7 +672,7 @@
         <p class="section-summary">This is the fastest orientation view: who serves traffic, where state lives, and which platform systems surround the request path.</p>
       </div>
       <div class="diagram-card">
-        <img src="docs/assets/architecture-3d-overview.svg" alt="TradersApp architecture overview" />
+        <img src="docs/assets/architecture-3d-overview.png" alt="TradersApp architecture overview" loading="lazy" />
       </div>
       <div class="asset-links">
         <span>Variants:</span>
@@ -684,13 +692,16 @@
         <p class="section-summary">Use this when you need the full platform shape in one frame: request path, stateful dependencies, async flow, and platform controls.</p>
       </div>
       <div class="diagram-card">
-        <img src="docs/assets/architecture-system-design-board.svg" alt="TradersApp detailed system design board" />
+        <img src="docs/assets/architecture-system-design-board-print.svg" alt="TradersApp detailed system design board" loading="lazy" />
       </div>
+      <p class="diagram-note">
+        The page preview uses the compact board render so the browser stays readable. Use the full SVG variant only when you need every edge and reference on a single canvas.
+      </p>
       <div class="asset-links">
         <span>Variants:</span>
-        <a href="docs/assets/architecture-system-design-board.svg">SVG</a>
+        <a href="docs/assets/architecture-system-design-board-print.svg">Compact SVG</a>
+        <a href="docs/assets/architecture-system-design-board.svg">Full SVG</a>
         <a href="docs/assets/architecture-system-design-board.png">PNG</a>
-        <a href="docs/assets/architecture-system-design-board-print.svg">Print SVG</a>
       </div>
     </section>
 
@@ -704,7 +715,7 @@
         <p class="section-summary">This section translates the architecture into operating intent so the page is useful for decisions, not just diagrams.</p>
       </div>
       <div class="diagram-card">
-        <img src="docs/assets/architecture-5w1h-map.svg" alt="TradersApp 5W1H operating map" />
+        <img src="docs/assets/architecture-5w1h-map.png" alt="TradersApp 5W1H operating map" loading="lazy" />
       </div>
       <div class="asset-links">
         <span>Variants:</span>
@@ -724,7 +735,7 @@
         <p class="section-summary">This is the strategic lens: what is already live, what is being hardened now, and what should stay deferred until the seams are stable.</p>
       </div>
       <div class="diagram-card">
-        <img src="docs/assets/architecture-birdview-roadmap.svg" alt="TradersApp bird's-eye architecture roadmap" />
+        <img src="docs/assets/architecture-birdview-roadmap.png" alt="TradersApp bird's-eye architecture roadmap" loading="lazy" />
       </div>
       <div class="asset-links">
         <span>Variants:</span>
