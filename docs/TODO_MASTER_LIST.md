@@ -25,6 +25,40 @@ How to read this:
 - `likely` means roughly `14.6w` of single-engineer work if done mostly sequentially.
 - The immediate next stage is much smaller than the full backlog.
 
+### Priority Buckets
+
+#### Must Do Now
+
+This is the short list to get the current cluster and deployment path into a usable state.
+
+| Scope | What | Est |
+|---|---|---:|
+| Live cluster | Re-check Longhorn, validate `StorageClass/longhorn`, test a real PVC, and decide whether the flannel fix must be persisted | 1-2d |
+| Secrets/runtime | Verify Infisical-fed Kubernetes secrets exist in-cluster and the app starts with the required keys | 0.5-1d |
+| Persistence proof | Restart `ml-engine` after deploy and verify `/data`, models, and DB-backed startup survive | 0.5d |
+
+#### Needed Before Production
+
+This is the real production baseline, separate from the bigger roadmap.
+
+| Scope | What | Est |
+|---|---|---:|
+| Database | Finish PostgreSQL cutover and remove remaining SQLite operational dependency | 3-5d |
+| Statelessness | Make `ml-engine` and BFF truly stateless, move cache/state to Redis, add request IDs and idempotency basics | 1-2w |
+| Kubernetes | Finish HPA metrics, ingress, TLS, anti-affinity, topology spread, Redis hardening, monitoring | 1-2w |
+| Kafka | Finish consumer identity, offset strategy, topic/bootstrap validation, DLQ, lag monitoring, producer resilience | 1-2w |
+| Core observability | Add practical dashboards, alerts, and enough tracing/log correlation to operate the system | 0.5-1.5w |
+
+#### Nice Later
+
+This is valuable, but it should not be mixed into the immediate delivery timeline.
+
+| Scope | What | Est |
+|---|---|---:|
+| Advanced reliability | Exactly-once-style Kafka flows, full distributed tracing, deep cache coherence checks | 1-2w |
+| Validation | Full load testing matrix, chaos engineering, CI SLO gates, cold-start benchmarking | 1-2w |
+| Delivery maturity | Canary releases, automated rollback, full GitHub Actions deployment pipeline hardening | 1-2w |
+
 ### Phase Progress
 
 | Phase | Progress | Status | Likely Left |
@@ -99,16 +133,13 @@ These should be done before the broader backlog.
 
 ## Estimated Time Remaining
 
-- Live cluster closeout: `1-2 days`
-- Core statelessness and shared state conversion: `3-5 weeks`
-- Kubernetes hardening and production readiness: `1-2 weeks`
-- Kafka reliability work: `1-2 weeks`
-- Observability: `1-2 weeks`
-- Load/chaos testing: `1-2 weeks`
-- CI/CD and deployment strategy: `1-2 weeks`
+- Must-do-now cluster closeout: `1-2 days`
+- Practical pre-production baseline: about `3-5 weeks`
+- Full backlog including advanced validation and delivery maturity: about `8-12 weeks`
 
 ### Realistic project estimate
 
+- First usable next milestone: `1-2 days`
 - First credible horizontally scalable release: `3-5 weeks`
 - Full backlog through chaos, canary, and performance gates: `8-12 weeks`
 
