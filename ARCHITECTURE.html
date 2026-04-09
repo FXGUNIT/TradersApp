@@ -593,19 +593,33 @@
 
     <div class="hero">
       <div class="hero-card">
-        <div class="eyebrow">Current architecture presentation</div>
-        <h1>One place to read the system as it actually exists today.</h1>
+        <div class="eyebrow">Architecture cockpit</div>
+        <h1>Read the platform the way it actually runs today.</h1>
         <p>
           TradersApp is no longer a simple app. It is a self-hosted trading ML platform with a live low-latency request path,
-          an extracted `analysis-service` seam, automated learning and data-quality loops, full observability, and self-hosted delivery.
+          an extracted <code>analysis-service</code> seam, automated learning and data-quality loops, full observability, and self-hosted delivery.
         </p>
+        <div class="hero-stats">
+          <div class="hero-stat">
+            <span>Critical path</span>
+            <strong>Frontend -> BFF -> gRPC -> ML Engine</strong>
+          </div>
+          <div class="hero-stat">
+            <span>Async plane</span>
+            <strong>Kafka, Airflow, MLflow, and model feedback loops</strong>
+          </div>
+          <div class="hero-stat">
+            <span>Delivery model</span>
+            <strong>Helm on k3s with Infisical-fed runtime secrets</strong>
+          </div>
+        </div>
       </div>
       <div class="status-card">
         <h2>Reality snapshot</h2>
         <div class="status-grid">
           <div class="status-item">
             <span class="pill live">Live runtime seam</span>
-            <strong>`analysis-service` is the only extracted domain service on the critical path.</strong>
+            <strong><code>analysis-service</code> is the only extracted domain service on the critical path.</strong>
             Everything else still stabilizes behind that seam instead of being broken into premature microservices.
           </div>
           <div class="status-item">
@@ -621,6 +635,24 @@
         </div>
       </div>
     </div>
+
+    <section class="orientation-grid">
+      <div class="orientation-card">
+        <h3>How to read this page</h3>
+        <ol class="orientation-list">
+          <li>Start with the overview and design board to orient around the hot path.</li>
+          <li>Use the operating map and roadmap to understand why the current shape exists.</li>
+          <li>Read runtime layers, contexts, and loops only after you know the system boundaries.</li>
+        </ol>
+      </div>
+      <div class="orientation-card">
+        <h3>Architecture stance</h3>
+        <p>
+          This platform optimizes for low-latency serving, cautious extraction, self-hosted ops, and safe ML evolution.
+          It intentionally favors stable contracts and shared control planes over premature service sprawl.
+        </p>
+      </div>
+    </section>
 
     <section class="section" id="overview">
       <div class="section-header">
