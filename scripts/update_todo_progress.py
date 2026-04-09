@@ -85,6 +85,10 @@ def format_days(value: float) -> str:
     return f"{value:07.3f}d"
 
 
+def format_weeks(value: float) -> str:
+    return f"{value:.1f}w"
+
+
 def make_bar(percent: float, width: int = 40) -> str:
     clamped = max(0.0, min(100.0, percent))
     filled = round((clamped / 100.0) * width)
@@ -107,6 +111,8 @@ def summarize(tasks: list[Task]) -> tuple[str, dict[str, dict[str, float]]]:
     remaining_max_days = sum(task.estimate_max_days for task in tasks if task.status != "Done")
     remaining_mid_days = (remaining_min_days + remaining_max_days) / 2.0
     remaining_conservative_days = remaining_min_days + ((remaining_max_days - remaining_min_days) * 0.90)
+    likely_weeks = remaining_mid_days / 5.0
+    conservative_weeks = remaining_conservative_days / 5.0
 
     per_phase: dict[str, dict[str, float]] = {}
     for task in tasks:
@@ -143,14 +149,14 @@ def summarize(tasks: list[Task]) -> tuple[str, dict[str, dict[str, float]]]:
         f"Complete      {format_pct(completion_pct)}  {make_bar(completion_pct, width=28)}",
         f"Remaining     {format_pct(remaining_pct)}  {make_bar(remaining_pct, width=28)}",
         f"Tasks         done {done:03d} | in progress {partial:03d} | not started {todo:03d} | total {total:03d}",
-        f"Time left     likely {format_days(remaining_mid_days)}",
-        f"Range         best case {format_days(remaining_min_days)} | conservative {format_days(remaining_conservative_days)} | max {format_days(remaining_max_days)}",
+        f"Backlog       likely {format_weeks(likely_weeks)} work weeks",
+        f"Range         best case {format_weeks(remaining_min_days / 5.0)} | conservative {format_weeks(conservative_weeks)} | max {format_weeks(remaining_max_days / 5.0)}",
         "```",
         "",
-        "How to read the time left:",
-        f"- `likely` = the current midpoint estimate for all unfinished work: `{format_days(remaining_mid_days)}`",
-        f"- `best case` = if the unfinished tasks land near their low-end estimates: `{format_days(remaining_min_days)}`",
-        f"- `conservative` = a safer planning number to use: `{format_days(remaining_conservative_days)}`",
+        "How to read this:",
+        "- This is backlog effort for the full remaining program, not literal nonstop calendar time for the current step.",
+        f"- `likely` means roughly `{format_weeks(likely_weeks)}` of single-engineer work if done mostly sequentially.",
+        "- The immediate next stage is much smaller than the full backlog.",
         "",
         "### Phase Progress",
         "",
@@ -171,7 +177,7 @@ def summarize(tasks: list[Task]) -> tuple[str, dict[str, dict[str, float]]]:
                     phase_name,
                     format_pct(phase_pct),
                     f"`{make_bar(phase_pct, width=18)}` {format_count(data['done'])}/{format_count(int(phase_total))} done",
-                    format_days(phase_mid),
+                    format_weeks(phase_mid / 5.0),
                 ]
             )
             + " |"
