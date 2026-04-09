@@ -770,6 +770,124 @@
       </div>
     </section>
 
+    <section class="section">
+      <div class="section-header">
+        <div>
+          <span class="section-kicker">Protocol Reference</span>
+          <h2>Ports and service edges</h2>
+          <p class="lead">The browser preview now keeps connection references in native HTML instead of burying them in the giant board SVG.</p>
+        </div>
+        <p class="section-summary">These are the paths that matter most when debugging traffic, auth, data-plane connectivity, or cluster delivery.</p>
+      </div>
+      <div class="cards-3">
+        <div class="card">
+          <h3>Frontend -> BFF</h3>
+          <p><code>HTTP / HTTPS</code> on <code>8788</code>. Browser traffic enters through the Node.js BFF edge.</p>
+        </div>
+        <div class="card">
+          <h3>BFF -> analysis-service</h3>
+          <p><code>gRPC</code> over the internal consensus seam. This is the stable runtime boundary on the hot path.</p>
+        </div>
+        <div class="card">
+          <h3>analysis-service -> ML Engine</h3>
+          <p><code>gRPC</code> to the Python ML runtime on <code>8001</code> for consensus and inference work.</p>
+        </div>
+        <div class="card">
+          <h3>All services -> Redis</h3>
+          <p><code>RESP</code> on <code>6379</code> for shared cache and low-latency online lookups.</p>
+        </div>
+        <div class="card">
+          <h3>ML Engine -> Kafka</h3>
+          <p><code>Kafka protocol</code> on <code>9092</code> for async events, feedback, and background pipelines.</p>
+        </div>
+        <div class="card">
+          <h3>ML Engine -> Feast</h3>
+          <p><code>gRPC / HTTP</code> to the feature-serving layer for online feature retrieval.</p>
+        </div>
+        <div class="card">
+          <h3>Prometheus -> Services</h3>
+          <p>Scrapes <code>/metrics</code> across runtime services. Prometheus itself is served on <code>9090</code>.</p>
+        </div>
+        <div class="card">
+          <h3>External -> Keycloak</h3>
+          <p><code>OIDC / JWT</code> via Keycloak on <code>8080</code> for SSO and identity federation.</p>
+        </div>
+        <div class="card">
+          <h3>Woodpecker -> k3s API</h3>
+          <p><code>kubectl / Helm</code> against the cluster API on <code>6443</code> for deployment automation.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-header">
+        <div>
+          <span class="section-kicker">Repo Surface</span>
+          <h2>Folder to service map</h2>
+          <p class="lead">This replaces the cramped folder legend from the old board with a readable service-oriented map.</p>
+        </div>
+        <p class="section-summary">Use this when you need to jump from an architectural concern to the part of the monorepo that actually owns it.</p>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Path</th>
+              <th>Primary ownership</th>
+              <th>What lives there</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>src/</code></td>
+              <td>Frontend experience</td>
+              <td>React UI, dashboards, state management, and operator-facing workflows.</td>
+            </tr>
+            <tr>
+              <td><code>bff/</code></td>
+              <td>Edge orchestration</td>
+              <td>Node.js BFF, auth/session logic, anti-corruption layer, and API composition.</td>
+            </tr>
+            <tr>
+              <td><code>proto/ddd/</code></td>
+              <td>Service contracts</td>
+              <td>gRPC schemas and the extracted consensus seam around <code>analysis-service</code>.</td>
+            </tr>
+            <tr>
+              <td><code>ml-engine/</code></td>
+              <td>Core ML runtime</td>
+              <td>Inference, training, features, monitoring, model implementations, and feedback loops.</td>
+            </tr>
+            <tr>
+              <td><code>telegram-bridge/</code></td>
+              <td>Messaging integration</td>
+              <td>Telegram-facing workflows and supporting web integration.</td>
+            </tr>
+            <tr>
+              <td><code>k8s/</code></td>
+              <td>Cluster deployment</td>
+              <td>Helm charts, overlays, manifests, policies, and runtime infrastructure config.</td>
+            </tr>
+            <tr>
+              <td><code>scripts/</code></td>
+              <td>Ops automation</td>
+              <td>Admin helpers, environment setup, validation utilities, and cluster support scripts.</td>
+            </tr>
+            <tr>
+              <td><code>docker-compose.*</code></td>
+              <td>Local platform bring-up</td>
+              <td>Local stacks for MLflow, Airflow, observability, identity, and related services.</td>
+            </tr>
+            <tr>
+              <td><code>docs/</code></td>
+              <td>Architecture and operations knowledge</td>
+              <td>ADRs, architecture docs, deployment notes, security guidance, and roadmap material.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
     <section class="section" id="runtime">
       <div class="section-header">
         <div>
