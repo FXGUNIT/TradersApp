@@ -28,13 +28,13 @@ from pathlib import Path
 from datetime import datetime, timezone
 from typing import Optional
 
-PROJECT_ROOT = Path(__file__).parent.parent.parent
+PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 # ─── Model Repository Setup ────────────────────────────────────────────────────
 
-TRITON_REPO = PROJECT_ROOT / "ml-engine" / "models" / "triton_repo"
-ONNX_DIR = PROJECT_ROOT / "ml-engine" / "models" / "onnx"
+TRITON_REPO = PROJECT_ROOT / "models" / "triton_repo"
+ONNX_DIR = PROJECT_ROOT / "models" / "onnx"
 
 
 def setup_model_repository():

@@ -22,7 +22,7 @@ from typing import Optional
 
 import numpy as np
 
-PROJECT_ROOT = Path(__file__).parent.parent.parent
+PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 try:
@@ -77,7 +77,7 @@ class TritonInferenceClient:
         self.use_ssl = use_ssl
         self._grpc_client = None
         self._ort_sessions: dict[str, ort.InferenceSession] = {}
-        self._onnx_dir = PROJECT_ROOT / "ml-engine" / "models" / "onnx"
+        self._onnx_dir = PROJECT_ROOT / "models" / "onnx"
         self._verbose = verbose
 
         # Try to connect to Triton
