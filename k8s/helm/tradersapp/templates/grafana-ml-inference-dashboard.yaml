@@ -335,17 +335,17 @@
       "targets": [
         {
           "expr": "histogram_quantile(0.50, sum(rate(ml_engine_inference_latency_ms_bucket[5m])) by (le, endpoint))",
-          "legendFormat": "P50 {{ \"{{endpoint}}\" }}",
+          "legendFormat": "P50 {{ print "{{endpoint}}" }}",
           "refId": "A"
         },
         {
           "expr": "histogram_quantile(0.95, sum(rate(ml_engine_inference_latency_ms_bucket[5m])) by (le, endpoint))",
-          "legendFormat": "P95 {{ \"{{endpoint}}\" }}",
+          "legendFormat": "P95 {{ print "{{endpoint}}" }}",
           "refId": "B"
         },
         {
           "expr": "histogram_quantile(0.99, sum(rate(ml_engine_inference_latency_ms_bucket[5m])) by (le, endpoint))",
-          "legendFormat": "P99 {{ \"{{endpoint}}\" }}",
+          "legendFormat": "P99 {{ print "{{endpoint}}" }}",
           "refId": "C"
         }
       ],
@@ -393,7 +393,7 @@
       "targets": [
         {
           "expr": "histogram_quantile(0.95, sum(rate(triton_inference_latency_ms_bucket[5m])) by (le, model_name))",
-          "legendFormat": "{{ \"{{model_name}}\" }} P95",
+          "legendFormat": "{{ print "{{model_name}}" }} P95",
           "refId": "A"
         }
       ],
@@ -454,7 +454,7 @@
         },
         {
           "expr": "sum by (endpoint) (rate(ml_engine_inference_requests_total[5m]))",
-          "legendFormat": "{{ \"{{endpoint}}\" }}",
+          "legendFormat": "{{ print "{{endpoint}}" }}",
           "refId": "B"
         }
       ],
@@ -511,7 +511,7 @@
       "targets": [
         {
           "expr": "avg by (model_name) (triton_inference_queue_depth)",
-          "legendFormat": "{{ \"{{model_name}}\" }} Queue Depth",
+          "legendFormat": "{{ print "{{model_name}}" }} Queue Depth",
           "refId": "A"
         }
       ],
@@ -557,7 +557,7 @@
       "targets": [
         {
           "expr": "sum by (signal) (ml_engine_model_predictions_total)",
-          "legendFormat": "{{ \"{{signal}}\" }}",
+          "legendFormat": "{{ print "{{signal}}" }}",
           "refId": "A"
         }
       ],
@@ -605,7 +605,7 @@
       "targets": [
         {
           "expr": "sum by (signal) (rate(ml_engine_model_predictions_total[5m]))",
-          "legendFormat": "{{ \"{{signal}}\" }}",
+          "legendFormat": "{{ print "{{signal}}" }}",
           "refId": "A"
         }
       ],
@@ -652,7 +652,7 @@
       "targets": [
         {
           "expr": "analysis_service_requests_total",
-          "legendFormat": "{{ \"{{endpoint}}\" }}",
+          "legendFormat": "{{ print "{{endpoint}}" }}",
           "refId": "A"
         }
       ],
