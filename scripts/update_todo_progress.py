@@ -102,6 +102,8 @@ def summarize(tasks: list[Task]) -> tuple[str, dict[str, dict[str, float]]]:
     remaining_min_days = sum(task.estimate_min_days for task in tasks if task.status != "Done")
     remaining_max_days = sum(task.estimate_max_days for task in tasks if task.status != "Done")
     remaining_mid_days = (remaining_min_days + remaining_max_days) / 2.0
+    remaining_p80_days = remaining_min_days + ((remaining_max_days - remaining_min_days) * 0.80)
+    remaining_p95_days = remaining_min_days + ((remaining_max_days - remaining_min_days) * 0.95)
 
     per_phase: dict[str, dict[str, float]] = {}
     for task in tasks:
@@ -141,9 +143,12 @@ def summarize(tasks: list[Task]) -> tuple[str, dict[str, dict[str, float]]]:
         (
             "TIME LEFT   "
             f"min {format_days(remaining_min_days)} | "
-            f"likely {format_days(remaining_mid_days)} | "
+            f"p50 {format_days(remaining_mid_days)} | "
+            f"p80 {format_days(remaining_p80_days)} | "
+            f"p95 {format_days(remaining_p95_days)} | "
             f"max {format_days(remaining_max_days)}"
         ),
+        "ACCURACY    p95 is a planning forecast, not a guaranteed empirical accuracy level",
         "```",
         "",
         "### Phase Bars",
@@ -229,9 +234,20 @@ def main() -> None:
         action="store_true",
         help="Print the updated markdown instead of writing the file.",
     )
+    parser.add_argument(
+        "--block-stdout",
+        action="store_true",
+        help="Print only the generated progress block.",
+    )
     args = parser.parse_args()
     todo_path = args.file.resolve()
+    markdown = todo_path.read_text(encoding="utf-8")
+    tasks = parse_tasks(markdown)
+    block, _ = summarize(tasks)
     updated_markdown = build_updated_markdown(todo_path)
+    if args.block_stdout:
+        print(block, end="")
+        return
     if args.stdout:
         print(updated_markdown, end="")
         return
