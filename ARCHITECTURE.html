@@ -657,9 +657,11 @@
     <section class="section" id="overview">
       <div class="section-header">
         <div>
+          <span class="section-kicker">First read</span>
           <h2>Architecture overview</h2>
           <p class="lead">Read this diagram first. It shows the request path, supporting systems, and current extraction reality at a glance.</p>
         </div>
+        <p class="section-summary">This is the fastest orientation view: who serves traffic, where state lives, and which platform systems surround the request path.</p>
       </div>
       <div class="diagram-card">
         <img src="docs/assets/architecture-3d-overview.svg" alt="TradersApp architecture overview" />
@@ -675,9 +677,11 @@
     <section class="section" id="system-design">
       <div class="section-header">
         <div>
+          <span class="section-kicker">Detailed board</span>
           <h2>System design board</h2>
           <p class="lead">This is the detailed board view in the style of a classic system-design map. It shows actors, service boundaries, stateful systems, event flow, observability, and delivery controls on one canvas.</p>
         </div>
+        <p class="section-summary">Use this when you need the full platform shape in one frame: request path, stateful dependencies, async flow, and platform controls.</p>
       </div>
       <div class="diagram-card">
         <img src="docs/assets/architecture-system-design-board.svg" alt="TradersApp detailed system design board" />
@@ -693,9 +697,11 @@
     <section class="section" id="operating-map">
       <div class="section-header">
         <div>
+          <span class="section-kicker">Who / what / why</span>
           <h2>Operating map</h2>
           <p class="lead">This is the single chart for what / how / why / where / whom across request serving, learning, observability, delivery, and the extraction strategy.</p>
         </div>
+        <p class="section-summary">This section translates the architecture into operating intent so the page is useful for decisions, not just diagrams.</p>
       </div>
       <div class="diagram-card">
         <img src="docs/assets/architecture-5w1h-map.svg" alt="TradersApp 5W1H operating map" />
@@ -711,9 +717,11 @@
     <section class="section" id="bird-roadmap">
       <div class="section-header">
         <div>
+          <span class="section-kicker">Evolution view</span>
           <h2>Bird's-eye roadmap</h2>
           <p class="lead">This is the evolution view of the same platform. Read it left to right as current reality, hardening, extraction, and long-run operating state.</p>
         </div>
+        <p class="section-summary">This is the strategic lens: what is already live, what is being hardened now, and what should stay deferred until the seams are stable.</p>
       </div>
       <div class="diagram-card">
         <img src="docs/assets/architecture-birdview-roadmap.svg" alt="TradersApp bird's-eye architecture roadmap" />
@@ -729,14 +737,16 @@
     <section class="section">
       <div class="section-header">
         <div>
+          <span class="section-kicker">Runtime truths</span>
           <h2>Current system shape</h2>
           <p class="lead">These are the runtime truths that matter when reading the rest of the platform.</p>
         </div>
+        <p class="section-summary">If someone only remembers one thing from this page, it should be these three flows: user serving, data and learning, and platform operations.</p>
       </div>
       <div class="cards-3">
         <div class="card">
           <h3>User flow</h3>
-          <p>User traffic enters through the React frontend, lands at the Node.js BFF, crosses the gRPC seam into `analysis-service`, and resolves through the Python ML Engine.</p>
+          <p>User traffic enters through the React frontend, lands at the Node.js BFF, crosses the gRPC seam into <code>analysis-service</code>, and resolves through the Python ML Engine.</p>
         </div>
         <div class="card">
           <h3>Data + learning flow</h3>
