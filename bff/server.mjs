@@ -529,6 +529,12 @@ const server = createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === "GET" && req.url === "/live") {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ live: true }));
+    return;
+  }
+
   if (req.method === "GET" && req.url === "/health") {
     const aiStatuses = buildAiStatusPayload();
     json(
