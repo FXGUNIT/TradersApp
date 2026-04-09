@@ -53,7 +53,7 @@ metadata:
 data:
   APP_PORT: "8001"
   DB_PATH: "/data/trading_data.db"
-  REQUIRE_DATABASE_URL: "true"
+  REQUIRE_DATABASE_URL: "false"
   CORS_ALLOWED_ORIGINS: "http://tradersapp.local"
   KAFKA_GROUP_ID: "ml-engine-consumers"
   KAFKA_CONSUMER_GROUP: "ml-engine-consumers"
