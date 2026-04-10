@@ -1,22 +1,20 @@
 #!/usr/bin/env bash
-# ─────────────────────────────────────────────────────────────────────
-# Longhorn unified dispatcher — runs all requested stages in a SINGLE
-# WSL session so the Windows sandbox approval happens exactly once.
+# Longhorn unified dispatcher runs all requested stages in a single WSL
+# session so the Windows sandbox boundary is crossed once per end-to-end run.
 #
 # Usage:
 #   bash longhorn-dispatch.sh [stages...]
 #
 # Stages (run in order given):
-#   prereqs    — check-longhorn-prereqs.sh
-#   reconcile  — reconcile-longhorn-control-plane.sh
-#   validate   — validate-longhorn-stage-a.sh
-#   rwx-fix    — apply k3s WSL RWX storage class fix
-#   all        — prereqs → reconcile → validate (default)
+#   prereqs    - check-longhorn-prereqs.sh
+#   reconcile  - reconcile-longhorn-control-plane.sh
+#   validate   - validate-longhorn-stage-a.sh
+#   rwx-fix    - apply k3s WSL RWX storage class fix
+#   all        - prereqs -> reconcile -> validate (default)
 #
 # Flags:
 #   --keep-namespace   passed through to validate stage
 #   --distro NAME      override WSL distro (unused inside WSL itself)
-# ─────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -83,15 +81,15 @@ failed=()
 for stage in "${stages[@]}"; do
   if ! run_stage "${stage}"; then
     failed+=("${stage}")
-    echo "!! Stage ${stage} FAILED — continuing remaining stages"
+    echo "!! Stage ${stage} FAILED - continuing remaining stages"
   fi
 done
 
 echo
 echo "================================================================"
 if [[ ${#failed[@]} -gt 0 ]]; then
-  echo "  DISPATCH COMPLETE — ${#failed[@]} stage(s) failed: ${failed[*]}"
+  echo "  DISPATCH COMPLETE - ${#failed[@]} stage(s) failed: ${failed[*]}"
   exit 1
 else
-  echo "  DISPATCH COMPLETE — all ${#stages[@]} stage(s) passed"
+  echo "  DISPATCH COMPLETE - all ${#stages[@]} stage(s) passed"
 fi

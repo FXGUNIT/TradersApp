@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
-# ─────────────────────────────────────────────────────────────────────
-# Apply k3s WSL RWX storage class fix — standalone bash version
-# called by longhorn-dispatch.sh as the "rwx-fix" stage.
-# ─────────────────────────────────────────────────────────────────────
+# Apply the k3s WSL RWX storage-class fix.
+# This standalone bash entrypoint is called by longhorn-dispatch.sh as the
+# "rwx-fix" stage.
 set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

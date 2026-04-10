@@ -75,6 +75,11 @@ echo "== Longhorn prerequisite check =="
 wait_for_api
 setup_kubectl
 
+node_count="0"
+if node_count_raw="$(kctl get nodes --no-headers 2>/dev/null | wc -l)"; then
+  node_count="$(printf '%s' "${node_count_raw}" | tr -d '[:space:]')"
+fi
+
 if command -v iscsiadm >/dev/null 2>&1; then
   iscsi_path="$(command -v iscsiadm)"
   status "open-iscsi binary" "OK (${iscsi_path})"
@@ -96,7 +101,7 @@ else
 fi
 
 status "hostname" "$(hostname)"
-status "node count" "$(kctl get nodes --no-headers 2>/dev/null | wc -l || echo 0)"
+status "node count" "${node_count}"
 
 if kctl get storageclass longhorn --no-headers >/dev/null 2>&1; then
   status "longhorn storageclass" "longhorn"
