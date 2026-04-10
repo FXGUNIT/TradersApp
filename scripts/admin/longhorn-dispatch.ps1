@@ -10,7 +10,9 @@ Write-Host "== Longhorn dispatch on WSL distro '$Distro' =="
 Write-Host "   Stages: $($Stages -join ', ')"
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
-$repoRootForWsl = ($repoRoot -replace "\\", "/")
+$drive = $repoRoot.Substring(0, 1).ToLowerInvariant()
+$tail = ($repoRoot.Substring(2) -replace "\\", "/")
+$wslRepo = "/mnt/$drive$tail"
 
 $bashArgs = @()
 foreach ($stage in $Stages) {
@@ -21,13 +23,8 @@ if ($KeepNamespace) {
 }
 
 $argString = ($bashArgs -join " ")
-$inlineScript = @"
-set -euo pipefail
-REPO="`$(wslpath -a '$repoRootForWsl')"
-bash "`$REPO/scripts/admin/longhorn-dispatch.sh" $argString
-"@
 
-& wsl.exe -d $Distro -- bash -lc $inlineScript
+& wsl.exe -d $Distro -- bash -lc "bash '$wslRepo/scripts/admin/longhorn-dispatch.sh' $argString"
 
 if ($LASTEXITCODE -ne 0) {
   throw "Longhorn dispatch failed with exit code $LASTEXITCODE"
