@@ -71,6 +71,70 @@ setup_kubectl() {
   fail "Unable to find a working kubectl entrypoint for k3s"
 }
 
+first_pod_by_prefix() {
+  local prefix="$1"
+  printf '%s\n' "${longhorn_pods}" | awk -v prefix="${prefix}" '$1 ~ ("^" prefix) { print $1; exit }'
+}
+
+first_unhealthy_pod() {
+  printf '%s\n' "${longhorn_pods}" | awk '
+    {
+      split($2, ready, "/")
+      if (($3 != "Running" && $3 != "Completed") || ($3 == "Running" && ready[1] != ready[2])) {
+        print $1
+        exit
+      }
+    }
+  '
+}
+
+print_pod_debug() {
+  local pod="$1"
+  local container="${2:-}"
+
+  if [[ -z "${pod}" ]]; then
+    return
+  fi
+
+  echo
+  echo "Describe ${pod}:"
+  kctl -n longhorn-system describe pod "${pod}" | tail -n 60 || true
+
+  if [[ -n "${container}" ]]; then
+    echo
+    echo "Logs ${pod}/${container}:"
+    kctl -n longhorn-system logs "${pod}" -c "${container}" --tail=80 || true
+    echo
+    echo "Previous logs ${pod}/${container}:"
+    kctl -n longhorn-system logs "${pod}" -c "${container}" --tail=80 --previous || true
+  else
+    echo
+    echo "Logs ${pod}:"
+    kctl -n longhorn-system logs "${pod}" --tail=80 || true
+    echo
+    echo "Previous logs ${pod}:"
+    kctl -n longhorn-system logs "${pod}" --tail=80 --previous || true
+  fi
+}
+
+diagnose_longhorn_failure() {
+  local manager_pod=""
+  local ui_pod=""
+  local failing_pod=""
+
+  manager_pod="$(first_pod_by_prefix 'longhorn-manager')"
+  ui_pod="$(first_pod_by_prefix 'longhorn-ui')"
+  failing_pod="$(first_unhealthy_pod)"
+
+  echo
+  echo "Longhorn diagnostics:"
+  print_pod_debug "${manager_pod}" "longhorn-manager"
+  print_pod_debug "${ui_pod}"
+  if [[ -n "${failing_pod}" && "${failing_pod}" != "${manager_pod}" && "${failing_pod}" != "${ui_pod}" ]]; then
+    print_pod_debug "${failing_pod}"
+  fi
+}
+
 cleanup() {
   if [[ -n "${temp_kubeconfig}" ]]; then
     rm -f "${temp_kubeconfig}" >/dev/null 2>&1 || true
@@ -111,6 +175,7 @@ if ! printf '%s\n' "${longhorn_pods}" | awk '
   }
   END { exit bad }
 '; then
+  diagnose_longhorn_failure
   fail "Some longhorn-system pods are not fully ready"
 fi
 status "A01 longhorn pods" "healthy"
