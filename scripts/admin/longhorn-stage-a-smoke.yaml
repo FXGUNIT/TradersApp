@@ -1,0 +1,87 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: longhorn-stage-a-smoke
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: longhorn-rwo-smoke
+  namespace: longhorn-stage-a-smoke
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: longhorn-rwx-smoke
+  namespace: longhorn-stage-a-smoke
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: rwo-smoke
+  namespace: longhorn-stage-a-smoke
+spec:
+  restartPolicy: Never
+  containers:
+    - name: tester
+      image: rancher/mirrored-library-busybox:1.37.0
+      command: ["sh", "-c", "sleep 3600"]
+      volumeMounts:
+        - name: data
+          mountPath: /data
+  volumes:
+    - name: data
+      persistentVolumeClaim:
+        claimName: longhorn-rwo-smoke
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: rwx-writer
+  namespace: longhorn-stage-a-smoke
+spec:
+  restartPolicy: Never
+  containers:
+    - name: writer
+      image: rancher/mirrored-library-busybox:1.37.0
+      command: ["sh", "-c", "sleep 3600"]
+      volumeMounts:
+        - name: data
+          mountPath: /data
+  volumes:
+    - name: data
+      persistentVolumeClaim:
+        claimName: longhorn-rwx-smoke
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: rwx-reader
+  namespace: longhorn-stage-a-smoke
+spec:
+  restartPolicy: Never
+  containers:
+    - name: reader
+      image: rancher/mirrored-library-busybox:1.37.0
+      command: ["sh", "-c", "sleep 3600"]
+      volumeMounts:
+        - name: data
+          mountPath: /data
+  volumes:
+    - name: data
+      persistentVolumeClaim:
+        claimName: longhorn-rwx-smoke
