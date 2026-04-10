@@ -127,6 +127,14 @@ diagnose_longhorn_failure() {
   failing_pod="$(first_unhealthy_pod)"
 
   echo
+  echo "Longhorn workload inventory:"
+  kctl -n longhorn-system get deploy,ds,sts,job || true
+
+  echo
+  echo "longhorn-grpc-tls secret:"
+  kctl -n longhorn-system get secret longhorn-grpc-tls -o yaml || true
+
+  echo
   echo "Longhorn diagnostics:"
   print_pod_debug "${manager_pod}" "longhorn-manager"
   print_pod_debug "${ui_pod}"
