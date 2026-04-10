@@ -43,7 +43,7 @@ def features_online(symbol: str = "MNQ", timestamp: str | None = None):
             "timestamp": timestamp or datetime.now(timezone.utc).isoformat(),
             "features": features, "feature_count": len(features),
             "latency_ms": round(latency_ms, 2),
-            "online_store": "redis" if features else "sqlite_fallback",
+            "online_store": "redis" if features else "db_fallback",
         }
     except Exception as e:
         return {"ok": False, "error": str(e)}

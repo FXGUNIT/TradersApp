@@ -25,6 +25,7 @@
  */
 
 import { EventEmitter } from 'events';
+import { getRedisClient } from './redis-session-store.mjs';
 
 // ─── Configuration ─────────────────────────────────────────────────────────────
 
@@ -596,10 +597,18 @@ export async function fetchBreakingNews(options = {}) {
     globalCache.add(item);
   }
 
-  // Enqueue HIGH impact items for reaction tracking
+  // Enqueue HIGH impact items for reaction tracking.
+  // Redis NX prevents duplicate enqueue across multiple BFF pods (cross-pod dedup).
+  // Falls back to in-process dedup if Redis is unavailable.
+  const rc = await getRedisClient().catch(() => null);
   for (const item of finalItems) {
     if (item.impact === 'HIGH' && !item.reactionLogged) {
-      reactionLog.enqueue(item, new Map());
+      let claimed = true;
+      if (rc?.isOpen) {
+        const key = `bknews:enq:${globalCache._hash(item.title)}`;
+        claimed = (await rc.set(key, '1', { NX: true, PX: 600_000 }).catch(() => null)) !== null;
+      }
+      if (claimed) reactionLog.enqueue(item, new Map());
     }
   }
 
