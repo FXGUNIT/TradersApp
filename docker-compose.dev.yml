@@ -223,9 +223,9 @@ services:
     volumes:
       - ./k8s/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
     command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.retention.time=7d'
-      - '--storage.tsdb.retention.size=500MB'
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=7d"
+      - "--storage.tsdb.retention.size=500MB"
     deploy:
       resources:
         limits:
