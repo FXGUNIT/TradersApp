@@ -56,14 +56,14 @@ mlEngine:
     enabled: true
     size: 10Gi
     accessModes: ["ReadWriteOnce"]
-    storageClass: standard  # Use longhorn in self-hosted production
+    storageClass: local-path  # Use longhorn in self-hosted production
     continualLearningDir: "/data/continual_learning"
     mambaCacheDir: "/data/mamba_cache"
   persistence:
     enabled: true
     size: 5Gi
     accessModes: ["ReadWriteOnce"]
-    storageClass: standard  # Use longhorn in self-hosted production
+    storageClass: local-path  # Use longhorn in self-hosted production
   modelRegistrySidecar:
     port: 8010
     warmup: true
@@ -188,7 +188,7 @@ triton:
   # PVC for ONNX model artifacts
   modelStorage:
     size: 2Gi
-    storageClass: standard  # Use longhorn in self-hosted production
+    storageClass: local-path  # Use longhorn in self-hosted production
   # tmpfs for GPU memory spill
   tmpStorageSize: 1Gi
   # Graceful shutdown (allow in-flight requests to complete)
@@ -267,7 +267,7 @@ vllm:
     pullPolicy: IfNotPresent
   modelStorage:
     size: 10Gi
-    storageClass: standard  # Use longhorn in self-hosted production
+    storageClass: local-path  # Use longhorn in self-hosted production
   nodeSelector:
     # nvidia.com/gpu: "true"
   tolerations:
@@ -325,7 +325,7 @@ feast:
   # PVC for Parquet feature files (offline store)
   featureStorage:
     size: 2Gi
-    storageClass: standard  # Use longhorn in self-hosted production
+    storageClass: local-path  # Use longhorn in self-hosted production
   # Materialization CronJob: SQLite → Parquet → Redis
   materialization:
     enabled: true
@@ -372,7 +372,7 @@ kafka:
   persistence:
     enabled: true
     size: 10Gi
-    storageClass: standard  # Use longhorn in self-hosted production
+    storageClass: local-path  # Use longhorn in self-hosted production
   resources:
     requests:
       cpu: 250m
@@ -440,7 +440,7 @@ mlflow:
     persistence:
       enabled: true
       size: 10Gi
-      storageClass: standard  # Use longhorn in self-hosted production
+      storageClass: local-path  # Use longhorn in self-hosted production
     resources:
       requests:
         cpu: 50m
@@ -462,7 +462,7 @@ mlflow:
     persistence:
       enabled: true
       size: 20Gi
-      storageClass: standard  # Use longhorn in self-hosted production
+      storageClass: local-path  # Use longhorn in self-hosted production
     resources:
       requests:
         cpu: 100m
