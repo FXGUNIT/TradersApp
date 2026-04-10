@@ -4,6 +4,7 @@ set -euo pipefail
 namespace="longhorn-stage-a-smoke"
 manifest_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 manifest="${manifest_dir}/longhorn-stage-a-smoke.yaml"
+manifest_kubectl_path="${manifest}"
 keep_namespace=0
 temp_kubeconfig=""
 kctl_cmd=()
@@ -63,6 +64,7 @@ setup_kubectl() {
     temp_kubeconfig="$(mktemp /tmp/k3s-stage-a-kubeconfig-XXXX.yaml)"
     sudo -n cat /etc/rancher/k3s/k3s.yaml > "${temp_kubeconfig}"
     win_cfg="$(wslpath -w "${temp_kubeconfig}")"
+    manifest_kubectl_path="$(wslpath -w "${manifest}")"
     kctl_cmd=("${windows_kubectl}" --kubeconfig "${win_cfg}")
     status "kubectl mode" "Windows kubectl.exe fallback"
     return
@@ -209,7 +211,7 @@ status "A02 longhorn class" "exists"
 status "A02 longhorn default" "${longhorn_default:-false/empty}"
 
 kctl delete namespace "${namespace}" --ignore-not-found=true --wait=true >/dev/null 2>&1 || true
-kctl apply -f "${manifest}" >/dev/null
+kctl apply -f "${manifest_kubectl_path}" >/dev/null
 
 kctl -n "${namespace}" wait --for=jsonpath='{.status.phase}'=Bound pvc/longhorn-rwo-smoke --timeout=240s >/dev/null
 status "A03 RWO PVC" "Bound"
