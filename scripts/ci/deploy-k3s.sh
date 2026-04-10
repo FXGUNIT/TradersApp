@@ -80,3 +80,50 @@ kubectl rollout status deployment/bff -n "$K8S_NAMESPACE" --timeout=180s
 kubectl rollout status deployment/ml-engine -n "$K8S_NAMESPACE" --timeout=180s
 kubectl rollout status deployment/mlflow -n "$K8S_NAMESPACE" --timeout=180s
 kubectl get pods -n "$K8S_NAMESPACE"
+
+# ---------------------------------------------------------------------------
+# Post-deploy smoke test (H02) + auto-rollback on failure (H03)
+# ---------------------------------------------------------------------------
+bff_pod=$(kubectl get pod -n "$K8S_NAMESPACE" -l app=bff -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+ml_pod=$(kubectl get pod -n "$K8S_NAMESPACE" -l app=ml-engine -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+
+smoke_pass=true
+
+# BFF /health — routed via pod exec so no Ingress dependency
+if [ -n "$bff_pod" ]; then
+  printf '[smoke] BFF /health ... '
+  if ! kubectl exec "$bff_pod" -n "$K8S_NAMESPACE" -- \
+       wget -qO- --timeout=10 http://localhost:8788/health > /dev/null 2>&1; then
+    printf 'FAIL\n'
+    smoke_pass=false
+  else
+    printf 'OK\n'
+  fi
+else
+  printf '[smoke] BFF pod not found — FAIL\n'
+  smoke_pass=false
+fi
+
+# ML Engine /health
+if [ -n "$ml_pod" ]; then
+  printf '[smoke] ML Engine /health ... '
+  if ! kubectl exec "$ml_pod" -n "$K8S_NAMESPACE" -- \
+       wget -qO- --timeout=10 http://localhost:8001/health > /dev/null 2>&1; then
+    printf 'FAIL\n'
+    smoke_pass=false
+  else
+    printf 'OK\n'
+  fi
+else
+  printf '[smoke] ML Engine pod not found — FAIL\n'
+  smoke_pass=false
+fi
+
+if [ "$smoke_pass" = "false" ]; then
+  printf '[smoke] Smoke test FAILED — initiating Helm rollback\n'
+  helm rollback "$release_name" -n "$K8S_NAMESPACE" --wait --timeout 5m
+  printf '[smoke] Rollback complete. Failing pipeline.\n'
+  exit 1
+fi
+
+printf '[smoke] All smoke checks PASSED\n'

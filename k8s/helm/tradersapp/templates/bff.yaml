@@ -125,3 +125,130 @@ spec:
       port: {{ .Values.bff.service.port }}
       targetPort: {{ .Values.bff.service.port }}
 {{- end }}
+
+{{- /* ------------------------------------------------------------------
+     BFF Canary Deployment (H04)
+     Enabled via: helm upgrade --set bff.canary.enabled=true bff.canary.image.tag=<sha>
+     Traffic split is pod-count weighted: 1 canary + N stable pods → ~1/(N+1) canary traffic.
+     No service mesh required; works with the existing bff Service (app: bff selector).
+     ------------------------------------------------------------------ */ -}}
+{{- if and .Values.bff.enabled .Values.bff.canary.enabled -}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bff-canary
+  namespace: {{ include "tradersapp.namespace" . }}
+  labels:
+    {{- include "tradersapp.labels" . | nindent 4 }}
+    tier: api
+    track: canary
+  annotations:
+    tradersapp/canary-weight: {{ .Values.bff.canary.replicaCount | quote }}
+spec:
+  replicas: {{ .Values.bff.canary.replicaCount }}
+  selector:
+    matchLabels:
+      app: bff
+      track: canary
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: bff
+        tier: api
+        track: canary
+        {{- include "tradersapp.labels" . | nindent 8 }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "{{ .Values.bff.service.port }}"
+        prometheus.io/path: "/metrics"
+        tradersapp/canary: "true"
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+      containers:
+        - name: bff
+          image: "{{ .Values.bff.image.repository }}:{{ .Values.bff.canary.image.tag | default .Values.bff.image.tag }}"
+          imagePullPolicy: {{ include "tradersapp.imagePullPolicy" .Values.bff.image }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.bff.service.port }}
+          {{- with .Values.bff.envFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          env:
+            - name: ML_ENGINE_URL
+              value: "http://ml-engine:8001"
+            - name: BFF_PORT
+              value: {{ .Values.bff.service.port | quote }}
+            - name: ML_ANALYSIS_TRANSPORT
+              value: "{{ .Values.bff.analysisTransport.mode }}"
+            - name: ML_ANALYSIS_GRPC_ADDR
+              value: "{{ .Values.bff.analysisTransport.grpcAddress }}"
+            - name: ML_ANALYSIS_GRPC_STRICT
+              value: "{{ .Values.bff.analysisTransport.grpcStrict }}"
+            - name: REDIS_HOST
+              value: "redis"
+            - name: NODE_ENV
+              value: "production"
+            - name: CANARY
+              value: "true"
+            - name: MY_POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: MY_POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: MY_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: OTEL_SERVICE_NAME
+              value: "bff-canary"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://jaeger.monitoring:4317"
+          {{- with .Values.bff.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          startupProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.bff.service.port }}
+            failureThreshold: 30
+            periodSeconds: 10
+            initialDelaySeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.bff.service.port }}
+            failureThreshold: 3
+            periodSeconds: 15
+            initialDelaySeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.bff.service.port }}
+            failureThreshold: 3
+            periodSeconds: 10
+            initialDelaySeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+      terminationGracePeriodSeconds: 30
+{{- end }}

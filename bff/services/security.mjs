@@ -16,6 +16,7 @@ import {
   getSession,
   listSessions,
 } from "./redis-session-store.mjs";
+import { verifyKeycloakToken } from "./keycloakJwtVerifier.mjs";
 
 // ---------------------------------------------------------------------------
 // Security headers — injected on every response
@@ -35,8 +36,8 @@ export const SECURITY_HEADERS = {
   "Referrer-Policy": "strict-origin-when-cross-origin",
   // Disable caching of sensitive responses
   "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
-  "Pragma": "no-cache",
-  "Expires": "0",
+  Pragma: "no-cache",
+  Expires: "0",
   // Permissions policy (disable unnecessary browser features)
   "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=()",
 };
@@ -52,7 +53,8 @@ export const CSP_HEADER = [
 ].join("; ");
 
 export function addSecurityHeaders(headers) {
-  headers["X-Content-Type-Options"] = SECURITY_HEADERS["X-Content-Type-Options"];
+  headers["X-Content-Type-Options"] =
+    SECURITY_HEADERS["X-Content-Type-Options"];
   headers["X-Frame-Options"] = SECURITY_HEADERS["X-Frame-Options"];
   headers["X-XSS-Protection"] = SECURITY_HEADERS["X-XSS-Protection"];
   headers["Referrer-Policy"] = SECURITY_HEADERS["Referrer-Policy"];
@@ -91,7 +93,11 @@ export class RateLimiter {
 
     if (!entry || entry.length === 0) {
       this._store.set(clientKey, [{ ts: now, count: 1 }]);
-      return { allowed: true, remaining: this.maxRequests - 1, resetMs: this.windowMs };
+      return {
+        allowed: true,
+        remaining: this.maxRequests - 1,
+        resetMs: this.windowMs,
+      };
     }
 
     // Filter to requests within current window
@@ -100,7 +106,11 @@ export class RateLimiter {
     if (valid.length === 0) {
       // All expired — start fresh
       this._store.set(clientKey, [{ ts: now, count: 1 }]);
-      return { allowed: true, remaining: this.maxRequests - 1, resetMs: this.windowMs };
+      return {
+        allowed: true,
+        remaining: this.maxRequests - 1,
+        resetMs: this.windowMs,
+      };
     }
 
     const totalCount = valid.reduce((sum, r) => sum + r.count, 0);
@@ -115,7 +125,11 @@ export class RateLimiter {
     valid.push({ ts: now, count: 1 });
     this._store.set(clientKey, valid);
 
-    return { allowed: true, remaining: this.maxRequests - totalCount - 1, resetMs: this.windowMs };
+    return {
+      allowed: true,
+      remaining: this.maxRequests - totalCount - 1,
+      resetMs: this.windowMs,
+    };
   }
 
   /** Remove expired entries from all clients. */
@@ -163,7 +177,7 @@ export const ROUTE_PERMISSIONS = {
   // Public read-only endpoints (no auth needed)
   "/health": null,
   "/ai/status": null,
-  "/content": null,       // GET /content/* — public read-only
+  "/content": null, // GET /content/* — public read-only
   "/news/upcoming": null,
   "/news/countdown": null,
   "/ml/health": null,
@@ -203,23 +217,30 @@ export const ROUTE_PERMISSIONS = {
  * @param {number} ttlMs - time-to-live in ms
  * @param {object} device - {fingerprint, browser, os, device, ip}
  */
-export async function createAdminSession(role = ROLES.ADMIN, ttlMs = 8 * 60 * 60 * 1000, device = {}) {
-  const token = await createSession({
-    role,
-    createdAt: Date.now(),
-    expiresAt: Date.now() + ttlMs,
-    device: {
-      fingerprint: device.fingerprint || "unknown",
-      browser: device.browser || "Unknown Browser",
-      os: device.os || "Unknown OS",
-      device: device.device || "Unknown Device",
-      ip: device.ip || "unknown",
-      rememberDevice: !!device.rememberDevice,
+export async function createAdminSession(
+  role = ROLES.ADMIN,
+  ttlMs = 8 * 60 * 60 * 1000,
+  device = {},
+) {
+  const token = await createSession(
+    {
+      role,
+      createdAt: Date.now(),
+      expiresAt: Date.now() + ttlMs,
+      device: {
+        fingerprint: device.fingerprint || "unknown",
+        browser: device.browser || "Unknown Browser",
+        os: device.os || "Unknown OS",
+        device: device.device || "Unknown Device",
+        ip: device.ip || "unknown",
+        rememberDevice: !!device.rememberDevice,
+      },
     },
-  }, {
-    prefix: ADMIN_SESSION_PREFIX,
-    ttlSeconds: Math.max(1, Math.ceil(ttlMs / 1000)),
-  });
+    {
+      prefix: ADMIN_SESSION_PREFIX,
+      ttlSeconds: Math.max(1, Math.ceil(ttlMs / 1000)),
+    },
+  );
   if (!token) {
     throw new Error("Admin session store unavailable.");
   }
@@ -284,7 +305,7 @@ export async function cleanupExpiredSessions() {
 
 /** Check if `grantedRole` satisfies `requiredRole`. */
 export function hasPermission(grantedRole, requiredRole) {
-  if (requiredRole === null) return true;  // Public
+  if (requiredRole === null) return true; // Public
   if (!grantedRole) return false;
   return ROLE_RANK[grantedRole] >= ROLE_RANK[requiredRole];
 }
@@ -324,9 +345,31 @@ const constantTimeMatch = (left, right) => {
  * Returns {authenticated: bool, role: string|null}.
  */
 export async function authenticateRequest(req) {
-  const authHeader = req.headers.authorization || req.headers.Authorization || "";
+  const authHeader =
+    req.headers.authorization || req.headers.Authorization || "";
 
-  // 1. Bearer token (admin session token)
+  // 1. Keycloak OIDC JWT (when KEYCLOAK_REALM_URL is configured)
+  if (authHeader.startsWith("Bearer ") && process.env.KEYCLOAK_REALM_URL) {
+    try {
+      const claims = await verifyKeycloakToken(req);
+      if (claims) {
+        // Map Keycloak realm roles to internal RBAC roles
+        const realmRoles = claims.realm_access?.roles ?? [];
+        const resourceRoles = Object.values(
+          claims.resource_access ?? {},
+        ).flatMap((r) => r.roles ?? []);
+        const allRoles = new Set([...realmRoles, ...resourceRoles]);
+        let role = ROLES.TRADER;
+        if (allRoles.has("admin")) role = ROLES.ADMIN;
+        else if (allRoles.has("mentor")) role = ROLES.MENTOR;
+        return { authenticated: true, role };
+      }
+    } catch {
+      // JWKS unreachable — fall through to session-based auth
+    }
+  }
+
+  // 2. Bearer token (admin session token — internal sessions)
   if (authHeader.startsWith("Bearer ")) {
     const token = authHeader.slice(7).trim();
     const result = await validateAdminToken(token);
@@ -335,7 +378,7 @@ export async function authenticateRequest(req) {
     }
   }
 
-  // 2. Service key (trusted services like Telegram bridge)
+  // 3. Service key (trusted services like Telegram bridge)
   const serviceKey = req.headers["x-support-key"] || "";
   if (serviceKey) {
     const configuredKey = process.env.SUPPORT_SERVICE_KEY || "";
@@ -366,7 +409,10 @@ export async function authorizeRequest(req) {
   }
 
   if (!hasPermission(role, requiredRole)) {
-    return { authorized: false, error: `Insufficient permissions. Required: ${requiredRole}` };
+    return {
+      authorized: false,
+      error: `Insufficient permissions. Required: ${requiredRole}`,
+    };
   }
 
   return { authorized: true, role };
@@ -401,7 +447,10 @@ export const RATE_LIMIT_CONFIGS = {
 
 /** Determine rate limit config based on request path. */
 export function getRateLimitConfig(pathname) {
-  if (pathname.startsWith("/ml/consensus") || pathname.startsWith("/ml/train")) {
+  if (
+    pathname.startsWith("/ml/consensus") ||
+    pathname.startsWith("/ml/train")
+  ) {
     return { name: "mlPredict", ...RATE_LIMIT_CONFIGS.mlPredict };
   }
   if (pathname.startsWith("/news/")) {

@@ -118,6 +118,14 @@ bff:
     mode: grpc
     grpcAddress: analysis-service:50051
     grpcStrict: false
+  # Canary rollout (H04) — pod-count weighted, no service mesh required.
+  # Enable with: helm upgrade --set bff.canary.enabled=true,bff.canary.image.tag=<sha>
+  # Traffic split: 1 canary pod / (replicaCount + 1) ≈ 10% with replicaCount=9
+  canary:
+    enabled: false
+    replicaCount: 1
+    image:
+      tag: "" # Defaults to bff.image.tag when empty
 
 analysisService:
   enabled: true
