@@ -145,6 +145,22 @@ diagnose_longhorn_failure() {
   fi
 }
 
+diagnose_pvc_failure() {
+  local pvc_name="$1"
+
+  echo
+  echo "PVC diagnostics for ${pvc_name}:"
+  kctl -n "${namespace}" get pvc "${pvc_name}" -o wide || true
+  echo
+  kctl -n "${namespace}" describe pvc "${pvc_name}" || true
+  echo
+  echo "Longhorn volumes:"
+  kctl -n longhorn-system get volumes.longhorn.io || true
+  echo
+  echo "Longhorn volume attachments:"
+  kctl -n longhorn-system get volumeattachments.longhorn.io || true
+}
+
 cleanup() {
   if [[ -n "${temp_kubeconfig}" ]]; then
     rm -f "${temp_kubeconfig}" >/dev/null 2>&1 || true
@@ -213,7 +229,10 @@ status "A02 longhorn default" "${longhorn_default:-false/empty}"
 kctl delete namespace "${namespace}" --ignore-not-found=true --wait=true >/dev/null 2>&1 || true
 kctl apply -f "${manifest_kubectl_path}" >/dev/null
 
-kctl -n "${namespace}" wait --for=jsonpath='{.status.phase}'=Bound pvc/longhorn-rwo-smoke --timeout=240s >/dev/null
+kctl -n "${namespace}" wait --for=jsonpath='{.status.phase}'=Bound pvc/longhorn-rwo-smoke --timeout=240s >/dev/null || {
+  diagnose_pvc_failure "longhorn-rwo-smoke"
+  fail "RWO Longhorn PVC did not bind"
+}
 status "A03 RWO PVC" "Bound"
 
 kctl -n "${namespace}" wait --for=condition=Ready pod/rwo-smoke --timeout=180s >/dev/null
@@ -223,7 +242,10 @@ if [[ "${rwo_value}" != "longhorn-rwo-ok" ]]; then
 fi
 status "A04 RWO pod IO" "${rwo_value}"
 
-kctl -n "${namespace}" wait --for=jsonpath='{.status.phase}'=Bound pvc/longhorn-rwx-smoke --timeout=240s >/dev/null
+kctl -n "${namespace}" wait --for=jsonpath='{.status.phase}'=Bound pvc/longhorn-rwx-smoke --timeout=240s >/dev/null || {
+  diagnose_pvc_failure "longhorn-rwx-smoke"
+  fail "RWX Longhorn PVC did not bind"
+}
 status "A05 RWX PVC" "Bound"
 
 kctl -n "${namespace}" wait --for=condition=Ready pod/rwx-writer --timeout=180s >/dev/null
