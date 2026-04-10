@@ -129,6 +129,10 @@ spec:
               value: {{ ternary "true" "false" .Values.mlEngine.kafkaEnabled | quote }}
             - name: KAFKA_BOOTSTRAP_SERVERS
               value: "kafka:29092"
+            - name: MY_POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
             - name: KAFKA_GROUP_ID
               value: "ml-engine-consumers"
             - name: KAFKA_AUTO_OFFSET_RESET

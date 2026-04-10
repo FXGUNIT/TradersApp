@@ -22,6 +22,7 @@ Environment:
 from __future__ import annotations
 
 import os
+import socket
 import sys
 import json
 import time
@@ -128,7 +129,7 @@ class KafkaConsumerClient:
         conf = {
             "bootstrap.servers": self._bootstrap,
             "group.id": self._group_id,
-            "client.id": f"traders-ml-engine-consumer",
+            "client.id": f"traders-ml-engine-consumer-{os.environ.get('MY_POD_NAME', socket.gethostname())}",
             "auto.offset.reset": self._auto_offset_reset,
             "enable.auto.commit": False,           # Manual commit for at-least-once delivery
             "auto.commit.interval.ms": 5000,

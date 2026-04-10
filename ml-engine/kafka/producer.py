@@ -25,6 +25,7 @@ Environment:
 from __future__ import annotations
 
 import os
+import socket
 import sys
 import json
 import time
@@ -166,7 +167,7 @@ class KafkaProducerClient:
 
         conf = {
             "bootstrap.servers": self._bootstrap,
-            "client.id": "traders-ml-engine",
+            "client.id": f"traders-ml-engine-{os.environ.get('MY_POD_NAME', socket.gethostname())}",
             "acks": "all",                        # Wait for all replicas
             "retries": 3,
             "retry.backoff.ms": 1000,
