@@ -268,7 +268,7 @@ def continuous_model_monitoring():
 
         from data_quality.validation_pipeline import run_full_validation
 
-        report = run_full_validation(db_path=db_path, block=False, snapshot=snapshot)
+        report = run_full_validation(db_path=db_path, block=False)
         if not report.get("passed", False):
             failed_suites = [
                 name

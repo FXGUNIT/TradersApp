@@ -24,14 +24,16 @@ from pathlib import Path
 
 import pandas as pd
 
-# Add ml-engine to path
-PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
-sys.path.insert(0, str(PROJECT_ROOT))
+# ml-engine root (3 levels up from this file: features/ → ml-engine/)
+ML_ENGINE_ROOT = Path(__file__).parent.parent
+PROJECT_ROOT = ML_ENGINE_ROOT.parent
+if str(ML_ENGINE_ROOT) not in sys.path:
+    sys.path.insert(0, str(ML_ENGINE_ROOT))
 
-from ml_engine.data.candle_db import CandleDatabase
-from ml_engine.features.feast_repo.feature_pipeline import engineer_features, get_feature_vector
+from data.candle_db import CandleDatabase
+from features.feature_pipeline import engineer_features, get_feature_vector
 
-OUTPUT_DIR = PROJECT_ROOT / "ml_engine" / "data" / "feast_features"
+OUTPUT_DIR = ML_ENGINE_ROOT / "data" / "feast_features"
 
 
 def export_candle_features(db: CandleDatabase, symbol: str = "MNQ") -> pd.DataFrame:

@@ -116,12 +116,12 @@ def feast_materialization():
     @task(task_id="export_features_to_parquet")
     def export_parquet() -> dict:
         import pandas as pd
-        from ml_engine.features.export_features_parquet import (
+        from features.export_features_parquet import (
             export_candle_features,
             export_trade_features,
             export_session_features,
         )
-        from ml_engine.data.candle_db import CandleDatabase
+        from data.candle_db import CandleDatabase
 
         db_path = os.environ.get(
             "FEAST_DB_PATH",
@@ -194,12 +194,11 @@ def feast_materialization():
         repo_path = str(ML_ENGINE_ROOT / "features" / "feast_repo")
         fs = feast.FeatureStore(repo_path=repo_path)
 
-        from feast import EntityTimestamp
+        from datetime import datetime, timezone as _tz
         try:
             print("[Feast] Materializing candle_features (last 24h)...")
-            materialize_start = pendulum.now("UTC").subtract(hours=24)
             result = fs.materialize_incremental(
-                end_date=EntityTimestamp("now"),
+                end_date=datetime.now(_tz.utc),
                 feature_views=["candle_features"],
             )
             print(f"[Feast] candle_features: {result}")
@@ -218,11 +217,11 @@ def feast_materialization():
         repo_path = str(ML_ENGINE_ROOT / "features" / "feast_repo")
         fs = feast.FeatureStore(repo_path=repo_path)
 
-        from feast import EntityTimestamp
+        from datetime import datetime, timezone as _tz
         try:
             print("[Feast] Materializing historical_features...")
             result = fs.materialize_incremental(
-                end_date=EntityTimestamp("now"),
+                end_date=datetime.now(_tz.utc),
                 feature_views=["historical_features"],
             )
             print(f"[Feast] historical_features: {result}")
@@ -241,11 +240,11 @@ def feast_materialization():
         repo_path = str(ML_ENGINE_ROOT / "features" / "feast_repo")
         fs = feast.FeatureStore(repo_path=repo_path)
 
-        from feast import EntityTimestamp
+        from datetime import datetime, timezone as _tz
         try:
             print("[Feast] Materializing session_features...")
             result = fs.materialize_incremental(
-                end_date=EntityTimestamp("now"),
+                end_date=datetime.now(_tz.utc),
                 feature_views=["session_features"],
             )
             print(f"[Feast] session_features: {result}")
@@ -262,7 +261,7 @@ def feast_materialization():
         """
         import time
 
-        from ml_engine.features.feast_client import get_candle_features, get_feature_info
+        from features.feast_client import get_candle_features, get_feature_info
 
         symbol = export_result.get("symbol", "MNQ")
 
