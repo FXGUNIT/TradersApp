@@ -38,7 +38,7 @@ wait_for_api() {
   for _ in $(seq 1 60); do
     state="$(sudo -n systemctl is-active k3s 2>/dev/null || true)"
     livez="$(curl -ksS -o /dev/null -w '%{http_code}' https://127.0.0.1:6443/livez 2>/dev/null || true)"
-    if [[ "${state}" == "active" && "${livez}" == "200" ]]; then
+    if [[ "${state}" == "active" && ( "${livez}" == "200" || "${livez}" == "401" ) ]]; then
       status "k3s service" "${state}"
       status "API livez" "${livez}"
       return
