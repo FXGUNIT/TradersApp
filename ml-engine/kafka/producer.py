@@ -74,6 +74,7 @@ TOPIC_CONSENSUS = "consensus-signals"
 TOPIC_PREDICTIONS = "model-predictions"
 TOPIC_FEEDBACK = "feedback-loop"
 TOPIC_DRIFT = "drift-alerts"
+TOPIC_DLQ = "dead-letter-queue"
 
 ALL_TOPICS = [
     TOPIC_CANDLES,
@@ -81,6 +82,7 @@ ALL_TOPICS = [
     TOPIC_PREDICTIONS,
     TOPIC_FEEDBACK,
     TOPIC_DRIFT,
+    TOPIC_DLQ,
 ]
 
 KAFKA_REQUEST_ID_HEADER = "x-request-id"
@@ -478,7 +480,26 @@ class KafkaProducerClient:
                 "metric_value": metric_value,
                 "threshold": threshold,
                 "description": description,
-                "triggered_at": datetime.now(timezone.utc).isoformat(),
+            },
+        )
+
+    def publish_dead_letter(
+        self,
+        original_topic: str,
+        original_key: str | None,
+        original_payload: dict,
+        error: str,
+    ) -> bool:
+        """Forward an unprocessable message to the dead-letter-queue topic."""
+        return self._publish(
+            topic=TOPIC_DLQ,
+            key=original_key or original_topic,
+            value={
+                "original_topic": original_topic,
+                "original_key": original_key,
+                "original_payload": original_payload,
+                "error": error,
+                "forwarded_at": datetime.now(timezone.utc).isoformat(),
             },
         )
 

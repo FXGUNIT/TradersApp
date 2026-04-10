@@ -67,6 +67,19 @@ TOPIC_CONSENSUS = "consensus-signals"
 TOPIC_PREDICTIONS = "model-predictions"
 TOPIC_FEEDBACK = "feedback-loop"
 TOPIC_DRIFT = "drift-alerts"
+TOPIC_DLQ = "dead-letter-queue"
+
+# Max handler failures before a message is forwarded to the dead-letter queue.
+DLQ_MAX_RETRIES = int(os.environ.get("KAFKA_DLQ_MAX_RETRIES", "3"))
+
+try:
+    from infrastructure.prometheus_exporter import set_kafka_consumer_lag as _set_lag
+except Exception:
+    try:
+        from ml_engine.infrastructure.prometheus_exporter import set_kafka_consumer_lag as _set_lag  # type: ignore
+    except Exception:
+        def _set_lag(topic: str, partition: int, lag: int) -> None:  # type: ignore
+            pass
 
 
 class KafkaConsumerClient:
@@ -108,6 +121,11 @@ class KafkaConsumerClient:
         self._messages_processed = 0
         self._messages_failed = 0
         self._last_message_time: Optional[str] = None
+
+        # DLQ retry tracking: (topic, partition, offset) -> failure_count
+        self._retry_counts: dict[tuple, int] = {}
+        # Lag reporting: emit metrics every N successful commits
+        self._lag_check_interval = int(os.environ.get("KAFKA_LAG_CHECK_INTERVAL", "50"))
         self._logger_name = "ml-engine.kafka.consumer"
 
         if self._enable:
@@ -430,10 +448,27 @@ class KafkaConsumerClient:
                             handler(event)
                             self._messages_processed += 1
                             self._last_message_time = datetime.now(timezone.utc).isoformat()
+                            # Clear retry count for successfully processed message
+                            self._retry_counts.pop((topic, msg.partition(), msg.offset()), None)
                             should_commit = True
                         except Exception as e:
                             self._log(logging.ERROR, "Handler error on topic=%s: %s", topic, e)
                             self._messages_failed += 1
+                            msg_key = (topic, msg.partition(), msg.offset())
+                            self._retry_counts[msg_key] = self._retry_counts.get(msg_key, 0) + 1
+                            if self._retry_counts[msg_key] >= DLQ_MAX_RETRIES:
+                                # Forward to DLQ and commit to unblock the consumer
+                                try:
+                                    from kafka.producer import get_producer  # lazy — avoids circular import
+                                    raw_key = msg.key().decode("utf-8", errors="replace") if msg.key() else None
+                                    get_producer().publish_dead_letter(topic, raw_key, event, str(e))
+                                except Exception as dlq_err:
+                                    self._log(logging.ERROR, "DLQ forward failed topic=%s offset=%s: %s",
+                                              topic, msg.offset(), dlq_err)
+                                del self._retry_counts[msg_key]
+                                should_commit = True  # unblock even when DLQ forward itself fails
+                                self._log(logging.ERROR, "Max retries reached; forwarded to DLQ topic=%s offset=%s",
+                                          topic, msg.offset())
                     else:
                         self._log(logging.WARNING, "No handler for topic=%s", topic)
                         should_commit = True
@@ -441,6 +476,18 @@ class KafkaConsumerClient:
                     if should_commit:
                         try:
                             self._consumer.commit(msg, asynchronous=False)
+                            # Periodic consumer-lag metric (every _lag_check_interval commits)
+                            if self._messages_processed % self._lag_check_interval == 0 and KAFKA_AVAILABLE:
+                                try:
+                                    from confluent_kafka import TopicPartition
+                                    tp = TopicPartition(topic, msg.partition())
+                                    low, high = self._consumer.get_watermark_offsets(tp, timeout=0.5)
+                                    committed_list = self._consumer.committed([tp], timeout=0.5)
+                                    if committed_list and committed_list[0].offset >= 0:
+                                        lag = max(0, high - committed_list[0].offset)
+                                        _set_lag(topic, msg.partition(), lag)
+                                except Exception:
+                                    pass
                         except Exception as e:
                             self._log(logging.ERROR, "Commit error topic=%s offset=%s: %s", topic, msg.offset(), e)
                     else:
