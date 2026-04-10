@@ -294,3 +294,41 @@ groups:
         annotations:
           summary: "Inference error rate > 1%"
           description: "More than 1% of inference requests are failing. Check Triton logs and model availability."
+
+  - name: pod-health
+    interval: 60s
+    rules:
+      # ID 49: Pod restart count alert
+      - alert: PodCrashLooping
+        expr: increase(kube_pod_container_status_restarts_total{namespace=~"tradersapp.*"}[15m]) > 3
+        for: 5m
+        labels:
+          severity: critical
+          service: kubernetes
+        annotations:
+          summary: "Pod {{ $labels.pod }} is crash-looping"
+          description: "Container {{ $labels.container }} in pod {{ $labels.pod }} has restarted more than 3 times in 15 minutes."
+
+      - alert: PodNotReady
+        expr: kube_pod_status_ready{condition="true", namespace=~"tradersapp.*"} == 0
+        for: 5m
+        labels:
+          severity: warning
+          service: kubernetes
+        annotations:
+          summary: "Pod {{ $labels.pod }} is not ready"
+          description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} has been in not-ready state for 5+ minutes."
+
+  - name: kafka-dlq
+    interval: 60s
+    rules:
+      # E06: DLQ message alert — poison messages indicate consumer handler failures
+      - alert: KafkaDLQMessageRate
+        expr: rate(ml_kafka_messages_published_total{topic="dead-letter-queue"}[5m]) > 0
+        for: 2m
+        labels:
+          severity: warning
+          service: kafka
+        annotations:
+          summary: "Messages forwarded to Kafka DLQ"
+          description: "ML Engine is forwarding messages to the dead-letter-queue. Handler is failing after {{ .topic }} retries."

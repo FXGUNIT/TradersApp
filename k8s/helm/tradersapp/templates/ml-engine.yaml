@@ -27,6 +27,7 @@ spec:
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/port: "{{ .Values.mlEngine.service.port }}"
+        prometheus.io/path: "/metrics"
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
@@ -141,6 +142,16 @@ spec:
               value: "true"
             - name: OTEL_SERVICE_NAME
               value: "ml-engine"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://jaeger.monitoring:4317"
+            - name: MY_POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: MY_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
             - name: DQ_VALIDATE_BEFORE_TRAIN
               value: {{ ternary "true" "false" .Values.mlEngine.dataQuality.validateBeforeTrain | quote }}
             - name: DQ_VALIDATE_BEFORE_PREDICT
