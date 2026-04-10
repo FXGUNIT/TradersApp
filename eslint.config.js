@@ -17,6 +17,7 @@ export default defineConfig([
     'src/**/*.fixed*',
     'src/**/*.full',
     'src/**/*.test*',
+    'telegram-bridge/**',
   ]),
   {
     files: ['**/*.{js,jsx}'],
@@ -32,6 +33,7 @@ export default defineConfig([
       'src/**/*.fixed*',
       'src/**/*.full',
       'src/**/*.test*',
+      'telegram-bridge/**',
     ],
     extends: [
       js.configs.recommended,
@@ -40,7 +42,7 @@ export default defineConfig([
     ],
     languageOptions: {
       ecmaVersion: 2020,
-      globals: globals.browser,
+      globals: { ...globals.browser, process: 'readonly' },
       parserOptions: {
         ecmaVersion: 'latest',
         ecmaFeatures: { jsx: true },
