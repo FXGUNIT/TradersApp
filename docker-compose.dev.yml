@@ -1,0 +1,256 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# TradersApp — Lightweight Dev Stack (replaces k3s for local development)
+# ─────────────────────────────────────────────────────────────────────────────
+# Tiers:
+#   Core only (~2 GB):   docker compose -f docker-compose.dev.yml up
+#   + MLflow (~3 GB):    docker compose -f docker-compose.dev.yml --profile mlops up
+#   + Observability:     docker compose -f docker-compose.dev.yml --profile mlops --profile observability up
+#
+# Stop:   docker compose -f docker-compose.dev.yml down
+# Reset:  docker compose -f docker-compose.dev.yml down -v
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  # ── Redis (always on — lightweight) ─────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: traders-dev-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --save "" --maxmemory 64mb --maxmemory-policy allkeys-lru --loglevel warning
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+
+  # ── ML Engine ──────────────────────────────────────────────────────────
+  ml-engine:
+    build:
+      context: .
+      dockerfile: Dockerfile.ml-engine
+    container_name: traders-dev-ml-engine
+    ports:
+      - "8001:8001"
+    environment:
+      DB_PATH: /data/trading_data.db
+      MODEL_STORE: /models/store
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      KAFKA_ENABLE: "false"
+      MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI:-}
+      OTEL_ENABLED: "false"
+    volumes:
+      - dev-ml-data:/data
+      - dev-ml-models:/models
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1536M
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 45s
+
+  # ── Analysis Service (gRPC) ──────────────────────────────────────────
+  analysis-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.bff
+    container_name: traders-dev-analysis
+    command: ["node", "analysis-server.mjs"]
+    ports:
+      - "50051:50051"
+    environment:
+      ML_ENGINE_URL: http://ml-engine:8001
+      ANALYSIS_SERVICE_GRPC_PORT: 50051
+      ANALYSIS_SERVICE_HEALTH_PORT: 8082
+      NODE_ENV: development
+    depends_on:
+      ml-engine:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8082/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ── BFF (single replica) ─────────────────────────────────────────────
+  bff:
+    build:
+      context: .
+      dockerfile: Dockerfile.bff
+    container_name: traders-dev-bff
+    ports:
+      - "8788:8788"
+    environment:
+      ML_ENGINE_URL: http://ml-engine:8001
+      ML_ANALYSIS_TRANSPORT: ${ML_ANALYSIS_TRANSPORT:-grpc}
+      ML_ANALYSIS_GRPC_ADDR: analysis-service:50051
+      ML_ANALYSIS_GRPC_STRICT: "false"
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      KAFKA_BOOTSTRAP_SERVERS: ""
+      NODE_ENV: development
+    depends_on:
+      ml-engine:
+        condition: service_healthy
+      analysis-service:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 384M
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8788/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ── Frontend (nginx) ─────────────────────────────────────────────────
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args:
+        VITE_BFF_URL: http://localhost:8788
+        VITE_API_URL: http://localhost:8788/api
+    container_name: traders-dev-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - bff
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+
+  # ═══════════════════════════════════════════════════════════════════════
+  #  PROFILE: mlops  (adds MLflow + Postgres + MinIO)
+  # ═══════════════════════════════════════════════════════════════════════
+  postgres:
+    image: postgres:16-alpine
+    container_name: traders-dev-postgres
+    profiles: ["mlops"]
+    environment:
+      POSTGRES_USER: traders
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-traders123}
+      POSTGRES_DB: mlflow
+    ports:
+      - "5432:5432"
+    volumes:
+      - dev-postgres-data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U traders"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    container_name: traders-dev-minio
+    profiles: ["mlops"]
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD:-minioadmin123}
+    command: server /data --console-address ":9001"
+    volumes:
+      - dev-minio-data:/data
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.21.3
+    container_name: traders-dev-mlflow
+    profiles: ["mlops"]
+    ports:
+      - "5000:5000"
+    environment:
+      MLFLOW_TRACKING_URI: postgresql://traders:${POSTGRES_PASSWORD:-traders123}@postgres:5432/mlflow
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-minioadmin}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-minioadmin}
+      AWS_DEFAULT_REGION: us-east-1
+      MLFLOW_ARTIFACT_ROOT: s3://mlflow-artifacts/
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 384M
+
+  # ═══════════════════════════════════════════════════════════════════════
+  #  PROFILE: observability  (adds Prometheus + Grafana only — no Jaeger/Loki)
+  # ═══════════════════════════════════════════════════════════════════════
+  prometheus:
+    image: prom/prometheus:v2.54.0
+    container_name: traders-dev-prometheus
+    profiles: ["observability"]
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./k8s/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=7d'
+      - '--storage.tsdb.retention.size=500MB'
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    container_name: traders-dev-grafana
+    profiles: ["observability"]
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-traders123}
+    volumes:
+      - ./k8s/observability/grafana-provisioning:/etc/grafana/provisioning:ro
+    deploy:
+      resources:
+        limits:
+          memory: 192M
+
+volumes:
+  dev-ml-data:
+  dev-ml-models:
+  dev-postgres-data:
+  dev-minio-data:
