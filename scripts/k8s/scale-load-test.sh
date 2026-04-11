@@ -35,6 +35,10 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LOCK_HELPER="$REPO_ROOT/scripts/lib/cluster-operation-lock.sh"
+
+# shellcheck source=/dev/null
+source "$LOCK_HELPER"
 
 # Default values
 NAMESPACE="${NAMESPACE:-tradersapp-dev}"
@@ -55,6 +59,7 @@ OUTPUT_DIR="${OUTPUT_DIR:-$REPO_ROOT/.artifacts/scale-load/$(date +%Y%m%d-%H%M%S
 USER_CLASS="${USER_CLASS:-}"
 WARM_CACHE="${WARM_CACHE:-false}"
 K6_SCENARIOS="${K6_SCENARIOS:-all}"
+CLUSTER_OPERATION_LOCK_OWNED="${CLUSTER_OPERATION_LOCK_OWNED:-false}"
 
 # k6 runner script
 K6_RUNNER="$REPO_ROOT/tests/load/k6/k6-runner.sh"
@@ -136,6 +141,16 @@ except Exception as e:
   fi
 
   echo "$(date -Iseconds),$replica,$scenario,$base_url,$sla_p95,$sla_p99,$max_fail,$exit_code,$total_req,$total_fail,$fail_ratio_val,$p50,$p95,$p99,$p95,$p99,$fail_ratio_val,$duration" >> "$CSV_FILE"
+
+  # ── Per-replica CSV: tests/load/results/scale-{replicas}.csv ─────────────────
+  local replica_csv="$REPO_ROOT/tests/load/results/scale-${replica}.csv"
+  if [[ ! -f "$replica_csv" ]]; then
+    cat > "$replica_csv" <<'CSVEOF'
+timestamp,scenario,sla_p95_ms,sla_p99_ms,total_requests,total_failures,fail_ratio,p50_ms,p95_ms,p99_ms,duration_s,exit_code
+CSVEOF
+  fi
+  echo "$(date -Iseconds),$scenario,$sla_p95,$sla_p99,$total_req,$total_fail,$fail_ratio_val,$p50,$p95,$p99,$duration,$exit_code" >> "$replica_csv"
+  log "Per-replica CSV: $replica_csv"
 }
 
 # ─── Parse CLI flags ───────────────────────────────────────────────────────────
@@ -184,6 +199,7 @@ fi
 ORIGINAL_REPLICAS="$(kubectl -n "$NAMESPACE" get deploy "$DEPLOYMENT" -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "1")"
 ORIGINAL_BFF_REPLICAS=""
 PORT_FORWARD_PID=""
+LOCK_ACQUIRED="false"
 OVERALL_STATUS=0
 
 cleanup() {
@@ -194,8 +210,22 @@ cleanup() {
   if [[ "$SCALE_BFF" == "true" && -n "$ORIGINAL_BFF_REPLICAS" ]]; then
     kubectl -n "$NAMESPACE" scale deploy "$BFF_DEPLOYMENT" --replicas="$ORIGINAL_BFF_REPLICAS" >/dev/null 2>&1 || true
   fi
+  if [[ "$LOCK_ACQUIRED" == "true" ]]; then
+    cluster_lock_release >/dev/null 2>&1 || true
+  fi
 }
 trap cleanup EXIT
+
+if [[ "$CLUSTER_OPERATION_LOCK_OWNED" == "true" ]]; then
+  if [[ -z "${CLUSTER_LOCK_DIR:-}" || ! -d "$CLUSTER_LOCK_DIR" ]]; then
+    fail "Inherited cluster lock requested, but no active lock directory was found."
+  fi
+  log "Using inherited cluster-operation lock: $CLUSTER_LOCK_DIR"
+else
+  cluster_lock_acquire "scale-load-test" "$NAMESPACE" || fail "Unable to acquire live-operation lock."
+  LOCK_ACQUIRED="true"
+  log "Acquired cluster-operation lock: $CLUSTER_LOCK_DIR"
+fi
 
 if [[ "$SCALE_BFF" == "true" ]]; then
   ORIGINAL_BFF_REPLICAS="$(kubectl -n "$NAMESPACE" get deploy "$BFF_DEPLOYMENT" -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "1")"
@@ -357,16 +387,50 @@ if [[ -f "$CSV_FILE" ]]; then
   log "Summary (from CSV):"
   python3 -c "
 import csv, sys
+
 try:
     rows = list(csv.DictReader(open('$CSV_FILE')))
-    print(f'  Replicas  P95(ms)  P99(ms)  Fail%    Exit')
-    print(f'  -------   ------   ------   -----    ----')
+    if not rows:
+        print('  (no data)')
+        sys.exit(0)
+
+    sla_p95 = float(rows[0].get('sla_p95_ms', 0))
+    sla_p99 = float(rows[0].get('sla_p99_ms', 0))
+    max_fail = float(rows[0].get('max_fail_ratio', 0.01))
+
+    print(f'  SLA P95  : {sla_p95:.0f} ms   SLA P99: {sla_p99:.0f} ms   Max fail: {max_fail*100:.2f}%')
+    print(f'  {\"─\"*75}')
+    print(f'  {\"Replicas\":>9}  {\"P95(ms)\":>9}  {\"P99(ms)\":>9}  {\"Fail%\":>7}  {\"Exit\":>5}  {\"P95 vs SLA\":>12}  {\"P99 vs SLA\":>12}')
+    print(f'  {\"─\"*75}')
+
+    prev_p95 = None
+    prev_p99 = None
     for r in rows:
-        print(f'  {r[\"replica_count\"]:>7}   '
-              f'{float(r.get(\"p95_ms\",\"0\")):>6.1f}   '
-              f'{float(r.get(\"p99_ms\",\"0\")):>6.1f}   '
-              f'{float(r.get(\"fail_ratio_val\",r.get(\"fail_ratio\",\"0\")))*100:>5.2f}%   '
-              f'{r.get(\"exit_code\",\"?\"):>4}')
+        rep   = int(r.get('replica_count', 0))
+        p95   = float(r.get('p95_ms', 0) or r.get('actual_p95_ms', 0))
+        p99   = float(r.get('p99_ms', 0) or r.get('actual_p99_ms', 0))
+        fail  = float(r.get('fail_ratio', 0))
+        exc   = r.get('exit_code', '?')
+
+        p95_flag = '  OK' if p95 <= sla_p95 else ' FAIL'
+        p99_flag = '  OK' if p99 <= sla_p99 else ' FAIL'
+        fail_flag = 'OK' if fail <= max_fail else 'FAIL'
+
+        delta_p95 = ''
+        delta_p99 = ''
+        if prev_p95 is not None:
+            d95 = p95 - prev_p95
+            delta_p95 = f'{d95:+.1f}ms'
+        if prev_p99 is not None:
+            d99 = p99 - prev_p99
+            delta_p99 = f'{d99:+.1f}ms'
+
+        print(f'  {rep:>9}  {p95:>9.1f}  {p99:>9.1f}  {fail*100:>6.2f}%  {exc:>5}  {p95_flag} ({delta_p95:<8})  {p99_flag} ({delta_p99:<8})')
+        prev_p95 = p95
+        prev_p99 = p99
+
+    print(f'  {\"─\"*75}')
+    print('  (P95/P99 delta shows change vs previous replica count; + = slower, - = faster)')
 except Exception as e:
     print('  Could not parse CSV summary:', e)
 " 2>/dev/null || true
