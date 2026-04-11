@@ -79,53 +79,68 @@ class FeatureLineageRegistry:
             base.mkdir(parents=True, exist_ok=True)
             db_path = str(base / "feature_lineage.db")
         self.db_path = db_path
+        self._busy_timeout_ms = int(os.getenv("FEATURE_LINEAGE_SQLITE_TIMEOUT_MS", "30000"))
         self._ensure_schema()
 
+    def _connect(self) -> sqlite3.Connection:
+        conn = sqlite3.connect(
+            self.db_path,
+            timeout=max(5.0, self._busy_timeout_ms / 1000.0),
+        )
+        conn.row_factory = sqlite3.Row
+        try:
+            conn.execute(f"PRAGMA busy_timeout = {self._busy_timeout_ms}")
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA synchronous=NORMAL")
+        except sqlite3.DatabaseError:
+            # Best-effort hardening only; some filesystems may not support WAL.
+            pass
+        return conn
+
     def _ensure_schema(self):
-        conn = sqlite3.connect(self.db_path)
-        conn.execute(f"""
-            CREATE TABLE IF NOT EXISTS {self.DB_TABLE} (
-                feature_name TEXT PRIMARY KEY,
-                feature_view TEXT NOT NULL,
-                source_table TEXT NOT NULL,
-                source_column TEXT,
-                transformation TEXT NOT NULL,
-                dtype TEXT NOT NULL,
-                description TEXT DEFAULT '',
-                created_at TEXT NOT NULL,
-                version INTEGER DEFAULT 1,
-                last_materialized TEXT,
-                last_materialized_by TEXT,
-                freshness_hours REAL,
-                drift_score REAL,
-                tags TEXT DEFAULT '[]'
-            )
-        """)
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS materialization_log (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                feature_view TEXT NOT NULL,
-                started_at TEXT NOT NULL,
-                completed_at TEXT,
-                rows_materialized INTEGER,
-                duration_seconds REAL,
-                status TEXT,
-                error TEXT
-            )
-        """)
-        conn.commit()
-        conn.close()
+        with self._connect() as conn:
+            conn.execute(f"""
+                CREATE TABLE IF NOT EXISTS {self.DB_TABLE} (
+                    feature_name TEXT PRIMARY KEY,
+                    feature_view TEXT NOT NULL,
+                    source_table TEXT NOT NULL,
+                    source_column TEXT,
+                    transformation TEXT NOT NULL,
+                    dtype TEXT NOT NULL,
+                    description TEXT DEFAULT '',
+                    created_at TEXT NOT NULL,
+                    version INTEGER DEFAULT 1,
+                    last_materialized TEXT,
+                    last_materialized_by TEXT,
+                    freshness_hours REAL,
+                    drift_score REAL,
+                    tags TEXT DEFAULT '[]'
+                )
+            """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS materialization_log (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    feature_view TEXT NOT NULL,
+                    started_at TEXT NOT NULL,
+                    completed_at TEXT,
+                    rows_materialized INTEGER,
+                    duration_seconds REAL,
+                    status TEXT,
+                    error TEXT
+                )
+            """)
+            conn.commit()
 
     def register(self, lineage: FeatureLineage) -> None:
         """Register a feature's lineage record."""
-        conn = sqlite3.connect(self.db_path)
-        conn.execute(f"""
-            INSERT OR REPLACE INTO {self.DB_TABLE}
-            (feature_name, feature_view, source_table, source_column, transformation,
-             dtype, description, created_at, version, last_materialized,
-             last_materialized_by, freshness_hours, drift_score, tags)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
+        self.register_many([lineage])
+
+    def register_many(self, lineages: list[FeatureLineage]) -> None:
+        """Bulk register feature lineages using a single transaction."""
+        if not lineages:
+            return
+
+        rows = [(
             lineage.feature_name,
             lineage.feature_view,
             lineage.source_table,
@@ -140,43 +155,43 @@ class FeatureLineageRegistry:
             lineage.freshness_hours,
             lineage.drift_score,
             json.dumps(lineage.tags),
-        ))
-        conn.commit()
-        conn.close()
+        ) for lineage in lineages]
 
-    def register_many(self, lineages: list[FeatureLineage]) -> None:
-        """Bulk register feature lineages."""
-        for l in lineages:
-            self.register(l)
+        with self._connect() as conn:
+            conn.executemany(f"""
+                INSERT OR REPLACE INTO {self.DB_TABLE}
+                (feature_name, feature_view, source_table, source_column, transformation,
+                 dtype, description, created_at, version, last_materialized,
+                 last_materialized_by, freshness_hours, drift_score, tags)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, rows)
+            conn.commit()
 
     def get(self, feature_name: str) -> FeatureLineage | None:
         """Get lineage for a single feature."""
-        conn = sqlite3.connect(self.db_path)
-        row = conn.execute(
-            f"SELECT * FROM {self.DB_TABLE} WHERE feature_name = ?", (feature_name,)
-        ).fetchone()
-        conn.close()
+        with self._connect() as conn:
+            row = conn.execute(
+                f"SELECT * FROM {self.DB_TABLE} WHERE feature_name = ?", (feature_name,)
+            ).fetchone()
         if row is None:
             return None
         return self._row_to_lineage(row)
 
     def get_by_view(self, feature_view: str) -> list[FeatureLineage]:
         """Get all features belonging to a FeatureView."""
-        conn = sqlite3.connect(self.db_path)
-        rows = conn.execute(
-            f"SELECT * FROM {self.DB_TABLE} WHERE feature_view = ? ORDER BY feature_name",
-            (feature_view,)
-        ).fetchall()
-        conn.close()
+        with self._connect() as conn:
+            rows = conn.execute(
+                f"SELECT * FROM {self.DB_TABLE} WHERE feature_view = ? ORDER BY feature_name",
+                (feature_view,)
+            ).fetchall()
         return [self._row_to_lineage(r) for r in rows]
 
     def get_all(self) -> list[FeatureLineage]:
         """Get all registered feature lineages."""
-        conn = sqlite3.connect(self.db_path)
-        rows = conn.execute(
-            f"SELECT * FROM {self.DB_TABLE} ORDER BY feature_view, feature_name"
-        ).fetchall()
-        conn.close()
+        with self._connect() as conn:
+            rows = conn.execute(
+                f"SELECT * FROM {self.DB_TABLE} ORDER BY feature_view, feature_name"
+            ).fetchall()
         return [self._row_to_lineage(r) for r in rows]
 
     def get_stale_features(
@@ -195,15 +210,14 @@ class FeatureLineageRegistry:
     ) -> None:
         """Mark all features in a FeatureView as freshly materialized."""
         now = datetime.now(timezone.utc).isoformat()
-        conn = sqlite3.connect(self.db_path)
-        conn.execute(f"""
-            UPDATE {self.DB_TABLE}
-            SET last_materialized = ?,
-                last_materialized_by = ?
-            WHERE feature_view = ?
-        """, (now, materialized_by, feature_view))
-        conn.commit()
-        conn.close()
+        with self._connect() as conn:
+            conn.execute(f"""
+                UPDATE {self.DB_TABLE}
+                SET last_materialized = ?,
+                    last_materialized_by = ?
+                WHERE feature_view = ?
+            """, (now, materialized_by, feature_view))
+            conn.commit()
 
     def log_materialization(
         self,
@@ -214,22 +228,21 @@ class FeatureLineageRegistry:
         error: str | None = None,
     ) -> None:
         """Log a materialization run."""
-        conn = sqlite3.connect(self.db_path)
-        conn.execute("""
-            INSERT INTO materialization_log
-            (feature_view, started_at, completed_at, rows_materialized, duration_seconds, status, error)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (
-            feature_view,
-            datetime.now(timezone.utc).isoformat(),
-            datetime.now(timezone.utc).isoformat(),
-            rows,
-            duration_seconds,
-            status,
-            error,
-        ))
-        conn.commit()
-        conn.close()
+        with self._connect() as conn:
+            conn.execute("""
+                INSERT INTO materialization_log
+                (feature_view, started_at, completed_at, rows_materialized, duration_seconds, status, error)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (
+                feature_view,
+                datetime.now(timezone.utc).isoformat(),
+                datetime.now(timezone.utc).isoformat(),
+                rows,
+                duration_seconds,
+                status,
+                error,
+            ))
+            conn.commit()
 
     def get_materialization_history(
         self,
@@ -237,17 +250,16 @@ class FeatureLineageRegistry:
         limit: int = 10,
     ) -> list[dict]:
         """Get materialization run history."""
-        conn = sqlite3.connect(self.db_path)
-        query = "SELECT * FROM materialization_log"
-        params: list = []
-        if feature_view:
-            query += " WHERE feature_view = ?"
-            params.append(feature_view)
-        query += " ORDER BY started_at DESC LIMIT ?"
-        params.append(limit)
-        rows = conn.execute(query, params).fetchall()
-        conn.close()
-        cols = [d[0] for d in conn.execute("PRAGMA table_info(materialization_log)").fetchall()]
+        with self._connect() as conn:
+            query = "SELECT * FROM materialization_log"
+            params: list = []
+            if feature_view:
+                query += " WHERE feature_view = ?"
+                params.append(feature_view)
+            query += " ORDER BY started_at DESC LIMIT ?"
+            params.append(limit)
+            rows = conn.execute(query, params).fetchall()
+            cols = [row["name"] for row in conn.execute("PRAGMA table_info(materialization_log)").fetchall()]
         return [dict(zip(cols, r)) for r in rows]
 
     def _row_to_lineage(self, row: sqlite3.Row) -> FeatureLineage:
@@ -384,8 +396,10 @@ def register_tradersapp_lineage(registry: FeatureLineageRegistry) -> None:
         ("candle_count",   "session_aggregates", "candle_count",  "raw",              "int64",   "Number of 5-minute candles in session"),
     ]
 
+    lineages: list[FeatureLineage] = []
+
     for name, table, col, xform, dtype, desc in candle_feats:
-        registry.register(FeatureLineage(
+        lineages.append(FeatureLineage(
             feature_name=name,
             feature_view="candle_features",
             source_table=table,
@@ -397,7 +411,7 @@ def register_tradersapp_lineage(registry: FeatureLineageRegistry) -> None:
         ))
 
     for name, table, col, xform, dtype, desc in hist_feats:
-        registry.register(FeatureLineage(
+        lineages.append(FeatureLineage(
             feature_name=name,
             feature_view="historical_features",
             source_table=table,
@@ -409,7 +423,7 @@ def register_tradersapp_lineage(registry: FeatureLineageRegistry) -> None:
         ))
 
     for name, table, col, xform, dtype, desc in sess_feats:
-        registry.register(FeatureLineage(
+        lineages.append(FeatureLineage(
             feature_name=name,
             feature_view="session_features",
             source_table=table,
@@ -419,6 +433,8 @@ def register_tradersapp_lineage(registry: FeatureLineageRegistry) -> None:
             description=desc,
             tags=["session", "aggregate"],
         ))
+
+    registry.register_many(lineages)
 
 
 # ─── Warmup ─────────────────────────────────────────────────────────────────────

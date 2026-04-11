@@ -80,6 +80,16 @@ def health():
         }
     models = registry_status.get("available_models", [])
 
+    feast_status = {
+        "lineage_registered": 0,
+        "online_store_warmed": feast_warmed,
+    }
+    if lineage_registry:
+        try:
+            feast_status["lineage_registered"] = len(lineage_registry.get_all())
+        except Exception as exc:
+            feast_status["lineage_error"] = str(exc)
+
     return {
         "status": "healthy",
         "request_id": get_request_id(),
@@ -92,10 +102,7 @@ def health():
         "models_available": models,
         "model_registry": registry_status,
         "last_training": stats.get("last_training"),
-        "feast": {
-            "lineage_registered": len(lineage_registry.get_all()) if lineage_registry else 0,
-            "online_store_warmed": feast_warmed,
-        },
+        "feast": feast_status,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
