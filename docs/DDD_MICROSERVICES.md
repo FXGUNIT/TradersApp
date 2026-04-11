@@ -4,7 +4,7 @@
 
 Asset variants: [PNG export](./assets/architecture-3d-overview.png) | [Print-friendly SVG](./assets/architecture-3d-overview-print.svg)
 
-This repo is no longer using DDD only as a naming convention. It now has explicit bounded-context ownership, versioned gRPC contracts, and one live extracted service boundary on the critical path.
+This repo is no longer using DDD only as a naming convention. It now has explicit bounded-context ownership, versioned gRPC contracts, and one live extracted service seam on the critical path.
 
 The important nuance is this: the platform is in an incremental extraction phase, not a finished microservice split. That is the correct shape for the current codebase. Stable contracts are already in place, but only the analysis boundary is deployed as its own runtime today.
 
@@ -13,7 +13,7 @@ The important nuance is this: the platform is in an incremental extraction phase
 | Context | Runtime status | Owns capability | Current implementation state |
 |---|---|---|---|
 | BFF orchestration | Separate runtime | Frontend orchestration, auth boundary, translation layer | Live and stable |
-| Analysis | Separate runtime | Low-latency consensus and scoring API | `analysis-service` is live over gRPC, but still proxies ML Engine internals |
+| Analysis | Separate runtime seam | Low-latency consensus and scoring API | `analysis-service` is live over gRPC, but still proxies ML Engine HTTP `/predict` internals |
 | Ingestion | Logical bounded context | Market data ingestion and persistence | Contracts and ownership exist; runtime remains in `ml-engine/data` and `ml-engine/kafka` |
 | Learning | Logical bounded context | Retraining, drift control, DQ gate | Contracts and ownership exist; runtime remains in `ml-engine/training`, `ml-engine/feedback`, and Airflow DAGs |
 
@@ -50,7 +50,7 @@ Current behavior:
 
 1. The BFF sends consensus requests to `AnalysisService.GetConsensus`.
 2. `analysis-service` validates and normalizes the request contract.
-3. The service proxies the call into the existing ML Engine `/predict` path.
+3. The service proxies the call into the existing ML Engine HTTP `/predict` path.
 4. The response comes back through the stable gRPC contract.
 
 This keeps the frontend and BFF stable while analysis logic is moved out of the monolith in controlled slices.
@@ -98,7 +98,8 @@ That is not full architecture linting, but it is enough to stop the most common 
 - MLflow, MinIO, and PostgreSQL give the learning context a stable control plane even before the service is physically extracted.
 - Airflow DAGs already act as the operational shell around the learning context.
 - Prometheus, Grafana, Loki, and Jaeger provide cross-service visibility without coupling domain logic together.
-- Gitea and Woodpecker enforce the same boundaries in CI before Helm deploys to k3s.
+- GitHub Actions currently drives the documented public-cloud deployment path, while Gitea and Woodpecker exist in-repo as the self-hosted CI/CD path.
+- Helm + k3s remain the production-style self-hosted rollout path, but the delivery story should currently be described as mixed rather than purely self-hosted.
 
 ## Practical migration order
 

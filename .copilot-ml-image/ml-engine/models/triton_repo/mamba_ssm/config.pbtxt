@@ -1,0 +1,85 @@
+# Triton model config — Mamba SSM (TorchScript via Python Backend)
+# Serves Mamba-1.4b state-space model for regime-aware sequence modeling
+# Backend: Python (libtorch / TorchScript)
+
+name: "mamba_ssm"
+backend: "python"
+max_batch_size: 4
+version_policy: { specific: { versions: [1] } }
+
+input [
+  {
+    name: "input_ids"
+    data_type: TYPE_INT64
+    dims: [-1, 512]
+    optional: false
+  }
+]
+
+output [
+  {
+    name: "logits"
+    data_type: TYPE_FP32
+    dims: [-1, 50277]
+  },
+  {
+    name: "prob_long"
+    data_type: TYPE_FP32
+    dims: [-1]
+  },
+  {
+    name: "prob_short"
+    data_type: TYPE_FP32
+    dims: [-1]
+  },
+  {
+    name: "confidence"
+    data_type: TYPE_FP32
+    dims: [-1]
+  },
+  {
+    name: "signal"
+    data_type: TYPE_STRING
+    dims: [-1]
+  }
+]
+
+instance_group [
+  {
+    count: 1
+    kind: KIND_GPU
+    gpus: [0]
+  }
+]
+
+# Dynamic batching disabled — Mamba is memory-intensive, process one at a time
+dynamic_batching {
+  preferred_batch_size: [1]
+  max_queue_delay_microseconds: 0
+}
+
+parameters {
+  key: "EXECUTE_TIMEOUT"
+  value: { string_value: "30" }
+}
+
+optimization {
+  input_pinned_memory { enable: true }
+  output_pinned_memory { enable: true }
+}
+
+strict_model_config: false
+
+# Model warmup: load TorchScript on startup
+warmup [
+  {
+    input_data: [
+      {
+        name: "input_ids"
+        dims: [1, 512]
+        data_type: TYPE_INT64
+        input_data_type: TYPE_INT64
+      }
+    ]
+  }
+]

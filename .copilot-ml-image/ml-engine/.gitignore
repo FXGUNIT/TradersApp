@@ -1,0 +1,53 @@
+# ─── DVC: data tracked via .dvc files, never raw ─────────────────────────────
+# Binary data — tracked via ml-engine/data/*.dvc
+*.db
+*.db-shm
+*.db-wal
+
+# Parquet feature exports — tracked via Feast + DVC
+*.parquet
+
+# ONNX model exports — tracked via ml-engine/models/*.dvc
+*.onnx
+
+# Numpy arrays
+*.npy
+*.npz
+
+# Raw/processed data directories
+raw/
+processed/
+interim/
+
+# Model binaries — tracked via ml-engine/models/*.dvc
+*.pkl
+*.joblib
+*.pt
+*.pth
+*.bin
+
+# Experiment outputs
+experiments/
+runs/
+logs/
+*.log
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# DVC internals (tracked at root level only)
+.dvc/
+.dvc tmp/
+.dvc cache/
+
+# MLflow artifacts (mounted externally)
+mlruns/
+mlartifacts/
+
+# Local overrides
+.env.local
+.env.dev
+*.local.yaml

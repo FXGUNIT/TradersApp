@@ -1,0 +1,38 @@
+# Prometheus scrape config for Triton Inference Server metrics
+#
+# Triton exposes metrics at:
+#   HTTP:  http://triton-gpu:8002/metrics
+#   gRPC:  triton-gpu:8001 (via grpc反射)
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: tradersapp
+    environment: production
+
+scrape_configs:
+  # ── Triton Inference Server ───────────────────────────────────────────────
+  - job_name: "triton"
+    static_configs:
+      - targets: ["triton-gpu:8002"]
+    metrics_path: /metrics
+    scrape_interval: 10s
+    scrape_timeout: 5s
+    relabel_configs:
+      # Label which model is being served
+      - source_labels: [__meta_triton_model_name]
+        target_label: model
+        regex: "(.+)"
+        action: replace
+      - source_labels: [__meta_triton_model_version]
+        target_label: model_version
+        regex: "(.+)"
+        action: replace
+
+  # ── ML Engine FastAPI ────────────────────────────────────────────────────
+  - job_name: "ml-engine"
+    static_configs:
+      - targets: ["ml-engine:8001"]
+    metrics_path: /metrics
+    scrape_interval: 10s

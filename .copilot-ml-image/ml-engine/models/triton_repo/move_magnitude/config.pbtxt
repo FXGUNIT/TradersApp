@@ -1,0 +1,52 @@
+# Triton model config — Move Magnitude (Target Profit Taker)
+# Python Backend — serves LightGBM quantile regression with JSON I/O
+
+name: "move_magnitude"
+backend: "python"
+max_batch_size: 32
+version_policy: { specific: { versions: [1] } }
+
+input [
+  {
+    name: "json_input"
+    data_type: TYPE_STRING
+    dims: [-1]
+  }
+]
+
+output [
+  {
+    name: "tp1_ticks"
+    data_type: TYPE_FP32
+    dims: [-1]
+  },
+  {
+    name: "tp2_ticks"
+    data_type: TYPE_FP32
+    dims: [-1]
+  },
+  {
+    name: "tp3_ticks"
+    data_type: TYPE_FP32
+    dims: [-1]
+  },
+  {
+    name: "uncertainty_band"
+    data_type: TYPE_FP32
+    dims: [-1]
+  }
+]
+
+instance_group [{ count: 1  kind: KIND_CPU }]
+
+dynamic_batching {
+  preferred_batch_size: [1, 4, 8, 16, 32]
+  max_queue_delay_microseconds: 5000
+}
+
+parameters {
+  key: "EXECUTE_TIMEOUT"
+  value: { string_value: "15" }
+}
+
+strict_model_config: false

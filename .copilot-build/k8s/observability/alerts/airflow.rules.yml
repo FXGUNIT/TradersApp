@@ -1,0 +1,117 @@
+# k8s/observability/alerts/airflow.rules.yml
+# Prometheus alerting rules for Apache Airflow DAG health
+groups:
+  - name: airflow-dag-health
+    interval: 60s
+    rules:
+      - alert: AirflowSchedulerDown
+        expr: absent(container_last_seen{name="traders-airflow-scheduler"})
+        for: 5m
+        labels:
+          severity: critical
+          service: airflow
+        annotations:
+          summary: "Airflow scheduler is down"
+          description: "The Airflow scheduler container has not been seen for 5+ minutes. DAGs will not run."
+
+      - alert: AirflowWebserverDown
+        expr: absent(container_last_seen{name="traders-airflow-webserver"})
+        for: 5m
+        labels:
+          severity: warning
+          service: airflow
+        annotations:
+          summary: "Airflow webserver is down"
+          description: "The Airflow webserver is unreachable. DAG status UI will be unavailable."
+
+      - alert: AirflowDAGBacklog
+        expr: |
+          (
+            time()
+            - on(dag_id) group_left()
+            airflow_dag_last_run_start_date{dag_id="continuous_model_monitoring"}
+          ) > 1800
+        for: 5m
+        labels:
+          severity: warning
+          service: airflow
+        annotations:
+          summary: "continuous_model_monitoring DAG is >30min overdue"
+          description: "The continuous_model_monitoring DAG has not run in over 30 minutes. Check Airflow scheduler logs."
+
+      - alert: AirflowDAGRunFailure
+        expr: increase(airflow_dag_run_failed_count[30m]) > 0
+        for: 2m
+        labels:
+          severity: critical
+          service: airflow
+        annotations:
+          summary: "Airflow DAG run failed"
+          description: "An Airflow DAG run has failed in the last 30 minutes. DAG ID: {{ $labels.dag_id }}, run state: failed."
+
+      - alert: AirflowTaskFailure
+        expr: increase(airflow_task_instance_failed_count[15m]) > 0
+        for: 2m
+        labels:
+          severity: warning
+          service: airflow
+        annotations:
+          summary: "Airflow task failure: {{ $labels.dag_id }}/{{ $labels.task_id }}"
+          description: "Task {{ $labels.task_id }} in DAG {{ $labels.dag_id }} failed. Check Airflow logs for details."
+
+      - alert: AirflowTriggeredRetrainFailed
+        expr: |
+          (
+            airflow_dag_run_duration_seconds{dag_id="continuous_model_monitoring"}
+            > 1200
+          )
+        for: 10m
+        labels:
+          severity: critical
+          service: airflow
+        annotations:
+          summary: "Model monitoring DAG took >20min (possible retrain failure)"
+          description: "The continuous_model_monitoring DAG run duration exceeds 20 minutes. A retrain may have stalled or failed."
+
+      - alert: AirflowDatabaseConnectionPoolExhausted
+        expr: |
+          pg_stat_activity_count{state="active", datname="airflow"}
+          > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: airflow
+        annotations:
+          summary: "Airflow PostgreSQL connection pool near exhaustion"
+          description: "PostgreSQL connection count for Airflow exceeds 80. Connections may be leaking or the scheduler is overloaded."
+
+  - name: airflow-dataprocessing
+    interval: 60s
+    rules:
+      - alert: AirflowCandleDataIngestionStalled
+        expr: |
+          increase(airflow_task_instance_completed_count{
+            dag_id=~"ingest.*|data_ingestion.*",
+            task_id=~"ingest_candles|fetch_candles"
+          }[30m]) == 0
+        for: 30m
+        labels:
+          severity: warning
+          service: airflow
+        annotations:
+          summary: "Candle data ingestion DAG has not completed in 30 minutes"
+          description: "The candle ingestion DAG has not completed any tasks in the last 30 minutes. Check Airflow logs."
+
+      - alert: AirflowRetrainPipelineStalled
+        expr: |
+          increase(airflow_task_instance_completed_count{
+            dag_id="continuous_model_monitoring",
+            task_id="trigger_retrain"
+          }[4h]) == 0
+        for: 4h
+        labels:
+          severity: warning
+          service: airflow
+        annotations:
+          summary: "No retrain triggered in 4 hours"
+          description: "The continuous_model_monitoring DAG has not triggered a retrain in over 4 hours. Verify drift detection thresholds and DAG health."

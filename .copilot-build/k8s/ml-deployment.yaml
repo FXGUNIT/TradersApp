@@ -1,0 +1,276 @@
+# k8s/ml-deployment.yaml — Python ML Engine on k3s
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ml-engine
+  namespace: tradersapp
+  labels:
+    app: ml-engine
+    tier: ml
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8001"
+    prometheus.io/path: "/metrics"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ml-engine
+  # Zero-downtime: block rollout until new pod is ready
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: ml-engine
+        tier: ml
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8001"
+    spec:
+      # Run as non-root
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      # Init container: pre-loads the latest MLflow Production model into the
+      # shared PVC before the main container starts. Ensures all pods start
+      # with the correct model even on fresh PVC mounts.
+      initContainers:
+        - name: model-sync
+          image: tradersapp/ml-engine:latest
+          imagePullPolicy: Always
+          command:
+            - python
+            - -c
+            - |
+              import os, sys
+              sys.path.insert(0, '/app')
+              from training.model_store import ModelStore
+              from infrastructure.mlflow_client import get_mlflow_client
+              store = ModelStore()
+              ml_client = get_mlflow_client("direction")
+              if ml_client:
+                  registry_models = ml_client.get_registry_models()
+                  model_names = sorted(registry_models) or store.list_all_models()
+                  for model_name in model_names:
+                      try:
+                          prod = ml_client.get_production_model(model_name)
+                          if prod and prod.get("version"):
+                              import mlflow
+                              ver = str(prod["version"])
+                              print(f"Pre-loading {model_name}@{ver} into PVC...")
+                              pipeline = mlflow.sklearn.load_model(f"models:/{model_name}/{ver}")
+                              store.save(model_name, pipeline, prod.get("metrics", {}),
+                                         prod.get("feature_cols", []), version=ver,
+                                         extra={"source": "init_sync", "run_id": prod.get("run_id")})
+                              print(f"  {model_name}@{ver} synced to PVC")
+                      except Exception as e:
+                          print(f"  Skipped {model_name}: {e}")
+              print("Model sync complete.")
+          env:
+            - name: MLFLOW_USE_REGISTRY
+              value: "true"
+            - name: MODEL_STORE_PVC_MOUNT
+              value: /models/store
+          volumeMounts:
+            - name: models
+              mountPath: /models
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+      containers:
+        - name: ml-engine
+          image: tradersapp/ml-engine:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8001
+              name: http
+          envFrom:
+            - configMapRef:
+                name: ml-engine-config
+            - configMapRef:
+                name: ml-engine-env
+            - secretRef:
+                name: ml-engine-secrets
+          env:
+            # Model store: use shared PVC mount for horizontal pod scaling
+            # All pods share the same ml-models-pvc → same model artifacts
+            - name: MODEL_STORE_PVC_MOUNT
+              value: /models/store
+            - name: MODEL_STORE_READ_ONLY
+              value: "true"
+            - name: MODEL_REGISTRY_MODE
+              value: sidecar
+            - name: MODEL_REGISTRY_URL
+              value: http://127.0.0.1:8010
+            - name: MODEL_REGISTRY_PORT
+              value: "8010"
+            - name: MODEL_REGISTRY_WARMUP
+              value: "true"
+            - name: MLFLOW_USE_REGISTRY
+              value: "true"
+            - name: REQUIRE_DATABASE_URL
+              value: "true"
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: tradersapp-secrets
+                  key: POSTGRES_PASSWORD
+                  optional: true
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 2000m
+              memory: 2Gi
+          # Startup probe: ML Engine loads models on boot, needs time
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8001
+            failureThreshold: 30
+            periodSeconds: 10
+            initialDelaySeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8001
+            failureThreshold: 3
+            periodSeconds: 20
+            initialDelaySeconds: 60
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8001
+            failureThreshold: 3
+            periodSeconds: 10
+            initialDelaySeconds: 30
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: models
+              mountPath: /models
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          lifecycle:
+            preStop:
+              # Graceful drain: stop accepting new requests before termination
+              exec:
+                command: ["/bin/sh", "-c", "sleep 5"]
+        - name: model-registry
+          image: tradersapp/ml-engine:latest
+          imagePullPolicy: Always
+          command:
+            - python
+            - -m
+            - uvicorn
+            - infrastructure.model_registry_sidecar:app
+            - --host
+            - 0.0.0.0
+            - --port
+            - "8010"
+          ports:
+            - containerPort: 8010
+              name: registry
+          envFrom:
+            - configMapRef:
+                name: ml-engine-config
+            - configMapRef:
+                name: ml-engine-env
+            - secretRef:
+                name: ml-engine-secrets
+          env:
+            - name: MODEL_STORE_PVC_MOUNT
+              value: /models/store
+            - name: MODEL_STORE_READ_ONLY
+              value: "true"
+            - name: MODEL_REGISTRY_WARMUP
+              value: "true"
+            - name: MODEL_REGISTRY_MAX_CACHED_INSTANCES
+              value: "4"
+            - name: MODEL_REGISTRY_PORT
+              value: "8010"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8010
+            failureThreshold: 3
+            periodSeconds: 10
+            initialDelaySeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8010
+            failureThreshold: 3
+            periodSeconds: 20
+            initialDelaySeconds: 20
+          volumeMounts:
+            - name: models
+              mountPath: /models
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: ml-state-pvc
+        - name: models
+          persistentVolumeClaim:
+            claimName: ml-models-pvc
+        - name: tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: 256Mi
+      # Graceful termination: give in-flight requests time to complete
+      terminationGracePeriodSeconds: 60
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ml-engine
+  namespace: tradersapp
+  labels:
+    app: ml-engine
+spec:
+  type: ClusterIP
+  selector:
+    app: ml-engine
+  ports:
+    - name: http
+      port: 8001
+      targetPort: 8001

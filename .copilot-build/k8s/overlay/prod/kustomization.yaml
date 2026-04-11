@@ -1,0 +1,69 @@
+# k8s/overlay/prod/kustomization.yaml — Production overlay
+namespace: tradersapp
+commonLabels:
+  environment: production
+resources:
+  - ../../base/namespace.yaml
+  - ../../base/storage.yaml
+  - ../../base/config.yaml
+  - ../../base/secrets.yaml
+  - ../../base/pdb.yaml
+  - ../../base/network-policies.yaml
+  - ../../ml-deployment.yaml
+  - ../../bff-deployment.yaml
+  - ../../frontend-deployment.yaml
+  - ../../hpa-ml-engine.yaml
+  - ../../hpa-bff.yaml
+patches:
+  # ML Engine: full resources
+  - target:
+      kind: Deployment
+      name: ml-engine
+    patch: |
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/cpu
+        value: "2000m"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: "2Gi"
+  # HPA: more aggressive in prod
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: ml-engine-hpa
+    patch: |
+      - op: replace
+        path: /spec/maxReplicas
+        value: 4
+  # Production shared storage: Longhorn is the standard self-hosted backend
+  - target:
+      kind: PersistentVolumeClaim
+      name: ml-models-pvc
+    patch: |
+      - op: replace
+        path: /spec/accessModes/0
+        value: ReadWriteMany
+      - op: replace
+        path: /spec/storageClassName
+        value: longhorn
+  - target:
+      kind: PersistentVolumeClaim
+      name: ml-state-pvc
+    patch: |
+      - op: replace
+        path: /spec/accessModes/0
+        value: ReadWriteMany
+      - op: replace
+        path: /spec/storageClassName
+        value: longhorn
+images:
+  - name: tradersapp/ml-engine
+    newTag: v1.0.0  # Semver tags only in prod
+  - name: tradersapp/bff
+    newTag: v1.0.0
+  - name: tradersapp/frontend
+    newTag: v1.0.0
+replicas:
+  - name: bff
+    count: 3
+  - name: frontend
+    count: 2

@@ -1,0 +1,29 @@
+{
+  "name": "tradersapp-bff",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "server.mjs",
+  "scripts": {
+    "analysis:start": "node analysis-server.mjs",
+    "analysis:dev": "node analysis-server.mjs",
+    "start": "node server.mjs",
+    "dev": "node server.mjs",
+    "pregenerate-grpc": "mkdir -p generated",
+    "generate-grpc": "grpc_tools_node_protoc --grpc_out=grpc_js:generated --js_out=import_style=commonjs,binary:generated -I ../proto ../proto/ddd/v1/*.proto && echo 'Generated gRPC stubs in bff/generated/'",
+    "generate-grpc:watch": "npm run generate-grpc && node --watch 'npm run generate-grpc' ../proto 2>/dev/null || true",
+    "postgenerate-grpc": "node -e \"const fs=require('fs');const path='generated/ddd/v1';fs.mkdirSync(path,{recursive:true});const files=['analysis_pb2.js','analysis_pb2_grpc.js'];files.forEach(f=>{const p=path+'/'+f;if(!fs.existsSync(p))console.warn('WARNING: missing '+p);else console.log('OK: '+p)});console.log('gRPC stub generation complete.');\""
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@grpc/grpc-js": "^1.14.3",
+    "@grpc/proto-loader": "^0.8.0",
+    "dotenv": "^16.3.1",
+    "prom-client": "^15.1.3",
+    "redis": "^5.0.0"
+  },
+  "devDependencies": {
+    "grpc-tools": "^1.12.4"
+  }
+}

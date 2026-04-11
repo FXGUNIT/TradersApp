@@ -1,0 +1,277 @@
+{{- /* Security: NetworkPolicies, PDBs, PVCs, ConfigMaps, Secrets */ -}}
+{{- if .Values.security.networkPolicies -}}
+---
+# Zero-trust NetworkPolicies
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ml-engine-netpol
+  namespace: {{ include "tradersapp.namespace" . }}
+spec:
+  podSelector:
+    matchLabels:
+      app: ml-engine
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: bff
+        - podSelector:
+            matchLabels:
+              app: frontend
+      ports:
+        - protocol: TCP
+          port: 8001
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: redis
+      ports:
+        - protocol: TCP
+          port: 6379
+    - to:
+        - podSelector:
+            matchLabels:
+              app: tradersapp-postgres
+      ports:
+        - protocol: TCP
+          port: 5432
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53  # DNS
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: bff-netpol
+  namespace: {{ include "tradersapp.namespace" . }}
+spec:
+  podSelector:
+    matchLabels:
+      app: bff
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: frontend
+      ports:
+        - protocol: TCP
+          port: 8788
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: analysis-service
+      ports:
+        - protocol: TCP
+          port: 50051
+    - to:
+        - podSelector:
+            matchLabels:
+              app: ml-engine
+      ports:
+        - protocol: TCP
+          port: 8001
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: analysis-service-netpol
+  namespace: {{ include "tradersapp.namespace" . }}
+spec:
+  podSelector:
+    matchLabels:
+      app: analysis-service
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: bff
+      ports:
+        - protocol: TCP
+          port: 50051
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: ml-engine
+      ports:
+        - protocol: TCP
+          port: 8001
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: frontend-netpol
+  namespace: {{ include "tradersapp.namespace" . }}
+spec:
+  podSelector:
+    matchLabels:
+      app: frontend
+  policyTypes: [Ingress, Egress]
+  ingress: []  # External only (no labeled pods need access)
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: bff
+      ports:
+        - protocol: TCP
+          port: 8788
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+{{- end }}
+
+{{- if .Values.security.podDisruptionBudgets -}}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: ml-engine-pdb
+  namespace: {{ include "tradersapp.namespace" . }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: ml-engine
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: bff-pdb
+  namespace: {{ include "tradersapp.namespace" . }}
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: bff
+{{- end }}
+
+{{- /* PVC for ML model store */ -}}
+{{- if .Values.mlEngine.persistence.enabled -}}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ml-models-pvc
+  namespace: {{ include "tradersapp.namespace" . }}
+spec:
+  accessModes:
+    {{- toYaml .Values.mlEngine.persistence.accessModes | nindent 4 }}
+  resources:
+    requests:
+      storage: {{ .Values.mlEngine.persistence.size }}
+  storageClassName: {{ .Values.mlEngine.persistence.storageClass }}
+{{- end }}
+
+{{- /* PVC for ML runtime state (/data) */ -}}
+{{- if .Values.mlEngine.runtimeState.enabled -}}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ml-state-pvc
+  namespace: {{ include "tradersapp.namespace" . }}
+spec:
+  accessModes:
+    {{- toYaml .Values.mlEngine.runtimeState.accessModes | nindent 4 }}
+  resources:
+    requests:
+      storage: {{ .Values.mlEngine.runtimeState.size }}
+  storageClassName: {{ .Values.mlEngine.runtimeState.storageClass }}
+{{- end }}
+
+{{- /* Redis (PVC optional) */ -}}
+{{- if .Values.redis.enabled -}}
+{{- if .Values.redis.persistence.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-pvc
+  namespace: {{ include "tradersapp.namespace" . }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.redis.persistence.size }}
+  {{- with .Values.redis.persistence.storageClass }}
+  storageClassName: {{ . }}
+  {{- end }}
+{{- end }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: {{ include "tradersapp.namespace" . }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+        - name: redis
+          image: "{{ .Values.redis.image.repository }}:{{ .Values.redis.image.tag }}"
+          ports:
+            - containerPort: 6379
+          {{- with .Values.redis.resources }}
+          resources:
+            {{- toYaml . | nindent 10 }}
+          {{- end }}
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
+          livenessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      volumes:
+        - name: redis-data
+          {{- if .Values.redis.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: redis-pvc
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: {{ include "tradersapp.namespace" . }}
+spec:
+  type: ClusterIP
+  selector:
+    app: redis
+  ports:
+    - port: 6379
+      targetPort: 6379
+{{- end }}

@@ -1,0 +1,170 @@
+# k8s/base/prometheus-rules.yaml — PrometheusRule CRDs for k8s
+# Prometheus Operator will pick these up automatically.
+# Requires prometheus-operator to be installed in the cluster.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: ml-engine-alerts
+  namespace: tradersapp
+  labels:
+    app: ml-engine
+    team: ml-platform
+spec:
+  groups:
+    - name: ml-engine-availability
+      interval: 30s
+      rules:
+        - alert: MLEngineDown
+          expr: up{job="ml-engine"} == 0
+          for: 1m
+          labels:
+            severity: critical
+            service: ml-engine
+          annotations:
+            summary: "ML Engine is down"
+            description: "ML Engine has been unreachable for more than 1 minute."
+        - alert: MLEngineHighErrorRate
+          expr: rate(ml_http_requests_total{status=~"5.."}[5m]) / rate(ml_http_requests_total[5m]) > 0.05
+          for: 3m
+          labels:
+            severity: critical
+            service: ml-engine
+          annotations:
+            summary: "ML Engine error rate > 5%"
+    - name: ml-engine-latency
+      interval: 30s
+      rules:
+        - alert: MLPredictionLatencyHigh
+          expr: histogram_quantile(0.99, sum(rate(ml_prediction_latency_seconds_bucket[5m])) by (le)) > 0.2
+          for: 5m
+          labels:
+            severity: warning
+            service: ml-engine
+          annotations:
+            summary: "Prediction latency p99 > 200ms"
+        - alert: MLPredictionLatencyCritical
+          expr: histogram_quantile(0.99, sum(rate(ml_prediction_latency_seconds_bucket[5m])) by (le)) > 0.5
+          for: 2m
+          labels:
+            severity: critical
+            service: ml-engine
+          annotations:
+            summary: "Prediction latency p99 > 500ms (CRITICAL)"
+        - alert: MLSLACriticalPathBreach
+          expr: histogram_quantile(0.95, sum(rate(bff_http_request_duration_seconds_bucket{route="/api/consensus"}[5m])) by (le)) > 0.050
+          for: 5m
+          labels:
+            severity: critical
+            service: bff
+            sla: "50ms"
+          annotations:
+            summary: "Consensus SLA breach - /api/consensus p95 > 50ms"
+        - alert: MLPredictionP50High
+          expr: histogram_quantile(0.50, sum(rate(ml_prediction_latency_seconds_bucket[5m])) by (le)) > 0.050
+          for: 10m
+          labels:
+            severity: warning
+            service: ml-engine
+          annotations:
+            summary: "Prediction p50 > 50ms"
+    - name: ml-engine-drift
+      interval: 60s
+      rules:
+        - alert: MLFeatureDriftDetected
+          expr: ml_feature_drift_psi > 0.2
+          for: 10m
+          labels:
+            severity: warning
+            service: ml-engine
+          annotations:
+            summary: "Feature drift detected (PSI > 0.2)"
+        - alert: MLDriftAlertStorm
+          expr: increase(ml_concept_drift_detected_total[15m]) + increase(ml_feature_drift_detected_total[15m]) + increase(ml_regime_drift_detected_total[15m]) > 5
+          for: 5m
+          labels:
+            severity: critical
+            service: ml-engine
+          annotations:
+            summary: "Drift alert storm — 5+ alerts in 15 minutes"
+    - name: ml-engine-resilience
+      interval: 30s
+      rules:
+        - alert: MLCircuitBreakerOpen
+          expr: ml_circuit_breaker_state == 2
+          for: 1m
+          labels:
+            severity: critical
+            service: ml-engine
+          annotations:
+            summary: "Circuit breaker OPEN — ML Engine rejecting requests"
+        - alert: DataQualityCriticalFailures
+          expr: max_over_time(ml_dq_critical_failures[5m]) > 0
+          for: 2m
+          labels:
+            severity: critical
+            service: ml-engine
+          annotations:
+            summary: "Data quality critical failures detected"
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: infrastructure-alerts
+  namespace: tradersapp
+  labels:
+    app: infrastructure
+    team: ml-platform
+spec:
+  groups:
+    - name: bff-availability
+      interval: 30s
+      rules:
+        - alert: BFFDown
+          expr: up{job="bff"} == 0
+          for: 1m
+          labels:
+            severity: critical
+            service: bff
+          annotations:
+            summary: "BFF is down"
+        - alert: BFFCannotReachMLEngine
+          expr: rate(bff_ml_engine_errors_total[5m]) > 0
+          for: 2m
+          labels:
+            severity: warning
+            service: bff
+          annotations:
+            summary: "BFF cannot reach ML Engine"
+    - name: kafka-availability
+      interval: 30s
+      rules:
+        - alert: KafkaConsumerLagHigh
+          expr: ml_kafka_consumer_lag > 500
+          for: 5m
+          labels:
+            severity: warning
+            service: kafka
+          annotations:
+            summary: "ML Engine Kafka consumer lag > 500"
+    - name: pod-health
+      interval: 60s
+      rules:
+        - alert: PodCrashLooping
+          expr: increase(kube_pod_container_status_restarts_total{namespace=~"tradersapp.*"}[15m]) > 3
+          for: 5m
+          labels:
+            severity: critical
+            service: kubernetes
+          annotations:
+            summary: "Pod {{ $labels.pod }} is crash-looping"
+    - name: redis-availability
+      interval: 30s
+      rules:
+        - alert: RedisDown
+          expr: redis_connected_clients == 0
+          for: 1m
+          labels:
+            severity: warning
+            service: redis
+          annotations:
+            summary: "Redis has no connected clients"

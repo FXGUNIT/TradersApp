@@ -1,0 +1,179 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1680 960" role="img" aria-labelledby="title desc">
+  <title id="title">TradersApp — Architecture Operating Map</title>
+  <desc id="desc">One chart answering what / how / why / where / whom for each lane in the TradersApp architecture.</desc>
+
+  <defs>
+    <linearGradient id="bg5" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f0f4fa"/>
+      <stop offset="100%" stop-color="#e8edf5"/>
+    </linearGradient>
+    <linearGradient id="row1-bg" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#fff7ea"/>
+      <stop offset="100%" stop-color="#fef3c7" stop-opacity="0.4"/>
+    </linearGradient>
+    <linearGradient id="row2-bg" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#eef9f0"/>
+      <stop offset="100%" stop-color="#d1fae5" stop-opacity="0.4"/>
+    </linearGradient>
+    <linearGradient id="row3-bg" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#eef8fc"/>
+      <stop offset="100%" stop-color="#dbeafe" stop-opacity="0.4"/>
+    </linearGradient>
+    <linearGradient id="row4-bg" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#f6f2ff"/>
+      <stop offset="100%" stop-color="#ede9fe" stop-opacity="0.4"/>
+    </linearGradient>
+    <linearGradient id="row5-bg" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#f8fafc"/>
+      <stop offset="100%" stop-color="#f1f5f9" stop-opacity="0.4"/>
+    </linearGradient>
+
+    <filter id="card5" x="-3%" y="-4%" width="106%" height="112%">
+      <feDropShadow dx="0" dy="2" stdDeviation="6" flood-color="#1e3a5f" flood-opacity="0.07"/>
+    </filter>
+    <filter id="inner-shadow" x="0%" y="0%" width="100%" height="100%">
+      <feComponentTransfer in="SourceAlpha">
+        <feFuncA type="table" tableValues="1 0"/>
+      </feComponentTransfer>
+      <feGaussianBlur stdDeviation="3"/>
+      <feOffset dx="0" dy="2"/>
+      <feComposite in2="SourceAlpha" operator="arithmetic" k2="-1" k3="1"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.08 0"/>
+      <feBlend in2="SourceGraphic" mode="normal"/>
+    </filter>
+
+    <style>
+      .bg5 { fill: url(#bg5); }
+      .title { font: 700 34px 'Inter','Segoe UI',Arial,sans-serif; fill: #0f1e35; }
+      .subtitle { font: 400 15px 'Inter','Segoe UI',Arial,sans-serif; fill: #64748b; }
+      .col-header { font: 700 19px 'Inter','Segoe UI',Arial,sans-serif; fill: #fff; }
+      .lane-label { font: 700 16px 'Inter','Segoe UI',Arial,sans-serif; fill: #0f1e35; }
+      .lane-tag { font: 600 10px 'Inter','Segoe UI',Arial,sans-serif; fill: #94a3b8; letter-spacing: 0.5px; }
+      .cell-primary { font: 700 14px 'Inter','Segoe UI',Arial,sans-serif; fill: #0f1e35; }
+      .cell { font: 400 13px 'Inter','Segoe UI',Arial,sans-serif; fill: #334155; }
+      .cell-sm { font: 400 12px 'Inter','Segoe UI',Arial,sans-serif; fill: #64748b; }
+      .vdiv { stroke: #e2e8f0; stroke-width: 1.5; }
+    </style>
+  </defs>
+
+  <rect class="bg5" width="1680" height="960"/>
+
+  <!-- Title -->
+  <text x="60" y="56" class="title">Architecture operating map</text>
+  <text x="60" y="80" class="subtitle">One chart that answers what · how · why · where · whom for each lane</text>
+
+  <!-- ── Column header row ── -->
+  <!-- Lane col -->
+  <rect x="56" y="108" width="200" height="52" rx="16" fill="#1e293b" filter="url(#card5)"/>
+  <text x="156" y="142" class="col-header" text-anchor="middle">Lane</text>
+  <!-- What col -->
+  <rect x="256" y="108" width="260" height="52" rx="16" fill="#475569" filter="url(#card5)"/>
+  <text x="386" y="142" class="col-header" text-anchor="middle">What</text>
+  <!-- How col -->
+  <rect x="516" y="108" width="260" height="52" rx="16" fill="#475569" filter="url(#card5)"/>
+  <text x="646" y="142" class="col-header" text-anchor="middle">How</text>
+  <!-- Why col -->
+  <rect x="776" y="108" width="260" height="52" rx="16" fill="#475569" filter="url(#card5)"/>
+  <text x="906" y="142" class="col-header" text-anchor="middle">Why</text>
+  <!-- Where col -->
+  <rect x="1036" y="108" width="260" height="52" rx="16" fill="#475569" filter="url(#card5)"/>
+  <text x="1166" y="142" class="col-header" text-anchor="middle">Where</text>
+  <!-- Whom col -->
+  <rect x="1296" y="108" width="330" height="52" rx="16" fill="#475569" filter="url(#card5)"/>
+  <text x="1461" y="142" class="col-header" text-anchor="middle">Whom</text>
+
+  <!-- Vertical dividers -->
+  <line x1="256" y1="108" x2="256" y2="840" class="vdiv"/>
+  <line x1="516" y1="108" x2="516" y2="840" class="vdiv"/>
+  <line x1="776" y1="108" x2="776" y2="840" class="vdiv"/>
+  <line x1="1036" y1="108" x2="1036" y2="840" class="vdiv"/>
+  <line x1="1296" y1="108" x2="1296" y2="840" class="vdiv"/>
+
+  <!-- Horizontal dividers (y positions: 160+154*4 = 776, last row ends at 840) -->
+  <line x1="56" y1="160" x2="1626" y2="160" class="vdiv"/>
+  <line x1="56" y1="314" x2="1626" y2="314" class="vdiv"/>
+  <line x1="56" y1="468" x2="1626" y2="468" class="vdiv"/>
+  <line x1="56" y1="622" x2="1626" y2="622" class="vdiv"/>
+
+  <!-- ═══ ROW 1 — Request path ═══ -->
+  <rect x="56" y="160" width="1570" height="154" fill="url(#row1-bg)"/>
+  <rect x="56" y="160" width="200" height="154" rx="0" fill="#ff8c00" fill-opacity="0.12"/>
+  <text x="76" y="200" class="lane-label">Request path</text>
+  <text x="76" y="218" class="lane-tag">CRITICAL SLA</text>
+  <text x="276" y="192" class="cell-primary">Frontend → BFF →</text>
+  <text x="276" y="210" class="cell-primary">analysis-service → ML Engine</text>
+  <text x="536" y="200" class="cell">HTTP at the edge.</text>
+  <text x="536" y="220" class="cell">gRPC at the service seam.</text>
+  <text x="796" y="200" class="cell">Keep live trading</text>
+  <text x="796" y="220" class="cell">latency under 50ms SLA.</text>
+  <text x="1056" y="200" class="cell">Browser, BFF, analysis-svc,</text>
+  <text x="1056" y="220" class="cell">ML Engine, Redis, Feast.</text>
+  <text x="1316" y="200" class="cell">Trader depends on it.</text>
+  <text x="1316" y="220" class="cell">BFF + analysis owners</text>
+  <text x="1316" y="240" class="cell">keep it stable.</text>
+
+  <!-- ═══ ROW 2 — Learning loop ═══ -->
+  <rect x="56" y="314" width="1570" height="154" fill="url(#row2-bg)"/>
+  <rect x="56" y="314" width="200" height="154" rx="0" fill="#059669" fill-opacity="0.10"/>
+  <text x="76" y="354" class="lane-label">Learning loop</text>
+  <text x="76" y="372" class="lane-tag">OFFLINE · ML OPS</text>
+  <text x="276" y="346" class="cell-primary">Retraining, data quality,</text>
+  <text x="276" y="364" class="cell-primary">registry, artifacts, feedback</text>
+  <text x="536" y="354" class="cell">Airflow DAGs, Great Expectations,</text>
+  <text x="536" y="374" class="cell">MLflow, Kafka, MinIO.</text>
+  <text x="796" y="354" class="cell">Stop drift. Promote only</text>
+  <text x="796" y="374" class="cell">validated model versions.</text>
+  <text x="1056" y="354" class="cell">ML Engine internals, Airflow,</text>
+  <text x="1056" y="374" class="cell">MLflow, MinIO, Postgres.</text>
+  <text x="1316" y="354" class="cell">ML owner / operator reviews</text>
+  <text x="1316" y="374" class="cell">and promotes versions.</text>
+
+  <!-- ═══ ROW 3 — Observability ═══ -->
+  <rect x="56" y="468" width="1570" height="154" fill="url(#row3-bg)"/>
+  <rect x="56" y="468" width="200" height="154" rx="0" fill="#0891b2" fill-opacity="0.10"/>
+  <text x="76" y="508" class="lane-label">Observability</text>
+  <text x="76" y="526" class="lane-tag">METRICS · LOGS · TRACES</text>
+  <text x="276" y="500" class="cell-primary">Metrics, logs, traces,</text>
+  <text x="276" y="518" class="cell-primary">dashboards, alerts.</text>
+  <text x="536" y="508" class="cell">Prometheus scrapes, Grafana</text>
+  <text x="536" y="528" class="cell">visualizes, Loki + Jaeger collect.</text>
+  <text x="796" y="508" class="cell">Catch latency, drift, retrain</text>
+  <text x="796" y="528" class="cell">failure, infra regressions early.</text>
+  <text x="1056" y="508" class="cell">Every runtime service</text>
+  <text x="1056" y="528" class="cell">across the full stack.</text>
+  <text x="1316" y="508" class="cell">Platform / operator team</text>
+  <text x="1316" y="528" class="cell">responds and tunes alerts.</text>
+
+  <!-- ═══ ROW 4 — Delivery + secrets ═══ -->
+  <rect x="56" y="622" width="1570" height="154" fill="url(#row4-bg)"/>
+  <rect x="56" y="622" width="200" height="154" rx="0" fill="#7c3aed" fill-opacity="0.10"/>
+  <text x="76" y="662" class="lane-label">Delivery + secrets</text>
+  <text x="76" y="680" class="lane-tag">CI/CD · RUNTIME</text>
+  <text x="276" y="654" class="cell-primary">Build, test, deploy, and</text>
+  <text x="276" y="672" class="cell-primary">inject runtime secrets.</text>
+  <text x="536" y="662" class="cell">Gitea, Woodpecker, Helm,</text>
+  <text x="536" y="682" class="cell">k3s, Infisical.</text>
+  <text x="796" y="662" class="cell">Ship changes safely without</text>
+  <text x="796" y="682" class="cell">manual drift.</text>
+  <text x="1056" y="662" class="cell">CI/CD pipeline, cluster release,</text>
+  <text x="1056" y="682" class="cell">runtime environments.</text>
+  <text x="1316" y="662" class="cell">Developer pushes; pipeline</text>
+  <text x="1316" y="682" class="cell">and platform own execution.</text>
+
+  <!-- ═══ ROW 5 — Reality check ═══ -->
+  <rect x="56" y="776" width="1570" height="64" fill="url(#row5-bg)"/>
+  <rect x="56" y="776" width="200" height="64" rx="0" fill="#1e293b" fill-opacity="0.07"/>
+  <text x="76" y="808" class="lane-label" fill-opacity="0.5">Reality check</text>
+  <text x="76" y="824" class="lane-tag">current state</text>
+  <text x="276" y="810" class="cell-sm">Only analysis extracted.</text>
+  <text x="276" y="826" class="cell-sm">Learning stays internal.</text>
+  <text x="536" y="810" class="cell-sm">Incremental extraction</text>
+  <text x="536" y="826" class="cell-sm">behind stable contracts.</text>
+  <text x="796" y="810" class="cell-sm">Lower risk than forcing</text>
+  <text x="796" y="826" class="cell-sm">premature microservices.</text>
+  <text x="1056" y="810" class="cell-sm">analysis-service is live.</text>
+  <text x="1056" y="826" class="cell-sm">Ingestion + learning in ML Engine.</text>
+  <text x="1316" y="810" class="cell-sm">Architecture owner chooses</text>
+  <text x="1316" y="826" class="cell-sm">the next extraction slice.</text>
+
+</svg>

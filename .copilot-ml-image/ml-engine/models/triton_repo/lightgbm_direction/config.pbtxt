@@ -1,0 +1,80 @@
+# Triton model config — LightGBM Direction Classifier
+# ONNX Runtime, GPU-accelerated, dynamic batching
+
+name: "lightgbm_direction"
+platform: "onnxruntime_onnx"
+max_batch_size: 64
+version_policy: {
+  specific: {
+    versions: [1]
+  }
+}
+
+input [
+  {
+    name: "input"
+    data_type: TYPE_FP32
+    dims: [44]
+    optional: false
+  }
+]
+
+output [
+  {
+    name: "prob_long"
+    data_type: TYPE_FP32
+    dims: [-1]
+  },
+  {
+    name: "prob_short"
+    data_type: TYPE_FP32
+    dims: [-1]
+  },
+  {
+    name: "confidence"
+    data_type: TYPE_FP32
+    dims: [-1]
+  },
+  {
+    name: "signal"
+    data_type: TYPE_STRING
+    dims: [-1]
+  }
+]
+
+instance_group [
+  {
+    count: 2
+    kind: KIND_GPU
+    gpus: [0]
+  }
+]
+
+# Dynamic batching — improves throughput by batching concurrent requests
+dynamic_batching {
+  preferred_batch_size: [1, 4, 8, 16, 32, 64]
+  max_queue_delay_microseconds: 5000   # Wait up to 5ms to fill a batch
+  preserve_ordering: false
+}
+
+# Optimization for memory and throughput
+optimization {
+  input_pinned_memory {
+    enable: true
+  }
+  output_pinned_memory {
+    enable: true
+  }
+  accelerator_deadline {
+    format: TYPE_MS
+    value: 50   # Target <50ms per batch
+  }
+}
+
+# Schedule policy — allows delayed scheduling for batching
+schedule_policy {
+  priority: PRIORITY_DEFAULT
+}
+
+# Metrics
+strict_model_config: false

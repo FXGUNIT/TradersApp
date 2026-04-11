@@ -1,0 +1,18 @@
+# Base kustomization - shared by all environments
+# k8s/base/kustomization.yaml
+namespace: tradersapp
+commonAnnotations:
+  tradersapp.io/version: "1.0.0"
+resources:
+  - namespace.yaml
+  - storage.yaml
+  - config.yaml
+  - pdb.yaml
+  - network-policies.yaml
+  - pod-monitor.yaml # Requires Prometheus Operator
+  - ml-deployment.yaml
+  - bff-deployment.yaml
+  - frontend-deployment.yaml
+  - hpa-ml-engine.yaml
+  - hpa-bff.yaml
+  - triton-deployment.yaml

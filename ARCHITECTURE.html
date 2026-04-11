@@ -607,13 +607,14 @@
         <div class="eyebrow">Architecture cockpit</div>
         <h1>Read the platform the way it actually runs today.</h1>
         <p>
-          TradersApp is no longer a simple app. It is a self-hosted trading ML platform with a live low-latency request path,
-          an extracted <code>analysis-service</code> seam, automated learning and data-quality loops, full observability, and self-hosted delivery.
+          TradersApp is no longer a simple app. It has a live low-latency request path, an extracted
+          <code>analysis-service</code> seam, automated learning and data-quality loops, and multiple delivery paths in-repo.
+          Some platform controls are current, some are partial, and some remain target-state only.
         </p>
         <div class="hero-stats">
           <div class="hero-stat">
             <span>Critical path</span>
-            <strong>Frontend -> BFF -> gRPC -> ML Engine</strong>
+            <strong>Frontend -> BFF -> gRPC seam -> HTTP /predict</strong>
           </div>
           <div class="hero-stat">
             <span>Async plane</span>
@@ -621,7 +622,7 @@
           </div>
           <div class="hero-stat">
             <span>Delivery model</span>
-            <strong>Helm on k3s with Infisical-fed runtime secrets</strong>
+            <strong>Mixed: Railway/Vercel today docs, Helm/k3s self-hosted path in repo</strong>
           </div>
         </div>
       </div>
@@ -639,9 +640,9 @@
             That is intentional risk control, not an architecture gap.
           </div>
           <div class="status-item">
-            <span class="pill ops">Ops already live</span>
-            <strong>Observability, MLflow, CI/CD, and secrets are part of the current platform.</strong>
-            The supporting systems are already self-hosted and wired into the operating model.
+            <span class="pill ops">Mixed ops maturity</span>
+            <strong>Observability, MLflow, CI/CD, and secrets all exist in-repo, but not at the same maturity level.</strong>
+            Public-cloud and self-hosted delivery paths both exist in the repo; the self-hosted path should be treated as partial until fully validated end to end.
           </div>
         </div>
       </div>
@@ -700,7 +701,7 @@
       <div class="cards-3">
         <div class="card">
           <h3>User flow</h3>
-          <p>User traffic enters through the React frontend, lands at the Node.js BFF, crosses the gRPC seam into <code>analysis-service</code>, and resolves through the Python ML Engine.</p>
+          <p>User traffic enters through the React frontend, lands at the Node.js BFF, crosses the gRPC seam into <code>analysis-service</code>, and currently resolves through the Python ML Engine over HTTP <code>/predict</code>.</p>
         </div>
         <div class="card">
           <h3>Data + learning flow</h3>
@@ -708,7 +709,7 @@
         </div>
         <div class="card">
           <h3>Platform flow</h3>
-          <p>Prometheus, Grafana, Loki, and Jaeger provide live visibility, while Gitea, Woodpecker, Helm, k3s, and Infisical form the self-hosted delivery and secrets path.</p>
+          <p>Prometheus, Grafana, Loki, and Jaeger provide visibility assets. Delivery is mixed: GitHub Actions + Railway/Vercel remain documented as active, while Gitea + Woodpecker + Helm + k3s exist as the self-hosted path in the repo.</p>
         </div>
       </div>
     </section>
@@ -733,7 +734,7 @@
         </div>
         <div class="card">
           <h3>analysis-service -> ML Engine</h3>
-          <p><code>gRPC</code> to the Python ML runtime on <code>8001</code> for consensus and inference work.</p>
+          <p><code>HTTP</code> to the Python ML runtime on <code>8001</code>, currently via <code>/predict</code> for consensus work.</p>
         </div>
         <div class="card">
           <h3>All services -> Redis</h3>
@@ -753,11 +754,11 @@
         </div>
         <div class="card">
           <h3>External -> Keycloak</h3>
-          <p><code>OIDC / JWT</code> via Keycloak on <code>8080</code> for SSO and identity federation.</p>
+          <p><code>OIDC / JWT</code> via Keycloak on <code>8080</code> is the intended self-hosted auth path, but its overall operating maturity is still partial.</p>
         </div>
         <div class="card">
           <h3>Woodpecker -> k3s API</h3>
-          <p><code>kubectl / Helm</code> against the cluster API on <code>6443</code> for deployment automation.</p>
+          <p><code>kubectl / Helm</code> against the cluster API on <code>6443</code> for the self-hosted deployment path. This is not the only deployment path currently documented in-repo.</p>
         </div>
       </div>
     </section>
@@ -960,8 +961,8 @@
           </tr>
           <tr>
             <td>Delivery plane</td>
-            <td>Gitea, Woodpecker, Helm, k3s, Infisical</td>
-            <td>Build, test, sign, deploy, and inject runtime secrets.</td>
+            <td>GitHub Actions + Railway/Vercel; Gitea, Woodpecker, Helm, k3s, Infisical</td>
+            <td>Public-cloud delivery is still documented as active; the self-hosted path exists in-repo and remains partial until fully validated.</td>
           </tr>
         </tbody>
       </table>
@@ -973,7 +974,7 @@
         <div>
           <span class="section-kicker">DDD reality</span>
           <h2>Bounded contexts and extraction status</h2>
-          <p class="lead">This is the important DDD truth: there are contracts for multiple contexts, but only one is fully extracted on the live request path today.</p>
+          <p class="lead">This is the important DDD truth: there are contracts for multiple contexts, but only one hot-path seam is extracted today and even that seam still proxies ML Engine internals.</p>
         </div>
         <p class="section-summary">This table shows where the architecture is deliberately conservative. Context boundaries exist before all of them become independent services.</p>
       </div>
@@ -1015,8 +1016,8 @@
           <tr>
             <td>Platform ops</td>
             <td>Infra stack</td>
-            <td>Live</td>
-            <td>Observability, CI/CD, secrets, and Helm rollout are already wired.</td>
+            <td>Mixed</td>
+            <td>Observability, CI/CD, secrets, and Helm rollout assets exist, but not every control-plane claim is equally live-validated.</td>
           </tr>
         </tbody>
       </table>
@@ -1039,10 +1040,10 @@
             <li>Browser hits the frontend.</li>
             <li>Frontend sends requests to the BFF.</li>
             <li>BFF calls <code>analysis-service</code> over gRPC.</li>
-            <li><code>analysis-service</code> resolves consensus through the ML Engine.</li>
+            <li><code>analysis-service</code> currently resolves consensus through ML Engine HTTP <code>/predict</code>.</li>
             <li>Feature lookups come from Redis and Feast where available.</li>
           </ol>
-          <p class="footer-note">This path carries the 50ms SLA target for critical operations.</p>
+          <p class="footer-note">Use the consensus-path <code>&lt;200ms P95</code> contract as the current documented baseline until the tighter 50ms language is fully reconciled.</p>
         </div>
         <div class="card loop-card">
           <h3>2. Learning loop</h3>
@@ -1066,10 +1067,10 @@
         <div class="card loop-card">
           <h3>4. Delivery loop</h3>
           <ol>
-            <li>Gitea hosts the source of truth.</li>
-            <li>Woodpecker runs unit, integration, performance, chaos, and k8s verification.</li>
-            <li>Images are built, scanned, signed, and deployed through Helm to k3s.</li>
-            <li>Secrets are expected to come from Infisical instead of static manifests.</li>
+            <li>GitHub Actions currently drives the documented public-cloud deploy path to Railway and Vercel.</li>
+            <li>Gitea and Woodpecker exist in-repo as the self-hosted CI/CD path and should be treated as partial until fully validated.</li>
+            <li>Helm and k3s remain the production-style self-hosted rollout path.</li>
+            <li>Infisical is the intended upstream secret source, but cluster-side External Secrets is not yet safe to describe as universally live.</li>
           </ol>
         </div>
       </div>
@@ -1136,9 +1137,10 @@
         <h2>Architectural truth to keep in mind</h2>
         <ol class="truth-list">
           <li>The repo is no longer a simple three-box app.</li>
-          <li>The first real DDD runtime extraction is complete around <code>analysis-service</code>.</li>
+          <li><code>analysis-service</code> is the first extracted seam on the hot path, but it still proxies ML Engine HTTP internals and should not be oversold as a fully independent domain implementation yet.</li>
           <li>Ingestion and learning are defined as bounded contexts, but they are not fully deployed as separate services yet.</li>
-          <li>That is intentional. The current architecture prioritizes stable contracts and safe extraction over premature service sprawl.</li>
+          <li>Delivery reality is mixed: public-cloud automation is still documented as active, while the self-hosted path exists and remains partial.</li>
+          <li>The architecture should prioritize stable contracts and safe extraction over premature service sprawl or presentation-heavy diagrams that hide the real runtime state.</li>
         </ol>
       </div>
     </section>

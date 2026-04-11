@@ -1,0 +1,87 @@
+FILE: AURA_SMART_VECTORS_SPEC.TXT
+PROJECT COMPONENT: The Diamond Navigation Lattice
+
+VISUAL STYLE: Patent Black Shine / Liquid Chrome / Minimalist High-Gloss
+
+INTELLIGENCE TYPE: Context-Aware Logic & Circadian-Responsive Opacity
+
+1. THE PHYSICAL AESTHETIC (THE "BLING")
+A. THE "PATENT LEATHER" FINISH
+
+Material: Ultra-glossy obsidian surface (background: linear-gradient(135deg, #1A1A1B 0%, #05070A 100%)).
+
+The Shine: A permanent 1px diagonal "Light Catch" (border-left: 1px solid rgba(255,255,255,0.4) and border-top: 1px solid rgba(255,255,255,0.2)).
+
+The Shape: A 32px x 32px "Squircle" (Super-ellipse) for an organic, elite feel.
+
+Micro-Glow: A 2px "Bling" spark at the tip of the arrow that pulses once every 10 seconds, mimicking a diamond catching the light.
+
+2. POSITIONING & SMART-COLLISION LOGIC
+A. THE "QUADRANT" LAYOUT
+
+Top-Left (The Anchor): Functions as "Global Back."
+
+Top-Right (The Ascent): Functions as "Page Top" or "Primary Action."
+
+Bottom-Right (The Lateral): Functions as "Next Step" or "Horizontal Scroll."
+
+Bottom-Center (The Descent): Functions as "Page Bottom" or "Expanded Details."
+
+B. "SMART HIDE" & COLLISION SENSING
+
+Element Avoidance: Using getBoundingClientRect(), the arrows will detect any interactive element (buttons/input fields) underneath them. If a collision is detected, the arrow will slide 40px away smoothly or fade to 5% opacity.
+
+Contextual Sleeping: During video playback or deep-reading modes, the arrows fade to 0% opacity until the user’s cursor moves or the screen is touched.
+
+3. CONTEXTUAL INTELLIGENCE (THE "SMART" LOGIC)
+A. AUTHENTICATION BARRIER (THE LOG-OUT GUARD)
+
+Logic: The "Back" arrow stores a session-token check.
+
+The Action: If the user logs out, the Arrow’s history stack is cleared immediately. If the user clicks "Back" after logout, the arrow does not trigger a page change; instead, it performs a subtle "Negative Shake" (2px left/right) and glows red for 200ms, indicating the action is restricted.
+
+B. CURSOR-PROXIMITY LEARNING
+
+Distance-Based Opacity: - Cursor > 300px away: 15% opacity (The "Ghost" state).
+
+Cursor < 100px away: 100% opacity (The "Active" state).
+
+Self-Learning Pathing: If a user consistently ignores an arrow in a specific section of the app, the system "learns" and keeps that specific arrow at 5% opacity for that user, reducing visual noise.
+
+4. TECHNICAL IMPLEMENTATION (THE ELITE CODE)
+A. THE "GLOSS" CSS (FOR THE INTERNAL AI)
+
+CSS
+.aura-smart-arrow {
+  width: 32px;
+  height: 32px;
+  background: var(--aura-surface); /* Adapts to Day/Night/Comfort */
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.2), inset 0 1px 1px rgba(255,255,255,0.3);
+  transition: all 0.5s cubic-bezier(0.19, 1, 0.22, 1);
+  cursor: pointer;
+  z-index: 9999;
+  position: fixed;
+}
+
+.aura-smart-arrow:hover {
+  transform: scale(1.15); /* The "Magnify" Style */
+  box-shadow: 0 0 20px var(--aura-gem-glow); /* The "Bling" Glow */
+}
+B. STATE-SWITCHING LOGIC
+
+Day Mode: High-gloss white ceramic with a silver stroke.
+
+Amber Mode: Soft-brushed copper with a matte finish.
+
+Night Mode: The "Patent Shoe" finish—Deep black with a chrome shine.
+
+5. THE "OOPH" FACTOR (FINAL UX DETAILS)
+No Clutter: On mobile, only 2 arrows are active at a time to keep the screen minimalist.
+
+The Click: When clicked, the arrow performs a "Micro-Squish" (scale 0.9) and emits a tiny "Light Ripple" that spreads across its surface.
+
+The Intelligence: If a user is at the very bottom of a page, the "Down" arrow morphs into an "Up" arrow automatically to help them return.

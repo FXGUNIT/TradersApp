@@ -1,0 +1,346 @@
+{{- /* ML Engine Deployment + Service + HPA + PDB */ -}}
+{{- if .Values.mlEngine.enabled -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ml-engine
+  namespace: {{ include "tradersapp.namespace" . }}
+  labels:
+    {{- include "tradersapp.labels" . | nindent 4 }}
+    tier: ml
+spec:
+  replicas: {{ .Values.mlEngine.replicaCount }}
+  selector:
+    matchLabels:
+      app: ml-engine
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: ml-engine
+        tier: ml
+        {{- include "tradersapp.labels" . | nindent 8 }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "{{ .Values.mlEngine.service.port }}"
+        prometheus.io/path: "/metrics"
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      # Soft pod anti-affinity — prefer spreading ml-engine pods across nodes.
+      # Works on single-node dev/staging; required for prod HA.
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: ml-engine
+                topologyKey: kubernetes.io/hostname
+      # Topology spread — ensure pods are distributed evenly across zones/nodes.
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: ml-engine
+        {{- if and .Values.mlEngine.persistence.enabled .Values.mlflow.enabled }}
+      # Init container: pre-loads the latest MLflow Production model into the
+      # shared PVC before the main container starts. All pods see the same model.
+      initContainers:
+        - name: model-sync
+          image: "{{ .Values.mlEngine.image.repository }}:{{ .Values.mlEngine.image.tag }}"
+          imagePullPolicy: {{ include "tradersapp.imagePullPolicy" .Values.mlEngine.image }}
+          command:
+            - python
+            - -c
+            - |
+              import os, sys
+              sys.path.insert(0, '/app')
+              from training.model_store import ModelStore
+              from infrastructure.mlflow_client import get_mlflow_client
+              store = ModelStore()
+              ml_client = get_mlflow_client("direction")
+              if ml_client:
+                  registry_models = ml_client.get_registry_models()
+                  model_names = sorted(registry_models) or store.list_all_models()
+                  for model_name in model_names:
+                      try:
+                          prod = ml_client.get_production_model(model_name)
+                          if prod and prod.get("version"):
+                              import mlflow
+                              ver = str(prod["version"])
+                              print(f"Pre-loading {model_name}@{ver} into PVC...")
+                              pipeline = mlflow.sklearn.load_model(f"models:/{model_name}/{ver}")
+                              store.save(model_name, pipeline, prod.get("metrics", {}),
+                                         prod.get("feature_cols", []), version=ver,
+                                         extra={"source": "init_sync", "run_id": prod.get("run_id")})
+                              print(f"  {model_name}@{ver} synced to PVC")
+                      except Exception as e:
+                          print(f"  Skipped {model_name}: {e}")
+              print("Model sync complete.")
+          env:
+            - name: MLFLOW_USE_REGISTRY
+              value: "true"
+            - name: MODEL_STORE_PVC_MOUNT
+              value: /models/store
+          volumeMounts:
+            - name: models
+              mountPath: /models
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+      {{- end }}
+      containers:
+        - name: ml-engine
+          image: "{{ .Values.mlEngine.image.repository }}:{{ .Values.mlEngine.image.tag }}"
+          imagePullPolicy: {{ include "tradersapp.imagePullPolicy" .Values.mlEngine.image }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.mlEngine.service.port }}
+          {{- with .Values.mlEngine.envFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          env:
+            # Shared PVC mount for model store — all pods see the same model artifacts
+            - name: MODEL_STORE_PVC_MOUNT
+              value: "/models/store"
+            - name: MODEL_STORE_READ_ONLY
+              value: "true"
+            - name: MODEL_REGISTRY_MODE
+              value: "sidecar"
+            - name: MODEL_REGISTRY_URL
+              value: "http://127.0.0.1:{{ .Values.mlEngine.modelRegistrySidecar.port }}"
+            - name: MODEL_REGISTRY_PORT
+              value: {{ .Values.mlEngine.modelRegistrySidecar.port | quote }}
+            - name: MODEL_REGISTRY_WARMUP
+              value: {{ ternary "true" "false" .Values.mlEngine.modelRegistrySidecar.warmup | quote }}
+            - name: MODEL_REGISTRY_MAX_CACHED_INSTANCES
+              value: {{ .Values.mlEngine.modelRegistrySidecar.maxCachedInstances | quote }}
+            # Enable MLflow registry: pods consult Production stage and hot-reload
+            - name: MLFLOW_USE_REGISTRY
+              value: "true"
+            - name: MLFLOW_TRACKING_URI
+              value: {{ .Values.mlflow.trackingUri | quote }}
+            - name: REDIS_HOST
+              value: "redis"
+            - name: KAFKA_ENABLE
+              value: {{ ternary "true" "false" .Values.mlEngine.kafkaEnabled | quote }}
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: "kafka:29092"
+            - name: MY_POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: KAFKA_GROUP_ID
+              value: "ml-engine-consumers"
+            - name: KAFKA_AUTO_OFFSET_RESET
+              value: "earliest"
+            - name: REQUIRE_DATABASE_URL
+              value: {{ ternary "true" "false" .Values.mlEngine.requireDatabaseUrl | quote }}
+            - name: OTEL_SERVICE_NAME
+              value: "ml-engine"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://jaeger.monitoring:4317"
+            - name: MY_POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: MY_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: DQ_VALIDATE_BEFORE_TRAIN
+              value: {{ ternary "true" "false" .Values.mlEngine.dataQuality.validateBeforeTrain | quote }}
+            - name: DQ_VALIDATE_BEFORE_PREDICT
+              value: "true"
+            - name: DQ_BLOCK_ON_CRITICAL
+              value: {{ ternary "true" "false" .Values.mlEngine.dataQuality.blockOnCritical | quote }}
+            - name: DQ_REQUIRE_GX
+              value: {{ ternary "true" "false" .Values.mlEngine.dataQuality.requireGreatExpectations | quote }}
+            - name: DQ_VALIDATE_DAYS
+              value: {{ .Values.mlEngine.dataQuality.lookbackDays | quote }}
+            - name: INFERENCE_P99_TARGET_MS
+              value: {{ .Values.triton.inferenceLatencyTargetMs | default 100 | quote }}
+            - name: DQ_ALERT_WEBHOOK
+              value: {{ .Values.mlEngine.dataQuality.alertWebhook | default "" | quote }}
+            # HPA Slack watcher — Task 52
+            - name: SLACK_HPA_WEBHOOK_URL
+              value: {{ .Values.mlEngine.hpaWatcher.slackWebhook | default "" | quote }}
+            - name: DQ_QUARANTINE_DIR
+              value: {{ .Values.mlEngine.dataQuality.quarantineDir | default "/data/dq_quarantine" | quote }}
+            - name: CONTINUAL_LEARNING_DIR
+              value: {{ .Values.mlEngine.runtimeState.continualLearningDir | default "/data/continual_learning" | quote }}
+            - name: MAMBA_CACHE_DIR
+              value: {{ .Values.mlEngine.runtimeState.mambaCacheDir | default "/data/mamba_cache" | quote }}
+          {{- with .Values.mlEngine.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          startupProbe:
+            httpGet:
+              path: /live
+              port: {{ .Values.mlEngine.service.port }}
+            failureThreshold: 30
+            periodSeconds: 10
+            initialDelaySeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /live
+              port: {{ .Values.mlEngine.service.port }}
+            failureThreshold: 3
+            periodSeconds: 20
+            initialDelaySeconds: 60
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: {{ .Values.mlEngine.service.port }}
+            failureThreshold: 3
+            periodSeconds: 10
+            initialDelaySeconds: 30
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: models
+              mountPath: /models
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+        - name: model-registry
+          image: "{{ .Values.mlEngine.image.repository }}:{{ .Values.mlEngine.image.tag }}"
+          imagePullPolicy: {{ include "tradersapp.imagePullPolicy" .Values.mlEngine.image }}
+          command:
+            - python
+            - -m
+            - uvicorn
+            - infrastructure.model_registry_sidecar:app
+            - --host
+            - 0.0.0.0
+            - --port
+            - {{ .Values.mlEngine.modelRegistrySidecar.port | quote }}
+          ports:
+            - name: registry
+              containerPort: {{ .Values.mlEngine.modelRegistrySidecar.port }}
+          {{- with .Values.mlEngine.envFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          env:
+            - name: MODEL_STORE_PVC_MOUNT
+              value: "/models/store"
+            - name: MODEL_STORE_READ_ONLY
+              value: "true"
+            - name: REDIS_HOST
+              value: "redis"
+            - name: MODEL_REGISTRY_WARMUP
+              value: {{ ternary "true" "false" .Values.mlEngine.modelRegistrySidecar.warmup | quote }}
+            - name: MODEL_REGISTRY_MAX_CACHED_INSTANCES
+              value: {{ .Values.mlEngine.modelRegistrySidecar.maxCachedInstances | quote }}
+            - name: MODEL_REGISTRY_PORT
+              value: {{ .Values.mlEngine.modelRegistrySidecar.port | quote }}
+          {{- with .Values.mlEngine.modelRegistrySidecar.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          startupProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.mlEngine.modelRegistrySidecar.port }}
+            failureThreshold: 30
+            periodSeconds: 5
+            initialDelaySeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.mlEngine.modelRegistrySidecar.port }}
+            failureThreshold: 3
+            periodSeconds: 10
+            initialDelaySeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.mlEngine.modelRegistrySidecar.port }}
+            failureThreshold: 3
+            periodSeconds: 20
+            initialDelaySeconds: 20
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: models
+              mountPath: /models
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: data
+          {{- if .Values.mlEngine.runtimeState.enabled }}
+          persistentVolumeClaim:
+            claimName: ml-state-pvc
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        - name: models
+          {{- if .Values.mlEngine.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: ml-models-pvc
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        - name: tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: 256Mi
+      terminationGracePeriodSeconds: 60
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ml-engine
+  namespace: {{ include "tradersapp.namespace" . }}
+spec:
+  type: {{ .Values.mlEngine.service.type }}
+  selector:
+    app: ml-engine
+  ports:
+    - name: http
+      port: {{ .Values.mlEngine.service.port }}
+      targetPort: {{ .Values.mlEngine.service.port }}
+{{- end }}

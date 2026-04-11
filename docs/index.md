@@ -1,132 +1,115 @@
 # TradersApp Platform Architecture
 
-![Architecture overview](./assets/architecture-3d-overview.svg)
+This page is the canonical architecture summary for the repo.
 
-Asset variants: [PNG export](./assets/architecture-3d-overview.png) | [Print-friendly SVG](./assets/architecture-3d-overview-print.svg)
+Its main job is to separate three things that were previously mixed together:
 
-TradersApp is now a self-hosted trading ML platform with explicit DDD boundaries, a live gRPC extraction seam, closed-loop retraining controls, and full platform observability. The request path is low-latency and synchronous; the learning, quality, and deployment loops are isolated and automated.
+- `Current`: what the code, compose files, Helm chart, and CI actually support now
+- `Partial`: capabilities present in-repo but not yet fully validated as live operating reality
+- `Target`: the intended future shape
 
-## System design board
+## How To Read The Architecture Assets
 
-![Architecture system design board](./assets/architecture-system-design-board.svg)
+| Asset | Read it as | Important warning |
+| --- | --- | --- |
+| `architecture-3d-overview.*` | Conceptual summary | Not a protocol-accurate runtime topology |
+| `architecture-system-design-board.*` | Capability inventory | Contains some target-state/control-plane material mixed with current-state material |
+| `architecture-5w1h-map.*` | Operating/roadmap view | Use for orientation, not exact deployment truth |
+| `architecture-birdview-roadmap.*` | Evolution roadmap | This is explicitly target-state material |
 
-Asset variants: [PNG export](./assets/architecture-system-design-board.png) | [Print-friendly SVG](./assets/architecture-system-design-board-print.svg)
+## Current Runtime Truth
 
-This is the detailed service-and-data-flow board, in the same category as a classic system-design map. It shows who enters the system, how requests move through the runtime, where events and state live, and how observability plus delivery control the platform.
+- Browser traffic hits the React frontend, then the Node.js BFF over HTTP.
+- The BFF uses `analysis-service` over gRPC when `ML_ANALYSIS_TRANSPORT=grpc`.
+- `analysis-service` currently proxies to the Python ML Engine over HTTP `/predict`, not gRPC.
+- If `ML_ANALYSIS_GRPC_STRICT=false`, the BFF can fall back to direct ML Engine HTTP calls when the gRPC seam is unavailable.
+- `analysis-service` is a real runtime seam, but it still ships from the BFF codebase/image (`bff/analysis-server.mjs`, `Dockerfile.bff`).
+- Ingestion and learning are defined as bounded contexts, but their runtime logic still lives inside `ml-engine/` modules and Airflow workflows.
+- Redis, Kafka, Feast, MLflow, Airflow, Prometheus, Grafana, Loki, and Jaeger all exist in-repo.
+- Keycloak, External Secrets, Trivy runtime/operator, OPA, and Falco should currently be described as mixed-maturity platform controls, not uniformly live operating truth.
 
-## Operating map
+## Deployment Reality
 
-![Architecture operating map](./assets/architecture-5w1h-map.svg)
+| Mode | Status | Source of truth |
+| --- | --- | --- |
+| Local lightweight dev | Current | `docker-compose.dev.yml` |
+| Full local platform bring-up | Current | `docker-compose.yml`, `docker-compose.observability.yml`, `docker-compose.airflow.yml`, `docker-compose.mlflow.yml` |
+| Public-cloud deploy path | Current / documented | GitHub Actions + Railway + Vercel in `.github/workflows/ci.yml`, `docs/SETUP.md`, `docs/DEPLOYMENT.md` |
+| Self-hosted CI/CD path | Partial / target | `.woodpecker.yml`, `docker-compose.gitea.yml`, `docs/CICD_GITEA_WOODPECKER.md` |
+| Self-hosted cluster rollout | Partial / target | `k8s/helm/tradersapp`, `docs/K8S_LIVE_CLUSTER_VALIDATION.md`, `docs/K8S_SECRET_CONTRACT.md` |
 
-Asset variants: [PNG export](./assets/architecture-5w1h-map.png) | [Print-friendly SVG](./assets/architecture-5w1h-map-print.svg)
+The repo currently contains both a public-cloud operating story and a self-hosted operating story.
+Until one becomes the sole validated path, architecture docs must describe delivery as mixed.
 
-This chart answers `what`, `how`, `why`, `where`, and `whom` for the live architecture lanes: request path, learning and data, observability, delivery, and the current extraction reality.
+## Runtime Layers
 
-## Bird's-eye roadmap
+| Layer | Components | State | What it does now |
+| --- | --- | --- | --- |
+| Experience | Frontend (`React`, `Vite`) | Current | Trading UI, dashboards, operator workflows |
+| Edge and orchestration | BFF (`Node.js`) | Current | Auth/session logic, anti-corruption layer, API composition |
+| Extracted hot-path seam | `analysis-service` (`gRPC` server) | Current | Stable consensus contract on the BFF-to-ML boundary |
+| Core ML runtime | ML Engine (`Python`) | Current | Inference, training, drift detection, feedback, monitoring endpoints |
+| Low-latency data plane | Redis, Feast | Current / partial | Shared cache and online/offline feature access |
+| Event plane | Kafka | Current / partial | Async topics for candles, signals, drift, and feedback |
+| MLOps plane | MLflow, MinIO, PostgreSQL | Current / partial | Experiment tracking, registry, artifacts, lineage |
+| Control plane | Airflow, Great Expectations | Current / partial | Scheduled validation, monitoring, retraining orchestration |
+| Observability plane | Prometheus, Grafana, Loki, Jaeger | Current / partial | Metrics, dashboards, logs, traces, alerts |
+| Delivery plane | GitHub Actions + Railway/Vercel; Gitea + Woodpecker + Helm + k3s | Mixed | Public-cloud path is currently documented/automated; self-hosted path exists and remains a target/partial operating mode |
 
-![Architecture bird's-eye roadmap](./assets/architecture-birdview-roadmap.svg)
+## Bounded Contexts And Extraction Status
 
-Asset variants: [PNG export](./assets/architecture-birdview-roadmap.png) | [Print-friendly SVG](./assets/architecture-birdview-roadmap-print.svg)
-
-This chart is the roadmap view of the same platform. Read it left to right as `today -> stabilize -> extract -> operate` so you can see how the current architecture evolves without pretending that already-internal domains are fully extracted yet.
-
-## Current system shape
-
-- User traffic enters through the React frontend and terminates at the Node.js BFF.
-- The BFF calls `analysis-service` over gRPC for the consensus path, with controlled fallback behavior.
-- `analysis-service` is the first extracted bounded-context runtime and currently proxies into the Python ML Engine while the domain is being pulled out safely.
-- The ML Engine still owns the deepest model logic, training loop, drift detection, feedback pipeline, and several not-yet-extracted contexts.
-- Redis and Feast back the low-latency feature path, Kafka carries event streams, and MLflow owns experiment and registry history.
-- Airflow enforces data-quality and monitoring DAGs, while Prometheus, Grafana, Loki, and Jaeger provide live operational visibility.
-- Gitea, Woodpecker, Helm, and k3s provide the self-hosted delivery path, with runtime secrets expected to come from Infisical.
-
-## Runtime layers
-
-| Layer | Components | What it does now |
-|---|---|---|
-| Experience | Frontend (`React`, `Vite`) | Trading UI, dashboards, operator workflows |
-| Edge and orchestration | BFF (`Node.js`) | Auth, session control, anti-corruption layer, API composition |
-| Domain service | `analysis-service` (`gRPC`) | Stable consensus service contract and extraction seam |
-| Core ML runtime | ML Engine (`Python`) | Inference, training, drift detection, feedback, monitoring endpoints |
-| Low-latency data plane | Redis, Feast | Online feature serving and cache-backed reads |
-| Event plane | Kafka | Market data, model signals, feedback topics |
-| MLOps plane | MLflow, MinIO, PostgreSQL | Experiment tracking, registry, artifacts, model lineage |
-| Control plane | Airflow, Great Expectations | Data validation, scheduled monitoring, retraining orchestration |
-| Observability plane | Prometheus, Grafana, Loki, Jaeger | Metrics, dashboards, logs, traces, alerts |
-| Delivery plane | Gitea, Woodpecker, Helm, k3s, Infisical | Build, test, sign, deploy, and inject secrets |
-
-## Bounded contexts and extraction status
+Canonical manifest: `architecture/ddd/bounded-contexts.json`
 
 | Context | Service boundary | Status | Notes |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | BFF orchestration | `bff` | Live | Owns frontend-facing contracts and translation logic |
-| Analysis | `analysis-service` | Live extraction seam | gRPC is implemented and deployed; internals still proxy ML Engine `/predict` |
-| Ingestion | `ingestion-service` contract | Logical only | Ownership is defined in `architecture/ddd/bounded-contexts.json`, but runtime remains inside `ml-engine` packages |
-| Learning | `learning-service` contract | Logical only | Retraining, drift, and DQ loops are live, but still run inside the ML Engine process and Airflow DAGs |
-| Platform ops | infra stack | Live | Observability, CI/CD, secrets, and Helm rollout are already wired |
+| Analysis | `analysis-service` | Live extraction seam | gRPC seam is implemented and deployed in compose/Helm; internals still proxy ML Engine HTTP `/predict` |
+| Ingestion | `ingestion-service` contract | Logical only | Ownership exists in the manifest and proto; runtime remains inside `ml-engine/data` and `ml-engine/kafka` |
+| Learning | `learning-service` contract | Logical only | Ownership exists in the manifest and proto; runtime remains inside `ml-engine/training`, `ml-engine/feedback`, and Airflow DAGs |
 
-## Critical paths and control loops
+## Request Path
 
-### 1. Request path
-
-1. Browser hits the frontend.
+1. Browser loads the frontend.
 2. Frontend sends requests to the BFF.
-3. BFF calls `analysis-service` over gRPC.
-4. `analysis-service` resolves consensus through the ML Engine.
-5. Feature lookups come from Redis and Feast where available.
+3. BFF calls `analysis-service` over gRPC when the gRPC transport is enabled.
+4. `analysis-service` normalizes the contract and proxies into ML Engine HTTP `/predict`.
+5. If gRPC is unavailable and strict mode is off, the BFF can call ML Engine HTTP directly.
+6. Redis and Feast may enrich the decision path where available.
 
-This is the path that carries the low-latency SLA and needs to stay under the 50ms target for critical operations.
+### SLA Note
 
-### 2. Learning loop
+The architecture docs should currently treat the consensus path as a `<200ms P95` contract until the broader SLA story is unified.
 
-1. ML Engine logs training and registry activity to MLflow.
-2. MinIO stores model artifacts; PostgreSQL stores run and registry metadata.
-3. Airflow runs model monitoring and retraining DAGs.
-4. Great Expectations gates dirty data before retraining is allowed.
-5. Approved versions remain in MLflow for rollback and promotion control.
+The older `50ms` language still present in some assets should be read as either:
 
-### 3. Observability loop
+- a subcomponent goal
+- a tighter aspirational target
+- or stale wording that needs cleanup
 
-1. Prometheus scrapes `/metrics` from runtime services.
-2. Grafana visualizes latency, drift, resource, and SLA dashboards.
-3. Loki centralizes logs; Jaeger collects traces.
-4. Alert rules cover 50ms SLA breaches, retrain failures, stale monitoring, and infra regressions.
+## Delivery Truth
 
-### 4. Delivery loop
+- GitHub Actions still drives the documented public-cloud deployment path in the repo.
+- Railway and Vercel are still present in both docs and CI workflows.
+- Gitea + Woodpecker + Helm + k3s is a real self-hosted path in-repo, but it should be described as partial until end-to-end validated as the primary operating model.
+- Infisical is the intended upstream secret source, but cluster-side External Secrets is not yet safe to describe as fully live everywhere.
 
-1. Gitea hosts the source of truth.
-2. Woodpecker runs unit, integration, performance, chaos, and k8s verification.
-3. Images are built, scanned, signed, and deployed through Helm to k3s.
-4. Secrets should be injected from Infisical instead of being hardcoded into manifests.
-
-## Deployment modes
-
-| Mode | Entry point | Use case |
-|---|---|---|
-| Full local stack | `docker-compose.yml` | End-to-end local bring-up with frontend, BFF, ML Engine, MLflow, Kafka, and observability |
-| MLOps-only local stack | `docker-compose.mlflow.yml` | Dedicated MLflow + MinIO + PostgreSQL workflow and registry testing |
-| Airflow control plane | `docker-compose.airflow.yml` | Data-quality, monitoring, and retraining DAG validation |
-| Cluster deploy | `k8s/helm/tradersapp` | k3s production-style rollout with Helm |
-
-## Canonical docs
+## Canonical Supporting Docs
 
 - [DDD Microservices + gRPC](./DDD_MICROSERVICES.md)
+- [Bounded Contexts](./BOUNDED_CONTEXTS.md)
 - [MLflow MLOps lifecycle](./MLOPS_MLFLOW.md)
 - [Continuous model monitoring + auto-retraining](./MODEL_MONITORING_RETRAINING.md)
 - [Data Quality + Airflow](./DATA_QUALITY_AIRFLOW.md)
 - [Automated testing + chaos](./AUTOMATED_TESTING.md)
-- [Low-latency inference serving](./INFERENCE_SERVING.md)
 - [CI/CD with Gitea + Woodpecker](./CICD_GITEA_WOODPECKER.md)
-- [Deployment guide](./DEPLOYMENT.md)
 - [Setup guide](./SETUP.md)
+- [Deployment guide](./DEPLOYMENT.md)
+- [K8S secret contract](./K8S_SECRET_CONTRACT.md)
 
-## Architectural truth to keep in mind
+## Architectural Truth To Keep In Mind
 
-- The repo is no longer a simple three-box app.
-- The first real DDD runtime extraction is complete around `analysis-service`.
-- Ingestion and learning are defined as bounded contexts, but they are not fully deployed as separate services yet.
-- That is intentional. The current architecture prioritizes stable contracts and safe extraction over premature service sprawl.
-
-## License
-
-Proprietary - FXGUNIT
+- The repo is not a simple three-box app anymore.
+- `analysis-service` is the first extracted seam on the hot path, but not yet a fully independent domain implementation.
+- Ingestion and learning are logical bounded contexts before they are separate deployable runtimes.
+- Delivery reality is currently mixed, not purely self-hosted.
+- Architecture docs must describe current state and target state separately or they become actively misleading.

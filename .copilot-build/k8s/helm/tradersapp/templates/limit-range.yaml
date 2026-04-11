@@ -1,0 +1,46 @@
+{{- /* LimitRange — default resource limits per pod/container in tradersapp namespace */ -}}
+{{- if .Values.limitRange.enabled -}}
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: tradersapp-limit-range
+  namespace: {{ include "tradersapp.namespace" . }}
+  labels:
+    {{- include "tradersapp.labels" . | nindent 4 }}
+    purpose: namespace-guardrail
+spec:
+  limits:
+    # ── Default limits applied to all pods if not overridden ───────────────────
+    - type: Pod
+      max:
+        cpu:    "{{ .Values.limitRange.podMax.cpu }}"
+        memory: "{{ .Values.limitRange.podMax.memory }}"
+      min:
+        cpu:    "{{ .Values.limitRange.podMin.cpu }}"
+        memory: "{{ .Values.limitRange.podMin.memory }}"
+    # ── Default limits applied to all containers ───────────────────────────────
+    - type: Container
+      max:
+        cpu:    "{{ .Values.limitRange.containerMax.cpu }}"
+        memory: "{{ .Values.limitRange.containerMax.memory }}"
+      min:
+        cpu:    "{{ .Values.limitRange.containerMin.cpu }}"
+        memory: "{{ .Values.limitRange.containerMin.memory }}"
+      # Default request = limit (Guaranteed QoS class)
+      default:
+        cpu:    "{{ .Values.limitRange.containerDefault.cpu }}"
+        memory: "{{ .Values.limitRange.containerDefault.memory }}"
+      defaultRequest:
+        cpu:    "{{ .Values.limitRange.containerDefaultRequest.cpu }}"
+        memory: "{{ .Values.limitRange.containerDefaultRequest.memory }}"
+      # Prevent any single container from claiming > 50% of the node's allocatable CPU
+      maxLimitRequestRatio:
+        cpu:    "{{ .Values.limitRange.maxLimitRequestRatio.cpu }}"
+        memory: "{{ .Values.limitRange.maxLimitRequestRatio.memory }}"
+    # ── PersistentVolumeClaim storage ─────────────────────────────────────────
+    - type: PersistentVolumeClaim
+      min:
+        storage: "{{ .Values.limitRange.pvcMin.storage }}"
+      max:
+        storage: "{{ .Values.limitRange.pvcMax.storage }}"
+{{- end }}

@@ -1,0 +1,205 @@
+# TradersApp — KEDA Autoscaling Configuration
+#
+# KEDA (Kubernetes Event-Driven Autoscaling) enables scaling based on
+# custom metrics from Prometheus, Kafka, Redis, and more.
+#
+# This enables inference-aware autoscaling:
+#   - Scale UP when: inference latency P95 > 150ms OR queue depth > 20
+#   - Scale DOWN when: inference latency P95 < 50ms for 5 minutes
+#
+# Prerequisites:
+#   kubectl apply -f https://kedacore.github.io/charts/releases/download/keda-2.15.1/keda-2.15.1.yaml
+#
+# Deploy:
+#   kubectl apply -f k8s/helm/tradersapp/templates/keda-autoscaling.yaml
+
+{{- if and .Values.mlEngine.enabled .Values.mlEngine.kedaAutoscaling.enabled }}
+---
+# KEDA ScaledObject: ML Engine — scale on inference latency and queue depth
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: {{ include "tradersapp.fullname" . }}-ml-engine-keda
+  namespace: {{ include "tradersapp.namespace" . }}
+  labels:
+    app: ml-engine
+    tier: ml
+    {{- include "tradersapp.labels" . | nindent 4 }}
+  annotations:
+    # Prevent multiple ScaledObjects managing the same Deployment
+    scaledobject.keda.sh/transfer-hpa-owned: "true"
+spec:
+  scaleTargetRef:
+    name: {{ include "tradersapp.fullname" . }}-ml-engine
+  pollingInterval: {{ .Values.mlEngine.kedaAutoscaling.pollingInterval | default 15 }}
+  cooldownPeriod: {{ .Values.mlEngine.kedaAutoscaling.cooldownPeriod | default 300 }}
+  minReplicaCount: {{ .Values.mlEngine.kedaAutoscaling.minReplicas | default 1 }}
+  maxReplicaCount: {{ .Values.mlEngine.kedaAutoscaling.maxReplicas | default 8 }}
+
+  advanced:
+    restoreToOriginalReplicaCount: false
+    horizontalPodAutoscalerConfig:
+      behavior:
+        scaleUp:
+          stabilizationWindowSeconds: 60
+          policies:
+            - type: Percent
+              value: 100
+              periodSeconds: 15
+        scaleDown:
+          stabilizationWindowSeconds: 300
+          policies:
+            - type: Pods
+              value: 1
+              periodSeconds: 60
+          selectPolicy: Min
+
+  triggers:
+    # ── Trigger 1: Prometheus — Inference Latency P95 ─────────────────────
+    - type: prometheus
+      metadata:
+        serverAddress: http://prometheus:9090
+        metricName: ml_engine_p95_latency
+        query: |
+          histogram_quantile(0.95,
+            sum(rate(ml_engine_inference_latency_ms_bucket{endpoint="/predict"}[2m])) by (le)
+          )
+        threshold: "{{ .Values.mlEngine.kedaAutoscaling.latencyThreshold | default "150" }}"
+        activationThreshold: "{{ .Values.mlEngine.kedaAutoscaling.latencyActivationThreshold | default "50" }}"
+      # Scale from 1→2 when P95 > 50ms (activation threshold)
+      # Scale further when P95 > 150ms (scaling threshold)
+
+    # ── Trigger 2: Prometheus — Inference Queue Depth ──────────────────────
+    - type: prometheus
+      metadata:
+        serverAddress: http://prometheus:9090
+        metricName: ml_engine_queue_depth
+        query: |
+          sum(ml_engine_inference_queue_depth{endpoint="/predict"})
+        threshold: "{{ .Values.mlEngine.kedaAutoscaling.queueDepthThreshold | default "20" }}"
+        activationThreshold: "{{ .Values.mlEngine.kedaAutoscaling.queueDepthActivationThreshold | default "5" }}"
+
+    # ── Trigger 3: CPU (fallback) ───────────────────────────────────────────
+    {{- if .Values.mlEngine.kedaAutoscaling.enableCpuTrigger }}
+    - type: cpu
+      metadata:
+        type: Utilization
+        value: "{{ .Values.mlEngine.kedaAutoscaling.cpuTarget | default "70" }}"
+    {{- end }}
+
+    # ── Trigger 4: Memory (fallback) ───────────────────────────────────────
+    {{- if .Values.mlEngine.kedaAutoscaling.enableMemoryTrigger }}
+    - type: memory
+      metadata:
+        type: Utilization
+        value: "{{ .Values.mlEngine.kedaAutoscaling.memoryTarget | default "80" }}"
+    {{- end }}
+{{- end }}
+
+{{- if and .Values.triton.enabled .Values.triton.kedaAutoscaling.enabled }}
+---
+# KEDA ScaledObject: Triton — scale on queue depth and GPU utilization
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: {{ include "tradersapp.fullname" . }}-triton-keda
+  namespace: {{ include "tradersapp.namespace" . }}
+  labels:
+    app: triton
+    tier: inference
+    {{- include "tradersapp.labels" . | nindent 4 }}
+  annotations:
+    scaledobject.keda.sh/transfer-hpa-owned: "true"
+spec:
+  scaleTargetRef:
+    name: {{ include "tradersapp.fullname" . }}-triton
+  pollingInterval: {{ .Values.triton.kedaAutoscaling.pollingInterval | default 15 }}
+  cooldownPeriod: {{ .Values.triton.kedaAutoscaling.cooldownPeriod | default 120 }}
+  minReplicaCount: {{ .Values.triton.kedaAutoscaling.minReplicas | default 1 }}
+  maxReplicaCount: {{ .Values.triton.kedaAutoscaling.maxReplicas | default 4 }}
+
+  advanced:
+    restoreToOriginalReplicaCount: false
+    horizontalPodAutoscalerConfig:
+      behavior:
+        scaleUp:
+          stabilizationWindowSeconds: 30
+          policies:
+            - type: Percent
+              value: 100
+              periodSeconds: 15
+        scaleDown:
+          stabilizationWindowSeconds: 300
+          policies:
+            - type: Pods
+              value: 1
+              periodSeconds: 60
+
+  triggers:
+    # ── Trigger: Triton Queue Depth ───────────────────────────────────────────
+    - type: prometheus
+      metadata:
+        serverAddress: http://prometheus:9090
+        metricName: triton_queue_depth
+        query: |
+          avg by (model_name) (triton_inference_queue_depth)
+        threshold: "{{ .Values.triton.kedaAutoscaling.queueDepthThreshold | default "20" }}"
+        activationThreshold: "{{ .Values.triton.kedaAutoscaling.queueDepthActivationThreshold | default "5" }}"
+
+    # ── Trigger: GPU Utilization ───────────────────────────────────────────
+    - type: prometheus
+      metadata:
+        serverAddress: http://prometheus:9090
+        metricName: triton_gpu_utilization
+        query: |
+          avg(rate(triton_inference_compute_infer_ns_sum[5m]) /
+              rate(triton_inference_compute_infer_ns_count[5m]) > 0) * 100
+        threshold: "{{ .Values.triton.kedaAutoscaling.gpuUtilizationThreshold | default "80" }}"
+        activationThreshold: "{{ .Values.triton.kedaAutoscaling.gpuUtilizationActivationThreshold | default "50" }}"
+{{- end }}
+
+{{- if and .Values.bff.enabled .Values.bff.kedaAutoscaling.enabled }}
+---
+# KEDA ScaledObject: BFF — scale on HTTP request rate
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: {{ include "tradersapp.fullname" . }}-bff-keda
+  namespace: {{ include "tradersapp.namespace" . }}
+  labels:
+    app: bff
+    tier: api
+    {{- include "tradersapp.labels" . | nindent 4 }}
+  annotations:
+    scaledobject.keda.sh/transfer-hpa-owned: "true"
+spec:
+  scaleTargetRef:
+    name: {{ include "tradersapp.fullname" . }}-bff
+  pollingInterval: {{ .Values.bff.kedaAutoscaling.pollingInterval | default 30 }}
+  cooldownPeriod: {{ .Values.bff.kedaAutoscaling.cooldownPeriod | default 300 }}
+  minReplicaCount: {{ .Values.bff.kedaAutoscaling.minReplicas | default 2 }}
+  maxReplicaCount: {{ .Values.bff.kedaAutoscaling.maxReplicas | default 16 }}
+
+  triggers:
+    # ── Trigger: HTTP Request Rate ─────────────────────────────────────────
+    - type: prometheus
+      metadata:
+        serverAddress: http://prometheus:9090
+        metricName: bff_request_rate
+        query: |
+          sum(rate(http_requests_total{service="bff"}[2m]))
+        threshold: "{{ .Values.bff.kedaAutoscaling.requestRateThreshold | default "10" }}"
+        activationThreshold: "{{ .Values.bff.kedaAutoscaling.requestRateActivationThreshold | default "2" }}"
+
+    # ── Trigger: BFF P95 Latency ───────────────────────────────────────────
+    - type: prometheus
+      metadata:
+        serverAddress: http://prometheus:9090
+        metricName: bff_p95_latency
+        query: |
+          histogram_quantile(0.95,
+            sum(rate(http_request_duration_seconds_bucket{service="bff"}[2m])) by (le)
+          ) * 1000
+        threshold: "{{ .Values.bff.kedaAutoscaling.latencyThreshold | default "500" }}"
+        activationThreshold: "{{ .Values.bff.kedaAutoscaling.latencyActivationThreshold | default "200" }}"
+{{- end }}

@@ -1,0 +1,29 @@
+{{- /* ResourceQuota — tradersapp namespace guardrail */ -}}
+{{- if .Values.resourceQuota.enabled -}}
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: tradersapp-quota
+  namespace: {{ include "tradersapp.namespace" . }}
+  labels:
+    {{- include "tradersapp.labels" . | nindent 4 }}
+    purpose: namespace-guardrail
+spec:
+  hard:
+    # ── Compute quota ─────────────────────────────────────────────────────────
+    requests.cpu:    "{{ .Values.resourceQuota.requests.cpu }}"
+    limits.cpu:      "{{ .Values.resourceQuota.limits.cpu }}"
+    requests.memory: "{{ .Values.resourceQuota.requests.memory }}"
+    limits.memory:   "{{ .Values.resourceQuota.limits.memory }}"
+    # ── Object count quota (prevents proliferation) ──────────────────────────
+    pods:                               "{{ .Values.resourceQuota.pods }}"
+    services:                           "{{ .Values.resourceQuota.services }}"
+    secrets:                            "{{ .Values.resourceQuota.secrets }}"
+    configmaps:                         "{{ .Values.resourceQuota.configmaps }}"
+    persistentvolumeclaims:             "{{ .Values.resourceQuota.persistentvolumeclaims }}"
+    {{- if .Values.resourceQuota.storage }}
+    requests.storage:                   "{{ .Values.resourceQuota.storage }}"
+    {{- end }}
+  # Keep the quota cluster-portable: some local k3s environments reject the
+  # PriorityClass scope selector here even though the hard limits are valid.
+{{- end }}

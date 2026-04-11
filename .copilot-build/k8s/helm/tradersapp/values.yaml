@@ -1,0 +1,754 @@
+# Default values for TradersApp Helm chart.
+# Override with: helm install -f values.prod.yaml tradersapp ./k8s/helm/tradersapp
+
+# Grafana dashboards
+grafana:
+  enabled: false
+
+# Global defaults
+namespace: tradersapp
+imagePullSecrets: []
+
+# ── Global Ingress configuration (ID 33) ───────────────────────────────────
+# Production values are in values.prod.yaml.
+# Disables the stub frontend ingress and enables the full ingress template.
+ingress:
+  enabled: false # Set true in values.prod.yaml to activate
+  className: nginx
+  annotations: {}
+  # hosts:
+  #   - host: tradersapp.local
+  #     paths:
+  #       - path: /
+  #         service: frontend
+  #         port: 80
+  tls:
+    enabled: false
+    clusterIssuer: letsencrypt-prod
+    hosts:
+      - tradersapp.local
+    secretName: frontend-tls
+  rateLimit:
+    rps: "50"
+    rpm: "500"
+    connections: "100"
+    burst: "20"
+    limitBy: "$remote_addr"
+  canary:
+    enabled: false
+    weight: "10"
+  # BFF API ingress
+  apiIngress:
+    enabled: false
+    className: nginx
+    annotations: {}
+    hosts:
+      - host: api.tradersapp.local
+        paths:
+          - path: /
+            service: bff
+            port: 8788
+    rateLimit:
+      rps: "200"
+      rpm: "2000"
+      burst: "50"
+    tls:
+      clusterIssuer: letsencrypt-prod
+      hosts:
+        - api.tradersapp.local
+    allowedOrigin: "*"
+
+# ML Engine
+mlEngine:
+  enabled: true
+  replicaCount: 1
+  kafkaEnabled: true
+  requireDatabaseUrl: true
+  image:
+    repository: tradersapp/ml-engine
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    port: 8001
+    type: ClusterIP
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 2000m
+      memory: 2Gi
+  autoscaling:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 80
+    targetMemoryUtilizationPercentage: 80
+    targetLatencyMs: "200"  # P95 inference latency — scale up when > 200ms avg per pod
+  # KEDA event-driven autoscaling — scale on inference latency and queue depth
+  kedaAutoscaling:
+    enabled: false # Enable with: helm upgrade --set mlEngine.kedaAutoscaling.enabled=true
+    minReplicas: 1
+    maxReplicas: 8
+    pollingInterval: 15 # seconds
+    cooldownPeriod: 300 # seconds (5 min) before scaling down
+    # Scale UP when P95 latency > 50ms (activation), further when > 150ms
+    latencyActivationThreshold: "50"
+    latencyThreshold: "150"
+    # Scale UP when queue depth > 5 (activation), further when > 20
+    queueDepthActivationThreshold: "5"
+    queueDepthThreshold: "20"
+    enableCpuTrigger: false
+    enableMemoryTrigger: false
+  dataQuality:
+    validateBeforeTrain: true
+    blockOnCritical: true
+    requireGreatExpectations: true
+    lookbackDays: 90
+    alertWebhook: ""
+    quarantineDir: "/data/dq_quarantine"
+  hpaWatcher:
+    enabled: false
+    image:
+      repository: curlimages/curl
+      tag: "8.10.1"
+      pullPolicy: IfNotPresent
+    pollIntervalSeconds: 30
+    lookbackSeconds: 300
+    slackWebhook: ""
+    slackWebhookSecretRef: ""
+  runtimeState:
+    enabled: true
+    size: 10Gi
+    accessModes: ["ReadWriteOnce"]
+    storageClass: local-path # Use longhorn in self-hosted production
+    continualLearningDir: "/data/continual_learning"
+    mambaCacheDir: "/data/mamba_cache"
+  persistence:
+    enabled: true
+    size: 5Gi
+    accessModes: ["ReadWriteOnce"]
+    storageClass: local-path # Use longhorn in self-hosted production
+  modelRegistrySidecar:
+    port: 8010
+    warmup: true
+    maxCachedInstances: 4
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+  envFrom:
+    - configMapRef:
+        name: ml-engine-config
+    - configMapRef:
+        name: ml-engine-env
+    - secretRef:
+        name: ml-engine-secrets
+
+# Dedicated PostgreSQL runtime database for ml-engine / Feast / training state.
+# Keep disabled in the base chart unless the environment wants an in-cluster DB.
+postgresql:
+  enabled: false
+  image:
+    repository: postgres
+    tag: "16-alpine"
+    pullPolicy: IfNotPresent
+  service:
+    port: 5432
+    type: ClusterIP
+  database: tradersapp
+  user: tradersapp
+  existingSecret: tradersapp-secrets
+  passwordKey: POSTGRES_PASSWORD
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  persistence:
+    enabled: true
+    size: 5Gi
+    accessModes: ["ReadWriteOnce"]
+    storageClass: local-path
+
+# BFF
+bff:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: tradersapp/bff
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    port: 8788
+    type: ClusterIP
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 60
+    targetMemoryUtilizationPercentage: 80
+  # KEDA autoscaling for BFF — scale on request rate and latency
+  kedaAutoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 16
+    pollingInterval: 30
+    cooldownPeriod: 300
+    requestRateActivationThreshold: "2"
+    requestRateThreshold: "10"
+    latencyActivationThreshold: "200"
+    latencyThreshold: "500"
+  analysisTransport:
+    mode: grpc
+    grpcAddress: analysis-service:50051
+    grpcStrict: false
+  # Canary rollout (H04) — pod-count weighted, no service mesh required.
+  # Enable with: helm upgrade --set bff.canary.enabled=true,bff.canary.image.tag=<sha>
+  # Traffic split: 1 canary pod / (replicaCount + 1) ≈ 10% with replicaCount=9
+  canary:
+    enabled: false
+    replicaCount: 1
+    image:
+      tag: "" # Defaults to bff.image.tag when empty
+  envFrom:
+    - configMapRef:
+        name: bff-config
+    - secretRef:
+        name: bff-secrets
+
+analysisService:
+  enabled: true
+  replicaCount: 2
+  service:
+    port: 50051
+    healthPort: 8082
+    type: ClusterIP
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# Frontend
+frontend:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: tradersapp/frontend
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    port: 80
+    type: ClusterIP
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+  ingress:
+    enabled: false # Replaced by k8s/helm/tradersapp/templates/ingress.yaml — set ingress.enabled=true in values.prod.yaml
+
+# Triton Inference Server — GPU-accelerated ONNX model serving
+# Set enabled=true and configure nodeSelector + tolerations for GPU nodes
+triton:
+  enabled: false # Requires GPU node, set to true if GPU available
+  replicaCount: 1
+  cudaVisibleDevices: "0"
+  inferenceLatencyTargetMs: 100
+  image:
+    repository: nvcr.io/nvidia/tritonserver
+    tag: "24.04-py3"
+    pullPolicy: IfNotPresent
+  # Node selector for GPU nodes (uncomment when GPU nodes available)
+  nodeSelector:
+    # nvidia.com/gpu: "true"
+  tolerations:
+    # - key: nvidia.com/gpu
+    #   operator: Exists
+    #   effect: NoSchedule
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+      nvidia.com/gpu: 1
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+      nvidia.com/gpu: 1
+  service:
+    ports:
+      http: 8000
+      grpc: 8001
+      metrics: 8002
+  # PVC for ONNX model artifacts
+  modelStorage:
+    size: 2Gi
+    storageClass: local-path # Use longhorn in self-hosted production
+  # tmpfs for GPU memory spill
+  tmpStorageSize: 1Gi
+  # Graceful shutdown (allow in-flight requests to complete)
+  gracefulShutdownSeconds: 5
+  # Inference warmup (load models before accepting traffic)
+  inferenceStagingSeconds: 30
+  # Model config defaults
+  strictModelConfig: false
+  logging:
+    verbose: false
+  prometheusMetrics: true
+  # Autoscaling (GPU-based HPA — requires Prometheus Adapter for queue depth metric)
+  autoscaling:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 4
+    targetGPUUtilization: 80 # %
+  # KEDA autoscaling for Triton — scale on queue depth and GPU utilization
+  kedaAutoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 4
+    pollingInterval: 15
+    cooldownPeriod: 120
+    queueDepthActivationThreshold: "5"
+    queueDepthThreshold: "20"
+    gpuUtilizationActivationThreshold: "50"
+    gpuUtilizationThreshold: "80"
+  # Rolling update strategy
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  # Per-model tuning (keyed by model name)
+  models:
+    lightgbm_direction:
+      nFeatures: 50
+      maxBatchSize: 64
+      preferredBatchSizes: [1, 8, 16, 32, 64]
+      maxQueueDelayUs: 100
+      instanceCount: 2 # 2 GPU instances for parallel inference
+      version: 1
+      versionPolicy: specific # specific | latest | all
+      inputDims: [50]
+      eagerBatching: false
+    random_forest:
+      nFeatures: 50
+      maxBatchSize: 64
+      preferredBatchSizes: [1, 8, 16, 32, 64]
+      maxQueueDelayUs: 100
+      instanceCount: 1
+      version: 1
+      versionPolicy: specific
+      inputDims: [50]
+      eagerBatching: false
+    xgboost_direction:
+      nFeatures: 50
+      maxBatchSize: 64
+      preferredBatchSizes: [1, 8, 16, 32, 64]
+      maxQueueDelayUs: 100
+      instanceCount: 1
+      version: 1
+      versionPolicy: specific
+      inputDims: [50]
+      eagerBatching: false
+
+# vLLM — serves Mamba SSM models (>= 1.4B params) via OpenAI-compatible API
+# Requires GPU node with nvidia.com/gpu=true
+vllm:
+  enabled: false # Enable when GPU nodes available
+  replicaCount: 1
+  image:
+    repository: tradersapp/vllm-mamba
+    tag: latest
+    pullPolicy: IfNotPresent
+  modelStorage:
+    size: 10Gi
+    storageClass: local-path # Use longhorn in self-hosted production
+  nodeSelector:
+    # nvidia.com/gpu: "true"
+  tolerations:
+    # - key: nvidia.com/gpu
+    #   operator: Exists
+    #   effect: NoSchedule
+  gpuMemoryUtilization: "0.90"
+  maxModelLen: "2048"
+  tensorParallelSize: "1"
+  quantization: "" # "" | "awq" | "gptq" | "squeezellm"
+  additionalArgs: []
+  logLevel: INFO
+  resources:
+    requests:
+      cpu: "1"
+      memory: "4Gi"
+      nvidia.com/gpu: 1
+    limits:
+      cpu: "4"
+      memory: "16Gi"
+      nvidia.com/gpu: 1
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 4
+    targetGPUUtilization: "80"
+  cudaVisibleDevices: "0"
+
+# Redis (in-cluster) — shared between Feast online store and ML Engine cache
+redis:
+  enabled: true
+  image:
+    repository: redis
+    tag: 7-alpine
+  persistence:
+    enabled: true
+    size: 5Gi
+    storageClass: longhorn
+  # Redis runtime configuration — maxmemory 256 MiB, LRU eviction when full
+  configuration: |
+    maxmemory 256mb
+    maxmemory-policy allkeys-lru
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+# Feast Feature Store — centralized, versioned feature access
+# Online: Redis (shared with cache) — <10ms retrieval
+# Offline: SQLite → Parquet → Feast materialization
+feast:
+  enabled: true
+  # Trading symbol for feature retrieval
+  symbol: MNQ
+  # Online store TTL in seconds (24 hours — re-materialized daily)
+  onlineTtlSeconds: 86400
+  # PVC for Parquet feature files (offline store)
+  featureStorage:
+    size: 2Gi
+    storageClass: local-path # Use longhorn in self-hosted production
+  # Materialization CronJob: SQLite → Parquet → Redis
+  materialization:
+    enabled: true
+    schedule: "0 5 * * *" # Daily at 05:00 UTC (before trading day)
+    concurrencyPolicy: Forbid # No overlapping runs
+    successfulJobsHistoryLimit: 3
+    failedJobsHistoryLimit: 3
+    startingDeadlineSeconds: 300
+    backoffLimit: 2
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+    initContainerSecurityContext: true
+    containerSecurityContext: true
+    startupProbe:
+      exec:
+        command:
+          [
+            "python",
+            "-c",
+            "import sys; sys.path.insert(0,'/app'); from ml_engine.data.candle_db import CandleDatabase; db = CandleDatabase(); print(db.get_stats())",
+          ]
+      initialDelaySeconds: 10
+      periodSeconds: 5
+      failureThreshold: 12
+  # Streaming materialization (Kafka → Redis every 5 min)
+  # Enable when Kafka is deployed for real-time candle features
+  streaming:
+    enabled: true
+    concurrencyPolicy: Replace
+  # Secret reference for optional credentials
+  secretRef:
+    existingSecret: ""
+  redis:
+    url: "redis://redis:6379"
+  volumeMounts: []
+
+# Kafka (event-driven inter-service communication)
+kafka:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: apache/kafka
+    tag: 3.7.0
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: local-path # Use longhorn in self-hosted production
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+  config:
+    KAFKA_LOG_RETENTION_HOURS: "168"
+    KAFKA_LOG_SEGMENT_BYTES: "1073741824"
+    KAFKA_MESSAGE_MAX_BYTES: "1048576"
+  topics:
+    - name: candle-data
+      partitions: 6
+      replicationFactor: 1
+    - name: consensus-signals
+      partitions: 6
+      replicationFactor: 1
+    - name: model-predictions
+      partitions: 6
+      replicationFactor: 1
+    - name: feedback-loop
+      partitions: 3
+      replicationFactor: 1
+    - name: drift-alerts
+      partitions: 3
+      replicationFactor: 1
+    # Dead-letter queue: poison messages forwarded here after DLQ_MAX_RETRIES failures.
+    # replicationFactor=1 is safe here because DLQ messages are diagnostics, not hot-path.
+    - name: dead-letter-queue
+      partitions: 3
+      replicationFactor: 1
+# NOTE (E10): This chart deploys a single Kafka broker (replicaCount=1, replicationFactor=1).
+# This is intentional for dev/staging — single-node k3s cannot distribute replicas.
+# Production upgrade path: set replicaCount=3, replicationFactor=3 and switch storageClass to longhorn.
+# Until then: broker failure = full Kafka outage. The producer circuit breaker + local buffer
+# (ml-engine/kafka/producer.py _buffer deque + _retry_loop) covers up to 60 s of broker downtime
+# without blocking request threads. For high availability, use a managed Kafka service (MSK/Confluent).
+
+# Observability stack via the kube-prometheus-stack dependency.
+# Disabled by default in base values and enabled in values.prod.yaml.
+monitoringStack:
+  enabled: false
+  prometheus:
+    enabled: true
+    prometheusSpec:
+      retention: 15d
+      scrapeInterval: 30s
+      evaluationInterval: 30s
+      externalLabels:
+        cluster: tradersapp
+      serviceMonitorSelectorNilUsesHelmValues: false
+      podMonitorSelectorNilUsesHelmValues: false
+      ruleSelectorNilUsesHelmValues: false
+      serviceMonitorNamespaceSelector: {}
+      podMonitorNamespaceSelector: {}
+      ruleNamespaceSelector: {}
+      resources:
+        requests:
+          cpu: 250m
+          memory: 512Mi
+        limits:
+          cpu: 1000m
+          memory: 2Gi
+      storageSpec:
+        volumeClaimTemplate:
+          spec:
+            accessModes: ["ReadWriteOnce"]
+            storageClassName: local-path
+            resources:
+              requests:
+                storage: 10Gi
+  alertmanager:
+    enabled: true
+  grafana:
+    enabled: true
+    adminUser: admin
+    adminPassword: ""
+    defaultDashboardsEnabled: true
+    persistence:
+      enabled: true
+      size: 5Gi
+      storageClassName: local-path
+    sidecar:
+      dashboards:
+        enabled: true
+        searchNamespace: ALL
+      datasources:
+        enabled: true
+        searchNamespace: ALL
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+  kubeStateMetrics:
+    enabled: true
+  nodeExporter:
+    enabled: true
+  prometheusOperator:
+    enabled: true
+  defaultRules:
+    create: true
+
+# MLflow (self-hosted MLOps: experiment tracking + model registry)
+mlflow:
+  enabled: true
+  replicaCount: 1
+  trackingUri: http://mlflow:5000
+  # Optional pre-created Kubernetes Secret for MLflow credentials.
+  # If empty, this chart will create a secret from values below.
+  # Recommended for production: set this to a secret managed via Infisical/External Secrets.
+  secretRef:
+    existingSecret: ""
+    postgresDbKey: POSTGRES_DB
+    postgresUserKey: POSTGRES_USER
+    postgresPasswordKey: POSTGRES_PASSWORD
+    minioUserKey: MINIO_ROOT_USER
+    minioPasswordKey: MINIO_ROOT_PASSWORD
+  gunicornOptions: --workers 2 --timeout=300
+  service:
+    type: ClusterIP
+    port: 5000
+  image:
+    repository: tradersapp/mlflow
+    tag: v2.21.3
+    pullPolicy: IfNotPresent
+  postgres:
+    image:
+      repository: postgres
+      tag: 16-alpine
+      pullPolicy: IfNotPresent
+    database: mlflow
+    user: mlflow
+    password: mlflow123
+    persistence:
+      enabled: true
+      size: 10Gi
+      storageClass: local-path # Use longhorn in self-hosted production
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+  minio:
+    image:
+      repository: minio/minio
+      tag: RELEASE.2025-09-07T16-13-09Z
+      pullPolicy: IfNotPresent
+    clientImage:
+      repository: minio/mc
+      tag: RELEASE.2025-08-13T08-35-41Z
+      pullPolicy: IfNotPresent
+    user: minioadmin
+    password: minioadmin123
+    persistence:
+      enabled: true
+      size: 20Gi
+      storageClass: local-path # Use longhorn in self-hosted production
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+  s3:
+    bucket: mlflow-artifacts
+    region: us-east-1
+    endpointUrl: http://minio:9000
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+
+# Security
+security:
+  networkPolicies: true
+  podDisruptionBudgets: true
+  runAsNonRoot: true
+  readOnlyRootFilesystem: true
+
+# ── Namespace resource guardrails (J05 — Phase 11) ─────────────────────────────
+# ResourceQuota — aggregate namespace-level compute and object count limits.
+# Enable with: helm upgrade --set resourceQuota.enabled=true
+resourceQuota:
+  enabled: false
+  requests:
+    cpu: "8" # 8 CPU cores total across all pods in namespace
+    memory: "16Gi" # 16 GiB RAM total
+  limits:
+    cpu: "16" # 16 CPU cores at burst across all pods
+    memory: "32Gi"
+  storage: "100Gi" # Max PVC storage sum across namespace
+  pods: "50" # Prevent pod proliferation
+  services: "20"
+  secrets: "100"
+  configmaps: "100"
+  persistentvolumeclaims: "20"
+
+# LimitRange — default per-pod and per-container resource constraints.
+# Applied automatically to every pod that doesn't declare explicit limits.
+# Enable with: helm upgrade --set limitRange.enabled=true
+limitRange:
+  enabled: false
+  # Pod-level bounds
+  podMax:
+    cpu: "4"
+    memory: "8Gi"
+  podMin:
+    cpu: "10m"
+    memory: "16Mi"
+  # Container-level defaults (applied when container omits limits/requests)
+  containerMax:
+    cpu: "4"
+    memory: "8Gi"
+  containerMin:
+    cpu: "10m"
+    memory: "16Mi"
+  containerDefault:
+    cpu: "500m"
+    memory: "256Mi"
+  containerDefaultRequest:
+    cpu: "50m"
+    memory: "64Mi"
+  # Burst ratio cap: a container's limit / request cannot exceed this
+  maxLimitRequestRatio:
+    cpu: "10"
+    memory: "4"
+  # PVC storage bounds
+  pvcMin:
+    storage: "100Mi"
+  pvcMax:
+    storage: "50Gi"
+
+# Pod annotations for Prometheus
+podAnnotations:
+  prometheus.io/scrape: "true"
+
+# Pod tolerations (for mixed node pools)
+tolerations: []
+# Example GPU toleration:
+# - key: nvidia.com/gpu
+#   operator: Exists
+#   effect: NoSchedule
+
+# Node selector (for specific node pools)
+nodeSelector: {}
+# Example GPU node:
+# nvidia.com/gpu: "true"
