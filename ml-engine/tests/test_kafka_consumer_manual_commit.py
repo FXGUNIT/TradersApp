@@ -145,11 +145,12 @@ def consumer_module(monkeypatch):
     monkeypatch.setitem(sys.modules, "ml_engine.infrastructure.prometheus_exporter", fake_prom)
 
     # Patch ML engine sub-modules that get imported lazily inside handler closures.
-    for mod_name, mock_cls in {
-        "ml_engine.infrastructure.drift_detector": ModuleType(mod_name),
-        "ml_engine.feedback.feedback_logger": ModuleType(mod_name),
-        "ml_engine.data.candle_db": ModuleType(mod_name),
-    }.items():
+    _mock_defs = [
+        ("ml_engine.infrastructure.drift_detector", ModuleType("ml_engine.infrastructure.drift_detector")),
+        ("ml_engine.feedback.feedback_logger", ModuleType("ml_engine.feedback.feedback_logger")),
+        ("ml_engine.data.candle_db", ModuleType("ml_engine.data.candle_db")),
+    ]
+    for mod_name, mock_cls in _mock_defs:
         mock_cls.get_drift_monitor = lambda *a, **k: None
         mock_cls.FeedbackLogger = type("FeedbackLogger", (), {})
         mock_cls.CandleDatabase = type("CandleDatabase", (), {})
