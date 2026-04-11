@@ -67,7 +67,7 @@ class MockConsumer:
         committed_offset: int = 100,
         fail_watermarks: bool = False,
     ):
-        self._watermark_high = watermark
+        self._watermark_high = high_watermark
         self._committed_offset = committed_offset
         self.fail_watermarks = fail_watermarks
         self.paused_partitions = []

@@ -183,6 +183,7 @@ class TestKafkaProducerCircuitBreaker(unittest.TestCase):
             KafkaProducerClient,
             KAFKA_CB_CLOSED,
             KAFKA_CB_HALF_OPEN,
+            KAFKA_CB_OPEN,
         )
 
         producer = KafkaProducerClient(enable=False)

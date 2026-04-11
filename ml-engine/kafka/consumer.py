@@ -401,7 +401,7 @@ class KafkaConsumerClient:
         Check consumer lag. If lag exceeds KAFKA_MAX_LAG, pause the consumer
         and set a backoff timer to prevent the ML engine from being overwhelmed.
         """
-        if not KAFKA_AVAILABLE or self._consumer is None:
+        if self._consumer is None:
             return
         try:
             from confluent_kafka import TopicPartition
