@@ -164,11 +164,11 @@ docker image prune -f
 
 ## What Changed vs. k3s
 
-| Old (k3s) | New (Compose) |
-|-----------|---------------|
-| Longhorn PVCs | Bind mounts (`./ml-engine/data`, `./ml-engine/models`) |
-| PostgreSQL + MinIO | SQLite + local FS for MLflow |
-| ~3–5 GB RAM | ~1–1.2 GB RAM |
-| `kubectl apply` | `.\scripts\dev-up.ps1` |
-| Helm upgrades | `docker compose up --build` |
-| Longhorn validation | N/A (no Longhorn in dev) |
+| Old (k3s)           | New (Compose)                                          |
+| ------------------- | ------------------------------------------------------ |
+| Longhorn PVCs       | Bind mounts (`./ml-engine/data`, `./ml-engine/models`) |
+| PostgreSQL + MinIO  | SQLite + local FS for MLflow                           |
+| ~3–5 GB RAM         | ~1–1.2 GB RAM                                          |
+| `kubectl apply`     | `.\scripts\dev-up.ps1`                                 |
+| Helm upgrades       | `docker compose up --build`                            |
+| Longhorn validation | N/A (no Longhorn in dev)                               |
