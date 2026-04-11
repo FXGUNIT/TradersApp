@@ -35,11 +35,11 @@ spec:
       ports:
         - protocol: TCP
           port: 6379
-    # Outbound: PostgreSQL (MLflow backend)
+    # Outbound: PostgreSQL runtime DB
     - to:
         - podSelector:
             matchLabels:
-              app: postgres
+              app.kubernetes.io/component: postgresql
       ports:
         - protocol: TCP
           port: 5432
