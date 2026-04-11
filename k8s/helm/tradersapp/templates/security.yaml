@@ -189,8 +189,9 @@ spec:
   storageClassName: {{ .Values.mlEngine.runtimeState.storageClass }}
 {{- end }}
 
-{{- /* Redis PVC */ -}}
-{{- if and .Values.redis.enabled .Values.redis.persistence.enabled -}}
+{{- /* Redis (PVC optional) */ -}}
+{{- if .Values.redis.enabled -}}
+{{- if .Values.redis.persistence.enabled }}
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -206,6 +207,7 @@ spec:
   {{- with .Values.redis.persistence.storageClass }}
   storageClassName: {{ . }}
   {{- end }}
+{{- end }}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -246,8 +248,12 @@ spec:
             periodSeconds: 5
       volumes:
         - name: redis-data
+          {{- if .Values.redis.persistence.enabled }}
           persistentVolumeClaim:
             claimName: redis-pvc
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
 ---
 apiVersion: v1
 kind: Service

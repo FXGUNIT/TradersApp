@@ -18,6 +18,7 @@ import { PositionSizingPanel } from './PositionSizingPanel.jsx';
 import { TimingRecommendation } from './TimingRecommendation.jsx';
 import { ModelVotesPanel } from './ModelVotesPanel.jsx';
 import { NewsCountdown } from './NewsCountdown.jsx';
+import { TradeReturnCalculator } from '../tradeReturnCalculator/TradeReturnCalculator.jsx';
 
 const AURA_COLORS = {
   info: 'var(--aura-status-info, #0A84FF)',
@@ -216,6 +217,9 @@ export const MlConsensusTab = React.memo(function MlConsensusTab({ theme: _theme
 
             {/* News */}
             <NewsCountdown consensus={consensus} />
+
+            {/* Trade Return Calculator */}
+            <TradeReturnCalculator consensus={consensus} />
 
             {/* Footer */}
             <div style={{

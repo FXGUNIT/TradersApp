@@ -5,12 +5,16 @@
  * Saves admin responses to Firebase (user sees them in real-time).
  *
  * Flow:
- *   User sends message → Firebase → Telegram notification to admin
+ *   User sends message → Firebase → BFF → Telegram notification to admin
  *   Admin replies (web or Telegram) → Firebase → User sees in real-time
+ *
+ * J01 (Phase 11): All Telegram sends route through BFF at /telegram/send-message.
+ * Token never leaves the browser bundle.
  */
 
 import { ref, push, set, onValue, off, get } from 'firebase/database';
 import { db } from '../firebase-config.js';
+import { bffFetch } from './gateways/base.js';
 
 const SUPPORT_CHATS_PATH = 'support_chats';
 
@@ -51,24 +55,16 @@ function getTypingRef(userId) {
 
 /**
  * Send a Telegram notification to admin about a new user message.
- * Uses the BFF server (port 8788) to send via the Telegram Bot API.
+ * Routes through BFF at /telegram/send-message — token lives server-side only.
  *
  * @param {string} userEmail - User's email
  * @param {string} userName  - User's display name
  * @param {string} userId    - User's UID
  * @param {string} message    - Message text
- * @param {string} chatId     - Admin's Telegram chat ID (optional)
+ * @param {string} [chatId]   - Admin's Telegram chat ID override (optional)
  * @returns {Promise<boolean>} success
  */
 export async function notifyAdminOfNewMessage(userEmail, userName, userId, message, chatId = null) {
-  const TELEGRAM_BOT_TOKEN = import.meta.env.VITE_TELEGRAM_BOT_TOKEN;
-  const TELEGRAM_ADMIN_CHAT_ID = chatId || import.meta.env.VITE_TELEGRAM_ADMIN_CHAT_ID;
-
-  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_ADMIN_CHAT_ID) {
-    console.warn('[SupportChat] Telegram not configured for notifications');
-    return false;
-  }
-
   const text = `💬 *New Support Message*
 
 *From:* ${userName} (${userEmail})
@@ -82,31 +78,29 @@ ${message.slice(0, 500)}${message.length > 500 ? '...' : ''}
 Reply to this chat to respond directly.`;
 
   try {
-    const response = await fetch(
-      `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: TELEGRAM_ADMIN_CHAT_ID,
-          text,
-          parse_mode: 'Markdown',
-          disable_web_page_preview: true,
-          reply_markup: {
-            inline_keyboard: [
-              [
-                {
-                  text: `Reply via Telegram`,
-                  url: `https://t.me/${import.meta.env.VITE_TELEGRAM_BOT_USERNAME || 'your_bot'}`,
-                },
-              ],
-            ],
-          },
-        }),
-      },
-    );
-    const data = await response.json();
-    return data.ok === true;
+    // J01: Route through BFF — token never leaves browser
+    const payload = {
+      text,
+      parse_mode: 'Markdown',
+      disable_web_page_preview: true,
+    };
+    if (chatId) payload.chat_id = chatId;
+
+    const result = await bffFetch('/telegram/send-message', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (result === null) {
+      console.warn('[SupportChat] BFF unavailable — Telegram notification dropped');
+      return false;
+    }
+    if (!result.ok) {
+      console.warn('[SupportChat] Telegram notification failed:', result.error);
+      return false;
+    }
+    return true;
   } catch (error) {
     console.error('[SupportChat] Telegram notification failed:', error);
     return false;

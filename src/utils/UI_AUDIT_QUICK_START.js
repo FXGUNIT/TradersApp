@@ -27,8 +27,6 @@ import { initUIAudit, runFullUIAudit, exposeAuditToWindow } from './uiAuditRunne
 useEffect(() => {
   if (isAdminAuthenticated) {
     initUIAudit({
-      telegramToken: TELEGRAM_TOKEN,
-      telegramChatId: TELEGRAM_CHAT_ID,
       onError: showToast,
     });
     exposeAuditToWindow();

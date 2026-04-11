@@ -36,6 +36,24 @@ spec:
       securityContext:
         runAsNonRoot: true
         runAsUser: 1001
+      # Soft pod anti-affinity — prefer spreading bff pods across nodes.
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: bff
+                topologyKey: kubernetes.io/hostname
+      # Topology spread — ensure pods are distributed evenly across zones/nodes.
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: bff
       containers:
         - name: bff
           image: "{{ .Values.bff.image.repository }}:{{ .Values.bff.image.tag }}"
@@ -84,26 +102,35 @@ spec:
             {{- toYaml . | nindent 12 }}
           {{- end }}
           startupProbe:
-            httpGet:
-              path: /health
-              port: {{ .Values.bff.service.port }}
+            exec:
+              command:
+                - node
+                - -e
+                - "fetch('http://127.0.0.1:{{ .Values.bff.service.port }}/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
             failureThreshold: 30
             periodSeconds: 10
             initialDelaySeconds: 5
+            timeoutSeconds: 5
           livenessProbe:
-            httpGet:
-              path: /health
-              port: {{ .Values.bff.service.port }}
+            exec:
+              command:
+                - node
+                - -e
+                - "fetch('http://127.0.0.1:{{ .Values.bff.service.port }}/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
             failureThreshold: 3
             periodSeconds: 15
             initialDelaySeconds: 20
+            timeoutSeconds: 5
           readinessProbe:
-            httpGet:
-              path: /health
-              port: {{ .Values.bff.service.port }}
+            exec:
+              command:
+                - node
+                - -e
+                - "fetch('http://127.0.0.1:{{ .Values.bff.service.port }}/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
             failureThreshold: 3
             periodSeconds: 10
             initialDelaySeconds: 10
+            timeoutSeconds: 5
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
@@ -225,26 +252,35 @@ spec:
             {{- toYaml . | nindent 12 }}
           {{- end }}
           startupProbe:
-            httpGet:
-              path: /health
-              port: {{ .Values.bff.service.port }}
+            exec:
+              command:
+                - node
+                - -e
+                - "fetch('http://127.0.0.1:{{ .Values.bff.service.port }}/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
             failureThreshold: 30
             periodSeconds: 10
             initialDelaySeconds: 5
+            timeoutSeconds: 5
           livenessProbe:
-            httpGet:
-              path: /health
-              port: {{ .Values.bff.service.port }}
+            exec:
+              command:
+                - node
+                - -e
+                - "fetch('http://127.0.0.1:{{ .Values.bff.service.port }}/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
             failureThreshold: 3
             periodSeconds: 15
             initialDelaySeconds: 20
+            timeoutSeconds: 5
           readinessProbe:
-            httpGet:
-              path: /health
-              port: {{ .Values.bff.service.port }}
+            exec:
+              command:
+                - node
+                - -e
+                - "fetch('http://127.0.0.1:{{ .Values.bff.service.port }}/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
             failureThreshold: 3
             periodSeconds: 10
             initialDelaySeconds: 10
+            timeoutSeconds: 5
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true

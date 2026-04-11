@@ -64,7 +64,7 @@ export function useAdminDiagnosticsEffects({
         "Social Engineering Detection initialized - accessible via window.__SocialEngineeringDetection",
       );
 
-      initTelegramMonitor(telegramToken, telegramChatId);
+      initTelegramMonitor();
       console.log(
         "Telegram Monitor initialized - use window.__TelegramMonitor for diagnostics",
       );

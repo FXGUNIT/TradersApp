@@ -1,17 +1,19 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# TradersApp — Lightweight Dev Stack (replaces k3s for local development)
-# ─────────────────────────────────────────────────────────────────────────────
-# Tiers:
-#   Core only (~2 GB):   docker compose -f docker-compose.dev.yml up
-#   + MLflow (~3 GB):    docker compose -f docker-compose.dev.yml --profile mlops up
-#   + Observability:     docker compose -f docker-compose.dev.yml --profile mlops --profile observability up
+# TradersApp — Lightweight Dev Stack
+# Optimized for: 4 GB RAM, no GPU, CPU-only laptop
 #
-# Stop:   docker compose -f docker-compose.dev.yml down
-# Reset:  docker compose -f docker-compose.dev.yml down -v
+# Tiers:
+#   Core only (~1 GB):   docker compose -f docker-compose.dev.yml up
+#   + MLflow (~1.2 GB):  docker compose -f docker-compose.dev.yml --profile mlops up
+#   Full (~1.5 GB):      .\scripts\dev-up.ps1 -Tier full
+#                        (starts this file + `docker-compose.observability.yml`)
+#
+# Stop:   .\scripts\dev-up.ps1 -Down
+# Reset:  .\scripts\dev-up.ps1 -Reset
 # ─────────────────────────────────────────────────────────────────────────────
 
 services:
-  # ── Redis (always on — lightweight) ─────────────────────────────────────
+  # ── Redis (always on — ~64 MB) ──────────────────────────────────────────
   redis:
     image: redis:7-alpine
     container_name: traders-dev-redis
@@ -24,11 +26,16 @@ services:
       timeout: 3s
       retries: 3
 
-  # ── ML Engine ──────────────────────────────────────────────────────────
+  # ── ML Engine (~512 MB max) ─────────────────────────────────────────────
+  # CPU-only: 1 worker, memory-mapped numpy, no GPU libs loaded
+  # SQLite DB + model files via bind mount (visible on filesystem)
   ml-engine:
     build:
       context: .
       dockerfile: Dockerfile.ml-engine
+      args:
+        # Disable GPU / heavy optional deps at build time
+        CUDA_ENABLED: "false"
     container_name: traders-dev-ml-engine
     ports:
       - "8001:8001"
@@ -38,11 +45,17 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       KAFKA_ENABLE: "false"
-      MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI:-}
+      # MLflow: disabled in core tier (set by dev-up.ps1 when --profile mlops)
+      MLFLOW_TRACKING_URI: ""
       OTEL_ENABLED: "false"
+      # Lightweight inference settings
+      NUMBA_THREADING_LAYER: "omp"
+      OMP_NUM_THREADS: "2"
+      MKL_NUM_THREADS: "2"
+      OPENBLAS_NUM_THREADS: "2"
     volumes:
-      - dev-ml-data:/data
-      - dev-ml-models:/models
+      - ./ml-engine/data:/data:ro       # bind mount — edit DB from Windows
+      - ./ml-engine/models:/models:ro   # bind mount — browse model files
     depends_on:
       redis:
         condition: service_healthy
@@ -50,15 +63,17 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1536M
+          memory: 512M
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:8001/health"]
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 45s
+      start_period: 60s
 
-  # ── Analysis Service (gRPC) ──────────────────────────────────────────
+  # ── Analysis Service (~128 MB) ──────────────────────────────────────────
+  # Runs from same Dockerfile.bff image, separate container for isolation.
+  # Merge into bff container only if RAM becomes critical (< 3 GB total).
   analysis-service:
     build:
       context: .
@@ -67,11 +82,14 @@ services:
     command: ["node", "analysis-server.mjs"]
     ports:
       - "50051:50051"
+      - "8082:8082"
     environment:
       ML_ENGINE_URL: http://ml-engine:8001
       ANALYSIS_SERVICE_GRPC_PORT: 50051
       ANALYSIS_SERVICE_HEALTH_PORT: 8082
       NODE_ENV: development
+      # Disable verbose logging to save CPU
+      LOG_LEVEL: "warn"
     depends_on:
       ml-engine:
         condition: service_healthy
@@ -79,15 +97,15 @@ services:
     deploy:
       resources:
         limits:
-          memory: 256M
+          memory: 128M
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8082/health || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 10s
+      start_period: 15s
 
-  # ── BFF (single replica) ─────────────────────────────────────────────
+  # ── BFF (~192 MB) ───────────────────────────────────────────────────────
   bff:
     build:
       context: .
@@ -104,6 +122,9 @@ services:
       REDIS_PORT: 6379
       KAFKA_BOOTSTRAP_SERVERS: ""
       NODE_ENV: development
+      LOG_LEVEL: "warn"
+      # Limit Node.js heap (let OS handle the rest)
+      NODE_OPTIONS: "--max-old-space-size=128"
     depends_on:
       ml-engine:
         condition: service_healthy
@@ -113,15 +134,15 @@ services:
     deploy:
       resources:
         limits:
-          memory: 384M
+          memory: 192M
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8788/health || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 10s
+      start_period: 15s
 
-  # ── Frontend (nginx) ─────────────────────────────────────────────────
+  # ── Frontend (nginx ~64 MB) ─────────────────────────────────────────────
   frontend:
     build:
       context: .
@@ -141,53 +162,12 @@ services:
           memory: 64M
 
   # ═══════════════════════════════════════════════════════════════════════
-  #  PROFILE: mlops  (adds MLflow + Postgres + MinIO)
+  #  PROFILE: mlops  (adds MLflow only — no PostgreSQL, no MinIO)
+  #
+  #  RAM budget: MLflow ~192 MB  |  Total stack: ~1.2 GB
+  #  Backend store:  SQLite (./mlflow/mlflow.db) — single-user fine
+  #  Artifacts:     local bind mount (./mlflow/artifacts)
   # ═══════════════════════════════════════════════════════════════════════
-  postgres:
-    image: postgres:16-alpine
-    container_name: traders-dev-postgres
-    profiles: ["mlops"]
-    environment:
-      POSTGRES_USER: traders
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-traders123}
-      POSTGRES_DB: mlflow
-    ports:
-      - "5432:5432"
-    volumes:
-      - dev-postgres-data:/var/lib/postgresql/data
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U traders"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-
-  minio:
-    image: minio/minio:latest
-    container_name: traders-dev-minio
-    profiles: ["mlops"]
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD:-minioadmin123}
-    command: server /data --console-address ":9001"
-    volumes:
-      - dev-minio-data:/data
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-    healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
-      interval: 15s
-      timeout: 10s
-      retries: 5
-
   mlflow:
     image: ghcr.io/mlflow/mlflow:v2.21.3
     container_name: traders-dev-mlflow
@@ -195,62 +175,28 @@ services:
     ports:
       - "5000:5000"
     environment:
-      MLFLOW_TRACKING_URI: postgresql://traders:${POSTGRES_PASSWORD:-traders123}@postgres:5432/mlflow
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-minioadmin}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-minioadmin}
-      AWS_DEFAULT_REGION: us-east-1
-      MLFLOW_ARTIFACT_ROOT: s3://mlflow-artifacts/
-    depends_on:
-      postgres:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
+      # SQLite backend — no PostgreSQL needed for single-user dev
+      MLFLOW_TRACKING_URI: file:///mlflow/artifacts
+      # No S3/MinIO — local filesystem artifact root
+      MLFLOW_ARTIFACT_ROOT: /mlflow/artifacts
+      # Disable artifact eviction to save CPU/memory
+      MLFLOW_ENABLE_ARTIFACT_CACHE: "false"
+    volumes:
+      # Bind mount: artifacts + SQLite DB visible in repo
+      - ./mlflow/artifacts:/mlflow/artifacts
     restart: unless-stopped
     deploy:
       resources:
         limits:
-          memory: 384M
-
-  # ═══════════════════════════════════════════════════════════════════════
-  #  PROFILE: observability  (adds Prometheus + Grafana only — no Jaeger/Loki)
-  # ═══════════════════════════════════════════════════════════════════════
-  prometheus:
-    image: prom/prometheus:v2.54.0
-    container_name: traders-dev-prometheus
-    profiles: ["observability"]
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./k8s/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-    command:
-      - "--config.file=/etc/prometheus/prometheus.yml"
-      - "--storage.tsdb.retention.time=7d"
-      - "--storage.tsdb.retention.size=500MB"
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-
-  grafana:
-    image: grafana/grafana:11.3.0
-    container_name: traders-dev-grafana
-    profiles: ["observability"]
-    ports:
-      - "3001:3000"
-    environment:
-      GF_SECURITY_ADMIN_USER: admin
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-traders123}
-    volumes:
-      - ./k8s/observability/grafana-provisioning:/etc/grafana/provisioning:ro
-    deploy:
-      resources:
-        limits:
           memory: 192M
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:5000/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
-volumes:
-  dev-ml-data:
-  dev-ml-models:
-  dev-postgres-data:
-  dev-minio-data:
+volumes: {}
+# Named volumes removed — all data now via bind mounts
+# so model files and MLflow artifacts are visible on the Windows filesystem.
+# For a clean slate: rm -rf ml-engine/data ml-engine/models mlflow/

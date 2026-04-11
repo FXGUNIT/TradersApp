@@ -1,131 +1,34 @@
-const TELEGRAM_TOKEN = import.meta.env.VITE_TELEGRAM_BOT_TOKEN;
-const TELEGRAM_CHAT_ID = import.meta.env.VITE_TELEGRAM_CHAT_ID;
+/**
+ * Telegram Alerts Service
+ *
+ * J01 (Phase 11): All sends now route through BFF at /telegram/send-message.
+ * Token never leaves the browser bundle.
+ *
+ * Note: sendForensicAlert lives in src/utils/securityAlertUtils.js where it
+ * uses the /telegram/send-forensic-alert BFF endpoint (server-side formatting).
+ * This file only contains the plain alert path.
+ */
+import { bffFetch } from './gateways/base.js';
 
-const telegramConfigured = Boolean(TELEGRAM_TOKEN && TELEGRAM_CHAT_ID);
+/**
+ * Send a plain Telegram alert message via the BFF proxy.
+ * @param {string} message - HTML message body
+ */
+export async function sendTelegramAlert(message) {
+  if (!message?.trim()) return;
 
-if (telegramConfigured) {
-  console.log("Telegram Security System: ONLINE");
+  try {
+    const result = await bffFetch('/telegram/send-message', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: message, parse_mode: 'HTML' }),
+    });
+    if (result === null) {
+      console.warn('[TelegramAlerts] BFF unavailable — alert dropped');
+    } else if (!result.ok) {
+      console.warn('[TelegramAlerts] Telegram send failed:', result.error);
+    }
+  } catch (error) {
+    console.warn('[TelegramAlerts] Telegram alert failed:', error);
+  }
 }
-
-const sendTelegramAlert = async (message) => {
-  if (!telegramConfigured) {
-    return;
-  }
-
-  try {
-    await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: TELEGRAM_CHAT_ID,
-        text: message,
-        parse_mode: "HTML",
-      }),
-    });
-  } catch (error) {
-    console.error("Telegram Alert Failed:", error);
-  }
-};
-
-window.sendTelegramAlert = sendTelegramAlert;
-
-const gatherForensicData = async () => {
-  try {
-    const forensic = {};
-    const userAgent = navigator.userAgent;
-    let browserName = "Unknown";
-    let osName = "Unknown";
-
-    if (/Edg/.test(userAgent)) browserName = "Edge";
-    else if (/Chrome/.test(userAgent)) browserName = "Chrome";
-    else if (/Safari/.test(userAgent)) browserName = "Safari";
-    else if (/Firefox/.test(userAgent)) browserName = "Firefox";
-    else if (/Opera|OPR/.test(userAgent)) browserName = "Opera";
-
-    if (/Windows/.test(userAgent)) osName = "Windows";
-    else if (/Mac/.test(userAgent)) osName = "macOS";
-    else if (/Linux/.test(userAgent)) osName = "Linux";
-    else if (/Android/.test(userAgent)) osName = "Android";
-    else if (/iPhone|iPad/.test(userAgent)) osName = "iOS";
-
-    forensic.browser = browserName;
-    forensic.os = osName;
-    forensic.screenResolution = `${window.screen.width}x${window.screen.height}`;
-
-    try {
-      const ipRes = await fetch("https://api.ipify.org?format=json");
-      const ipData = await ipRes.json();
-      forensic.ip = ipData.ip || "Unknown";
-    } catch {
-      forensic.ip = "Unknown";
-    }
-
-    try {
-      const geoRes = await fetch("https://ipapi.co/json/");
-      const geoData = await geoRes.json();
-      forensic.city = geoData.city || "Unknown";
-      forensic.region = geoData.region || "Unknown";
-      forensic.country = geoData.country_name || "Unknown";
-      forensic.isp = geoData.org || "Unknown";
-    } catch {
-      forensic.city = "Unknown";
-      forensic.region = "Unknown";
-      forensic.country = "Unknown";
-      forensic.isp = "Unknown";
-    }
-
-    forensic.timestamp = new Date().toLocaleString("en-US", {
-      weekday: "short",
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      timeZoneName: "short",
-    });
-
-    return forensic;
-  } catch (error) {
-    console.error("Forensic data gathering failed:", error);
-    return {
-      browser: "Unknown",
-      os: "Unknown",
-      screenResolution: "Unknown",
-      ip: "Unknown",
-      city: "Unknown",
-      region: "Unknown",
-      country: "Unknown",
-      isp: "Unknown",
-      timestamp: new Date().toLocaleString(),
-    };
-  }
-};
-
-export const sendForensicAlert = async (targetEmail, alertType = "BREACH") => {
-  const forensic = await gatherForensicData();
-
-  const message = `🚨 <b>INSTITUTIONAL ${alertType} ALERT</b>
-
-👤 <b>TARGET IDENTITY</b>
-Email: <code>${targetEmail}</code>
-
-🌐 <b>NETWORK PROFILE</b>
-IP: <code>${forensic.ip}</code>
-ISP: <code>${forensic.isp}</code>
-
-📍 <b>GEOGRAPHIC LOCATION</b>
-Location: <code>${forensic.city}, ${forensic.region}, ${forensic.country}</code>
-
-💻 <b>HARDWARE SIGNATURE</b>
-Device: <code>${forensic.os}</code>
-Browser: <code>${forensic.browser}</code>
-Display: <code>${forensic.screenResolution}</code>
-
-⏰ <b>TIMESTAMP</b>
-<code>${forensic.timestamp}</code>`;
-
-  sendTelegramAlert(message);
-};
-
-export { sendTelegramAlert };

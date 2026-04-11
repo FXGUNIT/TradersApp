@@ -34,11 +34,8 @@ import { runIconValidation } from './uiAuditIconValidation.js';
 In the TradersRegiment component, add this useEffect hook right after the component starts:
 
 useEffect(() => {
-  // Only initialize audit system for admin users
   if (isAdminAuthenticated) {
     initUIAudit({
-      telegramToken: TELEGRAM_TOKEN,
-      telegramChatId: TELEGRAM_CHAT_ID,
       onError: showToast,
       verbose: false,
     });
@@ -374,9 +371,9 @@ A: Make sure to call initUIAudit() and exposeAuditToWindow() first
    - Check browser console for errors during initialization
 
 Q: No Telegram alerts arriving
-A: Verify TELEGRAM_TOKEN and TELEGRAM_CHAT_ID are correct
-   - Test with: sendTelegramAlert('Test', 'Testing alert')
-   - Check Telegram bot is active and chat exists
+A: Verify BFF is running and TELEGRAM_BOT_TOKEN is set in BFF environment
+   - Check /api/health endpoint responds with telegramConfigured: true
+   - Check BFF console logs for send failures
    - Cooldown: Only 1 alert per 10 seconds to avoid spam
 
 Q: Crawler reports all elements as failed

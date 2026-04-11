@@ -7,6 +7,54 @@
 
 namespace: tradersapp
 
+# ── Global Ingress — TLS, rate limiting, BFF API route (ID 33) ─────────────
+ingress:
+  enabled: true
+  className: nginx
+  annotations: {}
+  hosts:
+    - host: tradersapp.io
+      paths:
+        - path: /
+          service: frontend
+          port: 80
+        - path: /api
+          service: bff
+          port: 8788
+  tls:
+    enabled: true
+    clusterIssuer: letsencrypt-prod
+    hosts:
+      - tradersapp.io
+      - api.tradersapp.io
+    secretName: tradersapp-tls
+  rateLimit:
+    rps: "50"
+    rpm: "500"
+    connections: "100"
+    burst: "20"
+    limitBy: "$remote_addr"
+  # BFF public API ingress
+  apiIngress:
+    enabled: true
+    className: nginx
+    annotations: {}
+    hosts:
+      - host: api.tradersapp.io
+        paths:
+          - path: /
+            service: bff
+            port: 8788
+    rateLimit:
+      rps: "200"
+      rpm: "2000"
+      burst: "50"
+    tls:
+      clusterIssuer: letsencrypt-prod
+      hosts:
+        - api.tradersapp.io
+    allowedOrigin: "https://tradersapp.io"
+
 # ML Engine — production resources
 mlEngine:
   enabled: true
@@ -67,6 +115,10 @@ mlEngine:
     runAsUser: 1000
     fsGroup: 1000
   envFrom:
+    - configMapRef:
+        name: ml-engine-config
+    - configMapRef:
+        name: ml-engine-env
     - secretRef:
         name: ml-engine-secrets
 
@@ -101,6 +153,8 @@ bff:
     runAsNonRoot: true
     runAsUser: 1001
   envFrom:
+    - configMapRef:
+        name: bff-config
     - secretRef:
         name: bff-secrets
 
@@ -141,9 +195,7 @@ frontend:
       cpu: 200m
       memory: 128Mi
   ingress:
-    enabled: true
-    host: tradersapp.io
-    path: /
+    enabled: false # Disabled above — use global ingress.* below
 
 # Triton — enabled for GPU inference nodes
 triton:

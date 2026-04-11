@@ -1,6 +1,6 @@
 ---
-name: Refactor Safely
-description: Plan and execute safe refactoring using dependency analysis
+name: refactor-safely
+description: "Use when planning safe refactoring, renaming symbols, extracting functions/modules, moving code, or restructuring without breaking dependencies. Triggers on refactor, rename, extract method, move file, code restructuring, or dependency-safe refactoring tasks."
 ---
 
 ## Refactor Safely

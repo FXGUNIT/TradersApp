@@ -1,13 +1,22 @@
-require('dotenv').config({ path: require('path').resolve(__dirname, '../.env.local') })
-const express = require('express')
-const bodyParser = require('body-parser')
-const cors = require('cors')
-const TelegramBot = require('node-telegram-bot-api')
-const fs = require('fs')
-const path = require('path')
-const crypto = require('crypto')
-const invitesService = require('./invitesService')
-const { processConversation, AI_PROVIDERS } = require('./aiConversation')
+import { fileURLToPath } from "node:url";
+import { dirname } from "node:path";
+import path from "node:path";
+import fs from "node:fs";
+import http from "node:http";
+import crypto from "node:crypto";
+import dotenv from "dotenv";
+import express from "express";
+import bodyParser from "body-parser";
+import cors from "cors";
+import TelegramBot from "node-telegram-bot-api";
+import rateLimit from "express-rate-limit";
+import * as invitesService from "./invitesService.js";
+import { processConversation, AI_PROVIDERS } from "./aiConversation.js";
+import { initFirestore, getDb } from "./firebaseAdmin.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+dotenv.config({ path: path.resolve(__dirname, "../.env.local") });
 
 // ─── Email Service (emailjs) ─────────────────────────────────────────────────
 /**
@@ -16,97 +25,121 @@ const { processConversation, AI_PROVIDERS } = require('./aiConversation')
  * Gracefully skips if env vars not set.
  */
 async function sendWelcomeEmail(toEmail, toName) {
-  const serviceId = process.env.EMAILJS_SERVICE_ID
-  const templateId = process.env.EMAILJS_TEMPLATE_ID
-  const publicKey = process.env.EMAILJS_PUBLIC_KEY
+  const serviceId = process.env.EMAILJS_SERVICE_ID;
+  const templateId = process.env.EMAILJS_TEMPLATE_ID;
+  const publicKey = process.env.EMAILJS_PUBLIC_KEY;
 
   if (!serviceId || !templateId || !publicKey) {
-    console.log('[sendWelcomeEmail] not configured — EMAILJS_* env vars missing; skipping')
-    return false
+    console.log(
+      "[sendWelcomeEmail] not configured — EMAILJS_* env vars missing; skipping",
+    );
+    return false;
   }
 
   try {
-    const emailjs = await import('emailjs-com')
+    const emailjs = await import("emailjs-com");
     await emailjs.send(serviceId, templateId, {
       to_email: toEmail,
       to_name: toName || toEmail,
-      to_name_first: (toName || toEmail).split(' ')[0],
-      reply_to: 'support@traders.app',
-      app_url: process.env.FRONTEND_URL || 'https://traders.app',
-    })
-    console.log(`[sendWelcomeEmail] Sent to ${toEmail}`)
-    return true
+      to_name_first: (toName || toEmail).split(" ")[0],
+      reply_to: "support@traders.app",
+      app_url: process.env.FRONTEND_URL || "https://traders.app",
+    });
+    console.log(`[sendWelcomeEmail] Sent to ${toEmail}`);
+    return true;
   } catch (e) {
-    console.error('[sendWelcomeEmail] Failed to send to', toEmail, ':', e?.message || e)
-    return false
+    console.error(
+      "[sendWelcomeEmail] Failed to send to",
+      toEmail,
+      ":",
+      e?.message || e,
+    );
+    return false;
   }
 }
 
 // ─── App Declaration (MUST be first) ─────────────────────────────────────────
-const app = express()
-const port = process.env.TELEGRAM_BRIDGE_PORT || 5001
-const rateLimit = require('express-rate-limit')
-const adminLimiter = rateLimit({ windowMs: 60 * 1000, max: 60, message: 'Too many admin requests, please try again later.' })
-const botLimiter = rateLimit({ windowMs: 60 * 1000, max: 10, message: 'Too many messages. Slow down.' })
+const app = express();
+const port = process.env.TELEGRAM_BRIDGE_PORT || 5001;
+const adminLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  message: "Too many admin requests, please try again later.",
+});
+const botLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  message: "Too many messages. Slow down.",
+});
 
 // ─── Firebase Admin for Support Chat ───────────────────────────────────────
-let adminDb = null
+let adminDb = null;
 try {
-  const { initFirestore, getDb } = require('./firebaseAdmin')
-  initFirestore()
-  adminDb = getDb()
-  console.log('Telegram Bridge: Firestore initialized for support chat')
+  initFirestore();
+  adminDb = getDb();
+  console.log("Telegram Bridge: Firestore initialized for support chat");
 } catch (err) {
-  console.error('Telegram Bridge: Firestore not available:', err.message)
+  console.error("Telegram Bridge: Firestore not available:", err.message);
 }
 
 // ─── Firebase Admin (invites) ────────────────────────────────────────────────
-let adminDb2 = null
+let adminDb2 = null;
 try {
-  const { initFirestore, getDb } = require('./firebaseAdmin')
-  initFirestore()
-  adminDb2 = getDb()
-  if (adminDb2) console.log('Telegram Bridge: Firestore initialized via Firebase Admin')
-  else console.log('Telegram Bridge: Firestore not available; using local invites fallback')
+  adminDb2 = getDb();
+  if (adminDb2)
+    console.log("Telegram Bridge: Firestore initialized via Firebase Admin");
+  else
+    console.log(
+      "Telegram Bridge: Firestore not available; using local invites fallback",
+    );
 } catch (err) {
-  console.error('Telegram Bridge: failed to initialize Firebase Admin', err)
+  console.error("Telegram Bridge: failed to initialize Firebase Admin", err);
 }
 
 // ─── Security ────────────────────────────────────────────────────────────────
-const ADMIN_API_KEY = process.env.TELEGRAM_ADMIN_API_KEY
-const SUPPORT_SERVICE_KEY = process.env.SUPPORT_SERVICE_KEY || process.env.TELEGRAM_ADMIN_API_KEY || ''
-const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
+const ADMIN_API_KEY = process.env.TELEGRAM_ADMIN_API_KEY;
+const SUPPORT_SERVICE_KEY =
+  process.env.SUPPORT_SERVICE_KEY || process.env.TELEGRAM_ADMIN_API_KEY || "";
+const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 
 if (!BOT_TOKEN) {
-  console.error('TELEGRAM_BOT_TOKEN not configured. Please set TELEGRAM_BOT_TOKEN in env.')
+  console.error(
+    "TELEGRAM_BOT_TOKEN not configured. Please set TELEGRAM_BOT_TOKEN in env.",
+  );
 }
 
-let adminChats = []
+let adminChats = [];
 if (process.env.TELEGRAM_ADMIN_CHAT_IDS) {
-  adminChats = process.env.TELEGRAM_ADMIN_CHAT_IDS.split(',').map(id => Number(id.trim())).filter(n => !Number.isNaN(n))
+  adminChats = process.env.TELEGRAM_ADMIN_CHAT_IDS.split(",")
+    .map((id) => Number(id.trim()))
+    .filter((n) => !Number.isNaN(n));
 }
 
 // ─── User registry — tracks all Telegram users who have interacted ─────────────
-const USER_REGISTRY_PATH = path.resolve(__dirname, 'user_registry.json')
-let userRegistry = {} // { chatId: { chatId, username, firstName, lastSeen, subscribed } }
+const USER_REGISTRY_PATH = path.resolve(__dirname, "user_registry.json");
+let userRegistry = {}; // { chatId: { chatId, username, firstName, lastSeen, subscribed } }
 
 function loadUserRegistry() {
   try {
     if (fs.existsSync(USER_REGISTRY_PATH)) {
-      userRegistry = JSON.parse(fs.readFileSync(USER_REGISTRY_PATH, 'utf8'))
+      userRegistry = JSON.parse(fs.readFileSync(USER_REGISTRY_PATH, "utf8"));
     }
-  } catch { userRegistry = {} }
+  } catch {
+    userRegistry = {};
+  }
 }
 function saveUserRegistry() {
   try {
-    fs.writeFileSync(USER_REGISTRY_PATH, JSON.stringify(userRegistry, null, 2))
-  } catch (e) { console.error('[userRegistry] Save failed:', e.message) }
+    fs.writeFileSync(USER_REGISTRY_PATH, JSON.stringify(userRegistry, null, 2));
+  } catch (e) {
+    console.error("[userRegistry] Save failed:", e.message);
+  }
 }
 
 function registerTelegramUser(msg) {
-  if (!msg?.chat?.id) return
-  const chatId = String(msg.chat.id)
-  const existing = userRegistry[chatId] || {}
+  if (!msg?.chat?.id) return;
+  const chatId = String(msg.chat.id);
+  const existing = userRegistry[chatId] || {};
   userRegistry[chatId] = {
     chatId,
     username: msg.from?.username || existing.username || null,
@@ -114,69 +147,72 @@ function registerTelegramUser(msg) {
     lastSeen: Date.now(),
     subscribed: existing.subscribed !== false, // default true
     firstSeen: existing.firstSeen || Date.now(),
-  }
-  saveUserRegistry()
+  };
+  saveUserRegistry();
 }
 
 function getSubscribedUsers() {
-  return Object.values(userRegistry).filter(u => u.subscribed)
+  return Object.values(userRegistry).filter((u) => u.subscribed);
 }
 
-const bot = BOT_TOKEN ? new TelegramBot(BOT_TOKEN, { polling: false }) : null
+const bot = BOT_TOKEN ? new TelegramBot(BOT_TOKEN, { polling: false }) : null;
 
 // ─── Session store (shared with AI conversation) ───────────────────────────
-let sessionStore = new Map()
-try {
-  const { AI_PROVIDERS: _AP } = require('./aiConversation')
-} catch {}
+let sessionStore = new Map();
 
 // ─── Middleware ──────────────────────────────────────────────────────────────
-app.use(cors())
-app.use(bodyParser.json())
+app.use(cors());
+app.use(bodyParser.json());
 
 function requireApiKey(req, res, next) {
-  if (!ADMIN_API_KEY) return next()
-  const key = req.headers['x-admin-api-key'] || req.headers['x-api-key']
-  if (key && key === ADMIN_API_KEY) return next()
-  return res.status(403).json({ ok: false, error: 'Forbidden' })
+  if (!ADMIN_API_KEY) return next();
+  const key = req.headers["x-admin-api-key"] || req.headers["x-api-key"];
+  if (key && key === ADMIN_API_KEY) return next();
+  return res.status(403).json({ ok: false, error: "Forbidden" });
 }
 
 function requireSupportKey(req, res, next) {
-  if (!SUPPORT_SERVICE_KEY) return next() // Disable auth in dev
-  if (req.headers['x-support-key'] === SUPPORT_SERVICE_KEY) return next()
-  return res.status(403).json({ ok: false, error: 'Invalid service key' })
+  if (!SUPPORT_SERVICE_KEY) return next(); // Disable auth in dev
+  if (req.headers["x-support-key"] === SUPPORT_SERVICE_KEY) return next();
+  return res.status(403).json({ ok: false, error: "Invalid service key" });
 }
 
 // ─── Support Chat Helpers ───────────────────────────────────────────────────
 
 async function notifyAdminSupport(userEmail, userName, userId, message) {
-  if (!bot || adminChats.length === 0) return false
-  const text = `💬 *New Support Message*\n\n*From:* ${userName} (${userEmail})\n*UID:* ${userId}\n*Time:* ${new Date().toLocaleString()}\n\n*Message:*\n${message.slice(0, 500)}${message.length > 500 ? '...' : ''}`
+  if (!bot || adminChats.length === 0) return false;
+  const text = `💬 *New Support Message*\n\n*From:* ${userName} (${userEmail})\n*UID:* ${userId}\n*Time:* ${new Date().toLocaleString()}\n\n*Message:*\n${message.slice(0, 500)}${message.length > 500 ? "..." : ""}`;
   for (const chat of adminChats) {
-    try { await bot.sendMessage(chat, text, { parse_mode: 'Markdown', disable_web_page_preview: true }) }
-    catch (e) { console.error('Support notify error', e) }
+    try {
+      await bot.sendMessage(chat, text, {
+        parse_mode: "Markdown",
+        disable_web_page_preview: true,
+      });
+    } catch (e) {
+      console.error("Support notify error", e);
+    }
   }
-  return true
+  return true;
 }
 
 async function saveAdminReplyToFirebase(userId, adminName, text) {
-  if (!adminDb) return false
+  if (!adminDb) return false;
   try {
-    const { ref, push, set } = require('firebase-admin/firestore')
-    const msgRef = push(ref(adminDb, `support_chats/${userId}/messages`))
+    const { ref, push, set } = await import("firebase-admin/firestore");
+    const msgRef = push(ref(adminDb, `support_chats/${userId}/messages`));
     await set(msgRef, {
-      sender: 'admin',
-      senderName: adminName || 'Support Team',
-      senderEmail: 'admin@traders.app',
+      sender: "admin",
+      senderName: adminName || "Support Team",
+      senderEmail: "admin@traders.app",
       text: text.trim(),
       timestamp: Date.now(),
       read: false,
       fromTelegram: true,
-    })
-    return true
+    });
+    return true;
   } catch (e) {
-    console.error('Firebase save reply error', e)
-    return false
+    console.error("Firebase save reply error", e);
+    return false;
   }
 }
 
@@ -188,38 +224,45 @@ async function saveAdminReplyToFirebase(userId, adminName, text) {
  * Saves to Firestore and notifies admin via Telegram.
  * Body: { userId, userEmail, userName, text }
  */
-app.post('/support/message', requireSupportKey, async (req, res) => {
-  const { userId, userEmail, userName, text } = req.body || {}
+app.post("/support/message", requireSupportKey, async (req, res) => {
+  const { userId, userEmail, userName, text } = req.body || {};
   if (!userId || !text?.trim()) {
-    return res.status(400).json({ ok: false, error: 'userId and text required' })
+    return res
+      .status(400)
+      .json({ ok: false, error: "userId and text required" });
   }
 
   try {
     if (adminDb) {
       try {
-        const { ref, push, set } = require('firebase-admin/firestore')
-        const msgRef = push(ref(adminDb, `support_chats/${userId}/messages`))
+        const { ref, push, set } = await import("firebase-admin/firestore");
+        const msgRef = push(ref(adminDb, `support_chats/${userId}/messages`));
         await set(msgRef, {
-          sender: 'user',
-          senderName: userName || 'User',
-          senderEmail: userEmail || '',
+          sender: "user",
+          senderName: userName || "User",
+          senderEmail: userEmail || "",
           text: text.trim(),
           timestamp: Date.now(),
           read: false,
           fromTelegram: false,
-        })
+        });
       } catch (e) {
-        console.error('Firestore save error (support/message)', e)
+        console.error("Firestore save error (support/message)", e);
       }
     }
 
-    const notified = await notifyAdminSupport(userEmail, userName, userId, text.trim())
-    res.json({ ok: true, notified, timestamp: Date.now() })
+    const notified = await notifyAdminSupport(
+      userEmail,
+      userName,
+      userId,
+      text.trim(),
+    );
+    res.json({ ok: true, notified, timestamp: Date.now() });
   } catch (e) {
-    console.error('/support/message error:', e)
-    res.status(500).json({ ok: false, error: e.message })
+    console.error("/support/message error:", e);
+    res.status(500).json({ ok: false, error: e.message });
   }
-})
+});
 
 /**
  * POST /support/telegram-reply
@@ -228,88 +271,114 @@ app.post('/support/message', requireSupportKey, async (req, res) => {
  * Body: { userId, adminName, text, adminChatId }
  * Header: X-Support-Key: <service_key>
  */
-app.post('/support/telegram-reply', requireSupportKey, async (req, res) => {
-  const { userId, adminName, text, adminChatId } = req.body || {}
+app.post("/support/telegram-reply", requireSupportKey, async (req, res) => {
+  const { userId, adminName, text, adminChatId } = req.body || {};
   if (!userId || !text?.trim()) {
-    return res.status(400).json({ ok: false, error: 'userId and text required' })
+    return res
+      .status(400)
+      .json({ ok: false, error: "userId and text required" });
   }
 
   try {
-    const saved = await saveAdminReplyToFirebase(userId, adminName, text)
+    const saved = await saveAdminReplyToFirebase(userId, adminName, text);
     if (saved && adminChatId) {
-      await bot.sendMessage(adminChatId, '✅ Reply sent to user.').catch(() => {})
+      await bot
+        .sendMessage(adminChatId, "✅ Reply sent to user.")
+        .catch(() => {});
     }
-    res.json({ ok: saved, saved: !!saved })
+    res.json({ ok: saved, saved: !!saved });
   } catch (e) {
-    console.error('/support/telegram-reply error:', e)
-    res.status(500).json({ ok: false, error: e.message })
+    console.error("/support/telegram-reply error:", e);
+    res.status(500).json({ ok: false, error: e.message });
   }
-})
+});
 
 /**
  * GET /support/chats
  * List all support chat conversations (admin dashboard).
  */
-app.get('/support/chats', requireSupportKey, async (req, res) => {
-  if (!adminDb) return res.json({ ok: false, chats: [], source: 'fallback' })
+app.get("/support/chats", requireSupportKey, async (req, res) => {
+  if (!adminDb) return res.json({ ok: false, chats: [], source: "fallback" });
   try {
-    const { ref, get } = require('firebase-admin/firestore')
-    const snapshot = await get(ref(adminDb, 'support_chats'))
-    const data = snapshot.data() || {}
-    const chats = Object.entries(data).map(([uid, chatData]) => {
-      const messages = chatData.messages || {}
-      const msgList = Object.values(messages).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
-      const unread = msgList.filter(m => m.sender === 'user' && !m.read).length
-      return {
-        uid,
-        lastMessage: msgList[0] || {},
-        unreadCount: unread,
-        totalMessages: msgList.length,
-      }
-    }).sort((a, b) => (b.lastMessage.timestamp || 0) - (a.lastMessage.timestamp || 0))
-    res.json({ ok: true, chats, source: 'firestore' })
+    const { ref, get } = await import("firebase-admin/firestore");
+    const snapshot = await get(ref(adminDb, "support_chats"));
+    const data = snapshot.data() || {};
+    const chats = Object.entries(data)
+      .map(([uid, chatData]) => {
+        const messages = chatData.messages || {};
+        const msgList = Object.values(messages).sort(
+          (a, b) => (b.timestamp || 0) - (a.timestamp || 0),
+        );
+        const unread = msgList.filter(
+          (m) => m.sender === "user" && !m.read,
+        ).length;
+        return {
+          uid,
+          lastMessage: msgList[0] || {},
+          unreadCount: unread,
+          totalMessages: msgList.length,
+        };
+      })
+      .sort(
+        (a, b) =>
+          (b.lastMessage.timestamp || 0) - (a.lastMessage.timestamp || 0),
+      );
+    res.json({ ok: true, chats, source: "firestore" });
   } catch (e) {
-    console.error('/support/chats error:', e)
-    res.status(500).json({ ok: false, error: e.message })
+    console.error("/support/chats error:", e);
+    res.status(500).json({ ok: false, error: e.message });
   }
-})
+});
 
 /**
  * GET /support/chats/:userId
  * Get messages for a specific support chat.
  */
-app.get('/support/chats/:userId', requireSupportKey, async (req, res) => {
-  const { userId } = req.params
-  if (!userId) return res.status(400).json({ ok: false, error: 'userId required' })
-  if (!adminDb) return res.json({ ok: false, messages: [], source: 'fallback' })
+app.get("/support/chats/:userId", requireSupportKey, async (req, res) => {
+  const { userId } = req.params;
+  if (!userId)
+    return res.status(400).json({ ok: false, error: "userId required" });
+  if (!adminDb)
+    return res.json({ ok: false, messages: [], source: "fallback" });
   try {
-    const { ref, get } = require('firebase-admin/firestore')
-    const snapshot = await get(ref(adminDb, `support_chats/${userId}/messages`))
-    const data = snapshot.data() || {}
-    const messages = Object.values(data).sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0))
-    res.json({ ok: true, messages, source: 'firestore' })
+    const { ref, get } = await import("firebase-admin/firestore");
+    const snapshot = await get(
+      ref(adminDb, `support_chats/${userId}/messages`),
+    );
+    const data = snapshot.data() || {};
+    const messages = Object.values(data).sort(
+      (a, b) => (a.timestamp || 0) - (b.timestamp || 0),
+    );
+    res.json({ ok: true, messages, source: "firestore" });
   } catch (e) {
-    console.error('/support/chats/:userId error:', e)
-    res.status(500).json({ ok: false, error: e.message })
+    console.error("/support/chats/:userId error:", e);
+    res.status(500).json({ ok: false, error: e.message });
   }
-})
+});
 
 /**
  * POST /support/chats/:userId/reply
  * Send admin reply to a user from the admin dashboard (web).
  */
-app.post('/support/chats/:userId/reply', requireSupportKey, async (req, res) => {
-  const { userId } = req.params
-  const { text, adminName } = req.body || {}
-  if (!userId || !text?.trim()) return res.status(400).json({ ok: false, error: 'userId and text required' })
-  try {
-    const saved = await saveAdminReplyToFirebase(userId, adminName, text)
-    res.json({ ok: saved, saved })
-  } catch (e) {
-    console.error('/support/chats/:userId/reply error:', e)
-    res.status(500).json({ ok: false, error: e.message })
-  }
-})
+app.post(
+  "/support/chats/:userId/reply",
+  requireSupportKey,
+  async (req, res) => {
+    const { userId } = req.params;
+    const { text, adminName } = req.body || {};
+    if (!userId || !text?.trim())
+      return res
+        .status(400)
+        .json({ ok: false, error: "userId and text required" });
+    try {
+      const saved = await saveAdminReplyToFirebase(userId, adminName, text);
+      res.json({ ok: saved, saved });
+    } catch (e) {
+      console.error("/support/chats/:userId/reply error:", e);
+      res.status(500).json({ ok: false, error: e.message });
+    }
+  },
+);
 
 // ─── Frontend Alias Routes (same handlers, different paths) ─────────────────
 
@@ -317,291 +386,345 @@ app.post('/support/chats/:userId/reply', requireSupportKey, async (req, res) => 
  * GET /support/threads — list all support threads (admin dashboard).
  * Alias for GET /support/chats.
  */
-app.get('/support/threads', requireSupportKey, async (req, res) => {
-  if (!adminDb) return res.json({ ok: false, thread: null, threads: [], source: 'fallback' })
+app.get("/support/threads", requireSupportKey, async (req, res) => {
+  if (!adminDb)
+    return res.json({
+      ok: false,
+      thread: null,
+      threads: [],
+      source: "fallback",
+    });
   try {
-    const { ref, get } = require('firebase-admin/firestore')
-    const snapshot = await get(ref(adminDb, 'support_chats'))
-    const data = snapshot.data() || {}
-    const threads = Object.entries(data).map(([uid, chatData]) => {
-      const messages = chatData.messages || {}
-      const msgList = Object.values(messages).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
-      const unread = msgList.filter(m => m.sender === 'user' && !m.read).length
-      return {
-        uid,
-        thread: {
-          messages: msgList,
-        },
-        unreadCount: unread,
-        totalMessages: msgList.length,
-        lastMessage: msgList[0] || {},
-      }
-    }).sort((a, b) => (b.lastMessage.timestamp || 0) - (a.lastMessage.timestamp || 0))
-    res.json({ ok: true, threads, source: 'firestore' })
+    const { ref, get } = await import("firebase-admin/firestore");
+    const snapshot = await get(ref(adminDb, "support_chats"));
+    const data = snapshot.data() || {};
+    const threads = Object.entries(data)
+      .map(([uid, chatData]) => {
+        const messages = chatData.messages || {};
+        const msgList = Object.values(messages).sort(
+          (a, b) => (b.timestamp || 0) - (a.timestamp || 0),
+        );
+        const unread = msgList.filter(
+          (m) => m.sender === "user" && !m.read,
+        ).length;
+        return {
+          uid,
+          thread: {
+            messages: msgList,
+          },
+          unreadCount: unread,
+          totalMessages: msgList.length,
+          lastMessage: msgList[0] || {},
+        };
+      })
+      .sort(
+        (a, b) =>
+          (b.lastMessage.timestamp || 0) - (a.lastMessage.timestamp || 0),
+      );
+    res.json({ ok: true, threads, source: "firestore" });
   } catch (e) {
-    console.error('/support/threads error:', e)
-    res.status(500).json({ ok: false, error: e.message })
+    console.error("/support/threads error:", e);
+    res.status(500).json({ ok: false, error: e.message });
   }
-})
+});
 
 /**
  * GET /support/threads/:uid — get messages for a specific support thread.
  * Alias for GET /support/chats/:userId.
  */
-app.get('/support/threads/:uid', requireSupportKey, async (req, res) => {
-  const { uid } = req.params
-  if (!uid) return res.status(400).json({ ok: false, error: 'uid required' })
-  if (!adminDb) return res.json({ ok: false, thread: null, source: 'fallback' })
+app.get("/support/threads/:uid", requireSupportKey, async (req, res) => {
+  const { uid } = req.params;
+  if (!uid) return res.status(400).json({ ok: false, error: "uid required" });
+  if (!adminDb)
+    return res.json({ ok: false, thread: null, source: "fallback" });
   try {
-    const { ref, get } = require('firebase-admin/firestore')
-    const snapshot = await get(ref(adminDb, `support_chats/${uid}/messages`))
-    const data = snapshot.data() || {}
-    const messages = Object.values(data).sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0))
-    res.json({ ok: true, thread: { messages }, source: 'firestore' })
+    const { ref, get } = await import("firebase-admin/firestore");
+    const snapshot = await get(ref(adminDb, `support_chats/${uid}/messages`));
+    const data = snapshot.data() || {};
+    const messages = Object.values(data).sort(
+      (a, b) => (a.timestamp || 0) - (b.timestamp || 0),
+    );
+    res.json({ ok: true, thread: { messages }, source: "firestore" });
   } catch (e) {
-    console.error('/support/threads/:uid error:', e)
-    res.status(500).json({ ok: false, error: e.message })
+    console.error("/support/threads/:uid error:", e);
+    res.status(500).json({ ok: false, error: e.message });
   }
-})
+});
 
 /**
  * POST /support/threads/:uid/messages — add a message to a support thread.
  * Body: { text, sender, email, type?, timestamp? }
  */
-app.post('/support/threads/:uid/messages', requireSupportKey, async (req, res) => {
-  const { uid } = req.params
-  const { text, sender, email, type, timestamp } = req.body || {}
-  if (!uid || !text?.trim()) return res.status(400).json({ ok: false, error: 'uid and text required' })
-  try {
-    if (adminDb) {
-      const { ref, push, set } = require('firebase-admin/firestore')
-      const msgRef = push(ref(adminDb, `support_chats/${uid}/messages`))
-      await set(msgRef, {
-        sender: sender || 'user',
-        senderName: sender === 'admin' ? (req.body?.adminName || 'Support Team') : (req.body?.userName || 'User'),
-        senderEmail: email || '',
-        text: text.trim(),
-        timestamp: timestamp || Date.now(),
-        read: false,
-        fromTelegram: sender === 'admin',
-        ...(type ? { type } : {}),
-      })
+app.post(
+  "/support/threads/:uid/messages",
+  requireSupportKey,
+  async (req, res) => {
+    const { uid } = req.params;
+    const { text, sender, email, type, timestamp } = req.body || {};
+    if (!uid || !text?.trim())
+      return res
+        .status(400)
+        .json({ ok: false, error: "uid and text required" });
+    try {
+      if (adminDb) {
+        const { ref, push, set } = await import("firebase-admin/firestore");
+        const msgRef = push(ref(adminDb, `support_chats/${uid}/messages`));
+        await set(msgRef, {
+          sender: sender || "user",
+          senderName:
+            sender === "admin"
+              ? req.body?.adminName || "Support Team"
+              : req.body?.userName || "User",
+          senderEmail: email || "",
+          text: text.trim(),
+          timestamp: timestamp || Date.now(),
+          read: false,
+          fromTelegram: sender === "admin",
+          ...(type ? { type } : {}),
+        });
+      }
+      // Notify admin via Telegram if it's a user message
+      if (sender !== "admin") {
+        const userEmail = email || "";
+        const userName = req.body?.userName || "User";
+        await notifyAdminSupport(userEmail, userName, uid, text.trim());
+      }
+      res.json({ ok: true, timestamp: Date.now() });
+    } catch (e) {
+      console.error("/support/threads/:uid/messages error:", e);
+      res.status(500).json({ ok: false, error: e.message });
     }
-    // Notify admin via Telegram if it's a user message
-    if (sender !== 'admin') {
-      const userEmail = email || ''
-      const userName = req.body?.userName || 'User'
-      await notifyAdminSupport(userEmail, userName, uid, text.trim())
-    }
-    res.json({ ok: true, timestamp: Date.now() })
-  } catch (e) {
-    console.error('/support/threads/:uid/messages error:', e)
-    res.status(500).json({ ok: false, error: e.message })
-  }
-})
+  },
+);
 
 // ─── Telegram Bot: AI Conversation Handler ──────────────────────────────────
-const BOT_MODE = process.env.TELEGRAM_BOT_MODE || 'polling'
+const BOT_MODE = process.env.TELEGRAM_BOT_MODE || "polling";
 
-const typingState = new Map()
+const typingState = new Map();
 
 function sendTypingAction(chatId) {
-  if (!bot) return
+  if (!bot) return;
   try {
-    bot.sendChatAction(chatId, 'typing').catch(() => {})
-    typingState.set(chatId, true)
+    bot.sendChatAction(chatId, "typing").catch(() => {});
+    typingState.set(chatId, true);
   } catch (e) {
-    console.error('sendChatAction error', e)
+    console.error("sendChatAction error", e);
   }
 }
 
 function clearTypingState(chatId) {
-  typingState.delete(chatId)
+  typingState.delete(chatId);
 }
 
 async function handleBotMessage(msg) {
-  if (!msg || !msg.text || !msg.chat) return
-  registerTelegramUser(msg) // track all users
-  const chatId = msg.chat.id
-  const text = msg.text.trim()
+  if (!msg || !msg.text || !msg.chat) return;
+  registerTelegramUser(msg); // track all users
+  const chatId = msg.chat.id;
+  const text = msg.text.trim();
 
-  if (msg.chat.type === 'group' || msg.chat.type === 'supergroup') {
-    if (!adminChats.includes(chatId)) return
+  if (msg.chat.type === "group" || msg.chat.type === "supergroup") {
+    if (!adminChats.includes(chatId)) return;
   }
 
-  sendTypingAction(chatId)
+  sendTypingAction(chatId);
 
   try {
-    const isAdmin = adminChats.includes(chatId)
+    const isAdmin = adminChats.includes(chatId);
     const response = await processConversation(text, {
       chatId,
       userId: msg.from?.id?.toString(),
       username: msg.from?.username,
       firstName: msg.from?.first_name,
       isAdmin,
-    })
+    });
 
-    const chunks = []
+    const chunks = [];
     if (response.length > 4096) {
       for (let i = 0; i < response.length; i += 4096 - 10) {
-        chunks.push(response.slice(i, i + 4096 - 10))
+        chunks.push(response.slice(i, i + 4096 - 10));
       }
     } else {
-      chunks.push(response)
+      chunks.push(response);
     }
 
     for (const chunk of chunks) {
       await bot.sendMessage(chatId, chunk, {
-        parse_mode: 'Markdown',
+        parse_mode: "Markdown",
         disable_web_page_preview: true,
-      })
-      if (chunks.length > 1) await new Promise(r => setTimeout(r, 200))
+      });
+      if (chunks.length > 1) await new Promise((r) => setTimeout(r, 200));
     }
   } catch (e) {
-    console.error('Bot message handler error:', e)
+    console.error("Bot message handler error:", e);
     try {
-      await bot.sendMessage(chatId, `Sorry, I encountered an error: ${e.message}`)
+      await bot.sendMessage(
+        chatId,
+        `Sorry, I encountered an error: ${e.message}`,
+      );
     } catch (sendErr) {
-      console.error('Failed to send error message:', sendErr)
+      console.error("Failed to send error message:", sendErr);
     }
   } finally {
-    clearTypingState(chatId)
+    clearTypingState(chatId);
   }
 }
 
 function setupBotPolling() {
   if (!bot) {
-    console.log('Telegram bot not initialized (no BOT_TOKEN)')
-    return
+    console.log("Telegram bot not initialized (no BOT_TOKEN)");
+    return;
   }
-  bot.on('message', handleBotMessage)
-  bot.on('edited_message', handleBotMessage)
-  bot.on('callback_query', async (query) => {
-    const chatId = query.message?.chat?.id
-    const data = query.data
-    if (!chatId || !data) return
-    sendTypingAction(chatId)
+  bot.on("message", handleBotMessage);
+  bot.on("edited_message", handleBotMessage);
+  bot.on("callback_query", async (query) => {
+    const chatId = query.message?.chat?.id;
+    const data = query.data;
+    if (!chatId || !data) return;
+    sendTypingAction(chatId);
     try {
       const response = await processConversation(data, {
         chatId,
         userId: query.from?.id?.toString(),
         username: query.from?.username,
-      })
-      await bot.answerCallbackQuery(query.id)
-      await bot.sendMessage(chatId, response, { parse_mode: 'Markdown' })
+      });
+      await bot.answerCallbackQuery(query.id);
+      await bot.sendMessage(chatId, response, { parse_mode: "Markdown" });
     } catch (e) {
-      console.error('Callback query error:', e)
-      await bot.answerCallbackQuery(query.id, { text: 'Error processing request' })
+      console.error("Callback query error:", e);
+      await bot.answerCallbackQuery(query.id, {
+        text: "Error processing request",
+      });
     } finally {
-      clearTypingState(chatId)
+      clearTypingState(chatId);
     }
-  })
-  bot.on('polling_error', (err) => {
-    console.error('Polling error:', err.message)
-  })
-  console.log(`Telegram bot initialized in ${BOT_MODE} mode`)
+  });
+  bot.on("polling_error", (err) => {
+    console.error("Polling error:", err.message);
+  });
+  console.log(`Telegram bot initialized in ${BOT_MODE} mode`);
 }
 
 function setupBotWebhook() {
   if (!bot) {
-    console.log('Telegram bot not initialized (no BOT_TOKEN)')
-    return
+    console.log("Telegram bot not initialized (no BOT_TOKEN)");
+    return;
   }
-  const webhookUrl = process.env.TELEGRAM_WEBHOOK_URL
+  const webhookUrl = process.env.TELEGRAM_WEBHOOK_URL;
   if (!webhookUrl) {
-    console.warn('TELEGRAM_WEBHOOK_URL not set — falling back to polling')
-    setupBotPolling()
-    return
+    console.warn("TELEGRAM_WEBHOOK_URL not set — falling back to polling");
+    setupBotPolling();
+    return;
   }
   try {
-    bot.setWebHook(webhookUrl).then(() => {
-      console.log(`Webhook set to: ${webhookUrl}`)
-    }).catch((err) => {
-      console.error('Failed to set webhook:', err)
-      setupBotPolling()
-    })
+    bot
+      .setWebHook(webhookUrl)
+      .then(() => {
+        console.log(`Webhook set to: ${webhookUrl}`);
+      })
+      .catch((err) => {
+        console.error("Failed to set webhook:", err);
+        setupBotPolling();
+      });
   } catch (e) {
-    console.error('Webhook setup error:', e)
-    setupBotPolling()
+    console.error("Webhook setup error:", e);
+    setupBotPolling();
   }
 }
 
-if (BOT_MODE === 'webhook') {
-  setupBotWebhook()
+if (BOT_MODE === "webhook") {
+  setupBotWebhook();
 } else {
-  setupBotPolling()
+  setupBotPolling();
 }
 
 // ─── Telegram Routes ────────────────────────────────────────────────────────
 
-app.post('/telegram/webhook', async (req, res) => {
+app.post("/telegram/webhook", async (req, res) => {
   try {
     if (bot && req.body && req.body.message) {
-      handleBotMessage(req.body.message).catch(console.error)
+      handleBotMessage(req.body.message).catch(console.error);
     }
-    res.json({ ok: true })
+    res.json({ ok: true });
   } catch (e) {
-    console.error('Webhook receiver error:', e)
-    res.json({ ok: false })
+    console.error("Webhook receiver error:", e);
+    res.json({ ok: false });
   }
-})
+});
 
-app.get('/telegram/status', (req, res) => {
+app.get("/telegram/status", (req, res) => {
   res.json({
     ok: !!bot,
     mode: BOT_MODE,
-    configured: !!(BOT_TOKEN),
+    configured: !!BOT_TOKEN,
     providers: Object.keys(AI_PROVIDERS).length,
     activeSessions: sessionStore ? sessionStore.size : 0,
-  })
-})
+  });
+});
 
-app.post('/telegram/ai', botLimiter, async (req, res) => {
-  const { text, chatId, userId, context } = req.body || {}
-  if (!text) return res.status(400).json({ ok: false, error: 'text required' })
+app.post("/telegram/ai", botLimiter, async (req, res) => {
+  const { text, chatId, userId, context } = req.body || {};
+  if (!text) return res.status(400).json({ ok: false, error: "text required" });
   try {
-    const response = await processConversation(text, { chatId, userId, ...context })
-    res.json({ ok: true, response })
+    const response = await processConversation(text, {
+      chatId,
+      userId,
+      ...context,
+    });
+    res.json({ ok: true, response });
   } catch (e) {
-    res.status(500).json({ ok: false, error: e.message })
+    res.status(500).json({ ok: false, error: e.message });
   }
-})
+});
 
 async function forwardToAdmins(text) {
-  if (!bot || adminChats.length === 0) return
+  if (!bot || adminChats.length === 0) return;
   for (const chat of adminChats) {
     try {
-      await bot.sendMessage(chat, text, { parse_mode: 'HTML' })
+      await bot.sendMessage(chat, text, { parse_mode: "HTML" });
     } catch (e) {
-      console.error('Telegram forward error', e)
+      console.error("Telegram forward error", e);
     }
   }
 }
 
-app.post('/telegram/notify', requireApiKey, adminLimiter, async (req, res) => {
-  const { event, payload } = req.body || {}
-  const headerKey = req.headers['x-telegram-webhook-key']
-  if (process.env.TELEGRAM_WEBHOOK_KEY && headerKey !== process.env.TELEGRAM_WEBHOOK_KEY) {
-    return res.status(403).json({ ok: false, error: 'Invalid webhook key' })
+app.post("/telegram/notify", requireApiKey, adminLimiter, async (req, res) => {
+  const { event, payload } = req.body || {};
+  const headerKey = req.headers["x-telegram-webhook-key"];
+  if (
+    process.env.TELEGRAM_WEBHOOK_KEY &&
+    headerKey !== process.env.TELEGRAM_WEBHOOK_KEY
+  ) {
+    return res.status(403).json({ ok: false, error: "Invalid webhook key" });
   }
-  const message = `<b>LIVE EVENT</b> - ${event || 'UNKNOWN'}<br/>` +
-    (payload ? Object.entries(payload).map(([k, v]) => `<b>${k}</b>: ${v}`).join('<br/>') : '')
-  await forwardToAdmins(message)
-  res.json({ ok: true })
-})
+  const message =
+    `<b>LIVE EVENT</b> - ${event || "UNKNOWN"}<br/>` +
+    (payload
+      ? Object.entries(payload)
+          .map(([k, v]) => `<b>${k}</b>: ${v}`)
+          .join("<br/>")
+      : "");
+  await forwardToAdmins(message);
+  res.json({ ok: true });
+});
 
 // ─── Admin Broadcast — send message to all subscribed users ───────────────────
-app.post('/telegram/broadcast', requireApiKey, async (req, res) => {
-  const { message, parse_mode = 'HTML', dry_run = false } = req.body || {}
-  if (!message) return res.status(400).json({ ok: false, error: 'message required' })
+app.post("/telegram/broadcast", requireApiKey, async (req, res) => {
+  const { message, parse_mode = "HTML", dry_run = false } = req.body || {};
+  if (!message)
+    return res.status(400).json({ ok: false, error: "message required" });
 
-  const users = getSubscribedUsers()
+  const users = getSubscribedUsers();
   if (users.length === 0) {
-    return res.json({ ok: true, sent: 0, skipped: 0, message: 'No subscribed users found.' })
+    return res.json({
+      ok: true,
+      sent: 0,
+      skipped: 0,
+      message: "No subscribed users found.",
+    });
   }
 
-  const header = `<b>📢 TradersApp Announcement</b>\n\n`
-  const fullMessage = header + message
+  const header = `<b>📢 TradersApp Announcement</b>\n\n`;
+  const fullMessage = header + message;
 
   if (dry_run) {
     return res.json({
@@ -609,170 +732,234 @@ app.post('/telegram/broadcast', requireApiKey, async (req, res) => {
       dry_run: true,
       recipients: users.length,
       preview: fullMessage.slice(0, 200),
-    })
+    });
   }
 
-  let sent = 0, skipped = 0
+  let sent = 0,
+    skipped = 0;
   for (const user of users) {
     try {
-      await bot.sendMessage(user.chatId, fullMessage, { parse_mode, disable_web_page_preview: true })
-      sent++
+      await bot.sendMessage(user.chatId, fullMessage, {
+        parse_mode,
+        disable_web_page_preview: true,
+      });
+      sent++;
       // Rate limit: max 30 msgs/sec (Telegram limit), sleep 35ms between messages
-      await new Promise(r => setTimeout(r, 35))
+      await new Promise((r) => setTimeout(r, 35));
     } catch (e) {
-      skipped++
-      console.error(`[broadcast] Failed to send to ${user.chatId} (${user.username}):`, e.message)
+      skipped++;
+      console.error(
+        `[broadcast] Failed to send to ${user.chatId} (${user.username}):`,
+        e.message,
+      );
     }
   }
 
-  console.log(`[broadcast] Sent ${sent}/${users.length} messages, ${skipped} skipped`)
-  res.json({ ok: true, sent, skipped, total: users.length })
-})
+  console.log(
+    `[broadcast] Sent ${sent}/${users.length} messages, ${skipped} skipped`,
+  );
+  res.json({ ok: true, sent, skipped, total: users.length });
+});
 
 // ─── Subscription management ───────────────────────────────────────────────────
-app.get('/telegram/users', requireApiKey, (req, res) => {
-  const users = Object.values(userRegistry)
+app.get("/telegram/users", requireApiKey, (req, res) => {
+  const users = Object.values(userRegistry);
   res.json({
     ok: true,
     total: users.length,
-    subscribed: users.filter(u => u.subscribed).length,
-    users: users.map(u => ({
+    subscribed: users.filter((u) => u.subscribed).length,
+    users: users.map((u) => ({
       chatId: u.chatId,
       username: u.username,
       firstName: u.firstName,
       lastSeen: new Date(u.lastSeen).toISOString(),
       subscribed: u.subscribed,
     })),
-  })
-})
+  });
+});
 
-app.patch('/telegram/users/:chatId', requireApiKey, (req, res) => {
-  const { chatId } = req.params
-  const { subscribed } = req.body || {}
+app.patch("/telegram/users/:chatId", requireApiKey, (req, res) => {
+  const { chatId } = req.params;
+  const { subscribed } = req.body || {};
   if (userRegistry[chatId]) {
-    userRegistry[chatId].subscribed = subscribed
-    saveUserRegistry()
-    return res.json({ ok: true, user: userRegistry[chatId] })
+    userRegistry[chatId].subscribed = subscribed;
+    saveUserRegistry();
+    return res.json({ ok: true, user: userRegistry[chatId] });
   }
-  res.status(404).json({ ok: false, error: 'User not found' })
-})
+  res.status(404).json({ ok: false, error: "User not found" });
+});
 
 // ─── Admin Invite Routes ────────────────────────────────────────────────────
 
-const invitesPath = path.resolve(__dirname, 'invites.json')
+const invitesPath = path.resolve(__dirname, "invites.json");
 function readInvites() {
-  try { return JSON.parse(fs.readFileSync(invitesPath, 'utf8')) } catch { return [] }
+  try {
+    return JSON.parse(fs.readFileSync(invitesPath, "utf8"));
+  } catch {
+    return [];
+  }
 }
 function writeInvites(data) {
-  fs.writeFileSync(invitesPath, JSON.stringify(data, null, 2))
+  fs.writeFileSync(invitesPath, JSON.stringify(data, null, 2));
 }
 function ensureInvitesFile() {
-  if (!fs.existsSync(invitesPath)) writeInvites([])
+  if (!fs.existsSync(invitesPath)) writeInvites([]);
 }
 
-app.post('/admin/invite', requireApiKey, adminLimiter, async (req, res) => {
-  const { email, name } = req.body || {}
-  if (!email) return res.status(400).json({ ok: false, error: 'email required' })
-  const invite = { email, name: name || email, status: 'PENDING', createdAt: Date.now() }
+app.post("/admin/invite", requireApiKey, adminLimiter, async (req, res) => {
+  const { email, name } = req.body || {};
+  if (!email)
+    return res.status(400).json({ ok: false, error: "email required" });
+  const invite = {
+    email,
+    name: name || email,
+    status: "PENDING",
+    createdAt: Date.now(),
+  };
   try {
-    const created = await invitesService.createInvite({ email: invite.email, name: invite.name })
-    invite.id = created.id
-    invite.docRef = created.docRef
-    if (adminChats.length) forwardToAdmins(`New invite requested: ${email} (${invite.name}) [${invite.id}]`)
-    res.json({ ok: true, invite })
+    const created = await invitesService.createInvite({
+      email: invite.email,
+      name: invite.name,
+    });
+    invite.id = created.id;
+    invite.docRef = created.docRef;
+    if (adminChats.length)
+      forwardToAdmins(
+        `New invite requested: ${email} (${invite.name}) [${invite.id}]`,
+      );
+    res.json({ ok: true, invite });
   } catch {
-    ensureInvitesFile()
-    const existing = readInvites()
-    const id = 'INV-' + Date.now()
-    const localInvite = { id, email: invite.email, name: invite.name, status: invite.status, createdAt: invite.createdAt }
-    existing.unshift(localInvite)
-    writeInvites(existing)
-    invite.id = id
-    if (adminChats.length) forwardToAdmins(`New invite requested: ${email} (${invite.name}) [${id}]`)
-    res.json({ ok: true, invite: localInvite })
+    ensureInvitesFile();
+    const existing = readInvites();
+    const id = "INV-" + Date.now();
+    const localInvite = {
+      id,
+      email: invite.email,
+      name: invite.name,
+      status: invite.status,
+      createdAt: invite.createdAt,
+    };
+    existing.unshift(localInvite);
+    writeInvites(existing);
+    invite.id = id;
+    if (adminChats.length)
+      forwardToAdmins(
+        `New invite requested: ${email} (${invite.name}) [${id}]`,
+      );
+    res.json({ ok: true, invite: localInvite });
   }
-})
+});
 
-app.post('/admin/approve', requireApiKey, adminLimiter, async (req, res) => {
-  const { id } = req.body || {}
-  if (!id) return res.status(400).json({ ok: false, error: 'id required' })
-  let invite
+app.post("/admin/approve", requireApiKey, adminLimiter, async (req, res) => {
+  const { id } = req.body || {};
+  if (!id) return res.status(400).json({ ok: false, error: "id required" });
+  let invite;
   if (adminDb2) {
     try {
-      const found = await invitesService.findInviteById(id, adminDb2)
-      if (!found) return res.status(404).json({ ok: false, error: 'not found' })
-      invite = found
-      await invitesService.approveInvite(id, adminDb2)
-      if (adminChats.length) forwardToAdmins(`Invite approved: ${invite?.email} (${invite?.name}) [${id}]`)
+      const found = await invitesService.findInviteById(id, adminDb2);
+      if (!found)
+        return res.status(404).json({ ok: false, error: "not found" });
+      invite = found;
+      await invitesService.approveInvite(id, adminDb2);
+      if (adminChats.length)
+        forwardToAdmins(
+          `Invite approved: ${invite?.email} (${invite?.name}) [${id}]`,
+        );
       if (invite?.email) {
-        try { await sendWelcomeEmail(invite.email, invite.name) } catch {}
+        try {
+          await sendWelcomeEmail(invite.email, invite.name);
+        } catch {}
       }
-      return res.json({ ok: true, invite: { ...invite, status: 'APPROVED', approvedAt: Date.now() } })
+      return res.json({
+        ok: true,
+        invite: { ...invite, status: "APPROVED", approvedAt: Date.now() },
+      });
     } catch (e) {
-      console.error('Firestore approve failed', e)
-      return res.status(500).json({ ok: false, error: 'db error' })
+      console.error("Firestore approve failed", e);
+      return res.status(500).json({ ok: false, error: "db error" });
     }
   } else {
-    ensureInvitesFile()
-    const invites = readInvites()
-    const idx = invites.findIndex(i => i.id === id)
-    if (idx < 0) return res.status(404).json({ ok: false, error: 'not found' })
-    invites[idx].status = 'APPROVED'
-    invites[idx].approvedAt = Date.now()
-    writeInvites(invites)
-    invite = invites[idx]
+    ensureInvitesFile();
+    const invites = readInvites();
+    const idx = invites.findIndex((i) => i.id === id);
+    if (idx < 0) return res.status(404).json({ ok: false, error: "not found" });
+    invites[idx].status = "APPROVED";
+    invites[idx].approvedAt = Date.now();
+    writeInvites(invites);
+    invite = invites[idx];
   }
-  const email = invite?.email
-  const name = invite?.name
-  if (adminChats.length) forwardToAdmins(`Invite approved: ${email} (${name}) [${id}]`)
+  const email = invite?.email;
+  const name = invite?.name;
+  if (adminChats.length)
+    forwardToAdmins(`Invite approved: ${email} (${name}) [${id}]`);
   if (email) {
-    try { await sendWelcomeEmail(email, name) } catch {}
-  }
-  res.json({ ok: true, invite: { ...invite, status: 'APPROVED', approvedAt: Date.now() } })
-})
-
-app.post('/admin/passwordreset', requireApiKey, adminLimiter, (req, res) => {
-  const { email } = req.body || {}
-  if (!email) return res.status(400).json({ ok: false, error: 'email required' })
-  forwardToAdmins(`Password reset requested for ${email}`)
-  res.json({ ok: true })
-})
-
-app.post('/admin/welcome', requireApiKey, adminLimiter, (req, res) => {
-  const { email } = req.body || {}
-  if (!email) return res.status(400).json({ ok: false, error: 'email required' })
-  forwardToAdmins(`Welcome email triggered for ${email}`)
-  res.json({ ok: true })
-})
-
-app.get('/admin/list_invites', requireApiKey, adminLimiter, async (req, res) => {
-  if (adminDb2) {
     try {
-      const snapshot = await adminDb2.collection('invites').orderBy('createdAt', 'desc').get()
-      const list = snapshot.docs.map(doc => doc.data())
-      return res.json(list)
-    } catch (e) {
-      console.error('Firestore list_invites failed', e)
-    }
+      await sendWelcomeEmail(email, name);
+    } catch {}
   }
-  ensureInvitesFile()
-  res.json(readInvites())
-})
+  res.json({
+    ok: true,
+    invite: { ...invite, status: "APPROVED", approvedAt: Date.now() },
+  });
+});
+
+app.post("/admin/passwordreset", requireApiKey, adminLimiter, (req, res) => {
+  const { email } = req.body || {};
+  if (!email)
+    return res.status(400).json({ ok: false, error: "email required" });
+  forwardToAdmins(`Password reset requested for ${email}`);
+  res.json({ ok: true });
+});
+
+app.post("/admin/welcome", requireApiKey, adminLimiter, (req, res) => {
+  const { email } = req.body || {};
+  if (!email)
+    return res.status(400).json({ ok: false, error: "email required" });
+  forwardToAdmins(`Welcome email triggered for ${email}`);
+  res.json({ ok: true });
+});
+
+app.get(
+  "/admin/list_invites",
+  requireApiKey,
+  adminLimiter,
+  async (req, res) => {
+    if (adminDb2) {
+      try {
+        const snapshot = await adminDb2
+          .collection("invites")
+          .orderBy("createdAt", "desc")
+          .get();
+        const list = snapshot.docs.map((doc) => doc.data());
+        return res.json(list);
+      } catch (e) {
+        console.error("Firestore list_invites failed", e);
+      }
+    }
+    ensureInvitesFile();
+    res.json(readInvites());
+  },
+);
 
 // ─── Diagnostic Routes ───────────────────────────────────────────────────────
 
-app.get('/telegram/notify-test', requireApiKey, adminLimiter, async (req, res) => {
-  try {
-    const msg = 'TEST MESSAGE: Telegram bridge is reachable'
-    await forwardToAdmins(msg)
-    res.json({ ok: true, message: msg })
-  } catch (e) {
-    res.status(500).json({ ok: false, error: e?.message || 'test failed' })
-  }
-})
+app.get(
+  "/telegram/notify-test",
+  requireApiKey,
+  adminLimiter,
+  async (req, res) => {
+    try {
+      const msg = "TEST MESSAGE: Telegram bridge is reachable";
+      await forwardToAdmins(msg);
+      res.json({ ok: true, message: msg });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: e?.message || "test failed" });
+    }
+  },
+);
 
 // ─── Start Server ────────────────────────────────────────────────────────────
-loadUserRegistry() // restore user registry on startup
+loadUserRegistry(); // restore user registry on startup
 app.listen(port, () => {
-  console.log(`Telegram bridge listening on port ${port}`)
-})
+  console.log(`Telegram bridge listening on port ${port}`);
+});

@@ -166,6 +166,7 @@ data:
   infrastructure.rules.yml: |
     # Content from k8s/observability/alerts/infrastructure.rules.yml
     # Apply via: kubectl create configmap prometheus-rules -n monitoring --from-file=k8s/observability/alerts/
+
 # NOTE: The placeholder data above is intentional. Apply the real rule files with:
 #   kubectl create configmap prometheus-rules -n monitoring \
 #     --from-file=k8s/observability/alerts/ \
@@ -254,6 +255,7 @@ spec:
       port: 3001
       targetPort: 3001
 
+
 # Grafana Datasource (Prometheus)
 ---
 apiVersion: v1
@@ -283,6 +285,7 @@ data:
         url: http://jaeger:16686
         isDefault: false
         editable: false
+
 
 # Grafana Dashboards ConfigMap
 ---

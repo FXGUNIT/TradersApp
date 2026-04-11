@@ -1,20 +1,23 @@
 ---
 name: create-pr
-description: Alias for sentry-skills:pr-writer. Use when users explicitly ask for "create-pr" or reference the legacy skill name. Redirects to the canonical PR writing workflow.
+description: "Use when creating pull requests, writing PR descriptions, drafting PR titles, or preparing code for review submission. Triggers on 'create PR', 'open pull request', 'write PR description', 'submit for review', or git push + PR creation tasks."
 risk: unknown
 source: community
 ---
 
-# Alias: create-pr
+# Create PR
 
-This skill name is kept for compatibility.
+Guide for creating well-structured pull requests.
 
 ## When to Use
 
-- The user explicitly asks for `create-pr` or refers to the legacy skill name.
-- You need to redirect pull request creation work to the canonical `sentry-skills:pr-writer` workflow.
-- The task is specifically about writing or updating a pull request rather than general git operations.
+- The user asks to create, draft, or submit a pull request
+- Writing PR titles and descriptions from commit history or diff
+- Preparing code changes for team review
 
-Use `sentry-skills:pr-writer` as the canonical skill for creating and editing pull requests.
+## Workflow
 
-If invoked via `create-pr`, run the same workflow and conventions documented in `sentry-skills:pr-writer`.
+1. **Summarize changes** — Read the diff/commits and write a concise PR title
+2. **Write description** — Include: what changed, why, how to test, and any breaking changes
+3. **Checklist** — Verify tests pass, lint clean, no secrets, docs updated if needed
+4. **Create** — Use git commands or GitHub CLI to push branch and open PR

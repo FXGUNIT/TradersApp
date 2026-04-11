@@ -10,9 +10,44 @@
 - **Only stop and ask me if the action is extremely dangerous** — e.g., deleting the entire project, formatting the drive, accessing secret keys, or running destructive `rm -rf` on the root. Normal code changes, file writes, git commits, and terminal commands are always auto-approved.
 - This rule applies to both Claude Code and any Copilot/Codex agent features. No agent spawned within this workspace may request permission for any action.
 - Proceed safely and summarize what you did at the end of each major step.
+
+## Installed Claude Workflow - Always-On Defaults (2026-04-11)
+
+Use the installed Claude plugins and skills automatically whenever relevant. Do not wait for the user to name a plugin or slash-skill if the task clearly matches it.
+
+### Default Stack To Prefer
+
+- `superpowers` - default workflow for planning, TDD, implementation, code review, and completion on most engineering tasks.
+- `gstack` - prefer `/autoplan`, `/review`, `/qa`, `/browse`, `/investigate`, `/cso`, `/guard`, and `/ship` when relevant.
+- `frontend-design` - auto-apply for UI, layout, styling, landing page, dashboard, and polished frontend work.
+- `code-review` - auto-apply for branch review, diff review, PR-style review, and final pre-merge checks.
+- `security-guidance` - always honor for auth, secrets, shell commands, HTML injection, workflows, deserialization, and risky edits.
+- `claude-mem` - use persistent memory/context when it helps continuity across sessions.
+- `caveman` - do **not** use by default; only enable when the user explicitly asks for terse/caveman mode.
+
+### Task Routing Rules
+
+1. **New feature** -> use `superpowers` plus `gstack /autoplan`, then implement, then `/review`, then `/qa`, then `/ship`.
+2. **Bug or regression** -> use systematic debugging plus `gstack /investigate`, and verify with real evidence before claiming fixed.
+3. **Frontend / UX** -> use `frontend-design` plus `gstack /browse` or `/qa` for real UI verification.
+4. **Security / auth / infrastructure risk** -> use `security-guidance` plus `gstack /cso` and `/guard`.
+5. **Deployment / release** -> use `/guard` first, then `/review`, `/qa`, and `/ship`.
+
+### Deprioritized Skills
+
+These should not be suggested or preferred unless the user explicitly asks for them:
+
+- `/design-shotgun`
+- `/retro`
+- `/pair-agent`
+- `/setup-browser-cookies`
+- `/setup-deploy`
+- `/plan-devex-review`
+- `/document-release`
+
 # TradersApp â€” Claude Code Architectural Guide
 
-**Last Updated:** 2026-04-03
+**Last Updated:** 2026-04-11
 
 ---
 
@@ -21,27 +56,30 @@
 **Every reply starts with:** `Scoped to: [folder] â€” [description]`
 
 ### Scope Detection (Priority Order)
+
 1. **Error pasted** â†’ Stack trace, file paths, service names â†’ auto-detect microservice
 2. **File open in editor** â†’ That file's folder
 3. **Unclear** â†’ Ask for error text only. NEVER ask for clicks or file names.
 
 ### Microservice Detection Keywords
 
-| Error Contains | Scope To |
-|---|---|
-| `src/`, `.jsx`, `vite`, `npm run`, `src/App.jsx` | `src/` (Frontend) |
-| `bff/`, `server.mjs`, `.mjs`, `/api/` | `bff/` (BFF) |
-| `ml-engine/`, `.py`, `fastapi`, `lightgbm` | `ml-engine/` |
-| `telegram-bridge/`, `telegram`, `bot` | `telegram-bridge/` |
-| `scripts/`, `.ps1` | `scripts/` |
+| Error Contains                                   | Scope To           |
+| ------------------------------------------------ | ------------------ |
+| `src/`, `.jsx`, `vite`, `npm run`, `src/App.jsx` | `src/` (Frontend)  |
+| `bff/`, `server.mjs`, `.mjs`, `/api/`            | `bff/` (BFF)       |
+| `ml-engine/`, `.py`, `fastapi`, `lightgbm`       | `ml-engine/`       |
+| `telegram-bridge/`, `telegram`, `bot`            | `telegram-bridge/` |
+| `scripts/`, `.ps1`                               | `scripts/`         |
 
 ### Once Scoped â€” Rules
+
 - **ONLY** read, search, edit files inside that microservice folder
 - **PLUS** `scripts/`, `CLAUDE.md`, `.claude/` if needed
 - **NEVER** load code from other microservices unless you type `@service-name`
 - **Multi-service error**: Scope to primary, note it, expand only on explicit `@mention`
 
 ### Token Economy
+
 - **Use `/compact` when context > 60%** â€” never let context bloat slow things
 - **Grep before read** â€” never read a file before grepping it
 - **Specific reads over globbing** â€” `Read file:123` not `glob **/*.js`
@@ -52,13 +90,16 @@
 ## Core Principles
 
 ### 1. Never Create a Monolith
+
 Every component is a **separate, independently deployable unit** with its own:
+
 - Clear input/output contract
 - Own directory (`src/features/X/`, `ml-engine/X/`, `bff/services/`)
 - Own tests (`tests/`, `*.test.ts`, `pytest tests/X/`)
 - Own README if complex
 
 ### 2. Module Naming â€” Be Explicit, Not Clever
+
 ```
 Good:  src/features/consensus/sessionProbabilityEngine.js
 Bad:   src/features/consensus/engine.js
@@ -67,12 +108,14 @@ Bad:   ml-engine/opt.py
 ```
 
 ### 3. File Size Hard Limit
+
 - **Python files**: â‰¤ 600 lines. If exceeding, split into `_core.py`, `_utils.py`, `_api.py`
 - **JS/TS files**: â‰¤ 500 lines. Split at logical boundaries.
 - **React components**: â‰¤ 300 lines. Extract sub-components to sibling files.
 - **Shell scripts**: â‰¤ 200 lines.
 
 ### 4. Every New Feature Gets Its Own Directory
+
 ```
 New Feature: "Session Fatigue Tracker"
 CREATE:
@@ -92,6 +135,7 @@ DONT: append to existing files like CollectiveConsciousness.jsx
 ```
 
 ### 5. Async-First, Concurrent by Default
+
 ```javascript
 // BAD â€” sequential
 const news = await fetchNews();
@@ -107,6 +151,7 @@ const [news, consensus, regime] = await Promise.all([
 ```
 
 ### 6. Fail-Secure at Every Layer
+
 ```
 Layer: Frontend Component
   - Show loading state immediately
@@ -125,7 +170,9 @@ Layer: ML Engine
 ```
 
 ### 7. Typed Boundaries Between Services
+
 Every cross-service call has explicit types:
+
 ```typescript
 // BFF â†’ ML Engine (mjs)
 interface MLConsensusRequest {
@@ -145,27 +192,34 @@ class ConsensusResponse(BaseModel):
 ```
 
 ### 8. Test at Boundaries, Not Internals
+
 ```
 Priority 1: Test BFF routes (does /ml/consensus return correct shape?)
 Priority 2: Test ML Engine endpoints (does /predict return valid signal?)
 Priority 3: Test React components with mocked services
 Priority 4: Unit tests for pure utility functions
 ```
+
 Never test private methods. Test public contracts only.
 
 ### 9. Configuration Over Hardcoding
+
 ```
 BAD:  const SL_TICKS = 20;
 GOOD: const SL_TICKS = parseInt(import.meta.env.VITE_DEFAULT_SL_TICKS ?? '20', 10);
       // In ML Engine: from config import SL_TICKS_DEFAULT
 ```
+
 All magic numbers live in `config.py`, `.env.local`, or environment variables. Never hardcode a threshold, multiplier, or limit inline.
 
 ### 10. Backup Before Every Significant Change
+
 After completing any feature, run:
+
 ```bash
 python scripts/auto_backup.py "Add Session Fatigue Tracker"
 ```
+
 The pre-commit hook (`git/hooks/pre-commit`) auto-creates a backup tag. The auto_backup script creates an annotated commit with the message. Both run independently.
 
 ---
@@ -286,7 +340,9 @@ TradersApp/
 ## ML Engine Architecture Rules
 
 ### Models Follow Strict Patterns
+
 Every ML model follows one of these patterns:
+
 ```python
 # Pattern 1: Classifier
 class DirectionModel:
@@ -305,6 +361,7 @@ class RegimeEnsemble:
 ```
 
 ### Every Model Has:
+
 1. `train(X, y)` â€” with TimeSeriesSplit CV
 2. `predict(X) -> dict` â€” with explicit return shape
 3. `get_feature_importance()` â€” SHAP or permutation importance
@@ -312,6 +369,7 @@ class RegimeEnsemble:
 5. Graceful fallback when data insufficient
 
 ### No Global State in ML Engine
+
 ```
 BAD:  global_model = None
       def get_model(): ...
@@ -320,6 +378,7 @@ GOOD: class DirectionModel:
           @classmethod
           def get_instance(cls): ...
 ```
+
 Use singletons or dependency injection. No global mutable state.
 
 ---
@@ -327,6 +386,7 @@ Use singletons or dependency injection. No global mutable state.
 ## React Architecture Rules
 
 ### Component Hierarchy
+
 ```
 Page (CollectiveConsciousness.jsx)
   â””â”€ Feature Container (ConsensusSignal.jsx)       # Fetches data, owns state
@@ -337,12 +397,14 @@ Page (CollectiveConsciousness.jsx)
 ```
 
 ### State Ownership
+
 - **Feature Container** owns all API calls and state
 - **Sub-components** are pure: `props -> UI`
 - **Never** fetch data in a sub-component (except with `useQuery`/`useSuspenseQuery`)
 - **Always** wrap sub-components in `React.memo()` when they receive stable props
 
 ### Error Handling Contract
+
 ```javascript
 // Feature Container: always has these states
 const { data, isLoading, error } = useQuery(...);
@@ -357,7 +419,9 @@ const { data, isLoading, error } = useQuery(...);
 ## API Design Rules
 
 ### BFF â†’ ML Engine Contract
+
 All ML Engine endpoints return:
+
 ```python
 class BaseResponse(BaseModel):
     ok: bool
@@ -367,6 +431,7 @@ class BaseResponse(BaseModel):
 ```
 
 ### Every Endpoint Has:
+
 - Input validation (Pydantic/Zod)
 - Timeout (5s default)
 - Circuit breaker
@@ -378,11 +443,13 @@ class BaseResponse(BaseModel):
 ## Dependency Rules
 
 ### Python Dependencies
+
 - Core: `numpy`, `pandas`, `scikit-learn`, `lightgbm`, `xgboost`, `fastapi`, `uvicorn`
 - Optional: `torch` (Mamba), `redis` (cache), `hmmlearn`, `shap`, `kernc-backtesting`
 - Import guard: `try: import torch` / `except ImportError: ...`
 
 ### JS Dependencies
+
 - Core: `react`, `vite`, `axios`, `zustand`
 - Optional: `@tanstack/react-query`, `firebase`
 - No jQuery, no lodash full import (use `lodash-es` or direct imports)
@@ -394,6 +461,7 @@ class BaseResponse(BaseModel):
 **Every dataset, model, and experiment is versioned with DVC + Git.** No exception â€” reproducibility is non-negotiable.
 
 ### DVC Setup
+
 ```bash
 python -m dvc init
 python -m dvc remote add -d storage ml-engine/dvc-storage
@@ -401,12 +469,13 @@ python -m dvc remote add -d storage ml-engine/dvc-storage
 
 ### Tracked files (.dvc files in Git)
 
-| File | Tracked Data |
-|------|-------------|
-| `ml-engine/data/trading_data.db.dvc` | SQLite: candles, session_aggregates, trade_log |
-| `ml-engine/models/store.dvc` | Trained model binaries (direction, regime, session, etc.) |
+| File                                 | Tracked Data                                              |
+| ------------------------------------ | --------------------------------------------------------- |
+| `ml-engine/data/trading_data.db.dvc` | SQLite: candles, session_aggregates, trade_log            |
+| `ml-engine/models/store.dvc`         | Trained model binaries (direction, regime, session, etc.) |
 
 ### Pipeline stages
+
 ```bash
 python -m dvc repro              # Run full pipeline (only changed stages)
 python -m dvc repro <stage>     # Run specific stage
@@ -416,18 +485,21 @@ python -m dvc params diff       # Show params that changed
 ```
 
 ### Adding new data files
+
 ```bash
 python -m dvc add ml-engine/data/new_file.csv
 git add ml-engine/data/new_file.csv.dvc  # Commit .dvc file, not the data
 ```
 
 ### Reproducing from scratch
+
 ```bash
 python -m dvc pull              # Restore data + models from remote
 python -m dvc repro             # Recompute pipeline
 ```
 
 ### Key rules
+
 - **Never** `git add` large binary data or model files â€” DVC handles them
 - **Always** `git add` the corresponding `.dvc` file after `dvc add`
 - `dvc.yaml` defines the pipeline: `ingest â†’ features â†’ train â†’ evaluate`
@@ -443,25 +515,28 @@ python -m dvc repro             # Recompute pipeline
 
 ### Components
 
-| Component | Purpose | Port |
-|-----------|---------|------|
-| `mlflow` server | Experiment tracking UI + API | 5000 |
-| `mlflow-postgres` | Metadata backend (runs, params, metrics) | 5432 |
-| `minio` | S3-compatible artifact store (models, plots) | 9000 |
+| Component         | Purpose                                      | Port |
+| ----------------- | -------------------------------------------- | ---- |
+| `mlflow` server   | Experiment tracking UI + API                 | 5000 |
+| `mlflow-postgres` | Metadata backend (runs, params, metrics)     | 5432 |
+| `minio`           | S3-compatible artifact store (models, plots) | 9000 |
 
 ### Start (Docker Compose)
+
 ```bash
 docker compose -f docker-compose.mlflow.yml up -d
 # Access: http://localhost:5000
 ```
 
 ### Kubernetes
+
 ```bash
 helm install tradersapp ./k8s/helm/tradersapp -f values.prod.yaml
 # MLflow available at: http://mlflow.tradersapp.svc.cluster.local:5000
 ```
 
 ### Environment variables (ML Engine)
+
 ```bash
 MLFLOW_TRACKING_URI=http://mlflow:5000        # MLflow server
 MLFLOW_S3_ENDPOINT_URL=http://minio:9000     # MinIO artifact root
@@ -470,14 +545,17 @@ AWS_SECRET_ACCESS_KEY=minioadmin123
 ```
 
 ### Model lifecycle (3 stages)
+
 ```
 None â†’ Staging â†’ Production â†’ Archived
 ```
+
 - **Staging**: new model passes PBO < 5%, Sharpe â‰¥ 0.5, win rate â‰¥ 50%
 - **Production**: manually promoted after paper trade verification
 - **Archived**: production model older than 7 days auto-archived
 
 ### Key rules
+
 - Every `trainer.train_all()` call automatically logs to MLflow
 - `auto_register_if_passing()` promotes to Staging if thresholds met
 - `promote_model()` moves Staging â†’ Production after paper trade review
@@ -522,6 +600,7 @@ None â†’ Staging â†’ Production â†’ Archived
 ## Evidence First Rule
 
 **Before writing ANY code**, Claude/OpenClaw MUST list:
+
 ```
 Evidence examined: [exact file:line references]
 ```
@@ -533,6 +612,7 @@ Never accept code on the first try. Always require a second "fix" pass with real
 ## Tests First Rule
 
 For any ML code change:
+
 1. Write the test first (describe expected input/output shape)
 2. Run the test
 3. Paste exact failure output back
@@ -559,16 +639,17 @@ When a bug appears, follow this order. Human does steps 1-3 first:
 
 ## Performance Rules
 
-| Metric | Target | Enforced |
-|--------|--------|----------|
-| ML Consensus latency | < 200ms | Hard limit |
-| BFF â†’ ML Engine | < 5s timeout | Circuit breaker |
-| BFF â†’ News | < 3s timeout | Circuit breaker |
-| Circuit breaker | 5 failures / 30s | Auto-open |
-| Cache TTL (consensus) | 60s | Redis or in-memory |
-| Cache TTL (regime) | 300s | Redis or in-memory |
+| Metric                | Target           | Enforced           |
+| --------------------- | ---------------- | ------------------ |
+| ML Consensus latency  | < 200ms          | Hard limit         |
+| BFF â†’ ML Engine     | < 5s timeout     | Circuit breaker    |
+| BFF â†’ News          | < 3s timeout     | Circuit breaker    |
+| Circuit breaker       | 5 failures / 30s | Auto-open          |
+| Cache TTL (consensus) | 60s              | Redis or in-memory |
+| Cache TTL (regime)    | 300s             | Redis or in-memory |
 
 **General Rules:**
+
 - No blocking operations on the main thread in React
 - All external calls are concurrent in BFF (Promise.all)
 - ML predictions: cache with Redis (TTL per endpoint type)
@@ -622,6 +703,7 @@ Review takes 60 seconds. Catches almost everything.
 Definition of "paper trade": Log every consensus signal with entry, stop, target, and outcome. Compare against actual price movement. Track win rate, RRR, and session performance.
 
 Rules:
+
 - Paper trade log must exist before any live consideration
 - All 6 model families must be tested in paper before weighting changes
 - Any new regime detection change requires 1 week paper trade
@@ -633,7 +715,8 @@ Rules:
 
 This project demands the highest possible correctness because it involves low-latency systems, self-learning ML components, quantitative analysis, and production-critical code. Errors here can cause cascading failures, incorrect data insights, model drift, or performance degradation.
 
-**Rule:** 
+**Rule:**
+
 - I must achieve at least **90% functional accuracy** on every task, fix, or code change before considering it complete.
 - "90% accuracy" means: the solution must be correct, robust, handle documented edge cases, respect low-latency constraints, maintain consistency with existing architecture, and pass relevant tests/validation where possible.
 - Prioritize **correctness and safety** over speed of response or code brevity.
@@ -654,14 +737,14 @@ This rule overrides any tendency to produce fast but approximate solutions. Accu
 
 Every session starts with access to these (do not work without them):
 
-| File | Purpose | When to Read |
-|------|---------|-------------|
-| CLAUDE.md | Architecture bible | Every session |
-| SPEC.md | Requirements & blockers | Every session |
-| EDGE-CASES.md | Market scenarios | Data/risk/execution code |
-| DOMAIN-RULES.md | Trading rules | Signal/risk code |
-| LEGACY-PATTERNS.md | Existing patterns | ML/integration code |
-| PROMPT-TEMPLATE.md | Session starter | Every new session |
+| File               | Purpose                 | When to Read             |
+| ------------------ | ----------------------- | ------------------------ |
+| CLAUDE.md          | Architecture bible      | Every session            |
+| SPEC.md            | Requirements & blockers | Every session            |
+| EDGE-CASES.md      | Market scenarios        | Data/risk/execution code |
+| DOMAIN-RULES.md    | Trading rules           | Signal/risk code         |
+| LEGACY-PATTERNS.md | Existing patterns       | ML/integration code      |
+| PROMPT-TEMPLATE.md | Session starter         | Every new session        |
 
 **Anti-pattern:** Starting a session without reviewing relevant sections of these files.
 
@@ -671,17 +754,16 @@ Every session starts with access to these (do not work without them):
 
 This project uses Claude model tiers for different task types. **Sub-agents MUST use these tiers:**
 
-| Tier | Model | When to Use |
-|------|-------|-------------|
-| **Opus 4.6** | `claude-opus-4-6` | Planning, architecture, complex multi-service research, AutoResearch orchestration, strategic decisions |
-| **Sonnet 4** | `claude-sonnet-4-6` | Coding, implementation, bug fixes, refactoring, feature development |
-| **Haiku 4.5** | `claude-haiku-4-5-20251001` | File exploration, grep/search, read-only analysis, pattern finding, simple research tasks |
+| Tier          | Model                       | When to Use                                                                                             |
+| ------------- | --------------------------- | ------------------------------------------------------------------------------------------------------- |
+| **Opus 4.6**  | `claude-opus-4-6`           | Planning, architecture, complex multi-service research, AutoResearch orchestration, strategic decisions |
+| **Sonnet 4**  | `claude-sonnet-4-6`         | Coding, implementation, bug fixes, refactoring, feature development                                     |
+| **Haiku 4.5** | `claude-haiku-4-5-20251001` | File exploration, grep/search, read-only analysis, pattern finding, simple research tasks               |
 
 **AutoResearch loop (scripts/autoresearch/):** Haiku explores bottlenecks â†’ Sonnet implements optimizations â†’ Opus evaluates loop direction.
 
 **Quick reference:**
+
 - Planning a new feature or architecture? â†’ Use **Opus**
 - Writing or editing code? â†’ Use **Sonnet**
 - Finding files, grep, understanding code structure? â†’ Use **Haiku**
-
-

@@ -40,6 +40,9 @@ spec:
         app: mlflow-postgres
         tier: data
     spec:
+      securityContext:
+        fsGroup: 999
+        fsGroupChangePolicy: OnRootMismatch
       containers:
         - name: postgres
           image: "{{ .Values.mlflow.postgres.image.repository }}:{{ .Values.mlflow.postgres.image.tag }}"
@@ -80,6 +83,9 @@ spec:
             periodSeconds: 5
             failureThreshold: 3
           securityContext:
+            runAsUser: 999
+            runAsGroup: 999
+            runAsNonRoot: true
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]

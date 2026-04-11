@@ -1,14 +1,14 @@
 <#
 .SYNOPSIS
-  Start TradersApp dev stack without k3s/Longhorn.
+  Start TradersApp dev stack — lightweight, 4 GB RAM / CPU-only.
 .DESCRIPTION
   Uses docker-compose.dev.yml with tiered profiles:
-    -Tier core    → ML Engine + BFF + Redis + Frontend (~2 GB)
-    -Tier mlops   → + MLflow + Postgres + MinIO (~3 GB)
-    -Tier full    → + Prometheus + Grafana (~3.5 GB)
+    -Tier core   -> ML Engine + BFF + Redis + Frontend (~1 GB)
+    -Tier mlops  -> + MLflow (SQLite, no MinIO/Postgres) (~1.2 GB)
+    -Tier full   -> + Prometheus + Grafana (~1.5 GB)
 .EXAMPLE
   .\scripts\dev-up.ps1                  # core only
-  .\scripts\dev-up.ps1 -Tier mlops      # core + MLflow stack
+  .\scripts\dev-up.ps1 -Tier mlops      # core + MLflow
   .\scripts\dev-up.ps1 -Tier full       # everything
   .\scripts\dev-up.ps1 -Down            # stop all
   .\scripts\dev-up.ps1 -Reset           # stop + delete volumes
@@ -23,6 +23,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $composeFile = Join-Path $PSScriptRoot "..\docker-compose.dev.yml"
+$observabilityFile = Join-Path $PSScriptRoot "..\docker-compose.observability.yml"
 
 if (-not (Test-Path $composeFile)) {
   Write-Error "docker-compose.dev.yml not found at $composeFile"
@@ -30,20 +31,32 @@ if (-not (Test-Path $composeFile)) {
 }
 
 $baseArgs = @("-f", $composeFile)
+$includeObservability = $Tier -eq "full"
 
-# ── Stop / Reset ─────────────────────────────────────────────────────────
+# Stop / Reset
 if ($Down -or $Reset) {
-  $downArgs = $baseArgs + @("--profile", "mlops", "--profile", "observability", "down")
+  $downArgs = $baseArgs + @("--profile", "mlops", "down")
   if ($Reset) { $downArgs += "-v" }
   Write-Host "Stopping dev stack$(if($Reset){' and removing volumes'})..." -ForegroundColor Yellow
   & docker compose @downArgs
-  exit $LASTEXITCODE
+  $exitCode = $LASTEXITCODE
+
+  if (Test-Path $observabilityFile) {
+    $obsDownArgs = @("-f", $observabilityFile, "down")
+    if ($Reset) { $obsDownArgs += "-v" }
+    & docker compose @obsDownArgs
+    if ($LASTEXITCODE -ne 0 -and $exitCode -eq 0) {
+      $exitCode = $LASTEXITCODE
+    }
+  }
+
+  exit $exitCode
 }
 
-# ── Build profiles list ─────────────────────────────────────────────────
+# Build profiles list
 $profiles = @()
 switch ($Tier) {
-  "full"  { $profiles = @("--profile", "mlops", "--profile", "observability") }
+  "full"  { $profiles = @("--profile", "mlops") }
   "mlops" { $profiles = @("--profile", "mlops") }
   "core"  { $profiles = @() }
 }
@@ -51,24 +64,36 @@ switch ($Tier) {
 $upArgs = $baseArgs + $profiles + @("up", "-d")
 if ($Build) { $upArgs += "--build" }
 
-# ── RAM estimate ─────────────────────────────────────────────────────────
+# RAM estimate
 $ramEstimate = switch ($Tier) {
-  "core"  { "~2 GB" }
-  "mlops" { "~3 GB" }
-  "full"  { "~3.5 GB" }
+  "core"  { "~1 GB" }
+  "mlops" { "~1.2 GB" }
+  "full"  { "~1.5 GB" }
 }
 
 Write-Host ""
-Write-Host "═══════════════════════════════════════════" -ForegroundColor Cyan
-Write-Host "  TradersApp Dev Stack — $Tier tier" -ForegroundColor Cyan
+Write-Host "============================================" -ForegroundColor Cyan
+Write-Host "  TradersApp Dev Stack  -  $Tier tier" -ForegroundColor Cyan
 Write-Host "  Estimated RAM: $ramEstimate" -ForegroundColor Cyan
-Write-Host "  No k3s. No Longhorn. No restart headaches." -ForegroundColor Green
-Write-Host "═══════════════════════════════════════════" -ForegroundColor Cyan
+Write-Host "  No k3s. No Longhorn. No GPU required." -ForegroundColor Green
+Write-Host "============================================" -ForegroundColor Cyan
 Write-Host ""
 
 & docker compose @upArgs
+$exitCode = $LASTEXITCODE
 
-if ($LASTEXITCODE -eq 0) {
+if ($exitCode -eq 0 -and $includeObservability) {
+  if (-not (Test-Path $observabilityFile)) {
+    Write-Warning "docker-compose.observability.yml not found at $observabilityFile; skipping observability tier."
+  }
+  else {
+    $obsUpArgs = @("-f", $observabilityFile, "up", "-d", "prometheus", "alertmanager", "grafana", "loki", "promtail", "jaeger")
+    & docker compose @obsUpArgs
+    $exitCode = $LASTEXITCODE
+  }
+}
+
+if ($exitCode -eq 0) {
   Write-Host ""
   Write-Host "Dev stack is up." -ForegroundColor Green
   Write-Host ""
@@ -78,14 +103,21 @@ if ($LASTEXITCODE -eq 0) {
   Write-Host "  Analysis:   localhost:50051 (gRPC)" -ForegroundColor White
   if ($Tier -in @("mlops", "full")) {
     Write-Host "  MLflow:     http://localhost:5000" -ForegroundColor White
-    Write-Host "  MinIO:      http://localhost:9001" -ForegroundColor White
   }
   if ($Tier -eq "full") {
     Write-Host "  Prometheus: http://localhost:9090" -ForegroundColor White
     Write-Host "  Grafana:    http://localhost:3001" -ForegroundColor White
   }
   Write-Host ""
-  Write-Host "Logs:  docker compose -f docker-compose.dev.yml logs -f [service]" -ForegroundColor DarkGray
+  if ($Tier -eq "full") {
+    Write-Host "Logs:  docker compose -f docker-compose.dev.yml logs -f [service]" -ForegroundColor DarkGray
+    Write-Host "       docker compose -f docker-compose.observability.yml logs -f [service]" -ForegroundColor DarkGray
+  }
+  else {
+    Write-Host "Logs:  docker compose -f docker-compose.dev.yml logs -f [service]" -ForegroundColor DarkGray
+  }
   Write-Host "Stop:  .\scripts\dev-up.ps1 -Down" -ForegroundColor DarkGray
   Write-Host "Reset: .\scripts\dev-up.ps1 -Reset" -ForegroundColor DarkGray
 }
+
+exit $exitCode

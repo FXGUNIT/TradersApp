@@ -1,6 +1,6 @@
 ---
-name: Debug Issue
-description: Systematically debug issues using graph-powered code navigation
+name: debug-issue
+description: "Use when systematically debugging issues, tracing call chains, finding root causes, or analyzing code flow paths. Triggers on debug, trace error, find root cause, call chain analysis, or 'why is this failing' tasks."
 ---
 
 ## Debug Issue

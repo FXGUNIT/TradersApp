@@ -34,9 +34,11 @@ export function createDispatcher({
   toggleMaintenanceState, getMaintenanceState, listAdminUsers,
   // Route factories
   createAdminRouteHandler, createContentRouteHandler, createConsensusRouteHandler,
-  createNewsRouteHandler, createIdentityRouteHandler,
+  createNewsRouteHandler, createTradeCalcRouteHandler, createIdentityRouteHandler,
   createTerminalAnalyticsRouteHandler, createTerminalRouteHandler,
   createOnboardingRouteHandler, createSupportRouteHandler,
+  // Telegram proxy handlers (J01 — token removed from browser bundles)
+  handleTelegramSendMessage, handleTelegramSendForensicAlert,
 }) {
   // Pre-build route handlers
   const _invokeTerminalAnalyticsChat = createTerminalAnalyticsService
@@ -51,7 +53,12 @@ export function createDispatcher({
   const supportHandler = createSupportRouteHandler({ appendSupportMessage, getSupportThread, listSupportThreads, json, readJsonBody });
   const consensusHandler = createConsensusRouteHandler({ json, readJsonBody });
   const newsHandler = createNewsRouteHandler({ json });
+  const tradeCalcHandler = createTradeCalcRouteHandler({ json, readJsonBody });
   const adminHandler = createAdminRouteHandler({ approveAdminUser, blockAdminUser, getMaintenanceState, listAdminUsers, lockAdminUser, recordAdminAuditEvent, toggleMaintenanceState, json, readJsonBody });
+
+  // Telegram proxy handlers — J01 (Phase 11): token removed from browser bundles
+  // handleTelegramSendMessage: POST /telegram/send-message
+  // handleTelegramSendForensicAlert: POST /telegram/send-forensic-alert
 
   return async function dispatcher(req, res) {
     const requestStartedAt = Date.now();
@@ -121,6 +128,7 @@ export function createDispatcher({
     if (await supportHandler(req, res, url, origin)) return;
     if (await consensusHandler(req, res, url, origin)) return;
     if (await newsHandler(req, res, url, origin)) return;
+    if (await tradeCalcHandler(req, res, url, origin)) return;
 
     // ── Admin auth: password verify (unauthenticated) ──────────────────────
     if (method === "POST" && pathname === "/auth/admin/verify") {
@@ -134,7 +142,7 @@ export function createDispatcher({
         const body = await readJsonBody(req);
         const password = String(body.password || "");
         if (!password) { json(res, 400, { ok: false, verified: false, error: "Password required." }, origin); return; }
-        const isValid = constantTimeMatch(hashPassword(password, process.env.MASTER_SALT || "TR_SECURITY_SALT_2024_REGIMENT"), ADMIN_PASS_HASH);
+        const isValid = constantTimeMatch(hashPassword(password, process.env.MASTER_SALT || ""), ADMIN_PASS_HASH);
         if (!isValid) {
           const next = registerAdminPasswordFailedAttempt(ck, ADMIN_ATTEMPT_LIMIT, ADMIN_LOCKOUT_WINDOW_MS);
           json(res, 401, { ok: false, verified: false, error: "Invalid admin password.", attemptsRemaining: Math.max(0, ADMIN_ATTEMPT_LIMIT - next.attempts), retryAfterMs: next.lockoutUntil > 0 ? next.lockoutUntil - Date.now() : 0 }, origin); return;
@@ -160,7 +168,7 @@ export function createDispatcher({
         const password = String(body.password || "");
         if (!ADMIN_PASS_HASH) { json(res, 503, { ok: false, error: "Admin password not configured." }, origin); return; }
         if (!password) { json(res, 400, { ok: false, error: "Password required." }, origin); return; }
-        if (!constantTimeMatch(hashPassword(password, process.env.MASTER_SALT || "TR_SECURITY_SALT_2024_REGIMENT"), ADMIN_PASS_HASH)) { json(res, 401, { ok: false, error: "Invalid admin password." }, origin); return; }
+        if (!constantTimeMatch(hashPassword(password, process.env.MASTER_SALT || ""), ADMIN_PASS_HASH)) { json(res, 401, { ok: false, error: "Invalid admin password." }, origin); return; }
         const ttlMs = Math.min(Number(body.ttlMs) || 8 * 3600 * 1000, 24 * 3600 * 1000);
         const device = { fingerprint: String(body.deviceFingerprint || "unknown"), browser: String(body.deviceBrowser || req.headers["user-agent"] || "Unknown").substring(0, 80), os: String(body.deviceOs || "unknown"), device: String(body.deviceType || "unknown"), ip: req.headers["x-forwarded-for"] || req.headers["x-real-ip"] || "unknown", rememberDevice: !!body.rememberDevice };
         const token = await createAdminSession(ROLES_ADMIN, ttlMs, device);
@@ -238,16 +246,20 @@ export function createDispatcher({
       } catch (e) { json(res, 400, { ok: false, error: e.message || "AI deliberation failed." }, origin); return; }
     }
 
-    // ── Telegram: /notify/telegram ───────────────────────────────────────
+    // ── Telegram proxy: /telegram/* (J01 — token removed from browser bundles) ─
+    if (method === "POST" && pathname.startsWith("/telegram/")) {
+      if (pathname === "/telegram/send-message") {
+        await handleTelegramSendMessage(req, res); return;
+      }
+      if (pathname === "/telegram/send-forensic-alert") {
+        await handleTelegramSendForensicAlert(req, res); return;
+      }
+      // Fall through to 404 for unknown /telegram/* paths
+    }
+
+    // Legacy: /notify/telegram → delegate to send-message handler
     if (method === "POST" && req.url === "/notify/telegram") {
-      try {
-        const body = await readJsonBody(req, 200_000);
-        const message = String(body.message || body.text || "");
-        const parseMode = String(body.parseMode || body.parse_mode || "HTML");
-        if (!message) { json(res, 400, { ok: false, error: "Telegram message is required." }, origin); return; }
-        const data = await sendTelegramMessage(message, parseMode, process.env.TELEGRAM_BOT_TOKEN, process.env.TELEGRAM_CHAT_ID);
-        json(res, 200, { ok: true, data }, origin); return;
-      } catch (e) { json(res, 400, { ok: false, error: e.message || "Telegram request failed." }, origin); return; }
+      await handleTelegramSendMessage(req, res); return;
     }
 
     // ── 404 ───────────────────────────────────────────────────────────────

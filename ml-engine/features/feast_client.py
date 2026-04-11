@@ -55,7 +55,7 @@ def get_candle_features(
     if FEAST_AVAILABLE and _feast_configured():
         return _feast_get_candle_features(symbol, ts)
     else:
-        return _sqlite_get_candle_features(symbol, ts)
+        return _db_get_candle_features(symbol, ts)
 
 
 def get_all_features(
@@ -78,9 +78,9 @@ def get_all_features(
     if FEAST_AVAILABLE and _feast_configured():
         features.update(_feast_get_all_features(symbol, ts))
     else:
-        features.update(_sqlite_get_candle_features(symbol, ts))
-        features.update(_sqlite_get_historical_features(symbol, ts))
-        features.update(_sqlite_get_session_features(symbol, ts))
+        features.update(_db_get_candle_features(symbol, ts))
+        features.update(_db_get_historical_features(symbol, ts))
+        features.update(_db_get_session_features(symbol, ts))
 
     return features
 
@@ -109,7 +109,7 @@ def get_historical_features_for_training(
     if FEAST_AVAILABLE and _feast_configured():
         return _feast_get_training_features(symbol, start_dt, end_dt)
     else:
-        return _sqlite_get_training_features(symbol, start_dt, end_dt)
+        return _db_get_training_features(symbol, start_dt, end_dt)
 
 
 # ─── Feat Implementation ────────────────────────────────────────────────────────
@@ -208,10 +208,14 @@ def _feast_get_training_features(symbol: str, start: datetime, end: datetime) ->
         return pd.DataFrame()
 
 
-# ─── SQLite Fallback ────────────────────────────────────────────────────────────
+# ─── Feast-Unavailable Fallback (uses CandleDatabase — PostgreSQL in k8s) ———————————
 
-def _sqlite_get_candle_features(symbol: str, ts: datetime) -> dict:
-    """Fallback: read candle features directly from SQLite."""
+def _db_get_candle_features(symbol: str, ts: datetime) -> dict:
+    """Fallback when Feast is unavailable: read candle features from CandleDatabase.
+
+    In production (k8s), CandleDatabase uses PostgreSQL because DATABASE_URL is set.
+    In dev (no DATABASE_URL), CandleDatabase falls back to SQLite.
+    """
     try:
         from ml_engine.data.candle_db import CandleDatabase
         db = CandleDatabase()
@@ -248,7 +252,7 @@ def _sqlite_get_candle_features(symbol: str, ts: datetime) -> dict:
         return {}
 
 
-def _sqlite_get_historical_features(symbol: str, ts: datetime) -> dict:
+def _db_get_historical_features(symbol: str, ts: datetime) -> dict:
     """Fallback: compute rolling trade stats from SQLite."""
     try:
         from ml_engine.data.candle_db import CandleDatabase
@@ -271,7 +275,7 @@ def _sqlite_get_historical_features(symbol: str, ts: datetime) -> dict:
         return {}
 
 
-def _sqlite_get_session_features(symbol: str, ts: datetime) -> dict:
+def _db_get_session_features(symbol: str, ts: datetime) -> dict:
     """Fallback: read session aggregates from SQLite."""
     try:
         from ml_engine.data.candle_db import CandleDatabase
@@ -293,7 +297,7 @@ def _sqlite_get_session_features(symbol: str, ts: datetime) -> dict:
         return {}
 
 
-def _sqlite_get_training_features(symbol: str, start: datetime, end: datetime) -> pd.DataFrame:
+def _db_get_training_features(symbol: str, start: datetime, end: datetime) -> pd.DataFrame:
     """Fallback: build training features directly from SQLite."""
     try:
         from ml_engine.data.candle_db import CandleDatabase
@@ -360,5 +364,5 @@ def get_feature_info() -> dict:
             "daily_range_used_pct", "volume_ratio_sess", "candle_count",
         ],
         "feast_available": FEAST_AVAILABLE,
-        "online_store": "redis" if FEAST_AVAILABLE else "sqlite_fallback",
+        "online_store": "redis" if FEAST_AVAILABLE else "db_fallback",
     }

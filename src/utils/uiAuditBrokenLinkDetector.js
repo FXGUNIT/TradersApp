@@ -4,25 +4,25 @@
  * ═══════════════════════════════════════════════════════════════════
  * Detects 404 errors, component loading failures, and broken links
  * Triggers Red Toast alerts and sends detailed logs to Telegram
- * 
+ *
+ * J01 (Phase 11): Telegram sends route through BFF at /telegram/send-message.
+ * Token never leaves the browser bundle.
+ *
  * Usage:
  *   import { initBrokenLinkDetector, getBrokenLinkReport } from './uiAuditBrokenLinkDetector.js';
- *   
+ *
  *   // In App.jsx:
  *   useEffect(() => {
- *     initBrokenLinkDetector({ 
- *       telegramToken: TELEGRAM_TOKEN,
- *       telegramChatId: TELEGRAM_CHAT_ID,
+ *     initBrokenLinkDetector({
  *       onError: showToast
  *     });
  *   }, []);
  */
 
 import { performance } from 'perf_hooks';
+import { bffFetch } from '../services/gateways/base.js';
 
 const DETECTOR_CONFIG = {
-  telegramToken: null,
-  telegramChatId: null,
   onError: null,                    // Toast callback
   checkInterval: 5000,              // Check for broken links every 5s
   timeout: 10000,                   // Network request timeout
@@ -46,11 +46,11 @@ let detectorState = {
 };
 
 /**
- * Send alert to Telegram
+ * Send alert to Telegram via BFF proxy (J01 — token never in bundle)
  */
 async function sendTelegramAlert(title, message, severity = 'ERROR') {
-  if (!DETECTOR_CONFIG.telegramToken || !DETECTOR_CONFIG.telegramChatId) {
-    console.warn('Telegram not configured for UI Audit alerts');
+  if (!DETECTOR_CONFIG.onError) {
+    console.warn('No error callback configured for UI Audit alerts');
     return;
   }
   
@@ -86,22 +86,22 @@ ${message}
   `;
   
   try {
-    const url = `https://api.telegram.org/bot${DETECTOR_CONFIG.telegramToken}/sendMessage`;
-    const response = await fetch(url, {
+    // J01: Route through BFF — token never leaves browser
+    const result = await bffFetch('/telegram/send-message', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        chat_id: DETECTOR_CONFIG.telegramChatId,
         text: telegramMessage,
         parse_mode: 'Markdown',
       }),
-      timeout: 5000,
     });
-    
-    if (!response.ok) {
-      console.error('Failed to send Telegram alert:', response.status);
+
+    if (result === null) {
+      console.warn('[UI Audit] BFF unavailable — Telegram alert dropped');
+    } else if (!result.ok) {
+      console.warn('[UI Audit] Telegram alert failed:', result.error);
     } else {
-      console.log('✅ Telegram alert sent successfully');
+      console.log('✅ Telegram alert sent via BFF proxy');
     }
   } catch (error) {
     console.error('Telegram alert failed:', error.message);

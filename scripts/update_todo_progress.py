@@ -22,7 +22,7 @@ STATUS_SCORE = {
 @dataclass
 class Task:
     phase: str
-    task_id: int
+    task_id: str  # int or alphanumeric (e.g. "D10", "71")
     status: str
     estimate_raw: str
     estimate_min_days: float
@@ -54,8 +54,21 @@ def parse_estimate_days(value: str) -> tuple[float, float]:
 def parse_tasks(markdown: str) -> list[Task]:
     tasks: list[Task] = []
     current_phase = "Unscoped"
+    in_execution_tracker = False
 
     for line in markdown.splitlines():
+        # Skip the Execution Tracker section — it uses checklist rows with | chars
+        # that corrupt the table column splitter. Only parse the Detailed Backlog tables.
+        if line.strip().startswith("## Execution Tracker"):
+            in_execution_tracker = True
+            continue
+        if in_execution_tracker:
+            # Skip until next top-level section (## at column 0)
+            if re.match(r"^##\s+\S", line):
+                in_execution_tracker = False
+            else:
+                continue
+
         phase_match = re.match(r"^###\s+(Phase\s+\d+:\s+.+)$", line.strip())
         if phase_match:
             current_phase = phase_match.group(1)
@@ -65,11 +78,16 @@ def parse_tasks(markdown: str) -> list[Task]:
             continue
 
         columns = [column.strip() for column in line.strip().strip("|").split("|")]
-        if not columns or not columns[0].isdigit():
+        if not columns or not re.match(r"^[A-Z0-9]+$", columns[0]):
             continue
 
-        task_id = int(columns[0])
-        status = columns[1]
+        # Reject rows whose second column is not a known task status
+        # (guards against "Immediate Next Actions" table: | P0 | **bold text** | ...)
+        status = columns[1] if len(columns) > 1 else ""
+        if status not in ("Done", "Partial", "Todo"):
+            continue
+
+        task_id = columns[0]
         estimate_raw = columns[-1]
         min_days, max_days = parse_estimate_days(estimate_raw)
         tasks.append(

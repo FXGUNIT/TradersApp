@@ -1,4 +1,4 @@
-{{- /* Frontend Deployment + Service + Ingress */ -}}
+{{- /* Frontend Deployment + Service */ -}}
 {{- if .Values.frontend.enabled -}}
 apiVersion: apps/v1
 kind: Deployment
@@ -32,6 +32,24 @@ spec:
       securityContext:
         runAsNonRoot: true
         runAsUser: 101
+      # Soft pod anti-affinity — prefer spreading frontend pods across nodes.
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: frontend
+                topologyKey: kubernetes.io/hostname
+      # Topology spread — ensure pods are distributed evenly across zones/nodes.
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: frontend
       containers:
         - name: frontend
           image: "{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }}"
@@ -77,24 +95,4 @@ spec:
     - name: http
       port: {{ .Values.frontend.service.port }}
       targetPort: {{ .Values.frontend.service.port }}
-{{- if .Values.frontend.ingress.enabled }}
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: frontend-ingress
-  namespace: {{ include "tradersapp.namespace" . }}
-spec:
-  rules:
-    - host: {{ .Values.frontend.ingress.host }}
-      http:
-        paths:
-          - path: {{ .Values.frontend.ingress.path }}
-            pathType: Prefix
-            backend:
-              service:
-                name: frontend
-                port:
-                  number: {{ .Values.frontend.service.port }}
-{{- end }}
 {{- end }}

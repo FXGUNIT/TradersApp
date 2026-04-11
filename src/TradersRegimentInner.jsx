@@ -110,8 +110,10 @@ import "./features/shell/registerLegacyRuntimeStyles.js";
 import "./styles/global.css";
 import "./index.css";
 
-const TELEGRAM_TOKEN = import.meta.env.VITE_TELEGRAM_BOT_TOKEN;
-const TELEGRAM_CHAT_ID = import.meta.env.VITE_TELEGRAM_CHAT_ID;
+// J01: Telegram tokens removed from browser bundle — diagnostic hooks degrade gracefully
+// when passed null. Real sends route through BFF at /telegram/send-message.
+const TELEGRAM_TOKEN = null;
+const TELEGRAM_CHAT_ID = null;
 const ENABLE_TELEGRAM_DIAGNOSTICS =
   import.meta.env.VITE_ENABLE_TELEGRAM_DIAGNOSTICS === "true";
 const fetchMaintenanceStateFn = null;
@@ -215,8 +217,8 @@ function TradersRegimentInner() {
   const [debugComponentStatus] = useState({});
   const [debugOverlayOpen, setDebugOverlayOpen] = useState(false);
 
-  useAdminDiagnosticsEffects({ isAdminAuthenticated, setDebugLogs, setDebugLatencies, setDebugTTI, showToast, telegramToken: TELEGRAM_TOKEN, telegramChatId: TELEGRAM_CHAT_ID });
-  useTelegramDiagnosticsAuditEffect({ enableTelegramDiagnostics: ENABLE_TELEGRAM_DIAGNOSTICS, telegramToken: TELEGRAM_TOKEN, telegramChatId: TELEGRAM_CHAT_ID });
+  useAdminDiagnosticsEffects({ isAdminAuthenticated, setDebugLogs, setDebugLatencies, setDebugTTI, showToast });
+  useTelegramDiagnosticsAuditEffect({ enableTelegramDiagnostics: ENABLE_TELEGRAM_DIAGNOSTICS });
   useAdminSessionRestoreEffect({ setIsAdminAuthenticated, setScreen, setIsInitialLoading, authBootstrapCompleteRef });
   useDashboardMotionEffect({ screen });
   useConnectionStatusEffect({ showToast });

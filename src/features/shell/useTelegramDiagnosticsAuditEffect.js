@@ -4,22 +4,17 @@ import { testTelegramConnectivity } from "../../services/telegramDiagnostics.js"
 
 export function useTelegramDiagnosticsAuditEffect({
   enableTelegramDiagnostics,
-  telegramToken,
-  telegramChatId,
 }) {
   useEffect(() => {
-    if (!enableTelegramDiagnostics || !telegramToken || !telegramChatId) {
+    if (!enableTelegramDiagnostics) {
       return undefined;
     }
 
     const runDiagnostics = async () => {
       try {
         /* eslint-disable no-console */
-        console.log("Starting Telegram connectivity audit...");
-        const diagnostics = await testTelegramConnectivity(
-          telegramToken,
-          telegramChatId,
-        );
+        console.log("Starting Telegram connectivity audit via BFF proxy...");
+        const diagnostics = await testTelegramConnectivity();
 
         console.log("Telegram audit complete:", diagnostics.summary);
 
@@ -31,23 +26,6 @@ export function useTelegramDiagnosticsAuditEffect({
             "Telegram system issues detected:",
             diagnostics.summary,
           );
-
-          try {
-            await fetch(
-              `https://api.telegram.org/bot${telegramToken}/sendMessage`,
-              {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  chat_id: telegramChatId,
-                  text: `<b>TELEGRAM CONNECTIVITY WARNING</b>\n<code>${diagnostics.summary.status}</code>\n\nDiagnostic tests: ${diagnostics.summary.passedTests}/${diagnostics.summary.totalTests} passed`,
-                  parse_mode: "HTML",
-                }),
-              },
-            );
-          } catch (error) {
-            console.error("Could not send diagnostic alert:", error);
-          }
         }
       } catch (error) {
         console.error("Telegram connectivity audit failed:", error);
@@ -56,7 +34,7 @@ export function useTelegramDiagnosticsAuditEffect({
 
     const timer = setTimeout(runDiagnostics, 500);
     return () => clearTimeout(timer);
-  }, [enableTelegramDiagnostics, telegramChatId, telegramToken]);
+  }, [enableTelegramDiagnostics]);
 }
 
 export default useTelegramDiagnosticsAuditEffect;

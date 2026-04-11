@@ -441,6 +441,9 @@ export const RATE_LIMIT_CONFIGS = {
   /** Terminal writes: 60 / minute per IP */
   terminalWrite: { windowMs: 60_000, maxRequests: 60 },
 
+  /** Monte Carlo trade sim: 60 / minute per IP (pure CPU math, no I/O) */
+  tradeCalc: { windowMs: 60_000, maxRequests: 60 },
+
   /** Health/status: 300 / minute per IP (cheap) */
   health: { windowMs: 60_000, maxRequests: 300 },
 };
@@ -455,6 +458,9 @@ export function getRateLimitConfig(pathname) {
   }
   if (pathname.startsWith("/news/")) {
     return { name: "news", ...RATE_LIMIT_CONFIGS.news };
+  }
+  if (pathname.startsWith("/trade-calc/")) {
+    return { name: "tradeCalc", ...RATE_LIMIT_CONFIGS.tradeCalc };
   }
   if (pathname.startsWith("/admin/")) {
     return { name: "admin", ...RATE_LIMIT_CONFIGS.admin };

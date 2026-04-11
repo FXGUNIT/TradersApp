@@ -42,10 +42,29 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(mess
 log = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Schema — PostgreSQL + TimescaleDB
+# Schema — load from canonical source to avoid drift
 # ---------------------------------------------------------------------------
 
-SCHEMA_SQL = """
+# Path relative to this script's location: ../data/schema_postgres.sql
+_SCHEMA_FILE = Path(__file__).parent.parent / "data" / "schema_postgres.sql"
+
+
+def _load_schema() -> str:
+    """Load canonical PostgreSQL schema from schema_postgres.sql."""
+    if not _SCHEMA_FILE.exists():
+        raise FileNotFoundError(
+            f"Schema file not found: {_SCHEMA_FILE}\n"
+            "Run from project root or ensure ml-engine/data/schema_postgres.sql exists."
+        )
+    return _SCHEMA_FILE.read_text(encoding="utf-8")
+
+
+# Legacy inline schema retained here for reference only — NOT used at runtime.
+# Canonical schema is ml-engine/data/schema_postgres.sql.
+# TimescaleDB extension (Neon-specific): enable manually after migration if needed:
+#   CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;
+#   SELECT create_hypertable('candles_5min', 'timestamp', migrate_data => TRUE);
+SCHEMA_SQL_LEGACY = """
 -- Enable TimescaleDB extension (Neon has it pre-installed)
 CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;
 
@@ -308,8 +327,10 @@ def run_migration(source_db: str, target_url: str, verify: bool = False):
         return
 
     log.info("=== CREATING SCHEMA ===")
-    # Execute schema (TimescaleDB commands may need superuser)
-    for stmt in SCHEMA_SQL.split(";"):
+    # Load canonical schema from schema_postgres.sql
+    schema_sql = _load_schema()
+    # Execute schema statement by statement (some may fail on re-run — non-fatal)
+    for stmt in schema_sql.split(";"):
         stmt = stmt.strip()
         if not stmt or stmt.startswith("--"):
             continue
@@ -374,9 +395,36 @@ def run_migration(source_db: str, target_url: str, verify: bool = False):
     # feature_importance
     migrate_table(
         src, dst, "feature_importance",
-        ["id", "model_name", "version", "feature", "importance", "recorded_at"],
+        ["id", "model_name", "feature", "importance", "computed_at"],
         batch_size=5000,
     )
+
+    # signal_log (feedback loop — migrate only if table exists in source)
+    src_tables = {r[0] for r in src.execute(
+        "SELECT name FROM sqlite_master WHERE type='table'"
+    ).fetchall()}
+    if "signal_log" in src_tables:
+        migrate_table(
+            src, dst, "signal_log",
+            ["id", "signal_time", "symbol", "session_id", "signal",
+             "confidence", "regime", "regime_confidence", "market_regime",
+             "session_phase", "votes_json", "consensus_json",
+             "matched_trade_id", "outcome_result", "outcome_correct", "created_at"],
+            batch_size=5000,
+        )
+    else:
+        log.info("  signal_log not in source — skipping")
+
+    if "signal_outcome" in src_tables:
+        migrate_table(
+            src, dst, "signal_outcome",
+            ["id", "signal_id", "trade_id", "result", "correct",
+             "pnl_ticks", "pnl_dollars", "actual_move_ticks",
+             "expected_move_ticks", "recorded_at"],
+            batch_size=5000,
+        )
+    else:
+        log.info("  signal_outcome not in source — skipping")
 
     src.close()
     dst.close()

@@ -1,6 +1,6 @@
 ---
-name: Explore Codebase
-description: Navigate and understand codebase structure using the knowledge graph
+name: explore-codebase
+description: "Use when navigating an unfamiliar codebase, understanding project structure, mapping module dependencies, or finding where specific functionality lives. Triggers on codebase exploration, project navigation, 'where is this code', or architecture understanding tasks."
 ---
 
 ## Explore Codebase

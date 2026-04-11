@@ -1,6 +1,6 @@
 ---
 name: debugging-strategies
-description: "Transform debugging from frustrating guesswork into systematic problem-solving with proven strategies, powerful tools, and methodical approaches."
+description: "Use when debugging errors, exceptions, crashes, or unexpected behavior. Triggers on stack traces, error messages, 'why is this broken', breakpoint debugging, log analysis, or systematic bug isolation tasks."
 risk: safe
 source: community
 date_added: "2026-02-27"

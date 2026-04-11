@@ -136,8 +136,6 @@ Add this useEffect hook:
   useEffect(() => {
     if (isAdminAuthenticated) {
       initUIAudit({
-        telegramToken: TELEGRAM_TOKEN,
-        telegramChatId: TELEGRAM_CHAT_ID,
         onError: showToast,
       });
       exposeAuditToWindow();
@@ -375,8 +373,8 @@ ISSUE 1: Audit doesn't run - "undefined __UIAudit"
 ISSUE 2: No Telegram alerts arriving
 ────────────────────────────────────────────────────────────────────
 ✓ Solution:
-  1. Verify TELEGRAM_TOKEN is correct
-  2. Verify TELEGRAM_CHAT_ID is correct
+  1. Verify BFF is running at the configured API base URL
+  2. Verify TELEGRAM_BOT_TOKEN is set in BFF environment variables
   3. Check that Telegram bot is active
   4. Look at browser console for failed requests
   5. Telegram rate limit: 1 alert per 10 seconds max

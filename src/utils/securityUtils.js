@@ -49,7 +49,11 @@ export const copyToClipboardSecure = async (text, showToast) => {
 };
 
 export const hashAdminPasswordWithSalt = async (password) => {
-  const MASTER_SALT = import.meta.env.VITE_MASTER_SALT || 'TR_SECURITY_SALT_2024_REGIMENT';
+  const MASTER_SALT = import.meta.env.VITE_MASTER_SALT;
+  // J02: No hardcoded fallback — require explicit configuration
+  if (!MASTER_SALT) {
+    throw new Error('MASTER_SALT not configured — set VITE_MASTER_SALT env var');
+  }
   const saltedPassword = password + MASTER_SALT;
   
   const encoder = new TextEncoder();

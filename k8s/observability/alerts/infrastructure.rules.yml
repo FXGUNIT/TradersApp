@@ -159,6 +159,29 @@ groups:
           summary: "Grafana is down"
           description: "Grafana is unreachable â€” dashboards unavailable."
 
+  - name: autoscaling-health
+    interval: 60s
+    rules:
+      - alert: HPANearMaxReplicas
+        expr: kube_horizontalpodautoscaler_status_current_replicas{namespace=~"tradersapp.*"} / clamp_min(kube_horizontalpodautoscaler_spec_max_replicas{namespace=~"tradersapp.*"}, 1) > 0.9
+        for: 10m
+        labels:
+          severity: warning
+          service: kubernetes
+        annotations:
+          summary: "HPA {{ $labels.horizontalpodautoscaler }} is near max replicas"
+          description: "The HPA {{ $labels.horizontalpodautoscaler }} in namespace {{ $labels.namespace }} has been above 90% of its max replicas for 10 minutes. Capacity may be exhausted soon."
+
+      - alert: HPAReplicaFlapping
+        expr: changes(kube_horizontalpodautoscaler_status_current_replicas{namespace=~"tradersapp.*"}[15m]) > 6
+        for: 5m
+        labels:
+          severity: warning
+          service: kubernetes
+        annotations:
+          summary: "HPA {{ $labels.horizontalpodautoscaler }} is scaling frequently"
+          description: "The HPA {{ $labels.horizontalpodautoscaler }} changed replica count more than 6 times in 15 minutes. Investigate load spikes, noisy metrics, or unstable thresholds."
+
   - name: mlflow-mlops
     interval: 60s
     rules:
@@ -322,7 +345,7 @@ groups:
   - name: kafka-dlq
     interval: 60s
     rules:
-      # E06: DLQ message alert — poison messages indicate consumer handler failures
+      # E06: DLQ message alert ï¿½ poison messages indicate consumer handler failures
       - alert: KafkaDLQMessageRate
         expr: rate(ml_kafka_messages_published_total{topic="dead-letter-queue"}[5m]) > 0
         for: 2m

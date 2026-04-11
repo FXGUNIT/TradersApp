@@ -3,19 +3,19 @@
  * UI INTEGRITY AUDIT - MASTER RUNNER
  * ═══════════════════════════════════════════════════════════════════
  * Orchestrates all three audit steps and generates comprehensive report
- * 
+ *
+ * J01 (Phase 11): Telegram sends route through BFF — no token in bundle.
+ *
  * Usage:
  *   import { initUIAudit, runFullUIAudit } from './uiAuditRunner.js';
- *   
+ *
  *   // Initialize in App.jsx:
  *   useEffect(() => {
  *     initUIAudit({
- *       telegramToken: TELEGRAM_TOKEN,
- *       telegramChatId: TELEGRAM_CHAT_ID,
  *       onError: showToast,
  *     });
  *   }, []);
- *   
+ *
  *   // Run full audit:
  *   const fullReport = await runFullUIAudit();
  *   console.log(fullReport);
@@ -36,16 +36,14 @@ const AUDIT_STATE = {
 };
 
 /**
- * Initialize audit system
+ * Initialize audit system (J01 — no telegram token in bundle)
  */
 export function initUIAudit(config = {}) {
   console.log('🚀 Initializing UI Integrity Audit System...');
   console.log('═'.repeat(80));
-  
-  // Initialize broken link detector with Telegram integration
+
+  // Initialize broken link detector with Telegram integration via BFF proxy
   initBrokenLinkDetector({
-    telegramToken: config.telegramToken,
-    telegramChatId: config.telegramChatId,
     onError: config.onError,
     captureNetworkErrors: true,
     monitorConsoleErrors: true,

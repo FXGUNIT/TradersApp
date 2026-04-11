@@ -37,7 +37,26 @@ spec:
         runAsNonRoot: true
         runAsUser: 1000
         fsGroup: 1000
-      {{- if .Values.mlEngine.persistence.enabled }}
+      # Soft pod anti-affinity — prefer spreading ml-engine pods across nodes.
+      # Works on single-node dev/staging; required for prod HA.
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: ml-engine
+                topologyKey: kubernetes.io/hostname
+      # Topology spread — ensure pods are distributed evenly across zones/nodes.
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: ml-engine
+        {{- if and .Values.mlEngine.persistence.enabled .Values.mlflow.enabled }}
       # Init container: pre-loads the latest MLflow Production model into the
       # shared PVC before the main container starts. All pods see the same model.
       initContainers:
@@ -100,9 +119,10 @@ spec:
           ports:
             - name: http
               containerPort: {{ .Values.mlEngine.service.port }}
+          {{- with .Values.mlEngine.envFrom }}
           envFrom:
-            - secretRef:
-                name: ml-engine-secrets
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           env:
             # Shared PVC mount for model store — all pods see the same model artifacts
             - name: MODEL_STORE_PVC_MOUNT
@@ -139,7 +159,7 @@ spec:
             - name: KAFKA_AUTO_OFFSET_RESET
               value: "earliest"
             - name: REQUIRE_DATABASE_URL
-              value: "true"
+              value: {{ ternary "true" "false" .Values.mlEngine.requireDatabaseUrl | quote }}
             - name: OTEL_SERVICE_NAME
               value: "ml-engine"
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
@@ -225,9 +245,10 @@ spec:
           ports:
             - name: registry
               containerPort: {{ .Values.mlEngine.modelRegistrySidecar.port }}
+          {{- with .Values.mlEngine.envFrom }}
           envFrom:
-            - secretRef:
-                name: ml-engine-secrets
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           env:
             - name: MODEL_STORE_PVC_MOUNT
               value: "/models/store"

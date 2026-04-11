@@ -9,11 +9,61 @@ grafana:
 namespace: tradersapp
 imagePullSecrets: []
 
+# ── Global Ingress configuration (ID 33) ───────────────────────────────────
+# Production values are in values.prod.yaml.
+# Disables the stub frontend ingress and enables the full ingress template.
+ingress:
+  enabled: false # Set true in values.prod.yaml to activate
+  className: nginx
+  annotations: {}
+  # hosts:
+  #   - host: tradersapp.local
+  #     paths:
+  #       - path: /
+  #         service: frontend
+  #         port: 80
+  tls:
+    enabled: false
+    clusterIssuer: letsencrypt-prod
+    hosts:
+      - tradersapp.local
+    secretName: frontend-tls
+  rateLimit:
+    rps: "50"
+    rpm: "500"
+    connections: "100"
+    burst: "20"
+    limitBy: "$remote_addr"
+  canary:
+    enabled: false
+    weight: "10"
+  # BFF API ingress
+  apiIngress:
+    enabled: false
+    className: nginx
+    annotations: {}
+    hosts:
+      - host: api.tradersapp.local
+        paths:
+          - path: /
+            service: bff
+            port: 8788
+    rateLimit:
+      rps: "200"
+      rpm: "2000"
+      burst: "50"
+    tls:
+      clusterIssuer: letsencrypt-prod
+      hosts:
+        - api.tradersapp.local
+    allowedOrigin: "*"
+
 # ML Engine
 mlEngine:
   enabled: true
   replicaCount: 1
   kafkaEnabled: true
+  requireDatabaseUrl: true
   image:
     repository: tradersapp/ml-engine
     tag: latest
@@ -79,6 +129,41 @@ mlEngine:
       limits:
         cpu: 500m
         memory: 1Gi
+  envFrom:
+    - configMapRef:
+        name: ml-engine-config
+    - configMapRef:
+        name: ml-engine-env
+    - secretRef:
+        name: ml-engine-secrets
+
+# Dedicated PostgreSQL runtime database for ml-engine / Feast / training state.
+# Keep disabled in the base chart unless the environment wants an in-cluster DB.
+postgresql:
+  enabled: false
+  image:
+    repository: postgres
+    tag: "16-alpine"
+    pullPolicy: IfNotPresent
+  service:
+    port: 5432
+    type: ClusterIP
+  database: tradersapp
+  user: tradersapp
+  existingSecret: tradersapp-secrets
+  passwordKey: POSTGRES_PASSWORD
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  persistence:
+    enabled: true
+    size: 5Gi
+    accessModes: ["ReadWriteOnce"]
+    storageClass: local-path
 
 # BFF
 bff:
@@ -126,6 +211,11 @@ bff:
     replicaCount: 1
     image:
       tag: "" # Defaults to bff.image.tag when empty
+  envFrom:
+    - configMapRef:
+        name: bff-config
+    - secretRef:
+        name: bff-secrets
 
 analysisService:
   enabled: true
@@ -161,9 +251,7 @@ frontend:
       cpu: 200m
       memory: 128Mi
   ingress:
-    enabled: true
-    host: tradersapp.local
-    path: /
+    enabled: false # Replaced by k8s/helm/tradersapp/templates/ingress.yaml — set ingress.enabled=true in values.prod.yaml
 
 # Triton Inference Server — GPU-accelerated ONNX model serving
 # Set enabled=true and configure nodeSelector + tolerations for GPU nodes
@@ -516,6 +604,59 @@ security:
   podDisruptionBudgets: true
   runAsNonRoot: true
   readOnlyRootFilesystem: true
+
+# ── Namespace resource guardrails (J05 — Phase 11) ─────────────────────────────
+# ResourceQuota — aggregate namespace-level compute and object count limits.
+# Enable with: helm upgrade --set resourceQuota.enabled=true
+resourceQuota:
+  enabled: false
+  requests:
+    cpu: "8" # 8 CPU cores total across all pods in namespace
+    memory: "16Gi" # 16 GiB RAM total
+  limits:
+    cpu: "16" # 16 CPU cores at burst across all pods
+    memory: "32Gi"
+  storage: "100Gi" # Max PVC storage sum across namespace
+  pods: "50" # Prevent pod proliferation
+  services: "20"
+  secrets: "100"
+  configmaps: "100"
+  persistentvolumeclaims: "20"
+
+# LimitRange — default per-pod and per-container resource constraints.
+# Applied automatically to every pod that doesn't declare explicit limits.
+# Enable with: helm upgrade --set limitRange.enabled=true
+limitRange:
+  enabled: false
+  # Pod-level bounds
+  podMax:
+    cpu: "4"
+    memory: "8Gi"
+  podMin:
+    cpu: "10m"
+    memory: "16Mi"
+  # Container-level defaults (applied when container omits limits/requests)
+  containerMax:
+    cpu: "4"
+    memory: "8Gi"
+  containerMin:
+    cpu: "10m"
+    memory: "16Mi"
+  containerDefault:
+    cpu: "500m"
+    memory: "256Mi"
+  containerDefaultRequest:
+    cpu: "50m"
+    memory: "64Mi"
+  # Burst ratio cap: a container's limit / request cannot exceed this
+  maxLimitRequestRatio:
+    cpu: "10"
+    memory: "4"
+  # PVC storage bounds
+  pvcMin:
+    storage: "100Mi"
+  pvcMax:
+    storage: "50Gi"
 
 # Pod annotations for Prometheus
 podAnnotations:

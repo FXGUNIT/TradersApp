@@ -1,13 +1,14 @@
-/* eslint-disable no-console */
 /**
  * ═══════════════════════════════════════════════════════════════════
  * TELEGRAM CONNECTIVITY MONITORING - ADMIN UTILITIES
  * ═══════════════════════════════════════════════════════════════════
- * 
- * This module provides utilities for admins to monitor and test
- * Telegram connectivity from the browser console or dashboard.
- * 
- * QUICK START:
+ *
+ * J01 (Phase 11): Telegram tokens are no longer in browser bundles.
+ * Diagnostic and monitor operations now route through the BFF at
+ * /telegram/send-message. initTelegramMonitor() no longer requires
+ * token/chatId — it degrades gracefully when BFF is unavailable.
+ *
+ * QUICK START (post-J01):
  * - In browser console: window.__TelegramMonitor.testConnection()
  * - Enable monitoring: window.__TelegramMonitor.startMonitoring()
  * - Check status: window.__TelegramMonitor.getStatus()
@@ -16,9 +17,7 @@
 import { testTelegramConnectivity, enableContinuousMonitoring, formatDiagnosticsReport } from './telegramDiagnostics.js';
 
 export class TelegramMonitor {
-  constructor(token, chatId) {
-    this.token = token;
-    this.chatId = chatId;
+  constructor() {
     this.lastDiagnostics = null;
     this.monitoringActive = false;
     this.monitoringInterval = null;
@@ -27,12 +26,12 @@ export class TelegramMonitor {
   }
 
   /**
-   * Run connectivity test
+   * Run connectivity test (BFF proxy route — no token needed)
    */
   async testConnection() {
-    console.log('🔍 Running Telegram connectivity test...');
+    console.log('🔍 Running Telegram connectivity test via BFF...');
     try {
-      const diagnostics = await testTelegramConnectivity(this.token, this.chatId);
+      const diagnostics = await testTelegramConnectivity();
       this.lastDiagnostics = diagnostics;
       this.successLog.push({
         timestamp: new Date().toISOString(),
@@ -49,18 +48,18 @@ export class TelegramMonitor {
   }
 
   /**
-   * Start continuous monitoring
+   * Start continuous monitoring via BFF proxy
    */
   async startMonitoring(intervalMinutes = 60) {
-    console.log(`🔄 Starting Telegram monitoring (every ${intervalMinutes} minutes)...`);
-    
+    console.log(`🔄 Starting Telegram monitoring (every ${intervalMinutes} minutes) via BFF...`);
+
     if (this.monitoringActive) {
       console.warn('⚠️ Monitoring already active');
       return;
     }
 
     this.monitoringActive = true;
-    const controller = await enableContinuousMonitoring(this.token, this.chatId, intervalMinutes);
+    const controller = await enableContinuousMonitoring(intervalMinutes);
     this.monitoringInterval = controller;
 
     // Run initial test
@@ -136,104 +135,24 @@ export class TelegramMonitor {
       recentSuccess: this.successLog.slice(-10)
     };
   }
-
-  /**
-   * Test specific endpoint
-   */
-  async testEndpoint(url, method = 'GET', timeout = 5000) {
-    const start = performance.now();
-    try {
-      const response = await Promise.race([
-        fetch(url, { method }),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Timeout')), timeout)
-        )
-      ]);
-      const latency = performance.now() - start;
-      return {
-        success: true,
-        latency: latency.toFixed(0) + 'ms',
-        status: response.status,
-        ok: response.ok
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error.message,
-        latency: (performance.now() - start).toFixed(0) + 'ms'
-      };
-    }
-  }
-
-  /**
-   * Performance benchmark
-   */
-  async benchmark() {
-    console.log('📊 Running performance benchmark...');
-    
-    const results = {
-      timestamp: new Date().toISOString(),
-      tests: []
-    };
-
-    // Test 1: API latency
-    console.log('Testing API latency...');
-    results.tests.push({
-      name: 'API Latency',
-      result: await this.testEndpoint(`https://api.telegram.org/bot${this.token}/getMe`)
-    });
-
-    // Test 2: Message send latency
-    console.log('Testing message send...');
-    results.tests.push({
-      name: 'Message Send',
-      result: await this.testEndpoint(
-        `https://api.telegram.org/bot${this.token}/sendMessage`,
-        'POST'
-      )
-    });
-
-    // Test 3: Bulk requests (rate limit test)
-    console.log('Testing rate limiting...');
-    const bulkStart = performance.now();
-    const bulkResults = await Promise.all([
-      ...Array(5).fill(null).map(() => 
-        this.testEndpoint(`https://api.telegram.org/bot${this.token}/getMe`)
-      )
-    ]);
-    results.tests.push({
-      name: 'Bulk Requests (5x)',
-      result: {
-        totalTime: (performance.now() - bulkStart).toFixed(0) + 'ms',
-        averageLatency: (bulkResults.reduce((sum, r) => {
-          const ms = parseInt(r.latency);
-          return sum + (isNaN(ms) ? 0 : ms);
-        }, 0) / 5).toFixed(0) + 'ms',
-        successRate: (bulkResults.filter(r => r.success).length / 5 * 100).toFixed(0) + '%'
-      }
-    });
-
-    console.table(results.tests);
-    return results;
-  }
 }
 
 /**
- * Initialize and expose monitor to window
+ * Initialize and expose monitor to window (J01 — no token required)
+ * Token-free: diagnostics now route through BFF at /telegram/send-message
  */
-export function initTelegramMonitor(token, chatId) {
-  const monitor = new TelegramMonitor(token, chatId);
+export function initTelegramMonitor() {
+  const monitor = new TelegramMonitor();
   window.__TelegramMonitor = monitor;
-  
-  console.log('✅ Telegram Monitor initialized');
+
+  console.log('✅ Telegram Monitor initialized (BFF proxy mode — no token in bundle)');
   console.log('Available commands:');
   console.log('  - window.__TelegramMonitor.testConnection()');
   console.log('  - window.__TelegramMonitor.startMonitoring(intervalMinutes)');
   console.log('  - window.__TelegramMonitor.stopMonitoring()');
   console.log('  - window.__TelegramMonitor.getStatus()');
-  console.log('  - window.__TelegramMonitor.benchmark()');
   console.log('  - window.__TelegramMonitor.exportDiagnostics()');
   console.log('  - window.__TelegramMonitor.getReport()');
-  
+
   return monitor;
 }

@@ -2,19 +2,22 @@
  * ═══════════════════════════════════════════════════════════════════
  * TELEGRAM CONNECTIVITY AUDIT SYSTEM
  * ═══════════════════════════════════════════════════════════════════
- * Comprehensive diagnostics for Telegram bot connectivity, rate limiting,
- * network status, and error recovery patterns.
+ *
+ * J01 (Phase 11): All Telegram sends now route through BFF at
+ * /telegram/send-message. Tokens no longer exist in browser bundles.
+ * Diagnostic sends use the BFF proxy, with graceful degradation
+ * when BFF is unavailable.
  */
 
 /* eslint-disable no-console */
 
+import { bffFetch } from './gateways/base.js';
+
 /**
  * Test Telegram connectivity with detailed diagnostics
- * @param {string} token - Telegram bot token
- * @param {string} chatId - Telegram chat ID
  * @returns {Promise<Object>} Diagnostic report
  */
-export async function testTelegramConnectivity(token, chatId) {
+export async function testTelegramConnectivity() {
   const diagnostics = {
     timestamp: new Date().toISOString(),
     systemInfo: {
@@ -39,20 +42,14 @@ export async function testTelegramConnectivity(token, chatId) {
     // TEST 1: DNS Resolution & Connectivity
     diagnostics.tests.connectivity = await testBasicConnectivity();
 
-    // TEST 2: Telegram API Health Check
-    diagnostics.tests.telegramAPI = await testTelegramAPIHealth(token);
+    // TEST 2: BFF Proxy Reachability (J01 — replaces direct Telegram API check)
+    diagnostics.tests.bffProxy = await testBffProxy();
 
-    // TEST 3: Send Test Message
-    diagnostics.tests.testMessage = await testSendMessage(token, chatId);
+    // TEST 3: Send Test Message via BFF
+    diagnostics.tests.testMessage = await testSendMessageViaBff();
 
-    // TEST 4: Rate Limiting Check
-    diagnostics.tests.rateLimiting = await testRateLimiting(token);
-
-    // TEST 5: CORS & Security Headers
-    diagnostics.tests.cors = await testCORSHeaders(token);
-
-    // TEST 6: Error Recovery Patterns
-    diagnostics.tests.errorRecovery = await testErrorRecoveryPatterns(token, chatId);
+    // TEST 4: Network conditions
+    diagnostics.tests.networkConditions = await testNetworkConditions();
 
     // Generate summary
     diagnostics.summary = generateSummary(diagnostics.tests);
@@ -71,7 +68,7 @@ export async function testTelegramConnectivity(token, chatId) {
   console.log('Summary:', diagnostics.summary);
   console.groupEnd();
 
-  // Also expose to window for easy access
+  // Expose to window for easy access
   window.__TelegramDiagnostics = diagnostics;
 
   return diagnostics;
@@ -101,7 +98,7 @@ async function testBasicConnectivity() {
         new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000))
       ]);
       const latency = performance.now() - start;
-      
+
       test.endpoints[endpoint.name] = {
         accessible: response.ok || response.status === 0,
         latency: latency.toFixed(0) + 'ms',
@@ -122,94 +119,101 @@ async function testBasicConnectivity() {
 }
 
 /**
- * Test Telegram API health
+ * Test BFF proxy reachability (J01 — replaces direct Telegram API health check)
  */
-async function testTelegramAPIHealth(token) {
+async function testBffProxy() {
   const test = {
-    name: 'Telegram API Health',
+    name: 'BFF Telegram Proxy',
     startTime: Date.now(),
     checks: {}
   };
 
   try {
-    // Check 1: getMe endpoint
+    // Check 1: BFF /health endpoint
     try {
       const start = performance.now();
-      const response = await fetch(`https://api.telegram.org/bot${token}/getMe`, {
-        timeout: 10000
+      const response = await fetch('/api/health', {
+        headers: { 'Accept': 'application/json' }
       });
       const latency = performance.now() - start;
-      const data = await response.json();
+      let healthData = {};
+      try { healthData = await response.json(); } catch { /* ignore parse errors */ }
 
-      test.checks.getMe = {
+      test.checks.health = {
         status: response.ok ? 'SUCCESS' : 'FAILED',
         httpStatus: response.status,
         latency: latency.toFixed(0) + 'ms',
-        botName: data.result?.username,
-        error: data.ok ? null : data.description
+        telegramConfigured: healthData?.telegramConfigured ?? false,
       };
     } catch (error) {
-      test.checks.getMe = {
+      test.checks.health = {
         status: 'ERROR',
-        error: error.message
+        error: error.message,
       };
     }
 
-    // Check 2: Verify token format
-    test.checks.tokenFormat = {
-      valid: /^\d+:[A-Za-z0-9_-]+$/.test(token),
-      message: token ? 'Token format looks valid' : 'Token is empty'
-    };
-
-    // Check 3: Message quota estimation
-    test.checks.quotaEstimate = {
-      messagesPerSecond: 30,
-      burstLimit: 100,
-      dailyEstimate: 2592000
-    };
+    // Check 2: BFF /live endpoint
+    try {
+      const start = performance.now();
+      const response = await fetch('/api/live');
+      const latency = performance.now() - start;
+      test.checks.live = {
+        status: response.ok ? 'SUCCESS' : 'FAILED',
+        httpStatus: response.status,
+        latency: latency.toFixed(0) + 'ms',
+      };
+    } catch (error) {
+      test.checks.live = {
+        status: 'ERROR',
+        error: error.message,
+      };
+    }
 
   } catch (error) {
     test.error = error.message;
   }
 
   test.totalTime = Date.now() - test.startTime;
-  test.status = test.checks.getMe?.status === 'SUCCESS' ? 'PASS' : 'FAIL';
+  test.status = test.checks.health?.status === 'SUCCESS' ? 'PASS' : 'FAIL';
   return test;
 }
 
 /**
- * Test sending an actual message
+ * Test sending a message via BFF proxy (J01)
  */
-async function testSendMessage(token, chatId) {
+async function testSendMessageViaBff() {
   const test = {
-    name: 'Test Message Send',
+    name: 'Test Message via BFF',
     startTime: Date.now()
   };
 
   try {
     const start = performance.now();
-    const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    const result = await bffFetch('/telegram/send-message', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        chat_id: chatId,
         text: '🧪 <b>CONNECTIVITY TEST</b>\nDiagnostic message from TradersApp',
-        parse_mode: 'HTML'
-      })
+        parse_mode: 'HTML',
+      }),
     });
     const latency = performance.now() - start;
-    const data = await response.json();
 
-    test.sent = response.ok && data.ok;
-    test.httpStatus = response.status;
-    test.latency = latency.toFixed(0) + 'ms';
-    test.messageId = data.result?.message_id;
-    test.error = data.ok ? null : data.description;
-    test.status = data.ok ? 'PASS' : 'FAIL';
-
-    // Store message ID for later deletion if needed
-    if (data.ok) {
-      test.deleteCommand = `curl https://api.telegram.org/bot${token}/deleteMessage -d chat_id=${chatId} -d message_id=${data.result.message_id}`;
+    if (result === null) {
+      test.sent = false;
+      test.error = 'BFF unavailable';
+      test.latency = latency.toFixed(0) + 'ms';
+      test.status = 'ERROR';
+    } else if (!result.ok) {
+      test.sent = false;
+      test.error = result.error || 'Unknown error';
+      test.latency = latency.toFixed(0) + 'ms';
+      test.status = 'FAIL';
+    } else {
+      test.sent = true;
+      test.messageId = result.message_id;
+      test.latency = latency.toFixed(0) + 'ms';
+      test.status = 'PASS';
     }
 
   } catch (error) {
@@ -223,138 +227,35 @@ async function testSendMessage(token, chatId) {
 }
 
 /**
- * Test rate limiting behavior
+ * Test network conditions
  */
-async function testRateLimiting(token) {
+async function testNetworkConditions() {
   const test = {
-    name: 'Rate Limiting',
-    startTime: Date.now(),
-    attempts: [],
-    rateLimit: {}
-  };
-
-  // Send 3 quick requests to check rate limit headers
-  for (let i = 0; i < 3; i++) {
-    try {
-      const start = performance.now();
-      const response = await fetch(`https://api.telegram.org/bot${token}/getMe`);
-      const latency = performance.now() - start;
-
-      test.attempts.push({
-        attempt: i + 1,
-        latency: latency.toFixed(0),
-        status: response.status,
-        retryAfter: response.headers.get('Retry-After'),
-        rateLimitRemaining: response.headers.get('X-Rate-Limit-Limit')
-      });
-
-      // Small delay between attempts
-      await new Promise(r => setTimeout(r, 100));
-    } catch (error) {
-      test.attempts.push({
-        attempt: i + 1,
-        error: error.message
-      });
-    }
-  }
-
-  test.rateLimit = {
-    status: test.attempts.every(a => a.status === 200) ? 'NORMAL' : 'POTENTIALLY_THROTTLED',
-    averageLatency: (test.attempts.reduce((sum, a) => sum + parseFloat(a.latency || 0), 0) / test.attempts.length).toFixed(0) + 'ms',
-    consistency: 'GOOD'
-  };
-
-  test.totalTime = Date.now() - test.startTime;
-  test.status = test.rateLimit.status === 'NORMAL' ? 'PASS' : 'WARNING';
-  return test;
-}
-
-/**
- * Test CORS and security headers
- */
-async function testCORSHeaders(token) {
-  const test = {
-    name: 'CORS & Security',
-    startTime: Date.now(),
-    headers: {}
-  };
-
-  try {
-    const response = await fetch(`https://api.telegram.org/bot${token}/getMe`);
-    
-    const relevantHeaders = [
-      'Access-Control-Allow-Origin',
-      'Access-Control-Allow-Methods',
-      'Access-Control-Allow-Headers',
-      'X-Frame-Options',
-      'X-Content-Type-Options',
-      'Content-Security-Policy',
-      'Strict-Transport-Security'
-    ];
-
-    relevantHeaders.forEach(header => {
-      test.headers[header] = response.headers.get(header) || '(not set)';
-    });
-
-    test.corsEnabled = !!response.headers.get('Access-Control-Allow-Origin');
-    test.status = 'PASS';
-
-  } catch (error) {
-    test.error = error.message;
-    test.status = 'PASS';
-  }
-
-  test.totalTime = Date.now() - test.startTime;
-  return test;
-}
-
-/**
- * Test error recovery patterns
- */
-async function testErrorRecoveryPatterns(token, _chatId) {
-  const test = {
-    name: 'Error Recovery',
+    name: 'Network Conditions',
     startTime: Date.now(),
     scenarios: {}
   };
 
-  // Scenario 1: Invalid token
+  // Scenario 1: CORS preflight for BFF
   try {
-    const response = await fetch('https://api.telegram.org/bot' + 'INVALID' + '/getMe');
-    const data = await response.json();
-    test.scenarios.invalidToken = {
-      httpStatus: response.status,
-      error: data.description,
-      recoveryTime: 'immediate',
-      recommendation: 'Check token format'
-    };
-  } catch (error) {
-    test.scenarios.invalidToken = { error: error.message };
-  }
-
-  // Scenario 2: Invalid chat ID (with valid token)
-  try {
-    const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: '0',
-        text: 'test'
-      })
+    const start = performance.now();
+    const response = await fetch('/api/health', {
+      method: 'OPTIONS',
+      headers: { 'Access-Control-Request-Method': 'POST' }
     });
-    const data = await response.json();
-    test.scenarios.invalidChatId = {
+    const latency = performance.now() - start;
+    test.scenarios.bffCors = {
       httpStatus: response.status,
-      error: data.description,
-      recommendation: 'Verify chat ID is correct'
+      latency: latency.toFixed(0) + 'ms',
+      recommendation: response.ok ? 'CORS preflight OK' : 'Check CORS configuration',
     };
   } catch (error) {
-    test.scenarios.invalidChatId = { error: error.message };
+    test.scenarios.bffCors = { error: error.message };
   }
 
-  // Scenario 3: Timeout handling
+  // Scenario 2: Timeout handling expectation
   test.scenarios.timeout = {
-    expectation: '10 second timeout',
+    expectation: '5 second timeout for BFF calls',
     recommendation: 'Implement retry with exponential backoff',
     maxRetries: 3
   };
@@ -391,16 +292,15 @@ function generateSummary(tests) {
 }
 
 /**
- * Continuous monitoring mode - runs diagnostics periodically
+ * Continuous monitoring mode — runs diagnostics periodically via BFF
  */
-export async function enableContinuousMonitoring(token, chatId, intervalMinutes = 60) {
-  console.log(`🔄 Telegram monitoring enabled - running every ${intervalMinutes} minutes`);
-  
+export async function enableContinuousMonitoring(intervalMinutes = 60) {
+  console.log(`🔄 Telegram monitoring enabled — running every ${intervalMinutes} minutes via BFF proxy`);
+
   const interval = setInterval(() => {
-    testTelegramConnectivity(token, chatId);
+    testTelegramConnectivity();
   }, intervalMinutes * 60 * 1000);
 
-  // Expose interval ID for cleanup
   window.__TelegramMonitoringInterval = interval;
 
   return {

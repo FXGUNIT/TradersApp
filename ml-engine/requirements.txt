@@ -14,8 +14,18 @@ pydantic-settings==2.7.1
 httpx==0.28.1
 scipy==1.14.1
 redis==5.2.1
-mlflow==2.21.3
+
 great-expectations>=1.7.0
 prometheus-client==0.21.1
 psycopg2-binary>=2.9,<3.0
 confluent-kafka>=2.5,<3.0
+
+# ── OpenTelemetry (ID 47 — FastAPI auto-instrumentation) ───────────────────
+# OTEL env vars are set in the Helm chart (OTEL_EXPORTER_OTLP_ENDPOINT, OTEL_SERVICE_NAME).
+# This package wires FastAPIInstrumentor() so actual traces flow to Jaeger/OTEL collector.
+opentelemetry-api==1.29.0
+opentelemetry-sdk==1.29.0
+opentelemetry-exporter-otlp-proto-grpc==1.29.0
+opentelemetry-instrumentation-fastapi==0.50b0
+opentelemetry-instrumentation-httpx==0.50b0
+opentelemetry-instrumentation-redis==0.50b0

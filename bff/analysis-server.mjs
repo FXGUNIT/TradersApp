@@ -28,9 +28,15 @@ const REPO_ROOT = resolve(__dirname, "..");
 // ───────────────────────────────────────────────────────────────────────────────
 
 const PROTO_PATH = resolve(REPO_ROOT, "proto", "ddd", "v1", "analysis.proto");
-const GENERATED_STUB_PATH = resolve(__dirname, "generated", "ddd", "v1", "analysis_pb2_grpc.js");
+const GENERATED_STUB_PATH = resolve(
+  __dirname,
+  "generated",
+  "ddd",
+  "v1",
+  "analysis_pb2_grpc.js",
+);
 
-let analysisServiceDef = null;  // The grpc.ServiceDefinition
+let analysisServiceDef = null; // The grpc.ServiceDefinition
 
 async function loadGrpcDefinition() {
   // Path 1: Use pre-generated stubs (faster, validated at build time)
@@ -50,7 +56,9 @@ async function loadGrpcDefinition() {
           return;
         }
       } catch (err) {
-        console.warn(`[analysis-server] Stub load failed (${stubPath}): ${err.message}`);
+        console.warn(
+          `[analysis-server] Stub load failed (${stubPath}): ${err.message}`,
+        );
       }
     }
   }
@@ -66,14 +74,17 @@ async function loadGrpcDefinition() {
     includeDirs: [REPO_ROOT],
   });
   const grpcDef = grpc.loadPackageDefinition(packageDefinition);
-  analysisServiceDef = grpcDef?.traders?.ddd?.v1?.analysis?.AnalysisService?.service;
+  analysisServiceDef =
+    grpcDef?.traders?.ddd?.v1?.analysis?.AnalysisService?.service;
   if (!analysisServiceDef) {
     throw new Error(
       "Failed to load AnalysisService gRPC definition.\n" +
-      "Run: npm run generate-grpc  (cd bff && npm run generate-grpc)"
+        "Run: npm run generate-grpc  (cd bff && npm run generate-grpc)",
     );
   }
-  console.log("[analysis-server] Using runtime proto loading (stubs not generated)");
+  console.log(
+    "[analysis-server] Using runtime proto loading (stubs not generated)",
+  );
 }
 
 function loadEnvFiles() {
@@ -127,22 +138,6 @@ const GRPC_PORT = Number(process.env.ANALYSIS_SERVICE_GRPC_PORT || 50051);
 const HEALTH_PORT = Number(process.env.ANALYSIS_SERVICE_HEALTH_PORT || 8082);
 const ML_ENGINE_URL = process.env.ML_ENGINE_URL || "http://127.0.0.1:8001";
 
-const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
-  keepCase: true,
-  longs: String,
-  enums: String,
-  defaults: true,
-  oneofs: true,
-  includeDirs: [REPO_ROOT],
-});
-
-const grpcDefinition = grpc.loadPackageDefinition(packageDefinition);
-const analysisPackage = grpcDefinition?.traders?.ddd?.v1?.analysis;
-
-if (!analysisPackage?.AnalysisService?.service) {
-  throw new Error("Failed to load AnalysisService gRPC definition.");
-}
-
 // ─── Circuit Breaker ──────────────────────────────────────────────────────────
 
 const CB_CONFIG = {
@@ -152,7 +147,7 @@ const CB_CONFIG = {
 };
 
 const cb = {
-  state: "CLOSED",  // CLOSED | HALF_OPEN | OPEN
+  state: "CLOSED", // CLOSED | HALF_OPEN | OPEN
   failures: 0,
   lastFailure: 0,
   halfOpenCalls: 0,
@@ -192,9 +187,14 @@ function circuitBreakerCheck() {
       cb.state = "HALF_OPEN";
       cb.halfOpenCalls = 0;
       cb.halfOpenSuccesses = 0;
-      console.log("[CircuitBreaker] OPEN → HALF_OPEN (recovery timeout elapsed)");
+      console.log(
+        "[CircuitBreaker] OPEN → HALF_OPEN (recovery timeout elapsed)",
+      );
     } else {
-      throw Object.assign(new Error("Circuit breaker OPEN — ML Engine unavailable"), { code: "CIRCUIT_OPEN" });
+      throw Object.assign(
+        new Error("Circuit breaker OPEN — ML Engine unavailable"),
+        { code: "CIRCUIT_OPEN" },
+      );
     }
   }
 }
@@ -205,7 +205,7 @@ const metrics = {
   requestsTotal: { total: 0, byEndpoint: {} },
   errorsTotal: { total: 0, byEndpoint: {} },
   latencyMs: { sum: 0, count: 0 },
-  cbState: 0,  // 0=CLOSED, 1=HALF_OPEN, 2=OPEN
+  cbState: 0, // 0=CLOSED, 1=HALF_OPEN, 2=OPEN
 };
 
 function recordRequest(endpoint, latencyMs, success) {
@@ -227,7 +227,8 @@ function recordRequest(endpoint, latencyMs, success) {
   }
 
   // Update circuit breaker state metric
-  metrics.cbState = cb.state === "CLOSED" ? 0 : cb.state === "HALF_OPEN" ? 1 : 2;
+  metrics.cbState =
+    cb.state === "CLOSED" ? 0 : cb.state === "HALF_OPEN" ? 1 : 2;
 }
 
 function getPrometheusMetrics() {
@@ -235,33 +236,51 @@ function getPrometheusMetrics() {
     "# HELP analysis_service_requests_total Total gRPC requests by endpoint",
     "# TYPE analysis_service_requests_total counter",
   ];
-  for (const [endpoint, count] of Object.entries(metrics.requestsTotal.byEndpoint)) {
-    lines.push(`analysis_service_requests_total{endpoint="${endpoint}"} ${count}`);
+  for (const [endpoint, count] of Object.entries(
+    metrics.requestsTotal.byEndpoint,
+  )) {
+    lines.push(
+      `analysis_service_requests_total{endpoint="${endpoint}"} ${count}`,
+    );
   }
-  lines.push(`analysis_service_requests_total{endpoint="unknown"} ${metrics.requestsTotal.total - Object.values(metrics.requestsTotal.byEndpoint).reduce((a, b) => a + b, 0)}`);
+  lines.push(
+    `analysis_service_requests_total{endpoint="unknown"} ${metrics.requestsTotal.total - Object.values(metrics.requestsTotal.byEndpoint).reduce((a, b) => a + b, 0)}`,
+  );
 
   lines.push("");
   lines.push("# HELP analysis_service_errors_total Total errors by endpoint");
   lines.push("# TYPE analysis_service_errors_total counter");
-  for (const [endpoint, count] of Object.entries(metrics.errorsTotal.byEndpoint)) {
-    lines.push(`analysis_service_errors_total{endpoint="${endpoint}"} ${count}`);
+  for (const [endpoint, count] of Object.entries(
+    metrics.errorsTotal.byEndpoint,
+  )) {
+    lines.push(
+      `analysis_service_errors_total{endpoint="${endpoint}"} ${count}`,
+    );
   }
 
   lines.push("");
-  lines.push("# HELP analysis_service_latency_ms Request latency in milliseconds");
+  lines.push(
+    "# HELP analysis_service_latency_ms Request latency in milliseconds",
+  );
   lines.push("# TYPE analysis_service_latency_ms histogram");
   lines.push(`analysis_service_latency_ms_sum ${metrics.latencyMs.sum}`);
   lines.push(`analysis_service_latency_ms_count ${metrics.latencyMs.count}`);
-  lines.push(`analysis_service_latency_ms_avg ${metrics.latencyMs.count > 0 ? (metrics.latencyMs.sum / metrics.latencyMs.count).toFixed(2) : 0}`);
+  lines.push(
+    `analysis_service_latency_ms_avg ${metrics.latencyMs.count > 0 ? (metrics.latencyMs.sum / metrics.latencyMs.count).toFixed(2) : 0}`,
+  );
 
   lines.push("");
-  lines.push("# HELP analysis_service_circuit_breaker_state Circuit breaker state (0=closed, 1=half-open, 2=open)");
+  lines.push(
+    "# HELP analysis_service_circuit_breaker_state Circuit breaker state (0=closed, 1=half-open, 2=open)",
+  );
   lines.push("# TYPE analysis_service_circuit_breaker_state gauge");
   lines.push(`analysis_service_circuit_breaker_state ${metrics.cbState}`);
   lines.push(`analysis_service_circuit_breaker_failures ${cb.failures}`);
 
   lines.push("");
-  lines.push("# HELP analysis_service_ml_engine_up Whether ML Engine is reachable");
+  lines.push(
+    "# HELP analysis_service_ml_engine_up Whether ML Engine is reachable",
+  );
   lines.push("# TYPE analysis_service_ml_engine_up gauge");
   lines.push(`analysis_service_ml_engine_up ${mlHealthy ? 1 : 0}`);
 
@@ -320,7 +339,9 @@ function toGrpcConsensusResponse(payload) {
   return {
     signal: String(payload?.signal || "NEUTRAL"),
     confidence: Number(payload?.confidence || 0.5),
-    models_used: Number(payload?.models_used || Object.keys(payload?.votes || {}).length || 0),
+    models_used: Number(
+      payload?.models_used || Object.keys(payload?.votes || {}).length || 0,
+    ),
     data_trades_analyzed: Number(payload?.data_trades_analyzed || 0),
     model_freshness: String(payload?.model_freshness || "unknown"),
     timing: stringMap(payload?.timing || {}),
@@ -354,7 +375,9 @@ async function mlEngineRequest(path, body, timeout = 30_000) {
 
     if (!response.ok) {
       const text = await response.text().catch(() => "");
-      throw new Error(`ML Engine ${response.status}: ${text || response.statusText}`);
+      throw new Error(
+        `ML Engine ${response.status}: ${text || response.statusText}`,
+      );
     }
 
     const latency = Date.now() - start;
@@ -386,7 +409,11 @@ async function mlEngineRegime(candles) {
 }
 
 async function mlEngineModelStatus(includeImportance) {
-  return await mlEngineRequest("/model-status", { include_feature_importance: includeImportance }, 10_000);
+  return await mlEngineRequest(
+    "/model-status",
+    { include_feature_importance: includeImportance },
+    10_000,
+  );
 }
 
 async function mlEngineTrain(mode) {
@@ -411,7 +438,9 @@ setInterval(async () => {
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 3000);
-    const res = await fetch(`${ML_ENGINE_URL}/health`, { signal: controller.signal });
+    const res = await fetch(`${ML_ENGINE_URL}/health`, {
+      signal: controller.signal,
+    });
     clearTimeout(timer);
     mlHealthy = res.ok;
   } catch {
@@ -472,7 +501,9 @@ async function getRegime(call, callback) {
 async function getModelStatus(call, callback) {
   try {
     const request = call.request || {};
-    const result = await mlEngineModelStatus(request.include_feature_importance || false);
+    const result = await mlEngineModelStatus(
+      request.include_feature_importance || false,
+    );
     callback(null, {
       ok: true,
       total_models: Number(result.total_models || 0),
@@ -565,14 +596,18 @@ function startHealthServer() {
       // Readiness: ML Engine must be healthy
       if (mlHealthy && cb.state !== "OPEN") {
         res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ ready: true, ml_engine: "up", cb_state: cb.state }));
+        res.end(
+          JSON.stringify({ ready: true, ml_engine: "up", cb_state: cb.state }),
+        );
       } else {
         res.writeHead(503, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({
-          ready: false,
-          ml_engine: mlHealthy ? "up" : "down",
-          cb_state: cb.state,
-        }));
+        res.end(
+          JSON.stringify({
+            ready: false,
+            ml_engine: mlHealthy ? "up" : "down",
+            cb_state: cb.state,
+          }),
+        );
       }
       return;
     }
@@ -599,7 +634,8 @@ function startHealthServer() {
             circuit_breaker: {
               state: cb.state,
               failures: cb.failures,
-              last_failure_age_ms: cb.lastFailure > 0 ? Date.now() - cb.lastFailure : null,
+              last_failure_age_ms:
+                cb.lastFailure > 0 ? Date.now() - cb.lastFailure : null,
             },
             uptime_s: process.uptime().toFixed(0),
             timestamp: new Date().toISOString(),
@@ -632,7 +668,9 @@ function startHealthServer() {
   });
 
   server.listen(HEALTH_PORT, "0.0.0.0", () => {
-    console.log(`[analysis-service] health HTTP listening on 0.0.0.0:${HEALTH_PORT}`);
+    console.log(
+      `[analysis-service] health HTTP listening on 0.0.0.0:${HEALTH_PORT}`,
+    );
     console.log(`[analysis-service]   /health  — full health check`);
     console.log(`[analysis-service]   /ready   — readiness probe`);
     console.log(`[analysis-service]   /live    — liveness probe`);
@@ -644,13 +682,15 @@ function startHealthServer() {
 
 // ─── Startup ──────────────────────────────────────────────────────────────────
 
-loadGrpcDefinition().then(() => {
-  startGrpcServer();
-  startHealthServer();
-}).catch((err) => {
-  console.error("[analysis-server] Failed to initialize gRPC:", err.message);
-  process.exit(1);
-});
+loadGrpcDefinition()
+  .then(() => {
+    startGrpcServer();
+    startHealthServer();
+  })
+  .catch((err) => {
+    console.error("[analysis-server] Failed to initialize gRPC:", err.message);
+    process.exit(1);
+  });
 
 function shutdown(signal) {
   console.log(`[analysis-service] shutting down on ${signal}`);
@@ -663,4 +703,3 @@ function shutdown(signal) {
 
 process.on("SIGINT", () => shutdown("SIGINT"));
 process.on("SIGTERM", () => shutdown("SIGTERM"));
-

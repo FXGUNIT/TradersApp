@@ -1,6 +1,6 @@
 ---
 name: "ci-cd-pipeline-builder"
-description: "CI/CD Pipeline Builder"
+description: "Use when creating or editing CI/CD pipelines, GitHub Actions workflows, Docker build stages, deployment automation, or continuous integration configs. Triggers on pipeline setup, workflow creation, deploy automation, or build configuration tasks."
 ---
 
 # CI/CD Pipeline Builder

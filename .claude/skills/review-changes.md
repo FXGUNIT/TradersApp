@@ -1,6 +1,6 @@
 ---
-name: Review Changes
-description: Perform a structured code review using change detection and impact
+name: review-changes
+description: "Use when reviewing recent code changes, analyzing git diffs, assessing change impact, or performing structured code reviews. Triggers on code review, diff analysis, change impact assessment, or 'what changed' tasks."
 ---
 
 ## Review Changes
@@ -18,6 +18,7 @@ Perform a thorough, risk-aware code review using the knowledge graph.
 ### Output Format
 
 Provide findings grouped by risk level (high/medium/low) with:
+
 - What changed and why it matters
 - Test coverage status
 - Suggested improvements

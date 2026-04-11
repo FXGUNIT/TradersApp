@@ -1,0 +1,121 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# cert-manager ClusterIssuer definitions for TradersApp
+#
+# Prerequisites:
+#   1. Install cert-manager:
+#        helm upgrade --install cert-manager jetstack/cert-manager \
+#          --namespace cert-manager --create-namespace \
+#          --set installCRDs=true
+#
+#   2. Apply this file:
+#        kubectl apply -f k8s/cert-manager/cluster-issuers.yaml
+#
+#   3. To use in your Ingress, reference by name:
+#        annotations:
+#          cert-manager.io/cluster-issuer: letsencrypt-prod
+#
+# ─────────────────────────────────────────────────────────────────────────────
+
+---
+# Self-signed issuer — used by internal services for mTLS or development.
+# Certificates are self-signed and NOT trusted by browsers.
+# Safe for: Redis AUTH, MLflow internal TLS, Kafka broker certs.
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: selfsigned-internal
+  labels:
+    app: cert-manager
+    purpose: internal
+spec:
+  selfSigned: {}
+
+---
+# Let's Encrypt (Staging) — for pre-production environments.
+# Issues certificates from the Let's Encrypt staging endpoint.
+# Staging certs are NOT trusted by browsers but are accepted by most tooling.
+# Use this to test the ACME challenge flow without hitting production rate limits.
+# Rate limits: 10 certificates per registered domain per 60 minutes.
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging
+  labels:
+    app: cert-manager
+    purpose: staging-tls
+spec:
+  acme:
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    email: "$ALERT_EMAIL"                          # ← override in values or secret
+    privateKeySecretRef:
+      name: letsencrypt-staging-account-key
+    solvers:
+      - http01:
+          ingress:
+            class: nginx                           # cert-manager creates Order + Challenge
+            ingressTemplate:
+              metadata:
+                labels:
+                  cert-manager.io/disable-feasibility-check: "true"
+                annotations:
+                  nginx.ingress.kubernetes.io/whitelist-source-range: ""
+
+---
+# Let's Encrypt (Production) — for public-facing production endpoints.
+# Issues certificates from the Let's Encrypt production endpoint.
+# PRODUCTION RATE LIMITS APPLY:
+#   - 5 certificates per registered domain per 7 days (failed validation included)
+#   - 5 duplicate certificates per week
+#   - 300 Authorizations per account per hour
+# Before using: ensure DNS points to this cluster's external IP/ingress IP.
+# Add to your Ingress:
+#   metadata:
+#     annotations:
+#       cert-manager.io/cluster-issuer: letsencrypt-prod
+#   spec:
+#     tls:
+#       - hosts: [traders.app, "*.traders.app"]
+#         secretName: tradersapp-tls
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+  labels:
+    app: cert-manager
+    purpose: production-tls
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: "$ALERT_EMAIL"                          # ← override in values or secret
+    privateKeySecretRef:
+      name: letsencrypt-prod-account-key
+    solvers:
+      - http01:
+          ingress:
+            class: nginx
+            ingressTemplate:
+              metadata:
+                labels:
+                  cert-manager.io/disable-feasibility-check: "true"
+                annotations:
+                  nginx.ingress.kubernetes.io/whitelist-source-range: ""
+    # Optional: specify a preferred chain (ISRG Root X1 → ISRG Root X2)
+    # preferredChain: "ISRG Root X1"
+
+---
+# Vault PKI issuer — alternative for internal/mtls workloads behind a firewall.
+# Uncomment and configure when using HashiCorp Vault as the CA.
+# Requires: Vault running with PKI secrets engine mounted at /pki
+# apiVersion: cert-manager.io/v1
+# kind: ClusterIssuer
+# metadata:
+#   name: vault-pki-internal
+# spec:
+#   vault:
+#     path: pki/root/generate/internal
+#     server: https://vault.internal:8200
+#     caBundle: ""          # omit to use the TLS cert of Vault itself
+#     auth:
+#       kubernetes:
+#         mountPath: /v1/auth/kubernetes
+#         role: cert-manager

@@ -43,6 +43,31 @@ from pathlib import Path
 from collections import deque
 import joblib
 import tempfile
+from contextlib import contextmanager
+
+# Cross-process file locking (Linux/k8s only; no-op on Windows dev)
+try:
+    import fcntl as _fcntl
+    _HAS_FCNTL = True
+except ImportError:  # pragma: no cover
+    _HAS_FCNTL = False
+
+
+@contextmanager
+def _exclusive_append(path: Path):
+    """
+    Open a file for exclusive appending with cross-process locking.
+    On Linux (k8s) uses fcntl.LOCK_EX to serialize concurrent pod writes.
+    On Windows (dev) falls back to plain open — sufficient for local use.
+    """
+    with open(path, "a", encoding="utf-8") as fh:
+        if _HAS_FCNTL:
+            _fcntl.flock(fh, _fcntl.LOCK_EX)
+        try:
+            yield fh
+        finally:
+            if _HAS_FCNTL:
+                _fcntl.flock(fh, _fcntl.LOCK_UN)
 
 try:
     if hasattr(sys.stdout, "reconfigure"):
@@ -202,11 +227,11 @@ class ExperienceReplayBuffer:
             }
 
     def _save_to_disk(self):
-        """Append latest trades to disk (append-only for persistence)."""
+        """Append latest trade to disk with cross-process locking."""
         if not self._buffer:
             return
         try:
-            with open(EXPERIENCE_REPLAY_PATH, "a") as f:
+            with _exclusive_append(EXPERIENCE_REPLAY_PATH) as f:
                 f.write(json.dumps(self._buffer[-1], default=str) + "\n")
         except Exception as e:
             print(f"[ExperienceReplay] Save failed: {e}")
@@ -302,11 +327,11 @@ class AntiForgettingValidator:
             print(f"[AntiForgetting] History load failed: {e}")
 
     def _save_training_round(self, report: AntiForgettingReport):
-        """Log a training round to history."""
+        """Log a training round to history with cross-process locking."""
         with self._lock:
             self._training_history.append(asdict(report))
             try:
-                with open(TRAINING_HISTORY_PATH, "a") as f:
+                with _exclusive_append(TRAINING_HISTORY_PATH) as f:
                     f.write(json.dumps(asdict(report), default=str) + "\n")
             except Exception as e:
                 print(f"[AntiForgetting] History save failed: {e}")

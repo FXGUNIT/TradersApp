@@ -1,0 +1,202 @@
+{{- /*
+Production Ingress — replaces the stub in frontend.yaml (ID 33)
+Handles TLS termination, rate limiting, and path-based routing for all public services.
+
+Enable cert-manager issuers by annotating with:
+  cert-manager.io/cluster-issuer: letsencrypt-prod    (public production)
+  cert-manager.io/cluster-issuer: letsencrypt-staging (staging)
+  cert-manager.io/cluster-issuer: selfsigned-internal (internal/dev)
+
+Rate limiting is enforced via nginx.ingress.kubernetes.io annotations.
+Override values in values.prod.yaml under: ingress.*
+*/ -}}
+
+{{- $global := .Values.global | default dict -}}
+{{- $ingress := .Values.ingress | default dict -}}
+{{- $ns := include "tradersapp.namespace" . -}}
+
+{{- if $ingress.enabled -}}
+
+---
+# ── Frontend Ingress ──────────────────────────────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: frontend-ingress
+  namespace: {{ $ns }}
+  labels:
+    {{- include "tradersapp.labels" . | nindent 4 }}
+    tier: web
+  annotations:
+    {{- with $ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+    # ── TLS ──────────────────────────────────────────────────────────────────
+    {{- if $ingress.tls.enabled }}
+    cert-manager.io/cluster-issuer: {{ $ingress.tls.clusterIssuer | quote }}
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    {{- end }}
+    # ── Rate limiting ────────────────────────────────────────────────────────
+    # Per-IP rate limit — prevents brute force and accidental crawlers
+    nginx.ingress.kubernetes.io/limit-rps: {{ $ingress.rateLimit.rps | default "50" | quote }}
+    nginx.ingress.kubernetes.io/limit-rpm: {{ $ingress.rateLimit.rpm | default "500" | quote }}
+    nginx.ingress.kubernetes.io/limit-connections: {{ $ingress.rateLimit.connections | default "100" | quote }}
+    # Burst allowance — allows short spikes above the RPS limit
+    nginx.ingress.kubernetes.io/limit-burst: {{ $ingress.rateLimit.burst | default "20" | quote }}
+    # Use a different key for authenticated vs anonymous requests
+    nginx.ingress.kubernetes.io/limit-key: "{{ $ingress.rateLimit.limitBy | default "$remote_addr" }}"
+    # Whitelist source ranges (empty = allow all). Set to internal CIDRs for admin ingress.
+    # nginx.ingress.kubernetes.io/whitelist-source-range: "10.0.0.0/8,172.16.0.0/12"
+    # ── Proxy settings ────────────────────────────────────────────────────────
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "10"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+    # Pass real client IP to backends
+    nginx.ingress.kubernetes.io/use-forwarded-headers: "true"
+    # ── Security headers ──────────────────────────────────────────────────────
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "Strict-Transport-Security: max-age=31536000; includeSubDomains; preload";
+      more_set_headers "X-Frame-Options: DENY";
+      more_set_headers "X-Content-Type-Options: nosniff";
+      more_set_headers "X-XSS-Protection: 1; mode=block";
+      more_set_headers "Referrer-Policy: strict-origin-when-cross-origin";
+      more_set_headers "Content-Security-Policy: default-src 'self'; frame-ancestors 'none';";
+    # ── Canary routing (H04) — weight-based split via annotation ──────────────
+    {{- if $ingress.canary.enabled }}
+    nginx.ingress.kubernetes.io/canary: "true"
+    nginx.ingress.kubernetes.io/canary-weight: {{ $ingress.canary.weight | default "10" | quote }}
+    {{- end }}
+spec:
+  {{- if $ingress.tls.enabled }}
+  tls:
+    - hosts:
+        {{- range $ingress.tls.hosts }}
+        - {{ . | quote }}
+        {{- end }}
+      secretName: {{ $ingress.tls.secretName | default "frontend-tls" | quote }}
+  {{- end }}
+  ingressClassName: {{ $ingress.className | default "nginx" | quote }}
+  rules:
+    {{- range $ingress.hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ .path | default "/" | quote }}
+            pathType: {{ .pathType | default "Prefix" | quote }}
+            backend:
+              service:
+                name: {{ .service | default "frontend" | quote }}
+                port:
+                  number: {{ .port | default 80 | int }}
+          {{- end }}
+    {{- end }}
+
+{{- end }}
+
+{{- /*
+BFF API Ingress — exposes the BFF on a dedicated path/host for public API access.
+Requires ALLOWED_ORIGINS in the BFF to include this host.
+*/ -}}
+{{- if and $ingress.enabled ($ingress.apiIngress | default dict).enabled -}}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: bff-ingress
+  namespace: {{ $ns }}
+  labels:
+    {{- include "tradersapp.labels" . | nindent 4 }}
+    tier: api
+  annotations:
+    {{- with ($ingress.apiIngress.annotations) }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+    nginx.ingress.kubernetes.io/limit-rps: {{ ($ingress.apiIngress.rateLimit).rps | default "200" | quote }}
+    nginx.ingress.kubernetes.io/limit-rpm: {{ ($ingress.apiIngress.rateLimit).rpm | default "2000" | quote }}
+    nginx.ingress.kubernetes.io/limit-burst: {{ ($ingress.apiIngress.rateLimit).burst | default "50" | quote }}
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "10"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
+    # CORS — BFF handles this via ALLOWED_ORIGINS env var, but we add headers here too
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "{{ $ingress.apiIngress.allowedOrigin | default "*" }}"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "Authorization, Content-Type, X-Request-ID"
+    {{- if ($ingress.apiIngress.tls).clusterIssuer }}
+    cert-manager.io/cluster-issuer: {{ ($ingress.apiIngress.tls).clusterIssuer | default "letsencrypt-prod" | quote }}
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    {{- end }}
+spec:
+  {{- if ($ingress.apiIngress.tls).hosts }}
+  tls:
+    - hosts:
+        {{- range ($ingress.apiIngress.tls).hosts | default (list "api.traders.app") }}
+        - {{ . | quote }}
+        {{- end }}
+      secretName: {{ ($ingress.apiIngress.tls).secretName | default "bff-api-tls" | quote }}
+  {{- end }}
+  ingressClassName: {{ $ingress.apiIngress.className | default ($ingress.className | default "nginx") | quote }}
+  rules:
+    {{- range ($ingress.apiIngress.hosts | default (list (dict "host" "api.traders.app" "paths" (list (dict "path" "/" "service" "bff" "port" 8788))))) }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ .path | default "/" | quote }}
+            pathType: {{ .pathType | default "Prefix" | quote }}
+            backend:
+              service:
+                name: {{ .service | quote }}
+                port:
+                  number: {{ .port | int }}
+          {{- end }}
+    {{- end }}
+
+{{- end }}
+
+{{- /*
+Grafana / Observability Ingress — internal-grade TLS, restricted source range.
+Disabled by default. Enable in values.prod.yaml under: observability.ingress
+*/ -}}
+{{- if and $ingress.enabled ($.Values.observability | default dict).ingressEnabled -}}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: observability-ingress
+  namespace: monitoring
+  labels:
+    {{- include "tradersapp.labels" . | nindent 4 }}
+    tier: observability
+  annotations:
+    cert-manager.io/cluster-issuer: selfsigned-internal
+    # Restrict to internal networks — no public exposure
+    nginx.ingress.kubernetes.io/whitelist-source-range: "{{ $.Values.observability.ingressWhitelist | default "10.0.0.0/8,172.16.0.0/12" }}"
+    nginx.ingress.kubernetes.io/auth-type: basic
+    nginx.ingress.kubernetes.io/auth-secret: grafana-auth-secret
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "5"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "30"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "30"
+spec:
+  tls:
+    - hosts:
+        - grafana.{{ $.Values.observability.domain | default "tradersapp.internal" }}
+      secretName: grafana-tls
+  ingressClassName: nginx
+  rules:
+    - host: grafana.{{ $.Values.observability.domain | default "tradersapp.internal" }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: grafana
+                port:
+                  number: 80
+
+{{- end }}
