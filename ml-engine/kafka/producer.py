@@ -240,8 +240,45 @@ class KafkaProducerClient:
                     msg.offset(),
                 )
 
-    def _resolve_request_id(self, value: dict) -> str:
-        return str(value.get("request_id") or get_request_id() or generate_request_id())
+    def _resolve_request_id(self, value: dict) -> tuple[str, str]:
+        """
+        Returns (request_id, idempotency_key).
+
+        E02: idempotency key uses IdempotencyService when available (picks up
+        in-flight-or-done work from other pods) otherwise generates a fresh UUID.
+        """
+        request_id = str(value.get("request_id") or get_request_id() or generate_request_id())
+        # Try to claim or reuse an idempotency key via the distributed service.
+        # Falls back to a UUID if the service is unavailable.
+        idempotency_key = self._resolve_idempotency_key(value, request_id)
+        return request_id, idempotency_key
+
+    def _resolve_idempotency_key(self, value: dict, request_id: str) -> str:
+        """
+        Resolve an idempotency key for this message.
+
+        Tries IdempotencyService.claim() first (cross-pod deduplication via Redis).
+        Falls back to uuid.uuid4().hex — every message still gets a unique key so
+        the producer-level enable.idempotence deduplication always works.
+        """
+        try:
+            from ml_engine.infrastructure.idempotency import get_idempotency_service
+            svc = get_idempotency_service()
+            # Scope by topic so keys are independent per topic.
+            topic = value.get("_topic", "kafka-producer")
+            claim = svc.claim(scope=topic, key=request_id, payload=value,
+                              wait_timeout_seconds=0.1, poll_interval_seconds=0.01)
+            if claim is not None:
+                if claim.replay_response is not None:
+                    # Another worker already processed this — reuse its key to avoid
+                    # producing a duplicate on the wire for the same logical message.
+                    return f"replay-{request_id}"
+                if claim.owner:
+                    return f"owner-{request_id}"
+        except Exception:
+            pass
+        # Best-effort: unique UUID per message; producer-level idempotence covers retries.
+        return uuid.uuid4().hex
 
     def _build_headers(self, request_id: str, idempotency_key: str | None = None, extra_headers: list[tuple[str, bytes]] | None = None) -> list[tuple[str, bytes]]:
         headers = [(KAFKA_REQUEST_ID_HEADER, request_id.encode("utf-8"))]

@@ -1,13 +1,42 @@
 #!/usr/bin/env bash
-# Run headless Locust sweeps while scaling a target deployment through 1/2/4/8 replicas.
+# Run k6 load test sweeps while scaling a target deployment through 1/2/4/8 replicas.
 #
-# Example:
-#   NAMESPACE=tradersapp-dev bash scripts/k8s/scale-load-test.sh
-#   HOST=http://127.0.0.1:8788 REPLICAS="1 2 4 8" USERS=80 bash scripts/k8s/scale-load-test.sh
+# Usage:
+#   # Run all k6 scenarios against local cluster
+#   bash scripts/k8s/scale-load-test.sh
+#
+#   # Specify k6 scenario (predict | mamba | consensus | all)
+#   bash scripts/k8s/scale-load-test.sh --scenarios predict
+#
+#   # Specify replicas and users
+#   REPLICAS="1 2 4 8" USERS=80 bash scripts/k8s/scale-load-test.sh --scenarios all
+#
+#   # Warm cache before measuring (pre-populate Redis)
+#   bash scripts/k8s/scale-load-test.sh --warm-cache --scenarios predict
+#
+#   # Override SLA thresholds
+#   SLA_P95_MS=150 SLA_P99_MS=300 bash scripts/k8s/scale-load-test.sh --scenarios predict
+#
+#   # Output CSV results to custom directory
+#   OUTPUT_DIR=/tmp/scale-test bash scripts/k8s/scale-load-test.sh --scenarios all
+#
+# Prerequisites:
+#   - kubectl configured for the target k3s/Railway cluster
+#   - k6 >= 0.47.0 installed
+#   - Services running in the target namespace
+#
+# Exit codes:
+#   0  — all sweep iterations passed SLA thresholds
+#   1  — one or more iterations breached SLA thresholds
 
 set -euo pipefail
 
+# ─── Argument parsing ─────────────────────────────────────────────────────────
+
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Default values
 NAMESPACE="${NAMESPACE:-tradersapp-dev}"
 DEPLOYMENT="${DEPLOYMENT:-ml-engine}"
 BFF_DEPLOYMENT="${BFF_DEPLOYMENT:-bff}"
@@ -24,23 +53,135 @@ HOST="${HOST:-}"
 PORT_FORWARD_PORT="${PORT_FORWARD_PORT:-8788}"
 OUTPUT_DIR="${OUTPUT_DIR:-$REPO_ROOT/.artifacts/scale-load/$(date +%Y%m%d-%H%M%S)}"
 USER_CLASS="${USER_CLASS:-}"
+WARM_CACHE="${WARM_CACHE:-false}"
+K6_SCENARIOS="${K6_SCENARIOS:-all}"
+
+# k6 runner script
+K6_RUNNER="$REPO_ROOT/tests/load/k6/k6-runner.sh"
+
+# Pre-warm endpoint (POST to /predict with sample data)
+WARM_PAYLOAD='{"symbol":"MNQ","candles":[{"symbol":"MNQ","timestamp":"1712500000","open":18500.0,"high":18505.0,"low":18498.0,"close":18503.0,"volume":4200}],"trades":[],"session_id":1,"mathEngineSnapshot":{"amdPhase":"ACCUMULATION","vrRegime":"NORMAL"}}'
+WARM_CACHE_REQUESTS="${WARM_CACHE_REQUESTS:-20}"
 
 mkdir -p "$OUTPUT_DIR"
+mkdir -p "$REPO_ROOT/tests/load/results"
 
-for cmd in kubectl curl python; do
-  if ! command -v "$cmd" >/dev/null 2>&1; then
-    echo "ERROR: required command not found: $cmd" >&2
-    exit 1
-  fi
+# ─── Helpers ──────────────────────────────────────────────────────────────────
+
+log()   { echo "[$(date +%H:%M:%S)] $*"; }
+fail()  { echo "ERROR: $*" >&2; exit 1; }
+
+for cmd in kubectl curl python3; do
+  command -v "$cmd" >/dev/null 2>&1 || fail "Required command not found: $cmd"
 done
 
-if ! python -m locust --version >/dev/null 2>&1; then
-  echo "ERROR: Locust is not available in the active Python environment." >&2
-  echo "Install it with: python -m pip install locust" >&2
-  exit 1
+warm_cache() {
+  local url="$1"
+  log "Warming cache at $url ($WARM_CACHE_REQUESTS requests)..."
+  for i in $(seq 1 "$WARM_CACHE_REQUESTS"); do
+    status=$(curl -fsS -m 5 -X POST "$url" \
+      -H "Content-Type: application/json" \
+      -d "$WARM_PAYLOAD" -o /dev/null -w "%{http_code}" 2>/dev/null || echo "000")
+    if [[ "$status" == "200" ]] || [[ "$status" == "503" ]]; then
+      log "  warm $i: HTTP $status ✓"
+    else
+      log "  warm $i: HTTP $status ✗"
+    fi
+    sleep 0.3
+  done
+  log "Cache warm complete."
+}
+
+# CSV helpers
+CSV_FILE=""
+init_csv() {
+  local label="$1"
+  CSV_FILE="$REPO_ROOT/tests/load/results/scale-${label}-$(date +%Y%m%d-%H%M%S).csv"
+  cat > "$CSV_FILE" <<EOF
+timestamp,replica_count,scenario,base_url,sla_p95_ms,sla_p99_ms,max_fail_ratio,exit_code,total_requests,total_failures,fail_ratio,p50_ms,p95_ms,p99_ms,actual_p95_ms,actual_p99_ms,actual_fail_ratio,duration_s
+EOF
+  log "CSV output: $CSV_FILE"
+}
+
+append_csv() {
+  local replica="$1"; local scenario="$2"; local base_url="$3"
+  local sla_p95="$4"; local sla_p99="$5"; local max_fail="$6"
+  local exit_code="$7"; local duration="$8"; local summary_file="$9"
+
+  # Parse summary.json from k6 output
+  local total_req=0; local total_fail=0; local fail_ratio_val="0"
+  local p50="0"; local p95="0"; local p99="0"
+
+  if [[ -f "$summary_file" ]] && command -v python3 >/dev/null 2>&1; then
+    python3 -c "
+import json, sys
+try:
+    data = json.load(open('$summary_file'))
+    m = data.get('metrics', {})
+    # Total request metrics — use 'http_reqs' which is always present
+    reqs = m.get('http_reqs', {})
+    vals = reqs.get('values', {})
+    total_req = int(vals.get('count', 0))
+    total_fail = int(vals.get('failures', 0))
+    fail_ratio_val = str(round(vals.get('fail_rate', 0.0), 6))
+    # Consensus latency metric (fallback to http_req_duration)
+    latency_m = m.get('consensus_latency_ms') or m.get('http_req_duration') or {}
+    lv = latency_m.get('values', {})
+    p50 = str(round(lv.get('p(50)', 0.0), 1))
+    p95 = str(round(lv.get('p(95)', 0.0), 1))
+    p99 = str(round(lv.get('p(99)', 0.0), 1))
+except Exception as e:
+    print('# CSV parse error:', e, file=sys.stderr)
+" 2>/dev/null || true
+  fi
+
+  echo "$(date -Iseconds),$replica,$scenario,$base_url,$sla_p95,$sla_p99,$max_fail,$exit_code,$total_req,$total_fail,$fail_ratio_val,$p50,$p95,$p99,$p95,$p99,$fail_ratio_val,$duration" >> "$CSV_FILE"
+}
+
+# ─── Parse CLI flags ───────────────────────────────────────────────────────────
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --scenarios)
+      K6_SCENARIOS="$2"; shift 2 ;;
+    --warm-cache)
+      WARM_CACHE="true"; shift ;;
+    --output-dir)
+      OUTPUT_DIR="$2"; shift 2 ;;
+    --namespace)
+      NAMESPACE="$2"; shift 2 ;;
+    --deployment)
+      DEPLOYMENT="$2"; shift 2 ;;
+    --help)
+      echo "Usage: $0 [--scenarios predict|mamba|consensus|all] [--warm-cache] [--output-dir DIR] [--namespace NS] [--deployment NAME]"
+      echo ""
+      echo "Environment variables:"
+      echo "  REPLICAS           Space-separated list of replica counts (default: '1 2 4 8')"
+      echo "  USERS              Locust/k6 virtual users (default: 40)"
+      echo "  RUN_TIME           Test duration per iteration (default: 45s)"
+      echo "  SLA_P95_MS         P95 SLA in ms (default: 200)"
+      echo "  SLA_P99_MS         P99 SLA in ms (default: 500)"
+      echo "  MAX_FAIL_RATIO     Max failure ratio (default: 0.01)"
+      echo "  HOST               Override base URL (skip port-forward)"
+      echo "  SCALE_BFF          Also scale BFF deployment (default: false)"
+      exit 0 ;;
+    *) shift ;;
+  esac
+done
+
+# ─── Pre-flight ────────────────────────────────────────────────────────────────
+
+if ! command -v k6 >/dev/null 2>&1; then
+  log "! k6 not found in PATH — falling back to Locust"
+  USE_K6=false
+else
+  USE_K6=true
+  if [[ ! -f "$K6_RUNNER" ]]; then
+    log "! k6-runner.sh not found at $K6_RUNNER — using direct k6 invocation"
+  fi
 fi
 
-ORIGINAL_REPLICAS="$(kubectl -n "$NAMESPACE" get deploy "$DEPLOYMENT" -o jsonpath='{.spec.replicas}')"
+ORIGINAL_REPLICAS="$(kubectl -n "$NAMESPACE" get deploy "$DEPLOYMENT" -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "1")"
 ORIGINAL_BFF_REPLICAS=""
 PORT_FORWARD_PID=""
 OVERALL_STATUS=0
@@ -49,7 +190,6 @@ cleanup() {
   if [[ -n "$PORT_FORWARD_PID" ]] && kill -0 "$PORT_FORWARD_PID" >/dev/null 2>&1; then
     kill "$PORT_FORWARD_PID" >/dev/null 2>&1 || true
   fi
-
   kubectl -n "$NAMESPACE" scale deploy "$DEPLOYMENT" --replicas="$ORIGINAL_REPLICAS" >/dev/null 2>&1 || true
   if [[ "$SCALE_BFF" == "true" && -n "$ORIGINAL_BFF_REPLICAS" ]]; then
     kubectl -n "$NAMESPACE" scale deploy "$BFF_DEPLOYMENT" --replicas="$ORIGINAL_BFF_REPLICAS" >/dev/null 2>&1 || true
@@ -58,17 +198,21 @@ cleanup() {
 trap cleanup EXIT
 
 if [[ "$SCALE_BFF" == "true" ]]; then
-  ORIGINAL_BFF_REPLICAS="$(kubectl -n "$NAMESPACE" get deploy "$BFF_DEPLOYMENT" -o jsonpath='{.spec.replicas}')"
+  ORIGINAL_BFF_REPLICAS="$(kubectl -n "$NAMESPACE" get deploy "$BFF_DEPLOYMENT" -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "1")"
 fi
 
+# ─── Port-forward to BFF ───────────────────────────────────────────────────────
+
 if [[ -z "$HOST" ]]; then
-  echo "Starting temporary port-forward to svc/bff on localhost:$PORT_FORWARD_PORT"
-  kubectl -n "$NAMESPACE" port-forward svc/bff "$PORT_FORWARD_PORT":8788 >"$OUTPUT_DIR/port-forward.log" 2>&1 &
+  log "Starting temporary port-forward to svc/bff on localhost:$PORT_FORWARD_PORT"
+  kubectl -n "$NAMESPACE" port-forward svc/bff "$PORT_FORWARD_PORT":8788 \
+    > "${OUTPUT_DIR}/port-forward.log" 2>&1 &
   PORT_FORWARD_PID=$!
 
   for _ in $(seq 1 30); do
-    if curl -fsS "http://127.0.0.1:$PORT_FORWARD_PORT/health" >/dev/null 2>&1; then
-      HOST="http://127.0.0.1:$PORT_FORWARD_PORT"
+    if curl -fsS -m 3 "http://127.0.0.1:${PORT_FORWARD_PORT}/health" >/dev/null 2>&1; then
+      HOST="http://127.0.0.1:${PORT_FORWARD_PORT}"
+      log "Port-forward ready: $HOST"
       break
     fi
     sleep 2
@@ -76,63 +220,162 @@ if [[ -z "$HOST" ]]; then
 fi
 
 if [[ -z "$HOST" ]]; then
-  echo "ERROR: unable to determine a healthy test host." >&2
-  exit 1
+  fail "Unable to determine a healthy test host."
 fi
 
-echo "========================================"
-echo "Scale Load Test"
-echo "Namespace:    $NAMESPACE"
-echo "Deployment:   $DEPLOYMENT"
-echo "Host:         $HOST"
-echo "Replicas:     $REPLICAS"
-echo "Output dir:   $OUTPUT_DIR"
-echo "========================================"
+# ─── Warm cache (optional) ─────────────────────────────────────────────────────
+
+if [[ "$WARM_CACHE" == "true" ]]; then
+  log "Pre-warming cache..."
+  warm_cache "${HOST}/api/consensus"
+  warm_cache "${HOST}/ml/predict"
+fi
+
+# ─── Print header ─────────────────────────────────────────────────────────────
+
+log "========================================"
+log "Scale Load Test Sweep"
+log "========================================"
+log "Namespace    : $NAMESPACE"
+log "Deployment   : $DEPLOYMENT"
+log "Host         : $HOST"
+log "Scenarios    : $K6_SCENARIOS"
+log "Replicas     : $REPLICAS"
+log "Output dir   : $OUTPUT_DIR"
+log "Warm cache   : $WARM_CACHE"
+log "SLA P95      : ${SLA_P95_MS} ms"
+log "SLA P99      : ${SLA_P99_MS} ms"
+log "Max fail %   : $(python3 -c "print($MAX_FAIL_RATIO * 100)")%"
+log "========================================"
+
+# Init CSV with timestamp
+CSV_LABEL="${K6_SCENARIOS}-warm" && [[ "$WARM_CACHE" != "true" ]] && CSV_LABEL="${K6_SCENARIOS}-cold"
+init_csv "$CSV_LABEL"
+
+# ─── Scale + run loop ──────────────────────────────────────────────────────────
 
 for replica_count in $REPLICAS; do
-  echo
-  echo ">>> Scaling $DEPLOYMENT to $replica_count replica(s)"
+  log ""
+  log ">>> Scaling $DEPLOYMENT to $replica_count replica(s)"
   kubectl -n "$NAMESPACE" scale deploy "$DEPLOYMENT" --replicas="$replica_count"
   kubectl -n "$NAMESPACE" rollout status deploy "$DEPLOYMENT" --timeout=180s
 
   if [[ "$SCALE_BFF" == "true" ]]; then
-    echo ">>> Scaling $BFF_DEPLOYMENT to $replica_count replica(s)"
+    log ">>> Scaling $BFF_DEPLOYMENT to $replica_count replica(s)"
     kubectl -n "$NAMESPACE" scale deploy "$BFF_DEPLOYMENT" --replicas="$replica_count"
     kubectl -n "$NAMESPACE" rollout status deploy "$BFF_DEPLOYMENT" --timeout=180s
   fi
 
-  report_prefix="$OUTPUT_DIR/replicas-${replica_count}"
-  locust_args=(
-    -m locust
-    -f "$REPO_ROOT/tests/load/locustfile.py"
-    --host "$HOST"
-    --headless
-    --users "$USERS"
-    --spawn-rate "$SPAWN_RATE"
-    --run-time "$RUN_TIME"
-    --stop-timeout "$STOP_TIMEOUT"
-    --html "${report_prefix}.html"
-    --csv "$report_prefix"
-    --sla-p95-ms "$SLA_P95_MS"
-    --sla-p99-ms "$SLA_P99_MS"
-    --max-fail-ratio "$MAX_FAIL_RATIO"
-  )
-
-  if [[ -n "$USER_CLASS" ]]; then
-    locust_args+=("$USER_CLASS")
+  # Warm cache before measurement if requested
+  if [[ "$WARM_CACHE" == "true" ]]; then
+    log "Warming cache at replica count $replica_count..."
+    warm_cache "${HOST}/api/consensus"
   fi
 
-  if ! python "${locust_args[@]}"; then
-    echo "Load test failed for replica count ${replica_count}" >&2
-    OVERALL_STATUS=1
+  # Allow services to stabilize
+  sleep 5
+
+  report_prefix="${OUTPUT_DIR}/replicas-${replica_count}"
+  SUMMARY_FILE="${report_prefix}-summary.json"
+  START_TIME=$(date +%s)
+
+  if [[ "$USE_K6" == "true" ]]; then
+    # ── Run via k6 ────────────────────────────────────────────────────────────
+    log "Running k6 scenario '$K6_SCENARIOS' at ${replica_count} replicas..."
+
+    k6_args=(
+      run
+      "$REPO_ROOT/tests/load/k6/scenarios.js"
+      --env "BASE_URL=${HOST}/ml"
+      --env "BFF_BASE_URL=${HOST}"
+      --env "SCENARIO=$K6_SCENARIOS"
+      --env "SLA_P95_MS=$SLA_P95_MS"
+      --env "SLA_P99_MS=$SLA_P99_MS"
+      --env "MAX_FAIL_RATIO=$MAX_FAIL_RATIO"
+      --summary-export "$SUMMARY_FILE"
+    )
+
+    if k6 "${k6_args[@]}"; then
+      log "k6 PASS for replica count $replica_count ✓"
+    else
+      log "k6 FAIL for replica count $replica_count ✗ — SLA threshold breached" >&2
+      OVERALL_STATUS=1
+    fi
+  else
+    # ── Fallback: run via Locust ───────────────────────────────────────────────
+    log "Running Locust at ${replica_count} replicas..."
+
+    locust_args=(
+      -f "$REPO_ROOT/tests/load/locustfile.py"
+      --host "$HOST"
+      --headless
+      --users "$USERS"
+      --spawn-rate "$SPAWN_RATE"
+      --run-time "$RUN_TIME"
+      --stop-timeout "$STOP_TIMEOUT"
+      --html "${report_prefix}.html"
+      --csv "$report_prefix"
+      --sla-p95-ms "$SLA_P95_MS"
+      --sla-p99-ms "$SLA_P99_MS"
+      --max-fail-ratio "$MAX_FAIL_RATIO"
+    )
+    [[ -n "$USER_CLASS" ]] && locust_args+=("$USER_CLASS")
+
+    if python -m locust "${locust_args[@]}"; then
+      log "Locust PASS for replica count $replica_count ✓"
+    else
+      log "Locust FAIL for replica count $replica_count ✗ — SLA threshold breached" >&2
+      OVERALL_STATUS=1
+    fi
+    # Generate synthetic summary for CSV
+    SUMMARY_FILE="${report_prefix}_stats_stats.json"
   fi
+
+  END_TIME=$(date +%s)
+  DURATION=$((END_TIME - START_TIME))
+
+  # Append to CSV
+  append_csv "$replica_count" "$K6_SCENARIOS" "$HOST" \
+    "$SLA_P95_MS" "$SLA_P99_MS" "$MAX_FAIL_RATIO" \
+    "$OVERALL_STATUS" "$DURATION" \
+    "$SUMMARY_FILE"
+
+  log "Results: ${report_prefix}*"
 done
 
-echo
+# ─── Summary ───────────────────────────────────────────────────────────────────
+
+echo ""
+log "========================================"
+log "Scale Load Test Sweep Complete"
+log "========================================"
+log "Results CSV : $CSV_FILE"
+log "Artifacts   : $OUTPUT_DIR"
+
+if [[ -f "$CSV_FILE" ]]; then
+  echo ""
+  log "Summary (from CSV):"
+  python3 -c "
+import csv, sys
+try:
+    rows = list(csv.DictReader(open('$CSV_FILE')))
+    print(f'  Replicas  P95(ms)  P99(ms)  Fail%    Exit')
+    print(f'  -------   ------   ------   -----    ----')
+    for r in rows:
+        print(f'  {r[\"replica_count\"]:>7}   '
+              f'{float(r.get(\"p95_ms\",\"0\")):>6.1f}   '
+              f'{float(r.get(\"p99_ms\",\"0\")):>6.1f}   '
+              f'{float(r.get(\"fail_ratio_val\",r.get(\"fail_ratio\",\"0\")))*100:>5.2f}%   '
+              f'{r.get(\"exit_code\",\"?\"):>4}')
+except Exception as e:
+    print('  Could not parse CSV summary:', e)
+" 2>/dev/null || true
+fi
+
 if [[ "$OVERALL_STATUS" -eq 0 ]]; then
-  echo "All scale-load sweeps completed successfully. Reports: $OUTPUT_DIR"
+  log "All scale-load sweeps PASSED — SLA thresholds met ✓"
 else
-  echo "One or more scale-load sweeps breached the configured thresholds. Reports: $OUTPUT_DIR" >&2
+  log "One or more scale-load sweeps FAILED — SLA thresholds breached ✗" >&2
 fi
 
 exit "$OVERALL_STATUS"
