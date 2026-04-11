@@ -23,6 +23,48 @@ import socket
 import pytest
 import redis.asyncio as aioredis
 
+# ---------------------------------------------------------------------------
+# Pre-flight check: fail fast with a clear message if Redis is unreachable
+# ---------------------------------------------------------------------------
+
+_redis_preflight_done = False
+_redis_preflight_url = None
+
+def _preflight_check():
+    """
+    Attempt a synchronous Redis connection before any test runs.
+    If unreachable, mark all tests to skip with a clear diagnostic message.
+    """
+    global _redis_preflight_done, _redis_preflight_url
+    if _redis_preflight_done:
+        return
+    url = _resolve_redis_url()
+    _redis_preflight_url = url
+
+    # Quick sync connect-check so we can skip cleanly
+    try:
+        import redis as sync_redis
+        r = sync_redis.Redis.from_url(url, socket_connect_timeout=3)
+        r.ping()
+        r.close()
+        _redis_preflight_done = True
+        print(f"\n[Redis Preflight] OK — {url}")
+        return
+    except Exception as exc:
+        pytest.exit(
+            f"\n[Redis Preflight] UNREACHABLE at {url}: {exc}\n"
+            "To run these tests:\n"
+            "  Inside cluster: kubectl exec -it <pod> -n tradersapp-dev -- "
+                "python -m pytest tests/integration/test_redis_multi_pod_coherence.py -v\n"
+            "  On host:       Start local Redis on port 6379, then re-run.\n"
+            "  Override URL:   REDIS_URL=redis://<host>:6379/0 pytest ...",
+            returncode=1,
+        )
+
+# Run pre-flight at module import time
+_resolve_redis_url()  # sets KUBERNETES_SERVICE_HOST detection
+_preflight_check()
+
 
 def _resolve_redis_url() -> str:
     """
