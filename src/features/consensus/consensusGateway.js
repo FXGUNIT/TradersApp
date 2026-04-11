@@ -2,9 +2,9 @@
  * consensusGateway — BFF ML consensus API calls
  * Extracted from CollectiveConsciousness.jsx (I06)
  */
-import { hasBff } from '../../services/gateways/base.js';
+import { hasBff } from "../../services/gateways/base.js";
 
-const BFF_BASE = String(import.meta.env.VITE_BFF_URL || '').trim();
+const BFF_BASE = String(import.meta.env.VITE_BFF_URL || "").trim();
 
 /**
  * Fetch ML consensus signal from BFF.
@@ -12,7 +12,7 @@ const BFF_BASE = String(import.meta.env.VITE_BFF_URL || '').trim();
  */
 export async function fetchConsensus({ session = 1, signal: _signal } = {}) {
   if (!hasBff()) {
-    throw new Error('ML Engine unavailable');
+    throw new Error("ML Engine unavailable");
   }
   const res = await fetch(`${BFF_BASE}/ml/consensus?session=${session}`, {
     signal: AbortSignal.timeout(15_000),

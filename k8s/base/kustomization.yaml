@@ -1,4 +1,4 @@
-# Base kustomization — shared by all environments
+# Base kustomization - shared by all environments
 # k8s/base/kustomization.yaml
 namespace: tradersapp
 commonAnnotations:
@@ -9,7 +9,7 @@ resources:
   - config.yaml
   - pdb.yaml
   - network-policies.yaml
-  - pod-monitor.yaml  # Requires Prometheus Operator
+  - pod-monitor.yaml # Requires Prometheus Operator
   - ml-deployment.yaml
   - bff-deployment.yaml
   - frontend-deployment.yaml

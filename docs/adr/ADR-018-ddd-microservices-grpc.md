@@ -1,5 +1,6 @@
 # ADR-018: DDD Bounded Contexts with gRPC Inter-Service Contracts
 
+**ADR ID:** ADR-018  
 **Status:** Accepted  
 **Date:** 2026-04-04
 

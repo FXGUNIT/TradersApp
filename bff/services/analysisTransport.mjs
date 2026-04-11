@@ -13,11 +13,20 @@ const ANALYSIS_GRPC_ADDR = String(
   process.env.ML_ANALYSIS_GRPC_ADDR || "analysis-service:50051",
 ).trim();
 const ANALYSIS_GRPC_STRICT =
-  String(process.env.ML_ANALYSIS_GRPC_STRICT || "false").toLowerCase() === "true";
+  String(process.env.ML_ANALYSIS_GRPC_STRICT || "false").toLowerCase() ===
+  "true";
 const ML_ENGINE_BASE = String(
-  process.env.ML_ENGINE_URL || process.env.ML_ENGINE_INTERNAL_URL || "http://ml-engine:8001",
+  process.env.ML_ENGINE_URL ||
+    process.env.ML_ENGINE_INTERNAL_URL ||
+    "http://ml-engine:8001",
 ).trim();
-const ANALYSIS_PROTO_PATH = resolve(REPO_ROOT, "proto", "ddd", "v1", "analysis.proto");
+const ANALYSIS_PROTO_PATH = resolve(
+  REPO_ROOT,
+  "proto",
+  "ddd",
+  "v1",
+  "analysis.proto",
+);
 
 let _grpcClientPromise = null;
 
@@ -62,7 +71,10 @@ function stableStringify(value) {
   }
 
   if (value && typeof value === "object") {
-    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(",")}}`;
+    return `{${Object.keys(value)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`)
+      .join(",")}}`;
   }
 
   return JSON.stringify(value);
@@ -120,8 +132,7 @@ async function getGrpcAnalysisClient() {
     });
 
     const loaded = grpc.loadPackageDefinition(packageDefinition);
-    const analysisCtor =
-      loaded?.traders?.ddd?.v1?.analysis?.AnalysisService;
+    const analysisCtor = loaded?.traders?.ddd?.v1?.analysis?.AnalysisService;
 
     if (!analysisCtor) {
       throw new Error(
@@ -177,7 +188,9 @@ async function callHttpPredict(payload, timeoutMs, options = {}) {
 
     if (!response.ok) {
       const text = await response.text().catch(() => "");
-      throw new Error(`ML Engine ${response.status}: ${text || response.statusText}`);
+      throw new Error(
+        `ML Engine ${response.status}: ${text || response.statusText}`,
+      );
     }
 
     return await response.json();
@@ -191,7 +204,11 @@ async function callHttpPredict(payload, timeoutMs, options = {}) {
   }
 }
 
-export async function predictConsensusTransport(payload, timeoutMs = 30_000, options = {}) {
+export async function predictConsensusTransport(
+  payload,
+  timeoutMs = 30_000,
+  options = {},
+) {
   if (ANALYSIS_TRANSPORT !== "grpc") {
     return await callHttpPredict(payload, timeoutMs, options);
   }

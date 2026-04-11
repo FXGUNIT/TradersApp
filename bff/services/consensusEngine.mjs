@@ -29,7 +29,14 @@ import { predictConsensusTransport } from "./analysisTransport.mjs";
 const CB_STATE = { CLOSED: "CLOSED", OPEN: "OPEN", HALF_OPEN: "HALF_OPEN" };
 
 class CircuitBreaker {
-  constructor(name, { failureThreshold = 5, recoveryTimeoutMs = 30_000, halfOpenMaxCalls = 3 } = {}) {
+  constructor(
+    name,
+    {
+      failureThreshold = 5,
+      recoveryTimeoutMs = 30_000,
+      halfOpenMaxCalls = 3,
+    } = {},
+  ) {
     this.name = name;
     this.failureThreshold = failureThreshold;
     this.recoveryTimeoutMs = recoveryTimeoutMs;
@@ -59,7 +66,9 @@ class CircuitBreaker {
         this._state = CB_STATE.CLOSED;
         this._failureCount = 0;
         this._successCount = 0;
-        console.log(`[CircuitBreaker:${this.name}] HALF_OPEN → CLOSED (recovered)`);
+        console.log(
+          `[CircuitBreaker:${this.name}] HALF_OPEN → CLOSED (recovered)`,
+        );
       }
     } else if (this._state === CB_STATE.CLOSED) {
       this._failureCount = 0;
@@ -72,10 +81,14 @@ class CircuitBreaker {
     if (this._state === CB_STATE.HALF_OPEN) {
       this._state = CB_STATE.OPEN;
       this._successCount = 0;
-      console.log(`[CircuitBreaker:${this.name}] HALF_OPEN → OPEN (still failing)`);
+      console.log(
+        `[CircuitBreaker:${this.name}] HALF_OPEN → OPEN (still failing)`,
+      );
     } else if (this._failureCount >= this.failureThreshold) {
       this._state = CB_STATE.OPEN;
-      console.log(`[CircuitBreaker:${this.name}] CLOSED → OPEN (${this._failureCount} failures)`);
+      console.log(
+        `[CircuitBreaker:${this.name}] CLOSED → OPEN (${this._failureCount} failures)`,
+      );
     }
   }
 
@@ -112,15 +125,24 @@ syncCircuitBreakerMetric();
 // ── ML Engine Client ──────────────────────────────────────────────────────────
 
 const ML_ENGINE_BASE = String(
-  process.env.ML_ENGINE_URL || process.env.ML_ENGINE_INTERNAL_URL || "http://ml-engine:8001",
+  process.env.ML_ENGINE_URL ||
+    process.env.ML_ENGINE_INTERNAL_URL ||
+    "http://ml-engine:8001",
 ).trim();
 const ML_REQUEST_TIMEOUT_MS = 30_000;
 
-async function mlRequest(path, body = null, timeout = ML_REQUEST_TIMEOUT_MS, options = {}) {
+async function mlRequest(
+  path,
+  body = null,
+  timeout = ML_REQUEST_TIMEOUT_MS,
+  options = {},
+) {
   const isAvailable = _mlCircuitBreaker.isAvailable();
   syncCircuitBreakerMetric();
   if (!isAvailable) {
-    const err = new Error(`Circuit breaker OPEN for ML Engine - state: ${_mlCircuitBreaker.state}`);
+    const err = new Error(
+      `Circuit breaker OPEN for ML Engine - state: ${_mlCircuitBreaker.state}`,
+    );
     err.code = "CIRCUIT_OPEN";
     throw err;
   }
@@ -195,7 +217,12 @@ async function mlRequest(path, body = null, timeout = ML_REQUEST_TIMEOUT_MS, opt
  * @param {number} sessionId - 0=pre, 1=main, 2=post
  * @returns {object} feature vector for ML Engine
  */
-export function buildMlFeatureVector(me, recentCandles = [], keyLevels = {}, sessionId = 1) {
+export function buildMlFeatureVector(
+  me,
+  recentCandles = [],
+  keyLevels = {},
+  sessionId = 1,
+) {
   const candles = recentCandles.slice(-20); // last 20 candles max
   const last = candles[candles.length - 1] || {};
 
@@ -207,16 +234,14 @@ export function buildMlFeatureVector(me, recentCandles = [], keyLevels = {}, ses
     2: { start_et: "16:01", end_et: "20:00" },
   };
 
-  const now = me?.timestamp
-    ? new Date(me.timestamp)
-    : new Date();
+  const now = me?.timestamp ? new Date(me.timestamp) : new Date();
   const etHour = parseInt(
     new Intl.DateTimeFormat("en-US", {
       timeZone: "America/New_York",
       hour: "numeric",
       hour12: false,
     }).format(now),
-    10
+    10,
   );
   const etMinute = parseInt(
     new Intl.DateTimeFormat("en-US", {
@@ -224,7 +249,7 @@ export function buildMlFeatureVector(me, recentCandles = [], keyLevels = {}, ses
       minute: "numeric",
       hour12: false,
     }).format(now),
-    10
+    10,
   );
   const minutesIntoSession = (() => {
     const cfg = sessionConfig[sessionId] || sessionConfig[1];
@@ -239,9 +264,10 @@ export function buildMlFeatureVector(me, recentCandles = [], keyLevels = {}, ses
   const sessionEndMin = eh * 60 + em;
   const [sh2, sm2] = cfg.start_et.split(":").map(Number);
   const sessionStartMin = sh2 * 60 + sm2;
-  const sessionPct = sessionEndMin > sessionStartMin
-    ? minutesIntoSession / (sessionEndMin - sessionStartMin)
-    : 0;
+  const sessionPct =
+    sessionEndMin > sessionStartMin
+      ? minutesIntoSession / (sessionEndMin - sessionStartMin)
+      : 0;
 
   // Rolling volatility from recent candles
   const logReturns = [];
@@ -252,13 +278,17 @@ export function buildMlFeatureVector(me, recentCandles = [], keyLevels = {}, ses
       logReturns.push(Math.log(curr / prev));
     }
   }
-  const rollingStd10 = logReturns.slice(-10).length >= 2
-    ? std(logReturns.slice(-10)) : 0;
-  const rollingStd20 = logReturns.slice(-20).length >= 2
-    ? std(logReturns.slice(-20)) : rollingStd10;
+  const rollingStd10 =
+    logReturns.slice(-10).length >= 2 ? std(logReturns.slice(-10)) : 0;
+  const rollingStd20 =
+    logReturns.slice(-20).length >= 2
+      ? std(logReturns.slice(-20))
+      : rollingStd10;
 
   // Volume ratio (5-bar)
-  const avgVol5 = candles.slice(-5).reduce((s, c) => s + (c.volume || 0), 0) / Math.max(1, candles.slice(-5).length);
+  const avgVol5 =
+    candles.slice(-5).reduce((s, c) => s + (c.volume || 0), 0) /
+    Math.max(1, candles.slice(-5).length);
   const volRatio5 = last.volume && avgVol5 > 0 ? last.volume / avgVol5 : 1;
 
   // True range + ATR (14-bar)
@@ -270,26 +300,35 @@ export function buildMlFeatureVector(me, recentCandles = [], keyLevels = {}, ses
       const tr = Math.max(
         c.high - c.low,
         Math.abs(c.high - p.close),
-        Math.abs(c.low - p.close)
+        Math.abs(c.low - p.close),
       );
       trs.push(tr);
     }
   }
-  const atr = trs.length >= 14
-    ? trs.slice(-14).reduce((a, b) => a + b, 0) / 14
-    : (last.high - last.low) || 1;
+  const atr =
+    trs.length >= 14
+      ? trs.slice(-14).reduce((a, b) => a + b, 0) / 14
+      : last.high - last.low || 1;
 
   const vr = me?.vr ?? 1.0;
   const vrRegime = vr < 0.85 ? 0 : vr < 1.15 ? 1 : 2;
 
   // AMD phase one-hot
   const amdPhase = me?.amdPhase || "UNCLEAR";
-  const amdPhases = ["ACCUMULATION", "MANIPULATION", "DISTRIBUTION", "TRANSITION", "UNCLEAR"];
+  const amdPhases = [
+    "ACCUMULATION",
+    "MANIPULATION",
+    "DISTRIBUTION",
+    "TRANSITION",
+    "UNCLEAR",
+  ];
 
   // Key level proximity
   const close = last.close || me?.close || 0;
-  const priceToPdh = keyLevels.pdh && atr > 0 ? (close - keyLevels.pdh) / atr : 0;
-  const priceToPdl = keyLevels.pdl && atr > 0 ? (keyLevels.pdl - close) / atr : 0;
+  const priceToPdh =
+    keyLevels.pdh && atr > 0 ? (close - keyLevels.pdh) / atr : 0;
+  const priceToPdl =
+    keyLevels.pdl && atr > 0 ? (keyLevels.pdl - close) / atr : 0;
 
   // VWAP slope encoding
   const vwapSlopeEntry = me?.vwapSlope ?? 0;
@@ -321,10 +360,14 @@ export function buildMlFeatureVector(me, recentCandles = [], keyLevels = {}, ses
     realized_vol: rollingStd20 * Math.sqrt(78), // daily bars * sqrt(78) ≈ annual
 
     // Momentum
-    momentum_3bar: logReturns.length >= 3
-      ? logReturns.slice(-3).reduce((a, b) => a + b, 0) : 0,
-    momentum_5bar: logReturns.length >= 5
-      ? logReturns.slice(-5).reduce((a, b) => a + b, 0) : 0,
+    momentum_3bar:
+      logReturns.length >= 3
+        ? logReturns.slice(-3).reduce((a, b) => a + b, 0)
+        : 0,
+    momentum_5bar:
+      logReturns.length >= 5
+        ? logReturns.slice(-5).reduce((a, b) => a + b, 0)
+        : 0,
 
     // Time
     hour_of_day: etHour,
@@ -335,13 +378,14 @@ export function buildMlFeatureVector(me, recentCandles = [], keyLevels = {}, ses
 
     // Session time flags
     is_first_30min: minutesIntoSession <= 30 ? 1 : 0,
-    is_last_30min: (sessionEndMin - (etHour * 60 + etMinute)) <= 30 ? 1 : 0,
-    is_lunch_hour: (etHour === 12) || (etHour === 11 && etMinute >= 30) ? 1 : 0,
+    is_last_30min: sessionEndMin - (etHour * 60 + etMinute) <= 30 ? 1 : 0,
+    is_lunch_hour: etHour === 12 || (etHour === 11 && etMinute >= 30) ? 1 : 0,
 
     // Levels
     price_to_pdh: priceToPdh,
     price_to_pdl: priceToPdl,
-    near_level: (Math.abs(priceToPdh) < 0.5 || Math.abs(priceToPdl) < 0.5) ? 1 : 0,
+    near_level:
+      Math.abs(priceToPdh) < 0.5 || Math.abs(priceToPdl) < 0.5 ? 1 : 0,
 
     // Indicators
     adx: me?.adx ?? 25,
@@ -405,22 +449,32 @@ export async function getMlConsensus({
   requestId = null,
   idempotencyKey = null,
 } = {}) {
-  const features = buildMlFeatureVector(mathEngine, recentCandles, keyLevels, sessionId);
+  const features = buildMlFeatureVector(
+    mathEngine,
+    recentCandles,
+    keyLevels,
+    sessionId,
+  );
 
   try {
     // Call ML Engine prediction
-    const mlResult = await mlRequest("/predict", {
-      features,
-      candles: recentCandles.slice(-50),
-      trades: [],
-      session_id: sessionId,
-      math_engine_snapshot: mathEngine,
-      key_levels: keyLevels,
-      symbol,
-    }, ML_REQUEST_TIMEOUT_MS, {
-      requestId,
-      idempotencyKey,
-    });
+    const mlResult = await mlRequest(
+      "/predict",
+      {
+        features,
+        candles: recentCandles.slice(-50),
+        trades: [],
+        session_id: sessionId,
+        math_engine_snapshot: mathEngine,
+        key_levels: keyLevels,
+        symbol,
+      },
+      ML_REQUEST_TIMEOUT_MS,
+      {
+        requestId,
+        idempotencyKey,
+      },
+    );
 
     // Enrich with session context
     const sessionNames = ["Pre-Market", "Main Trading", "Post-Market"];
@@ -481,7 +535,7 @@ export async function getMlConsensus({
     console.error(
       isCircuitOpen
         ? `[consensusEngine] Circuit breaker OPEN — ML Engine failing`
-        : `[consensusEngine] ML Engine unavailable: ${err.message}`
+        : `[consensusEngine] ML Engine unavailable: ${err.message}`,
     );
 
     return {
@@ -490,16 +544,28 @@ export async function getMlConsensus({
       circuit_breaker: {
         state: _mlCircuitBreaker.state,
         failure_count: _mlCircuitBreaker._failureCount,
-        recovery_timeout_s: Math.max(0, Math.ceil((_mlCircuitBreaker._lastFailureTime + _mlCircuitBreaker.recoveryTimeoutMs - Date.now()) / 1000)),
+        recovery_timeout_s: Math.max(
+          0,
+          Math.ceil(
+            (_mlCircuitBreaker._lastFailureTime +
+              _mlCircuitBreaker.recoveryTimeoutMs -
+              Date.now()) /
+              1000,
+          ),
+        ),
       },
       timestamp: new Date().toISOString(),
       signal: "NEUTRAL",
       confidence: 0.5,
-      error: isCircuitOpen ? "ML Engine circuit breaker OPEN — using fallback" : err.message,
+      error: isCircuitOpen
+        ? "ML Engine circuit breaker OPEN — using fallback"
+        : err.message,
       votes: {},
       session: {
         id: sessionId,
-        name: ["Pre-Market", "Main Trading", "Post-Market"][sessionId] || "Main Trading",
+        name:
+          ["Pre-Market", "Main Trading", "Post-Market"][sessionId] ||
+          "Main Trading",
         session_pct: features.session_pct,
         minutes_into_session: features.minutes_into_session,
       },
@@ -582,7 +648,9 @@ export function getMlCircuitStatus() {
  */
 export async function getMlSlaReport(endpoint = null) {
   try {
-    const url = endpoint ? `/sla?endpoint=${encodeURIComponent(endpoint)}` : "/sla";
+    const url = endpoint
+      ? `/sla?endpoint=${encodeURIComponent(endpoint)}`
+      : "/sla";
     return await mlRequest(url, null, 5_000);
   } catch (err) {
     return { ok: false, error: err.message };
@@ -605,15 +673,20 @@ export async function getMlCacheStats() {
  * Called automatically when breaking news is detected in consensus response.
  */
 export async function triggerMLNewsTraining(newsItem, options = {}) {
-  if (!newsItem || newsItem.impact !== 'HIGH') return { triggered: false };
+  if (!newsItem || newsItem.impact !== "HIGH") return { triggered: false };
   try {
-    const res = await mlRequest('/news-trigger', {
-      news: newsItem,
-      trigger_type: 'breaking_news_high_impact',
-    }, 8000, options);
+    const res = await mlRequest(
+      "/news-trigger",
+      {
+        news: newsItem,
+        trigger_type: "breaking_news_high_impact",
+      },
+      8000,
+      options,
+    );
     return { triggered: true, response: res };
   } catch (err) {
-    console.error('[consensusEngine] news-trigger failed:', err.message);
+    console.error("[consensusEngine] news-trigger failed:", err.message);
     return { triggered: false, error: err.message };
   }
 }
@@ -623,18 +696,23 @@ export async function triggerMLNewsTraining(newsItem, options = {}) {
  */
 export async function logNewsReaction(newsId, reactionData, options = {}) {
   try {
-    const res = await mlRequest('/news/reaction', {
-      news_id: newsId,
-      reaction_5m: reactionData.reaction5m,
-      reaction_15m: reactionData.reaction15m,
-      reaction_30m: reactionData.reaction30m,
-      reaction_60m: reactionData.reaction60m,
-      direction: reactionData.direction,
-      magnitude: reactionData.magnitude,
-    }, 5000, options);
+    const res = await mlRequest(
+      "/news/reaction",
+      {
+        news_id: newsId,
+        reaction_5m: reactionData.reaction5m,
+        reaction_15m: reactionData.reaction15m,
+        reaction_30m: reactionData.reaction30m,
+        reaction_60m: reactionData.reaction60m,
+        direction: reactionData.direction,
+        magnitude: reactionData.magnitude,
+      },
+      5000,
+      options,
+    );
     return { ok: true, ...res };
   } catch (err) {
-    console.error('[consensusEngine] news/reaction failed:', err.message);
+    console.error("[consensusEngine] news/reaction failed:", err.message);
     return { ok: false, error: err.message };
   }
 }
@@ -644,10 +722,15 @@ export async function logNewsReaction(newsId, reactionData, options = {}) {
  */
 export async function getMLNewsReactions(limit = 50, options = {}) {
   try {
-    const res = await mlRequest(`/news/reactions?limit=${limit}`, null, 5000, options);
+    const res = await mlRequest(
+      `/news/reactions?limit=${limit}`,
+      null,
+      5000,
+      options,
+    );
     return res;
   } catch (err) {
-    console.error('[consensusEngine] news/reactions failed:', err.message);
+    console.error("[consensusEngine] news/reactions failed:", err.message);
     return { ok: false, entries: [], error: err.message };
   }
 }
@@ -661,13 +744,21 @@ export async function getMLNewsReactions(limit = 50, options = {}) {
  */
 export async function getPhysicsRegime(candles = [], options = {}) {
   try {
-    const res = await mlRequest("/regime", {
-      candles: candles.slice(-100),
-      symbol: "MNQ",
-    }, 30_000, options);
+    const res = await mlRequest(
+      "/regime",
+      {
+        candles: candles.slice(-100),
+        symbol: "MNQ",
+      },
+      30_000,
+      options,
+    );
     return res;
   } catch (err) {
-    console.error("[consensusEngine] Regime analysis unavailable:", err.message);
+    console.error(
+      "[consensusEngine] Regime analysis unavailable:",
+      err.message,
+    );
     return { ok: false, error: err.message };
   }
 }

@@ -239,7 +239,8 @@ const buildAiStatusPayload = () =>
     errors: 0,
   }));
 
-const getOriginFallback = () => ALLOWED_ORIGINS[0] || "https://tradersapp.local";
+const getOriginFallback = () =>
+  ALLOWED_ORIGINS[0] || "https://tradersapp.local";
 
 const _addSecurityHeaders = (headers) => addSecurityHeaders(headers);
 

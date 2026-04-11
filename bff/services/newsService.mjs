@@ -17,22 +17,33 @@ const FOREX_FACTORY_URL = "https://www.forexfactory.com/calendar";
 const NEWS_API_KEY = String(process.env.NEWS_API_KEY || "").trim() || null;
 const NEWS_API_URL = "https://newsdata.io/api/1/news";
 const ML_ENGINE_BASE = String(
-  process.env.ML_ENGINE_URL || process.env.ML_ENGINE_INTERNAL_URL || "http://ml-engine:8001",
+  process.env.ML_ENGINE_URL ||
+    process.env.ML_ENGINE_INTERNAL_URL ||
+    "http://ml-engine:8001",
 ).trim();
 
-const STAR_THRESHOLD = 3;  // Only track 3★ events
+const STAR_THRESHOLD = 3; // Only track 3★ events
 
 /**
  * Impact levels from Forex Factory
  */
-const IMPACT_STARS = { "1": 1, "2": 2, "3": 3 };
+const IMPACT_STARS = { 1: 1, 2: 2, 3: 3 };
 
 /**
  * Currency pairs to track (relevant for MNQ/ES trading)
  */
 const RELEVANT_CURRENCIES = [
-  "USD", "EUR", "GBP", "JPY", "CAD", "AUD", "NZD",
-  "CNH", "CHF", "MXN", "ZAR",
+  "USD",
+  "EUR",
+  "GBP",
+  "JPY",
+  "CAD",
+  "AUD",
+  "NZD",
+  "CNH",
+  "CHF",
+  "MXN",
+  "ZAR",
 ];
 
 /**
@@ -45,7 +56,8 @@ export async function scrapeForexFactory() {
       headers: {
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        Accept:
+          "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Accept-Language": "en-US,en;q=0.5",
       },
     });
@@ -70,7 +82,8 @@ function parseForexFactoryHTML(html) {
   const events = [];
 
   // Match event rows: typically in a <tr class="calendar__row">...</tr>
-  const rowRegex = /<tr[^>]*class="[^"]*calendar[^"]*row[^"]*"[^>]*>([\s\S]*?)<\/tr>/gi;
+  const rowRegex =
+    /<tr[^>]*class="[^"]*calendar[^"]*row[^"]*"[^>]*>([\s\S]*?)<\/tr>/gi;
   const rows = [...html.matchAll(rowRegex)];
 
   const now = new Date();
@@ -79,9 +92,11 @@ function parseForexFactoryHTML(html) {
     const row = rowMatch[1];
 
     // Extract star rating (3 star icons = 3★ event)
-    const starCount = ((row.match(/🟫/g) || []).length) +
-                       ((row.match(/<span[^>]*class="[^"]*impact[^"]*[^"]*3[^"]*"[^>]*>/gi) || []).length) +
-                       ((row.match(/impact--high/gi) || []).length > 0 ? 3 : 0);
+    const starCount =
+      (row.match(/🟫/g) || []).length +
+      (row.match(/<span[^>]*class="[^"]*impact[^"]*[^"]*3[^"]*"[^>]*>/gi) || [])
+        .length +
+      ((row.match(/impact--high/gi) || []).length > 0 ? 3 : 0);
 
     // Better: parse by looking for impact class
     const impactMatch = row.match(/impact--(\d)/i);
@@ -90,23 +105,44 @@ function parseForexFactoryHTML(html) {
     if (impact < STAR_THRESHOLD) continue;
 
     // Extract date
-    const dateMatch = row.match(/class="[^"]*date[^"]*"[^>]*>([\s\S]*?)<\/td>/i);
-    const dateStr = dateMatch ? dateMatch[1].trim().replace(/<[^>]+>/g, "").trim() : "";
+    const dateMatch = row.match(
+      /class="[^"]*date[^"]*"[^>]*>([\s\S]*?)<\/td>/i,
+    );
+    const dateStr = dateMatch
+      ? dateMatch[1]
+          .trim()
+          .replace(/<[^>]+>/g, "")
+          .trim()
+      : "";
 
     // Extract time
-    const timeMatch = row.match(/class="[^"]*time[^"]*"[^>]*>([\s\S]*?)<\/td>/i);
-    const timeStr = timeMatch ? timeMatch[1].trim().replace(/<[^>]+>/g, "").trim() : "";
+    const timeMatch = row.match(
+      /class="[^"]*time[^"]*"[^>]*>([\s\S]*?)<\/td>/i,
+    );
+    const timeStr = timeMatch
+      ? timeMatch[1]
+          .trim()
+          .replace(/<[^>]+>/g, "")
+          .trim()
+      : "";
 
     // Extract currency
-    const currencyMatch = row.match(/class="[^"]*currency[^"]*"[^>]*>([\s\S]*?)<\/td>/i);
+    const currencyMatch = row.match(
+      /class="[^"]*currency[^"]*"[^>]*>([\s\S]*?)<\/td>/i,
+    );
     const currency = currencyMatch
       ? currencyMatch[1].replace(/<[^>]+>/g, "").trim()
       : "";
 
     // Extract event name
-    const eventMatch = row.match(/class="[^"]*event[^"]*"[^>]*>([\s\S]*?)<\/td>/i);
+    const eventMatch = row.match(
+      /class="[^"]*event[^"]*"[^>]*>([\s\S]*?)<\/td>/i,
+    );
     const eventName = eventMatch
-      ? eventMatch[1].replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim()
+      ? eventMatch[1]
+          .replace(/<[^>]+>/g, "")
+          .replace(/\s+/g, " ")
+          .trim()
       : "";
 
     if (!eventName || !isRelevantCurrency(currency)) continue;
@@ -143,8 +179,20 @@ function parseFFDateTime(dateStr, timeStr, now) {
     const monthStr = parts[0];
     const dayNum = parseInt(parts[1], 10);
 
-    const months = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
-                     jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
+    const months = {
+      jan: 0,
+      feb: 1,
+      mar: 2,
+      apr: 3,
+      may: 4,
+      jun: 5,
+      jul: 6,
+      aug: 7,
+      sep: 8,
+      oct: 9,
+      nov: 10,
+      dec: 11,
+    };
     const month = months[monthStr.toLowerCase().slice(0, 3)];
     if (month === undefined) return null;
 
@@ -153,7 +201,8 @@ function parseFFDateTime(dateStr, timeStr, now) {
     if (month < now.getMonth()) year++;
 
     // Parse time: "8:30am" or "8:30 am" or "All Day"
-    let hour = 12, minute = 0;
+    let hour = 12,
+      minute = 0;
     if (timeStr && !/all\s*day/i.test(timeStr)) {
       const timeMatch = timeStr.match(/(\d{1,2}):(\d{2})\s*(am|pm)?/i);
       if (timeMatch) {
@@ -178,7 +227,7 @@ function parseFFDateTime(dateStr, timeStr, now) {
 function isRelevantCurrency(currency) {
   if (!currency) return false;
   const c = currency.toUpperCase();
-  return RELEVANT_CURRENCIES.some(rc => c.includes(rc));
+  return RELEVANT_CURRENCIES.some((rc) => c.includes(rc));
 }
 
 /**
@@ -228,10 +277,30 @@ export async function fetchNewsData() {
  */
 function classifySentiment(article) {
   const text = `${article.title} ${article.description || ""}`.toLowerCase();
-  const bullish = ["rate cut", "rate hike", "fed", "stimulus", "bullish", "surge", "gain", "rally", "growth"];
-  const bearish = ["recession", "crash", "plunge", "sell", "loss", "crisis", "war", "tension", "slowdown"];
-  const bullCount = bullish.filter(w => text.includes(w)).length;
-  const bearCount = bearish.filter(w => text.includes(w)).length;
+  const bullish = [
+    "rate cut",
+    "rate hike",
+    "fed",
+    "stimulus",
+    "bullish",
+    "surge",
+    "gain",
+    "rally",
+    "growth",
+  ];
+  const bearish = [
+    "recession",
+    "crash",
+    "plunge",
+    "sell",
+    "loss",
+    "crisis",
+    "war",
+    "tension",
+    "slowdown",
+  ];
+  const bullCount = bullish.filter((w) => text.includes(w)).length;
+  const bearCount = bearish.filter((w) => text.includes(w)).length;
   if (bullCount > bearCount) return "bullish";
   if (bearCount > bullCount) return "bearish";
   return "neutral";
@@ -272,7 +341,8 @@ export async function getUpcomingEvents(daysAhead = 7) {
  * Trigger ML model retrain on high-impact event.
  */
 export async function triggerRetrainOnEvent(event) {
-  if (!event || event.impact < STAR_THRESHOLD) return { triggered: false, reason: "Not high-impact" };
+  if (!event || event.impact < STAR_THRESHOLD)
+    return { triggered: false, reason: "Not high-impact" };
 
   try {
     const controller = new AbortController();
@@ -299,7 +369,12 @@ export async function triggerRetrainOnEvent(event) {
 }
 
 export function createNewsService() {
-  return { getUpcomingEvents, triggerRetrainOnEvent, scrapeForexFactory, fetchNewsData };
+  return {
+    getUpcomingEvents,
+    triggerRetrainOnEvent,
+    scrapeForexFactory,
+    fetchNewsData,
+  };
 }
 
 export default createNewsService;

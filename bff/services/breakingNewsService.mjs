@@ -37,7 +37,9 @@ const YF_RSS_BASE = "https://feeds.finance.yahoo.com/rss/2.0/headline";
 const GDELT_URL = "https://api.gdeltproject.org/api/v2/doc/doc";
 
 const ML_ENGINE_BASE = String(
-  process.env.ML_ENGINE_URL || process.env.ML_ENGINE_INTERNAL_URL || "http://ml-engine:8001",
+  process.env.ML_ENGINE_URL ||
+    process.env.ML_ENGINE_INTERNAL_URL ||
+    "http://ml-engine:8001",
 ).trim();
 const BREAKING_NEWS_CACHE_KEY = "bknews:latest";
 const BREAKING_NEWS_CACHE_TTL_MS = Number.parseInt(
@@ -271,7 +273,10 @@ function sortNewsItems(items = []) {
   });
 }
 
-function selectNewsItems(items = [], { maxItems = 30, minImpact = "LOW" } = {}) {
+function selectNewsItems(
+  items = [],
+  { maxItems = 30, minImpact = "LOW" } = {},
+) {
   const filtered = sortNewsItems(items).filter((item) => {
     if (minImpact === "HIGH") return item.impact === "HIGH";
     if (minImpact === "MEDIUM") return impactRank(item.impact) >= 2;
@@ -317,11 +322,9 @@ async function writeBreakingNewsSnapshot(snapshot) {
     return false;
   }
   try {
-    await rc.set(
-      BREAKING_NEWS_CACHE_KEY,
-      JSON.stringify(snapshot),
-      { EX: BREAKING_NEWS_CACHE_TTL_SECONDS },
-    );
+    await rc.set(BREAKING_NEWS_CACHE_KEY, JSON.stringify(snapshot), {
+      EX: BREAKING_NEWS_CACHE_TTL_SECONDS,
+    });
     return true;
   } catch {
     return false;
