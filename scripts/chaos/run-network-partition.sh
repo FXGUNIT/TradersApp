@@ -27,6 +27,7 @@ set -euo pipefail
 # ─── Config ───────────────────────────────────────────────────────────────────
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+source "$REPO_ROOT/scripts/lib/cluster-operation-lock.sh"
 NAMESPACE="${NAMESPACE:-tradersapp}"
 CHAOS_MANIFEST="${CHAOS_MANIFEST:-$REPO_ROOT/k8s/chaos/bff-network-delay-chaos.yaml}"
 # Override delay (ms) and duration (s) from env — defaults match manifest
@@ -50,6 +51,16 @@ fail() { echo "ERROR: $*" >&2; exit 1; }
 
 run_curl() {
   curl -fsS -m 5 -o /dev/null -w "%{http_code}" "$1" 2>/dev/null || echo "000";
+}
+
+cleanup() {
+  local _exit_code=$?
+  if [[ -n "${PF_PID:-}" ]]; then
+    kill "$PF_PID" 2>/dev/null || true
+    wait "$PF_PID" 2>/dev/null || true
+  fi
+  cluster_lock_release
+  return 0
 }
 
 build_payload() {
@@ -88,6 +99,9 @@ done
 
 [[ -f "$CHAOS_MANIFEST" ]] || fail "Chaos manifest not found: $CHAOS_MANIFEST"
 
+trap cleanup EXIT
+cluster_lock_acquire "run-network-partition" "$NAMESPACE" "chaos"
+
 kubectl -n "$NAMESPACE" get pod -l "app=bff" >/dev/null 2>&1 || fail "BFF deployment not found in $NAMESPACE"
 kubectl -n "$NAMESPACE" get pod -l "app=ml-engine" >/dev/null 2>&1 || fail "ML Engine deployment not found in $NAMESPACE"
 
@@ -97,12 +111,6 @@ kubectl -n "$NAMESPACE" port-forward "svc/bff" "${BFF_PORT}:8788" \
   > "${RESULTS_DIR}/port-forward.log" 2>&1 &
 PF_PID=$!
 sleep 3
-
-cleanup_pf() {
-  kill "$PF_PID" 2>/dev/null || true
-  wait "$PF_PID" 2>/dev/null || true
-}
-trap cleanup_pf EXIT
 
 # Baseline health check
 HEALTH_STATUS=$(run_curl "$HEALTH_URL")

@@ -27,6 +27,15 @@ set -euo pipefail
 # ─── Config ───────────────────────────────────────────────────────────────────
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+source "$REPO_ROOT/scripts/lib/cluster-operation-lock.sh"
+cleanup_pf() {
+  [[ -n "${PF_PID:-}" ]] || return 0
+  kill "$PF_PID" 2>/dev/null || true
+  wait "$PF_PID" 2>/dev/null || true
+  cluster_lock_release
+}
+
+trap cleanup_pf EXIT
 NAMESPACE="${NAMESPACE:-tradersapp}"
 CHAOS_MANIFEST="${CHAOS_MANIFEST:-$REPO_ROOT/k8s/chaos/kafka-broker-chaos.yaml}"
 KAFKA_APP="${KAFKA_APP:-kafka}"
@@ -85,6 +94,9 @@ kubectl -n "$NAMESPACE" get pod -l "app=$KAFKA_APP" >/dev/null 2>&1 \
 kubectl -n "$NAMESPACE" get pod -l "app=$BFF_APP" >/dev/null 2>&1 \
   || fail "BFF pods not found (app=$BFF_APP) in namespace $NAMESPACE"
 
+cluster_lock_acquire "run-kafka-broker-failure" "$NAMESPACE" \
+  || fail "Unable to acquire live cluster-operation lock"
+
 # Record pre-chaos Kafka pods
 KAFKA_PODS_BEFORE=$(kubectl -n "$NAMESPACE" get pods -l "app=$KAFKA_APP" \
   -o jsonpath='{.items[*].metadata.name}')
@@ -118,6 +130,7 @@ sleep 3
 cleanup_pf() {
   kill "$PF_PID" 2>/dev/null || true
   wait "$PF_PID" 2>/dev/null || true
+  cluster_lock_release
 }
 trap cleanup_pf EXIT
 

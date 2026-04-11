@@ -1,7 +1,20 @@
 # Phase 2 Stateless Audit — ML Engine
 
-**Date:** 2026-04-11
+**Date:** 2026-04-11 (updated)
 **Status:** COMPLETE — no global mutable state found
+
+---
+
+## Additional Audit 2026-04-11 — Task 11 Verification
+
+Files additionally audited:
+- `infrastructure/model_monitor.py` — TTL cache for monitoring snapshots
+- `models/mamba/mamba_sequence_model.py` — MambaTradingModel singleton
+- `models/regime/hmm_regime.py` — HMMRegimeDetector class
+- `models/regime/fp_fk_regime.py` — FPFKRegimeDetector class
+- `models/regime/anomalous_diffusion.py` — AnomalousDiffusionModel class
+- `models/regime/regime_ensemble.py` — RegimeEnsemble class
+- `inference/predictor.py` — full file re-audit
 
 ---
 
@@ -201,12 +214,15 @@ class ModelRegistryClient:
 | F7 | `optimization/rrr_optimizer.py` | Pure module functions only | COMPLIANT |
 | F8 | `model_registry_service.py:35` | `ModelRegistryService` — LRU cache + Redis | COMPLIANT |
 | F9 | `model_registry_client.py:19` | `ModelRegistryClient` — app.state accessor | COMPLIANT |
+| F10 | `models/mamba/mamba_sequence_model.py:325` | `MambaTradingModel._instances` — class-level singleton | COMPLIANT |
+| F11 | `infrastructure/model_monitor.py:21` | `TTLCache(maxsize=1, ttl=240)` — per-pod monitoring | ACCEPTABLE |
 
 **Conclusion:** The ml-engine is ALREADY stateless. All model instances are managed via:
 1. `ModelRegistryService` with bounded LRU cache
 2. Redis for cross-pod coordination
 3. Hot-reload via `invalidate()` + MLflow Production stage polling
 4. FastAPI `app.state` dependency injection (not bare module-level globals)
+5. `MambaTradingModel._instances` class-level singleton (architecture-recommended pattern)
 
 No `global_model = None` patterns were found. No module-level model instances exist. The architecture already implements the "singleton via class `_instance` + `get_instance()`" pattern via `ModelRegistryService._get_instance()` with Redis coordination.
 
@@ -235,4 +251,109 @@ def _check_no_globals():
 # This guard runs at import time to catch accidental module-level model globals
 ```
 
-This is informational only — the current architecture is already correct.
+---
+
+## Finding 10: `models/mamba/mamba_sequence_model.py` — `MambaTradingModel._instances`
+
+```python
+class MambaTradingModel:
+    _instances: dict[str, "MambaTradingModel"] = {}  # line 325
+```
+
+**Analysis:** Class-level singleton dictionary for GPU/CPU model instances. This is the **correct singleton pattern** per CLAUDE.md ("singleton via class `_instance` + `get_instance()`"). The class variable `_instances` is used only to hold one loaded model per `model_size` — the class itself is the singleton manager. This is NOT bare module-level global mutable state; it is the recommended class-level singleton pattern.
+
+**Usage:** `MambaTradingModel.get_instance(model_size)` returns the cached instance. The Mamba model is NOT managed by `ModelRegistryService` (it is a separate model family used for sequence prediction).
+
+**Verdict:** COMPLIANT. This is the architecture-recommended singleton pattern.
+
+---
+
+## Finding 11: `infrastructure/model_monitor.py` — TTL cache for monitoring snapshots
+
+```python
+_snapshot_cache: TTLCache | None = None  # line 21
+def _get_snapshot_cache(maxsize: int = 1, ttl: int = 240) -> TTLCache | dict:
+    global _snapshot_cache
+    ...
+    _snapshot_cache = TTLCache(maxsize=maxsize, ttl=ttl)  # 4-min TTL, maxsize=1
+```
+
+**Analysis:** Per-pod TTL cache for monitoring snapshots. This is **intentional per-pod monitoring state** (as stated in the task description) — it avoids redundant snapshot computation between DAG runs on the same pod. The cache is bounded (maxsize=1) and short-lived (TTL=240s). This is not model inference state — it is administrative/monitoring state scoped to the pod.
+
+**Verdict:** ACCEPTABLE. This is per-pod monitoring state, not cross-request model state.
+
+---
+
+## Task 11 Audit — 2026-04-11 (Phase 2 Final Task)
+
+### Files Scanned
+
+| File | Violations | Result | Notes |
+|------|-----------|--------|-------|
+| `models/direction/lightgbm_classifier.py` | 0 | COMPLIANT | Class with `__init__`, no module-level instances |
+| `models/direction/xgboost_classifier.py` | 0 | COMPLIANT | Class with `__init__`, no module-level instances |
+| `models/direction/random_forest.py` | 0 | COMPLIANT | Class with `__init__`, no module-level instances |
+| `models/direction/svm_classifier.py` | 0 | COMPLIANT | Class with `__init__`, no module-level instances |
+| `models/direction/neural_net.py` | 0 | COMPLIANT | Class with `__init__`, no module-level instances |
+| `models/direction/amd_classifier.py` | 0 | COMPLIANT | Class with `__init__`, no module-level instances |
+| `models/session/time_probability.py` | 0 | COMPLIANT | Class with `__init__`, no module-level instances |
+| `models/magnitude/move_magnitude.py` | 0 | COMPLIANT | Class with `__init__`, no module-level instances |
+| `models/regime/hmm_regime.py` | 0 | COMPLIANT | Class with `__init__`, no module-level instances |
+| `models/regime/fp_fk_regime.py` | 0 | COMPLIANT | Class with `__init__`, no module-level instances |
+| `models/regime/anomalous_diffusion.py` | 0 | COMPLIANT | Class with `__init__`, no module-level instances |
+| `models/regime/regime_ensemble.py` | 0 | COMPLIANT | Class with `__init__`, no module-level instances |
+| `models/mamba/mamba_sequence_model.py` | 0 | COMPLIANT | Uses `MambaTradingModel._instances` class dict singleton (recommended pattern) |
+| `inference/predictor.py` | 0 | COMPLIANT | Instance class; models loaded via `ModelStore` in `_models` instance dict |
+| `_lifespan.py` | 0 | COMPLIANT | FastAPI app-scoped singletons via lifespan pattern; models NOT stored here |
+| `infrastructure/model_registry_service.py` | 0 | COMPLIANT | LRU OrderedDict cache + Redis coordination (the stateless design) |
+
+### Verification Commands
+
+```bash
+# py_compile — all files pass
+python -m py_compile ml-engine/models/direction/*.py \
+  ml-engine/models/session/time_probability.py \
+  ml-engine/models/magnitude/move_magnitude.py \
+  ml-engine/models/regime/*.py \
+  ml-engine/models/mamba/mamba_sequence_model.py \
+  ml-engine/inference/predictor.py \
+  ml-engine/_lifespan.py \
+  ml-engine/infrastructure/model_registry_service.py
+# ALL OK
+
+# grep — no bare model instances at module level
+grep -rn "^[a-zA-Z_][a-zA-Z0-9_]* = [A-Z]" ml-engine/models/ ml-engine/inference/
+# CLEAN — only module-level constants (PROJECT_ROOT, MAMBA_AVAILABLE, etc.)
+```
+
+### Summary
+
+| Finding | File | Issue | Status |
+|---------|------|-------|--------|
+| T11-1 | All direction models | No module-level `model = X()` | COMPLIANT |
+| T11-2 | All session/magnitude models | No module-level `model = X()` | COMPLIANT |
+| T11-3 | All regime models | No module-level `model = X()` | COMPLIANT |
+| T11-4 | `mamba_sequence_model.py` | `_instances` class dict singleton (line 325) | COMPLIANT — recommended pattern |
+| T11-5 | `inference/predictor.py` | `Predictor` instance class only | COMPLIANT |
+| T11-6 | `_lifespan.py` | FastAPI singletons, not model state | COMPLIANT |
+| T11-7 | `model_registry_service.py` | LRU cache + Redis for pod coordination | COMPLIANT — the stateless backbone |
+
+### Architecture Already Achieves Statelessness
+
+The `ml-engine` is already fully stateless at the model level:
+
+1. **`ModelRegistryService`** (in `infrastructure/model_registry_service.py`):
+   - LRU OrderedDict cache bounded by `max_cached_instances`
+   - Redis-backed shared metadata (LRU ordering, access timestamps)
+   - Hot-reload via `invalidate()` + MLflow Production stage polling
+   - Thread-safe via `threading.RLock`
+
+2. **Route handlers** (`_routes_workflow.py`): All inference calls go through `ModelRegistryClient.get_instance().predict(...)` and `.advance_regime(...)` — never direct model instantiation
+
+3. **No bare global mutable state**: No `global_model = None`, no module-level `model = X()` pattern anywhere in `models/` or `inference/`
+
+4. **`MambaTradingModel`**: Uses proper class-level singleton dict `_instances` with thread-safe `get_instance()` method
+
+### Conclusion
+
+**ml-engine is ALREADY stateless for Phase 2 purposes.** No code changes were required. All models follow the instance class pattern. `ModelRegistryService` provides the Redis-backed coordination layer that enables horizontal pod scaling.

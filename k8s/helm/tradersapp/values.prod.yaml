@@ -7,6 +7,9 @@
 
 namespace: tradersapp
 
+grafana:
+  enabled: true
+
 # ── Global Ingress — TLS, rate limiting, BFF API route (ID 33) ─────────────
 ingress:
   enabled: true
@@ -55,6 +58,19 @@ ingress:
         - api.tradersapp.io
     allowedOrigin: "https://tradersapp.io"
 
+# Observability stack via kube-prometheus-stack
+monitoringStack:
+  enabled: true
+  prometheus:
+    prometheusSpec:
+      storageSpec:
+        volumeClaimTemplate:
+          spec:
+            storageClassName: longhorn
+  grafana:
+    persistence:
+      storageClassName: longhorn
+
 # ML Engine — production resources
 mlEngine:
   enabled: true
@@ -87,6 +103,11 @@ mlEngine:
     lookbackDays: 90
     alertWebhook: ""
     quarantineDir: "/data/dq_quarantine"
+  hpaWatcher:
+    enabled: true
+    pollIntervalSeconds: 30
+    lookbackSeconds: 300
+    slackWebhookSecretRef: observability-secrets/SLACK_HPA_WEBHOOK_URL
   runtimeState:
     enabled: true
     size: 10Gi
@@ -159,6 +180,14 @@ bff:
         name: bff-config
     - secretRef:
         name: bff-secrets
+  # Canary rollout (H04) — disabled in production by default.
+  # Enable with: helm upgrade --set bff.canary.enabled=true,bff.canary.image.tag=<sha>
+  # Traffic split: 1 canary pod / (replicaCount + 1) ≈ 10% with replicaCount=9
+  canary:
+    enabled: false
+    replicaCount: 1
+    image:
+      tag: "" # Defaults to bff.image.tag when empty
 
 analysisService:
   enabled: true
@@ -244,11 +273,11 @@ mlflow:
   trackingUri: http://mlflow:5000
   # Secrets are managed via External Secrets Operator
   secretRef:
-    existingSecret: mlflow-secrets
+    existingSecret: mlflow-runtime-secret
     postgresDbKey: POSTGRES_DB
     postgresUserKey: POSTGRES_USER
     postgresPasswordKey: POSTGRES_PASSWORD
-    # MinIO credentials managed via mlflow-secrets
+    # MinIO credentials managed via mlflow-runtime-secret
   gunicornOptions: --workers 2 --timeout=300
   service:
     type: ClusterIP
@@ -264,7 +293,7 @@ mlflow:
       pullPolicy: IfNotPresent
     database: mlflow
     user: mlflow
-    # Password managed via mlflow-secrets (key: POSTGRES_PASSWORD)
+    # Password managed via mlflow-runtime-secret (key: POSTGRES_PASSWORD)
     password: ""
     persistence:
       enabled: true
@@ -286,7 +315,7 @@ mlflow:
       repository: minio/mc
       tag: RELEASE.2025-08-13T08-35-41Z
       pullPolicy: IfNotPresent
-    # Credentials managed via mlflow-secrets
+    # Credentials managed via mlflow-runtime-secret
     # (keys: MINIO_ROOT_USER, MINIO_ROOT_PASSWORD)
     user: ""
     password: ""
