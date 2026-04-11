@@ -351,6 +351,7 @@ observability:
     grafanaAdminPassword: observability-secrets/GRAFANA_ADMIN_PASSWORD
     alertmanagerWebhook: observability-secrets/ALERTMANAGER_WEBHOOK_URL
     slackWebhook: observability-secrets/SLACK_WEBHOOK_URL
+    slackHpaWebhook: observability-secrets/SLACK_HPA_WEBHOOK_URL
 
 # Keycloak
 keycloak:
