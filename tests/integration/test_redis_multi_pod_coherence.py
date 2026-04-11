@@ -10,82 +10,43 @@ Run modes:
   - From the developer host (Windows/Mac):
       Falls back to localhost:6379 if a local Redis is running.
       Tests still simulate multi-connection coherence correctly.
+  - Override: set REDIS_URL env var to any target.
 
 Tests:
 1. Pod A writes cache key X → Pod B reads key X → both see same value
 2. Cache invalidation on Pod A → Pod B's stale read is evicted
-3. Race condition: both pods write simultaneously → Redis last-write-wins correctly
+3. Sequential writes → Redis last-write-wins correctly
 """
 
-import asyncio
 import os
 import socket
 import pytest
 import redis.asyncio as aioredis
+import redis as sync_redis
+
 
 # ---------------------------------------------------------------------------
-# Pre-flight check: fail fast with a clear message if Redis is unreachable
+# Redis URL resolution
 # ---------------------------------------------------------------------------
-
-_redis_preflight_done = False
-_redis_preflight_url = None
-
-def _preflight_check():
-    """
-    Attempt a synchronous Redis connection before any test runs.
-    If unreachable, mark all tests to skip with a clear diagnostic message.
-    """
-    global _redis_preflight_done, _redis_preflight_url
-    if _redis_preflight_done:
-        return
-    url = _resolve_redis_url()
-    _redis_preflight_url = url
-
-    # Quick sync connect-check so we can skip cleanly
-    try:
-        import redis as sync_redis
-        r = sync_redis.Redis.from_url(url, socket_connect_timeout=3)
-        r.ping()
-        r.close()
-        _redis_preflight_done = True
-        print(f"\n[Redis Preflight] OK — {url}")
-        return
-    except Exception as exc:
-        pytest.exit(
-            f"\n[Redis Preflight] UNREACHABLE at {url}: {exc}\n"
-            "To run these tests:\n"
-            "  Inside cluster: kubectl exec -it <pod> -n tradersapp-dev -- "
-                "python -m pytest tests/integration/test_redis_multi_pod_coherence.py -v\n"
-            "  On host:       Start local Redis on port 6379, then re-run.\n"
-            "  Override URL:   REDIS_URL=redis://<host>:6379/0 pytest ...",
-            returncode=1,
-        )
-
-# Run pre-flight at module import time
-_resolve_redis_url()  # sets KUBERNETES_SERVICE_HOST detection
-_preflight_check()
-
 
 def _resolve_redis_url() -> str:
     """
     Resolve the Redis URL based on execution environment.
 
     Priority:
-    1. REDIS_URL env var (for CI / custom targets)
-    2. Cluster in-pod detection via KUBERNETES_SERVICE_HOST
-    3. localhost fallback (for local dev)
+    1. REDIS_URL env var (CI / custom targets)
+    2. KUBERNETES_SERVICE_HOST set → cluster DNS name
+    3. TCP probe cluster IP (10.96.4.188) → use it
+    4. Fallback to localhost:6379
     """
     if os.environ.get("REDIS_URL"):
         return os.environ["REDIS_URL"]
 
-    # Running inside a k8s/k3s pod — use the cluster DNS name
     if os.environ.get("KUBERNETES_SERVICE_HOST"):
         return "redis://redis.tradersapp-dev.svc.cluster.local:6379/0"
 
-    # Developer host — try cluster IP if available, else localhost
-    cluster_ip = "10.96.4.188"
-    if _check_tcp_connectivity(cluster_ip, 6379, timeout=2):
-        return f"redis://{cluster_ip}:6379/0"
+    if _check_tcp_connectivity("10.96.4.188", 6379, timeout=2):
+        return "redis://10.96.4.188:6379/0"
 
     return "redis://localhost:6379/0"
 
@@ -100,6 +61,37 @@ def _check_tcp_connectivity(host: str, port: int, timeout: int = 2) -> bool:
         return True
     except (socket.error, OSError):
         return False
+
+
+# ---------------------------------------------------------------------------
+# Pre-flight check — fail fast with a clear message if Redis is unreachable
+# ---------------------------------------------------------------------------
+
+_resolve_redis_url()  # force resolution so KUBERNETES_SERVICE_HOST is checked
+
+_redis_url = os.environ.get("REDIS_URL") or (
+    "redis://redis.tradersapp-dev.svc.cluster.local:6379/0"
+    if os.environ.get("KUBERNETES_SERVICE_HOST")
+    else "redis://10.96.4.188:6379/0"
+    if _check_tcp_connectivity("10.96.4.188", 6379, timeout=2)
+    else "redis://localhost:6379/0"
+)
+
+try:
+    _r = sync_redis.Redis.from_url(_redis_url, socket_connect_timeout=3)
+    _r.ping()
+    _r.close()
+    print(f"\n[Redis Preflight] OK — {_redis_url}")
+except Exception as exc:
+    pytest.exit(
+        f"\n[Redis Preflight] UNREACHABLE at {_redis_url}: {exc}\n"
+        "To run these tests:\n"
+        "  Inside cluster : kubectl exec -it <pod> -n tradersapp-dev -- "
+            "python -m pytest tests/integration/test_redis_multi_pod_coherence.py -v\n"
+        "  On dev host    : Start local Redis on port 6379, then re-run\n"
+        "  Override URL   : REDIS_URL=redis://<host>:6379/0 pytest ...",
+        returncode=1,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -133,8 +125,8 @@ async def pod_a_invalidate(redis_url: str, key: str) -> str:
 
 @pytest.fixture(scope="session")
 def redis_url() -> str:
-    url = _resolve_redis_url()
-    print(f"\n[Coherence Test] Using Redis at: {url}")
+    url = _redis_url
+    print(f"\n[Coherence Test] Redis URL: {url}")
     return url
 
 
@@ -162,7 +154,6 @@ async def test_cache_invalidation_coherence(redis_url: str):
 
     await pod_a_write(redis_url, key, value)
 
-    # Verify write is visible to the other "pod"
     result = await pod_b_read(redis_url, key)
     assert result is not None, "Precondition failed: write not visible"
     assert result.decode() == value
