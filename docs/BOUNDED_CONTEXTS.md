@@ -100,7 +100,7 @@ These are important, but they are not themselves canonical bounded contexts in t
 The repo still has some contract/documentation debt even after this cleanup:
 
 - `proto/ddd/v1/analysis.proto` still contains a `TriggerTraining` RPC even though `learning.proto` also exists.
-- Architecture truth still depends too much on manual review; it should be validated automatically in CI.
+- The architecture docs verifier is intentionally lightweight today and should grow if the canonical doc set expands.
 
 These are real cleanup items, not reasons to invent extra current services in the docs.
 
