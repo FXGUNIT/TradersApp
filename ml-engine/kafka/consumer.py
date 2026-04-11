@@ -104,7 +104,10 @@ class KafkaConsumerClient:
             TOPIC_DRIFT,
         ]
         env_group_id = os.environ.get("KAFKA_GROUP_ID") or os.environ.get("KAFKA_CONSUMER_GROUP")
-        self._group_id = group_id or env_group_id or "traders-ml-engine"
+        # E01: group ID includes pod identity so each ml-engine pod gets its own
+        # consumer group instance. This makes partition ownership explicit per pod.
+        _pod_id = os.environ.get("MY_POD_NAME", socket.gethostname())
+        self._group_id = group_id or env_group_id or f"traders-ml-engine-{_pod_id}"
         self._bootstrap = bootstrap_servers or os.environ.get(
             "KAFKA_BOOTSTRAP_SERVERS", "localhost:9092"
         )
@@ -126,6 +129,12 @@ class KafkaConsumerClient:
         self._retry_counts: dict[tuple, int] = {}
         # Lag reporting: emit metrics every N successful commits
         self._lag_check_interval = int(os.environ.get("KAFKA_LAG_CHECK_INTERVAL", "50"))
+        # Consumer backpressure: pause when lag exceeds this threshold
+        self._max_lag = int(os.environ.get("KAFKA_MAX_LAG", "10000"))
+        self._backoff_seconds = int(os.environ.get("KAFKA_CONSUMER_BACKOFF_SECONDS", "60"))
+        self._paused = False
+        self._pause_until: float = 0.0
+        self._paused_topics: set[str] = set()
         self._logger_name = "ml-engine.kafka.consumer"
 
         if self._enable:
@@ -377,7 +386,68 @@ class KafkaConsumerClient:
         self._handlers[topic] = handler
         self._log(logging.INFO, "Registered handler for topic=%s", topic)
 
-    # ─── Consumer Loop ─────────────────────────────────────────────────────────
+    # ─── Consumer Backpressure ─────────────────────────────────────────────────
+
+    def _check_and_apply_backpressure(self, topic: str, partition: int) -> None:
+        """
+        Check consumer lag. If lag exceeds KAFKA_MAX_LAG, pause the consumer
+        and set a backoff timer to prevent the ML engine from being overwhelmed.
+        """
+        if not KAFKA_AVAILABLE or self._consumer is None:
+            return
+        try:
+            from confluent_kafka import TopicPartition
+            tp = TopicPartition(topic, partition)
+            low, high = self._consumer.get_watermark_offsets(tp, timeout=0.5)
+            committed_list = self._consumer.committed([tp], timeout=0.5)
+            if not (committed_list and committed_list[0].offset >= 0):
+                return
+            lag = max(0, high - committed_list[0].offset)
+            _set_lag(topic, partition, lag)
+
+            now = time.time()
+            # Resume check — if backoff has expired and we are paused, resume
+            if self._paused and now >= self._pause_until:
+                self._log(
+                    logging.INFO,
+                    "Backoff expired; resuming consumer from topic=%s partition=%s (lag=%s)",
+                    topic,
+                    partition,
+                    lag,
+                )
+                try:
+                    self._consumer.resume([tp])
+                    self._paused_topics.discard(f"{topic}:{partition}")
+                except Exception as e:
+                    self._log(logging.WARNING, "Resume failed topic=%s: %s", topic, e)
+                if not self._paused_topics:
+                    self._paused = False
+
+            if lag > self._max_lag and not self._paused:
+                self._pause_until = now + self._backoff_seconds
+                self._paused = True
+                self._paused_topics.add(f"{topic}:{partition}")
+                self._log(
+                    logging.WARNING,
+                    "Consumer lag %s exceeds threshold %s; pausing topic=%s partition=%s for %ss",
+                    lag,
+                    self._max_lag,
+                    topic,
+                    partition,
+                    self._backoff_seconds,
+                )
+                try:
+                    self._consumer.pause([tp])
+                except Exception as e:
+                    self._log(logging.ERROR, "Pause failed topic=%s partition=%s: %s", topic, partition, e)
+                self._log(
+                    logging.INFO,
+                    "Consumer paused for %ss (until %.0f); BFF degrades gracefully while backpressure is applied",
+                    self._backoff_seconds,
+                    self._pause_until,
+                )
+        except Exception as e:
+            self._log(logging.WARNING, "Backpressure check failed topic=%s partition=%s: %s", topic, partition, e)
 
     def start(self, blocking: bool = True):
         """
@@ -476,18 +546,11 @@ class KafkaConsumerClient:
                     if should_commit:
                         try:
                             self._consumer.commit(msg, asynchronous=False)
+                            # Consumer backpressure: check lag and pause if threshold exceeded
+                            self._check_and_apply_backpressure(topic, msg.partition())
                             # Periodic consumer-lag metric (every _lag_check_interval commits)
                             if self._messages_processed % self._lag_check_interval == 0 and KAFKA_AVAILABLE:
-                                try:
-                                    from confluent_kafka import TopicPartition
-                                    tp = TopicPartition(topic, msg.partition())
-                                    low, high = self._consumer.get_watermark_offsets(tp, timeout=0.5)
-                                    committed_list = self._consumer.committed([tp], timeout=0.5)
-                                    if committed_list and committed_list[0].offset >= 0:
-                                        lag = max(0, high - committed_list[0].offset)
-                                        _set_lag(topic, msg.partition(), lag)
-                                except Exception:
-                                    pass
+                                self._check_and_apply_backpressure(topic, msg.partition())
                         except Exception as e:
                             self._log(logging.ERROR, "Commit error topic=%s offset=%s: %s", topic, msg.offset(), e)
                     else:

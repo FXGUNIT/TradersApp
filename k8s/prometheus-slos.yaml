@@ -247,6 +247,20 @@ groups:
           summary: "BFF P95 latency above 500ms"
           description: "BFF consensus endpoint P95 latency is {{ $value | printf \"%.3f\" }}s."
 
+      # Task 51: SLA breach alert — P99 > 500ms on critical path endpoints
+      - alert: MLSLACriticalPathBreach
+        expr: |
+          histogram_quantile(0.99, sum(rate(bff_http_request_duration_seconds_bucket{service="bff", handler=~".*consensus.*|.*predict.*|.*inference.*"}[5m])) by (le, handler)) > 0.5
+        for: 2m
+        labels:
+          severity: critical
+          service: bff
+          slo: latency
+        annotations:
+          summary: "BFF P99 latency SLA breach (>500ms) on critical path"
+          description: "Critical path endpoint {{ $labels.handler }} P99 latency is {{ $value | printf \"%.3f\" }}s (threshold: 0.5s). SLA breached for 2+ minutes. Investigate ML Engine responsiveness and BFF circuit breaker state."
+          runbook: "https://wiki.tradersapp.runbook/sla-breach"
+
       - alert: BFFErrorRateHigh
         expr: |
           sum(rate(http_requests_total{service="bff", status=~"5.."}[5m]))

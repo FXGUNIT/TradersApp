@@ -407,6 +407,11 @@ redis:
   persistence:
     enabled: true
     size: 1Gi
+    storageClass: longhorn
+  # Redis runtime configuration — maxmemory 256 MiB, LRU eviction when full
+  configuration: |
+    maxmemory 256mb
+    maxmemory-policy allkeys-lru
   resources:
     requests:
       cpu: 50m

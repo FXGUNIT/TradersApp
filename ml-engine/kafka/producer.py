@@ -33,6 +33,7 @@ import signal
 import logging
 import functools
 import threading
+import uuid
 from collections import deque
 from pathlib import Path
 from datetime import datetime, timezone
@@ -92,6 +93,11 @@ ALL_TOPICS = [
 ]
 
 KAFKA_REQUEST_ID_HEADER = "x-request-id"
+# E02: Exactly-once semantics — each message carries a UUID idempotency key.
+# The producer uses transactional.id + enable.idempotence so Kafka brokers deduplicate
+# retries automatically. The X-Idempotency-Key header allows consumers to detect
+# duplicate delivery at the application level as a second line of defense.
+IDEMPOTENCY_KEY_HEADER = "X-Idempotency-Key"
 
 KAFKA_CB_CLOSED = "CLOSED"
 KAFKA_CB_OPEN = "OPEN"
@@ -181,6 +187,10 @@ class KafkaProducerClient:
             "retry.backoff.ms": 1000,
             "max.in.flight.requests.per.connection": 1,  # Exactly-once semantics
             "enable.idempotence": True,
+            # E02: transactional.id makes the producer the sole writer for this
+            # producer instance across restarts. Each pod must have a unique value.
+            "transactional.id": f"traders-ml-engine-{os.environ.get('MY_POD_NAME', socket.gethostname())}",
+            "transactional_id.conflict_timeout.ms": 30000,
             "compression.type": "zstd",            # Compress messages
             "linger.ms": 5,                       # Batch up to 5ms
             "batch.size": 16384,                  # 16KB batch size
@@ -189,8 +199,11 @@ class KafkaProducerClient:
 
         try:
             self._producer = Producer(conf)
+            # E02: init_transactions() is required before first use of transactional producer.
+            # This is a no-op when idempotence is already active; it seeds the TID epoch.
+            self._producer.init_transactions(pending_timeout_ms=10000)
             self._record_success()
-            self._log(logging.INFO, "Producer connected to %s", self._bootstrap)
+            self._log(logging.INFO, "Producer connected to %s (exactly-once enabled)", self._bootstrap)
         except KafkaException as e:
             self._producer = None
             self._record_failure(e)
@@ -230,8 +243,12 @@ class KafkaProducerClient:
     def _resolve_request_id(self, value: dict) -> str:
         return str(value.get("request_id") or get_request_id() or generate_request_id())
 
-    def _build_headers(self, request_id: str, extra_headers: list[tuple[str, bytes]] | None = None) -> list[tuple[str, bytes]]:
+    def _build_headers(self, request_id: str, idempotency_key: str | None = None, extra_headers: list[tuple[str, bytes]] | None = None) -> list[tuple[str, bytes]]:
         headers = [(KAFKA_REQUEST_ID_HEADER, request_id.encode("utf-8"))]
+        # E02: X-Idempotency-Key lets consumers deduplicate at application level.
+        # When not provided, generate a UUID so every message gets a unique key.
+        key_val = idempotency_key or uuid.uuid4().hex
+        headers.append((IDEMPOTENCY_KEY_HEADER, key_val.encode("utf-8")))
         if extra_headers:
             headers.extend(extra_headers)
         return headers

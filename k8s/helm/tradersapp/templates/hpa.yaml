@@ -66,6 +66,14 @@ spec:
         target:
           type: Utilization
           averageUtilization: {{ .Values.bff.autoscaling.targetCPUUtilizationPercentage }}
+  {{- if .Values.bff.autoscaling.targetMemoryUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.bff.autoscaling.targetMemoryUtilizationPercentage }}
+  {{- end }}
   behavior:
     scaleDown:
       stabilizationWindowSeconds: 300

@@ -144,8 +144,9 @@ bff:
   autoscaling:
     enabled: true
     minReplicas: 2
-    maxReplicas: 8
+    maxReplicas: 10
     targetCPUUtilizationPercentage: 60
+    targetMemoryUtilizationPercentage: 80
   analysisTransport:
     mode: grpc
     grpcAddress: analysis-service:50051
