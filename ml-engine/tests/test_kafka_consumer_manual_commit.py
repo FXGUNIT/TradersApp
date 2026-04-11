@@ -83,9 +83,11 @@ def consumer_module(monkeypatch):
     fake_confluent.TopicPartition = type("TopicPartition", (), {})
     monkeypatch.setitem(sys.modules, "confluent_kafka", fake_confluent)
 
-    fake_producer_module = ModuleType("kafka.producer")
-    fake_producer_module.get_producer = lambda: None
-    monkeypatch.setitem(sys.modules, "kafka.producer", fake_producer_module)
+    # Import the real kafka package first so its __init__.py runs to completion
+    # (kafka/__init__.py imports KafkaProducer from kafka.producer).  After the
+    # import is complete we patch get_producer on the live submodule.
+    import kafka.producer  # side-effect: also populates the top-level kafka package
+    kafka.producer.get_producer = lambda: None
 
     from kafka import consumer as consumer_module
 
@@ -159,9 +161,8 @@ def test_manual_commit_after_dlq_exhaustion_unblocks_consumer(consumer_module, m
     )
     dlq_producer = DummyDLQProducer()
 
-    fake_producer_module = ModuleType("kafka.producer")
-    fake_producer_module.get_producer = lambda: dlq_producer
-    monkeypatch.setitem(sys.modules, "kafka.producer", fake_producer_module)
+    import kafka.producer
+    kafka.producer.get_producer = lambda: dlq_producer
 
     def handler(_event: dict):
         raise RuntimeError("handler failed")
