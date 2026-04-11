@@ -1,0 +1,52 @@
+{
+  "contexts": [
+    {
+      "name": "ingestion",
+      "service": "ingestion-service",
+      "owned_paths": [
+        "proto/ddd/v1/ingestion.proto",
+        "ml-engine/data",
+        "ml-engine/kafka"
+      ],
+      "grpc_contract": "proto/ddd/v1/ingestion.proto",
+      "owns_capability": "market data ingestion and persistence"
+    },
+    {
+      "name": "analysis",
+      "service": "analysis-service",
+      "owned_paths": [
+        "proto/ddd/v1/analysis.proto",
+        "bff/analysis-server.mjs",
+        "ml-engine/inference",
+        "ml-engine/features",
+        "ml-engine/models",
+        "ml-engine/session"
+      ],
+      "grpc_contract": "proto/ddd/v1/analysis.proto",
+      "owns_capability": "low-latency scoring and consensus generation"
+    },
+    {
+      "name": "learning",
+      "service": "learning-service",
+      "owned_paths": [
+        "proto/ddd/v1/learning.proto",
+        "ml-engine/training",
+        "ml-engine/feedback",
+        "ml-engine/data_quality"
+      ],
+      "grpc_contract": "proto/ddd/v1/learning.proto",
+      "owns_capability": "self-learning, drift control, and retraining"
+    },
+    {
+      "name": "bff-orchestration",
+      "service": "bff",
+      "owned_paths": [
+        "bff/routes",
+        "bff/services",
+        "bff/domains"
+      ],
+      "grpc_contract": "proto/ddd/v1/analysis.proto",
+      "owns_capability": "frontend orchestration and anti-corruption translation"
+    }
+  ]
+}

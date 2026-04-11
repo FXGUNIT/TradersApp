@@ -1,0 +1,240 @@
+# docker-compose.chaos.yml
+# Chaos Engineering environment for TradersApp
+# Run with: docker compose -f docker-compose.chaos.yml up
+#
+# Includes:
+#   - ML Engine (port 8001)
+#   - BFF (port 8788)
+#   - Redis (port 6379)
+#   - LitmusChaos (port 8080) — self-hosted chaos engineering
+#   - Prometheus (port 9090) — for monitoring chaos experiments
+#   - Grafana (port 3001) — chaos experiment dashboards
+#
+# Chaos experiments via Litmus API:
+#   curl -X POST http://localhost:8080/apis/litmuschaos.io/v1alpha1/namespaces/default/pods \
+#     -H "Content-Type: application/json" \
+#     -d '{"kind":"PodKill","spec":{"target":"ml-engine"}}'
+
+version: "3.9"
+
+services:
+  # ── Core Services ──────────────────────────────────────────────────────────
+
+  ml-engine:
+    image: ${DOCKER_REGISTRY:-ghcr.io/gunitsingh1994/tradersapp}/ml-engine:${IMAGE_TAG:-latest}
+    container_name: ml-engine-chaos
+    ports:
+      - "8001:8001"
+    environment:
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - ML_ENGINE_PORT=8001
+    depends_on:
+      redis:
+        condition: service_healthy
+      mlflow:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - chaos-net
+    mem_limit: 1g
+    cpus: 1.0
+
+  bff:
+    image: ${DOCKER_REGISTRY:-ghcr.io/gunitsingh1994/tradersapp}/bff:${IMAGE_TAG:-latest}
+    container_name: bff-chaos
+    ports:
+      - "8788:8788"
+    environment:
+      - ML_ENGINE_URL=http://ml-engine:8001
+      - NODE_ENV=production
+    depends_on:
+      ml-engine:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8788/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - chaos-net
+    mem_limit: 512m
+    cpus: 0.5
+
+  # ── Support Infrastructure ───────────────────────────────────────────────────
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis-chaos
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-chaos-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - chaos-net
+
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.16.2
+    container_name: mlflow-chaos
+    ports:
+      - "5000:5000"
+    command: mlflow server \
+      --backend-store-uri postgresql://mlflow:mlflowpass@mlflow-db:5432/mlflow \
+      --artifacts-destination s3://minio-artifacts/mlflow-artifacts/ \
+      --host 0.0.0.0 \
+      --port 5000
+    environment:
+      - MLFLOW_S3_ENDPOINT_URL=http://minio:9000
+      - AWS_ACCESS_KEY_ID=minioadmin
+      - AWS_SECRET_ACCESS_KEY=minioadmin123
+    depends_on:
+      mlflow-db:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks:
+      - chaos-net
+
+  mlflow-db:
+    image: postgres:16-alpine
+    container_name: mlflow-db-chaos
+    environment:
+      - POSTGRES_USER=mlflow
+      - POSTGRES_PASSWORD=mlflowpass
+      - POSTGRES_DB=mlflow
+    volumes:
+      - mlflow-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mlflow -d mlflow"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - chaos-net
+
+  minio:
+    image: minio/minio:latest
+    container_name: minio-chaos
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin123
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks:
+      - chaos-net
+
+  # ── Chaos Engineering: LitmusChaos ──────────────────────────────────────────
+
+  litmusChaos:
+    image: litmuschaos/litmus-server:3.16.0
+    container_name: litmus-chaos
+    ports:
+      - "8080:8080"
+    environment:
+      - CHAOS_OPERATOR_NAMESPACE=default
+      - SUBGRAPH_LIMIT=10
+      - TRIVY_SERVICE_ACCOUNT=litmus-admin
+      - CHAOS_SVC_ACCOUNT=litmus-admin
+    networks:
+      - chaos-net
+
+  # ── Observability for Chaos ─────────────────────────────────────────────────
+
+  prometheus-chaos:
+    image: prom/prometheus:v2.55.0
+    container_name: prometheus-chaos
+    ports:
+      - "9095:9090"
+    volumes:
+      - ./k8s/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./k8s/observability/alerts:/etc/prometheus/alerts:ro
+      - prometheus-chaos-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    networks:
+      - chaos-net
+
+  grafana-chaos:
+    image: grafana/grafana:11.5.0
+    container_name: grafana-chaos
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./k8s/observability/grafana-provisioning:/etc/grafana/provisioning:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus-chaos
+    networks:
+      - chaos-net
+
+  # ── Locust Load Generator ───────────────────────────────────────────────────
+
+  locust:
+    image: locustio/locust:2.30.0
+    container_name: locust-chaos
+    ports:
+      - "8089:8089"
+    volumes:
+      - ./tests/load/locustfile.py:/mnt/locust/locustfile.py:ro
+    command: >
+      -f /mnt/locust/locustfile.py
+      --host=http://bff:8788
+      --users 100
+      --spawn-rate 10
+      --run-time 5m
+      --headless
+    depends_on:
+      - bff
+      - ml-engine
+    networks:
+      - chaos-net
+
+# ── Networks ────────────────────────────────────────────────────────────────────
+
+networks:
+  chaos-net:
+    driver: bridge
+
+# ── Volumes ─────────────────────────────────────────────────────────────────────
+
+volumes:
+  redis-chaos-data:
+  mlflow-db-data:
+  minio-data:
+  prometheus-chaos-data:
+  grafana-data:

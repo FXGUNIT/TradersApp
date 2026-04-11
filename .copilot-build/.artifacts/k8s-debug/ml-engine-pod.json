@@ -1,0 +1,725 @@
+{
+    "apiVersion": "v1",
+    "kind": "Pod",
+    "metadata": {
+        "annotations": {
+            "kubectl.kubernetes.io/restartedAt": "2026-04-11T09:32:04Z",
+            "prometheus.io/path": "/metrics",
+            "prometheus.io/port": "8001",
+            "prometheus.io/scrape": "true"
+        },
+        "creationTimestamp": "2026-04-11T10:50:10Z",
+        "generateName": "ml-engine-747c876d49-",
+        "generation": 1,
+        "labels": {
+            "app": "ml-engine",
+            "app.kubernetes.io/component": "tradersapp",
+            "app.kubernetes.io/instance": "tradersapp",
+            "app.kubernetes.io/name": "tradersapp",
+            "app.kubernetes.io/part-of": "tradersapp",
+            "app.kubernetes.io/version": "1.0.0",
+            "helm.sh/chart": "tradersapp-1.0.0",
+            "pod-template-hash": "747c876d49",
+            "tier": "ml"
+        },
+        "name": "ml-engine-747c876d49-5lkr6",
+        "namespace": "tradersapp-dev",
+        "ownerReferences": [
+            {
+                "apiVersion": "apps/v1",
+                "blockOwnerDeletion": true,
+                "controller": true,
+                "kind": "ReplicaSet",
+                "name": "ml-engine-747c876d49",
+                "uid": "58b0d398-0921-4100-9c9c-816159a3c69c"
+            }
+        ],
+        "resourceVersion": "220737",
+        "uid": "4177eeea-430e-47c2-ad7d-cf78b9148f3b"
+    },
+    "spec": {
+        "affinity": {
+            "podAntiAffinity": {
+                "preferredDuringSchedulingIgnoredDuringExecution": [
+                    {
+                        "podAffinityTerm": {
+                            "labelSelector": {
+                                "matchLabels": {
+                                    "app": "ml-engine"
+                                }
+                            },
+                            "topologyKey": "kubernetes.io/hostname"
+                        },
+                        "weight": 100
+                    }
+                ]
+            }
+        },
+        "containers": [
+            {
+                "env": [
+                    {
+                        "name": "MODEL_STORE_PVC_MOUNT",
+                        "value": "/models/store"
+                    },
+                    {
+                        "name": "MODEL_STORE_READ_ONLY",
+                        "value": "true"
+                    },
+                    {
+                        "name": "MODEL_REGISTRY_MODE",
+                        "value": "sidecar"
+                    },
+                    {
+                        "name": "MODEL_REGISTRY_URL",
+                        "value": "http://127.0.0.1:8010"
+                    },
+                    {
+                        "name": "MODEL_REGISTRY_PORT",
+                        "value": "8010"
+                    },
+                    {
+                        "name": "MODEL_REGISTRY_WARMUP",
+                        "value": "true"
+                    },
+                    {
+                        "name": "MODEL_REGISTRY_MAX_CACHED_INSTANCES",
+                        "value": "4"
+                    },
+                    {
+                        "name": "MLFLOW_USE_REGISTRY",
+                        "value": "true"
+                    },
+                    {
+                        "name": "MLFLOW_TRACKING_URI",
+                        "value": "http://mlflow:5000"
+                    },
+                    {
+                        "name": "REDIS_HOST",
+                        "value": "redis"
+                    },
+                    {
+                        "name": "KAFKA_ENABLE",
+                        "value": "false"
+                    },
+                    {
+                        "name": "KAFKA_BOOTSTRAP_SERVERS",
+                        "value": "kafka:29092"
+                    },
+                    {
+                        "name": "MY_POD_NAME",
+                        "valueFrom": {
+                            "fieldRef": {
+                                "apiVersion": "v1",
+                                "fieldPath": "metadata.name"
+                            }
+                        }
+                    },
+                    {
+                        "name": "KAFKA_GROUP_ID",
+                        "value": "ml-engine-consumers"
+                    },
+                    {
+                        "name": "KAFKA_AUTO_OFFSET_RESET",
+                        "value": "earliest"
+                    },
+                    {
+                        "name": "REQUIRE_DATABASE_URL",
+                        "value": "true"
+                    },
+                    {
+                        "name": "OTEL_SERVICE_NAME",
+                        "value": "ml-engine"
+                    },
+                    {
+                        "name": "OTEL_EXPORTER_OTLP_ENDPOINT",
+                        "value": "http://jaeger.monitoring:4317"
+                    },
+                    {
+                        "name": "MY_POD_NAMESPACE",
+                        "valueFrom": {
+                            "fieldRef": {
+                                "apiVersion": "v1",
+                                "fieldPath": "metadata.namespace"
+                            }
+                        }
+                    },
+                    {
+                        "name": "MY_NODE_NAME",
+                        "valueFrom": {
+                            "fieldRef": {
+                                "apiVersion": "v1",
+                                "fieldPath": "spec.nodeName"
+                            }
+                        }
+                    },
+                    {
+                        "name": "DQ_VALIDATE_BEFORE_TRAIN",
+                        "value": "true"
+                    },
+                    {
+                        "name": "DQ_VALIDATE_BEFORE_PREDICT",
+                        "value": "true"
+                    },
+                    {
+                        "name": "DQ_BLOCK_ON_CRITICAL",
+                        "value": "true"
+                    },
+                    {
+                        "name": "DQ_REQUIRE_GX",
+                        "value": "true"
+                    },
+                    {
+                        "name": "DQ_VALIDATE_DAYS",
+                        "value": "90"
+                    },
+                    {
+                        "name": "INFERENCE_P99_TARGET_MS",
+                        "value": "100"
+                    },
+                    {
+                        "name": "DQ_ALERT_WEBHOOK"
+                    },
+                    {
+                        "name": "DQ_QUARANTINE_DIR",
+                        "value": "/data/dq_quarantine"
+                    },
+                    {
+                        "name": "CONTINUAL_LEARNING_DIR",
+                        "value": "/data/continual_learning"
+                    },
+                    {
+                        "name": "MAMBA_CACHE_DIR",
+                        "value": "/data/mamba_cache"
+                    }
+                ],
+                "envFrom": [
+                    {
+                        "configMapRef": {
+                            "name": "ml-engine-config"
+                        }
+                    },
+                    {
+                        "configMapRef": {
+                            "name": "ml-engine-env"
+                        }
+                    },
+                    {
+                        "secretRef": {
+                            "name": "ml-engine-secrets"
+                        }
+                    }
+                ],
+                "image": "tradersapp/ml-engine:dev-latest",
+                "imagePullPolicy": "IfNotPresent",
+                "livenessProbe": {
+                    "failureThreshold": 3,
+                    "httpGet": {
+                        "path": "/health",
+                        "port": 8001,
+                        "scheme": "HTTP"
+                    },
+                    "initialDelaySeconds": 60,
+                    "periodSeconds": 20,
+                    "successThreshold": 1,
+                    "timeoutSeconds": 1
+                },
+                "name": "ml-engine",
+                "ports": [
+                    {
+                        "containerPort": 8001,
+                        "name": "http",
+                        "protocol": "TCP"
+                    }
+                ],
+                "readinessProbe": {
+                    "failureThreshold": 3,
+                    "httpGet": {
+                        "path": "/health",
+                        "port": 8001,
+                        "scheme": "HTTP"
+                    },
+                    "initialDelaySeconds": 30,
+                    "periodSeconds": 10,
+                    "successThreshold": 1,
+                    "timeoutSeconds": 1
+                },
+                "resources": {
+                    "limits": {
+                        "cpu": "2",
+                        "memory": "2Gi"
+                    },
+                    "requests": {
+                        "cpu": "250m",
+                        "memory": "512Mi"
+                    }
+                },
+                "securityContext": {
+                    "allowPrivilegeEscalation": false,
+                    "capabilities": {
+                        "drop": [
+                            "ALL"
+                        ]
+                    },
+                    "readOnlyRootFilesystem": true
+                },
+                "startupProbe": {
+                    "failureThreshold": 30,
+                    "httpGet": {
+                        "path": "/health",
+                        "port": 8001,
+                        "scheme": "HTTP"
+                    },
+                    "initialDelaySeconds": 5,
+                    "periodSeconds": 10,
+                    "successThreshold": 1,
+                    "timeoutSeconds": 1
+                },
+                "terminationMessagePath": "/dev/termination-log",
+                "terminationMessagePolicy": "File",
+                "volumeMounts": [
+                    {
+                        "mountPath": "/data",
+                        "name": "data"
+                    },
+                    {
+                        "mountPath": "/models",
+                        "name": "models",
+                        "readOnly": true
+                    },
+                    {
+                        "mountPath": "/tmp",
+                        "name": "tmp"
+                    },
+                    {
+                        "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                        "name": "kube-api-access-qq6b8",
+                        "readOnly": true
+                    }
+                ]
+            },
+            {
+                "command": [
+                    "python",
+                    "-m",
+                    "uvicorn",
+                    "infrastructure.model_registry_sidecar:app",
+                    "--host",
+                    "0.0.0.0",
+                    "--port",
+                    "8010"
+                ],
+                "env": [
+                    {
+                        "name": "MODEL_STORE_PVC_MOUNT",
+                        "value": "/models/store"
+                    },
+                    {
+                        "name": "MODEL_STORE_READ_ONLY",
+                        "value": "true"
+                    },
+                    {
+                        "name": "REDIS_HOST",
+                        "value": "redis"
+                    },
+                    {
+                        "name": "MODEL_REGISTRY_WARMUP",
+                        "value": "true"
+                    },
+                    {
+                        "name": "MODEL_REGISTRY_MAX_CACHED_INSTANCES",
+                        "value": "4"
+                    },
+                    {
+                        "name": "MODEL_REGISTRY_PORT",
+                        "value": "8010"
+                    }
+                ],
+                "envFrom": [
+                    {
+                        "configMapRef": {
+                            "name": "ml-engine-config"
+                        }
+                    },
+                    {
+                        "configMapRef": {
+                            "name": "ml-engine-env"
+                        }
+                    },
+                    {
+                        "secretRef": {
+                            "name": "ml-engine-secrets"
+                        }
+                    }
+                ],
+                "image": "tradersapp/ml-engine:dev-latest",
+                "imagePullPolicy": "IfNotPresent",
+                "livenessProbe": {
+                    "failureThreshold": 3,
+                    "httpGet": {
+                        "path": "/health",
+                        "port": 8010,
+                        "scheme": "HTTP"
+                    },
+                    "initialDelaySeconds": 20,
+                    "periodSeconds": 20,
+                    "successThreshold": 1,
+                    "timeoutSeconds": 1
+                },
+                "name": "model-registry",
+                "ports": [
+                    {
+                        "containerPort": 8010,
+                        "name": "registry",
+                        "protocol": "TCP"
+                    }
+                ],
+                "readinessProbe": {
+                    "failureThreshold": 3,
+                    "httpGet": {
+                        "path": "/health",
+                        "port": 8010,
+                        "scheme": "HTTP"
+                    },
+                    "initialDelaySeconds": 5,
+                    "periodSeconds": 10,
+                    "successThreshold": 1,
+                    "timeoutSeconds": 1
+                },
+                "resources": {
+                    "limits": {
+                        "cpu": "500m",
+                        "memory": "1Gi"
+                    },
+                    "requests": {
+                        "cpu": "100m",
+                        "memory": "256Mi"
+                    }
+                },
+                "securityContext": {
+                    "allowPrivilegeEscalation": false,
+                    "capabilities": {
+                        "drop": [
+                            "ALL"
+                        ]
+                    },
+                    "readOnlyRootFilesystem": true
+                },
+                "terminationMessagePath": "/dev/termination-log",
+                "terminationMessagePolicy": "File",
+                "volumeMounts": [
+                    {
+                        "mountPath": "/models",
+                        "name": "models",
+                        "readOnly": true
+                    },
+                    {
+                        "mountPath": "/tmp",
+                        "name": "tmp"
+                    },
+                    {
+                        "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                        "name": "kube-api-access-qq6b8",
+                        "readOnly": true
+                    }
+                ]
+            }
+        ],
+        "dnsPolicy": "ClusterFirst",
+        "enableServiceLinks": true,
+        "nodeName": "fxg",
+        "preemptionPolicy": "PreemptLowerPriority",
+        "priority": 0,
+        "restartPolicy": "Always",
+        "schedulerName": "default-scheduler",
+        "securityContext": {
+            "fsGroup": 1000,
+            "runAsNonRoot": true,
+            "runAsUser": 1000
+        },
+        "serviceAccount": "default",
+        "serviceAccountName": "default",
+        "terminationGracePeriodSeconds": 60,
+        "tolerations": [
+            {
+                "effect": "NoExecute",
+                "key": "node.kubernetes.io/not-ready",
+                "operator": "Exists",
+                "tolerationSeconds": 300
+            },
+            {
+                "effect": "NoExecute",
+                "key": "node.kubernetes.io/unreachable",
+                "operator": "Exists",
+                "tolerationSeconds": 300
+            }
+        ],
+        "topologySpreadConstraints": [
+            {
+                "labelSelector": {
+                    "matchLabels": {
+                        "app": "ml-engine"
+                    }
+                },
+                "maxSkew": 1,
+                "topologyKey": "kubernetes.io/hostname",
+                "whenUnsatisfiable": "ScheduleAnyway"
+            }
+        ],
+        "volumes": [
+            {
+                "name": "data",
+                "persistentVolumeClaim": {
+                    "claimName": "ml-state-pvc"
+                }
+            },
+            {
+                "name": "models",
+                "persistentVolumeClaim": {
+                    "claimName": "ml-models-pvc"
+                }
+            },
+            {
+                "emptyDir": {
+                    "medium": "Memory",
+                    "sizeLimit": "256Mi"
+                },
+                "name": "tmp"
+            },
+            {
+                "name": "kube-api-access-qq6b8",
+                "projected": {
+                    "defaultMode": 420,
+                    "sources": [
+                        {
+                            "serviceAccountToken": {
+                                "expirationSeconds": 3607,
+                                "path": "token"
+                            }
+                        },
+                        {
+                            "configMap": {
+                                "items": [
+                                    {
+                                        "key": "ca.crt",
+                                        "path": "ca.crt"
+                                    }
+                                ],
+                                "name": "kube-root-ca.crt"
+                            }
+                        },
+                        {
+                            "downwardAPI": {
+                                "items": [
+                                    {
+                                        "fieldRef": {
+                                            "apiVersion": "v1",
+                                            "fieldPath": "metadata.namespace"
+                                        },
+                                        "path": "namespace"
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                }
+            }
+        ]
+    },
+    "status": {
+        "conditions": [
+            {
+                "lastProbeTime": null,
+                "lastTransitionTime": "2026-04-11T13:37:16Z",
+                "observedGeneration": 1,
+                "status": "True",
+                "type": "PodReadyToStartContainers"
+            },
+            {
+                "lastProbeTime": null,
+                "lastTransitionTime": "2026-04-11T10:50:14Z",
+                "observedGeneration": 1,
+                "status": "True",
+                "type": "Initialized"
+            },
+            {
+                "lastProbeTime": null,
+                "lastTransitionTime": "2026-04-11T10:50:14Z",
+                "message": "containers with unready status: [ml-engine]",
+                "observedGeneration": 1,
+                "reason": "ContainersNotReady",
+                "status": "False",
+                "type": "Ready"
+            },
+            {
+                "lastProbeTime": null,
+                "lastTransitionTime": "2026-04-11T10:50:14Z",
+                "message": "containers with unready status: [ml-engine]",
+                "observedGeneration": 1,
+                "reason": "ContainersNotReady",
+                "status": "False",
+                "type": "ContainersReady"
+            },
+            {
+                "lastProbeTime": null,
+                "lastTransitionTime": "2026-04-11T10:50:11Z",
+                "observedGeneration": 1,
+                "status": "True",
+                "type": "PodScheduled"
+            }
+        ],
+        "containerStatuses": [
+            {
+                "allocatedResources": {
+                    "cpu": "250m",
+                    "memory": "512Mi"
+                },
+                "containerID": "containerd://ae09e0fa073995aa645a36646f3d9ca3fac5920bded80bdc2675e583f3efa635",
+                "image": "docker.io/tradersapp/ml-engine:dev-latest",
+                "imageID": "sha256:56ba7fe1d2582be211d17814afa403c0c55ec927a3c93c451d373eb0793ee9ae",
+                "lastState": {
+                    "terminated": {
+                        "containerID": "containerd://8cca57672d2dec77274e19d17704089160723f158e774fd0d6394045cc0fb92a",
+                        "exitCode": 3,
+                        "finishedAt": "2026-04-11T13:39:29Z",
+                        "reason": "Error",
+                        "startedAt": "2026-04-11T13:39:01Z"
+                    }
+                },
+                "name": "ml-engine",
+                "ready": false,
+                "resources": {
+                    "limits": {
+                        "cpu": "2",
+                        "memory": "2Gi"
+                    },
+                    "requests": {
+                        "cpu": "250m",
+                        "memory": "512Mi"
+                    }
+                },
+                "restartCount": 17,
+                "started": false,
+                "state": {
+                    "running": {
+                        "startedAt": "2026-04-11T13:40:14Z"
+                    }
+                },
+                "user": {
+                    "linux": {
+                        "gid": 0,
+                        "supplementalGroups": [
+                            0,
+                            1000
+                        ],
+                        "uid": 1000
+                    }
+                },
+                "volumeMounts": [
+                    {
+                        "mountPath": "/data",
+                        "name": "data"
+                    },
+                    {
+                        "mountPath": "/models",
+                        "name": "models",
+                        "readOnly": true,
+                        "recursiveReadOnly": "Disabled"
+                    },
+                    {
+                        "mountPath": "/tmp",
+                        "name": "tmp"
+                    },
+                    {
+                        "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                        "name": "kube-api-access-qq6b8",
+                        "readOnly": true,
+                        "recursiveReadOnly": "Disabled"
+                    }
+                ]
+            },
+            {
+                "allocatedResources": {
+                    "cpu": "100m",
+                    "memory": "256Mi"
+                },
+                "containerID": "containerd://0785934fb8ab7fa55c9b3de199e9cd305835e0d9fe05f9dc25f14f00df48d704",
+                "image": "docker.io/tradersapp/ml-engine:dev-latest",
+                "imageID": "sha256:56ba7fe1d2582be211d17814afa403c0c55ec927a3c93c451d373eb0793ee9ae",
+                "lastState": {
+                    "terminated": {
+                        "containerID": "containerd://74c268610cf299f04e85edb6f2f3163d420272b487e064f25a0a9e7228999d1c",
+                        "exitCode": 128,
+                        "finishedAt": "2026-04-11T13:36:18Z",
+                        "message": "failed to create containerd task: failed to start shim: can't find shim for sandbox 0ce5227ef9aaf7ab6c9f077858fae7f7e2f8a9365c832d208e792ea29c596529: not found",
+                        "reason": "StartError",
+                        "startedAt": "1970-01-01T00:00:00Z"
+                    }
+                },
+                "name": "model-registry",
+                "ready": true,
+                "resources": {
+                    "limits": {
+                        "cpu": "500m",
+                        "memory": "1Gi"
+                    },
+                    "requests": {
+                        "cpu": "100m",
+                        "memory": "256Mi"
+                    }
+                },
+                "restartCount": 9,
+                "started": true,
+                "state": {
+                    "running": {
+                        "startedAt": "2026-04-11T13:37:14Z"
+                    }
+                },
+                "user": {
+                    "linux": {
+                        "gid": 0,
+                        "supplementalGroups": [
+                            0,
+                            1000
+                        ],
+                        "uid": 1000
+                    }
+                },
+                "volumeMounts": [
+                    {
+                        "mountPath": "/models",
+                        "name": "models",
+                        "readOnly": true,
+                        "recursiveReadOnly": "Disabled"
+                    },
+                    {
+                        "mountPath": "/tmp",
+                        "name": "tmp"
+                    },
+                    {
+                        "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                        "name": "kube-api-access-qq6b8",
+                        "readOnly": true,
+                        "recursiveReadOnly": "Disabled"
+                    }
+                ]
+            }
+        ],
+        "hostIP": "172.21.239.98",
+        "hostIPs": [
+            {
+                "ip": "172.21.239.98"
+            }
+        ],
+        "observedGeneration": 1,
+        "phase": "Running",
+        "podIP": "10.42.0.73",
+        "podIPs": [
+            {
+                "ip": "10.42.0.73"
+            }
+        ],
+        "qosClass": "Burstable",
+        "startTime": "2026-04-11T10:50:14Z"
+    }
+}

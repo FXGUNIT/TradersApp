@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python scripts/update_todo_progress.py)",
+      "Bash(python scripts/auto_backup.py \"chore: close Q07 checkpoint — Stage B complete, proceed to Stage C\")",
+      "Bash(git add:*)",
+      "Bash(git commit -m ':*)"
+    ]
+  },
+  "outputStyle": "default"
+}
