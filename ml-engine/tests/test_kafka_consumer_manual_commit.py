@@ -76,8 +76,16 @@ class DummyDLQProducer:
 
 @pytest.fixture
 def consumer_module(monkeypatch):
-    # Block kafka-python from being found so we can redirect the "kafka" namespace
-    # to the TradersApp project's ml_engine.kafka package.
+    # The ml-engine package lives at e:\TradersApp\ml-engine (hyphenated directory name).
+    # Add the TradersApp root to sys.path so Python resolves "ml_engine" → the
+    # ml-engine directory (Windows is case-insensitive for the name, hyphens ≠ underscores
+    # in identifiers so the directory must be found via path lookup).
+    import pathlib
+    tradersapp_root = str(pathlib.Path(__file__).resolve().parents[2])
+    monkeypatch.syspath_prepend(tradersapp_root)
+
+    # Block kafka-python from sys.modules so we can replace it with the project's
+    # ml_engine.kafka package before any real imports happen.
     for key in list(sys.modules):
         if key == "kafka" or key.startswith("kafka."):
             monkeypatch.setitem(sys.modules, key, None)
@@ -96,8 +104,6 @@ def consumer_module(monkeypatch):
     fake_confluent.KafkaException = Exception
     fake_confluent.TopicPartition = type("TopicPartition", (), {})
     monkeypatch.setitem(sys.modules, "confluent_kafka", fake_confluent)
-
-    from kafka.consumer import KafkaConsumerClient, TOPIC_PREDICTIONS
 
     consumer_module = importlib.reload(
         __import__("kafka.consumer", fromlist=["KafkaConsumerClient"])
