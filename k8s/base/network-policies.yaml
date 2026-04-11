@@ -175,7 +175,7 @@ spec:
       ports:
         - protocol: TCP
           port: 6379
-  egress: []  # Redis is stateless cache, no outbound needed
+  egress: [] # Redis is stateless cache, no outbound needed
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -199,7 +199,7 @@ spec:
           port: 9092
         - protocol: TCP
           port: 29092
-  egress: []  # Kafka brokers don't need outbound in single-node
+  egress: [] # Kafka brokers don't need outbound in single-node
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -301,7 +301,7 @@ spec:
       ports:
         - protocol: TCP
           port: 5432
-  egress: []  # PostgreSQL is stateless, no outbound needed
+  egress: [] # PostgreSQL is stateless, no outbound needed
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -329,4 +329,4 @@ spec:
       ports:
         - protocol: TCP
           port: 9000
-  egress: []  # MinIO artifact storage, no outbound needed
+  egress: [] # MinIO artifact storage, no outbound needed
