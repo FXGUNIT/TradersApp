@@ -1,9 +1,9 @@
-# k8s/hpa-ml-engine.yaml — Horizontal Pod Autoscaler for ML Engine
+# k8s/overlay/dev/hpa-ml-engine.yaml — Horizontal Pod Autoscaler for ML Engine (dev)
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
   name: ml-engine-hpa
-  namespace: tradersapp
+  namespace: tradersapp-dev
 spec:
   scaleTargetRef:
     apiVersion: apps/v1

@@ -1,9 +1,9 @@
-# k8s/hpa-bff.yaml — Horizontal Pod Autoscaler for BFF
+# k8s/overlay/dev/hpa-bff.yaml — Horizontal Pod Autoscaler for BFF (dev)
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
   name: bff-hpa
-  namespace: tradersapp
+  namespace: tradersapp-dev
 spec:
   scaleTargetRef:
     apiVersion: apps/v1

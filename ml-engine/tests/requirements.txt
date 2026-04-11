@@ -1,0 +1,7 @@
+# Test dependencies for ml-engine
+# These supplements ml-engine/requirements.txt (which contains production deps).
+
+# kafka-python is required by test_kafka_consumer_manual_commit.py
+# which imports `from kafka import consumer`.  confluent-kafka (the production
+# broker library) is already in the main requirements.txt.
+kafka-python>=2.0.2
