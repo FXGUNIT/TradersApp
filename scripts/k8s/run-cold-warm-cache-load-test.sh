@@ -69,6 +69,7 @@ Options:
   --service-port PORT    Service port (default: 8001)
   --base-url URL         Base URL for health + k6 traffic (default: http://ml-engine:8001)
   --output-dir PATH      Directory for result files (default: tests/load/results)
+  --scenarios VALUE      Reserved for CLI compatibility; ignored because this script only runs cold/warm
   --cache-clear MODE     Cache eviction mode: pod-kill | redis-flush | rollout-restart
   --help                 Show this help text
 EOF
@@ -99,6 +100,9 @@ parse_args() {
         ;;
       --output-dir)
         RESULTS_DIR="${2:?Missing value for --output-dir}"
+        shift 2
+        ;;
+      --scenarios)
         shift 2
         ;;
       --cache-clear)
