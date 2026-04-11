@@ -76,6 +76,20 @@ class DummyDLQProducer:
 
 @pytest.fixture
 def consumer_module(monkeypatch):
+    # Block kafka-python from being found so we can redirect the "kafka" namespace
+    # to the TradersApp project's ml_engine.kafka package.
+    for key in list(sys.modules):
+        if key == "kafka" or key.startswith("kafka."):
+            monkeypatch.setitem(sys.modules, key, None)
+
+    # Wire "kafka" → ml_engine.kafka so `from kafka import consumer` lands on the
+    # project module (which defines KafkaConsumerClient, TOPIC_PREDICTIONS, etc.).
+    import ml_engine.kafka
+    monkeypatch.setitem(sys.modules, "kafka", ml_engine.kafka)
+    monkeypatch.setitem(sys.modules, "kafka.consumer", ml_engine.kafka.consumer)
+    monkeypatch.setitem(sys.modules, "kafka.producer", ml_engine.kafka.producer)
+
+    # Mock confluent_kafka (the production broker library) so KAFKA_AVAILABLE=False.
     fake_confluent = ModuleType("confluent_kafka")
     fake_confluent.Consumer = type("Consumer", (), {})
     fake_confluent.KafkaError = type("KafkaError", (), {"_PARTITION_EOF": -191})
@@ -83,15 +97,11 @@ def consumer_module(monkeypatch):
     fake_confluent.TopicPartition = type("TopicPartition", (), {})
     monkeypatch.setitem(sys.modules, "confluent_kafka", fake_confluent)
 
-    # Import the real kafka package first so its __init__.py runs to completion
-    # (kafka/__init__.py imports KafkaProducer from kafka.producer).  After the
-    # import is complete we patch get_producer on the live submodule.
-    import kafka.producer  # side-effect: also populates the top-level kafka package
-    kafka.producer.get_producer = lambda: None
+    from kafka.consumer import KafkaConsumerClient, TOPIC_PREDICTIONS
 
-    from kafka import consumer as consumer_module
-
-    consumer_module = importlib.reload(consumer_module)
+    consumer_module = importlib.reload(
+        __import__("kafka.consumer", fromlist=["KafkaConsumerClient"])
+    )
     monkeypatch.setattr(consumer_module, "KAFKA_AVAILABLE", False, raising=False)
     monkeypatch.setattr(consumer_module, "DLQ_MAX_RETRIES", 2, raising=False)
     return consumer_module
@@ -161,8 +171,8 @@ def test_manual_commit_after_dlq_exhaustion_unblocks_consumer(consumer_module, m
     )
     dlq_producer = DummyDLQProducer()
 
-    import kafka.producer
-    kafka.producer.get_producer = lambda: dlq_producer
+    import ml_engine.kafka.producer as mlq_producer
+    monkeypatch.setattr(mlq_producer, "get_producer", lambda: dlq_producer)
 
     def handler(_event: dict):
         raise RuntimeError("handler failed")
