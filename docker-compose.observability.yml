@@ -25,11 +25,11 @@ services:
       - ./k8s/observability/alerts:/etc/prometheus/rules:ro
       - prometheus-data:/prometheus
     command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--storage.tsdb.retention.time=30d'
-      - '--web.enable-lifecycle'
-      - '--web.page-title=TradersApp Prometheus'
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=30d"
+      - "--web.enable-lifecycle"
+      - "--web.page-title=TradersApp Prometheus"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
@@ -44,8 +44,8 @@ services:
       - ./k8s/observability/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
       - alertmanager-data:/alertmanager
     command:
-      - '--config.file=/etc/alertmanager/alertmanager.yml'
-      - '--storage.path=/alertmanager'
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+      - "--storage.path=/alertmanager"
     restart: unless-stopped
 
   # ── Grafana ────────────────────────────────────────────────────────────────
@@ -100,11 +100,11 @@ services:
     container_name: traders-jaeger
     user: "0:0"
     ports:
-      - "16686:16686"  # UI
-      - "6831:6831"   # UDP agent (legacy)
-      - "14268:14268"  # HTTP collector
-      - "4317:4317"   # gRPC collector (OTLP)
-      - "4318:4318"   # HTTP OTLP receiver
+      - "16686:16686" # UI
+      - "6831:6831" # UDP agent (legacy)
+      - "14268:14268" # HTTP collector
+      - "4317:4317" # gRPC collector (OTLP)
+      - "4318:4318" # HTTP OTLP receiver
     environment:
       COLLECTOR_OTLP_ENABLED: "true"
       SPAN_STORAGE_TYPE: badger
