@@ -78,6 +78,23 @@ require_cmd() {
   fi
 }
 
+prefer_k3s_kubeconfig() {
+  if [[ -n "${KUBECONFIG:-}" ]]; then
+    return 0
+  fi
+
+  if [[ ! -f /etc/rancher/k3s/k3s.yaml ]]; then
+    return 0
+  fi
+
+  local current_context=""
+  current_context="$(kubectl config current-context 2>/dev/null || true)"
+  if [[ -z "$current_context" || "$current_context" == "docker-desktop" ]]; then
+    export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+    printf '[%s] INFO: using k3s kubeconfig at %s (previous context: %s)\n' "$(timestamp)" "$KUBECONFIG" "${current_context:-unset}"
+  fi
+}
+
 parse_args() {
   while (($# > 0)); do
     case "$1" in
@@ -194,6 +211,7 @@ check_service_hints() {
 parse_args "$@"
 
 require_cmd kubectl
+prefer_k3s_kubeconfig
 pass "kubectl is installed ($(command -v kubectl))"
 
 printf '[%s] INFO: validating PostgreSQL cutover prereqs\n' "$(timestamp)"

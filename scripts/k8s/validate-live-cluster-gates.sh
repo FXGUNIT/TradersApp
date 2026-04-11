@@ -54,6 +54,23 @@ require_cmd() {
   fi
 }
 
+prefer_k3s_kubeconfig() {
+  if [[ -n "${KUBECONFIG:-}" ]]; then
+    return 0
+  fi
+
+  if [[ ! -f /etc/rancher/k3s/k3s.yaml ]]; then
+    return 0
+  fi
+
+  local current_context=""
+  current_context="$(kubectl config current-context 2>/dev/null || true)"
+  if [[ -z "$current_context" || "$current_context" == "docker-desktop" ]]; then
+    export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+    log "Using k3s kubeconfig at $KUBECONFIG (previous context: ${current_context:-unset})"
+  fi
+}
+
 check_exists() {
   local kind="$1"
   local name="$2"
@@ -145,9 +162,12 @@ while (($# > 0)); do
 done
 
 require_cmd kubectl
+prefer_k3s_kubeconfig
 
+current_context="$(kubectl config current-context 2>/dev/null || true)"
 log "Validating live cluster gates"
 log "Namespace: $NAMESPACE"
+log "Context: ${current_context:-unknown}"
 log "Mode: read-only kubectl get/list checks only"
 
 if ! kubectl get namespace "$NAMESPACE" >/dev/null 2>&1; then
