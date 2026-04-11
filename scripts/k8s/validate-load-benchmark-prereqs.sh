@@ -158,6 +158,23 @@ require_cmd() {
   return 1
 }
 
+prefer_k3s_kubeconfig() {
+  if [[ -n "${KUBECONFIG:-}" ]]; then
+    return 0
+  fi
+
+  if [[ ! -f /etc/rancher/k3s/k3s.yaml ]]; then
+    return 0
+  fi
+
+  local current_context=""
+  current_context="$(kubectl config current-context 2>/dev/null || true)"
+  if [[ -z "$current_context" || "$current_context" == "docker-desktop" ]]; then
+    export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+    echo "INFO: using k3s kubeconfig at $KUBECONFIG (previous context: ${current_context:-unset})"
+  fi
+}
+
 check_help_contains_all() {
   local label="$1"
   shift
@@ -325,6 +342,7 @@ main() {
   local have_python3=0
 
   parse_args "$@"
+  prefer_k3s_kubeconfig
 
   echo "Load Benchmark Preflight"
   echo "Namespace: $NAMESPACE"

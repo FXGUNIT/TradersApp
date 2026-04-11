@@ -17,7 +17,7 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-NAMESPACE="${NAMESPACE:-tradersapp}"
+NAMESPACE="${NAMESPACE:-tradersapp-dev}"
 HPA_FILE="${REPO_ROOT}/k8s/hpa-bff.yaml"
 BFF_URL="${BFF_URL:-http://bff:8788}"
 BFF_PORT="${BFF_PORT:-8788}"
@@ -34,15 +34,35 @@ log() { echo "[$(date +%H:%M:%S)] $*"; }
 warn() { echo "[$(date +%H:%M:%S)] WARN: $*" >&2; }
 fail() { echo "[$(date +%H:%M:%S)] FAIL: $*" >&2; exit 1; }
 
+prefer_k3s_kubeconfig() {
+  if [[ -n "${KUBECONFIG:-}" ]]; then
+    return 0
+  fi
+
+  if [[ ! -f /etc/rancher/k3s/k3s.yaml ]]; then
+    return 0
+  fi
+
+  local current_context=""
+  current_context="$(kubectl config current-context 2>/dev/null || true)"
+  if [[ -z "$current_context" || "$current_context" == "docker-desktop" ]]; then
+    export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+    log "Using k3s kubeconfig at $KUBECONFIG (previous context: ${current_context:-unset})"
+  fi
+}
+
 for cmd in kubectl; do
   if ! command -v "$cmd" >/dev/null 2>&1; then
     fail "required command not found: $cmd"
   fi
 done
 
+prefer_k3s_kubeconfig
+
 # ── Step 1: Pre-flight checks ────────────────────────────────────────────────
 log "Step 1: Pre-flight checks"
 log "  Namespace: $NAMESPACE"
+log "  Context:   $(kubectl config current-context 2>/dev/null || echo unknown)"
 log "  HPA file:  $HPA_FILE"
 log "  BFF URL:   $BFF_URL"
 
