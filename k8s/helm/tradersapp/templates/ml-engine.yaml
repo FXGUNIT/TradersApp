@@ -160,6 +160,11 @@ spec:
               value: "earliest"
             - name: REQUIRE_DATABASE_URL
               value: {{ ternary "true" "false" .Values.mlEngine.requireDatabaseUrl | quote }}
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: ml-engine-secrets
+                  key: DATABASE_URL
             - name: OTEL_SERVICE_NAME
               value: "ml-engine"
             - name: OTEL_EXPORTER_OTLP_ENDPOINT

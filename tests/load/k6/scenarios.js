@@ -19,29 +19,62 @@ import { Rate } from 'k6/metrics';
 // Custom metric: error rate across all endpoints
 const errorRate = new Rate('error_rate');
 
-// ─── Sample Payloads ─────────────────────────────────────────────────────────
+// ─── Fixtures (from tests/load/k6/fixtures.py — embedded as constants) ────────
 
-const sampleCandle = {
+// Trending candles — consistent directional movement, 50 × 5-min bars
+const TRENDING_BASE = 45000;
+const trendingCandles = Array.from({ length: 50 }, (_, i) => {
+  const offset = i * 15;
+  return {
+    symbol: 'MNQ',
+    timeframe: '5min',
+    open: +(TRENDING_BASE + offset).toFixed(2),
+    high: +(TRENDING_BASE + offset + 30).toFixed(2),
+    low: +(TRENDING_BASE + offset - 10).toFixed(2),
+    close: +(TRENDING_BASE + offset + 25).toFixed(2),
+    volume: 1200 + (i % 10) * 50,
+    timestamp: `2026-04-12T${String(i % 24).padStart(2, '0')}:${String((i * 5) % 60).padStart(2, '0')}:00Z`,
+  };
+});
+
+// Ranging candles — oscillation within a ±20-point range
+const RANGING_BASE = 45000;
+const rangingCandles = Array.from({ length: 50 }, (_, i) => {
+  const offset = 40 * (i % 2);
+  return {
+    symbol: 'MNQ',
+    timeframe: '5min',
+    open: +(RANGING_BASE + offset).toFixed(2),
+    high: +(RANGING_BASE + offset + 15).toFixed(2),
+    low: +(RANGING_BASE + offset - 15).toFixed(2),
+    close: +(RANGING_BASE + offset + 5).toFixed(2),
+    volume: 800 + (i % 5) * 100,
+    timestamp: `2026-04-12T${String(i % 24).padStart(2, '0')}:${String((i * 5) % 60).padStart(2, '0')}:00Z`,
+  };
+});
+
+// Volatile candles — large range, high volume (earnings-like event)
+const VOLATILE_BASE = 45000;
+const volatileCandles = Array.from({ length: 50 }, (_, i) => ({
   symbol: 'MNQ',
   timeframe: '5min',
-  open: 45000.0,
-  high: 45050.0,
-  low: 44980.0,
-  close: 45020.0,
-  volume: 1200,
-  timestamp: new Date().toISOString(),
-};
+  open: +(VOLATILE_BASE + 50).toFixed(2),
+  high: +(VOLATILE_BASE + 150).toFixed(2),
+  low: +(VOLATILE_BASE - 100).toFixed(2),
+  close: +(VOLATILE_BASE - 50).toFixed(2),
+  volume: 5000 + (i % 10) * 200,
+  timestamp: `2026-04-12T${String(i % 24).padStart(2, '0')}:${String((i * 5) % 60).padStart(2, '0')}:00Z`,
+}));
 
+// Consensus symbols
+const SYMBOLS = ['MNQ', 'ES', 'NQ', 'RTY'];
+
+// Payloads wired to fixtures
+const sampleCandle = trendingCandles[0];                       // single trending candle
 const sampleMambaInput = {
   symbol: 'MNQ',
-  candles: Array.from({ length: 100 }, (_, i) => ({
-    timestamp: new Date(Date.now() - (100 - i) * 300000).toISOString(),
-    open: parseFloat((45000 + Math.sin(i / 10) * 100).toFixed(2)),
-    high: parseFloat((45050 + Math.sin(i / 10) * 100).toFixed(2)),
-    low: parseFloat((44980 + Math.sin(i / 10) * 100).toFixed(2)),
-    close: parseFloat((45020 + Math.sin(i / 10) * 100).toFixed(2)),
-    volume: 1200 + Math.floor(Math.random() * 500),
-  })),
+  // 100 candles: first 50 trending + next 50 ranging  (mirrors get_mamba_candles())
+  candles: [...trendingCandles, ...rangingCandles].slice(0, 100),
 };
 
 // ─── k6 Options ─────────────────────────────────────────────────────────────
