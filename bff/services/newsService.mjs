@@ -16,7 +16,9 @@
 const FOREX_FACTORY_URL = "https://www.forexfactory.com/calendar";
 const NEWS_API_KEY = String(process.env.NEWS_API_KEY || "").trim() || null;
 const NEWS_API_URL = "https://newsdata.io/api/1/news";
-const ML_ENGINE_BASE = process.env.ML_ENGINE_URL || "http://127.0.0.1:8001";
+const ML_ENGINE_BASE = String(
+  process.env.ML_ENGINE_URL || process.env.ML_ENGINE_INTERNAL_URL || "http://ml-engine:8001",
+).trim();
 
 const STAR_THRESHOLD = 3;  // Only track 3★ events
 

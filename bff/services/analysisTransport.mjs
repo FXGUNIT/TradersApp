@@ -9,10 +9,14 @@ const REPO_ROOT = resolve(__dirname, "..", "..");
 const ANALYSIS_TRANSPORT = String(
   process.env.ML_ANALYSIS_TRANSPORT || "http",
 ).toLowerCase();
-const ANALYSIS_GRPC_ADDR = process.env.ML_ANALYSIS_GRPC_ADDR || "127.0.0.1:50051";
+const ANALYSIS_GRPC_ADDR = String(
+  process.env.ML_ANALYSIS_GRPC_ADDR || "analysis-service:50051",
+).trim();
 const ANALYSIS_GRPC_STRICT =
   String(process.env.ML_ANALYSIS_GRPC_STRICT || "false").toLowerCase() === "true";
-const ML_ENGINE_BASE = process.env.ML_ENGINE_URL || "http://127.0.0.1:8001";
+const ML_ENGINE_BASE = String(
+  process.env.ML_ENGINE_URL || process.env.ML_ENGINE_INTERNAL_URL || "http://ml-engine:8001",
+).trim();
 const ANALYSIS_PROTO_PATH = resolve(REPO_ROOT, "proto", "ddd", "v1", "analysis.proto");
 
 let _grpcClientPromise = null;

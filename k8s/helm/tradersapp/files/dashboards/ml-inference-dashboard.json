@@ -335,17 +335,17 @@
       "targets": [
         {
           "expr": "histogram_quantile(0.50, sum(rate(ml_engine_inference_latency_ms_bucket[5m])) by (le, endpoint))",
-          "legendFormat": "P50 {{ print "{{endpoint}}" }}",
+          "legendFormat": "P50 {{endpoint}}",
           "refId": "A"
         },
         {
           "expr": "histogram_quantile(0.95, sum(rate(ml_engine_inference_latency_ms_bucket[5m])) by (le, endpoint))",
-          "legendFormat": "P95 {{ print "{{endpoint}}" }}",
+          "legendFormat": "P95 {{endpoint}}",
           "refId": "B"
         },
         {
           "expr": "histogram_quantile(0.99, sum(rate(ml_engine_inference_latency_ms_bucket[5m])) by (le, endpoint))",
-          "legendFormat": "P99 {{ print "{{endpoint}}" }}",
+          "legendFormat": "P99 {{endpoint}}",
           "refId": "C"
         }
       ],

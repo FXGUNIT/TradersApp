@@ -136,7 +136,9 @@ loadEnvFiles();
 
 const GRPC_PORT = Number(process.env.ANALYSIS_SERVICE_GRPC_PORT || 50051);
 const HEALTH_PORT = Number(process.env.ANALYSIS_SERVICE_HEALTH_PORT || 8082);
-const ML_ENGINE_URL = process.env.ML_ENGINE_URL || "http://127.0.0.1:8001";
+const ML_ENGINE_URL = String(
+  process.env.ML_ENGINE_URL || process.env.ML_ENGINE_INTERNAL_URL || "http://ml-engine:8001",
+).trim();
 
 // ─── Circuit Breaker ──────────────────────────────────────────────────────────
 

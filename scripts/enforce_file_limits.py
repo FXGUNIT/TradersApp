@@ -17,6 +17,12 @@ import sys
 import os
 from pathlib import Path
 
+try:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(errors="replace")
+except OSError:
+    pass
+
 PYTHON_LIMIT = 600
 JS_LIMIT = 500
 REACT_LIMIT = 300
@@ -87,9 +93,9 @@ def scan(root: Path, quiet: bool) -> list[tuple[Path, int, int, str]]:
 
             if lines > rule["limit"]:
                 violations.append((rel, lines, rule["limit"], rule["label"]))
-                print(f"  ❌ [{rule['label']}] {rel} — {lines} lines (max {rule['limit']})")
+                print(f"  [FAIL] [{rule['label']}] {rel} - {lines} lines (max {rule['limit']})")
             elif not quiet:
-                print(f"  ✓  [{rule['label']}] {rel} — {lines} lines")
+                print(f"  [OK]   [{rule['label']}] {rel} - {lines} lines")
 
     return violations
 
@@ -109,12 +115,12 @@ def main() -> None:
 
     print()
     if violations:
-        print(f"❌ File size gate FAILED — {len(violations)} file(s) exceed hard limits:")
+        print(f"[FAIL] File size gate FAILED - {len(violations)} file(s) exceed hard limits:")
         for rel, lines, limit, label in violations:
             print(f"   {rel}  ({lines}/{limit} lines, {lines - limit} over)")
         sys.exit(1)
     else:
-        print("✅ File size gate PASSED — all files within hard limits")
+        print("[PASS] File size gate PASSED - all files within hard limits")
 
 
 if __name__ == "__main__":

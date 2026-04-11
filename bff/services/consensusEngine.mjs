@@ -111,7 +111,9 @@ syncCircuitBreakerMetric();
 
 // ── ML Engine Client ──────────────────────────────────────────────────────────
 
-const ML_ENGINE_BASE = process.env.ML_ENGINE_URL || "http://127.0.0.1:8001";
+const ML_ENGINE_BASE = String(
+  process.env.ML_ENGINE_URL || process.env.ML_ENGINE_INTERNAL_URL || "http://ml-engine:8001",
+).trim();
 const ML_REQUEST_TIMEOUT_MS = 30_000;
 
 async function mlRequest(path, body = null, timeout = ML_REQUEST_TIMEOUT_MS, options = {}) {

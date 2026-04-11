@@ -1,4 +1,4 @@
-{{- /* Base kustomization — shared by all environments */ -}}
+# Base kustomization — shared by all environments
 # k8s/base/kustomization.yaml
 namespace: tradersapp
 commonAnnotations:

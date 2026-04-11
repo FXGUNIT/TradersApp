@@ -1,4 +1,4 @@
-﻿{{- if .Values.mlflow.enabled }}
+{{- if .Values.mlflow.enabled }}
 {{- $namespace := include "tradersapp.namespace" . }}
 {{- $secretName := default "mlflow-runtime-secret" .Values.mlflow.secretRef.existingSecret }}
 {{- $postgresDbKey := default "POSTGRES_DB" .Values.mlflow.secretRef.postgresDbKey }}

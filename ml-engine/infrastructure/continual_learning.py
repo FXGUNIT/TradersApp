@@ -536,7 +536,18 @@ class ContinualLearningOrchestrator:
     8. Log to training history
     """
 
-    def __init__(self, config: ContinualLearningConfig = None):
+    _instance: "ContinualLearningOrchestrator | None" = None
+    _instance_lock = threading.Lock()
+
+    @classmethod
+    def get_instance(cls) -> "ContinualLearningOrchestrator":
+        if cls._instance is None:
+            with cls._instance_lock:
+                if cls._instance is None:
+                    cls._instance = cls()
+        return cls._instance
+
+    def __init__(self, config: ContinualLearningConfig | None = None):
         self.config = config or ContinualLearningConfig()
         self.validator = AntiForgettingValidator(self.config)
         self.replay_buffer = self.validator.replay_buffer
@@ -623,16 +634,8 @@ class ContinualLearningOrchestrator:
         }
 
 
-# ─── Global Instance ─────────────────────────────────────────────────────────
-
-_global_orchestrator: ContinualLearningOrchestrator | None = None
-_orchestrator_lock = threading.Lock()
+# ─── Singleton Accessor ───────────────────────────────────────────────────────
 
 
 def get_continual_learning_orchestrator() -> ContinualLearningOrchestrator:
-    global _global_orchestrator
-    if _global_orchestrator is None:
-        with _orchestrator_lock:
-            if _global_orchestrator is None:
-                _global_orchestrator = ContinualLearningOrchestrator()
-    return _global_orchestrator
+    return ContinualLearningOrchestrator.get_instance()

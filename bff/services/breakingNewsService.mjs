@@ -36,7 +36,9 @@ const NEWS_API_URL = "https://newsdata.io/api/1/news";
 const YF_RSS_BASE = "https://feeds.finance.yahoo.com/rss/2.0/headline";
 const GDELT_URL = "https://api.gdeltproject.org/api/v2/doc/doc";
 
-const ML_ENGINE_BASE = process.env.ML_ENGINE_URL || "http://127.0.0.1:8001";
+const ML_ENGINE_BASE = String(
+  process.env.ML_ENGINE_URL || process.env.ML_ENGINE_INTERNAL_URL || "http://ml-engine:8001",
+).trim();
 const BREAKING_NEWS_CACHE_KEY = "bknews:latest";
 const BREAKING_NEWS_CACHE_TTL_MS = Number.parseInt(
   process.env.BREAKING_NEWS_CACHE_TTL_MS || "600000",

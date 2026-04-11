@@ -13,7 +13,7 @@ import {
   simulateEquityCurve,
 } from './calculatorUtils.js';
 
-const BFF_BASE = import.meta.env.VITE_BFF_URL || "http://127.0.0.1:8788";
+const BFF_BASE = String(import.meta.env.VITE_BFF_URL || '').trim();
 const MAX_CLIENT_TRADES = 10_000;
 
 function formatCurrency(v) {

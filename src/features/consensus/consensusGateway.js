@@ -4,7 +4,7 @@
  */
 import { hasBff } from '../../services/gateways/base.js';
 
-const BFF_BASE = import.meta.env.VITE_BFF_URL || "http://127.0.0.1:8788";
+const BFF_BASE = String(import.meta.env.VITE_BFF_URL || '').trim();
 
 /**
  * Fetch ML consensus signal from BFF.

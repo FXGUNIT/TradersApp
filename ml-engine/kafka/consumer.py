@@ -72,22 +72,50 @@ TOPIC_DLQ = "dead-letter-queue"
 # Max handler failures before a message is forwarded to the dead-letter queue.
 DLQ_MAX_RETRIES = int(os.environ.get("KAFKA_DLQ_MAX_RETRIES", "3"))
 
-try:
-    from infrastructure.prometheus_exporter import (
-        set_kafka_consumer_lag as _set_lag,
-        record_kafka_consumer_processed as _record_processed,
-    )
-except Exception:
+def _get_prometheus_exporter():
     try:
-        from ml_engine.infrastructure.prometheus_exporter import (  # type: ignore
-            set_kafka_consumer_lag as _set_lag,
-            record_kafka_consumer_processed as _record_processed,
-        )
+        from infrastructure import prometheus_exporter
+        return prometheus_exporter
     except Exception:
-        def _set_lag(topic: str, partition: int, lag: int) -> None:  # type: ignore
-            pass
-        def _record_processed(topic: str) -> None:  # type: ignore
-            pass
+        try:
+            from ml_engine.infrastructure import prometheus_exporter  # type: ignore
+            return prometheus_exporter
+        except Exception:
+            return None
+
+
+def _set_lag(topic: str, partition: int, lag: int) -> None:
+    exporter = _get_prometheus_exporter()
+    setter = getattr(exporter, "set_kafka_consumer_lag", None) if exporter else None
+    if callable(setter):
+        setter(topic, partition, lag)
+
+
+def _record_processed(topic: str) -> None:
+    exporter = _get_prometheus_exporter()
+    recorder = getattr(exporter, "record_kafka_consumer_processed", None) if exporter else None
+    if callable(recorder):
+        recorder(topic)
+
+
+def _make_topic_partition(topic: str, partition: int):
+    try:
+        from confluent_kafka import TopicPartition as KafkaTopicPartition
+
+        candidate = KafkaTopicPartition(topic, partition)
+        if isinstance(getattr(candidate, "topic", None), str) and isinstance(getattr(candidate, "partition", None), int):
+            return candidate
+    except Exception:
+        pass
+
+    class _TopicPartitionFallback:
+        def __init__(self, topic_name: str, partition_id: int):
+            self.topic = topic_name
+            self.partition = partition_id
+            self.offset = -1
+            self.error = None
+
+    return _TopicPartitionFallback(topic, partition)
 
 
 class KafkaConsumerClient:
@@ -404,8 +432,7 @@ class KafkaConsumerClient:
         if self._consumer is None:
             return
         try:
-            from confluent_kafka import TopicPartition
-            tp = TopicPartition(topic, partition)
+            tp = _make_topic_partition(topic, partition)
             low, high = self._consumer.get_watermark_offsets(tp, timeout=0.5)
             committed_list = self._consumer.committed([tp], timeout=0.5)
             if not (committed_list and committed_list[0].offset >= 0):
@@ -430,6 +457,7 @@ class KafkaConsumerClient:
                     self._log(logging.WARNING, "Resume failed topic=%s: %s", topic, e)
                 if not self._paused_topics:
                     self._paused = False
+                return
 
             if lag > self._max_lag and not self._paused:
                 self._pause_until = now + self._backoff_seconds
