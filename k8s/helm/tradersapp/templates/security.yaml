@@ -34,7 +34,7 @@ spec:
     - to:
         - podSelector:
             matchLabels:
-              app.kubernetes.io/component: postgresql
+              app: tradersapp-postgres
       ports:
         - protocol: TCP
           port: 5432
