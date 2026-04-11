@@ -1,127 +1,101 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1800 1000" role="img" aria-labelledby="title desc">
-  <title id="title">TradersApp What How Why Where Whom map</title>
-  <desc id="desc">Single-chart operating map showing what, how, why, where, and whom for each major part of the TradersApp architecture.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1700 980" role="img" aria-labelledby="title desc">
+  <title id="title">TradersApp - Architecture Operating Map</title>
+  <desc id="desc">Current operating map answering what, how, why, where, and who for the major architecture lanes.</desc>
   <defs>
-    <filter id="shadow" x="-20%" y="-20%" width="140%" height="160%">
-      <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#10233d" flood-opacity="0.10"/>
-    </filter>
     <style>
-      .title { font: 700 42px 'Segoe UI', Arial, sans-serif; fill: #10233d; }
-      .subtitle { font: 500 18px 'Segoe UI', Arial, sans-serif; fill: #536f8c; }
-      .header { font: 700 22px 'Segoe UI', Arial, sans-serif; fill: #10233d; }
-      .rowtitle { font: 700 20px 'Segoe UI', Arial, sans-serif; fill: #10233d; }
-      .cell { font: 500 15px 'Segoe UI', Arial, sans-serif; fill: #425d7b; }
-      .mini { font: 600 12px 'Segoe UI', Arial, sans-serif; fill: #6b839d; }
+      .bg { fill: #ffffff; }
+      .title { font: 700 36px 'Segoe UI', Arial, sans-serif; fill: #0f172a; }
+      .subtitle { font: 500 17px 'Segoe UI', Arial, sans-serif; fill: #475569; }
+      .hdr { font: 700 18px 'Segoe UI', Arial, sans-serif; fill: #ffffff; }
+      .lane { font: 700 17px 'Segoe UI', Arial, sans-serif; fill: #0f172a; }
+      .cell { font: 500 13px 'Segoe UI', Arial, sans-serif; fill: #334155; }
+      .cell-strong { font: 700 13px 'Segoe UI', Arial, sans-serif; fill: #0f172a; }
+      .tag { font: 700 11px 'Segoe UI', Arial, sans-serif; fill: #475569; }
     </style>
   </defs>
 
-  <rect width="1800" height="1000" fill="#f8fbff"/>
-  <text x="70" y="74" class="title">Architecture operating map</text>
-  <text x="70" y="106" class="subtitle">One chart that answers what / how / why / where / whom for the system as it exists today</text>
+  <rect class="bg" width="1700" height="980"/>
+  <text x="60" y="64" class="title">Architecture operating map</text>
+  <text x="60" y="94" class="subtitle">Read this as current-state operating intent, not as a target-state promise.</text>
 
-  <g filter="url(#shadow)">
-    <rect x="70" y="150" width="1660" height="776" rx="28" fill="#ffffff" stroke="#d9e2eb" stroke-width="2"/>
+  <rect x="50" y="130" width="1600" height="780" rx="24" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
+
+  <rect x="50" y="130" width="220" height="58" rx="16" fill="#1e293b"/>
+  <rect x="270" y="130" width="270" height="58" rx="16" fill="#475569"/>
+  <rect x="540" y="130" width="270" height="58" rx="16" fill="#475569"/>
+  <rect x="810" y="130" width="270" height="58" rx="16" fill="#475569"/>
+  <rect x="1080" y="130" width="270" height="58" rx="16" fill="#475569"/>
+  <rect x="1350" y="130" width="300" height="58" rx="16" fill="#475569"/>
+
+  <text x="160" y="167" class="hdr" text-anchor="middle">Lane</text>
+  <text x="405" y="167" class="hdr" text-anchor="middle">What</text>
+  <text x="675" y="167" class="hdr" text-anchor="middle">How</text>
+  <text x="945" y="167" class="hdr" text-anchor="middle">Why</text>
+  <text x="1215" y="167" class="hdr" text-anchor="middle">Where</text>
+  <text x="1500" y="167" class="hdr" text-anchor="middle">Who</text>
+
+  <rect x="50" y="210" width="1600" height="126" fill="#fff7ed"/>
+  <rect x="50" y="336" width="1600" height="126" fill="#eefbf3"/>
+  <rect x="50" y="462" width="1600" height="126" fill="#eff6ff"/>
+  <rect x="50" y="588" width="1600" height="126" fill="#f5f3ff"/>
+  <rect x="50" y="714" width="1600" height="126" fill="#f8fafc"/>
+
+  <g stroke="#cbd5e1" stroke-width="2">
+    <line x1="270" y1="188" x2="270" y2="840"/>
+    <line x1="540" y1="188" x2="540" y2="840"/>
+    <line x1="810" y1="188" x2="810" y2="840"/>
+    <line x1="1080" y1="188" x2="1080" y2="840"/>
+    <line x1="1350" y1="188" x2="1350" y2="840"/>
+    <line x1="50" y1="210" x2="1650" y2="210"/>
+    <line x1="50" y1="336" x2="1650" y2="336"/>
+    <line x1="50" y1="462" x2="1650" y2="462"/>
+    <line x1="50" y1="588" x2="1650" y2="588"/>
+    <line x1="50" y1="714" x2="1650" y2="714"/>
+    <line x1="50" y1="840" x2="1650" y2="840"/>
   </g>
 
-  <g>
-    <rect x="70" y="150" width="250" height="86" fill="#f2f6fb" stroke="#d9e2eb" stroke-width="2"/>
-    <text x="98" y="204" class="header">Lane</text>
-    <rect x="320" y="150" width="282" height="86" fill="#f2f6fb" stroke="#d9e2eb" stroke-width="2"/>
-    <text x="348" y="204" class="header">What</text>
-    <rect x="602" y="150" width="282" height="86" fill="#f2f6fb" stroke="#d9e2eb" stroke-width="2"/>
-    <text x="630" y="204" class="header">How</text>
-    <rect x="884" y="150" width="282" height="86" fill="#f2f6fb" stroke="#d9e2eb" stroke-width="2"/>
-    <text x="912" y="204" class="header">Why</text>
-    <rect x="1166" y="150" width="282" height="86" fill="#f2f6fb" stroke="#d9e2eb" stroke-width="2"/>
-    <text x="1194" y="204" class="header">Where</text>
-    <rect x="1448" y="150" width="282" height="86" fill="#f2f6fb" stroke="#d9e2eb" stroke-width="2"/>
-    <text x="1476" y="204" class="header">Whom</text>
-    <rect x="70" y="236" width="1660" height="138" fill="#fff7ea" stroke="#f1c27a" stroke-width="2"/>
-    <line x1="320" y1="236" x2="320" y2="374" stroke="#d9e2eb" stroke-width="2"/>
-    <line x1="602" y1="236" x2="602" y2="374" stroke="#d9e2eb" stroke-width="2"/>
-    <line x1="884" y1="236" x2="884" y2="374" stroke="#d9e2eb" stroke-width="2"/>
-    <line x1="1166" y1="236" x2="1166" y2="374" stroke="#d9e2eb" stroke-width="2"/>
-    <line x1="1448" y1="236" x2="1448" y2="374" stroke="#d9e2eb" stroke-width="2"/>
-    <text x="98" y="290" class="rowtitle">Request path</text>
-    <text x="342" y="284" class="cell">Frontend -&gt; BFF -&gt;</text>
-    <text x="342" y="310" class="cell">analysis-service -&gt; ML Engine</text>
-    <text x="624" y="284" class="cell">HTTP at the edge; gRPC</text>
-    <text x="624" y="310" class="cell">at the extracted service seam</text>
-    <text x="906" y="284" class="cell">Keep live trading latency</text>
-    <text x="906" y="310" class="cell">under the critical SLA</text>
-    <text x="1188" y="284" class="cell">Browser, BFF, analysis-service,</text>
-    <text x="1188" y="310" class="cell">ML Engine, Redis, Feast</text>
-    <text x="1470" y="284" class="cell">Trader depends on it;</text>
-    <text x="1470" y="310" class="cell">BFF + analysis owners keep it stable</text>
-    <rect x="70" y="374" width="1660" height="138" fill="#eef9f0" stroke="#b8dfc1" stroke-width="2"/>
-    <line x1="320" y1="374" x2="320" y2="512" stroke="#d9e2eb" stroke-width="2"/>
-    <line x1="602" y1="374" x2="602" y2="512" stroke="#d9e2eb" stroke-width="2"/>
-    <line x1="884" y1="374" x2="884" y2="512" stroke="#d9e2eb" stroke-width="2"/>
-    <line x1="1166" y1="374" x2="1166" y2="512" stroke="#d9e2eb" stroke-width="2"/>
-    <line x1="1448" y1="374" x2="1448" y2="512" stroke="#d9e2eb" stroke-width="2"/>
-    <text x="98" y="428" class="rowtitle">Learning loop</text>
-    <text x="342" y="422" class="cell">Retraining, data quality,</text>
-    <text x="342" y="448" class="cell">registry, artifacts, feedback</text>
-    <text x="624" y="422" class="cell">Airflow DAGs, Great Expectations,</text>
-    <text x="624" y="448" class="cell">MLflow, Kafka, MinIO</text>
-    <text x="906" y="422" class="cell">Stop drift and promote</text>
-    <text x="906" y="448" class="cell">only validated model versions</text>
-    <text x="1188" y="422" class="cell">ML Engine internals, Airflow,</text>
-    <text x="1188" y="448" class="cell">MLflow, MinIO, Postgres</text>
-    <text x="1470" y="422" class="cell">ML owner / operator</text>
-    <text x="1470" y="448" class="cell">reviews and promotes versions</text>
-    <rect x="70" y="512" width="1660" height="138" fill="#eef8fc" stroke="#b8dceb" stroke-width="2"/>
-    <line x1="320" y1="512" x2="320" y2="650" stroke="#d9e2eb" stroke-width="2"/>
-    <line x1="602" y1="512" x2="602" y2="650" stroke="#d9e2eb" stroke-width="2"/>
-    <line x1="884" y1="512" x2="884" y2="650" stroke="#d9e2eb" stroke-width="2"/>
-    <line x1="1166" y1="512" x2="1166" y2="650" stroke="#d9e2eb" stroke-width="2"/>
-    <line x1="1448" y1="512" x2="1448" y2="650" stroke="#d9e2eb" stroke-width="2"/>
-    <text x="98" y="566" class="rowtitle">Observability</text>
-    <text x="342" y="560" class="cell">Metrics, logs, traces,</text>
-    <text x="342" y="586" class="cell">dashboards, alerts</text>
-    <text x="624" y="560" class="cell">Prometheus scrapes, Grafana</text>
-    <text x="624" y="586" class="cell">visualizes, Loki + Jaeger collect</text>
-    <text x="906" y="560" class="cell">Catch latency, drift, retrain,</text>
-    <text x="906" y="586" class="cell">and infra failures early</text>
-    <text x="1188" y="560" class="cell">Every runtime service</text>
-    <text x="1188" y="586" class="cell">across the stack</text>
-    <text x="1470" y="560" class="cell">Platform / operator team</text>
-    <text x="1470" y="586" class="cell">responds and tunes alerts</text>
-    <rect x="70" y="650" width="1660" height="138" fill="#f6f2ff" stroke="#d4c7ff" stroke-width="2"/>
-    <line x1="320" y1="650" x2="320" y2="788" stroke="#d9e2eb" stroke-width="2"/>
-    <line x1="602" y1="650" x2="602" y2="788" stroke="#d9e2eb" stroke-width="2"/>
-    <line x1="884" y1="650" x2="884" y2="788" stroke="#d9e2eb" stroke-width="2"/>
-    <line x1="1166" y1="650" x2="1166" y2="788" stroke="#d9e2eb" stroke-width="2"/>
-    <line x1="1448" y1="650" x2="1448" y2="788" stroke="#d9e2eb" stroke-width="2"/>
-    <text x="98" y="704" class="rowtitle">Delivery + secrets</text>
-    <text x="342" y="698" class="cell">Build, test, deploy,</text>
-    <text x="342" y="724" class="cell">and inject runtime secrets</text>
-    <text x="624" y="698" class="cell">Gitea, Woodpecker, Helm,</text>
-    <text x="624" y="724" class="cell">k3s, Infisical</text>
-    <text x="906" y="698" class="cell">Ship changes safely without</text>
-    <text x="906" y="724" class="cell">manual drift</text>
-    <text x="1188" y="698" class="cell">CI/CD pipeline, cluster release,</text>
-    <text x="1188" y="724" class="cell">runtime environments</text>
-    <text x="1470" y="698" class="cell">Developer pushes; pipeline</text>
-    <text x="1470" y="724" class="cell">and platform own execution</text>
-    <rect x="70" y="788" width="1660" height="138" fill="#ffffff" stroke="#d9e2eb" stroke-width="2"/>
-    <line x1="320" y1="788" x2="320" y2="926" stroke="#d9e2eb" stroke-width="2"/>
-    <line x1="602" y1="788" x2="602" y2="926" stroke="#d9e2eb" stroke-width="2"/>
-    <line x1="884" y1="788" x2="884" y2="926" stroke="#d9e2eb" stroke-width="2"/>
-    <line x1="1166" y1="788" x2="1166" y2="926" stroke="#d9e2eb" stroke-width="2"/>
-    <line x1="1448" y1="788" x2="1448" y2="926" stroke="#d9e2eb" stroke-width="2"/>
-    <text x="98" y="842" class="rowtitle">Reality check</text>
-    <text x="98" y="870" class="mini">current state only</text>
-    <text x="342" y="836" class="cell">Only analysis is extracted;</text>
-    <text x="342" y="862" class="cell">learning mostly stays internal</text>
-    <text x="624" y="836" class="cell">Incremental extraction behind</text>
-    <text x="624" y="862" class="cell">stable contracts</text>
-    <text x="906" y="836" class="cell">Lower risk than forcing</text>
-    <text x="906" y="862" class="cell">premature microservices</text>
-    <text x="1188" y="836" class="cell">analysis-service is live;</text>
-    <text x="1188" y="862" class="cell">ingestion + learning still sit</text>
-    <text x="1188" y="888" class="cell">mostly inside ML Engine</text>
-    <text x="1470" y="836" class="cell">Architecture owner chooses</text>
-    <text x="1470" y="862" class="cell">the next extraction slice</text>
-  </g>
+  <text x="78" y="248" class="lane">Request path</text>
+  <text x="78" y="268" class="tag">CURRENT</text>
+  <text x="292" y="242" class="cell-strong">Frontend -> BFF -> analysis-service -> ML Engine</text>
+  <text x="292" y="262" class="cell">This is the live serving path for consensus work.</text>
+  <text x="562" y="242" class="cell">HTTP at the edge, gRPC on the seam, HTTP /predict behind the seam today.</text>
+  <text x="832" y="242" class="cell">Keep the user-facing contract stable while extraction continues behind it.</text>
+  <text x="1102" y="242" class="cell">Browser, BFF, analysis-service, ML Engine, Redis, Feast.</text>
+  <text x="1372" y="242" class="cell">Trader traffic, BFF owner, analysis owner.</text>
+
+  <text x="78" y="374" class="lane">Learning loop</text>
+  <text x="78" y="394" class="tag">PARTIAL</text>
+  <text x="292" y="368" class="cell-strong">Training, drift checks, DQ gates, registry, artifacts</text>
+  <text x="292" y="388" class="cell">The capability exists, but validation depth differs by environment.</text>
+  <text x="562" y="368" class="cell">Airflow DAGs, Great Expectations, MLflow, Kafka, MinIO, PostgreSQL.</text>
+  <text x="832" y="368" class="cell">Promote models through checks instead of pushing directly from code changes.</text>
+  <text x="1102" y="368" class="cell">ml-engine modules, Airflow workflows, MLOps services.</text>
+  <text x="1372" y="368" class="cell">ML operator, platform owner, data-quality owner.</text>
+
+  <text x="78" y="500" class="lane">Observability</text>
+  <text x="78" y="520" class="tag">PARTIAL</text>
+  <text x="292" y="494" class="cell-strong">Metrics, logs, traces, alerts, dashboards</text>
+  <text x="292" y="514" class="cell">The stack is defined in-repo; live signal coverage still needs proving in every target environment.</text>
+  <text x="562" y="494" class="cell">Prometheus, Grafana, Loki, Jaeger, OTEL wiring, rules, dashboards.</text>
+  <text x="832" y="494" class="cell">Catch latency, drift, retrain failure, and deploy regressions early.</text>
+  <text x="1102" y="494" class="cell">Across runtime services and cluster support services.</text>
+  <text x="1372" y="494" class="cell">Platform operator and service owners.</text>
+
+  <text x="78" y="626" class="lane">Delivery + secrets</text>
+  <text x="78" y="646" class="tag">MIXED</text>
+  <text x="292" y="620" class="cell-strong">Build, test, deploy, inject secrets</text>
+  <text x="292" y="640" class="cell">The repo still carries both public-cloud and self-hosted operating stories.</text>
+  <text x="562" y="620" class="cell">GitHub Actions plus Railway/Vercel current; Gitea/Woodpecker plus Helm/k3s partial.</text>
+  <text x="832" y="620" class="cell">Avoid drift and make environment claims explicit instead of implied.</text>
+  <text x="1102" y="620" class="cell">CI workflows, Helm charts, k8s docs, setup and deployment docs.</text>
+  <text x="1372" y="620" class="cell">Developer, platform owner, release owner.</text>
+
+  <text x="78" y="752" class="lane">Boundary reality</text>
+  <text x="78" y="772" class="tag">CURRENT</text>
+  <text x="292" y="746" class="cell-strong">Only analysis is physically extracted today</text>
+  <text x="292" y="766" class="cell">Ingestion and learning are bounded contexts before they are separate runtimes.</text>
+  <text x="562" y="746" class="cell">Keep contracts stable first; move behavior out in slices later.</text>
+  <text x="832" y="746" class="cell">This lowers blast radius and stops premature service sprawl.</text>
+  <text x="1102" y="746" class="cell">analysis-service live; ingestion and learning still mostly inside ml-engine.</text>
+  <text x="1372" y="746" class="cell">Architecture owner, BFF owner, ML owner.</text>
 </svg>

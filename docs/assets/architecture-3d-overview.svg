@@ -1,351 +1,104 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1080" role="img" aria-labelledby="title desc">
-  <title id="title">TradersApp — Architecture Overview</title>
-  <desc id="desc">High-level architecture showing the TradersApp request path, supporting systems, and extraction status.</desc>
-
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 980" role="img" aria-labelledby="title desc">
+  <title id="title">TradersApp - Current Runtime Overview</title>
+  <desc id="desc">Current runtime topology showing the live request path, support planes, deployment modes, and extraction status.</desc>
   <defs>
-    <!-- ── Gradients ── -->
-    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#f0f4fa"/>
-      <stop offset="100%" stop-color="#e8edf5"/>
-    </linearGradient>
-
-    <linearGradient id="requestGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#ff8c00" stop-opacity="0.18"/>
-      <stop offset="100%" stop-color="#ff8c00" stop-opacity="0.04"/>
-    </linearGradient>
-
-    <linearGradient id="delivGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#7c3aed" stop-opacity="0.12"/>
-      <stop offset="100%" stop-color="#4f46e5" stop-opacity="0.06"/>
-    </linearGradient>
-
-    <linearGradient id="learnGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#059669" stop-opacity="0.12"/>
-      <stop offset="100%" stop-color="#0d9488" stop-opacity="0.06"/>
-    </linearGradient>
-
-    <linearGradient id="observeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#0891b2" stop-opacity="0.12"/>
-      <stop offset="100%" stop-color="#0284c7" stop-opacity="0.06"/>
-    </linearGradient>
-
-    <linearGradient id="footerGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#1e293b" stop-opacity="0.06"/>
-      <stop offset="100%" stop-color="#1e293b" stop-opacity="0.02"/>
-    </linearGradient>
-
-    <linearGradient id="boxGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="#ffffff"/>
-      <stop offset="100%" stop-color="#f8fafc"/>
-    </linearGradient>
-
-    <!-- ── Filters ── -->
-    <filter id="card" x="-8%" y="-6%" width="116%" height="118%">
-      <feDropShadow dx="0" dy="3" stdDeviation="8" flood-color="#1e3a5f" flood-opacity="0.08"/>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#0f172a" flood-opacity="0.10"/>
     </filter>
-    <filter id="boxShadow" x="-4%" y="-4%" width="108%" height="114%">
-      <feDropShadow dx="0" dy="2" stdDeviation="5" flood-color="#1e3a5f" flood-opacity="0.10"/>
-    </filter>
-    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur stdDeviation="3" result="blur"/>
-      <feMerge>
-        <feMergeNode in="blur"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
-    </filter>
-
-    <!-- ── Markers ── -->
-    <marker id="arr-orange" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
-      <path d="M0,0 L0,8 L8,4 z" fill="#e07010"/>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#ea580c"/>
     </marker>
-    <marker id="arr-blue" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
-      <path d="M0,0 L0,8 L8,4 z" fill="#4f8ef7"/>
-    </marker>
-    <marker id="arr-green" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
-      <path d="M0,0 L0,8 L8,4 z" fill="#10b981"/>
-    </marker>
-
-    <!-- ── Clip paths ── -->
-    <clipPath id="header-clip">
-      <rect x="0" y="0" width="1600" height="130" rx="0"/>
-    </clipPath>
-
     <style>
-      .bg { fill: url(#bgGrad); }
-      .title { font: 700 38px 'Inter', 'Segoe UI', Arial, sans-serif; fill: #0f1e35; }
-      .subtitle { font: 400 16px 'Inter', 'Segoe UI', Arial, sans-serif; fill: #64748b; }
-      .pill { font: 700 11px 'Inter', 'Segoe UI', Arial, sans-serif; fill: #fff; letter-spacing: 0.8px; }
-      .sec-title { font: 700 22px 'Inter', 'Segoe UI', Arial, sans-serif; fill: #0f1e35; }
-      .sec-sub { font: 400 14px 'Inter', 'Segoe UI', Arial, sans-serif; fill: #64748b; }
-      .sec-note { font: 400 12px 'Inter', 'Segoe UI', Arial, sans-serif; fill: #94a3b8; }
-      .box-title { font: 700 18px 'Inter', 'Segoe UI', Arial, sans-serif; fill: #0f1e35; }
-      .box-sub { font: 400 13px 'Inter', 'Segoe UI', Arial, sans-serif; fill: #64748b; }
-      .box-tag { font: 700 10px 'Inter', 'Segoe UI', Arial, sans-serif; fill: #94a3b8; letter-spacing: 0.5px; }
-      .footer-title { font: 700 20px 'Inter', 'Segoe UI', Arial, sans-serif; fill: #0f1e35; }
-      .footer-body { font: 400 14px 'Inter', 'Segoe UI', Arial, sans-serif; fill: #334155; }
-      .divider { fill: #e2e8f0; }
-      .lane-badge { font: 700 10px 'Inter', 'Segoe UI', Arial, sans-serif; fill: #fff; letter-spacing: 0.8px; }
+      .bg { fill: #f4f7fb; }
+      .title { font: 700 38px 'Segoe UI', Arial, sans-serif; fill: #0f172a; }
+      .subtitle { font: 500 17px 'Segoe UI', Arial, sans-serif; fill: #475569; }
+      .section { font: 700 22px 'Segoe UI', Arial, sans-serif; fill: #0f172a; }
+      .body { font: 500 14px 'Segoe UI', Arial, sans-serif; fill: #334155; }
+      .small { font: 500 12px 'Segoe UI', Arial, sans-serif; fill: #64748b; }
+      .card-title { font: 700 18px 'Segoe UI', Arial, sans-serif; fill: #0f172a; }
+      .pill { font: 700 11px 'Segoe UI', Arial, sans-serif; fill: #ffffff; letter-spacing: 0.6px; }
+      .status { font: 700 11px 'Segoe UI', Arial, sans-serif; fill: #0f172a; }
     </style>
   </defs>
 
-  <!-- ── Background ── -->
-  <rect class="bg" width="1600" height="1080"/>
+  <rect class="bg" width="1600" height="980"/>
 
-  <!-- Subtle grid pattern -->
-  <g opacity="0.4">
-    <line x1="0" y1="200" x2="1600" y2="200" stroke="#cbd5e1" stroke-width="0.5" stroke-dasharray="6 6"/>
-    <line x1="0" y1="450" x2="1600" y2="450" stroke="#cbd5e1" stroke-width="0.5" stroke-dasharray="6 6"/>
-    <line x1="0" y1="880" x2="1600" y2="880" stroke="#cbd5e1" stroke-width="0.5" stroke-dasharray="6 6"/>
+  <text x="72" y="70" class="title">Current runtime overview</text>
+  <text x="72" y="102" class="subtitle">Source of truth for what runs now, what is partial, and where the contracts actually sit.</text>
+
+  <g filter="url(#shadow)">
+    <rect x="60" y="140" width="1480" height="260" rx="28" fill="#fff7ed" stroke="#fdba74" stroke-width="2"/>
+    <rect x="60" y="432" width="460" height="250" rx="28" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/>
+    <rect x="570" y="432" width="460" height="250" rx="28" fill="#eefbf3" stroke="#bbf7d0" stroke-width="2"/>
+    <rect x="1080" y="432" width="460" height="250" rx="28" fill="#eff6ff" stroke="#bfdbfe" stroke-width="2"/>
+    <rect x="60" y="714" width="1480" height="206" rx="28" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
   </g>
 
-  <!-- ── Title ── -->
-  <text x="72" y="60" class="title">TradersApp</text>
-  <text x="72" y="88" class="subtitle">Architecture overview — request path, supporting systems, and extraction status</text>
+  <rect x="90" y="166" width="170" height="28" rx="14" fill="#ea580c"/>
+  <text x="114" y="184" class="pill">LIVE REQUEST PATH</text>
+  <text x="90" y="232" class="section">Serving topology</text>
+  <text x="90" y="258" class="body">This is the path the user actually hits. The only extracted runtime seam is analysis-service.</text>
+  <text x="90" y="280" class="small">Current baseline: document the consensus path as less than 200ms P95 until tighter numbers are re-ratified.</text>
 
-  <!-- ══════════════════════════════════════════
-       SECTION 1 — REQUEST PATH
-       ══════════════════════════════════════════ -->
-
-  <!-- Section background -->
-  <rect x="56" y="118" width="1488" height="310" rx="22" fill="url(#requestGrad)" filter="url(#card)"/>
-  <rect x="56" y="118" width="1488" height="50" rx="22" fill="#ff8c00" fill-opacity="0.85"/>
-  <rect x="56" y="144" width="1488" height="24" fill="#ff8c00" fill-opacity="0.85"/>
-  <rect x="56" y="140" width="1488" height="28" fill="none"/>
-  <!-- badge -->
-  <rect x="80" y="126" width="158" height="26" rx="13" fill="#fff" fill-opacity="0.25"/>
-  <text x="102" y="143" class="pill">1 · REQUEST PATH</text>
-
-  <!-- Intro text -->
-  <text x="80" y="188" class="sec-title">Critical serving path</text>
-  <text x="80" y="208" class="sec-sub">Live user-facing flow — keep under the 50ms SLA target.</text>
-  <text x="80" y="226" class="sec-note">Only analysis-service is extracted today. Everything else sits inside the ML Engine.</text>
-
-  <!-- Service boxes (horizontal flow) -->
-  <!-- Frontend -->
-  <g filter="url(#boxShadow)">
-    <rect x="80" y="252" width="280" height="120" rx="18" fill="url(#boxGrad)" stroke="#e2e8f0" stroke-width="1.5"/>
-    <rect x="80" y="252" width="280" height="8" rx="8" fill="#4f8ef7" fill-opacity="0.9"/>
+  <g filter="url(#shadow)">
+    <rect x="108" y="308" width="250" height="68" rx="18" fill="#ffffff" stroke="#cbd5e1"/>
+    <rect x="428" y="308" width="250" height="68" rx="18" fill="#ffffff" stroke="#cbd5e1"/>
+    <rect x="748" y="308" width="250" height="68" rx="18" fill="#ffffff" stroke="#cbd5e1"/>
+    <rect x="1068" y="308" width="250" height="68" rx="18" fill="#ffffff" stroke="#cbd5e1"/>
   </g>
-  <text x="108" y="290" class="box-tag">FRONTEND</text>
-  <text x="108" y="316" class="box-title">React + Vite</text>
-  <text x="108" y="336" class="box-sub">Trading UI · Vite HMR</text>
+  <text x="138" y="337" class="card-title">Frontend</text>
+  <text x="138" y="358" class="body">React + Vite user interface</text>
+  <text x="458" y="337" class="card-title">BFF</text>
+  <text x="458" y="358" class="body">Node.js edge, auth, orchestration</text>
+  <text x="778" y="337" class="card-title">analysis-service</text>
+  <text x="778" y="358" class="body">gRPC seam on the hot path</text>
+  <text x="1098" y="337" class="card-title">ML Engine</text>
+  <text x="1098" y="358" class="body">Python inference and training runtime</text>
 
-  <!-- Arrow 1 -->
-  <line x1="360" y1="312" x2="435" y2="312" stroke="#e07010" stroke-width="4" marker-end="url(#arr-orange)"/>
+  <line x1="358" y1="342" x2="426" y2="342" stroke="#ea580c" stroke-width="5" marker-end="url(#arrow)"/>
+  <line x1="678" y1="342" x2="746" y2="342" stroke="#ea580c" stroke-width="5" marker-end="url(#arrow)"/>
+  <line x1="998" y1="342" x2="1066" y2="342" stroke="#ea580c" stroke-width="5" marker-end="url(#arrow)"/>
+  <text x="374" y="330" class="small">HTTP</text>
+  <text x="694" y="330" class="small">gRPC</text>
+  <text x="1014" y="330" class="small">HTTP /predict</text>
 
-  <!-- BFF -->
-  <g filter="url(#boxShadow)">
-    <rect x="443" y="252" width="280" height="120" rx="18" fill="url(#boxGrad)" stroke="#e2e8f0" stroke-width="1.5"/>
-    <rect x="443" y="252" width="280" height="8" rx="8" fill="#7c3aed" fill-opacity="0.85"/>
-  </g>
-  <text x="471" y="290" class="box-tag">EDGE + ORCHESTRATION</text>
-  <text x="471" y="316" class="box-title">BFF</text>
-  <text x="471" y="336" class="box-sub">Node.js · Auth · Rate limit · Cache</text>
+  <rect x="90" y="458" width="138" height="28" rx="14" fill="#334155"/>
+  <text x="114" y="476" class="pill">DATA PLANE</text>
+  <text x="90" y="524" class="section">Fast reads and event flow</text>
+  <text x="90" y="552" class="body">Redis and Feast support low-latency feature access. Kafka exists in-repo and is partially proven in live ops.</text>
+  <text x="90" y="578" class="small">Use this box for state and event ownership, not for deployment truth.</text>
+  <text x="90" y="622" class="body">Current / partial:</text>
+  <text x="210" y="622" class="body">Redis, Feast, Kafka</text>
+  <rect x="366" y="608" width="104" height="24" rx="12" fill="#e2e8f0"/>
+  <text x="388" y="624" class="status">CURRENT+</text>
 
-  <!-- Arrow 2 -->
-  <line x1="723" y1="312" x2="798" y2="312" stroke="#e07010" stroke-width="4" marker-end="url(#arr-orange)"/>
+  <rect x="600" y="458" width="176" height="28" rx="14" fill="#15803d"/>
+  <text x="624" y="476" class="pill">LEARNING + CONTROL</text>
+  <text x="600" y="524" class="section">Training, quality, registry</text>
+  <text x="600" y="552" class="body">Airflow, Great Expectations, MLflow, MinIO, and PostgreSQL are present, but validation maturity still differs by environment.</text>
+  <text x="600" y="578" class="small">Learning is still mostly implemented inside ml-engine modules and Airflow workflows.</text>
+  <text x="600" y="622" class="body">Current / partial:</text>
+  <text x="720" y="622" class="body">Airflow, GE, MLflow, MinIO, PostgreSQL</text>
+  <rect x="908" y="608" width="94" height="24" rx="12" fill="#dcfce7"/>
+  <text x="932" y="624" class="status">PARTIAL</text>
 
-  <!-- analysis-service -->
-  <g filter="url(#boxShadow)">
-    <rect x="806" y="252" width="280" height="120" rx="18" fill="url(#boxGrad)" stroke="#e2e8f0" stroke-width="1.5"/>
-    <rect x="806" y="252" width="280" height="8" rx="8" fill="#e07010" fill-opacity="0.9"/>
-    <text x="1086" y="272" class="lane-badge" fill="#fff" font-size="9" font-family="Inter,sans-serif" font-weight="700" letter-spacing="0.5">EXTRACTED</text>
-  </g>
-  <text x="834" y="290" class="box-tag">SERVICE BOUNDARY</text>
-  <text x="834" y="316" class="box-title">analysis-service</text>
-  <text x="834" y="336" class="box-sub">gRPC consensus · extraction seam</text>
+  <rect x="1110" y="458" width="194" height="28" rx="14" fill="#2563eb"/>
+  <text x="1134" y="476" class="pill">OBSERVE + DELIVER</text>
+  <text x="1110" y="524" class="section">Visibility and release reality</text>
+  <text x="1110" y="552" class="body">Prometheus, Grafana, Loki, and Jaeger exist. Delivery is mixed: GitHub Actions plus Railway/Vercel are still current docs, while Gitea/Woodpecker plus Helm/k3s remain partial.</text>
+  <text x="1110" y="578" class="small">Infisical is the intended secret source. External Secrets and some control-plane pieces are not uniformly live.</text>
+  <text x="1110" y="622" class="body">Mixed:</text>
+  <text x="1160" y="622" class="body">public cloud path current, self-hosted path partial</text>
+  <rect x="1436" y="608" width="82" height="24" rx="12" fill="#dbeafe"/>
+  <text x="1458" y="624" class="status">MIXED</text>
 
-  <!-- Arrow 3 -->
-  <line x1="1086" y1="312" x2="1161" y2="312" stroke="#e07010" stroke-width="4" marker-end="url(#arr-orange)"/>
-
-  <!-- ML Engine -->
-  <g filter="url(#boxShadow)">
-    <rect x="1169" y="252" width="280" height="120" rx="18" fill="url(#boxGrad)" stroke="#e2e8f0" stroke-width="1.5"/>
-    <rect x="1169" y="252" width="280" height="8" rx="8" fill="#059669" fill-opacity="0.85"/>
-  </g>
-  <text x="1197" y="290" class="box-tag">ML RUNTIME</text>
-  <text x="1197" y="316" class="box-title">ML Engine</text>
-  <text x="1197" y="336" class="box-sub">Inference · Drift · Feedback · Training</text>
-
-  <!-- Data-plane connectors (below) -->
-  <line x1="1210" y1="372" x2="1210" y2="395" stroke="#10b981" stroke-width="2" stroke-dasharray="4 3" marker-end="url(#arr-green)"/>
-  <line x1="1320" y1="372" x2="1320" y2="395" stroke="#10b981" stroke-width="2" stroke-dasharray="4 3" marker-end="url(#arr-green)"/>
-  <text x="1169" y="410" class="box-tag" fill="#10b981">Redis + Feast · features + cache</text>
-
-  <!-- ══════════════════════════════════════════
-       SECTION 2–4 — SUPPORTING SYSTEMS (3 cols)
-       ══════════════════════════════════════════ -->
-  <g transform="translate(0, 436)">
-
-    <!-- ── 2. Delivery + Secrets ── -->
-    <rect x="56" y="0" width="460" height="412" rx="22" fill="url(#delivGrad)" filter="url(#card)"/>
-    <rect x="56" y="0" width="460" height="50" rx="22" fill="#7c3aed" fill-opacity="0.85"/>
-    <rect x="56" y="26" width="460" height="24" fill="#7c3aed" fill-opacity="0.85"/>
-    <rect x="80" y="8" width="196" height="26" rx="13" fill="#fff" fill-opacity="0.2"/>
-    <text x="102" y="25" class="pill">2 · DELIVERY + SECRETS</text>
-
-    <text x="80" y="82" class="sec-title">Build, deploy, and runtime secrets</text>
-    <text x="80" y="102" class="sec-sub">CI/CD pipeline, cluster rollout, secrets injection.</text>
-
-    <!-- Cards -->
-    <g filter="url(#boxShadow)">
-      <rect x="80" y="124" width="412" height="74" rx="16" fill="url(#boxGrad)" stroke="#e2e8f0" stroke-width="1.5"/>
-      <rect x="80" y="124" width="6" height="74" rx="3" fill="#7c3aed"/>
-    </g>
-    <text x="104" y="154" class="box-title">Gitea + Woodpecker</text>
-    <text x="104" y="174" class="box-sub">Source hosting · CI/CD · Chaos testing</text>
-
-    <g filter="url(#boxShadow)">
-      <rect x="80" y="212" width="412" height="74" rx="16" fill="url(#boxGrad)" stroke="#e2e8f0" stroke-width="1.5"/>
-      <rect x="80" y="212" width="6" height="74" rx="3" fill="#4f46e5"/>
-    </g>
-    <text x="104" y="242" class="box-title">Helm on k3s</text>
-    <text x="104" y="262" class="box-sub">Container orchestration · Helm charts</text>
-
-    <g filter="url(#boxShadow)">
-      <rect x="80" y="300" width="412" height="74" rx="16" fill="url(#boxGrad)" stroke="#e2e8f0" stroke-width="1.5"/>
-      <rect x="80" y="300" width="6" height="74" rx="3" fill="#6366f1"/>
-    </g>
-    <text x="104" y="330" class="box-title">Infisical</text>
-    <text x="104" y="350" class="box-sub">Secrets vault · Zero-trust · Env sync</text>
-
-    <!-- ── 3. Learning + Data ── -->
-    <rect x="532" y="0" width="530" height="412" rx="22" fill="url(#learnGrad)" filter="url(#card)"/>
-    <rect x="532" y="0" width="530" height="50" rx="22" fill="#059669" fill-opacity="0.85"/>
-    <rect x="532" y="26" width="530" height="24" fill="#059669" fill-opacity="0.85"/>
-    <rect x="556" y="8" width="190" height="26" rx="13" fill="#fff" fill-opacity="0.2"/>
-    <text x="578" y="25" class="pill">3 · LEARNING + DATA</text>
-
-    <text x="556" y="82" class="sec-title">Model lifecycle and data quality</text>
-    <text x="556" y="102" class="sec-sub">Retraining, registry, DQ gates, feedback bus.</text>
-
-    <!-- Top row -->
-    <g filter="url(#boxShadow)">
-      <rect x="556" y="124" width="238" height="74" rx="16" fill="url(#boxGrad)" stroke="#e2e8f0" stroke-width="1.5"/>
-      <rect x="556" y="124" width="6" height="74" rx="3" fill="#0d9488"/>
-    </g>
-    <text x="580" y="154" class="box-title">Redis + Feast</text>
-    <text x="580" y="174" class="box-sub">Online features · &lt;10ms</text>
-
-    <g filter="url(#boxShadow)">
-      <rect x="808" y="124" width="238" height="74" rx="16" fill="url(#boxGrad)" stroke="#e2e8f0" stroke-width="1.5"/>
-      <rect x="808" y="124" width="6" height="74" rx="3" fill="#e11d48"/>
-    </g>
-    <text x="832" y="154" class="box-title">Kafka</text>
-    <text x="832" y="174" class="box-sub">Events · Feedback bus</text>
-
-    <!-- Bottom row -->
-    <g filter="url(#boxShadow)">
-      <rect x="556" y="212" width="238" height="74" rx="16" fill="url(#boxGrad)" stroke="#e2e8f0" stroke-width="1.5"/>
-      <rect x="556" y="212" width="6" height="74" rx="3" fill="#0891b2"/>
-    </g>
-    <text x="580" y="242" class="box-title">Airflow + GE</text>
-    <text x="580" y="262" class="box-sub">DQ gates · Retrain DAGs</text>
-
-    <g filter="url(#boxShadow)">
-      <rect x="808" y="212" width="238" height="74" rx="16" fill="url(#boxGrad)" stroke="#e2e8f0" stroke-width="1.5"/>
-      <rect x="808" y="212" width="6" height="74" rx="3" fill="#059669"/>
-    </g>
-    <text x="832" y="242" class="box-title">MLflow + MinIO</text>
-    <text x="832" y="262" class="box-sub">Registry · Artifacts</text>
-
-    <!-- Status strip -->
-    <g filter="url(#boxShadow)">
-      <rect x="556" y="300" width="490" height="74" rx="16" fill="url(#boxGrad)" stroke="#e2e8f0" stroke-width="1.5"/>
-      <rect x="556" y="300" width="490" height="8" rx="8" fill="#10b981" fill-opacity="0.6"/>
-    </g>
-    <text x="580" y="330" class="box-title">PostgreSQL</text>
-    <text x="580" y="350" class="box-sub">MLflow metadata backend · Model registry state</text>
-    <text x="820" y="344" class="box-tag" fill="#10b981">LIVE</text>
-
-    <!-- ── 4. Observability ── -->
-    <rect x="1078" y="0" width="466" height="412" rx="22" fill="url(#observeGrad)" filter="url(#card)"/>
-    <rect x="1078" y="0" width="466" height="50" rx="22" fill="#0891b2" fill-opacity="0.85"/>
-    <rect x="1078" y="26" width="466" height="24" fill="#0891b2" fill-opacity="0.85"/>
-    <rect x="1102" y="8" width="186" height="26" rx="13" fill="#fff" fill-opacity="0.2"/>
-    <text x="1124" y="25" class="pill">4 · OBSERVABILITY</text>
-
-    <text x="1102" y="82" class="sec-title">Metrics, logs, traces, alerts</text>
-    <text x="1102" y="102" class="sec-sub">Prometheus scrapes · Grafana visualizes · Loki + Jaeger collect</text>
-
-    <!-- Top row -->
-    <g filter="url(#boxShadow)">
-      <rect x="1102" y="124" width="204" height="74" rx="16" fill="url(#boxGrad)" stroke="#e2e8f0" stroke-width="1.5"/>
-      <rect x="1102" y="124" width="6" height="74" rx="3" fill="#e97716"/>
-    </g>
-    <text x="1126" y="154" class="box-title">Prometheus</text>
-    <text x="1126" y="174" class="box-sub">Metrics · Alerts</text>
-
-    <g filter="url(#boxShadow)">
-      <rect x="1324" y="124" width="204" height="74" rx="16" fill="url(#boxGrad)" stroke="#e2e8f0" stroke-width="1.5"/>
-      <rect x="1324" y="124" width="6" height="74" rx="3" fill="#1e293b"/>
-    </g>
-    <text x="1348" y="154" class="box-title">Loki</text>
-    <text x="1348" y="174" class="box-sub">Log aggregation</text>
-
-    <!-- Bottom row -->
-    <g filter="url(#boxShadow)">
-      <rect x="1102" y="212" width="204" height="74" rx="16" fill="url(#boxGrad)" stroke="#e2e8f0" stroke-width="1.5"/>
-      <rect x="1102" y="212" width="6" height="74" rx="3" fill="#f0a500"/>
-    </g>
-    <text x="1126" y="242" class="box-title">Grafana</text>
-    <text x="1126" y="262" class="box-sub">Dashboards · SLA viz</text>
-
-    <g filter="url(#boxShadow)">
-      <rect x="1324" y="212" width="204" height="74" rx="16" fill="url(#boxGrad)" stroke="#e2e8f0" stroke-width="1.5"/>
-      <rect x="1324" y="212" width="6" height="74" rx="3" fill="#9f7aea"/>
-    </g>
-    <text x="1348" y="242" class="box-title">Jaeger</text>
-    <text x="1348" y="262" class="box-sub">Distributed traces</text>
-
-    <!-- SLA alert note -->
-    <g filter="url(#boxShadow)">
-      <rect x="1102" y="300" width="426" height="74" rx="16" fill="url(#boxGrad)" stroke="#e2e8f0" stroke-width="1.5"/>
-    </g>
-    <text x="1126" y="330" class="box-title">Alert targets</text>
-    <text x="1126" y="350" class="box-sub">SLA breach · Drift · Retrain failure · Infra regression</text>
-    <text x="1300" y="344" class="box-tag" fill="#e11d48">50ms SLA</text>
-  </g>
-
-  <!-- ══════════════════════════════════════════
-       FOOTER — CURRENT REALITY
-       ══════════════════════════════════════════ -->
-  <rect x="56" y="870" width="1488" height="172" rx="22" fill="url(#footerGrad)" filter="url(#card)"/>
-  <rect x="56" y="870" width="1488" height="6" rx="3" fill="#1e293b" fill-opacity="0.15"/>
-
-  <text x="80" y="916" class="footer-title">Current reality</text>
-
-  <!-- 4 callouts in a row -->
-  <g>
-    <rect x="80" y="938" width="330" height="78" rx="14" fill="url(#boxGrad)" stroke="#e2e8f0" stroke-width="1"/>
-    <rect x="80" y="938" width="5" height="78" rx="3" fill="#e07010"/>
-    <text x="100" y="966" class="box-title" font-size="14">analysis-service</text>
-    <text x="100" y="984" class="box-sub" font-size="12">Only extracted domain runtime</text>
-    <text x="100" y="1002" class="box-sub" font-size="12">on the live request path today.</text>
-  </g>
-
-  <g>
-    <rect x="426" y="938" width="330" height="78" rx="14" fill="url(#boxGrad)" stroke="#e2e8f0" stroke-width="1"/>
-    <rect x="426" y="938" width="5" height="78" rx="3" fill="#059669"/>
-    <text x="446" y="966" class="box-title" font-size="14">Ingestion + Learning</text>
-    <text x="446" y="984" class="box-sub" font-size="12">Still run inside ML Engine and</text>
-    <text x="446" y="1002" class="box-sub" font-size="12">Airflow — not yet extracted.</text>
-  </g>
-
-  <g>
-    <rect x="772" y="938" width="330" height="78" rx="14" fill="url(#boxGrad)" stroke="#e2e8f0" stroke-width="1"/>
-    <rect x="772" y="938" width="5" height="78" rx="3" fill="#0891b2"/>
-    <text x="792" y="966" class="box-title" font-size="14">Platform ops wired</text>
-    <text x="792" y="984" class="box-sub" font-size="12">MLflow, observability, and CI/CD</text>
-    <text x="792" y="1002" class="box-sub" font-size="12">already self-hosted and operational.</text>
-  </g>
-
-  <g>
-    <rect x="1118" y="938" width="426" height="78" rx="14" fill="url(#boxGrad)" stroke="#e2e8f0" stroke-width="1"/>
-    <rect x="1118" y="938" width="5" height="78" rx="3" fill="#7c3aed"/>
-    <text x="1138" y="966" class="box-title" font-size="14">Next extraction</text>
-    <text x="1138" y="984" class="box-sub" font-size="12">Extract ingestion and learning</text>
-    <text x="1138" y="1002" class="box-sub" font-size="12">behind stable contracts incrementally.</text>
-  </g>
-
+  <rect x="90" y="740" width="170" height="28" rx="14" fill="#0f172a"/>
+  <text x="114" y="758" class="pill">BOUNDARY STATUS</text>
+  <text x="90" y="806" class="section">What is actually extracted today</text>
+  <text x="90" y="836" class="body">Current:</text>
+  <text x="180" y="836" class="body">BFF orchestration runtime, analysis-service seam, ML Engine runtime</text>
+  <text x="90" y="866" class="body">Logical only:</text>
+  <text x="180" y="866" class="body">ingestion and learning are bounded contexts before they are separate deployables</text>
+  <text x="90" y="896" class="body">Important nuance:</text>
+  <text x="260" y="896" class="body">analysis-service is live, but still proxies ML Engine HTTP internals for consensus work</text>
 </svg>
