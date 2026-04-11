@@ -50,14 +50,88 @@ CACHE_CLEAR="${CACHE_CLEAR:-rollout-restart}"
 K6_CSV="${RESULTS_DIR}/cold-warm-${TIMESTAMP}.csv"
 K6_OUT="${RESULTS_DIR}/cold-warm-${TIMESTAMP}"
 
-mkdir -p "$RESULTS_DIR"
-
 # ─── Helpers ────────────────────────────────────────────────────────────────────
 
 log()   { echo "[$(date +%H:%M:%S)] $*"; }
 warn()  { echo "[$(date +%H:%M:%S)] WARN: $*" >&2; }
 fail()  { echo "ERROR: $*" >&2; exit 1; }
 run()   { log "RUN: $*"; "$@"; }
+
+usage() {
+  cat <<'EOF'
+Usage:
+  bash scripts/k8s/run-cold-warm-cache-load-test.sh [options]
+
+Options:
+  --namespace NAME       Kubernetes namespace to target (default: tradersapp-dev)
+  --deployment NAME      Deployment to restart/inspect (default: ml-engine)
+  --service NAME         Service name (default: ml-engine)
+  --service-port PORT    Service port (default: 8001)
+  --base-url URL         Base URL for health + k6 traffic (default: http://ml-engine:8001)
+  --output-dir PATH      Directory for result files (default: tests/load/results)
+  --cache-clear MODE     Cache eviction mode: pod-kill | redis-flush | rollout-restart
+  --help                 Show this help text
+EOF
+}
+
+parse_args() {
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --namespace)
+        NAMESPACE="${2:?Missing value for --namespace}"
+        shift 2
+        ;;
+      --deployment)
+        DEPLOYMENT="${2:?Missing value for --deployment}"
+        shift 2
+        ;;
+      --service)
+        SERVICE="${2:?Missing value for --service}"
+        shift 2
+        ;;
+      --service-port)
+        SERVICE_PORT="${2:?Missing value for --service-port}"
+        shift 2
+        ;;
+      --base-url)
+        BASE_URL="${2:?Missing value for --base-url}"
+        shift 2
+        ;;
+      --output-dir)
+        RESULTS_DIR="${2:?Missing value for --output-dir}"
+        shift 2
+        ;;
+      --cache-clear)
+        CACHE_CLEAR="${2:?Missing value for --cache-clear}"
+        shift 2
+        ;;
+      --help|-h)
+        usage
+        exit 0
+        ;;
+      *)
+        fail "Unknown argument: $1"
+        ;;
+    esac
+  done
+}
+
+prefer_k3s_kubeconfig() {
+  if [[ -n "${KUBECONFIG:-}" ]]; then
+    return 0
+  fi
+
+  if [[ ! -f /etc/rancher/k3s/k3s.yaml ]]; then
+    return 0
+  fi
+
+  local current_context=""
+  current_context="$(kubectl config current-context 2>/dev/null || true)"
+  if [[ -z "$current_context" || "$current_context" == "docker-desktop" ]]; then
+    export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+    log "Using k3s kubeconfig at $KUBECONFIG (previous context: ${current_context:-unset})"
+  fi
+}
 
 kubectl_or_fail() {
   kubectl -n "$NAMESPACE" "$@" || fail "kubectl failed: $*"
@@ -219,6 +293,13 @@ PY
   log "Comparison CSV: $out_csv"
   echo "$out_csv"
 }
+
+parse_args "$@"
+
+K6_CSV="${RESULTS_DIR}/cold-warm-${TIMESTAMP}.csv"
+K6_OUT="${RESULTS_DIR}/cold-warm-${TIMESTAMP}"
+mkdir -p "$RESULTS_DIR"
+prefer_k3s_kubeconfig
 
 # ─── Pre-flight checks ──────────────────────────────────────────────────────────
 
