@@ -351,13 +351,14 @@ class KafkaProducerClient:
         self._connect(**self._connect_kwargs)
         return self._producer is not None
 
-    def _make_buffer_entry(self, topic: str, key: str, request_id: str, payload: dict) -> dict[str, Any]:
+    def _make_buffer_entry(self, topic: str, key: str, request_id: str, idempotency_key: str, payload: dict) -> dict[str, Any]:
         return {
             "topic": topic,
             "key": key,
             "request_id": request_id,
+            "idempotency_key": idempotency_key,
             "payload": payload,
-            "headers": self._build_headers(request_id),
+            "headers": self._build_headers(request_id, idempotency_key),
             "queued_at": datetime.now(timezone.utc).isoformat(),
             "attempts": 0,
         }
@@ -514,11 +515,16 @@ class KafkaProducerClient:
         )
 
     def publish_trade_outcome(self, outcome: dict) -> bool:
-        """Publish a trade outcome to the feedback-loop topic."""
-        trade_id = outcome.get("trade_id") or outcome.get("id") or str(time.time())
+        """
+        Publish a trade outcome to the feedback-loop topic.
+        E05: key=symbol ensures all outcomes for the same symbol land on the same
+        partition — preserving causal ordering so drift detection sees in-sequence
+        trade results without cross-partition reordering jitter.
+        """
+        symbol = outcome.get("symbol", "MNQ")
         return self._publish(
             topic=TOPIC_FEEDBACK,
-            key=trade_id,
+            key=symbol,
             value={
                 **outcome,
                 "published_at": datetime.now(timezone.utc).isoformat(),
@@ -571,10 +577,14 @@ class KafkaProducerClient:
         Core publish method with delivery callback.
         Requests never fail because of Kafka availability: when Kafka is down,
         messages are buffered locally and retried in the background.
+
+        E05: key=<symbol-or-domain-key> ensures the Confluent murmur2 partitioner
+        routes all messages for the same symbol to the same partition, preserving
+        per-symbol ordering while still allowing cross-partition parallelism.
         """
-        request_id = self._resolve_request_id(value)
-        payload = {**value, "request_id": request_id}
-        entry = self._make_buffer_entry(topic, key, request_id, payload)
+        request_id, idempotency_key = self._resolve_request_id(value)
+        payload = {**value, "request_id": request_id, "_topic": topic}
+        entry = self._make_buffer_entry(topic, key, request_id, idempotency_key, payload)
 
         if not self._enable or self._producer is None:
             with request_id_context(request_id):

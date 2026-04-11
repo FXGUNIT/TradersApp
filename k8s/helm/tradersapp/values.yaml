@@ -107,6 +107,16 @@ mlEngine:
     lookbackDays: 90
     alertWebhook: ""
     quarantineDir: "/data/dq_quarantine"
+  hpaWatcher:
+    enabled: false
+    image:
+      repository: curlimages/curl
+      tag: "8.10.1"
+      pullPolicy: IfNotPresent
+    pollIntervalSeconds: 30
+    lookbackSeconds: 300
+    slackWebhook: ""
+    slackWebhookSecretRef: ""
   runtimeState:
     enabled: true
     size: 10Gi
@@ -406,7 +416,7 @@ redis:
     tag: 7-alpine
   persistence:
     enabled: true
-    size: 1Gi
+    size: 5Gi
     storageClass: longhorn
   # Redis runtime configuration — maxmemory 256 MiB, LRU eviction when full
   configuration: |
@@ -524,10 +534,72 @@ kafka:
 # (ml-engine/kafka/producer.py _buffer deque + _retry_loop) covers up to 60 s of broker downtime
 # without blocking request threads. For high availability, use a managed Kafka service (MSK/Confluent).
 
-# Observability (Prometheus + Grafana via kube-prometheus-stack)
-# Note: enable via kube-prometheus-stack Helm chart, not this chart
-# observability:
-#   enabled: false
+# Observability stack via the kube-prometheus-stack dependency.
+# Disabled by default in base values and enabled in values.prod.yaml.
+monitoringStack:
+  enabled: false
+  prometheus:
+    enabled: true
+    prometheusSpec:
+      retention: 15d
+      scrapeInterval: 30s
+      evaluationInterval: 30s
+      externalLabels:
+        cluster: tradersapp
+      serviceMonitorSelectorNilUsesHelmValues: false
+      podMonitorSelectorNilUsesHelmValues: false
+      ruleSelectorNilUsesHelmValues: false
+      serviceMonitorNamespaceSelector: {}
+      podMonitorNamespaceSelector: {}
+      ruleNamespaceSelector: {}
+      resources:
+        requests:
+          cpu: 250m
+          memory: 512Mi
+        limits:
+          cpu: 1000m
+          memory: 2Gi
+      storageSpec:
+        volumeClaimTemplate:
+          spec:
+            accessModes: ["ReadWriteOnce"]
+            storageClassName: local-path
+            resources:
+              requests:
+                storage: 10Gi
+  alertmanager:
+    enabled: true
+  grafana:
+    enabled: true
+    adminUser: admin
+    adminPassword: ""
+    defaultDashboardsEnabled: true
+    persistence:
+      enabled: true
+      size: 5Gi
+      storageClassName: local-path
+    sidecar:
+      dashboards:
+        enabled: true
+        searchNamespace: ALL
+      datasources:
+        enabled: true
+        searchNamespace: ALL
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+  kubeStateMetrics:
+    enabled: true
+  nodeExporter:
+    enabled: true
+  prometheusOperator:
+    enabled: true
+  defaultRules:
+    create: true
 
 # MLflow (self-hosted MLOps: experiment tracking + model registry)
 mlflow:

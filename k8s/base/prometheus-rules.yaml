@@ -51,14 +51,14 @@ spec:
           annotations:
             summary: "Prediction latency p99 > 500ms (CRITICAL)"
         - alert: MLSLACriticalPathBreach
-          expr: histogram_quantile(0.95, sum(rate(bff_http_request_duration_seconds_bucket{route="/ml/consensus"}[5m])) by (le)) > 0.050
+          expr: histogram_quantile(0.95, sum(rate(bff_http_request_duration_seconds_bucket{route="/api/consensus"}[5m])) by (le)) > 0.050
           for: 5m
           labels:
             severity: critical
             service: bff
             sla: "50ms"
           annotations:
-            summary: "Consensus SLA breach - /ml/consensus p95 > 50ms"
+            summary: "Consensus SLA breach - /api/consensus p95 > 50ms"
         - alert: MLPredictionP50High
           expr: histogram_quantile(0.50, sum(rate(ml_prediction_latency_seconds_bucket[5m])) by (le)) > 0.050
           for: 10m
@@ -138,14 +138,25 @@ spec:
     - name: kafka-availability
       interval: 30s
       rules:
-        - alert: KafkaConsumerLag
-          expr: kafka_consumer_group_lag > 10000
+        - alert: KafkaConsumerLagHigh
+          expr: ml_kafka_consumer_lag > 500
+          for: 5m
+          labels:
+            severity: warning
+            service: kafka
+          annotations:
+            summary: "ML Engine Kafka consumer lag > 500"
+    - name: pod-health
+      interval: 60s
+      rules:
+        - alert: PodCrashLooping
+          expr: increase(kube_pod_container_status_restarts_total{namespace=~"tradersapp.*"}[15m]) > 3
           for: 5m
           labels:
             severity: critical
-            service: kafka
+            service: kubernetes
           annotations:
-            summary: "Kafka consumer lag > 10,000 messages"
+            summary: "Pod {{ $labels.pod }} is crash-looping"
     - name: redis-availability
       interval: 30s
       rules:

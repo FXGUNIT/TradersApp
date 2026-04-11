@@ -9,7 +9,14 @@
 import { createClient } from "redis";
 
 const REDIS_URL = process.env.REDIS_URL || "redis://redis:6379";
-const SESSION_TTL_SECONDS = Number.parseInt(process.env.SESSION_TTL_SECONDS || "28800", 10);
+const REDIS_CONNECT_TIMEOUT_MS = Number.parseInt(
+  process.env.REDIS_CONNECT_TIMEOUT_MS || "1000",
+  10,
+);
+const SESSION_TTL_SECONDS = Number.parseInt(
+  process.env.SESSION_TTL_SECONDS || "28800",
+  10,
+);
 const RATE_LIMIT_PREFIX = "ratelimit:";
 const DEFAULT_SESSION_PREFIX = "session:";
 export const ADMIN_SESSION_PREFIX = "admin-session:";
@@ -26,7 +33,10 @@ function buildKey(prefix, id) {
 function resolveOptions(options = {}) {
   return {
     prefix: options.prefix || DEFAULT_SESSION_PREFIX,
-    ttlSeconds: Number.parseInt(String(options.ttlSeconds || SESSION_TTL_SECONDS), 10),
+    ttlSeconds: Number.parseInt(
+      String(options.ttlSeconds || SESSION_TTL_SECONDS),
+      10,
+    ),
     touch: options.touch !== false,
     userIdField: options.userIdField || "userId",
   };
@@ -38,7 +48,15 @@ export async function getRedisClient() {
   }
 
   if (!redisClient) {
-    redisClient = createClient({ url: REDIS_URL });
+    redisClient = createClient({
+      url: REDIS_URL,
+      socket: {
+        connectTimeout: REDIS_CONNECT_TIMEOUT_MS,
+        keepAlive: 5_000,
+        reconnectStrategy: (retries) =>
+          retries < 2 ? Math.min((retries + 1) * 100, 250) : false,
+      },
+    });
 
     redisClient.on("error", (error) => {
       console.error("[Redis] Client error:", error.message);
@@ -60,7 +78,8 @@ export async function getRedisClient() {
   }
 
   if (!redisConnectPromise) {
-    redisConnectPromise = redisClient.connect()
+    redisConnectPromise = redisClient
+      .connect()
       .then(() => {
         isConnected = true;
         return redisClient;
@@ -95,7 +114,11 @@ export async function createSession(sessionData, options = {}) {
   }
 
   try {
-    await client.setEx(buildKey(prefix, sessionId), ttlSeconds, JSON.stringify(session));
+    await client.setEx(
+      buildKey(prefix, sessionId),
+      ttlSeconds,
+      JSON.stringify(session),
+    );
     return sessionId;
   } catch (error) {
     console.error("[Redis] Failed to create session:", error.message);
@@ -157,7 +180,11 @@ export async function updateSession(sessionId, updates, options = {}) {
   };
 
   try {
-    await client.setEx(buildKey(prefix, sessionId), ttlSeconds, JSON.stringify(updatedSession));
+    await client.setEx(
+      buildKey(prefix, sessionId),
+      ttlSeconds,
+      JSON.stringify(updatedSession),
+    );
     return true;
   } catch (error) {
     console.error("[Redis] Failed to update session:", error.message);
@@ -276,7 +303,10 @@ export async function checkRateLimit(clientKey, maxRequests, windowMs) {
       };
     }
 
-    await client.zAdd(redisKey, { score: now, value: `${now}:${Math.random()}` });
+    await client.zAdd(redisKey, {
+      score: now,
+      value: `${now}:${Math.random()}`,
+    });
     await client.expire(redisKey, Math.ceil(windowMs / 1000) + 1);
 
     return {

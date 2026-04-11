@@ -18,10 +18,6 @@ import {
   getNewsReactions,
 } from "../services/breakingNewsService.mjs";
 
-// In-process cache for breaking news (30s TTL)
-let _breakingCache = null;
-let _breakingCacheTs = 0;
-
 export function createNewsRouteHandler({
   json,
 }) {
@@ -83,21 +79,13 @@ export function createNewsRouteHandler({
       }
     }
 
-    // GET /news/breaking — real-time breaking news (30s polling safe)
+    // GET /news/breaking — real-time breaking news backed by shared Redis cache
     if (req.method === "GET" && pathname === "/news/breaking") {
       try {
         const fresh = url.searchParams.get("fresh") === "true";
         const minImpact = url.searchParams.get("minImpact") || "LOW";
         const maxItems = parseInt(url.searchParams.get("max") || "30", 10);
-
-        let data;
-        if (fresh || !_breakingCache || (Date.now() - _breakingCacheTs) > 600_000) {
-          data = await fetchBreakingNews({ maxItems, minImpact });
-          _breakingCache = data;
-          _breakingCacheTs = Date.now();
-        } else {
-          data = _breakingCache;
-        }
+        const data = await fetchBreakingNews({ fresh, maxItems, minImpact });
 
         // Fire-and-forget ML retrain on HIGH impact items
         const highImpact = data.items.filter(i => i.impact === 'HIGH' && !i.reactionLogged);
@@ -108,8 +96,6 @@ export function createNewsRouteHandler({
         json(res, 200, {
           ok: true,
           ...data,
-          cached: !fresh,
-          cacheAgeMs: fresh ? 0 : (Date.now() - _breakingCacheTs),
         }, origin);
         return true;
       } catch (err) {
@@ -130,13 +116,13 @@ export function createNewsRouteHandler({
       try {
         const minutes = parseInt(url.searchParams.get("minutes") || "120", 10);
         const reactions = getRecentNewsReactions(minutes);
-        const cached = getCachedNews();
+        const cached = await getCachedNews({ maxItems: 20 });
 
         json(res, 200, {
           ok: true,
           reactions,
-          recentNews: cached.items.slice(0, 20),
-          fetchedAt: new Date().toISOString(),
+          recentNews: cached.items,
+          fetchedAt: cached.fetchedAt,
         }, origin);
         return true;
       } catch (err) {

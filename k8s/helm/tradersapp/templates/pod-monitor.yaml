@@ -1,18 +1,31 @@
-# k8s/base/pod-monitor.yaml — PodMonitor for Prometheus scraping
-# Uses Prometheus Operator custom resources for auto-discovery.
-# Requires prometheus-operator or kube-prometheus-stack installed.
+{{- /*
+Helm-rendered PodMonitor resources for kube-prometheus-stack.
+Enable via `monitoringStack.enabled=true` or the legacy observability gate.
+These mirror the base PodMonitor intent for frontend, bff, and ml-engine.
+*/ -}}
+
+{{- $observability := .Values.observability | default dict -}}
+{{- $frontend := .Values.frontend | default dict -}}
+{{- $bff := .Values.bff | default dict -}}
+{{- $mlEngine := .Values.mlEngine | default dict -}}
+{{- $monitoringStack := .Values.monitoringStack | default dict -}}
+{{- $monitoringEnabled := or ($observability.prometheus | default false) ($observability.enabled | default false) ($monitoringStack.enabled | default false) -}}
+{{- $namespace := include "tradersapp.namespace" . -}}
+
+{{- if and $monitoringEnabled ($frontend.enabled | default false) }}
+---
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
 metadata:
-  name: ml-engine-monitor
-  namespace: tradersapp
+  name: frontend-monitor
+  namespace: {{ $namespace }}
   labels:
-    team: ml-platform
-    app: ml-engine
+    {{- include "tradersapp.labels" . | nindent 4 }}
+    app: frontend
 spec:
   selector:
     matchLabels:
-      app: ml-engine
+      app: frontend
   podMetricsEndpoints:
     - port: http
       path: /metrics
@@ -31,14 +44,17 @@ spec:
           targetLabel: namespace
         - sourceLabels: [__meta_kubernetes_pod_label_app]
           targetLabel: app
+{{- end }}
+
+{{- if and $monitoringEnabled ($bff.enabled | default false) }}
 ---
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
 metadata:
   name: bff-monitor
-  namespace: tradersapp
+  namespace: {{ $namespace }}
   labels:
-    team: ml-platform
+    {{- include "tradersapp.labels" . | nindent 4 }}
     app: bff
 spec:
   selector:
@@ -62,21 +78,24 @@ spec:
           targetLabel: namespace
         - sourceLabels: [__meta_kubernetes_pod_label_app]
           targetLabel: app
+{{- end }}
+
+{{- if and $monitoringEnabled ($mlEngine.enabled | default false) }}
 ---
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
 metadata:
-  name: triton-monitor
-  namespace: tradersapp
+  name: ml-engine-monitor
+  namespace: {{ $namespace }}
   labels:
-    team: ml-platform
-    app: triton
+    {{- include "tradersapp.labels" . | nindent 4 }}
+    app: ml-engine
 spec:
   selector:
     matchLabels:
-      app: triton
+      app: ml-engine
   podMetricsEndpoints:
-    - port: metrics
+    - port: http
       path: /metrics
       interval: 15s
       scrapeTimeout: 10s
@@ -93,3 +112,4 @@ spec:
           targetLabel: namespace
         - sourceLabels: [__meta_kubernetes_pod_label_app]
           targetLabel: app
+{{- end }}

@@ -106,7 +106,7 @@ spec:
               command:
                 - node
                 - -e
-                - "fetch('http://127.0.0.1:{{ .Values.bff.service.port }}/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+                - "fetch('http://127.0.0.1:{{ .Values.bff.service.port }}/live').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
             failureThreshold: 30
             periodSeconds: 10
             initialDelaySeconds: 5
@@ -116,7 +116,7 @@ spec:
               command:
                 - node
                 - -e
-                - "fetch('http://127.0.0.1:{{ .Values.bff.service.port }}/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+                - "fetch('http://127.0.0.1:{{ .Values.bff.service.port }}/live').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
             failureThreshold: 3
             periodSeconds: 15
             initialDelaySeconds: 20
@@ -126,7 +126,7 @@ spec:
               command:
                 - node
                 - -e
-                - "fetch('http://127.0.0.1:{{ .Values.bff.service.port }}/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+                - "fetch('http://127.0.0.1:{{ .Values.bff.service.port }}/ready').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
             failureThreshold: 3
             periodSeconds: 10
             initialDelaySeconds: 10
@@ -256,7 +256,7 @@ spec:
               command:
                 - node
                 - -e
-                - "fetch('http://127.0.0.1:{{ .Values.bff.service.port }}/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+                - "fetch('http://127.0.0.1:{{ .Values.bff.service.port }}/live').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
             failureThreshold: 30
             periodSeconds: 10
             initialDelaySeconds: 5
@@ -266,7 +266,7 @@ spec:
               command:
                 - node
                 - -e
-                - "fetch('http://127.0.0.1:{{ .Values.bff.service.port }}/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+                - "fetch('http://127.0.0.1:{{ .Values.bff.service.port }}/live').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
             failureThreshold: 3
             periodSeconds: 15
             initialDelaySeconds: 20
@@ -276,7 +276,7 @@ spec:
               command:
                 - node
                 - -e
-                - "fetch('http://127.0.0.1:{{ .Values.bff.service.port }}/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+                - "fetch('http://127.0.0.1:{{ .Values.bff.service.port }}/ready').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
             failureThreshold: 3
             periodSeconds: 10
             initialDelaySeconds: 10

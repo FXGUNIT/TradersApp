@@ -79,6 +79,17 @@ feast_warmed: bool = False
 start_time: float = time.time()
 
 
+def _resolve_feast_redis_url() -> str:
+    """Resolve the Feast online-store URL from cluster-friendly env vars."""
+    explicit_url = (os.environ.get("FEAST_REDIS_URL") or os.environ.get("REDIS_URL") or "").strip()
+    if explicit_url:
+        return explicit_url
+
+    redis_host = (os.environ.get("REDIS_HOST") or "localhost").strip() or "localhost"
+    redis_port = (os.environ.get("REDIS_PORT") or "6379").strip() or "6379"
+    return f"redis://{redis_host}:{redis_port}"
+
+
 @asynccontextmanager
 async def lifespan(app: "FastAPI"):
     global db, trainer, consensus_agg, store, drift_monitor
@@ -139,11 +150,13 @@ async def lifespan(app: "FastAPI"):
         register_tradersapp_lineage(lineage_registry)
         print(f"[Feast] Feature lineage registered ({len(lineage_registry.get_all())} features)")
 
+        feast_redis_url = _resolve_feast_redis_url()
+        os.environ.setdefault("FEAST_REDIS_URL", feast_redis_url)
         warmup_result = warmup_online_store(
-            redis_url=os.environ.get("FEAST_REDIS_URL", "redis://localhost:6379"),
+            redis_url=feast_redis_url,
             db_path=config.DB_PATH,
             symbol="MNQ",
-            lookback_minutes=60,
+            lookback_minutes=max(5, int(os.environ.get("FEAST_WARMUP_LOOKBACK_MINUTES", "15"))),
         )
         print(f"[Feast] Online store warmed: {warmup_result['timestamps_warmed']} timestamps "
               f"loaded in {warmup_result['duration_ms']:.1f}ms")

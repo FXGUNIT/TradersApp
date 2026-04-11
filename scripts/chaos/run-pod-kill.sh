@@ -7,7 +7,11 @@
 #   3. Waits for the pod to be evicted / killed
 #   4. Waits for the pod to be rescheduled and READY
 #   5. Verifies /health on the ML Engine returns 200
-#   6. Verifies no permanent service disruption (other pods still serving)
+#   6. Measures time from kill event to health recovery
+#   7. Writes recovery time to tests/load/results/pod-kill-recovery.csv
+#
+# SLO: Recovery time must be < 60 seconds.
+#      Script exits 1 if SLO is breached; 0 otherwise.
 #
 # Prerequisites:
 #   - kubectl configured for the target k3s/Railway cluster
@@ -19,14 +23,15 @@
 #   CHAOS_MANIFEST=./k8s/chaos/ml-engine-pod-chaos.yaml bash scripts/chaos/run-pod-kill.sh
 #
 # Exit codes:
-#   0  — chaos injected, recovery verified
-#   1  — pre-flight check failed or recovery did not complete
+#   0  — chaos injected, recovery verified, SLO met
+#   1  — pre-flight check failed, recovery SLO breached, or health check failed
 
 set -euo pipefail
 
 # ─── Config ───────────────────────────────────────────────────────────────────
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+source "$REPO_ROOT/scripts/lib/cluster-operation-lock.sh"
 NAMESPACE="${NAMESPACE:-tradersapp}"
 CHAOS_MANIFEST="${CHAOS_MANIFEST:-$REPO_ROOT/k8s/chaos/ml-engine-pod-chaos.yaml}"
 DEPLOYMENT="${DEPLOYMENT:-ml-engine}"
@@ -35,7 +40,8 @@ SERVICE_PORT="${SERVICE_PORT:-8001}"
 HEALTH_PATH="${HEALTH_PATH:-/health}"
 TIMEOUT_ROLLBACK="${TIMEOUT_ROLLBACK:-300}"
 HEALTH_URL="http://127.0.0.1:${SERVICE_PORT}${HEALTH_PATH}"
-RESULTS_DIR="${RESULTS_DIR:-$REPO_ROOT/.artifacts/chaos/$(date +%Y%m%d-%H%M%S)}"
+RESULTS_DIR="${RESULTS_DIR:-$REPO_ROOT/tests/load/results}"
+RECOVERY_CSV="${RESULTS_DIR}/pod-kill-recovery.csv"
 
 mkdir -p "$RESULTS_DIR"
 
@@ -46,6 +52,12 @@ log() { echo "[$(date +%H:%M:%S)] $*"; }
 fail() { echo "ERROR: $*" >&2; exit 1; }
 
 run() { log "RUN: $*"; "$@"; }
+
+cleanup() {
+  local _exit_code=$?
+  cluster_lock_release
+  return 0
+}
 
 kubectl_or_fail() {
   kubectl -n "$NAMESPACE" "$@" || fail "kubectl failed: $*"
@@ -70,6 +82,9 @@ wait_for_chaos_active() {
 wait_for_recovery() {
   log "Waiting up to ${TIMEOUT_ROLLBACK}s for $DEPLOYMENT to recover..."
 
+  KILL_EPOCH=$(date +%s)   # record the moment the kill was issued
+  log "Kill epoch recorded: $(date -d "@$KILL_EPOCH" +%Y-%m-%dT%H:%M:%S)"
+
   # Wait for rollout to complete (new pod image or rescheduling)
   kubectl_or_fail rollout status "deploy/$DEPLOYMENT" --timeout="${TIMEOUT_ROLLBACK}s"
 
@@ -88,7 +103,9 @@ wait_for_recovery() {
   while [[ $(date +%s) -lt $deadline ]]; do
     status=$(curl -fsS -m 3 -o /dev/null -w "%{http_code}" "$HEALTH_URL" 2>/dev/null || echo "000")
     if [[ "$status" == "200" ]]; then
-      log "Health endpoint returned 200 — service recovered ✓"
+      RECOVERED_EPOCH=$(date +%s)
+      RECOVERY_SECONDS=$((RECOVERED_EPOCH - KILL_EPOCH))
+      log "Health endpoint returned 200 — service recovered ✓ (${RECOVERY_SECONDS}s)"
       healthy=true
       break
     fi
@@ -100,6 +117,7 @@ wait_for_recovery() {
   wait "$PF_PID" 2>/dev/null || true
 
   if [[ "$healthy" != "true" ]]; then
+    RECOVERY_SECONDS=$((TIMEOUT_ROLLBACK + 1))
     fail "Health endpoint did not return 200 within ${TIMEOUT_ROLLBACK}s after pod kill"
   fi
 }
@@ -120,6 +138,9 @@ for cmd in kubectl curl; do
 done
 
 [[ -f "$CHAOS_MANIFEST" ]] || fail "Chaos manifest not found: $CHAOS_MANIFEST"
+
+trap cleanup EXIT
+cluster_lock_acquire "run-pod-kill" "$NAMESPACE" "chaos"
 
 # Check Chaos Mesh CRD is installed
 kubectl api-resources --api-group=chaos-mesh.org 2>/dev/null | grep -q PodChaos \
@@ -192,21 +213,50 @@ kubectl delete -f "$CHAOS_MANIFEST" --wait=true --ignore-not-found=true
 
 cat > "${RESULTS_DIR}/result.json" <<EOF
 {
-  "test":        "ml-engine-pod-kill",
-  "namespace":   "$NAMESPACE",
-  "deployment":  "$DEPLOYMENT",
-  "replicas":    "$POD_COUNT",
-  "chaos_name":  "$CHAOS_NAME",
-  "status":      "PASS",
-  "recovered":   true,
-  "timestamp":   "$(date -Iseconds)"
+  "test":             "ml-engine-pod-kill",
+  "namespace":        "$NAMESPACE",
+  "deployment":       "$DEPLOYMENT",
+  "replicas":         "$POD_COUNT",
+  "chaos_name":       "$CHAOS_NAME",
+  "recovery_seconds": "$RECOVERY_SECONDS",
+  "recovery_slo_sec": "60",
+  "slo_met":          $([[ "$RECOVERY_SECONDS" -le 60 ]] && echo "true" || echo "false"),
+  "status":           $([[ "$RECOVERY_SECONDS" -le 60 ]] && echo "\"PASS\"" || echo "\"FAIL\""),
+  "recovered":        true,
+  "timestamp":        "$(date -Iseconds)"
 }
 EOF
+
+# ─── Write recovery CSV ────────────────────────────────────────────────────────
+
+RECOVERY_TIMESTAMP=$(date -Iseconds)
+mkdir -p "$RESULTS_DIR"
+{
+  echo "timestamp,namespace,deployment,replicas,recovery_sec,slo_sec,slo_met"
+  echo "${RECOVERY_TIMESTAMP},${NAMESPACE},${DEPLOYMENT},${POD_COUNT},${RECOVERY_SECONDS},60,$([[ \"$RECOVERY_SECONDS\" -le 60 ]] && echo 'true' || echo 'false')"
+} >> "$RECOVERY_CSV"
+log "Recovery CSV appended: $RECOVERY_CSV"
+
+# ─── SLO check ────────────────────────────────────────────────────────────────
+
+if [[ "$RECOVERY_SECONDS" -gt 60 ]]; then
+  warn "Recovery SLO BREACHED: ${RECOVERY_SECONDS}s > 60s SLO"
+  log ""
+  log "========================================"
+  log "Chaos Test FAILED — Recovery SLO breached"
+  log "Recovery time  : ${RECOVERY_SECONDS}s (SLO: 60s)"
+  log "Results dir    : $RESULTS_DIR"
+  log "Recovery CSV   : $RECOVERY_CSV"
+  log "========================================"
+  exit 1
+fi
 
 log ""
 log "========================================"
 log "Chaos Test PASSED — Pod kill + recovery verified"
-log "Results: $RESULTS_DIR"
+log "Recovery time  : ${RECOVERY_SECONDS}s  (SLO: 60s — met)"
+log "Results dir    : $RESULTS_DIR"
+log "Recovery CSV   : $RECOVERY_CSV"
 log "========================================"
 
 exit 0

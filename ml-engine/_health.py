@@ -26,6 +26,41 @@ except ImportError:
     _HANDLE_METRICS = None
 
 
+# ── /live and /ready ──────────────────────────────────────────────────────────
+
+def live():
+    """Liveness check — stays lightweight and never reaches external services."""
+    return {
+        "status": "live",
+        "service": "tradersapp-ml-engine",
+        "request_id": get_request_id(),
+        "uptime_sec": round(_time.time() - start_time, 1),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+def ready():
+    """Readiness check — verifies the DB facade is initialized without heavy introspection."""
+    db_available = False
+    db_backend = "unknown"
+    if db is not None:
+        db_backend = getattr(db, "backend_type", "unknown")
+        try:
+            db_available = bool(db.health_check())
+        except Exception:
+            db_available = False
+
+    return {
+        "status": "ready" if db_available else "starting",
+        "service": "tradersapp-ml-engine",
+        "request_id": get_request_id(),
+        "db_backend": db_backend,
+        "db_available": db_available,
+        "feast_warmed": feast_warmed,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
 # ── /health ───────────────────────────────────────────────────────────────────
 
 def health():

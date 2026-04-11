@@ -24,9 +24,6 @@ spec:
     {{- if .Values.resourceQuota.storage }}
     requests.storage:                   "{{ .Values.resourceQuota.storage }}"
     {{- end }}
-  scopeSelector:
-    matchExpressions:
-      - scopeName: PriorityClass
-        operator: In
-        values: ["high-priority"]
+  # Keep the quota cluster-portable: some local k3s environments reject the
+  # PriorityClass scope selector here even though the hard limits are valid.
 {{- end }}

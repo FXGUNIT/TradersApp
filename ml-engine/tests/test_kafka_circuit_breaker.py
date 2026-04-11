@@ -18,9 +18,6 @@ from unittest.mock import patch, MagicMock, call
 
 from infrastructure.request_context import request_id_context
 
-# Must import after setting up sys.path (handled by ml-engine package structure)
-# Run from ml-engine/ directory: python -m pytest tests/test_kafka_circuit_breaker.py
-
 
 class DummyDeliveredMessage:
     """Fake delivery report returned by the mocked callback."""
@@ -102,10 +99,10 @@ class TestKafkaProducerCircuitBreaker(unittest.TestCase):
     def tearDown(self):
         import sys
         # Reset singleton so test order doesn't matter
-        from ml_engine.kafka import producer as _p
+        from kafka import producer as _p
         _p._producer_instance = None
-        if "ml_engine.kafka.producer" in sys.modules:
-            del sys.modules["ml_engine.kafka.producer"]
+        if "kafka.producer" in sys.modules:
+            del sys.modules["kafka.producer"]
         if "confluent_kafka" in sys.modules:
             del sys.modules["confluent_kafka"]
 
@@ -113,7 +110,7 @@ class TestKafkaProducerCircuitBreaker(unittest.TestCase):
 
     def test_publish_returns_true_when_broker_down(self):
         """publish_* methods must never raise — they return True and buffer."""
-        from ml_engine.kafka.producer import KafkaProducerClient
+        from kafka.producer import KafkaProducerClient
 
         producer = KafkaProducerClient(enable=False)
         producer._enable = True  # re-enable without real broker
@@ -133,7 +130,7 @@ class TestKafkaProducerCircuitBreaker(unittest.TestCase):
 
     def test_circuit_opens_after_failure_threshold(self):
         """Circuit must transition to OPEN after _failure_threshold failures."""
-        from ml_engine.kafka.producer import (
+        from kafka.producer import (
             KafkaProducerClient,
             KAFKA_CB_OPEN,
             KAFKA_CB_CLOSED,
@@ -156,7 +153,7 @@ class TestKafkaProducerCircuitBreaker(unittest.TestCase):
 
     def test_buffer_fills_when_circuit_open(self):
         """When circuit is OPEN, _publish buffers messages instead of discarding."""
-        from ml_engine.kafka.producer import (
+        from kafka.producer import (
             KafkaProducerClient,
             KAFKA_CB_OPEN,
         )
@@ -182,7 +179,7 @@ class TestKafkaProducerCircuitBreaker(unittest.TestCase):
 
     def test_buffer_retry_on_half_open(self):
         """After recovery timeout, circuit half-opens and _drain_buffer replays messages."""
-        from ml_engine.kafka.producer import (
+        from kafka.producer import (
             KafkaProducerClient,
             KAFKA_CB_CLOSED,
             KAFKA_CB_HALF_OPEN,
@@ -231,8 +228,8 @@ class TestKafkaProducerCircuitBreaker(unittest.TestCase):
 
     def test_prometheus_metric_exported_on_circuit_open(self):
         """set_kafka_producer_circuit_state must be called on OPEN transition."""
-        from ml_engine.kafka.producer import KafkaProducerClient, KAFKA_CB_OPEN
-        from ml_engine.infrastructure import prometheus_exporter
+        from kafka.producer import KafkaProducerClient, KAFKA_CB_OPEN
+        from infrastructure import prometheus_exporter
 
         called_states = []
 
@@ -255,8 +252,8 @@ class TestKafkaProducerCircuitBreaker(unittest.TestCase):
 
     def test_prometheus_metric_exported_on_circuit_half_open(self):
         """set_kafka_producer_circuit_state must be called when circuit half-opens."""
-        from ml_engine.kafka.producer import KafkaProducerClient, KAFKA_CB_OPEN
-        from ml_engine.infrastructure import prometheus_exporter
+        from kafka.producer import KafkaProducerClient, KAFKA_CB_OPEN
+        from infrastructure import prometheus_exporter
 
         called_states = []
 
@@ -296,16 +293,16 @@ class TestKafkaProducerBufferBehavior(unittest.TestCase):
 
     def tearDown(self):
         import sys
-        from ml_engine.kafka import producer as _p
+        from kafka import producer as _p
         _p._producer_instance = None
-        if "ml_engine.kafka.producer" in sys.modules:
-            del sys.modules["ml_engine.kafka.producer"]
+        if "kafka.producer" in sys.modules:
+            del sys.modules["kafka.producer"]
         if "confluent_kafka" in sys.modules:
             del sys.modules["confluent_kafka"]
 
     def test_buffer_fifo_eviction(self):
         """When buffer is full, oldest message is evicted (FIFO)."""
-        from ml_engine.kafka.producer import KafkaProducerClient
+        from kafka.producer import KafkaProducerClient
 
         producer = KafkaProducerClient(enable=False)
         producer._enable = True

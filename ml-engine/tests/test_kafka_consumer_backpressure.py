@@ -14,12 +14,7 @@ import time
 import unittest
 from unittest.mock import patch, MagicMock, call
 
-try:
-    from ml_engine.kafka.consumer import KafkaConsumerClient, TopicPartition
-except ImportError:
-    import sys
-    sys.path.insert(0, ".")
-    from ml_engine.kafka.consumer import KafkaConsumerClient
+from kafka.consumer import KafkaConsumerClient
 
 
 class FakeTopicPartition:
@@ -123,10 +118,10 @@ class TestKafkaConsumerBackpressure(unittest.TestCase):
 
     def tearDown(self):
         import sys
-        from ml_engine.kafka import consumer as _c
+        from kafka import consumer as _c
         _c._consumer_instance = None
-        if "ml_engine.kafka.consumer" in sys.modules:
-            del sys.modules["ml_engine.kafka.consumer"]
+        if "kafka.consumer" in sys.modules:
+            del sys.modules["kafka.consumer"]
         if "confluent_kafka" in sys.modules:
             del sys.modules["confluent_kafka"]
 
@@ -205,7 +200,7 @@ class TestKafkaConsumerBackpressure(unittest.TestCase):
 
     def test_lag_metric_exported_on_check(self):
         """_set_lag (prometheus_exporter.set_kafka_consumer_lag) must be called."""
-        from ml_engine.infrastructure import prometheus_exporter
+        from infrastructure import prometheus_exporter
 
         recorded_lags = []
 
@@ -253,10 +248,10 @@ class TestKafkaConsumerBackpressureEnvVars(unittest.TestCase):
 
     def tearDown(self):
         import sys
-        from ml_engine.kafka import consumer as _c
+        from kafka import consumer as _c
         _c._consumer_instance = None
-        if "ml_engine.kafka.consumer" in sys.modules:
-            del sys.modules["ml_engine.kafka.consumer"]
+        if "kafka.consumer" in sys.modules:
+            del sys.modules["kafka.consumer"]
         if "confluent_kafka" in sys.modules:
             del sys.modules["confluent_kafka"]
 

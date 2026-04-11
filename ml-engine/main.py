@@ -82,6 +82,8 @@ from _routes_pso import (
     global_exception_handler,
 )
 from _health import (
+    live,
+    ready,
     health,
     metrics_endpoint,
     get_sla_report,
@@ -126,6 +128,8 @@ def _register_routes(app: FastAPI) -> None:
     """Register all route handlers on the FastAPI app."""
 
     # ── Health & Observability ──────────────────────────────────────────────
+    app.add_api_route("/live", live, methods=["GET"], include_in_schema=False)
+    app.add_api_route("/ready", ready, methods=["GET"], include_in_schema=False)
     app.add_api_route("/health", health, methods=["GET"], tags=["health"])
     app.add_api_route("/metrics", metrics_endpoint, methods=["GET"], include_in_schema=False)
     app.add_api_route("/sla", sla_report, methods=["GET"], tags=["sla"])

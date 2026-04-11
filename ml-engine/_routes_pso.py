@@ -9,7 +9,7 @@ import traceback
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import HTTPException, Query, Response
+from fastapi import HTTPException, Query, Request as FastAPIRequest, Response
 from fastapi.responses import JSONResponse
 
 from _lifespan import db, drift_monitor, feedback_logger, trade_processor, retrain_pipeline, triton_client
@@ -38,12 +38,31 @@ except ImportError:
     run_alpha_discovery = None
 
 
-def pso_discover(request: "PSORequest"):
+def pso_discover(
+    request: "PSORequest",
+    raw_request: FastAPIRequest = None,
+    response: Response = None,
+):
     """Run Particle Swarm Optimization for alpha discovery per regime."""
     from features.feature_pipeline import engineer_features
 
     if not PSO_AVAILABLE:
         return {"ok": False, "error": "PSO optimizer not available. Install: pip install pyswarms"}
+
+    # Idempotency claim before any expensive computation
+    claim = None
+    payload = request.model_dump(mode="json")
+    try:
+        claim, replay = _claim_idempotency(
+            raw_request, response, "pso_discover", payload,
+            allow_body_fallback=True, wait_timeout_seconds=0.5, lock_ttl_seconds=600,
+        )
+        if replay is not None:
+            return replay
+    except HTTPException:
+        raise
+    except Exception:
+        pass  # Proceed without idempotency if service unavailable
 
     monitor = get_sla_monitor()
     start = time.time()
@@ -60,6 +79,7 @@ def pso_discover(request: "PSORequest"):
         candle_hash = "from_db"
 
     if df.empty:
+        _release_idempotency_claim(claim)
         monitor.record("/pso/discover", (time.time() - start) * 1000, 400)
         raise HTTPException(status_code=400, detail="No candles available. Upload historical data first.")
 
@@ -71,49 +91,62 @@ def pso_discover(request: "PSORequest"):
         cached["_cached"] = True
         cached["_cache_age_ms"] = round((time.time() - start) * 1000, 1)
         monitor.record("/pso/discover", (time.time() - start) * 1000, 200)
+        _store_idempotent_response(claim, cached, ttl_seconds=300)
+        _release_idempotency_claim(claim)
         return cached
 
-    trade_df = db.get_trade_log(limit=5000)
-    feat_df = engineer_features(df, trade_df, None, {}, {})
+    try:
+        trade_df = db.get_trade_log(limit=5000)
+        feat_df = engineer_features(df, trade_df, None, {}, {})
 
-    if request.regime != "ALL":
-        niche_config = NichingPSO.REGIME_NICHES.get(request.regime.upper()) if NichingPSO else None
-        if not niche_config:
-            monitor.record("/pso/discover", (time.time() - start) * 1000, 400)
-            raise HTTPException(status_code=400, detail=f"Unknown regime: {request.regime}")
-        pso = PSOOptimizer(n_particles=request.n_particles, max_iterations=request.max_iterations)
-        result = pso.optimize(df, trade_df, feat_df, regime=request.regime.upper())
-        output = {
-            "regimes_found": 1,
-            "best_regime": request.regime.upper(),
-            "best_regime_alpha": float(result.alpha_contribution),
-            "total_alpha": float(result.alpha_contribution),
-            "regimes": {
-                request.regime.upper(): {
-                    "alpha_ticks": round(result.alpha_contribution, 3),
-                    "expectancy": round(result.best_metrics.expectancy, 3),
-                    "win_rate": round(result.best_metrics.win_rate, 3),
-                    "sharpe": round(result.best_metrics.sharpe, 3),
-                    "max_drawdown": round(result.best_metrics.max_drawdown, 3),
-                    "profit_factor": round(result.best_metrics.profit_factor, 3),
-                    "trades_analyzed": result.best_metrics.trades_count,
-                    "convergence_iters": result.iterations_run,
-                    "best_params": result.params,
-                    "convergence_history": [round(x, 4) for x in result.convergence_history[-20:]],
-                }
-            },
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        }
-    else:
-        result = run_alpha_discovery(df, trade_df, n_particles=request.n_particles, max_iterations=request.max_iterations)
-        output = result
+        if request.regime != "ALL":
+            niche_config = NichingPSO.REGIME_NICHES.get(request.regime.upper()) if NichingPSO else None
+            if not niche_config:
+                _release_idempotency_claim(claim)
+                monitor.record("/pso/discover", (time.time() - start) * 1000, 400)
+                raise HTTPException(status_code=400, detail=f"Unknown regime: {request.regime}")
+            pso = PSOOptimizer(n_particles=request.n_particles, max_iterations=request.max_iterations)
+            result = pso.optimize(df, trade_df, feat_df, regime=request.regime.upper())
+            output = {
+                "regimes_found": 1,
+                "best_regime": request.regime.upper(),
+                "best_regime_alpha": float(result.alpha_contribution),
+                "total_alpha": float(result.alpha_contribution),
+                "regimes": {
+                    request.regime.upper(): {
+                        "alpha_ticks": round(result.alpha_contribution, 3),
+                        "expectancy": round(result.best_metrics.expectancy, 3),
+                        "win_rate": round(result.best_metrics.win_rate, 3),
+                        "sharpe": round(result.best_metrics.sharpe, 3),
+                        "max_drawdown": round(result.best_metrics.max_drawdown, 3),
+                        "profit_factor": round(result.best_metrics.profit_factor, 3),
+                        "trades_analyzed": result.best_metrics.trades_count,
+                        "convergence_iters": result.iterations_run,
+                        "best_params": result.params,
+                        "convergence_history": [round(x, 4) for x in result.convergence_history[-20:]],
+                    }
+                },
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+        else:
+            result = run_alpha_discovery(df, trade_df, n_particles=request.n_particles, max_iterations=request.max_iterations)
+            output = result
 
-    cache.set(cache_key, output, ttl=300)
-    latency_ms = (time.time() - start) * 1000
-    monitor.record("/pso/discover", latency_ms, 200)
-    if PROMETHEUS_AVAILABLE:
-        record_prometheus_cache(hit=False)
-    return output
+        cache.set(cache_key, output, ttl=300)
+        latency_ms = (time.time() - start) * 1000
+        monitor.record("/pso/discover", latency_ms, 200)
+        if PROMETHEUS_AVAILABLE:
+            record_prometheus_cache(hit=False)
+        _store_idempotent_response(claim, output, ttl_seconds=300)
+        return output
+    except HTTPException:
+        _release_idempotency_claim(claim)
+        raise
+    except Exception as exc:
+        _release_idempotency_claim(claim)
+        raise HTTPException(status_code=500, detail=str(exc))
+    finally:
+        _release_idempotency_claim(claim)
 
 
 # ── Mamba SSM Routes ────────────────────────────────────────────────────────────

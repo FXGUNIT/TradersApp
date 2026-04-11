@@ -1,6 +1,6 @@
 # Kubernetes Secret Contract
 
-Updated: 2026-04-10
+Updated: 2026-04-11
 
 This document records the secret contract expected by the current Kubernetes manifests and Helm chart, plus the live findings from the `tradersapp-dev` cluster validated on 2026-04-10.
 
@@ -13,7 +13,7 @@ This document records the secret contract expected by the current Kubernetes man
   - `ml-engine-secrets`
   - `tradersapp-secrets`
 - Live secrets missing in `tradersapp-dev`:
-  - `mlflow-secrets`
+  - `mlflow-runtime-secret`
   - `keycloak-admin-secret`
 
 ## Service contract
@@ -69,23 +69,19 @@ Live `tradersapp-dev` findings:
 ### `mlflow`
 
 Repo contract:
-- Production Helm values point `mlflow.secretRef.existingSecret` at `mlflow-secrets`
-- The Helm template consumes these keys from `mlflow-secrets`:
+- Helm uses `mlflow-runtime-secret` as the runtime secret object for MLflow
+- The Helm template consumes these keys from `mlflow-runtime-secret`:
   - `POSTGRES_DB`
   - `POSTGRES_USER`
   - `POSTGRES_PASSWORD`
   - `MINIO_ROOT_USER`
   - `MINIO_ROOT_PASSWORD`
-- CI deployment script `scripts/ci/deploy-k3s.sh` creates exactly those five keys
+- CI deployment script `scripts/ci/deploy-k3s.sh` creates exactly those five keys in `mlflow-runtime-secret`
+- `k8s/base/external-secrets.yaml` now mirrors the same secret object and key names
 
 Live `tradersapp-dev` findings:
-- `mlflow-secrets` does not exist
-- `k8s/base/external-secrets.yaml` currently defines a different `mlflow-secrets` contract:
-  - `MLFLOW_TRACKING_URI`
-  - `MLFLOW_ARTIFACT_ROOT`
-  - `AWS_ACCESS_KEY_ID`
-  - `AWS_SECRET_ACCESS_KEY`
-- That ExternalSecret contract does not match the Helm template or CI deployment contract
+- `mlflow-runtime-secret` was not present in the last validated `tradersapp-dev` snapshot
+- The live cluster still does not have the External Secrets CRD installed, so the secret must come from Helm or bootstrap, not from cluster-side syncing
 
 ### `keycloak`
 
@@ -115,14 +111,14 @@ Live `tradersapp-dev` findings:
 
 1. The live cluster is using static opaque secrets in `tradersapp-dev`, not External Secrets Operator objects.
 2. `ml-engine-secrets` does not contain `DATABASE_URL`, so `B02` is currently failing.
-3. `mlflow-secrets` is absent in the live cluster, so `B03` is currently failing.
+3. `mlflow-runtime-secret` is absent in the last validated live cluster snapshot, so `B03` is currently failing.
 4. The repo has two BFF secret patterns:
    - Raw manifests/dev overlay use `tradersapp-secrets`
    - Helm prod values use `bff-secrets`
-5. `k8s/base/external-secrets.yaml` and the Helm/CI MLflow contract are inconsistent.
+5. The Helm chart default/runtime path and CI agree on `mlflow-runtime-secret`, but the validated live cluster snapshot still lacks it.
 
 ## Practical interpretation
 
 - Stage B should treat `B01-B05` as a live verification pass, not an assumption that Infisical sync is already functioning.
 - For the current dev cluster, `JWT_SECRET` and `BFF_API_KEY` exist, but the broader prod-style secret contract is incomplete.
-- Before relying on the Helm prod path, the `mlflow-secrets` contract in `k8s/base/external-secrets.yaml` should be aligned with the Helm template and CI deployment script.
+- Before relying on the Helm prod path, make sure the runtime secret is provisioned in-cluster; the repo contract now uses `mlflow-runtime-secret` with the five runtime keys above.

@@ -14,7 +14,7 @@
  *    - Global news coverage as fallback
  *
  * Caching:
- * - In-memory LRU cache per source (max 50 items)
+ * - Redis-backed shared snapshot cache across BFF pods
  * - Deduplication by title hash across all sources
  * - Rate limit awareness per source
  *
@@ -24,7 +24,6 @@
  * - ML models use reaction data for news-impact learning
  */
 
-import { EventEmitter } from "events";
 import { getRedisClient } from "./redis-session-store.mjs";
 
 // ─── Configuration ─────────────────────────────────────────────────────────────
@@ -38,6 +37,15 @@ const YF_RSS_BASE = "https://feeds.finance.yahoo.com/rss/2.0/headline";
 const GDELT_URL = "https://api.gdeltproject.org/api/v2/doc/doc";
 
 const ML_ENGINE_BASE = process.env.ML_ENGINE_URL || "http://127.0.0.1:8001";
+const BREAKING_NEWS_CACHE_KEY = "bknews:latest";
+const BREAKING_NEWS_CACHE_TTL_MS = Number.parseInt(
+  process.env.BREAKING_NEWS_CACHE_TTL_MS || "600000",
+  10,
+);
+const BREAKING_NEWS_CACHE_TTL_SECONDS = Math.max(
+  1,
+  Math.ceil(BREAKING_NEWS_CACHE_TTL_MS / 1000),
+);
 
 // Keywords that make a breaking news item relevant to MNQ/ES trading
 const TRADING_KEYWORDS = [
@@ -242,6 +250,108 @@ class NewsCache {
 
 // Global cache — shared across all requests
 const globalCache = new NewsCache();
+
+function hashNewsTitle(str = "") {
+  return globalCache._hash(str);
+}
+
+function impactRank(impact = "LOW") {
+  if (impact === "HIGH") return 3;
+  if (impact === "MEDIUM") return 2;
+  return 1;
+}
+
+function sortNewsItems(items = []) {
+  return [...items].sort((a, b) => {
+    const impactDiff = impactRank(b.impact) - impactRank(a.impact);
+    if (impactDiff !== 0) return impactDiff;
+    return new Date(b.publishedAt) - new Date(a.publishedAt);
+  });
+}
+
+function selectNewsItems(items = [], { maxItems = 30, minImpact = "LOW" } = {}) {
+  const filtered = sortNewsItems(items).filter((item) => {
+    if (minImpact === "HIGH") return item.impact === "HIGH";
+    if (minImpact === "MEDIUM") return impactRank(item.impact) >= 2;
+    return true;
+  });
+  return filtered.slice(0, maxItems);
+}
+
+function buildBreakingNewsPayload(snapshot, options = {}) {
+  const items = selectNewsItems(snapshot?.items || [], options);
+  return {
+    items,
+    total: items.length,
+    highImpactCount: items.filter((item) => item.impact === "HIGH").length,
+    sources: snapshot?.sources || {},
+    fetchedAt: snapshot?.fetchedAt || new Date().toISOString(),
+  };
+}
+
+async function readBreakingNewsSnapshot() {
+  const rc = await getRedisClient().catch(() => null);
+  if (!rc?.isOpen) {
+    return null;
+  }
+  try {
+    const raw = await rc.get(BREAKING_NEWS_CACHE_KEY);
+    if (!raw) {
+      return null;
+    }
+    const snapshot = JSON.parse(raw);
+    if (!snapshot || !Array.isArray(snapshot.items)) {
+      return null;
+    }
+    return snapshot;
+  } catch {
+    return null;
+  }
+}
+
+async function writeBreakingNewsSnapshot(snapshot) {
+  const rc = await getRedisClient().catch(() => null);
+  if (!rc?.isOpen) {
+    return false;
+  }
+  try {
+    await rc.set(
+      BREAKING_NEWS_CACHE_KEY,
+      JSON.stringify(snapshot),
+      { EX: BREAKING_NEWS_CACHE_TTL_SECONDS },
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function markBreakingNewsReacted(newsId) {
+  if (!newsId) {
+    return;
+  }
+  const snapshot = await readBreakingNewsSnapshot();
+  if (!snapshot?.items?.length) {
+    return;
+  }
+  let changed = false;
+  const items = snapshot.items.map((item) => {
+    if (item.id !== newsId) {
+      return item;
+    }
+    changed = true;
+    return {
+      ...item,
+      reactionLogged: true,
+    };
+  });
+  if (changed) {
+    await writeBreakingNewsSnapshot({
+      ...snapshot,
+      items,
+    });
+  }
+}
 
 // ─── News Reaction Logger ─────────────────────────────────────────────────────
 
@@ -717,7 +827,26 @@ export async function fetchBreakingNews(options = {}) {
     maxItems = 30,
     minImpact = "LOW",
     includeAllSources = true,
+    fresh = false,
   } = options;
+
+  if (!fresh) {
+    const cachedSnapshot = await readBreakingNewsSnapshot();
+    if (cachedSnapshot) {
+      const cachedPayload = buildBreakingNewsPayload(cachedSnapshot, {
+        maxItems,
+        minImpact,
+      });
+      return {
+        ...cachedPayload,
+        cached: true,
+        cacheAgeMs: Math.max(
+          0,
+          Date.now() - new Date(cachedPayload.fetchedAt).getTime(),
+        ),
+      };
+    }
+  }
 
   // Fetch all sources concurrently
   const results = await Promise.allSettled([
@@ -748,37 +877,40 @@ export async function fetchBreakingNews(options = {}) {
     unique.push(item);
   }
 
-  // Filter by minimum impact if needed
-  const impactOrder = { HIGH: 3, MEDIUM: 2, LOW: 1 };
-  const filtered = unique.filter((item) => {
-    if (minImpact === "HIGH") return item.impact === "HIGH";
-    if (minImpact === "MEDIUM") return impactOrder[item.impact] >= 2;
-    return true;
+  const sortedItems = sortNewsItems(unique);
+  const fetchedAt = new Date().toISOString();
+  const sources = {
+    finnhub: FINNHUB_API_KEY ? "configured" : "no_key",
+    newsdata: NEWS_API_KEY ? "configured" : "no_key",
+    yahoo: "always_on",
+    gdelt: "fallback",
+  };
+  await writeBreakingNewsSnapshot({
+    items: sortedItems,
+    sources,
+    fetchedAt,
   });
-
-  // Sort: HIGH impact first, then by recency
-  filtered.sort((a, b) => {
-    const impactDiff = impactOrder[b.impact] - impactOrder[a.impact];
-    if (impactDiff !== 0) return impactDiff;
-    return new Date(b.publishedAt) - new Date(a.publishedAt);
-  });
-
-  const finalItems = filtered.slice(0, maxItems);
-
-  // Update global cache
-  for (const item of finalItems) {
-    globalCache.add(item);
-  }
+  const finalPayload = buildBreakingNewsPayload(
+    {
+      items: sortedItems,
+      sources,
+      fetchedAt,
+    },
+    {
+      maxItems,
+      minImpact,
+    },
+  );
 
   // Enqueue HIGH impact items for reaction tracking.
   // Redis NX prevents duplicate enqueue across multiple BFF pods (cross-pod dedup).
   // Falls back to in-process dedup if Redis is unavailable.
   const rc = await getRedisClient().catch(() => null);
-  for (const item of finalItems) {
+  for (const item of finalPayload.items) {
     if (item.impact === "HIGH" && !item.reactionLogged) {
       let claimed = true;
       if (rc?.isOpen) {
-        const key = `bknews:enq:${globalCache._hash(item.title)}`;
+        const key = `bknews:enq:${hashNewsTitle(item.title)}`;
         claimed =
           (await rc
             .set(key, "1", { NX: true, PX: 600_000 })
@@ -789,26 +921,23 @@ export async function fetchBreakingNews(options = {}) {
   }
 
   return {
-    items: finalItems,
-    total: finalItems.length,
-    highImpactCount: finalItems.filter((i) => i.impact === "HIGH").length,
-    sources: {
-      finnhub: FINNHUB_API_KEY ? "configured" : "no_key",
-      newsdata: NEWS_API_KEY ? "configured" : "no_key",
-      yahoo: "always_on",
-      gdelt: "fallback",
-    },
-    fetchedAt: new Date().toISOString(),
+    ...finalPayload,
+    cached: false,
+    cacheAgeMs: 0,
   };
 }
 
 /**
  * Get all cached news (no new fetches).
  */
-export function getCachedNews() {
+export async function getCachedNews(options = {}) {
+  const snapshot = await readBreakingNewsSnapshot();
+  const payload = buildBreakingNewsPayload(snapshot, options);
   return {
-    items: globalCache.getAll(),
-    fetchedAt: new Date().toISOString(),
+    ...payload,
+    cacheAgeMs: snapshot?.fetchedAt
+      ? Math.max(0, Date.now() - new Date(snapshot.fetchedAt).getTime())
+      : null,
     reactionLog: reactionLog.getAllReactions().length,
   };
 }
@@ -867,7 +996,7 @@ export async function triggerMLRetrainOnNews(newsItem) {
     if (!res.ok) return { triggered: false, reason: `ML Engine ${res.status}` };
 
     const data = await res.json();
-    globalCache.markReacted(newsItem.id);
+    await markBreakingNewsReacted(newsItem.id);
     return { triggered: true, newsId: newsItem.id, response: data };
   } catch (err) {
     return { triggered: false, reason: err.message };

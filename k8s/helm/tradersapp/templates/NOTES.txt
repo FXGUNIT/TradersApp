@@ -46,6 +46,9 @@ Service endpoints:
   BFF:        http://bff.{{ .Values.namespace }}.svc:8788
   Frontend:   http://frontend.{{ .Values.namespace }}.svc:80
 
-For full observability, install kube-prometheus-stack:
-  helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-  helm install prometheus prometheus-community/kube-prometheus-stack -n monitoring --create-namespace
+For full observability with the bundled kube-prometheus-stack dependency:
+  helm dependency build ./k8s/helm/tradersapp
+  helm upgrade --install tradersapp ./k8s/helm/tradersapp \
+    -n {{ .Values.namespace }} \
+    -f values.prod.yaml \
+    --set monitoringStack.enabled=true

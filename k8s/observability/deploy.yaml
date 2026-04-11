@@ -128,7 +128,13 @@ data:
           # Propagate pod labels as Prometheus labels
           - action: labelmap
             regex: __meta_kubernetes_pod_label_(.+)
-          # Add namespace, pod, node labels for multi-pod debugging (F06)
+          # Add standardized pod/node labels plus legacy aliases for compatibility
+          - source_labels: [__meta_kubernetes_namespace]
+            target_label: pod_namespace
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod_name
+          - source_labels: [__meta_kubernetes_pod_node_name]
+            target_label: node_name
           - source_labels: [__meta_kubernetes_namespace]
             target_label: kubernetes_namespace
           - source_labels: [__meta_kubernetes_pod_name]
@@ -137,6 +143,10 @@ data:
             target_label: kubernetes_node_name
           - source_labels: [__meta_kubernetes_pod_name]
             target_label: instance
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod
+          - source_labels: [__meta_kubernetes_namespace]
+            target_label: namespace
 
       # Prometheus self-scrape
       - job_name: prometheus

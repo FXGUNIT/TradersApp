@@ -73,12 +73,20 @@ TOPIC_DLQ = "dead-letter-queue"
 DLQ_MAX_RETRIES = int(os.environ.get("KAFKA_DLQ_MAX_RETRIES", "3"))
 
 try:
-    from infrastructure.prometheus_exporter import set_kafka_consumer_lag as _set_lag
+    from infrastructure.prometheus_exporter import (
+        set_kafka_consumer_lag as _set_lag,
+        record_kafka_consumer_processed as _record_processed,
+    )
 except Exception:
     try:
-        from ml_engine.infrastructure.prometheus_exporter import set_kafka_consumer_lag as _set_lag  # type: ignore
+        from ml_engine.infrastructure.prometheus_exporter import (  # type: ignore
+            set_kafka_consumer_lag as _set_lag,
+            record_kafka_consumer_processed as _record_processed,
+        )
     except Exception:
         def _set_lag(topic: str, partition: int, lag: int) -> None:  # type: ignore
+            pass
+        def _record_processed(topic: str) -> None:  # type: ignore
             pass
 
 
@@ -517,6 +525,7 @@ class KafkaConsumerClient:
                             )
                             handler(event)
                             self._messages_processed += 1
+                            _record_processed(topic)  # E03: update consumer-processed Prometheus counter
                             self._last_message_time = datetime.now(timezone.utc).isoformat()
                             # Clear retry count for successfully processed message
                             self._retry_counts.pop((topic, msg.partition(), msg.offset()), None)

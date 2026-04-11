@@ -1,80 +1,145 @@
-#!/usr/bin/env bash
-# =============================================================================
-# watch-hpa-events.sh — HPA scaling event watcher for TradersApp
-# =============================================================================
-# Watches Kubernetes events for HPA ScalingReplicaSet reasons in the
-# tradersapp namespace, formats them as Slack messages, and sends to a
-# Slack webhook.
+#!/usr/bin/env sh
+# watch-hpa-events.sh - HPA scaling event watcher for TradersApp
+#
+# Watches Kubernetes events for HorizontalPodAutoscaler rescale activity in the
+# target namespace and sends Slack notifications when a webhook is configured.
 #
 # Usage:
 #   SLACK_HPA_WEBHOOK_URL="https://hooks.slack.com/..." \
 #   K8S_NAMESPACE="tradersapp" \
 #   ./watch-hpa-events.sh
 #
-# Kubernetes deployment: run as a DaemonSet or sidecar, or schedule via
-# a CronJob that wakes every 5 minutes and tails recent events.
-# The CronJob approach avoids long-running process management overhead.
-#
-# systemd timer equivalent (for bare-metal / VMs):
-#   /etc/systemd/system/watch-hpa-events.timer
-#   /etc/systemd/system/watch-hpa-events.service
-# =============================================================================
-set -euo pipefail
+# Flags:
+#   --once              Scan once and exit
+#   --namespace NAME    Override the namespace to watch
+#   --poll-interval N   Seconds between scans in continuous mode
+#   --lookback-seconds N  Skip events older than this window
 
-# ── Config ────────────────────────────────────────────────────────────────────
-SLACK_WEBHOOK_URL="${SLACK_HPA_WEBHOOK_URL:-${SLACK_HPA_WEBHOOK_URL:-}}"
+set -eu
+
 K8S_NAMESPACE="${K8S_NAMESPACE:-tradersapp}"
-POLL_INTERVAL="${POLL_INTERVAL:-30}"    # seconds between kubectl polls
-LOOKBACK_SECONDS="${LOOKBACK_SECONDS:-300}"  # catch events from last 5 minutes on start
-PREV_REPLICAS_FILE="${PREV_REPLICAS_FILE:-/tmp/hpa_replicas_prev.json}"
+POLL_INTERVAL="${POLL_INTERVAL:-30}"
+LOOKBACK_SECONDS="${LOOKBACK_SECONDS:-300}"
+RUN_ONCE="${RUN_ONCE:-0}"
+KUBECTL_BIN="${KUBECTL_BIN:-kubectl}"
+SEEN_EVENTS_FILE="${SEEN_EVENTS_FILE:-/tmp/watch-hpa-events.seen}"
+SLACK_WEBHOOK_URL="${SLACK_HPA_WEBHOOK_URL:-${SLACK_WEBHOOK_URL:-}}"
 
-# ── Validation ─────────────────────────────────────────────────────────────────
-if [[ -z "$SLACK_WEBHOOK_URL" ]]; then
-  echo "[watch-hpa-events] ERROR: SLACK_HPA_WEBHOOK_URL is not set. Exiting." >&2
+usage() {
+  cat <<'EOF'
+Usage: watch-hpa-events.sh [--once] [--namespace NAME] [--poll-interval N] [--lookback-seconds N]
+EOF
+}
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --once)
+      RUN_ONCE=1
+      ;;
+    --namespace)
+      if [ "${2:-}" = "" ]; then
+        echo "[watch-hpa-events] ERROR: --namespace requires a value" >&2
+        exit 1
+      fi
+      K8S_NAMESPACE="$2"
+      shift
+      ;;
+    --poll-interval)
+      if [ "${2:-}" = "" ]; then
+        echo "[watch-hpa-events] ERROR: --poll-interval requires a value" >&2
+        exit 1
+      fi
+      POLL_INTERVAL="$2"
+      shift
+      ;;
+    --lookback-seconds)
+      if [ "${2:-}" = "" ]; then
+        echo "[watch-hpa-events] ERROR: --lookback-seconds requires a value" >&2
+        exit 1
+      fi
+      LOOKBACK_SECONDS="$2"
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "[watch-hpa-events] ERROR: unknown argument: $1" >&2
+      usage >&2
+      exit 1
+      ;;
+  esac
+  shift
+done
+
+if [ ! -x "$KUBECTL_BIN" ] && ! command -v "$KUBECTL_BIN" >/dev/null 2>&1; then
+  echo "[watch-hpa-events] ERROR: kubectl not found at '$KUBECTL_BIN'." >&2
   exit 1
 fi
 
-if ! command -v kubectl &>/dev/null; then
-  echo "[watch-hpa-events] ERROR: kubectl not found in PATH." >&2
-  exit 1
+if [ ! -f "$SEEN_EVENTS_FILE" ]; then
+  : > "$SEEN_EVENTS_FILE"
 fi
 
-# ── Slack payload helper ───────────────────────────────────────────────────────
+json_escape() {
+  printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
+}
+
 send_slack() {
-  local payload="$1"
-  local response
-  response=$(curl -s -X POST \
+  payload="$1"
+
+  if [ -z "$SLACK_WEBHOOK_URL" ]; then
+    echo "[watch-hpa-events] Slack webhook not configured; skipping send." >&2
+    return 0
+  fi
+
+  if ! command -v curl >/dev/null 2>&1; then
+    echo "[watch-hpa-events] ERROR: curl not found in PATH." >&2
+    return 1
+  fi
+
+  response="$(curl -fsS -X POST \
     -H 'Content-type: application/json' \
     --data "$payload" \
-    "$SLACK_WEBHOOK_URL")
-  if echo "$response" | grep -q '"ok":true'; then
-    echo "[watch-hpa-events] Slack notification sent successfully."
-  else
-    echo "[watch-hpa-events] WARNING: Slack webhook returned non-ok: $response" >&2
+    "$SLACK_WEBHOOK_URL" 2>&1 || true)"
+
+  if [ -n "$response" ]; then
+    echo "[watch-hpa-events] Slack webhook response: $response"
   fi
 }
 
 format_slack_message() {
-  local event_reason="$1"
-  local hpa_name="$2"
-  local namespace="$3"
-  local first_timestamp="$4"
-  local message="$5"
-  local involved_object="$6"
-  local count="${7:-1}"
+  event_reason="$1"
+  hpa_name="$2"
+  namespace="$3"
+  first_timestamp="$4"
+  message="$5"
+  involved_object="$6"
+  count="${7:-1}"
 
-  # Choose Slack emoji and colour based on scaling direction
-  local emoji="kubernetes"
-  local colour="#E01E5A"
-  if echo "$message" | grep -qi "scaling up\|scale up\|increased"; then
-    emoji=":arrow_up:"
-    colour="#2EB67D"   # green
-  elif echo "$message" | grep -qi "scaling down\|scale down\|decreased"; then
-    emoji=":arrow_down:"
-    colour="#ECB22E"   # yellow/amber
-  fi
+  emoji=":gear:"
+  colour="#E01E5A"
 
-  # Slack Block Kit payload
+  case "$message" in
+    *"scaling up"*|*"scale up"*|*"increased"*|*"desired replica count is larger"*)
+      emoji=":arrow_up:"
+      colour="#2EB67D"
+      ;;
+    *"scaling down"*|*"scale down"*|*"decreased"*|*"desired replica count is smaller"*)
+      emoji=":arrow_down:"
+      colour="#ECB22E"
+      ;;
+  esac
+
+  escaped_reason="$(json_escape "$event_reason")"
+  escaped_hpa="$(json_escape "$hpa_name")"
+  escaped_namespace="$(json_escape "$namespace")"
+  escaped_first_seen="$(json_escape "$first_timestamp")"
+  escaped_message="$(json_escape "$message")"
+  escaped_object="$(json_escape "$involved_object")"
+  now_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || printf '%s' 'unknown')"
+
   cat <<EOF
 {
   "attachments": [
@@ -85,25 +150,25 @@ format_slack_message() {
           "type": "header",
           "text": {
             "type": "plain_text",
-            "text": "$emoji HPA Scaling Event: $hpa_name",
+            "text": "$emoji HPA Scaling Event: $escaped_hpa",
             "emoji": true
           }
         },
         {
           "type": "section",
           "fields": [
-            {"type": "mrkdwn", "text": "*Reason:*\n\`$event_reason\`"},
-            {"type": "mrkdwn", "text": "*Namespace:*\n\`$namespace\`"},
-            {"type": "mrkdwn", "text": "*Involved Object:*\n\`$involved_object\`"},
-            {"type": "mrkdwn", "text": "*First Seen:*\n\`$first_timestamp\`"},
+            {"type": "mrkdwn", "text": "*Reason:*\n\`$escaped_reason\`"},
+            {"type": "mrkdwn", "text": "*Namespace:*\n\`$escaped_namespace\`"},
+            {"type": "mrkdwn", "text": "*Involved Object:*\n\`$escaped_object\`"},
+            {"type": "mrkdwn", "text": "*First Seen:*\n\`$escaped_first_seen\`"},
             {"type": "mrkdwn", "text": "*Event Count:*\n$count"},
-            {"type": "mrkdwn", "text": "*Message:*\n\`\`\`$message\`\`\`"}
+            {"type": "mrkdwn", "text": "*Message:*\n\`\`\`$escaped_message\`\`\`"}
           ]
         },
         {
           "type": "context",
           "elements": [
-            {"type": "mrkdwn", "text": "TradersApp K8s Events | namespace=$namespace | $(date -u +%Y-%m-%dT%H:%M:%SZ)"}
+            {"type": "mrkdwn", "text": "TradersApp HPA watcher | namespace=$escaped_namespace | observed_at=$now_utc"}
           ]
         }
       ]
@@ -113,84 +178,83 @@ format_slack_message() {
 EOF
 }
 
-# ── Main watch loop ────────────────────────────────────────────────────────────
-echo "[watch-hpa-events] Starting HPA event watcher (namespace=$K8S_NAMESPACE, poll_interval=${POLL_INTERVAL}s)"
-echo "[watch-hpa-events] Webhook URL: ${SLACK_WEBHOOK_URL:+<set>}" >&2
+event_already_seen() {
+  event_key="$1"
+  grep -Fxq "$event_key" "$SEEN_EVENTS_FILE"
+}
 
-# Keep track of already-reported event hashes to avoid duplicates
-declare -A REPORTED_EVENTS
+mark_event_seen() {
+  event_key="$1"
+  printf '%s\n' "$event_key" >> "$SEEN_EVENTS_FILE"
+}
 
-while true; do
-  # Get recent ScalingReplicaSet events for the namespace (lookback window)
-  #kubectl get events \
-  #  --namespace "$K8S_NAMESPACE" \
-  #  --field-selector reason=ScalingReplicaSet \
-  #  -o json \
-  #  2>/dev/null | \
+scan_hpa_events() {
+  cutoff=""
+  case "$LOOKBACK_SECONDS" in
+    ''|*[!0-9]*)
+      LOOKBACK_SECONDS=0
+      ;;
+  esac
+  if [ "$LOOKBACK_SECONDS" -gt 0 ]; then
+    cutoff="$(date -u -d "-${LOOKBACK_SECONDS} seconds" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || true)"
+  fi
 
-  # Use a JSONPath query to extract relevant fields efficiently
-  #kubectl get events \
-  #  --namespace "$K8S_NAMESPACE" \
-  #  --field-selector reason=ScalingReplicaSet \
-  #  -o custom-columns=\
-  #    "LAST_SEEN:.lastTimestamp",\
-  #    "REASON:.reason",\
-  #    "FIRST_SEEN:.firstTimestamp",\
-  #    "COUNT:.count",\
-  #    "KIND:.involvedObject.kind",\
-  #    "NAME:.involvedObject.name",\
-  #    "MESSAGE:.message" \
-  #  --no-headers 2>/dev/null | \
-
-  # Parse events from kubectl output
+  "$KUBECTL_BIN" get events \
+    --namespace "$K8S_NAMESPACE" \
+    --field-selector involvedObject.kind=HorizontalPodAutoscaler \
+    --sort-by=.lastTimestamp \
+    -o custom-columns=LAST_SEEN:.lastTimestamp,UID:.metadata.uid,TYPE:.type,REASON:.reason,COUNT:.count,KIND:.involvedObject.kind,NAME:.involvedObject.name,MESSAGE:.message \
+    --no-headers 2>/dev/null |
   while IFS= read -r line; do
-    # Skip empty lines
-    [[ -z "$line" ]] && continue
+    [ -n "$line" ] || continue
 
-    # Parse columns
-    # Format: LAST_SEEN REASON FIRST_SEEN COUNT KIND NAME MESSAGE
-    last_seen=$(echo "$line" | awk '{print $1}')
-    reason=$(echo "$line" | awk '{print $2}')
-    first_seen=$(echo "$line" | awk '{print $3}')
-    count=$(echo "$line" | awk '{print $4}')
-    kind=$(echo "$line" | awk '{print $5}')
-    name=$(echo "$line" | awk '{print $6}')
-    # Message is everything after field 6
-    message=$(echo "$line" | awk '{$1=$2=$3=$4=$5=$6=""; print $0}' | sed 's/^[[:space:]]*//')
+    last_seen="$(printf '%s\n' "$line" | awk '{print $1}')"
+    event_uid="$(printf '%s\n' "$line" | awk '{print $2}')"
+    event_type="$(printf '%s\n' "$line" | awk '{print $3}')"
+    event_reason="$(printf '%s\n' "$line" | awk '{print $4}')"
+    count="$(printf '%s\n' "$line" | awk '{print $5}')"
+    kind="$(printf '%s\n' "$line" | awk '{print $6}')"
+    name="$(printf '%s\n' "$line" | awk '{print $7}')"
+    message="$(printf '%s\n' "$line" | cut -d' ' -f8-)"
 
-    # Build a unique event key to avoid duplicate alerts
-    event_key="${reason}:${name}:${kind}:${count}"
-    if [[ -n "${REPORTED_EVENTS[$event_key]:-}" ]]; then
+    if [ -n "$cutoff" ] && [ -n "$last_seen" ] && [ "$last_seen" \< "$cutoff" ]; then
+      continue
+    fi
+
+    event_key="${event_uid:-${event_reason}:${name}:${last_seen}:${count}}"
+    if event_already_seen "$event_key"; then
       echo "[watch-hpa-events] Skipping already-reported event: $event_key"
       continue
     fi
-    REPORTED_EVENTS[$event_key]=1
 
-    # Format and send Slack message
-    payload=$(format_slack_message \
-      "$reason" \
+    payload="$(format_slack_message \
+      "$event_reason" \
       "$name" \
       "$K8S_NAMESPACE" \
-      "$first_seen" \
+      "$last_seen" \
       "$message" \
       "${kind}/${name}" \
-      "$count")
+      "$count")"
 
-    echo "[watch-hpa-events] Sending Slack notification for HPA event: $name ($reason)"
+    echo "[watch-hpa-events] HPA event detected: ${name} (${event_reason}, type=${event_type}, count=${count})"
     send_slack "$payload"
+    mark_event_seen "$event_key"
+  done
+}
 
-  done < <(kubectl get events \
-    --namespace "$K8S_NAMESPACE" \
-    --field-selector reason=ScalingReplicaSet \
-    -o custom-columns=\
-      "LAST_SEEN:.lastTimestamp",\
-      "REASON:.reason",\
-      "FIRST_SEEN:.firstTimestamp",\
-      "COUNT:.count",\
-      "KIND:.involvedObject.kind",\
-      "NAME:.involvedObject.name",\
-      "MESSAGE:.message" \
-    --no-headers 2>/dev/null)
+echo "[watch-hpa-events] Starting HPA event watcher (namespace=$K8S_NAMESPACE, poll_interval=${POLL_INTERVAL}s, lookback=${LOOKBACK_SECONDS}s)"
+if [ -n "$SLACK_WEBHOOK_URL" ]; then
+  echo "[watch-hpa-events] Slack webhook: configured"
+else
+  echo "[watch-hpa-events] Slack webhook: not configured"
+fi
+
+while :; do
+  scan_hpa_events
+
+  if [ "$RUN_ONCE" = "1" ]; then
+    exit 0
+  fi
 
   sleep "$POLL_INTERVAL"
 done

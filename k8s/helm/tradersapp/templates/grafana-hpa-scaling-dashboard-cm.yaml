@@ -1,0 +1,13 @@
+{{- if .Values.grafana.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-hpa-scaling-dashboard
+  namespace: {{ .Release.Namespace }}
+  labels:
+    grafana_dashboard: "1"
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+data:
+  hpa-scaling-dashboard.json: |
+{{ .Files.Get "files/dashboards/hpa-scaling-dashboard.json" | indent 4 }}
+{{- end }}

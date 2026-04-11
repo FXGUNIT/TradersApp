@@ -16,3 +16,9 @@ maintainers:
 sources:
   - https://github.com/FXGUNIT/TradersApp
 icon: https://tradersapp.io/icon.png
+dependencies:
+  - name: kube-prometheus-stack
+    alias: monitoringStack
+    version: 80.13.3
+    repository: https://prometheus-community.github.io/helm-charts
+    condition: monitoringStack.enabled
