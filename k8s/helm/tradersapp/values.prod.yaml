@@ -76,9 +76,10 @@ mlEngine:
   autoscaling:
     enabled: true
     minReplicas: 1
-    maxReplicas: 4
-    targetCPUUtilizationPercentage: 70
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 80
     targetMemoryUtilizationPercentage: 80
+    targetLatencyMs: "200"
   dataQuality:
     validateBeforeTrain: true
     blockOnCritical: true

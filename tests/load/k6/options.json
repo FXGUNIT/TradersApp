@@ -1,0 +1,43 @@
+{
+  "$schema": "https://raw.githubusercontent.com/grafana/k6/master/jsonschema/k6.json",
+  "_description": "k6 load test configuration — tunable via environment variables from k6-runner.sh",
+  "thresholds": {
+    "predict_latency_ms":   ["p(95)<200",   "p(99)<500"],
+    "mamba_latency_ms":     ["p(95)<200",   "p(99)<500"],
+    "consensus_latency_ms": ["p(95)<300",   "p(99)<750"],
+    "predict_fail_rate":    ["rate<0.01"],
+    "mamba_fail_rate":      ["rate<0.01"],
+    "consensus_fail_rate":  ["rate<0.01"],
+    "http_req_failed":      ["rate<0.01"]
+  },
+  "scenarios": {
+    "predict": {
+      "executor":       "ramping-vus",
+      "startVUs":       0,
+      "stages": [
+        { "duration": "30s", "target": 50 },
+        { "duration": "60s", "target": 50 }
+      ],
+      "preAllocatedVUs": 50
+    },
+    "mamba": {
+      "executor":       "ramping-vus",
+      "startVUs":       0,
+      "stages": [
+        { "duration": "30s", "target": 25 },
+        { "duration": "60s", "target": 25 }
+      ],
+      "preAllocatedVUs": 25
+    },
+    "consensus": {
+      "executor":       "ramping-vus",
+      "startVUs":       0,
+      "stages": [
+        { "duration": "60s", "target": 75 },
+        { "duration": "120s", "target": 75 }
+      ],
+      "preAllocatedVUs": 75
+    }
+  },
+  "summaryTrendCols": ["avg", "min", "med", "p(95)", "p(99)", "max"]
+}

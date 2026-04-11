@@ -309,6 +309,13 @@ def get_metrics(registry=DEFAULT_REGISTRY) -> dict:
         labelnames=["topic", "partition"],
         registry=registry,
     )
+    # ── Kafka Producer Circuit Breaker ──────────────────────────────────
+    metrics["kafka_producer_circuit_state"] = Gauge(
+        name="kafka_producer_circuit_state",
+        documentation="Kafka producer circuit state: 0=closed, 1=half_open, 2=open",
+        labelnames=["broker"],
+        registry=registry,
+    )
 
     # ── MLflow / MLOps ─────────────────────────────────────────────────
     metrics["training_runs_total"] = Counter(
@@ -605,6 +612,18 @@ def record_kafka_consumer_processed(topic: str):
     if not PROMETHEUS_AVAILABLE:
         return
     _metrics["kafka_consumer_processed"].labels(topic=topic).inc()
+
+
+def set_kafka_producer_circuit_state(state: str, broker: str = "default"):
+    """Set Kafka producer circuit breaker state metric (0=closed, 1=half_open, 2=open)."""
+    global _metrics
+    if _metrics is None:
+        _metrics = get_metrics()
+    if not PROMETHEUS_AVAILABLE:
+        return
+    state_map = {"CLOSED": 0, "HALF_OPEN": 1, "OPEN": 2}
+    value = state_map.get(state.upper() if isinstance(state, str) else str(state), 0)
+    _metrics["kafka_producer_circuit_state"].labels(broker=broker).set(value)
 
 
 def set_kafka_consumer_lag(topic: str, partition: int, lag: int):

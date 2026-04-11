@@ -81,9 +81,10 @@ mlEngine:
   autoscaling:
     enabled: true
     minReplicas: 1
-    maxReplicas: 4
-    targetCPUUtilizationPercentage: 70
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 80
     targetMemoryUtilizationPercentage: 80
+    targetLatencyMs: "200"  # P95 inference latency — scale up when > 200ms avg per pod
   # KEDA event-driven autoscaling — scale on inference latency and queue depth
   kedaAutoscaling:
     enabled: false # Enable with: helm upgrade --set mlEngine.kedaAutoscaling.enabled=true
@@ -186,8 +187,9 @@ bff:
   autoscaling:
     enabled: true
     minReplicas: 2
-    maxReplicas: 8
+    maxReplicas: 10
     targetCPUUtilizationPercentage: 60
+    targetMemoryUtilizationPercentage: 80
   # KEDA autoscaling for BFF — scale on request rate and latency
   kedaAutoscaling:
     enabled: false

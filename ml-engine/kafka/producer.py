@@ -59,6 +59,12 @@ except ModuleNotFoundError:
         generate_request_id,
     )
 
+try:
+    from infrastructure.prometheus_exporter import set_kafka_producer_circuit_state
+except Exception:
+    def set_kafka_producer_circuit_state(state: str, broker: str = "default") -> None:  # type: ignore
+        pass
+
 
 try:
     from confluent_kafka import Producer, KafkaError, KafkaException
@@ -255,6 +261,7 @@ class KafkaProducerClient:
         if self._circuit_state in (KAFKA_CB_OPEN, KAFKA_CB_HALF_OPEN):
             self._log(logging.INFO, "Kafka circuit state %s -> %s", self._circuit_state, KAFKA_CB_CLOSED)
         self._circuit_state = KAFKA_CB_CLOSED
+        set_kafka_producer_circuit_state(self._circuit_state, broker=self._bootstrap)
 
     def _record_failure(self, error: Exception | str) -> None:
         self._failure_count += 1
@@ -263,6 +270,7 @@ class KafkaProducerClient:
             self._circuit_state = KAFKA_CB_OPEN
         elif self._failure_count >= self._failure_threshold:
             self._circuit_state = KAFKA_CB_OPEN
+        set_kafka_producer_circuit_state(self._circuit_state, broker=self._bootstrap)
         self._log(
             logging.WARNING,
             "Kafka failure recorded state=%s failures=%s error=%s",
@@ -276,6 +284,7 @@ class KafkaProducerClient:
             return True
         if time.time() - self._last_failure_time >= self._recovery_timeout_seconds:
             self._circuit_state = KAFKA_CB_HALF_OPEN
+            set_kafka_producer_circuit_state(self._circuit_state, broker=self._bootstrap)
             self._log(logging.INFO, "Kafka circuit OPEN -> HALF_OPEN")
             return True
         return False

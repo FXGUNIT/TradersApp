@@ -28,6 +28,16 @@ spec:
           type: Utilization
           averageUtilization: {{ .Values.mlEngine.autoscaling.targetMemoryUtilizationPercentage }}
   {{- end }}
+  {{- /* Custom metric: ML Engine P95 inference latency — scale up when P95 > 200ms */ -}}
+  {{- if .Values.mlEngine.autoscaling.targetLatencyMs }}
+    - type: Pods
+      pods:
+        metric:
+          name: ml-engine-p95-latency-ms
+        target:
+          type: AverageValue
+          averageValue: {{ .Values.mlEngine.autoscaling.targetLatencyMs | quote }}
+  {{- end }}
   behavior:
     scaleDown:
       stabilizationWindowSeconds: 300
