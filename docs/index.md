@@ -12,10 +12,10 @@ Its main job is to separate three things that were previously mixed together:
 
 | Asset | Read it as | Important warning |
 | --- | --- | --- |
-| `architecture-3d-overview.*` | Conceptual summary | Not a protocol-accurate runtime topology |
-| `architecture-system-design-board.*` | Capability inventory | Contains some target-state/control-plane material mixed with current-state material |
-| `architecture-5w1h-map.*` | Operating/roadmap view | Use for orientation, not exact deployment truth |
-| `architecture-birdview-roadmap.*` | Evolution roadmap | This is explicitly target-state material |
+| `architecture-3d-overview.*` | Current runtime overview | Use this first for the live request path, support planes, and extraction status |
+| `architecture-system-design-board.*` | Detailed topology board | Current-state inventory with explicit maturity labels for support systems and controls |
+| `architecture-5w1h-map.*` | Current operating map | Current-state operating intent across request path, learning, observability, delivery, and boundaries |
+| `architecture-birdview-roadmap.*` | Evolution roadmap | Planning view only; treat the `Today` column as current reality and the later columns as target work |
 
 ## Current Runtime Truth
 
@@ -80,7 +80,7 @@ Canonical manifest: `architecture/ddd/bounded-contexts.json`
 
 The architecture docs should currently treat the consensus path as a `<200ms P95` contract until the broader SLA story is unified.
 
-The older `50ms` language still present in some assets should be read as either:
+Older tighter-latency language still present in historical references should be read as either:
 
 - a subcomponent goal
 - a tighter aspirational target

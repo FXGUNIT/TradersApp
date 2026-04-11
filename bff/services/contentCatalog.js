@@ -1,53 +1,7 @@
-export const HUB_CONTENT = Object.freeze({
-  eyebrow: "TRADERS REGIMENT",
-  title: "Command Centre",
-  description: "Select your operational wing to proceed.",
-  cards: [
-    {
-      id: "artillery",
-      title: "Trading Terminal",
-      description:
-        "Live MNQ/MES execution, order flow analysis, and capital deployment.",
-      action: "APP",
-      accentToken: "var(--accent-primary, #2563eb)",
-      glowToken: "var(--accent-glow, rgba(37,99,235,0.3))",
-      surfaceToken: "var(--surface-elevated, #FFFFFF)",
-    },
-    {
-      id: "consciousness",
-      title: "TR'S COLLECTIVE CONSCIOUSNESS",
-      description:
-        "Engage the intelligence grid for recursive market strategy and risk analysis.",
-      action: "CONSCIOUSNESS",
-      accentToken: "var(--amd-manipulation, #BF5AF2)",
-      glowToken: "rgba(191,90,242,0.3)",
-      surfaceToken: "var(--surface-elevated, #FFFFFF)",
-    },
-  ],
-});
-
-export const DOCUMENT_META = Object.freeze({
-  tos: { slug: "tos", title: "Terms of Service", surface: "legal" },
-  privacy: { slug: "privacy", title: "Privacy Policy", surface: "legal" },
-  eula: { slug: "eula", title: "Regiment Master EULA", surface: "legal" },
-});
-
-export function getLocalHubContent() {
-  return HUB_CONTENT;
-}
-
-export function getLocalDocumentMeta(slug) {
-  return DOCUMENT_META[slug] || null;
-}
-
-export function listLocalDocumentMeta() {
-  return Object.values(DOCUMENT_META);
-}
-
-export default {
+export {
   DOCUMENT_META,
   HUB_CONTENT,
-  getLocalDocumentMeta,
-  getLocalHubContent,
-  listLocalDocumentMeta,
-};
+  getDocumentMeta as getLocalDocumentMeta,
+  getHubContent as getLocalHubContent,
+  listDocumentMeta as listLocalDocumentMeta,
+} from "../domains/contentState.mjs";

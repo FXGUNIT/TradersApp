@@ -1,107 +1,87 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1800 1040" role="img" aria-labelledby="title desc">
-  <title id="title">TradersApp bird view roadmap</title>
-  <desc id="desc">Birds-eye roadmap that shows today, stabilization, extraction, and operating state for the main TradersApp architecture lanes.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1760 1040" role="img" aria-labelledby="title desc">
+  <title id="title">TradersApp - Architecture Roadmap</title>
+  <desc id="desc">Roadmap view that separates current state, stabilization work, extraction work, and eventual operating targets across the major architecture lanes.</desc>
   <defs>
-    <filter id="shadow" x="-20%" y="-20%" width="140%" height="160%">
-      <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#10233d" flood-opacity="0.10"/>
-    </filter>
     <style>
-      .title { font: 700 42px 'Segoe UI', Arial, sans-serif; fill: #10233d; }
-      .subtitle { font: 500 18px 'Segoe UI', Arial, sans-serif; fill: #536f8c; }
-      .header { font: 700 24px 'Segoe UI', Arial, sans-serif; fill: #10233d; }
-      .rowtitle { font: 700 20px 'Segoe UI', Arial, sans-serif; fill: #10233d; }
-      .cell { font: 500 15px 'Segoe UI', Arial, sans-serif; fill: #425d7b; }
+      .bg { fill: #ffffff; }
+      .title { font: 700 36px 'Segoe UI', Arial, sans-serif; fill: #0f172a; }
+      .subtitle { font: 500 16px 'Segoe UI', Arial, sans-serif; fill: #475569; }
+      .hdr { font: 700 18px 'Segoe UI', Arial, sans-serif; fill: #ffffff; }
+      .lane { font: 700 17px 'Segoe UI', Arial, sans-serif; fill: #0f172a; }
+      .cell { font: 500 13px 'Segoe UI', Arial, sans-serif; fill: #334155; }
+      .tag { font: 700 11px 'Segoe UI', Arial, sans-serif; fill: #475569; }
     </style>
   </defs>
 
-  <rect width="1800" height="1040" fill="#f8fbff"/>
-  <text x="70" y="74" class="title">Bird&apos;s-eye architecture roadmap</text>
-  <text x="70" y="106" class="subtitle">Read left to right: current reality -> next hardening -> service extraction -> long-run operating state</text>
+  <rect class="bg" width="1760" height="1040"/>
+  <text x="60" y="64" class="title">Architecture roadmap</text>
+  <text x="60" y="94" class="subtitle">This chart is intentionally a planning view. Only the first column describes present reality.</text>
 
-  <g filter="url(#shadow)">
-    <rect x="70" y="150" width="1660" height="822" rx="28" fill="#ffffff" stroke="#d9e2eb" stroke-width="2"/>
+  <rect x="50" y="130" width="1660" height="840" rx="24" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
+
+  <rect x="50" y="130" width="220" height="60" rx="16" fill="#1e293b"/>
+  <rect x="270" y="130" width="360" height="60" rx="16" fill="#2563eb"/>
+  <rect x="630" y="130" width="360" height="60" rx="16" fill="#d97706"/>
+  <rect x="990" y="130" width="360" height="60" rx="16" fill="#7c3aed"/>
+  <rect x="1350" y="130" width="360" height="60" rx="16" fill="#15803d"/>
+
+  <text x="160" y="168" class="hdr" text-anchor="middle">Lane</text>
+  <text x="450" y="168" class="hdr" text-anchor="middle">Today</text>
+  <text x="810" y="168" class="hdr" text-anchor="middle">Stabilize</text>
+  <text x="1170" y="168" class="hdr" text-anchor="middle">Extract</text>
+  <text x="1530" y="168" class="hdr" text-anchor="middle">Operate</text>
+
+  <g stroke="#cbd5e1" stroke-width="2">
+    <line x1="270" y1="190" x2="270" y2="940"/>
+    <line x1="630" y1="190" x2="630" y2="940"/>
+    <line x1="990" y1="190" x2="990" y2="940"/>
+    <line x1="1350" y1="190" x2="1350" y2="940"/>
+    <line x1="50" y1="220" x2="1710" y2="220"/>
+    <line x1="50" y1="364" x2="1710" y2="364"/>
+    <line x1="50" y1="508" x2="1710" y2="508"/>
+    <line x1="50" y1="652" x2="1710" y2="652"/>
+    <line x1="50" y1="796" x2="1710" y2="796"/>
+    <line x1="50" y1="940" x2="1710" y2="940"/>
   </g>
-  <g>
-    <rect x="70" y="150" width="220" height="92" fill="#edf2f7" stroke="#d9e2eb" stroke-width="2"/>
-    <text x="98" y="206" class="header">Lane</text>
-    <rect x="290" y="150" width="360" height="92" fill="#eaf2ff" stroke="#d9e2eb" stroke-width="2"/>
-    <text x="318" y="206" class="header">Today</text>
-    <rect x="650" y="150" width="360" height="92" fill="#fff4df" stroke="#d9e2eb" stroke-width="2"/>
-    <text x="678" y="206" class="header">Stabilize</text>
-    <rect x="1010" y="150" width="360" height="92" fill="#f3ecff" stroke="#d9e2eb" stroke-width="2"/>
-    <text x="1038" y="206" class="header">Extract</text>
-    <rect x="1370" y="150" width="360" height="92" fill="#e8f7ee" stroke="#d9e2eb" stroke-width="2"/>
-    <text x="1398" y="206" class="header">Operate</text>
-    <rect x="70" y="242" width="1660" height="146" fill="#ffffff" stroke="#d9e2eb" stroke-width="2"/>
-    <line x1="290" y1="242" x2="290" y2="388" stroke="#d9e2eb" stroke-width="2"/>
-    <line x1="650" y1="242" x2="650" y2="388" stroke="#d9e2eb" stroke-width="2"/>
-    <line x1="1010" y1="242" x2="1010" y2="388" stroke="#d9e2eb" stroke-width="2"/>
-    <line x1="1370" y1="242" x2="1370" y2="388" stroke="#d9e2eb" stroke-width="2"/>
-    <text x="94" y="294" class="rowtitle">Request path</text>
-    <text x="312" y="286" class="cell">Frontend, BFF, analysis-service, and ML Engine</text>
-    <text x="312" y="310" class="cell">already form the live low-latency path.</text>
-    <text x="672" y="286" class="cell">Keep the gRPC seam strict, protect the 50ms</text>
-    <text x="672" y="310" class="cell">SLA, and reduce fallback drift.</text>
-    <text x="1032" y="286" class="cell">Move more analysis logic out of ML Engine and</text>
-    <text x="1032" y="310" class="cell">behind analysis-service contracts.</text>
-    <text x="1392" y="286" class="cell">Independent request-path runtime with</text>
-    <text x="1392" y="310" class="cell">predictable latency and bounded ownership.</text>
-    <rect x="70" y="388" width="1660" height="146" fill="#fbfdff" stroke="#d9e2eb" stroke-width="2"/>
-    <line x1="290" y1="388" x2="290" y2="534" stroke="#d9e2eb" stroke-width="2"/>
-    <line x1="650" y1="388" x2="650" y2="534" stroke="#d9e2eb" stroke-width="2"/>
-    <line x1="1010" y1="388" x2="1010" y2="534" stroke="#d9e2eb" stroke-width="2"/>
-    <line x1="1370" y1="388" x2="1370" y2="534" stroke="#d9e2eb" stroke-width="2"/>
-    <text x="94" y="440" class="rowtitle">Domain services</text>
-    <text x="312" y="432" class="cell">Only analysis is extracted today; ingestion and</text>
-    <text x="312" y="456" class="cell">learning still mostly live inside ML Engine.</text>
-    <text x="672" y="432" class="cell">Lock the contracts first so service extraction</text>
-    <text x="672" y="456" class="cell">does not break user-facing behavior.</text>
-    <text x="1032" y="432" class="cell">Pull ingestion and learning into their own</text>
-    <text x="1032" y="456" class="cell">runtimes one slice at a time.</text>
-    <text x="1392" y="432" class="cell">Each bounded context owns one capability with</text>
-    <text x="1392" y="456" class="cell">clear APIs and team ownership.</text>
-    <rect x="70" y="534" width="1660" height="146" fill="#ffffff" stroke="#d9e2eb" stroke-width="2"/>
-    <line x1="290" y1="534" x2="290" y2="680" stroke="#d9e2eb" stroke-width="2"/>
-    <line x1="650" y1="534" x2="650" y2="680" stroke="#d9e2eb" stroke-width="2"/>
-    <line x1="1010" y1="534" x2="1010" y2="680" stroke="#d9e2eb" stroke-width="2"/>
-    <line x1="1370" y1="534" x2="1370" y2="680" stroke="#d9e2eb" stroke-width="2"/>
-    <text x="94" y="586" class="rowtitle">Learning + data</text>
-    <text x="312" y="578" class="cell">Airflow, Great Expectations, MLflow, Kafka,</text>
-    <text x="312" y="602" class="cell">MinIO, and Postgres already support the</text>
-    <text x="312" y="626" class="cell">learning loop.</text>
-    <text x="672" y="578" class="cell">Make validated data mandatory before</text>
-    <text x="672" y="602" class="cell">retraining or model promotion can happen.</text>
-    <text x="1032" y="578" class="cell">Shift retraining, registry, and feedback flow into</text>
-    <text x="1032" y="602" class="cell">a dedicated learning boundary.</text>
-    <text x="1392" y="578" class="cell">Closed-loop retraining with versioned rollback,</text>
-    <text x="1392" y="602" class="cell">promotion gates, and clean lineage.</text>
-    <rect x="70" y="680" width="1660" height="146" fill="#fbfdff" stroke="#d9e2eb" stroke-width="2"/>
-    <line x1="290" y1="680" x2="290" y2="826" stroke="#d9e2eb" stroke-width="2"/>
-    <line x1="650" y1="680" x2="650" y2="826" stroke="#d9e2eb" stroke-width="2"/>
-    <line x1="1010" y1="680" x2="1010" y2="826" stroke="#d9e2eb" stroke-width="2"/>
-    <line x1="1370" y1="680" x2="1370" y2="826" stroke="#d9e2eb" stroke-width="2"/>
-    <text x="94" y="732" class="rowtitle">Observability</text>
-    <text x="312" y="724" class="cell">Prometheus, Grafana, Loki, and Jaeger are</text>
-    <text x="312" y="748" class="cell">already live across the platform.</text>
-    <text x="672" y="724" class="cell">Keep alerts tight for SLA breach, drift, retrain</text>
-    <text x="672" y="748" class="cell">failure, and service regressions.</text>
-    <text x="1032" y="724" class="cell">Add domain-level dashboards and traces as</text>
-    <text x="1032" y="748" class="cell">new services are pulled out.</text>
-    <text x="1392" y="724" class="cell">Every service is observable by default, with fast</text>
-    <text x="1392" y="748" class="cell">diagnosis from one control plane.</text>
-    <rect x="70" y="826" width="1660" height="146" fill="#ffffff" stroke="#d9e2eb" stroke-width="2"/>
-    <line x1="290" y1="826" x2="290" y2="972" stroke="#d9e2eb" stroke-width="2"/>
-    <line x1="650" y1="826" x2="650" y2="972" stroke="#d9e2eb" stroke-width="2"/>
-    <line x1="1010" y1="826" x2="1010" y2="972" stroke="#d9e2eb" stroke-width="2"/>
-    <line x1="1370" y1="826" x2="1370" y2="972" stroke="#d9e2eb" stroke-width="2"/>
-    <text x="94" y="878" class="rowtitle">Delivery + secrets</text>
-    <text x="312" y="870" class="cell">Gitea, Woodpecker, Helm, k3s, and Infisical</text>
-    <text x="312" y="894" class="cell">form the current self-hosted release path.</text>
-    <text x="672" y="870" class="cell">Make build, test, deploy, and secret injection</text>
-    <text x="672" y="894" class="cell">mandatory on every change.</text>
-    <text x="1032" y="870" class="cell">Add cleaner release promotion and</text>
-    <text x="1032" y="894" class="cell">environment-specific secret governance.</text>
-    <text x="1392" y="870" class="cell">Zero-manual-drift delivery where releases are</text>
-    <text x="1392" y="894" class="cell">repeatable, auditable, and safe.</text>
-  </g>
+
+  <rect x="50" y="220" width="1660" height="144" fill="#fff7ed"/>
+  <rect x="50" y="364" width="1660" height="144" fill="#eefbf3"/>
+  <rect x="50" y="508" width="1660" height="144" fill="#eff6ff"/>
+  <rect x="50" y="652" width="1660" height="144" fill="#f5f3ff"/>
+  <rect x="50" y="796" width="1660" height="144" fill="#f8fafc"/>
+
+  <text x="78" y="258" class="lane">Request path</text>
+  <text x="78" y="278" class="tag">CURRENT</text>
+  <text x="292" y="252" class="cell">BFF -> analysis-service -> HTTP /predict behind the seam.</text>
+  <text x="652" y="252" class="cell">Unify SLA language around less than 200ms P95 and verify fallback policy.</text>
+  <text x="1012" y="252" class="cell">Move more analysis behavior into analysis-service without breaking the contract.</text>
+  <text x="1372" y="252" class="cell">Optional strict gRPC-only serving once the seam is independently hardened.</text>
+
+  <text x="78" y="402" class="lane">Bounded contexts</text>
+  <text x="78" y="422" class="tag">CURRENT</text>
+  <text x="292" y="396" class="cell">Analysis extracted first. Ingestion and learning remain logical boundaries.</text>
+  <text x="652" y="396" class="cell">Keep manifest, docs, and proto comments aligned before adding more deployables.</text>
+  <text x="1012" y="396" class="cell">Pull ingestion and learning out in slices once ownership and contracts are stable.</text>
+  <text x="1372" y="396" class="cell">One service per bounded context with clearer team ownership and lower coupling.</text>
+
+  <text x="78" y="546" class="lane">Learning + data</text>
+  <text x="78" y="566" class="tag">PARTIAL</text>
+  <text x="292" y="540" class="cell">Airflow, GE, MLflow, Kafka, MinIO, and PostgreSQL exist and support the loop.</text>
+  <text x="652" y="540" class="cell">Prove the live PostgreSQL, lag, and data-quality path in target environments.</text>
+  <text x="1012" y="540" class="cell">Shift retraining and feedback execution behind a cleaner learning boundary.</text>
+  <text x="1372" y="540" class="cell">Closed-loop promotion, rollback, and lineage with explicit approval points.</text>
+
+  <text x="78" y="690" class="lane">Controls + observability</text>
+  <text x="78" y="710" class="tag">PARTIAL</text>
+  <text x="292" y="684" class="cell">Observability and policy systems exist, but maturity is uneven across environments.</text>
+  <text x="652" y="684" class="cell">Verify alerts, traces, secret sync, and policy enforcement in a real cluster flow.</text>
+  <text x="1012" y="684" class="cell">Attach ownership and status labels to each control-plane component.</text>
+  <text x="1372" y="684" class="cell">Controls become dependable operating guardrails instead of slideware.</text>
+
+  <text x="78" y="834" class="lane">Delivery story</text>
+  <text x="78" y="854" class="tag">MIXED</text>
+  <text x="292" y="828" class="cell">Public-cloud deploy path is current in docs. Self-hosted CI/CD and k3s are partial.</text>
+  <text x="652" y="828" class="cell">Pick the primary path per environment and stop mixing current and target language.</text>
+  <text x="1012" y="828" class="cell">Separate deployment docs into current, partial, and target views.</text>
+  <text x="1372" y="828" class="cell">One validated release path per environment, with rollback and verification rehearsed.</text>
 </svg>

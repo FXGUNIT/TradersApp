@@ -11,7 +11,7 @@ import "proto/ddd/v1/common.proto";
 // Analysis Service — Inference Bounded Context
 //
 // Owner: ml-engine
-// Consumers: bff (analysis-service), portfolio-service
+// Consumers: bff (analysis-service seam)
 //
 // Services:
 //   - AnalysisService: consensus prediction, regime detection, model status
@@ -156,4 +156,3 @@ service AnalysisService {
   // Trigger model training
   rpc TriggerTraining(TriggerTrainingRequest) returns (TriggerTrainingResponse);
 }
-

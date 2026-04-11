@@ -2,7 +2,7 @@
 
 ![Architecture overview](./assets/architecture-3d-overview.svg)
 
-Asset variants: [PNG export](./assets/architecture-3d-overview.png) | [Print-friendly SVG](./assets/architecture-3d-overview-print.svg)
+Asset variants: [Legacy PNG export](./assets/architecture-3d-overview.png) | [Print-friendly SVG](./assets/architecture-3d-overview-print.svg)
 
 This repo is no longer using DDD only as a naming convention. It now has explicit bounded-context ownership, versioned gRPC contracts, and one live extracted service seam on the critical path.
 

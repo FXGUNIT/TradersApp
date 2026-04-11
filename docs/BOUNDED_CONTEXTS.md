@@ -100,8 +100,7 @@ These are important, but they are not themselves canonical bounded contexts in t
 The repo still has some contract/documentation debt even after this cleanup:
 
 - `proto/ddd/v1/analysis.proto` still contains a `TriggerTraining` RPC even though `learning.proto` also exists.
-- `proto/ddd/v1/analysis.proto` still comments `portfolio-service` as a consumer.
-- Some architecture assets still present the delivery and control plane more strongly than the live validated state justifies.
+- Architecture truth still depends too much on manual review; it should be validated automatically in CI.
 
 These are real cleanup items, not reasons to invent extra current services in the docs.
 
