@@ -1,14 +1,14 @@
 # HPA Scaling Test Runbook
 
-**Status:** Live cluster tested — blockers identified
-**Last Updated:** 2026-04-12
-**Cluster:** desktop-control-plane (k3s v1.34.3) — tradersapp-dev namespace
+**Status:** Live cluster tested - current blockers identified  
+**Last Updated:** 2026-04-12  
+**Cluster:** desktop-control-plane (k3s v1.34.3) - `tradersapp-dev`
 
 ---
 
 ## Overview
 
-Validates that Kubernetes Horizontal Pod Autoscaler (HPA) correctly scales TradersApp microservices under load and scales back down when load subsides.
+Validate that Kubernetes Horizontal Pod Autoscalers (HPAs) for TradersApp can scale `ml-engine` and `bff` up under sustained load and back down after idle.
 
 ---
 
@@ -16,232 +16,219 @@ Validates that Kubernetes Horizontal Pod Autoscaler (HPA) correctly scales Trade
 
 | Deployment | Min Replicas | Max Replicas | Target CPU% | Target Memory% | Custom Metric |
 |-----------|-------------|-------------|-------------|----------------|---------------|
-| `bff` | 2 | 8 | 60% | — | — |
-| `ml-engine` | 1 | 10 | 70% | 80% | P95 latency < 200ms |
+| `bff` | 2 | 8 | 60% | none | none |
+| `ml-engine` | 1 | 10 | 70% | 80% | none in `tradersapp-dev` |
 
-### bff HPA — `bff-hpa`
+### `bff-hpa`
 - Scale-up stabilization: 15s
 - Scale-down stabilization: 300s
-- Scale-up policy: 100% pod increase per 15s period
-- Targets `Deployment/bff` in namespace `tradersapp-dev`
+- Targets `Deployment/bff` in `tradersapp-dev`
 
-### ml-engine HPA — `ml-engine-hpa`
+### `ml-engine-hpa`
 - Scale-up stabilization: 30s
-- Scale-down stabilization: 300s (50% max reduction per 60s)
-- Scale-up policies: 100% or +2 pods per 15s (select max)
-- Targets `Deployment/ml-engine` in namespace `tradersapp-dev`
-- Custom metric: `ml-engine-p95-latency-ms` → scale up when avg > 200ms
+- Scale-down stabilization: 300s
+- Targets `Deployment/ml-engine` in `tradersapp-dev`
+- Dev overlay uses CPU and memory only. The latency metric remains a production/custom-metrics concern.
 
 ---
 
 ## Cluster State (2026-04-12)
 
-### HPAs Applied
-Both HPAs were successfully applied to `tradersapp-dev`:
-```
-kubectl get hpa -n tradersapp-dev
-NAME            REFERENCE              TARGETS                            MINPODS   MAXPODS   REPLICAS   AGE
-bff-hpa         Deployment/bff         cpu: <unknown>/60%                2         8         2          ~2m
-ml-engine-hpa   Deployment/ml-engine   cpu: <unknown>/70%...             1         10        1          ~2m
-```
+### Repo-Managed HPAs Restored
 
-### Critical Finding: `ScalingActive: False`
-```
-Conditions:
-  Type           Status  Reason                   Message
-  ----           ------  ------                   -------
-  AbleToScale    True    SucceededGetScale        the HPA controller was able to get the target's current scale
-  ScalingActive  False   FailedGetResourceMetric  the HPA was unable to compute the replica count:
-                                                   failed to get cpu utilization: unable to get metrics
-                                                   for resource cpu: unable to fetch metrics from resource
-                                                   metrics API: the server could not find the requested
-                                                   resource (get pods.metrics.k8s.io)
-```
-
-**Root Cause:** `metrics.k8s.io` API is not registered. The metrics-server pod is not installed in this k3s cluster.
-
-**Additional Warnings:**
-- `FailedGetPodsMetric`: `custom.metrics.k8s.io` not registered (Prometheus adapter not installed)
-- `FailedGetResourceMetric` for memory: same cause
-
-### Deployment Status
-```
-NAME                  READY   UP-TO-DATE   AVAILABLE   AGE
-bff                   0/2     2            0           31h
-ml-engine             0/1     1            0           31h
-redis                 1/1     1            1           10h
-tradersapp-postgres   1/1     1            1           10h
-```
-
-**ml-engine pods stuck in Pending:**
-```
-Events:
-  Warning  FailedScheduling  ...  persistentvolumeclaim "ml-models-pvc" not found
-  Warning  ProvisioningFailed  persistentvolumeclaim/ml-state-pvc  storageclass "local-path" not found
-```
-
-- `ml-models-pvc` — does not exist (Helm chart did not create it)
-- `ml-state-pvc` — stuck Pending; local-path provisioner failing: `storageclass.storage.k8s.io "local-path" not found`
-- bff pods crash-loop (52+ restarts): startup probe fails because ml-engine is unreachable
-
----
-
-## Prerequisites (Must Be Satisfied Before Running Load Test)
-
-### 1. Install metrics-server (enables CPU/memory HPA)
+The live namespace is now back on the repo-managed HPA names:
 
 ```bash
-# For k3s (installs into kube-system)
-kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+kubectl get hpa -n tradersapp-dev
+NAME            REFERENCE              TARGETS        MINPODS   MAXPODS   REPLICAS
+bff-hpa         Deployment/bff         cpu: 70%/60%   2         8         3
+ml-engine-hpa   Deployment/ml-engine   ...            1         10        >1
+```
 
-# Patch to work with self-signed certs (k3s self-signed)
-kubectl patch deployment metrics-server -n kube-system \
-  --type=json \
-  -p '[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"}]'
+What was verified live:
+- `ml-engine-hpa` was recreated from `k8s/overlay/dev/hpa-ml-engine.yaml` and scaled above its floor
+- `bff-hpa` was recreated from `k8s/overlay/dev/hpa-bff.yaml`
+- `bff-hpa` scaled from `2` to `3` and later returned to `2`
+- validation scripts now fail fast if an unexpected HPA name already targets either deployment
 
-# Verify
-kubectl get apiservices | grep metrics
+### Metrics API State
+
+`metrics-server` is present in `kube-system`, but the metrics API is still flapping between healthy and unavailable:
+
+```bash
+kubectl describe apiservice v1beta1.metrics.k8s.io
 kubectl top nodes
 kubectl top pods -n tradersapp-dev
 ```
 
-### 2. Fix ml-engine PVCs (required for ml-engine pods to start)
+Observed state:
+- `kubectl top` sometimes works and sometimes returns `Metrics API not available`
+- the `metrics-server` pod has a high restart count
+- `bff-hpa` can report `ScalingActive: True` when metrics are present
+- `ml-engine-hpa` still becomes noisy whenever the Metrics API drops out
+
+### PVC State
+
+The original ml-engine PVC blockers are cleared:
 
 ```bash
-# Option A: Create missing ml-models-pvc manually
-cat <<EOF | kubectl apply -f -
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: ml-models-pvc
-  namespace: tradersapp-dev
-spec:
-  accessModes:
-    - ReadWriteOnce
-  storageClassName: local-path
-  resources:
-    requests:
-      storage: 2Gi
-EOF
-
-# Option B: Check why ml-state-pvc is failing
-kubectl describe pvc ml-state-pvc -n tradersapp-dev
-# If local-path storage class is missing, reinstall k3s with local-path provisioner
+kubectl get pvc -n tradersapp-dev
+NAME                                  STATUS
+ml-models-pvc                         Bound
+ml-state-pvc                          Bound
+tradersapp-tradersapp-feast-features  Pending
 ```
 
-### 3. Verify pods are Running before testing HPA
+`ml-models-pvc` and `ml-state-pvc` are now `Bound`. The remaining Feast PVC is not on the critical path for Stage M scaling validation.
+
+### Deployment Readiness
+
+```bash
+kubectl get deploy,pods -n tradersapp-dev
+```
+
+Current runtime blockers:
+- new `ml-engine` pods can reach `2/2 Ready`, but the deployment is not yet stably converged
+- `bff` can scale, but its pods are still not consistently Ready
+- `redis` and `tradersapp-postgres` are healthy
+
+Stage M is now blocked by metrics stability and app readiness - not by PVC provisioning or HPA naming drift.
+
+---
+
+## Prerequisites
+
+### 1. Repair `metrics-server`
+
+```bash
+# If metrics-server is absent, install it
+kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+
+# For k3s, patch in the safe kubelet flags
+kubectl patch deployment metrics-server -n kube-system \
+  --type=json \
+  -p '[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"},{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-preferred-address-types=InternalIP,Hostname,InternalDNS,ExternalDNS,ExternalIP"}]'
+
+# Verify the API is actually healthy
+kubectl get apiservice v1beta1.metrics.k8s.io
+kubectl get deploy,svc,endpoints -n kube-system | grep metrics-server
+kubectl logs -n kube-system deploy/metrics-server --tail=100
+kubectl top nodes
+kubectl top pods -n tradersapp-dev
+```
+
+`kubectl top` must work before HPA scale-up validation is meaningful.
+
+### 2. Remove Drifted HPAs And Re-Apply The Repo-Managed Manifests
+
+```bash
+# Remove the unexpected one-replica HPAs
+kubectl delete hpa bff ml-engine -n tradersapp-dev
+
+# Apply the repo-managed dev HPAs
+kubectl apply -f k8s/overlay/dev/hpa-bff.yaml
+kubectl apply -f k8s/overlay/dev/hpa-ml-engine.yaml
+
+# Or reconcile through Helm now that values.dev.yaml enables autoscaling
+helm upgrade --install tradersapp ./k8s/helm/tradersapp \
+  -n tradersapp-dev \
+  -f k8s/helm/tradersapp/values.yaml \
+  -f k8s/helm/tradersapp/values.dev.yaml
+
+# Expected end state
+kubectl get hpa ml-engine-hpa bff-hpa -n tradersapp-dev
+```
+
+### 3. Verify Pods Are Ready
 
 ```bash
 kubectl get pods -n tradersapp-dev -l app=ml-engine
-# Must show: 1/1 Running (not 0/1 Pending)
-
 kubectl get pods -n tradersapp-dev -l app=bff
-# Must show: 1/1 Running (not crashlooping)
 ```
 
-### 4. Install Prometheus Adapter (for custom metrics like `ml-engine-p95-latency-ms`)
+Required state before load testing:
+- `ml-engine` main container and sidecar are both Ready
+- `bff` pods are Ready
+- startup and readiness probes pass consistently
+
+### 4. Install Prometheus Adapter For Future Custom Metrics
 
 ```bash
-# Using Helm
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
 helm repo update
 helm install prometheus-adapter prometheus-community/prometheus-adapter \
   --namespace prometheus \
   --create-namespace \
   --set metricsRelistInterval=30s
-
-# Or using kustomize if repo has overlays
-# Required for ml-engine-hpa custom metric to activate
 ```
+
+This is not required for the current `tradersapp-dev` HPA validation path. It is only needed if the environment later re-enables latency-based HPA metrics.
 
 ---
 
 ## Load Test Procedure
 
-### Step 1: Verify pre-conditions
+### Step 1: Verify Pre-Conditions
+
 ```bash
-# 1. Metrics API available
-kubectl get apiservices | grep metrics.k8s.io
-kubectl top nodes  # Must return node CPU/memory
-
-# 2. HPAs exist and are reachable
-kubectl get hpa -n tradersapp-dev
-
-# 3. ml-engine pods running
+kubectl get apiservice v1beta1.metrics.k8s.io
+kubectl top nodes
+kubectl get hpa ml-engine-hpa bff-hpa -n tradersapp-dev
 kubectl get pods -n tradersapp-dev -l app=ml-engine
+kubectl get pods -n tradersapp-dev -l app=bff
 ```
 
-### Step 2: Record baseline
+### Step 2: Record Baseline
+
 ```bash
 kubectl get hpa -n tradersapp-dev -o wide > /tmp/hpa-baseline.txt
 kubectl get deploy -n tradersapp-dev -o wide >> /tmp/hpa-baseline.txt
 cat /tmp/hpa-baseline.txt
 ```
 
-### Step 3: Start load generation
+### Step 3: Run The Automated Validation
 
 ```bash
-# Using busybox (always available in k8s)
-kubectl run -n tradersapp-dev load-test --rm -i --image=busybox --restart=Never -- \
-  sh -c 'while true; do wget -qO- http://ml-engine:8001/health; sleep 0.05; done' &
-LOAD_PID=$!
-echo "Load PID: $LOAD_PID"
-
-# Alternative: kubectl exec into a running pod if busybox not preferred
-# kubectl exec -n tradersapp-dev deploy/bff -- sh -c 'while true; do curl -s http://ml-engine:8001/health; done'
+NAMESPACE=tradersapp-dev bash scripts/k8s/run-hpa-scaling-test.sh
+NAMESPACE=tradersapp-dev bash scripts/k8s/validate-hpa-ml-engine.sh
+NAMESPACE=tradersapp-dev bash scripts/k8s/validate-hpa-bff.sh
 ```
 
-### Step 4: Monitor HPA scaling events
-```bash
-# In another terminal, watch HPA events
-kubectl get events -n tradersapp-dev --watch --field-selector involvedObject.kind=HorizontalPodAutoscaler
+The scripts now refuse to continue if a drifted HPA with the wrong name already targets the deployment.
 
-# Watch replica count
+### Step 4: Watch Scaling Events
+
+```bash
+kubectl get events -n tradersapp-dev --watch --field-selector involvedObject.kind=HorizontalPodAutoscaler
 watch -n5 "kubectl get hpa -n tradersapp-dev && kubectl get pods -n tradersapp-dev -l app=ml-engine"
 ```
 
-### Step 5: Wait for scale-up (expect within 30-60s with current HPA config)
-```bash
-echo "Waiting 90s for scale-up..."
-sleep 90
-kubectl get hpa -n tradersapp-dev -o wide
-kubectl get pods -n tradersapp-dev -l app=ml-engine
-```
+### Step 5: Validate Scale-Up
 
-### Step 6: Verify scale-up occurred
-
-**Pass criteria:**
+Pass criteria:
 - `kubectl get hpa ml-engine-hpa -n tradersapp-dev` shows `currentReplicas > 1`
-- Pod events show no evictions or crashes during scaling
-- `kubectl top pods -n tradersapp-dev -l app=ml-engine` shows CPU > 70%
+- `kubectl get hpa bff-hpa -n tradersapp-dev` can scale independently under BFF-targeted load
+- pod events show no evictions or crashes during scaling
+- `kubectl top pods -n tradersapp-dev -l app=ml-engine` shows CPU above the configured threshold during the test
 
-### Step 7: Stop load and verify scale-down
-```bash
-kill $LOAD_PID 2>/dev/null || true
+### Step 6: Validate Scale-Down
 
-echo "Waiting 360s for scale-down (5min stabilization window + buffer)..."
-sleep 360
-kubectl get hpa -n tradersapp-dev -o wide
-kubectl get pods -n tradersapp-dev -l app=ml-engine
-```
-
-### Step 8: Capture final state
-```bash
-kubectl get hpa -n tradersapp-dev -o yaml > /tmp/hpa-final.yaml
-kubectl describe hpa -n tradersapp-dev >> /tmp/hpa-final.txt
-```
+After load stops:
+- HPA desired replicas fall back to the configured minimum
+- scale-down completes within the 300s stabilization window plus buffer
+- service readiness remains intact during convergence
 
 ---
 
 ## Acceptance Criteria
 
-- [ ] HPA `ScalingActive: True` after metrics-server is installed
-- [ ] HPA triggers scale-up within 3 minutes of sustained high load
-- [ ] Scale-up does not exceed max replicas (ml-engine: 10, bff: 8)
-- [ ] HPA triggers scale-down within 5 minutes of idle
-- [ ] No pod evictions during scaling (PDB respected — check PDBs exist)
-- [ ] No crashed pods during scaling events
-- [ ] Service availability maintained during scale
+- [ ] `ml-engine-hpa` and `bff-hpa` are the only HPAs targeting those deployments
+- [ ] HPA `ScalingActive: True` after metrics-server repair
+- [ ] `ml-engine` scales up within 3 minutes of sustained load
+- [ ] `bff` scales independently under BFF-targeted load
+- [ ] Scale-up stays within configured max replicas
+- [ ] Scale-down completes after idle without crashing pods
+- [ ] Service availability is maintained throughout the test
 
 ---
 
@@ -249,24 +236,24 @@ kubectl describe hpa -n tradersapp-dev >> /tmp/hpa-final.txt
 
 | Blocker | Severity | Fix |
 |---------|----------|-----|
-| `metrics.k8s.io` not registered | **Critical** | Install metrics-server |
-| `custom.metrics.k8s.io` not registered | Medium | Install Prometheus adapter |
-| `ml-models-pvc` missing | **Critical** | Create PVC or fix Helm chart |
-| `ml-state-pvc` stuck Pending | **Critical** | Verify local-path storage class |
-| bff pods crashloop | Medium | Fix ml-engine reachability first |
+| Live HPAs drifted to manual `bff` / `ml-engine` objects pinned to `1/1` | Critical | Delete drifted HPAs and apply repo-managed `bff-hpa` / `ml-engine-hpa` |
+| `metrics.k8s.io` API unhealthy | Critical | Repair metrics-server until `kubectl top` works and HPA reports `ScalingActive=True` |
+| `custom.metrics.k8s.io` not registered | Medium | Install Prometheus adapter if custom latency metrics are required |
+| `ml-engine` startup probes failing | Critical | Redeploy a healthy `dev-latest` image and verify `/live` and `/ready` |
+| `bff` startup probes timing out | Medium | Fix BFF readiness after Redis and ML Engine reachability are stable |
 
 ---
 
 ## Scripts
 
-- `scripts/k8s/run-hpa-scaling-test.sh` — automated end-to-end scaling test
-- `scripts/k8s/validate-hpa-ml-engine.sh` — ml-engine-specific validation script
-- `scripts/k8s/validate-hpa-bff.sh` — bff-specific validation script
-- `scripts/k8s/watch-hpa-events.sh` — live HPA event watcher
+- `scripts/k8s/run-hpa-scaling-test.sh` - end-to-end HPA validation
+- `scripts/k8s/validate-hpa-ml-engine.sh` - ml-engine-specific validation
+- `scripts/k8s/validate-hpa-bff.sh` - bff-specific validation
+- `scripts/k8s/watch-hpa-events.sh` - live HPA event watcher
 
 ## See Also
 
-- `docs/K6_LOAD_TEST_RUNBOOK.md` — HTTP load testing with k6
-- `k8s/overlay/dev/hpa-ml-engine.yaml` — ml-engine HPA manifest (tradersapp-dev)
-- `k8s/overlay/dev/hpa-bff.yaml` — bff HPA manifest (tradersapp-dev)
-- `k8s/helm/tradersapp/values.prod.yaml` — HPA configuration source of truth
+- `docs/K6_LOAD_TEST_RUNBOOK.md`
+- `k8s/overlay/dev/hpa-ml-engine.yaml`
+- `k8s/overlay/dev/hpa-bff.yaml`
+- `k8s/helm/tradersapp/values.dev.yaml`

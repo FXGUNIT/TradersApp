@@ -18,7 +18,8 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 NAMESPACE="${NAMESPACE:-tradersapp-dev}"
-HPA_FILE="${REPO_ROOT}/k8s/hpa-ml-engine.yaml"
+HPA_FILE="${REPO_ROOT}/k8s/overlay/dev/hpa-ml-engine.yaml"
+EXPECTED_HPA_NAME="${EXPECTED_HPA_NAME:-ml-engine-hpa}"
 ML_ENGINE_URL="${ML_ENGINE_URL:-http://ml-engine:8001}"
 ML_ENGINE_PORT="${ML_ENGINE_PORT:-8001}"
 MIN_REPLICAS="${MIN_REPLICAS:-1}"
@@ -27,6 +28,7 @@ SCALE_UP_TIMEOUT="${SCALE_UP_TIMEOUT:-180}"
 LOAD_DURATION="${LOAD_DURATION:-90}"
 LOAD_CONCURRENCY="${LOAD_CONCURRENCY:-25}"
 OUTPUT_DIR="${OUTPUT_DIR:-${REPO_ROOT}/.artifacts/hpa-validation/ml-engine-$(date +%Y%m%d-%H%M%S)}"
+LOAD_POD_NAME="${LOAD_POD_NAME:-ml-engine-hpa-load}"
 
 mkdir -p "$OUTPUT_DIR"
 
@@ -59,6 +61,48 @@ done
 
 prefer_k3s_kubeconfig
 
+find_hpas_for_target() {
+  local target="$1"
+  kubectl get hpa -n "$NAMESPACE" \
+    -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.scaleTargetRef.name}{"\n"}{end}' 2>/dev/null \
+    | awk -F '\t' -v target="$target" '$2 == target { print $1 }'
+}
+
+assert_expected_hpa() {
+  local target="$1"
+  local expected="$2"
+  mapfile -t matches < <(find_hpas_for_target "$target")
+
+  if [[ "${#matches[@]}" -eq 0 ]]; then
+    return 0
+  fi
+
+  if [[ "${#matches[@]}" -gt 1 ]]; then
+    fail "multiple HPAs target deployment '$target': ${matches[*]}; remove drifted HPAs before validation"
+  fi
+
+  if [[ "${matches[0]}" != "$expected" ]]; then
+    fail "unexpected HPA '${matches[0]}' targets deployment '$target'; expected '$expected'"
+  fi
+}
+
+cleanup_load_pod() {
+  kubectl delete pod "$LOAD_POD_NAME" -n "$NAMESPACE" --ignore-not-found=true >/dev/null 2>&1 || true
+}
+
+run_incluster_load() {
+  cleanup_load_pod
+  kubectl run "$LOAD_POD_NAME" \
+    -n "$NAMESPACE" \
+    --image=busybox \
+    --restart=Never \
+    --command -- \
+    sh -c "end=\$((\$(date +%s) + ${LOAD_DURATION})); while [ \$(date +%s) -lt \$end ]; do wget -qO- --header='Content-Type: application/json' --post-data='{\"symbol\":\"MNQ\",\"candles\":[]}' ${ML_ENGINE_URL}/predict >/dev/null 2>&1 || true; sleep 0.05; done" \
+    2>&1 | tee "${OUTPUT_DIR}/load-incluster.log"
+}
+
+trap cleanup_load_pod EXIT
+
 # ── Step 1: Pre-flight checks ────────────────────────────────────────────────
 log "Step 1: Pre-flight checks"
 log "  Namespace:   $NAMESPACE"
@@ -74,17 +118,19 @@ if ! kubectl get deploy ml-engine -n "$NAMESPACE" >/dev/null 2>&1; then
   fail "deployment 'ml-engine' not found in namespace '$NAMESPACE'"
 fi
 
+assert_expected_hpa "ml-engine" "$EXPECTED_HPA_NAME"
+
 # ── Step 2: Record baseline ──────────────────────────────────────────────────
 log "Step 2: Recording baseline"
-HPA_BEFORE=$(kubectl get hpa ml-engine-hpa -n "$NAMESPACE" -o jsonpath='{.spec.minReplicas}/{.spec.maxReplicas}/{.status.currentReplicas}/{.status.desiredReplicas}' 2>/dev/null || echo "N/A")
+HPA_BEFORE=$(kubectl get hpa "$EXPECTED_HPA_NAME" -n "$NAMESPACE" -o jsonpath='{.spec.minReplicas}/{.spec.maxReplicas}/{.status.currentReplicas}/{.status.desiredReplicas}' 2>/dev/null || echo "N/A")
 REPLICAS_BEFORE=$(kubectl get deploy ml-engine -n "$NAMESPACE" -o jsonpath='{.spec.replicas}')
 log "  HPA (min/max/current/desired): $HPA_BEFORE"
 log "  Deployment replicas:            $REPLICAS_BEFORE"
 
 # Ensure minReplicas is at least 1 so HPA is meaningful
-CURRENT_MIN=$(kubectl get hpa ml-engine-hpa -n "$NAMESPACE" -o jsonpath='{.spec.minReplicas}' 2>/dev/null || echo "")
+CURRENT_MIN=$(kubectl get hpa "$EXPECTED_HPA_NAME" -n "$NAMESPACE" -o jsonpath='{.spec.minReplicas}' 2>/dev/null || echo "")
 if [[ -z "$CURRENT_MIN" ]]; then
-  warn "HPA ml-engine-hpa not found — applying manifest"
+  warn "HPA $EXPECTED_HPA_NAME not found - applying manifest"
   kubectl apply -f "$HPA_FILE" --namespace="$NAMESPACE"
   log "HPA manifest applied."
 else
@@ -95,7 +141,7 @@ fi
 log "Step 3: Applying HPA manifest"
 kubectl apply -f "$HPA_FILE" --namespace="$NAMESPACE"
 log "HPA applied."
-kubectl get hpa ml-engine-hpa -n "$NAMESPACE" -o wide 2>&1 | tee "${OUTPUT_DIR}/hpa-before.txt"
+kubectl get hpa "$EXPECTED_HPA_NAME" -n "$NAMESPACE" -o wide 2>&1 | tee "${OUTPUT_DIR}/hpa-before.txt"
 
 # ── Step 4: Wait for HPA to stabilise ───────────────────────────────────────
 log "Step 4: Waiting ${SCALE_UP_TIMEOUT}s for HPA to stabilise before load"
@@ -104,7 +150,7 @@ sleep 15
 # ── Step 5: Start load test ──────────────────────────────────────────────────
 log "Step 5: Starting sustained load test (${LOAD_DURATION}s, ${LOAD_CONCURRENCY} concurrent workers)"
 log "  Metrics to watch:"
-log "    kubectl get hpa ml-engine-hpa -n $NAMESPACE -w"
+log "    kubectl get hpa $EXPECTED_HPA_NAME -n $NAMESPACE -w"
 log "    kubectl top pods -n $NAMESPACE -l app=ml-engine"
 
 # Pick load generation tool
@@ -116,7 +162,7 @@ elif command -v hey >/dev/null 2>&1; then
 elif command -v ab >/dev/null 2>&1; then
   LOAD_CMD="ab"
 else
-  LOAD_CMD="curl"
+  LOAD_CMD="kubectl"
 fi
 log "  Using load tool: $LOAD_CMD"
 
@@ -158,15 +204,8 @@ K6SCRIPT
         -T "application/json" "${ML_ENGINE_URL}/predict" \
         2>&1 | tee "${OUTPUT_DIR}/load-ab.log"
       ;;
-    curl)
-      # Fallback: burst of parallel curls — enough to push CPU utilisation
-      for _ in $(seq 1 "$LOAD_CONCURRENCY"); do
-        curl -sf -X POST "${ML_ENGINE_URL}/predict" \
-          -H "Content-Type: application/json" \
-          -d '{"symbol":"MNQ","candles":[]}' &>/dev/null & true
-      done
-      sleep "$LOAD_DURATION"
-      wait
+    kubectl)
+      run_incluster_load
       ;;
   esac
 }
@@ -175,7 +214,7 @@ K6SCRIPT
 log "Step 6: Monitoring HPA scaling events during load"
 
 MONITOR_LOG="${OUTPUT_DIR}/hpa-monitor.log"
-kubectl get hpa ml-engine-hpa -n "$NAMESPACE" -w &
+kubectl get hpa "$EXPECTED_HPA_NAME" -n "$NAMESPACE" -w &
 HPA_WATCH_PID=$!
 
 # Run load in background
@@ -187,7 +226,7 @@ SCALED_UP=false
 for i in $(seq 1 $((SCALE_UP_TIMEOUT / 10))); do
   sleep 10
   CURRENT=$(kubectl get deploy ml-engine -n "$NAMESPACE" -o jsonpath='{.spec.replicas}')
-  DESIRED=$(kubectl get hpa ml-engine-hpa -n "$NAMESPACE" -o jsonpath='{.status.desiredReplicas}' 2>/dev/null || echo "0")
+  DESIRED=$(kubectl get hpa "$EXPECTED_HPA_NAME" -n "$NAMESPACE" -o jsonpath='{.status.desiredReplicas}' 2>/dev/null || echo "0")
   log "  t=$((i*10))s | replicas=$CURRENT | HPA desired=$DESIRED"
   echo "t=$((i*10))s replicas=$CURRENT desired=$DESIRED" >> "$MONITOR_LOG"
   if [[ "$CURRENT" -gt "$MIN_REPLICAS" ]]; then
@@ -203,11 +242,11 @@ kill "$HPA_WATCH_PID" 2>/dev/null || true
 
 # ── Step 7: Verify results ───────────────────────────────────────────────────
 log "Step 7: Verifying HPA scaling"
-kubectl get hpa ml-engine-hpa -n "$NAMESPACE" -o wide 2>&1 | tee "${OUTPUT_DIR}/hpa-after.txt"
+kubectl get hpa "$EXPECTED_HPA_NAME" -n "$NAMESPACE" -o wide 2>&1 | tee "${OUTPUT_DIR}/hpa-after.txt"
 kubectl get pods -n "$NAMESPACE" -l app=ml-engine 2>&1 | tee "${OUTPUT_DIR}/pods-after.txt"
 
 FINAL_REPLICAS=$(kubectl get deploy ml-engine -n "$NAMESPACE" -o jsonpath='{.spec.replicas}')
-FINAL_DESIRED=$(kubectl get hpa ml-engine-hpa -n "$NAMESPACE" -o jsonpath='{.status.desiredReplicas}' 2>/dev/null || echo "0")
+FINAL_DESIRED=$(kubectl get hpa "$EXPECTED_HPA_NAME" -n "$NAMESPACE" -o jsonpath='{.status.desiredReplicas}' 2>/dev/null || echo "0")
 
 log "  Final replicas:   $FINAL_REPLICAS"
 log "  HPA desired:      $FINAL_DESIRED"

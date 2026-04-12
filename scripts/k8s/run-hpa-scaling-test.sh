@@ -27,6 +27,10 @@ set -euo pipefail
 # ── Defaults ──────────────────────────────────────────────────────────────────
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 NAMESPACE="${NAMESPACE:-tradersapp-dev}"
+ML_HPA_FILE="${ML_HPA_FILE:-${REPO_ROOT}/k8s/overlay/dev/hpa-ml-engine.yaml}"
+BFF_HPA_FILE="${BFF_HPA_FILE:-${REPO_ROOT}/k8s/overlay/dev/hpa-bff.yaml}"
+EXPECTED_ML_HPA_NAME="${EXPECTED_ML_HPA_NAME:-ml-engine-hpa}"
+EXPECTED_BFF_HPA_NAME="${EXPECTED_BFF_HPA_NAME:-bff-hpa}"
 SCALE_UP_TIMEOUT="${SCALE_UP_TIMEOUT:-180}"   # seconds to wait for scale-up
 SCALE_DOWN_WAIT="${SCALE_DOWN_WAIT:-360}"     # seconds to wait for scale-down
 LOAD_INTERVAL="${LOAD_INTERVAL:-0.05}"       # seconds between health requests
@@ -40,6 +44,48 @@ warn()  { echo "[$(date +%H:%M:%S)] WARN: $*" >&2; }
 fail()  { echo "[$(date +%H:%M:%S)] FAIL: $*" >&2; exit 1; }
 info()  { echo "[$(date +%H:%M:%S)] INFO: $*" >&2; }
 
+prefer_k3s_kubeconfig() {
+  if [[ -n "${KUBECONFIG:-}" ]]; then
+    return 0
+  fi
+
+  if [[ ! -f /etc/rancher/k3s/k3s.yaml ]]; then
+    return 0
+  fi
+
+  local current_context=""
+  current_context="$(kubectl config current-context 2>/dev/null || true)"
+  if [[ -z "$current_context" || "$current_context" == "docker-desktop" ]]; then
+    export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+    log "Using k3s kubeconfig at $KUBECONFIG (previous context: ${current_context:-unset})"
+  fi
+}
+
+find_hpas_for_target() {
+  local target="$1"
+  kubectl get hpa -n "$NAMESPACE" \
+    -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.scaleTargetRef.name}{"\n"}{end}' 2>/dev/null \
+    | awk -F '\t' -v target="$target" '$2 == target { print $1 }'
+}
+
+assert_expected_hpa() {
+  local target="$1"
+  local expected="$2"
+  mapfile -t matches < <(find_hpas_for_target "$target")
+
+  if [[ "${#matches[@]}" -eq 0 ]]; then
+    return 0
+  fi
+
+  if [[ "${#matches[@]}" -gt 1 ]]; then
+    fail "multiple HPAs target deployment '$target': ${matches[*]}; remove drifted HPAs before validation"
+  fi
+
+  if [[ "${matches[0]}" != "$expected" ]]; then
+    fail "unexpected HPA '${matches[0]}' targets deployment '$target'; expected '$expected'"
+  fi
+}
+
 # Capture everything to a log file too
 exec > >(tee "${OUTPUT_DIR}/run.log") 2>&1
 
@@ -49,6 +95,8 @@ for cmd in kubectl; do
     fail "required command not found: $cmd"
   fi
 done
+
+prefer_k3s_kubeconfig
 
 # ── Step 1: Pre-flight checks ─────────────────────────────────────────────────
 log "========================================"
@@ -83,15 +131,18 @@ else
 fi
 
 # Check HPA existence
-for hpa in ml-engine-hpa bff-hpa; do
+assert_expected_hpa "ml-engine" "$EXPECTED_ML_HPA_NAME"
+assert_expected_hpa "bff" "$EXPECTED_BFF_HPA_NAME"
+
+for hpa in "$EXPECTED_ML_HPA_NAME" "$EXPECTED_BFF_HPA_NAME"; do
   if kubectl get hpa "$hpa" -n "$NAMESPACE" >/dev/null 2>&1; then
     log "[OK] HPA '$hpa' exists"
   else
     warn "HPA '$hpa' not found — applying from repo"
-    if [[ "$hpa" == "ml-engine-hpa" ]]; then
-      kubectl apply -f "${REPO_ROOT}/k8s/overlay/dev/hpa-ml-engine.yaml" 2>&1 | sed 's/^/    /'
+    if [[ "$hpa" == "$EXPECTED_ML_HPA_NAME" ]]; then
+      kubectl apply -f "$ML_HPA_FILE" 2>&1 | sed 's/^/    /'
     else
-      kubectl apply -f "${REPO_ROOT}/k8s/overlay/dev/hpa-bff.yaml" 2>&1 | sed 's/^/    /'
+      kubectl apply -f "$BFF_HPA_FILE" 2>&1 | sed 's/^/    /'
     fi
   fi
 done
@@ -187,8 +238,8 @@ for i in $(seq 1 $((SCALE_UP_TIMEOUT / 10))); do
   sleep 10
 
   REPLICAS=$(kubectl get deploy ml-engine -n "$NAMESPACE" -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "0")
-  DESIRED=$(kubectl get hpa ml-engine-hpa -n "$NAMESPACE" -o jsonpath='{.status.desiredReplicas}' 2>/dev/null || echo "0")
-  CURRENT=$(kubectl get hpa ml-engine-hpa -n "$NAMESPACE" -o jsonpath='{.status.currentReplicas}' 2>/dev/null || echo "0")
+  DESIRED=$(kubectl get hpa "$EXPECTED_ML_HPA_NAME" -n "$NAMESPACE" -o jsonpath='{.status.desiredReplicas}' 2>/dev/null || echo "0")
+  CURRENT=$(kubectl get hpa "$EXPECTED_ML_HPA_NAME" -n "$NAMESPACE" -o jsonpath='{.status.currentReplicas}' 2>/dev/null || echo "0")
   CPU=$(get_cpu_util)
   TIMESTAMP=$(date +%H:%M:%S)
 
@@ -229,7 +280,7 @@ log "Step 7: Waiting ${SCALE_DOWN_WAIT}s for scale-down (stabilization window 30
 for i in $(seq 1 $((SCALE_DOWN_WAIT / 30))); do
   sleep 30
   REPLICAS=$(kubectl get deploy ml-engine -n "$NAMESPACE" -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "0")
-  DESIRED=$(kubectl get hpa ml-engine-hpa -n "$NAMESPACE" -o jsonpath='{.status.desiredReplicas}' 2>/dev/null || echo "0")
+  DESIRED=$(kubectl get hpa "$EXPECTED_ML_HPA_NAME" -n "$NAMESPACE" -o jsonpath='{.status.desiredReplicas}' 2>/dev/null || echo "0")
   log "  t=${i}0m | ml-engine replicas=$REPLICAS | HPA desired=$DESIRED"
 
   if [[ "$REPLICAS" -le 1 && "$DESIRED" -le 1 ]]; then

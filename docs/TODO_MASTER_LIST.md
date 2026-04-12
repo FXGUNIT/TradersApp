@@ -934,7 +934,7 @@ Automation rules:
 ### Stage M: Kubernetes HPA Live Scaling Validation
 
 - [-] `M01` Apply and validate HPA manifests for ml-engine and bff in `tradersapp-dev`.
-  - Finding: HPAs applied (`kubectl apply`) to `tradersapp-dev`. `ml-engine-hpa` and `bff-hpa` confirmed present in cluster.
+  - Repo tooling now targets `k8s/overlay/dev/hpa-ml-engine.yaml` and `k8s/overlay/dev/hpa-bff.yaml` directly.
   - **Critical blocker 1:** `metrics.k8s.io` not registered — `ScalingActive: False`. Install metrics-server.
   - **Critical blocker 2:** `ml-models-pvc` missing — ml-engine pods stuck in `Pending`.
   - **Critical blocker 3:** `ml-state-pvc` stuck Pending — local-path provisioner failing.
@@ -942,11 +942,18 @@ Automation rules:
   - Load test attempted: confirmed HPA cannot scale without metrics-server.
   - Runbook created: `docs/HPA_SCALING_TEST_RUNBOOK.md`
   - Test script created: `scripts/k8s/run-hpa-scaling-test.sh`
+  - Update (2026-04-12): validation scripts now target `k8s/overlay/dev/hpa-*.yaml`, fail fast on drifted HPA names, and the live blocker has shifted to manual one-replica HPAs plus unhealthy metrics-server.
+  - Update (2026-04-12, later): drifted HPAs were removed live and replaced with repo-managed `ml-engine-hpa` / `bff-hpa`.
   - Namespace fix applied: `k8s/overlay/dev/hpa-ml-engine.yaml` and `hpa-bff.yaml` corrected from `tradersapp` → `tradersapp-dev`
 - [-] `M02` Install metrics-server and verify `ScalingActive: True` on both HPAs.
+  - Update (2026-04-12): `metrics-server` is present but unhealthy. `v1beta1.metrics.k8s.io` reports `FailedDiscoveryCheck`, `kubectl top` fails, and both HPAs report `ScalingActive: False`.
+  - Update (2026-04-12, later): `metrics-server` became intermittently healthy enough for live HPA activity, but it still flaps and prevents a clean M02 closeout.
 - [-] `M03` Fix ml-engine PVC issues (ml-models-pvc + ml-state-pvc) so pods reach Running state.
+  - Update (2026-04-12): `ml-models-pvc` and `ml-state-pvc` are both `Bound`. Pod readiness is still blocked, but the blocker has moved from PVC provisioning to startup probe failures in the current `dev-latest` runtime.
 - [-] `M04` Run `scripts/k8s/run-hpa-scaling-test.sh` end-to-end; verify replicas scale up under load and scale down after idle.
 - [-] `M05` Verify bff HPA scales independently from ml-engine under BFF-targeted load.
+  - Update (2026-04-12): M04-M05 are still blocked by three live issues: repair `metrics-server`, remove the drifted one-replica HPAs so the repo-managed `*-hpa` objects can own scaling, and get `ml-engine` / `bff` startup probes passing.
+  - Update (2026-04-12, later): `bff-hpa` scaled independently from `2` to `3` and returned to `2`; `ml-engine-hpa` scaled above floor live, but clean scale-down verification is still noisy because the Metrics API keeps flapping.
 
 **[Q26]** `[-]` M01 complete — cluster assessed, HPAs applied, blockers documented, runbook + test script created. M02–M05 require metrics-server installation + PVC fix.
 
