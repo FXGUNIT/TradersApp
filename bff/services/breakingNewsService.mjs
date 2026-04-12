@@ -428,75 +428,7 @@ async function fetchGDELT() {
   }
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-async function fetchWithTimeout(url, timeoutMs = 5000) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const res = await fetch(url, {
-      signal: controller.signal,
-      headers: { "User-Agent": "TradersApp/1.0 (Breaking News Intelligence)" },
-    });
-    clearTimeout(timer);
-    return res;
-  } catch (err) {
-    clearTimeout(timer);
-    throw err;
-  }
-}
-
-function parseRSSItems(xmlText, source) {
-  const items = [];
-  const itemMatches = xmlText.matchAll(/<item>([\s\S]*?)<\/item>/gi);
-  for (const match of itemMatches) {
-    const itemXml = match[1];
-    const title = extractRSSField(itemXml, "title");
-    const link = extractRSSField(itemXml, "link");
-    const description = extractRSSField(itemXml, "description");
-    const pubDate =
-      extractRSSField(itemXml, "pubDate") || new Date().toISOString();
-    if (title) {
-      items.push({ title, link, description, pubDate });
-    }
-  }
-  return items;
-}
-
-function extractRSSField(xml, field) {
-  // Try CDATA first
-  const cdataMatch = xml.match(
-    new RegExp(`<${field}><!\[CDATA\\[([\\s\\S]*?)\\]\\]><\\/${field}>`, "i"),
-  );
-  if (cdataMatch) return cdataMatch[1].trim();
-
-  // Try regular text
-  const textMatch = xml.match(
-    new RegExp(`<${field}>([\\s\\S]*?)<\\/${field}>`, "i"),
-  );
-  if (textMatch) return textMatch[1].replace(/<[^>]+>/g, "").trim();
-
-  return "";
-}
-
-function extractKeywords(title, description) {
-  const text = `${title} ${description}`.toLowerCase();
-  const keywords = [];
-  if (/fed|federal reserve|rate/i.test(text)) keywords.push("fed");
-  if (/inflation|cpi|pce/i.test(text)) keywords.push("inflation");
-  if (/jobs|employment|nfp|unemployment/i.test(text)) keywords.push("jobs");
-  if (/earnings|revenue|profit/i.test(text)) keywords.push("earnings");
-  if (/gdp|growth|economy/i.test(text)) keywords.push("gdp");
-  if (/trade|tariff|china/i.test(text)) keywords.push("trade");
-  if (/oil|crude|opec/i.test(text)) keywords.push("oil");
-  if (/recession|crisis/i.test(text)) keywords.push("recession");
-  if (/vix|volatility/i.test(text)) keywords.push("volatility");
-  if (/apple|nvidia|tesla|meta|microsoft|google|amazon/i.test(text))
-    keywords.push("mega-cap");
-  return keywords.length > 0 ? keywords : ["general"];
-}
-
-// ─── Main: Fetch All Sources ─────────────────────────────────────────────────
+// ─── Main: Fetch All Sources ────────────────────────────────
 
 /**
  * Fetch breaking news from all sources, deduplicate, cache.
