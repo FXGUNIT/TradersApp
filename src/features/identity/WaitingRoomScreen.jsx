@@ -133,7 +133,7 @@ export default function WaitingRoomScreen({
   const emailVerified = profile?.emailVerified !== false;
   const effectiveStatus = liveStatus || profile?.status || "PENDING";
   const eligibilityMessage = profile?.trainingEligibilityMessage || "";
-  const daysUsed = Number(profile?.daysUsed ?? profile?.days_used ?? profile?.dayCounter || 0);
+  const daysUsed = Number(profile?.daysUsed ?? profile?.days_used ?? profile?.dayCounter ?? 0);
   const daysRemaining = Math.max(10 - daysUsed, 0);
 
   useEffect(() => {
@@ -285,7 +285,7 @@ export default function WaitingRoomScreen({
               {eligibilityMessage}
               {!profile?.isTrainingEligible
                 ? ` ${daysRemaining} more distinct app-use day${daysRemaining === 1 ? "" : "s"} required.`
-                : " Your future journal uploads can now train the models."}
+                : ""}
             </div>
           </div>
         ) : null}

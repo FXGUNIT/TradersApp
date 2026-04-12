@@ -104,7 +104,11 @@ def upload_trades(request: "UploadTradesRequest"):
         training_metadata = build_trade_training_metadata(
             source_uid=request.source_uid,
             source_role=request.source_role,
-            source_days_used=request.source_days_used,
+            source_days_used=(
+                request.days_used
+                if request.days_used is not None
+                else request.source_days_used
+            ),
             is_training_eligible=request.is_training_eligible,
         )
         rows = []

@@ -1,7 +1,6 @@
 import { MlConsensusTab } from './features/consensus/MlConsensusTab.jsx';
 import { WarRoomLoader } from './features/consensus/WarRoomLoader.jsx';
-import { useUsers } from '../hooks/useUsers';
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import MessageRenderer from '../components/MessageRenderer.jsx';
 import ThemeSwitcher from '../components/ThemeSwitcher.jsx';
 import AiEnginesStatus from '../components/AiEnginesStatus.jsx';
@@ -58,21 +57,107 @@ const PHASE_DEFINITIONS = [
 ];
 
 const STAGE_ORDER = ['stage1', 'stage2', 'stage3', 'stage4', 'stage5', 'complete'];
+const COLLECTIVE_CONSCIOUSNESS_WINDOW_MS = 24 * 60 * 60 * 1000;
+const COLLECTIVE_CONSCIOUSNESS_STANDARD_LIMIT = 10;
+const COLLECTIVE_CONSCIOUSNESS_PREMIUM_LIMIT = 50;
+const BFF_API_BASE = String(import.meta.env.VITE_BFF_URL || '').trim() || '/api';
+
+function normalizeUsageState(profile = {}, override = null) {
+  const source =
+    override && typeof override === 'object'
+      ? override
+      : profile?.collectiveConsciousness && typeof profile.collectiveConsciousness === 'object'
+        ? profile.collectiveConsciousness
+        : {};
+  const plan = String(source.plan || profile?.plan || 'standard').toLowerCase() === 'premium'
+    ? 'premium'
+    : 'standard';
+  const currentTier = source.currentTier || (source.isAdminBypass ? 'admin' : plan);
+  const questionsAllowed =
+    source.questionsAllowed ?? (
+      currentTier === 'admin'
+        ? null
+        : plan === 'premium'
+          ? COLLECTIVE_CONSCIOUSNESS_PREMIUM_LIMIT
+          : COLLECTIVE_CONSCIOUSNESS_STANDARD_LIMIT
+    );
+  const questionCount = Number(source.questionCount ?? source.questionsUsed ?? 0);
+  const windowStartTimestamp = source.windowStartTimestamp || source.window_start_timestamp || null;
+  const resetTimestamp =
+    source.resetTimestamp ||
+    (windowStartTimestamp
+      ? new Date(new Date(windowStartTimestamp).getTime() + COLLECTIVE_CONSCIOUSNESS_WINDOW_MS).toISOString()
+      : null);
+  const rawRemainingWaitMs = resetTimestamp
+    ? Math.max(new Date(resetTimestamp).getTime() - Date.now(), 0)
+    : Number(source.remainingWaitMs || 0);
+  const windowExpired = Boolean(resetTimestamp) && rawRemainingWaitMs === 0;
+  const remainingWaitMs = windowExpired ? 0 : rawRemainingWaitMs;
+  const effectiveQuestionCount = windowExpired ? 0 : questionCount;
+  const isBlocked = Boolean(
+    source.isBlocked ??
+      (questionsAllowed !== null && effectiveQuestionCount >= questionsAllowed && remainingWaitMs > 0),
+  );
+  const questionsRemaining =
+    questionsAllowed === null
+      ? null
+      : Math.max(questionsAllowed - effectiveQuestionCount, 0);
+
+  return {
+    plan,
+    currentTier,
+    questionCount: effectiveQuestionCount,
+    questionsAllowed,
+    questionsRemaining,
+    windowStartTimestamp: windowExpired ? null : windowStartTimestamp,
+    resetTimestamp: windowExpired ? null : resetTimestamp,
+    remainingWaitMs,
+    isBlocked,
+    isAdminBypass: currentTier === 'admin' || Boolean(source.isAdminBypass),
+    upsell: source.upsell || null,
+  };
+}
+
+function formatRemainingTime(ms) {
+  const totalSeconds = Math.max(Math.ceil(ms / 1000), 0);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (hours > 0) {
+    return `${hours}h ${String(minutes).padStart(2, '0')}m ${String(seconds).padStart(2, '0')}s`;
+  }
+
+  return `${minutes}m ${String(seconds).padStart(2, '0')}s`;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ML Consensus Tab
 // ─────────────────────────────────────────────────────────────────────────────
 
 
-export default function CollectiveConsciousness({ onBack, theme, auth, currentTheme, onThemeChange, aiStatuses = [] }) {
+export default function CollectiveConsciousness({
+  onBack,
+  theme,
+  auth,
+  profile,
+  currentTheme,
+  onThemeChange,
+  aiStatuses = [],
+}) {
   const normalizedTheme = currentTheme || theme || "lumiere";
   const isDark = normalizedTheme === "midnight" || normalizedTheme === "night";
-  const { users } = useUsers();
   const [activeTab, setActiveTab] = useState('chat'); // 'chat' | 'ml'
   const [messages, setMessages] = useState([]);
   const [localHistory, setLocalHistory] = useState([]);
   const [input, setInput] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [usageState, setUsageState] = useState(() => normalizeUsageState(profile));
+  const [upgradeRequestState, setUpgradeRequestState] = useState({
+    status: 'idle',
+    message: '',
+  });
+  const [, setClockNow] = useState(Date.now());
   const engineMode = (() => {
     const h = getISTState().h;
     return (h >= 8 && h < 17) ? 'fast' : 'full';
@@ -80,7 +165,8 @@ export default function CollectiveConsciousness({ onBack, theme, auth, currentTh
   const chatEndRef = useRef(null);
   const inputRef = useRef(null);
 
-  const userData = auth?.uid ? users[auth.uid] : null;
+  const userData = profile || null;
+  const liveUsageState = normalizeUsageState(profile, usageState);
   const isFastMode = engineMode === 'fast';
   const normalizedEngineStatuses = Array.isArray(aiStatuses) ? aiStatuses : [];
   const configuredEngineCount = normalizedEngineStatuses.filter(
@@ -110,9 +196,25 @@ export default function CollectiveConsciousness({ onBack, theme, auth, currentTh
     scrollToBottom();
   }, [messages, isProcessing, scrollToBottom]);
 
+  useEffect(() => {
+    setUsageState((prev) => normalizeUsageState(profile, prev));
+  }, [profile]);
+
+  useEffect(() => {
+    if (!liveUsageState.resetTimestamp) {
+      return undefined;
+    }
+
+    const interval = setInterval(() => {
+      setClockNow(Date.now());
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [liveUsageState.resetTimestamp]);
+
   const handleSubmit = async () => {
     const trimmed = input.trim();
-    if (!trimmed || isProcessing) return;
+    if (!trimmed || isProcessing || liveUsageState.isBlocked) return;
 
     const userMsg = { role: 'user', content: trimmed, timestamp: Date.now() };
     setMessages(prev => [...prev, userMsg]);
@@ -167,10 +269,33 @@ ${scenarioContext}
 User Question: ${trimmed}`;
 
     try {
-      const response = await runDeliberation(MASTER_INTELLIGENCE_SYSTEM_PROMPT, fullPrompt);
+      const result = await runDeliberation(
+        MASTER_INTELLIGENCE_SYSTEM_PROMPT,
+        fullPrompt,
+        {
+          uid: auth?.uid,
+          email: profile?.email || auth?.email,
+          fullName: profile?.fullName,
+          role: profile?.role,
+        },
+      );
+      const response = result?.response || "";
+      setUsageState(normalizeUsageState(profile, result?.usage));
       setMessages(prev => [...prev, { role: 'assistant', content: response, timestamp: Date.now() }]);
       setLocalHistory(prev => [...prev, { role: 'user', content: trimmed }, { role: 'assistant', content: response }]);
     } catch (err) {
+      if (err?.code === "COLLECTIVE_CONSCIOUSNESS_LIMIT_REACHED") {
+        const blockedUsage = normalizeUsageState(profile, err?.usage || err);
+        const blockedMessage =
+          blockedUsage.currentTier === "premium"
+            ? `Premium limit reached. Your rolling 24-hour window resets in ${formatRemainingTime(blockedUsage.remainingWaitMs)}.`
+            : `Free limit reached. Your rolling 24-hour window resets in ${formatRemainingTime(blockedUsage.remainingWaitMs)}. Upgrade to Collective Consciousness Premium for ₹800/month when you're ready.`;
+        setUsageState(blockedUsage);
+        setMessages(prev => [...prev, { role: 'assistant', content: blockedMessage, timestamp: Date.now() }]);
+        setLocalHistory(prev => [...prev, { role: 'user', content: trimmed }, { role: 'assistant', content: blockedMessage }]);
+        return;
+      }
+
       const errMsg = `Error: ${err.message}`;
       setMessages(prev => [...prev, { role: 'assistant', content: errMsg, timestamp: Date.now() }]);
       setLocalHistory(prev => [...prev, { role: 'user', content: trimmed }, { role: 'assistant', content: errMsg }]);
@@ -186,6 +311,61 @@ User Question: ${trimmed}`;
       handleSubmit();
     }
   };
+
+  const handleUpgradeRequest = useCallback(async () => {
+    if (!hasBff() || upgradeRequestState.status === 'sending') {
+      return;
+    }
+
+    setUpgradeRequestState({
+      status: 'sending',
+      message: '',
+    });
+
+    const message = [
+      "Collective Consciousness upgrade request",
+      `Name: ${profile?.fullName || profile?.email || auth?.uid || 'Unknown user'}`,
+      `Email: ${profile?.email || auth?.email || 'unknown'}`,
+      `UID: ${auth?.uid || 'unknown'}`,
+      `Plan: ${liveUsageState.plan}`,
+      `Questions used: ${liveUsageState.questionCount}/${liveUsageState.questionsAllowed || 'unlimited'}`,
+      "Requested upgrade: Collective Consciousness Premium - ₹800/month",
+    ].join("\n");
+
+    try {
+      const response = await fetch(`${BFF_API_BASE}/telegram/send-message`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text: message,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data?.ok === false) {
+        throw new Error(data?.error || `Telegram request failed (${response.status})`);
+      }
+      setUpgradeRequestState({
+        status: 'sent',
+        message: 'Telegram sales request sent. We will process your upgrade.',
+      });
+    } catch (error) {
+      setUpgradeRequestState({
+        status: 'error',
+        message: error?.message || 'Telegram sales request failed.',
+      });
+    }
+  }, [
+    auth?.email,
+    auth?.uid,
+    liveUsageState.plan,
+    liveUsageState.questionCount,
+    liveUsageState.questionsAllowed,
+    profile?.email,
+    profile?.fullName,
+    upgradeRequestState.status,
+  ]);
 
   return (
     <div style={{
@@ -290,6 +470,140 @@ User Question: ${trimmed}`;
         padding: '24px 16px',
       }}>
         <div style={{ maxWidth: 800, margin: '0 auto', width: '100%' }}>
+          <div style={{
+            marginBottom: 20,
+            padding: '16px 18px',
+            borderRadius: 18,
+            background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.03)',
+            border: `1px solid ${liveUsageState.isBlocked ? 'rgba(245,158,11,0.35)' : AURA_COLORS.borderSubtle}`,
+            display: 'grid',
+            gap: 8,
+          }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 12,
+              flexWrap: 'wrap',
+            }}>
+              <div style={{
+                fontSize: 11,
+                fontWeight: 800,
+                letterSpacing: 1.8,
+                textTransform: 'uppercase',
+                color: liveUsageState.currentTier === 'premium'
+                  ? AURA_COLORS.success
+                  : liveUsageState.currentTier === 'admin'
+                    ? AURA_COLORS.manipulation
+                    : AURA_COLORS.info,
+              }}>
+                {liveUsageState.currentTier === 'premium'
+                  ? 'Premium Tier'
+                  : liveUsageState.currentTier === 'admin'
+                    ? 'Admin Bypass'
+                    : 'Standard Tier'}
+              </div>
+              <div style={{
+                fontSize: 12,
+                color: mutedColor,
+              }}>
+                {liveUsageState.questionsAllowed === null
+                  ? `${liveUsageState.questionCount} questions in the current window`
+                  : `${liveUsageState.questionCount}/${liveUsageState.questionsAllowed} questions used`}
+              </div>
+            </div>
+            <div style={{
+              fontSize: 13,
+              color: textColor,
+              lineHeight: 1.6,
+            }}>
+              {liveUsageState.resetTimestamp
+                ? `Rolling 24-hour window resets in ${formatRemainingTime(liveUsageState.remainingWaitMs)}.`
+                : 'Your first question starts a rolling 24-hour window.'}
+            </div>
+            {liveUsageState.isBlocked ? (
+              <div style={{
+                padding: '14px 16px',
+                borderRadius: 14,
+                background: liveUsageState.currentTier === 'premium'
+                  ? 'rgba(255,255,255,0.05)'
+                  : 'rgba(245,158,11,0.08)',
+                border: liveUsageState.currentTier === 'premium'
+                  ? `1px solid ${AURA_COLORS.borderSubtle}`
+                  : '1px solid rgba(245,158,11,0.24)',
+                display: 'grid',
+                gap: 12,
+              }}>
+                <div style={{
+                  fontSize: 13,
+                  lineHeight: 1.7,
+                  color: textColor,
+                }}>
+                  {liveUsageState.currentTier === 'premium'
+                    ? `You've reached the premium cap for this rolling window. You can ask again in ${formatRemainingTime(liveUsageState.remainingWaitMs)}.`
+                    : `You've used all 10 standard questions for this rolling window. You can ask again in ${formatRemainingTime(liveUsageState.remainingWaitMs)}.`}
+                </div>
+                {liveUsageState.currentTier === 'standard' ? (
+                  <>
+                    <div style={{
+                      fontSize: 13,
+                      lineHeight: 1.7,
+                      color: mutedColor,
+                    }}>
+                      Upgrade to the Collective Consciousness plan for ₹800/month to unlock 50 questions per rolling 24-hour window.
+                    </div>
+                    <div style={{
+                      display: 'flex',
+                      gap: 10,
+                      flexWrap: 'wrap',
+                    }}>
+                      <button
+                        onClick={handleUpgradeRequest}
+                        disabled={!hasBff() || upgradeRequestState.status === 'sending'}
+                        style={{
+                          border: 'none',
+                          borderRadius: 12,
+                          padding: '10px 14px',
+                          fontSize: 12,
+                          fontWeight: 700,
+                          cursor: !hasBff() || upgradeRequestState.status === 'sending' ? 'default' : 'pointer',
+                          background: AURA_COLORS.warning,
+                          color: '#111827',
+                        }}
+                      >
+                        Upgrade to Premium - ₹800/month
+                      </button>
+                      <button
+                        onClick={handleUpgradeRequest}
+                        disabled={!hasBff() || upgradeRequestState.status === 'sending'}
+                        style={{
+                          borderRadius: 12,
+                          padding: '10px 14px',
+                          fontSize: 12,
+                          fontWeight: 700,
+                          cursor: !hasBff() || upgradeRequestState.status === 'sending' ? 'default' : 'pointer',
+                          background: 'transparent',
+                          color: AURA_COLORS.info,
+                          border: `1px solid ${AURA_COLORS.info}`,
+                        }}
+                      >
+                        Contact Sales on Telegram
+                      </button>
+                    </div>
+                    {upgradeRequestState.message ? (
+                      <div style={{
+                        fontSize: 12,
+                        color: upgradeRequestState.status === 'error' ? '#DC2626' : AURA_COLORS.success,
+                      }}>
+                        {upgradeRequestState.message}
+                      </div>
+                    ) : null}
+                  </>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+
           {/* Welcome state */}
           {messages.length === 0 && !isProcessing && (
             <div style={{
@@ -463,8 +777,12 @@ User Question: ${trimmed}`;
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Ask the Intelligence Grid..."
-              disabled={isProcessing}
+              placeholder={
+                liveUsageState.isBlocked
+                  ? "Collective Consciousness will unlock when your rolling window resets..."
+                  : "Ask the Intelligence Grid..."
+              }
+              disabled={isProcessing || liveUsageState.isBlocked}
               rows={1}
               style={{
                 width: '100%',
@@ -491,7 +809,7 @@ User Question: ${trimmed}`;
             {/* Submit button inside textarea */}
             <button
               onClick={handleSubmit}
-              disabled={isProcessing || !input.trim()}
+              disabled={isProcessing || liveUsageState.isBlocked || !input.trim()}
               style={{
                 position: 'absolute',
                 right: 8,
@@ -500,9 +818,9 @@ User Question: ${trimmed}`;
                 height: 32,
                 borderRadius: '50%',
                 border: 'none',
-                background: (isProcessing || !input.trim()) ? 'var(--surface-glass, rgba(255,255,255,0.06))' : AURA_COLORS.info,
-                color: (isProcessing || !input.trim()) ? mutedColor : 'var(--accent-text, #FFFFFF)',
-                cursor: (isProcessing || !input.trim()) ? 'default' : 'pointer',
+                background: (isProcessing || liveUsageState.isBlocked || !input.trim()) ? 'var(--surface-glass, rgba(255,255,255,0.06))' : AURA_COLORS.info,
+                color: (isProcessing || liveUsageState.isBlocked || !input.trim()) ? mutedColor : 'var(--accent-text, #FFFFFF)',
+                cursor: (isProcessing || liveUsageState.isBlocked || !input.trim()) ? 'default' : 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',

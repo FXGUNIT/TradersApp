@@ -27,6 +27,7 @@ SCHEMA_PG = Path(__file__).parent / "schema_postgres.sql"
 SQLITE_TRADE_LOG_POLICY_COLUMNS = {
     "source_uid": "TEXT",
     "source_role": "TEXT",
+    "days_used": "INTEGER",
     "source_days_used": "INTEGER",
     "is_training_eligible": "INTEGER",
 }
@@ -34,6 +35,7 @@ SQLITE_TRADE_LOG_POLICY_COLUMNS = {
 POSTGRES_TRADE_LOG_POLICY_COLUMNS = {
     "source_uid": "TEXT",
     "source_role": "TEXT",
+    "days_used": "INTEGER",
     "source_days_used": "INTEGER",
     "is_training_eligible": "BOOLEAN",
 }
@@ -354,9 +356,9 @@ class SQLiteBackend(DatabaseBackend):
                  vwap_slope_entry, vr_entry, volatility_regime,
                  expected_move_ticks, actual_move_ticks, alpha_raw,
                  holding_minutes, exit_type, source_uid, source_role,
-                 source_days_used, is_training_eligible)
+                 days_used, source_days_used, is_training_eligible)
                 VALUES
-                (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     row.get("entry_time"),
@@ -387,6 +389,7 @@ class SQLiteBackend(DatabaseBackend):
                     row.get("exit_type"),
                     row.get("source_uid"),
                     row.get("source_role"),
+                    row.get("days_used", row.get("source_days_used")),
                     row.get("source_days_used"),
                     None
                     if row.get("is_training_eligible") is None
@@ -1023,9 +1026,9 @@ class PostgresBackend(DatabaseBackend):
                      vwap_slope_entry, vr_entry, volatility_regime,
                      expected_move_ticks, actual_move_ticks, alpha_raw,
                      holding_minutes, exit_type, source_uid, source_role,
-                     source_days_used, is_training_eligible)
+                     days_used, source_days_used, is_training_eligible)
                     VALUES
-                    (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT (entry_time, symbol) DO UPDATE SET
                         exit_time = EXCLUDED.exit_time,
                         exit_price = EXCLUDED.exit_price,
@@ -1039,6 +1042,7 @@ class PostgresBackend(DatabaseBackend):
                         exit_type = EXCLUDED.exit_type,
                         source_uid = EXCLUDED.source_uid,
                         source_role = EXCLUDED.source_role,
+                        days_used = EXCLUDED.days_used,
                         source_days_used = EXCLUDED.source_days_used,
                         is_training_eligible = EXCLUDED.is_training_eligible
                     """,
@@ -1071,6 +1075,7 @@ class PostgresBackend(DatabaseBackend):
                         row.get("exit_type"),
                         row.get("source_uid"),
                         row.get("source_role"),
+                        row.get("days_used", row.get("source_days_used")),
                         row.get("source_days_used"),
                         row.get("is_training_eligible"),
                     ),

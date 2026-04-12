@@ -99,6 +99,7 @@ CREATE TABLE IF NOT EXISTS trade_log (
     exit_type            TEXT,
     source_uid           TEXT,
     source_role          TEXT,
+    days_used            INTEGER,
     source_days_used     INTEGER,
     is_training_eligible INTEGER,
 
@@ -217,4 +218,3 @@ CREATE TABLE IF NOT EXISTS training_batch_runs (
     UNIQUE(batch_date, batch_type, symbol)
 );
 CREATE INDEX IF NOT EXISTS idx_training_batch_runs_date ON training_batch_runs(batch_date DESC, symbol);
-

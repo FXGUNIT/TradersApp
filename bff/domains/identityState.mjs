@@ -12,7 +12,14 @@ const TRAINING_ELIGIBILITY_DAY_THRESHOLD = 10;
 const TRAINING_ELIGIBILITY_LOCKED_MESSAGE =
   "Unlock more AI accuracy after 10 days of usage";
 const TRAINING_ELIGIBILITY_UNLOCKED_MESSAGE =
-  "Your data is now used for AI training";
+  "Future uploads are now eligible for training";
+const COLLECTIVE_CONSCIOUSNESS_STANDARD_PLAN = "standard";
+const COLLECTIVE_CONSCIOUSNESS_PREMIUM_PLAN = "premium";
+const COLLECTIVE_CONSCIOUSNESS_STANDARD_LIMIT = 10;
+const COLLECTIVE_CONSCIOUSNESS_PREMIUM_LIMIT = 50;
+const COLLECTIVE_CONSCIOUSNESS_WINDOW_MS = 24 * 60 * 60 * 1000;
+const COLLECTIVE_CONSCIOUSNESS_PREMIUM_PRICE_INR_MONTHLY = 800;
+const COLLECTIVE_CONSCIOUSNESS_ADMIN_BYPASS_EMAIL = "cricgunit@gmail.com";
 
 function nowIso() {
   return new Date().toISOString();
@@ -111,6 +118,43 @@ function normalizeActiveDay(value) {
   return parsed.toISOString().slice(0, 10);
 }
 
+function normalizeIsoTimestamp(value) {
+  if (!value) {
+    return null;
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+
+  return parsed.toISOString();
+}
+
+function normalizeQuestionCount(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return 0;
+  }
+
+  return Math.floor(parsed);
+}
+
+function normalizeCollectivePlan(value) {
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase();
+
+  if (
+    normalized === COLLECTIVE_CONSCIOUSNESS_PREMIUM_PLAN ||
+    normalized === "collective_consciousness_premium"
+  ) {
+    return COLLECTIVE_CONSCIOUSNESS_PREMIUM_PLAN;
+  }
+
+  return COLLECTIVE_CONSCIOUSNESS_STANDARD_PLAN;
+}
+
 function resolveTrainingEligibility(role, dayCounter) {
   return (
     String(role || "user")
@@ -126,12 +170,112 @@ function resolveTrainingEligibilityMessage(isTrainingEligible) {
     : TRAINING_ELIGIBILITY_LOCKED_MESSAGE;
 }
 
+function getCollectiveConsciousnessLimit(plan) {
+  return normalizeCollectivePlan(plan) === COLLECTIVE_CONSCIOUSNESS_PREMIUM_PLAN
+    ? COLLECTIVE_CONSCIOUSNESS_PREMIUM_LIMIT
+    : COLLECTIVE_CONSCIOUSNESS_STANDARD_LIMIT;
+}
+
+function buildCollectiveConsciousnessUpsellMetadata() {
+  return {
+    enabled: true,
+    plan_name: "Collective Consciousness",
+    monthly_price_inr: COLLECTIVE_CONSCIOUSNESS_PREMIUM_PRICE_INR_MONTHLY,
+    price_label: `₹${COLLECTIVE_CONSCIOUSNESS_PREMIUM_PRICE_INR_MONTHLY}/month`,
+    cta_label: "Upgrade to Premium",
+    telegram_cta_label: "Contact Sales on Telegram",
+    channel: "telegram",
+  };
+}
+
+function resolveCollectiveConsciousnessState(user = {}, options = {}) {
+  const now = options.now instanceof Date ? options.now : new Date();
+  const nowMs = now.getTime();
+  const role = String(user.role || "user")
+    .trim()
+    .toLowerCase();
+  const email = String(user.email || "")
+    .trim()
+    .toLowerCase();
+  const plan = normalizeCollectivePlan(
+    user.plan ??
+      user.collectiveConsciousness?.plan ??
+      user.collectiveConsciousnessPlan ??
+      user.subscriptionPlan,
+  );
+  const rawWindowStartTimestamp = normalizeIsoTimestamp(
+    user.windowStartTimestamp ??
+      user.window_start_timestamp ??
+      user.collectiveConsciousness?.windowStartTimestamp ??
+      user.collectiveConsciousness?.window_start_timestamp,
+  );
+  const rawQuestionCount = normalizeQuestionCount(
+    user.questionCount ??
+      user.question_count ??
+      user.collectiveConsciousness?.questionCount ??
+      user.collectiveConsciousness?.question_count,
+  );
+  const isAdminBypass =
+    role === "admin" || email === COLLECTIVE_CONSCIOUSNESS_ADMIN_BYPASS_EMAIL;
+  const questionsAllowed = isAdminBypass
+    ? null
+    : getCollectiveConsciousnessLimit(plan);
+  const windowStartMs = rawWindowStartTimestamp
+    ? new Date(rawWindowStartTimestamp).getTime()
+    : null;
+  const windowExpired =
+    Number.isFinite(windowStartMs) &&
+    nowMs - windowStartMs >= COLLECTIVE_CONSCIOUSNESS_WINDOW_MS;
+  const windowStartTimestamp =
+    rawWindowStartTimestamp && !windowExpired ? rawWindowStartTimestamp : null;
+  const questionCount = windowStartTimestamp ? rawQuestionCount : 0;
+  const resetTimestamp = windowStartTimestamp
+    ? new Date(
+        new Date(windowStartTimestamp).getTime() +
+          COLLECTIVE_CONSCIOUSNESS_WINDOW_MS,
+      ).toISOString()
+    : null;
+  const remainingWaitMs = resetTimestamp
+    ? Math.max(new Date(resetTimestamp).getTime() - nowMs, 0)
+    : 0;
+  const isBlocked =
+    !isAdminBypass &&
+    questionsAllowed !== null &&
+    questionCount >= questionsAllowed &&
+    remainingWaitMs > 0;
+  const questionsRemaining =
+    questionsAllowed === null
+      ? null
+      : Math.max(questionsAllowed - questionCount, 0);
+
+  return {
+    plan,
+    windowStartTimestamp,
+    questionCount,
+    currentTier: isAdminBypass ? "admin" : plan,
+    questionsAllowed,
+    questionsRemaining,
+    resetTimestamp,
+    remainingWaitMs,
+    isAdminBypass,
+    isBlocked,
+    upsell:
+      !isAdminBypass && plan === COLLECTIVE_CONSCIOUSNESS_STANDARD_PLAN
+        ? buildCollectiveConsciousnessUpsellMetadata()
+        : null,
+  };
+}
+
 function normalizeUserRecord(uid, user = {}) {
   const role = user.role || "user";
   const daysUsed = normalizeDayCounter(
     user.daysUsed ?? user.days_used ?? user.dayCounter,
   );
   const isTrainingEligible = resolveTrainingEligibility(role, daysUsed);
+  const collectiveConsciousness = resolveCollectiveConsciousnessState({
+    ...user,
+    role,
+  });
 
   return {
     ...user,
@@ -153,17 +297,25 @@ function normalizeUserRecord(uid, user = {}) {
     days_used: daysUsed,
     dayCounter: daysUsed,
     lastActiveDay:
-      typeof user.lastActiveDay === "string" && user.lastActiveDay.trim()
-        ? normalizeActiveDay(user.lastActiveDay)
+      typeof (user.lastActiveDay ?? user.last_active_day) === "string" &&
+      String(user.lastActiveDay ?? user.last_active_day).trim()
+        ? normalizeActiveDay(user.lastActiveDay ?? user.last_active_day)
         : null,
     last_active_day:
-      typeof user.lastActiveDay === "string" && user.lastActiveDay.trim()
-        ? normalizeActiveDay(user.lastActiveDay)
+      typeof (user.lastActiveDay ?? user.last_active_day) === "string" &&
+      String(user.lastActiveDay ?? user.last_active_day).trim()
+        ? normalizeActiveDay(user.lastActiveDay ?? user.last_active_day)
         : null,
     isTrainingEligible,
     is_training_eligible: isTrainingEligible,
     trainingEligibilityMessage:
       resolveTrainingEligibilityMessage(isTrainingEligible),
+    plan: collectiveConsciousness.plan,
+    windowStartTimestamp: collectiveConsciousness.windowStartTimestamp,
+    window_start_timestamp: collectiveConsciousness.windowStartTimestamp,
+    questionCount: collectiveConsciousness.questionCount,
+    question_count: collectiveConsciousness.questionCount,
+    collectiveConsciousness,
     updatedAt: user.updatedAt || nowIso(),
   };
 }
@@ -296,6 +448,12 @@ export function getUserStatus(uid) {
     isTrainingEligible: normalized.isTrainingEligible,
     is_training_eligible: normalized.is_training_eligible,
     trainingEligibilityMessage: normalized.trainingEligibilityMessage,
+    plan: normalized.plan,
+    questionCount: normalized.questionCount,
+    question_count: normalized.question_count,
+    windowStartTimestamp: normalized.windowStartTimestamp,
+    window_start_timestamp: normalized.window_start_timestamp,
+    collectiveConsciousness: normalized.collectiveConsciousness,
     updatedAt: normalized.updatedAt,
   };
 }
@@ -334,6 +492,7 @@ export function patchUserAccess(uid, patch = {}) {
   const allowed = {
     status: patch.status,
     role: patch.role,
+    plan: patch.plan,
     approvedAt: patch.approvedAt,
     approvedBy: patch.approvedBy,
     blockedAt: patch.blockedAt,
@@ -473,6 +632,79 @@ export function ensureUserRecord(uid, patch = {}) {
   return clone(nextUser);
 }
 
+export function getCollectiveConsciousnessStatus(uid) {
+  if (!uid) {
+    return null;
+  }
+
+  const state = readState();
+  const user = state.users?.[uid];
+  if (!user) {
+    return null;
+  }
+
+  const normalized = normalizeUserRecord(uid, user);
+  return clone(normalized.collectiveConsciousness);
+}
+
+export function consumeCollectiveConsciousnessQuestion(uid, patch = {}, options = {}) {
+  if (!uid) {
+    return {
+      ok: false,
+      blocked: true,
+      error: "User UID is required.",
+      code: "COLLECTIVE_CONSCIOUSNESS_UID_REQUIRED",
+    };
+  }
+
+  const state = readState();
+  const existingUser = state.users?.[uid] || null;
+  const seededUser = upsertUser(state, uid, {
+    uid,
+    ...(existingUser || {}),
+    email: patch.email ?? existingUser?.email ?? null,
+    fullName:
+      patch.fullName ??
+      patch.displayName ??
+      existingUser?.fullName ??
+      existingUser?.displayName ??
+      patch.email ??
+      uid,
+    role: patch.role ?? existingUser?.role ?? "user",
+    plan: existingUser?.plan,
+    updatedAt: nowIso(),
+  });
+  const currentState = resolveCollectiveConsciousnessState(seededUser, options);
+
+  if (currentState.isBlocked) {
+    writeState(state);
+    return {
+      ok: false,
+      blocked: true,
+      code: "COLLECTIVE_CONSCIOUSNESS_LIMIT_REACHED",
+      error: "Collective Consciousness question limit reached.",
+      usage: clone(currentState),
+    };
+  }
+
+  const timestamp = (options.now instanceof Date ? options.now : new Date()).toISOString();
+  const nextUser = upsertUser(state, uid, {
+    ...seededUser,
+    plan: currentState.plan,
+    windowStartTimestamp: currentState.windowStartTimestamp || timestamp,
+    questionCount: currentState.questionCount + 1,
+    updatedAt: nowIso(),
+  });
+  writeState(state);
+
+  return {
+    ok: true,
+    blocked: false,
+    usage: clone(normalizeUserRecord(uid, nextUser).collectiveConsciousness),
+    user: clone(nextUser),
+  };
+}
+
 export function provisionUser(uid, patch = {}) {
   if (!uid) {
     return null;
@@ -527,9 +759,11 @@ export function recordUserActiveDay(uid, options = {}) {
 }
 
 export default {
+  consumeCollectiveConsciousnessQuestion,
   deleteSession,
   ensureUserRecord,
   findUserByEmail,
+  getCollectiveConsciousnessStatus,
   getUserByUid,
   getUserStatus,
   listTrainingEligibilityUsers,

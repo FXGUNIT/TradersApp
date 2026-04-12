@@ -59,6 +59,7 @@ import {
   toggleMaintenanceState,
 } from "./domains/adminState.mjs";
 import {
+  consumeCollectiveConsciousnessQuestion,
   deleteSession,
   findUserByEmail,
   getUserByUid,
@@ -452,7 +453,7 @@ const dispatcher = createDispatcher({
   patchUserSecurity,
   provisionUser,
   recordUserActiveDay,
-  recordUserActiveDay,
+  consumeCollectiveConsciousnessQuestion,
   revokeOtherSessions,
   upsertSession,
   appendSupportMessage,

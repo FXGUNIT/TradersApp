@@ -106,6 +106,7 @@ CREATE TABLE IF NOT EXISTS trade_log (
     exit_type            TEXT,
     source_uid           TEXT,
     source_role          TEXT,
+    days_used            INTEGER,
     source_days_used     INTEGER,
     is_training_eligible BOOLEAN,
 

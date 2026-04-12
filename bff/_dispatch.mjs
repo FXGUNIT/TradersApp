@@ -65,6 +65,7 @@ export function createDispatcher({
   patchUserSecurity,
   provisionUser,
   recordUserActiveDay,
+  consumeCollectiveConsciousnessQuestion,
   revokeOtherSessions,
   upsertSession,
   appendSupportMessage,
@@ -184,6 +185,38 @@ export function createDispatcher({
     );
     const pathname = url.pathname;
     const method = req.method || "GET";
+    const resolveCollectiveConsciousnessRequest = (body = {}) => {
+      const user = body?.user && typeof body.user === "object" ? body.user : {};
+      const uid = String(body.uid || user.uid || "").trim();
+      const email = String(body.email || user.email || "")
+        .trim()
+        .toLowerCase();
+      const fullName = String(
+        body.fullName || user.fullName || user.displayName || "",
+      ).trim();
+      const role = String(body.role || user.role || "")
+        .trim()
+        .toLowerCase();
+
+      return {
+        uid,
+        email: email || null,
+        fullName: fullName || null,
+        role: role || null,
+      };
+    };
+    const buildCollectiveConsciousnessLimitPayload = (usage = {}) => ({
+      ok: false,
+      error: "Collective Consciousness question limit reached.",
+      code: "COLLECTIVE_CONSCIOUSNESS_LIMIT_REACHED",
+      currentTier: usage.currentTier || "standard",
+      questionsUsed: Number(usage.questionCount || 0),
+      questionsAllowed: usage.questionsAllowed,
+      resetTimestamp: usage.resetTimestamp || null,
+      remainingWaitMs: Number(usage.remainingWaitMs || 0),
+      upsell: usage.upsell || null,
+      usage,
+    });
 
     if (pathname !== "/metrics") {
       res.once("finish", () => {
@@ -577,11 +610,38 @@ export function createDispatcher({
           .toLowerCase();
         const systemPrompt = String(body.systemPrompt || "");
         const userPrompt = String(body.userPrompt || "");
+        const userContext = resolveCollectiveConsciousnessRequest(body);
         if (!provider || !userPrompt) {
           json(
             res,
             400,
             { ok: false, error: "Provider and userPrompt are required." },
+            origin,
+          );
+          return;
+        }
+        if (!userContext.uid) {
+          json(
+            res,
+            400,
+            {
+              ok: false,
+              error: "Collective Consciousness user context is required.",
+              code: "COLLECTIVE_CONSCIOUSNESS_UID_REQUIRED",
+            },
+            origin,
+          );
+          return;
+        }
+        const access = consumeCollectiveConsciousnessQuestion(
+          userContext.uid,
+          userContext,
+        );
+        if (!access.ok) {
+          json(
+            res,
+            429,
+            buildCollectiveConsciousnessLimitPayload(access.usage),
             origin,
           );
           return;
@@ -595,7 +655,13 @@ export function createDispatcher({
         json(
           res,
           200,
-          { ok: true, provider, response, statuses: buildAiStatusPayload() },
+          {
+            ok: true,
+            provider,
+            response,
+            statuses: buildAiStatusPayload(),
+            usage: access.usage,
+          },
           origin,
         );
         return;
@@ -616,11 +682,38 @@ export function createDispatcher({
         const body = await readJsonBody(req, 200_000);
         const systemPrompt = String(body.systemPrompt || "");
         const userPrompt = String(body.userPrompt || "");
+        const userContext = resolveCollectiveConsciousnessRequest(body);
         if (!userPrompt) {
           json(
             res,
             400,
             { ok: false, error: "userPrompt is required." },
+            origin,
+          );
+          return;
+        }
+        if (!userContext.uid) {
+          json(
+            res,
+            400,
+            {
+              ok: false,
+              error: "Collective Consciousness user context is required.",
+              code: "COLLECTIVE_CONSCIOUSNESS_UID_REQUIRED",
+            },
+            origin,
+          );
+          return;
+        }
+        const access = consumeCollectiveConsciousnessQuestion(
+          userContext.uid,
+          userContext,
+        );
+        if (!access.ok) {
+          json(
+            res,
+            429,
+            buildCollectiveConsciousnessLimitPayload(access.usage),
             origin,
           );
           return;
@@ -650,6 +743,7 @@ export function createDispatcher({
                 provider,
                 response,
                 statuses: buildAiStatusPayload(),
+                usage: access.usage,
               },
               origin,
             );

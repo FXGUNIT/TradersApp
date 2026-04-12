@@ -59,6 +59,27 @@ function mergeProfileData(userData, authData = {}, fullData = {}) {
   const sessions = normalizeSessionMap(
     fullData?.sessions || userData?.sessions || {},
   );
+  const collectiveConsciousness =
+    userData?.collectiveConsciousness && typeof userData.collectiveConsciousness === "object"
+      ? userData.collectiveConsciousness
+      : {
+          plan: String(userData?.plan || "standard").toLowerCase() === "premium"
+            ? "premium"
+            : "standard",
+          questionCount: Number(userData?.questionCount ?? userData?.question_count ?? 0),
+          windowStartTimestamp:
+            userData?.windowStartTimestamp ??
+            userData?.window_start_timestamp ??
+            null,
+          resetTimestamp: userData?.resetTimestamp || null,
+          questionsAllowed: userData?.questionsAllowed ?? null,
+          questionsRemaining: userData?.questionsRemaining ?? null,
+          currentTier: userData?.currentTier || null,
+          remainingWaitMs: Number(userData?.remainingWaitMs || 0),
+          isBlocked: Boolean(userData?.isBlocked),
+          isAdminBypass: Boolean(userData?.isAdminBypass),
+          upsell: userData?.upsell || null,
+        };
 
   const profile = {
     uid: authData.uid ?? userData?.uid ?? null,
@@ -79,12 +100,14 @@ function mergeProfileData(userData, authData = {}, fullData = {}) {
     accountState: fullData?.accountState || {},
     firmRules: fullData?.firmRules || {},
     journal: fullData?.journal || {},
-    daysUsed: Number(userData?.daysUsed ?? userData?.days_used ?? userData?.dayCounter || 0),
-    days_used: Number(userData?.days_used ?? userData?.daysUsed ?? userData?.dayCounter || 0),
-    dayCounter: Number(userData?.daysUsed ?? userData?.days_used ?? userData?.dayCounter || 0),
+    daysUsed: Number(userData?.daysUsed ?? userData?.days_used ?? userData?.dayCounter ?? 0),
+    days_used: Number(userData?.days_used ?? userData?.daysUsed ?? userData?.dayCounter ?? 0),
+    dayCounter: Number(userData?.daysUsed ?? userData?.days_used ?? userData?.dayCounter ?? 0),
     lastActiveDay: userData?.lastActiveDay || null,
     isTrainingEligible: Boolean(userData?.isTrainingEligible),
     trainingEligibilityMessage: userData?.trainingEligibilityMessage || "",
+    plan: collectiveConsciousness.plan,
+    collectiveConsciousness,
     sessions,
   };
 

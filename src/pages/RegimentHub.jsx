@@ -220,7 +220,7 @@ export default function RegimentHub({
   const mutedColor = "var(--text-secondary, #9CA3AF)";
   const cardBg = "var(--surface-glass, rgba(255,255,255,0.72))";
   const cardBorder = "var(--border-subtle, rgba(0,0,0,0.08))";
-  const daysUsed = Number(profile?.daysUsed ?? profile?.days_used ?? profile?.dayCounter || 0);
+  const daysUsed = Number(profile?.daysUsed ?? profile?.days_used ?? profile?.dayCounter ?? 0);
   const daysRemaining = Math.max(10 - daysUsed, 0);
   const eligibilityMessage = profile?.trainingEligibilityMessage || "";
 
@@ -342,7 +342,7 @@ export default function RegimentHub({
               {eligibilityMessage}
               {!profile?.isTrainingEligible
                 ? ` ${daysRemaining} more distinct app-use day${daysRemaining === 1 ? "" : "s"} before your data can train the models.`
-                : " New journal uploads are now eligible for training."}
+                : ""}
             </div>
           </div>
         ) : null}

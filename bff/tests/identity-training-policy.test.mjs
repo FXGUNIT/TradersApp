@@ -77,7 +77,7 @@ test("recordUserActiveDay flips user eligibility at day ten", async () => {
     assert.equal(result.user.isTrainingEligible, true);
     assert.equal(
       result.user.trainingEligibilityMessage,
-      "Your data is now used for AI training",
+      "Future uploads are now eligible for training",
     );
   });
 });
@@ -92,7 +92,7 @@ test("admin users are always training eligible", async () => {
     assert.equal(record.user.isTrainingEligible, true);
     assert.equal(
       record.user.trainingEligibilityMessage,
-      "Your data is now used for AI training",
+      "Future uploads are now eligible for training",
     );
 
     const result = recordUserActiveDay("admin-1", { activeDay: "2026-04-01" });

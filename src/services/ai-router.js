@@ -149,9 +149,14 @@ async function callBffJson(path, payload) {
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(
+    const error = new Error(
       data?.error || data?.message || `BFF request failed (${response.status})`,
     );
+    error.status = response.status;
+    if (data && typeof data === "object") {
+      Object.assign(error, data);
+    }
+    throw error;
   }
 
   return data;
@@ -322,7 +327,7 @@ export async function askSambaNova(systemPrompt, userPrompt) {
   return callProvider("sambanova", systemPrompt, userPrompt);
 }
 
-export async function runDeliberation(systemPrompt, userPrompt) {
+export async function runDeliberation(systemPrompt, userPrompt, user = {}) {
   councilStage.current = "stage1";
   councilStage.label = "Thinking...";
 
@@ -330,6 +335,10 @@ export async function runDeliberation(systemPrompt, userPrompt) {
     const data = await callBffJson("/ai/deliberate", {
       systemPrompt,
       userPrompt,
+      uid: user?.uid || "",
+      email: user?.email || "",
+      fullName: user?.fullName || user?.displayName || "",
+      role: user?.role || "",
     });
 
     if (Array.isArray(data?.statuses)) {
@@ -342,7 +351,12 @@ export async function runDeliberation(systemPrompt, userPrompt) {
 
     councilStage.current = "complete";
     councilStage.label = "Done";
-    return data?.response || "";
+    return {
+      response: data?.response || "",
+      usage: data?.usage || null,
+      provider: data?.provider || null,
+      statuses: data?.statuses || [],
+    };
   } catch (error) {
     councilStage.current = "complete";
     councilStage.label = "Error";
@@ -351,7 +365,8 @@ export async function runDeliberation(systemPrompt, userPrompt) {
 }
 
 export async function askGeminiWithFallback(systemPrompt, userPrompt) {
-  return runDeliberation(systemPrompt, userPrompt);
+  const result = await runDeliberation(systemPrompt, userPrompt);
+  return result?.response || "";
 }
 
 export function scanPromptSecurity(userPrompt, telegramSendMessage) {

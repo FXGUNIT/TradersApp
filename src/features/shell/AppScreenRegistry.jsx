@@ -212,6 +212,7 @@ export default function AppScreenRegistry({
           currentTheme={currentTheme}
           onThemeChange={handleThemeChange}
           auth={auth}
+          profile={profile}
           aiStatuses={aiStatuses}
         />
       );
