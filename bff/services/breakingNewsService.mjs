@@ -25,6 +25,26 @@
  */
 
 import { getRedisClient } from "./redis-session-store.mjs";
+import {
+  TRADING_KEYWORDS,
+  HIGH_IMPACT_KEYWORDS,
+  MEDIUM_IMPACT_KEYWORDS,
+  BULLISH_WORDS,
+  BEARISH_WORDS,
+  classifySentiment,
+  classifyImpact,
+  isRelevantToTrading,
+  generateNewsId,
+  extractKeywords,
+  hashNewsTitle,
+  impactRank,
+  sortNewsItems,
+  selectNewsItems,
+  buildBreakingNewsPayload,
+  parseRSSItems,
+  extractRSSField,
+  fetchWithTimeout,
+} from "./newsFormatter.mjs";
 
 // ─── Configuration ─────────────────────────────────────────────────────────────
 
@@ -51,250 +71,6 @@ const BREAKING_NEWS_CACHE_TTL_SECONDS = Math.max(
   Math.ceil(BREAKING_NEWS_CACHE_TTL_MS / 1000),
 );
 
-// Keywords that make a breaking news item relevant to MNQ/ES trading
-const TRADING_KEYWORDS = [
-  // Indices & ETFs
-  "spy",
-  "qqq",
-  "s&p",
-  "sp500",
-  "nasdaq",
-  "dow jones",
-  "dow ",
-  "russell",
-  "mnq",
-  "es futures",
-  "nq futures",
-  "emini",
-  "futures",
-  // Market-moving keywords
-  "fed",
-  "federal reserve",
-  "rate hike",
-  "rate cut",
-  "interest rate",
-  "inflation",
-  "cpi",
-  "pce",
-  "gdp",
-  "jobs report",
-  "nonfarm",
-  "unemployment",
-  "treasury",
-  "yield curve",
-  "bond",
-  "10-year",
-  // Earnings surprises
-  "earnings",
-  "revenue",
-  "profit",
-  "guidance",
-  "beats",
-  "misses",
-  "quarterly",
-  "q1",
-  "q2",
-  "q3",
-  "q4",
-  // Mega-cap tech (market movers)
-  "apple",
-  "google",
-  "alphabet",
-  "microsoft",
-  "amazon",
-  "meta",
-  "facebook",
-  "nvidia",
-  "tesla",
-  "tsla",
-  "jpmorgan",
-  "goldman",
-  "bank of america",
-  // Macro & geopolitical
-  "recession",
-  "crisis",
-  "tariff",
-  "trade war",
-  "china",
-  "europe",
-  "opec",
-  "oil price",
-  "crude oil",
-  "war",
-  "sanction",
-  "election",
-  "fomc",
-  // Volatility
-  "vix",
-  "volatility",
-  "market turmoil",
-  "selloff",
-  "rally",
-  "surge",
-  "plunge",
-  "crash",
-  "correction",
-  "bull market",
-  "bear market",
-];
-
-// Keywords by impact tier
-const HIGH_IMPACT_KEYWORDS = [
-  "fed",
-  "federal reserve",
-  "rate hike",
-  "rate cut",
-  "interest rate",
-  "cpi",
-  "inflation",
-  "fomc",
-  "nonfarm",
-  "jobs report",
-  "recession",
-  "crisis",
-  "trade war",
-  "tariff",
-  "earnings surprise",
-  "profit warning",
-  "guidance cut",
-  "market crash",
-  "black swan",
-  "flash crash",
-  "bankruptcy",
-  "default",
-  "sovereign debt",
-];
-
-const MEDIUM_IMPACT_KEYWORDS = [
-  "gdp",
-  "pce",
-  "pmi",
-  "ism",
-  "retail sales",
-  "housing starts",
-  "earnings",
-  "revenue beat",
-  "guidance raise",
-  "opec",
-  "oil",
-  "china",
-  "europe",
-  "geopolitics",
-  "vix",
-  "volatility spike",
-];
-
-// ─── In-Memory Cache ──────────────────────────────────────────────────────────
-
-class NewsCache {
-  constructor(maxAgeMs = 600_000, maxItems = 80) {
-    // 10-minute TTL
-    this.maxAgeMs = maxAgeMs;
-    this.maxItems = maxItems;
-    this.items = new Map(); // titleHash → { item, fetchedAt }
-    this.seenIds = new Set();
-  }
-
-  _hash(str) {
-    let h = 0;
-    for (let i = 0; i < Math.min(str.length, 200); i++) {
-      h = (h << 5) - h + str.charCodeAt(i);
-      h |= 0;
-    }
-    return h.toString(36);
-  }
-
-  add(item) {
-    const key = this._hash(item.title);
-    if (this.seenIds.has(key)) return false; // deduplicated
-
-    // Evict oldest if full
-    if (this.items.size >= this.maxItems) {
-      const oldest = [...this.items.entries()].sort(
-        (a, b) => a[1].fetchedAt - b[1].fetchedAt,
-      )[0];
-      this.items.delete(oldest[0]);
-    }
-
-    this.items.set(key, { item, fetchedAt: Date.now() });
-    this.seenIds.add(key);
-    return true;
-  }
-
-  getAll() {
-    const now = Date.now();
-    const valid = [];
-    for (const [key, { item, fetchedAt }] of this.items) {
-      if (now - fetchedAt > this.maxAgeMs) {
-        this.items.delete(key);
-        this.seenIds.delete(key);
-      } else {
-        valid.push(item);
-      }
-    }
-    return valid.sort(
-      (a, b) => new Date(b.publishedAt) - new Date(a.publishedAt),
-    );
-  }
-
-  markReacted(id) {
-    for (const [key, { item }] of this.items) {
-      if (item.id === id) {
-        item.reactionLogged = true;
-        break;
-      }
-    }
-  }
-
-  clear() {
-    this.items.clear();
-    this.seenIds.clear();
-  }
-}
-
-// Global cache — shared across all requests
-const globalCache = new NewsCache();
-
-function hashNewsTitle(str = "") {
-  return globalCache._hash(str);
-}
-
-function impactRank(impact = "LOW") {
-  if (impact === "HIGH") return 3;
-  if (impact === "MEDIUM") return 2;
-  return 1;
-}
-
-function sortNewsItems(items = []) {
-  return [...items].sort((a, b) => {
-    const impactDiff = impactRank(b.impact) - impactRank(a.impact);
-    if (impactDiff !== 0) return impactDiff;
-    return new Date(b.publishedAt) - new Date(a.publishedAt);
-  });
-}
-
-function selectNewsItems(
-  items = [],
-  { maxItems = 30, minImpact = "LOW" } = {},
-) {
-  const filtered = sortNewsItems(items).filter((item) => {
-    if (minImpact === "HIGH") return item.impact === "HIGH";
-    if (minImpact === "MEDIUM") return impactRank(item.impact) >= 2;
-    return true;
-  });
-  return filtered.slice(0, maxItems);
-}
-
-function buildBreakingNewsPayload(snapshot, options = {}) {
-  const items = selectNewsItems(snapshot?.items || [], options);
-  return {
-    items,
-    total: items.length,
-    highImpactCount: items.filter((item) => item.impact === "HIGH").length,
-    sources: snapshot?.sources || {},
-    fetchedAt: snapshot?.fetchedAt || new Date().toISOString(),
-  };
-}
 
 async function readBreakingNewsSnapshot() {
   const rc = await getRedisClient().catch(() => null);
@@ -455,107 +231,6 @@ class NewsReactionLog {
 
 const reactionLog = new NewsReactionLog();
 
-// ─── Sentiment & Impact Classifier ────────────────────────────────────────────
-
-const BULLISH_WORDS = [
-  "surge",
-  "rally",
-  "gain",
-  "rise",
-  "jump",
-  "soar",
-  "climb",
-  "higher",
-  "beat",
-  "exceed",
-  "growth",
-  "expansion",
-  "bullish",
-  "optimistic",
-  "record high",
-  "all-time",
-  "strong",
-  "robust",
-  "upbeat",
-  "rate cut",
-  "stimulus",
-  "bailout",
-  "trade deal",
-  "deal reached",
-  "upgrade",
-  "outperform",
-  "buy rating",
-];
-
-const BEARISH_WORDS = [
-  "plunge",
-  "crash",
-  "fall",
-  "drop",
-  "decline",
-  "sink",
-  "tumble",
-  "miss",
-  "below",
-  "weak",
-  "slump",
-  "bearish",
-  "pessimistic",
-  "selloff",
-  "worst",
-  "loss",
-  "losses",
-  "cut",
-  "reduce",
-  "rate hike",
-  "tightening",
-  "recession",
-  "downgrade",
-  "underperform",
-  "bankruptcy",
-  "default",
-  "sanction",
-  "tariff war",
-  "outbreak",
-];
-
-function classifySentiment(title, description = "") {
-  const text = `${title} ${description}`.toLowerCase();
-  const bullCount = BULLISH_WORDS.filter((w) => text.includes(w)).length;
-  const bearCount = BEARISH_WORDS.filter((w) => text.includes(w)).length;
-  if (bullCount > bearCount) return "bullish";
-  if (bearCount > bullCount) return "bearish";
-  return "neutral";
-}
-
-function classifyImpact(title, description = "") {
-  const text = `${title} ${description}`.toLowerCase();
-  const highCount = HIGH_IMPACT_KEYWORDS.filter((k) => text.includes(k)).length;
-  const medCount = MEDIUM_IMPACT_KEYWORDS.filter((k) =>
-    text.includes(k),
-  ).length;
-  if (highCount >= 2 || (text.includes("fed") && text.includes("rate")))
-    return "HIGH";
-  if (highCount >= 1) return "HIGH";
-  if (medCount >= 2) return "MEDIUM";
-  if (medCount >= 1) return "LOW";
-  return "LOW";
-}
-
-function isRelevantToTrading(title, description = "") {
-  const text = `${title} ${description}`.toLowerCase();
-  return TRADING_KEYWORDS.some((kw) => text.includes(kw));
-}
-
-function generateNewsId(source, title, publishedAt) {
-  const str = `${source}:${title}:${publishedAt}`;
-  let h = 0;
-  for (let i = 0; i < str.length; i++) {
-    h = (h << 5) - h + str.charCodeAt(i);
-    h |= 0;
-  }
-  return `news_${h.toString(36)}_${Date.now().toString(36)}`;
-}
 
 // ─── Source: Finnhub ─────────────────────────────────────────────────────────
 
