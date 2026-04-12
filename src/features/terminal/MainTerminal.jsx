@@ -18,6 +18,9 @@ import {
   normalizeJournal,
   parseRrrMultiple,
   parseWorkspaceSnapshot,
+  buildTradePlannerState,
+  buildP2JournalState,
+  buildJournalFormState,
 } from "./terminalStateHelpers.js";
 import TerminalTradeReadinessPanel from "./TerminalTradeReadinessPanel.jsx";
 import PremarketTab from "./PremarketTab.jsx";
@@ -28,15 +31,17 @@ import {
   T,
   AMD_PHASES,
   TIME_OPTIONS,
-  SCREENSHOT_EXTRACT_PROMPT,
-  TNC_PARSE_PROMPT,
-  PART1_PROMPT,
-  PART2_PROMPT,
   Tag,
   AMDPhaseTag,
   CountdownBanner,
   glowBtn,
 } from "./terminalHelperComponents";
+import {
+  SCREENSHOT_EXTRACT_PROMPT,
+  TNC_PARSE_PROMPT,
+  PART1_PROMPT,
+  PART2_PROMPT,
+} from "./terminalAiPrompts.js";
 import { CSS_VARS } from "../../styles/cssVars.js";
 import {
   clearDraft,
@@ -55,94 +60,20 @@ import {
 } from "../../services/clients/TerminalAnalyticsClient.js";
 import { getISTState } from "../../utils/tradingUtils.js";
 import { usePasteListener } from "./terminalPasteListener.js";
+import {
+  DEFAULT_EXTRACTED_VALS,
+  DEFAULT_FIRM_RULES,
+  MAX_HISTORY_ENTRIES,
+  ROTATING_QUOTES,
+} from "./terminalWorkspaceState.js";
 
 const warningTint = "var(--status-warning-soft, rgba(255,214,10,0.12))";
 const overlayTint = "var(--surface-overlay, rgba(15,23,42,0.5))";
 const modalShadow = "var(--shadow-deep, 0 30px 80px rgba(15,23,42,0.18))";
 
-const defaultExtractedVals = {
-  adx: null,
-  ci: null,
-  vwap: null,
-  vwapSlope: null,
-  atr: null,
-  currentPrice: null,
-  fiveDayATR: null,
-  twentyDayATR: null,
-};
-
-const buildTradePlannerState = () => ({
-  timeIST: "",
-  instrument: "MNQ",
-  direction: "Long",
-  tradeType: "Trend",
-  accountBalance: "",
-  riskPct: "0.3",
-  entryPrice: "",
-  currentPrice: "",
-  rrr: "1:2",
-  lastTradeResult: "",
-  notes: "",
-});
-
-const buildP2JournalState = () => ({
-  exit: "",
-  result: "win",
-  pnl: "",
-  balAfter: "",
-  lessons: "",
-  amdPhase: "UNCLEAR",
-});
-
-const buildJournalFormState = () => ({
-  date: getISTDateString(),
-  instrument: "MNQ",
-  direction: "Long",
-  tradeType: "Trend",
-  amdPhase: "UNCLEAR",
-  rrr: "1:2",
-  result: "win",
-  entry: "",
-  exit: "",
-  predictedTP1: "",
-  actualExit: "",
-  contracts: "1",
-  pnl: "",
-  session: "Trading Hours",
-  balAfter: "",
-  setup: "",
-  lessons: "",
-});
-
-const defaultFirmRules = {
-  parsed: false,
-  firmName: "",
-  maxDailyLoss: "",
-  maxDailyLossType: "dollar",
-  maxDrawdown: "",
-  drawdownType: "trailing",
-  profitTarget: "",
-  consistencyMaxDayPct: "",
-  restrictedNewsWindowMins: "15",
-  newsTrading: true,
-  scalpingAllowed: true,
-  overnightHoldingAllowed: true,
-  weekendTrading: true,
-  copyTradingAllowed: false,
-  maxContracts: "",
-  minimumTradingDays: "",
-  keyRules: [],
-  notes: "",
-  parseStatus: "",
-};
-
-const MAX_HISTORY_ENTRIES = 10;
-const ROTATING_QUOTES = [
-  "The trend is your friend until the end when it bends. - Ed Seykota",
-  "Markets can remain irrational longer than you can remain solvent. - John Maynard Keynes",
-  "Risk comes from not knowing what you're doing. - Warren Buffett",
-  "The goal is to make money, not to be right. - Mark Douglas",
-];
+// Aliases for backward compatibility with rest of MainTerminal
+const defaultExtractedVals = DEFAULT_EXTRACTED_VALS;
+const defaultFirmRules = DEFAULT_FIRM_RULES;
 export default function MainTerminal({
   profile,
   onLogout,

@@ -154,3 +154,54 @@ export function buildAccountState(accountState) {
     ...(accountState || {}),
   };
 }
+
+// ─── Form State Builders (extracted from MainTerminal.jsx) ──────────────────────
+
+export function buildTradePlannerState() {
+  return {
+    timeIST: "",
+    instrument: "MNQ",
+    direction: "Long",
+    tradeType: "Trend",
+    accountBalance: "",
+    riskPct: "0.3",
+    entryPrice: "",
+    currentPrice: "",
+    rrr: "1:2",
+    lastTradeResult: "",
+    notes: "",
+  };
+}
+
+export function buildP2JournalState() {
+  return {
+    exit: "",
+    result: "win",
+    pnl: "",
+    balAfter: "",
+    lessons: "",
+    amdPhase: "UNCLEAR",
+  };
+}
+
+export function buildJournalFormState(getISTDateStringFn = getISTDateString) {
+  return {
+    date: getISTDateStringFn(),
+    instrument: "MNQ",
+    direction: "Long",
+    tradeType: "Trend",
+    amdPhase: "UNCLEAR",
+    rrr: "1:2",
+    result: "win",
+    entry: "",
+    exit: "",
+    predictedTP1: "",
+    actualExit: "",
+    contracts: "1",
+    pnl: "",
+    session: "Trading Hours",
+    balAfter: "",
+    setup: "",
+    lessons: "",
+  };
+}
