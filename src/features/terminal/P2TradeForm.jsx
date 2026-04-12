@@ -1,7 +1,15 @@
 import React from "react";
-import { AMD_PHASES, Field, Tag } from "./terminalHelperComponents";
+import {
+  AMD_PHASES,
+  Field,
+  Tag,
+  RenderOut,
+  TrafficLight,
+  cardS,
+  glowBtn,
+} from "./terminalHelperComponents";
 import { CSS_VARS } from "../../styles/cssVars.js";
-import { glowBtn } from "./terminalHelperComponents.js";
+import VerdictSynthesis from "./VerdictSynthesis.jsx";
 
 export default function P2TradeForm({
   p2Jf,
@@ -12,19 +20,12 @@ export default function P2TradeForm({
   p2Ref,
   predictedP2TP1,
   predictedP2SL,
-  slPts,
-  ptVal,
-  accountState,
+  loading,
   addP2Trade,
   err,
   setErr,
-  loading,
-  isTerminalDerivedPending,
-  execBlocked,
-  runPart2,
-  hasFirmRules,
-  onSaveAccount,
-  showToast,
+  trafficState,
+  verdictScores,
 }) {
   return (
     <div ref={p2Ref} style={{ marginTop: 24 }}>
@@ -185,6 +186,21 @@ export default function P2TradeForm({
           )}
         </div>
       )}
+
+      {/* TrafficLight + RenderOut sit in the parent, not this form — shown via parent */}
+
+      {trafficState && <TrafficLight state={trafficState} />}
+
+      {p2Out && (
+        <div
+          style={cardS({ borderLeft: `4px solid var(--status-orange, #ff9500)` })}
+          className="glass-panel card-tilt"
+        >
+          <RenderOut text={p2Out} />
+        </div>
+      )}
+
+      <VerdictSynthesis verdictScores={verdictScores} />
     </div>
   );
 }

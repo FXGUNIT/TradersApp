@@ -571,24 +571,17 @@ export default function TradeTab({
         p2Ref={p2Ref}
         predictedP2TP1={predictedP2TP1}
         predictedP2SL={predictedP2SL}
-        slPts={slPts}
-        ptVal={ptVal}
-        accountState={accountState}
+        loading={loading}
         addP2Trade={addP2Trade}
         err={err}
         setErr={setErr}
-        loading={loading}
-        isTerminalDerivedPending={isTerminalDerivedPending}
-        execBlocked={execBlocked}
-        runPart2={runPart2}
-        hasFirmRules={hasFirmRules}
-        onSaveAccount={() => {}}
-        showToast={showToast}
         trafficState={trafficState}
         verdictScores={verdictScores}
       />
 
+      {/*
       <VerdictSynthesis verdictScores={verdictScores} />
+      */}
     </div>
   );
 }
