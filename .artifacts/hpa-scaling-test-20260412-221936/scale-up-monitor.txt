@@ -12,3 +12,4 @@ t=100s replicas=1 desired=1 current=1 cpu=unknown
 t=110s replicas=1 desired=1 current=1 cpu=unknown
 t=120s replicas=1 desired=1 current=1 cpu=unknown
 t=130s replicas=1 desired=1 current=1 cpu=unknown
+t=140s replicas=1 desired=1 current=1 cpu=unknown
