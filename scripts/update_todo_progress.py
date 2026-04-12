@@ -398,9 +398,8 @@ def main() -> None:
     if args.stdout:
         print(updated_markdown, end="")
         return
-    if not args.once:
-        todo_path.write_text(updated_markdown, encoding="utf-8")
-        print(f"Updated live status in {args.file}")
+    todo_path.write_text(updated_markdown, encoding="utf-8")
+    print(f"Updated live status in {args.file}")
 
 
 if __name__ == "__main__":

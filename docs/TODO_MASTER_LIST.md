@@ -75,6 +75,17 @@ TOTAL    | 121    | 116   |      5      |    0    | ✅ 95.9% complete
 
 ---
 
+<!--  live-status:start --> -->
+## Live Status
+Generated: `2026-04-13 02:33`  ·  Update: `python scripts/update_todo_progress.py --once`
+
+| Section | Tasks | Progress | Status |
+|---|---|---:|---|
+| Stage M | [0/5] |   0.0% | 🔄 IN PROGRESS |
+| Stage N | [5/5] | 100.0% | ✅ COMPLETE |
+
+<!--  live-status:end --> -->
+
 ## Stage M: Kubernetes HPA Live Scaling Validation
 
 > **Claimed by:** (update the JSON coordination block above before starting)
