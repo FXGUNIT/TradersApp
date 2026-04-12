@@ -808,18 +808,79 @@ class PostgresBackend(DatabaseBackend):
         database_url: str,
         min_connections: int = 1,
         max_connections: int = 10,
+        connect_retry_attempts: Optional[int] = None,
+        connect_retry_delay_seconds: Optional[float] = None,
+        connect_retry_backoff: Optional[float] = None,
     ):
         if not PSYCOPG2_AVAILABLE:
             raise RuntimeError(
                 "psycopg2 is required for PostgreSQL backend. "
                 "Install with: pip install psycopg2-binary"
             )
-        self._pool = pool.ThreadedConnectionPool(
-            min_connections,
-            max_connections,
-            database_url,
+        self._pool = None
+        self._connect_retry_attempts = _positive_int(
+            connect_retry_attempts
+            if connect_retry_attempts is not None
+            else os.getenv("POSTGRES_CONNECT_RETRY_ATTEMPTS"),
+            default=6,
         )
-        self._init_schema()
+        self._connect_retry_delay_seconds = _positive_float(
+            connect_retry_delay_seconds
+            if connect_retry_delay_seconds is not None
+            else os.getenv("POSTGRES_CONNECT_RETRY_DELAY_SECONDS"),
+            default=2.0,
+        )
+        self._connect_retry_backoff = _positive_float(
+            connect_retry_backoff
+            if connect_retry_backoff is not None
+            else os.getenv("POSTGRES_CONNECT_RETRY_BACKOFF"),
+            default=1.5,
+        )
+        self._bootstrap_pool(database_url, min_connections, max_connections)
+
+    def _bootstrap_pool(
+        self,
+        database_url: str,
+        min_connections: int,
+        max_connections: int,
+    ) -> None:
+        last_error = None
+        for attempt in range(1, self._connect_retry_attempts + 1):
+            candidate_pool = None
+            try:
+                candidate_pool = pool.ThreadedConnectionPool(
+                    min_connections,
+                    max_connections,
+                    database_url,
+                )
+                self._pool = candidate_pool
+                self._init_schema()
+                return
+            except Exception as exc:
+                last_error = exc
+                if candidate_pool is not None:
+                    try:
+                        candidate_pool.closeall()
+                    except Exception:
+                        pass
+                self._pool = None
+                if attempt >= self._connect_retry_attempts:
+                    break
+                delay_seconds = (
+                    self._connect_retry_delay_seconds
+                    * (self._connect_retry_backoff ** (attempt - 1))
+                )
+                print(
+                    "[PostgresBackend] Startup connection failed "
+                    f"(attempt {attempt}/{self._connect_retry_attempts}): {exc}. "
+                    f"Retrying in {delay_seconds:.1f}s"
+                )
+                time.sleep(delay_seconds)
+
+        raise RuntimeError(
+            "Unable to initialize PostgreSQL backend after "
+            f"{self._connect_retry_attempts} attempts"
+        ) from last_error
 
     @contextmanager
     def conn(self):
@@ -1434,7 +1495,8 @@ class PostgresBackend(DatabaseBackend):
     # ── Lifecycle ──────────────────────────────────────────────────────────────
 
     def close(self) -> None:
-        self._pool.closeall()
+        if self._pool is not None:
+            self._pool.closeall()
 
     def health_check(self) -> bool:
         try:
