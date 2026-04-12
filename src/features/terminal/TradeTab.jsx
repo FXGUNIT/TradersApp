@@ -127,11 +127,6 @@ export default function TradeTab({
   // ── Verdict radar — derive 5 scores from readiness panel signals ───────
   const [circuitSecs, setCircuitSecs] = useState(0);
 
-  <TradeTabCircuitBreaker
-    execBlocked={execBlocked}
-    onCircuitSecsChange={setCircuitSecs}
-    circuitSecs={circuitSecs}
-  />
   // All inputs come from terminalDerivedState (already computed by the worker)
   const verdictScores = useMemo(
     () =>
@@ -148,6 +143,11 @@ export default function TradeTab({
 
   return (
     <div>
+      <TradeTabCircuitBreaker
+        execBlocked={execBlocked}
+        onCircuitSecsChange={setCircuitSecs}
+        circuitSecs={circuitSecs}
+      />
       <TerminalTradeReadinessPanel
         complianceColor={complianceColor}
         curBal={curBal}
