@@ -4,3 +4,5 @@ t=20s replicas=1 desired=1 current=1 cpu=unknown
 t=30s replicas=1 desired=1 current=1 cpu=unknown
 t=40s replicas=1 desired=1 current=1 cpu=unknown
 t=50s replicas=1 desired=1 current=1 cpu=unknown
+t=60s replicas=1 desired=1 current=1 cpu=unknown
+t=70s replicas=1 desired=1 current=1 cpu=unknown
