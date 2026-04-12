@@ -41,14 +41,23 @@ prefer_k3s_kubeconfig() {
     return 0
   fi
 
-  if [[ ! -f /etc/rancher/k3s/k3s.yaml ]]; then
+  local k3s_kubeconfig="/etc/rancher/k3s/k3s.yaml"
+  if [[ ! -f "$k3s_kubeconfig" ]]; then
     return 0
   fi
 
   local current_context=""
   current_context="$(kubectl config current-context 2>/dev/null || true)"
-  if [[ -z "$current_context" || "$current_context" == "docker-desktop" ]]; then
-    export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+
+  if [[ -n "$current_context" ]]; then
+    if kubectl get namespace "$NAMESPACE" >/dev/null 2>&1 || kubectl get nodes >/dev/null 2>&1; then
+      return 0
+    fi
+  fi
+
+  if KUBECONFIG="$k3s_kubeconfig" kubectl get namespace "$NAMESPACE" >/dev/null 2>&1 \
+    || KUBECONFIG="$k3s_kubeconfig" kubectl get nodes >/dev/null 2>&1; then
+    export KUBECONFIG="$k3s_kubeconfig"
     log "Using k3s kubeconfig at $KUBECONFIG (previous context: ${current_context:-unset})"
   fi
 }
@@ -97,7 +106,7 @@ run_incluster_load() {
     --image=busybox \
     --restart=Never \
     --command -- \
-    sh -c "end=\$((\$(date +%s) + ${LOAD_DURATION})); while [ \$(date +%s) -lt \$end ]; do wget -qO- ${BFF_URL}/health >/dev/null 2>&1 || true; sleep 0.02; done" \
+    sh -c "end=\$((\$(date +%s) + ${LOAD_DURATION})); worker() { while [ \$(date +%s) -lt \$end ]; do wget -qO- ${BFF_URL}/health >/dev/null 2>&1 || true; sleep 0.02; done; }; i=0; while [ \$i -lt ${LOAD_CONCURRENCY} ]; do worker & i=\$((i + 1)); done; wait" \
     2>&1 | tee "${OUTPUT_DIR}/load-incluster.log"
 }
 

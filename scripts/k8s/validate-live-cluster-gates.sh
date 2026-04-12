@@ -59,14 +59,23 @@ prefer_k3s_kubeconfig() {
     return 0
   fi
 
-  if [[ ! -f /etc/rancher/k3s/k3s.yaml ]]; then
+  local k3s_kubeconfig="/etc/rancher/k3s/k3s.yaml"
+  if [[ ! -f "$k3s_kubeconfig" ]]; then
     return 0
   fi
 
   local current_context=""
   current_context="$(kubectl config current-context 2>/dev/null || true)"
-  if [[ -z "$current_context" || "$current_context" == "docker-desktop" ]]; then
-    export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+
+  if [[ -n "$current_context" ]]; then
+    if kubectl get namespace "$NAMESPACE" >/dev/null 2>&1 || kubectl get nodes >/dev/null 2>&1; then
+      return 0
+    fi
+  fi
+
+  if KUBECONFIG="$k3s_kubeconfig" kubectl get namespace "$NAMESPACE" >/dev/null 2>&1 \
+    || KUBECONFIG="$k3s_kubeconfig" kubectl get nodes >/dev/null 2>&1; then
+    export KUBECONFIG="$k3s_kubeconfig"
     log "Using k3s kubeconfig at $KUBECONFIG (previous context: ${current_context:-unset})"
   fi
 }

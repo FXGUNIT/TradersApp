@@ -67,6 +67,8 @@ spec:
       ports:
         - protocol: UDP
           port: 53
+        - protocol: TCP
+          port: 53
     # Outbound: Jaeger (observability)
     - to:
         - podSelector:
@@ -111,11 +113,21 @@ spec:
       ports:
         - protocol: TCP
           port: 8001
+    # Outbound: Redis cache
+    - to:
+        - podSelector:
+            matchLabels:
+              app: redis
+      ports:
+        - protocol: TCP
+          port: 6379
     # Outbound: DNS
     - to:
         - namespaceSelector: {}
       ports:
         - protocol: UDP
+          port: 53
+        - protocol: TCP
           port: 53
 ---
 apiVersion: networking.k8s.io/v1

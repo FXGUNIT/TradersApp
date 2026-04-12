@@ -34,6 +34,7 @@ EXPECTED_BFF_HPA_NAME="${EXPECTED_BFF_HPA_NAME:-bff-hpa}"
 SCALE_UP_TIMEOUT="${SCALE_UP_TIMEOUT:-180}"   # seconds to wait for scale-up
 SCALE_DOWN_WAIT="${SCALE_DOWN_WAIT:-360}"     # seconds to wait for scale-down
 LOAD_INTERVAL="${LOAD_INTERVAL:-0.05}"       # seconds between health requests
+LOAD_WORKERS="${LOAD_WORKERS:-25}"           # busybox workers when local load tools are unavailable
 OUTPUT_DIR="${OUTPUT_DIR:-${REPO_ROOT}/.artifacts/hpa-scaling-test-$(date +%Y%m%d-%H%M%S)}"
 
 mkdir -p "$OUTPUT_DIR"
@@ -49,14 +50,23 @@ prefer_k3s_kubeconfig() {
     return 0
   fi
 
-  if [[ ! -f /etc/rancher/k3s/k3s.yaml ]]; then
+  local k3s_kubeconfig="/etc/rancher/k3s/k3s.yaml"
+  if [[ ! -f "$k3s_kubeconfig" ]]; then
     return 0
   fi
 
   local current_context=""
   current_context="$(kubectl config current-context 2>/dev/null || true)"
-  if [[ -z "$current_context" || "$current_context" == "docker-desktop" ]]; then
-    export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+
+  if [[ -n "$current_context" ]]; then
+    if kubectl get namespace "$NAMESPACE" >/dev/null 2>&1 || kubectl get nodes >/dev/null 2>&1; then
+      return 0
+    fi
+  fi
+
+  if KUBECONFIG="$k3s_kubeconfig" kubectl get namespace "$NAMESPACE" >/dev/null 2>&1 \
+    || KUBECONFIG="$k3s_kubeconfig" kubectl get nodes >/dev/null 2>&1; then
+    export KUBECONFIG="$k3s_kubeconfig"
     log "Using k3s kubeconfig at $KUBECONFIG (previous context: ${current_context:-unset})"
   fi
 }
@@ -199,7 +209,7 @@ kubectl run load-test \
     --image=busybox \
     --restart=Never \
     --command -- \
-    sh -c "while wget -qO- http://ml-engine:8001/health; do sleep ${LOAD_INTERVAL}; done" \
+    sh -c "worker() { while wget -qO- http://ml-engine:8001/health >/dev/null 2>&1; do sleep ${LOAD_INTERVAL}; done; }; i=0; while [ \$i -lt ${LOAD_WORKERS} ]; do worker & i=\$((i + 1)); done; wait" \
     >/dev/null 2>&1 || true
 
 log "Load generator pod scheduled (may take ~10s to start)"
