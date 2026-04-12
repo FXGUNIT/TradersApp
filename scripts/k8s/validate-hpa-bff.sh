@@ -26,7 +26,7 @@ MIN_REPLICAS="${MIN_REPLICAS:-2}"
 MAX_REPLICAS="${MAX_REPLICAS:-8}"
 SCALE_UP_TIMEOUT="${SCALE_UP_TIMEOUT:-180}"
 LOAD_DURATION="${LOAD_DURATION:-90}"
-LOAD_CONCURRENCY="${LOAD_CONCURRENCY:-50}"
+LOAD_CONCURRENCY="${LOAD_CONCURRENCY:-600}"
 LOAD_IMAGE="${LOAD_IMAGE:-tradersapp/bff:dev-latest}"
 OUTPUT_DIR="${OUTPUT_DIR:-${REPO_ROOT}/.artifacts/hpa-validation/bff-$(date +%Y%m%d-%H%M%S)}"
 LOAD_POD_NAME="${LOAD_POD_NAME:-bff-hpa-load}"
@@ -108,7 +108,7 @@ run_incluster_load() {
     --labels=app=frontend \
     --restart=Never \
     --command -- \
-    node -e "const url='${BFF_URL}/health'; const endAt=Date.now()+(${LOAD_DURATION}*1000); const workers=${LOAD_CONCURRENCY}; const sleep=(ms)=>new Promise((resolve)=>setTimeout(resolve,ms)); async function worker(){ while (Date.now()<endAt){ try { await fetch(url); } catch (_) {} await sleep(20); } } Promise.all(Array.from({length:workers},()=>worker())).then(()=>process.exit(0)).catch(()=>process.exit(1));" \
+    node -e "const url='${BFF_URL}/health'; const endAt=Date.now()+(${LOAD_DURATION}*1000); const workers=${LOAD_CONCURRENCY}; async function worker(){ while (Date.now()<endAt){ try { await fetch(url); } catch (_) {} } } Promise.all(Array.from({length:workers},()=>worker())).then(()=>process.exit(0)).catch(()=>process.exit(1));" \
     2>&1 | tee "${OUTPUT_DIR}/load-incluster.log"
 }
 
