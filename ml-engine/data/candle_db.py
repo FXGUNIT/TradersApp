@@ -14,6 +14,7 @@ import json
 import os
 import sqlite3
 import threading
+import time
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from pathlib import Path
@@ -707,6 +708,22 @@ except ImportError:
 def _translate_sqlite_placeholders(query: str) -> str:
     """Translate SQLite-style placeholders to psycopg2 placeholders."""
     return query.replace("?", "%s")
+
+
+def _positive_int(value, default: int) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return default
+    return parsed if parsed > 0 else default
+
+
+def _positive_float(value, default: float) -> float:
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return default
+    return parsed if parsed > 0 else default
 
 
 class PostgresCompatCursor:
