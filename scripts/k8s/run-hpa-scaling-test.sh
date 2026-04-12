@@ -34,7 +34,8 @@ EXPECTED_BFF_HPA_NAME="${EXPECTED_BFF_HPA_NAME:-bff-hpa}"
 SCALE_UP_TIMEOUT="${SCALE_UP_TIMEOUT:-180}"   # seconds to wait for scale-up
 SCALE_DOWN_WAIT="${SCALE_DOWN_WAIT:-360}"     # seconds to wait for scale-down
 LOAD_INTERVAL="${LOAD_INTERVAL:-0.05}"       # seconds between health requests
-LOAD_WORKERS="${LOAD_WORKERS:-25}"           # busybox workers when local load tools are unavailable
+LOAD_WORKERS="${LOAD_WORKERS:-100}"          # in-cluster request workers when local load tools are unavailable
+LOAD_IMAGE="${LOAD_IMAGE:-tradersapp/bff:dev-latest}"
 OUTPUT_DIR="${OUTPUT_DIR:-${REPO_ROOT}/.artifacts/hpa-scaling-test-$(date +%Y%m%d-%H%M%S)}"
 
 mkdir -p "$OUTPUT_DIR"
@@ -200,19 +201,12 @@ sleep 2
 # Start load as a Kubernetes Job for better reliability
 kubectl run load-test \
   --namespace="$NAMESPACE" \
-  --image=busybox \
-  --labels=app=bff \
+  --image="$LOAD_IMAGE" \
+  --labels=app=frontend \
   --restart=Never \
-  --dry-run=client \
-  -o yaml | sed 's/restart: Always/restart: Never/' | kubectl apply -f - >/dev/null 2>&1 || \
-  kubectl run load-test \
-    --namespace="$NAMESPACE" \
-    --image=busybox \
-    --labels=app=bff \
-    --restart=Never \
-    --command -- \
-    sh -c "worker() { while wget -qO- http://ml-engine:8001/health >/dev/null 2>&1; do sleep ${LOAD_INTERVAL}; done; }; i=0; while [ \$i -lt ${LOAD_WORKERS} ]; do worker & i=\$((i + 1)); done; wait" \
-    >/dev/null 2>&1 || true
+  --command -- \
+  node -e "const url='http://ml-engine:8001/predict'; const payload=JSON.stringify({symbol:'MNQ',candles:[]}); const headers={'Content-Type':'application/json'}; const sleep=(ms)=>new Promise((resolve)=>setTimeout(resolve,ms)); async function worker(){ while (true) { try { await fetch(url,{method:'POST',headers,body:payload}); } catch (_) {} await sleep(${LOAD_INTERVAL} * 1000); } } Promise.all(Array.from({length:${LOAD_WORKERS}},()=>worker())).catch(()=>process.exit(1));" \
+  >/dev/null 2>&1 || true
 
 log "Load generator pod scheduled (may take ~10s to start)"
 log "Waiting 15s for load pod to start..."

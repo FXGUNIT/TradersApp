@@ -105,7 +105,7 @@ run_incluster_load() {
   kubectl run "$LOAD_POD_NAME" \
     -n "$NAMESPACE" \
     --image="$LOAD_IMAGE" \
-    --labels=app=bff \
+    --labels=app=frontend \
     --restart=Never \
     --command -- \
     node -e "const url='${ML_ENGINE_URL}/predict'; const endAt=Date.now()+(${LOAD_DURATION}*1000); const workers=${LOAD_CONCURRENCY}; const payload=JSON.stringify({symbol:'MNQ',candles:[]}); const headers={'Content-Type':'application/json'}; const sleep=(ms)=>new Promise((resolve)=>setTimeout(resolve,ms)); async function worker(){ while (Date.now()<endAt){ try { await fetch(url,{method:'POST',headers,body:payload}); } catch (_) {} await sleep(50); } } Promise.all(Array.from({length:workers},()=>worker())).then(()=>process.exit(0)).catch(()=>process.exit(1));" \
