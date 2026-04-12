@@ -11,7 +11,7 @@
 # What this script does:
 #   1. Pre-flight checks (metrics API, pod readiness, HPA existence)
 #   2. Records baseline HPA state
-#   3. Generates sustained HTTP load against ml-engine:8001/health
+#   3. Generates sustained HTTP load against ml-engine:8001/predict
 #   4. Polls replica count every 10s for up to SCALE_UP_TIMEOUT seconds
 #   5. Reports whether scale-up was detected
 #   6. Stops load, waits for scale-down, reports final state
@@ -33,9 +33,10 @@ EXPECTED_ML_HPA_NAME="${EXPECTED_ML_HPA_NAME:-ml-engine-hpa}"
 EXPECTED_BFF_HPA_NAME="${EXPECTED_BFF_HPA_NAME:-bff-hpa}"
 SCALE_UP_TIMEOUT="${SCALE_UP_TIMEOUT:-180}"   # seconds to wait for scale-up
 SCALE_DOWN_WAIT="${SCALE_DOWN_WAIT:-}"        # auto-computed unless explicitly set
-LOAD_INTERVAL="${LOAD_INTERVAL:-0.05}"       # seconds between health requests
-LOAD_WORKERS="${LOAD_WORKERS:-100}"          # in-cluster request workers when local load tools are unavailable
+LOAD_INTERVAL="${LOAD_INTERVAL:-0.05}"       # seconds between predict requests
+LOAD_WORKERS="${LOAD_WORKERS:-25}"           # keep default aligned with the focused validator's proven-safe profile
 LOAD_IMAGE="${LOAD_IMAGE:-tradersapp/bff:dev-latest}"
+LOAD_POD_NAME="${LOAD_POD_NAME:-load-test}"
 OUTPUT_DIR="${OUTPUT_DIR:-${REPO_ROOT}/.artifacts/hpa-scaling-test-$(date +%Y%m%d-%H%M%S)}"
 
 mkdir -p "$OUTPUT_DIR"
@@ -49,6 +50,10 @@ log()   { echo "[$(date +%H:%M:%S)] $*"; }
 warn()  { echo "[$(date +%H:%M:%S)] WARN: $*" >&2; }
 fail()  { echo "[$(date +%H:%M:%S)] FAIL: $*" >&2; exit 1; }
 info()  { echo "[$(date +%H:%M:%S)] INFO: $*" >&2; }
+
+cleanup_load_pod() {
+  kubectl delete pod "$LOAD_POD_NAME" -n "$NAMESPACE" --ignore-not-found=true >/dev/null 2>&1 || true
+}
 
 prefer_k3s_kubeconfig() {
   if [[ -n "${KUBECONFIG:-}" ]]; then
@@ -103,6 +108,8 @@ assert_expected_hpa() {
 
 # Capture everything to a log file too
 exec > >(tee "${OUTPUT_DIR}/run.log") 2>&1
+
+trap cleanup_load_pod EXIT
 
 # ── Step 0: Tool check ───────────────────────────────────────────────────────
 for cmd in kubectl; do
@@ -198,14 +205,14 @@ BASELINE_REPLICAS=$(kubectl get deploy ml-engine -n "$NAMESPACE" -o jsonpath='{.
 
 # ── Step 3: Start load generation ─────────────────────────────────────────────
 log ""
-log "Step 3: Starting sustained load against ml-engine:8001/health"
+log "Step 3: Starting sustained load against ml-engine:8001/predict"
 
 # Kill any previous load tests
-kubectl delete pod load-test -n "$NAMESPACE" --ignore-not-found=true >/dev/null 2>&1 || true
+cleanup_load_pod
 sleep 2
 
 # Start load as a Kubernetes Job for better reliability
-kubectl run load-test \
+kubectl run "$LOAD_POD_NAME" \
   --namespace="$NAMESPACE" \
   --image="$LOAD_IMAGE" \
   --labels=app=frontend \
@@ -219,12 +226,12 @@ log "Waiting 15s for load pod to start..."
 sleep 15
 
 # Verify load pod is running
-LOAD_POD=$(kubectl get pods -n "$NAMESPACE" -l "run=load-test" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
-if [[ -n "$LOAD_POD" ]]; then
+LOAD_POD=$(kubectl get pod "$LOAD_POD_NAME" -n "$NAMESPACE" -o jsonpath='{.metadata.name}' 2>/dev/null || echo "")
+if [[ "$LOAD_POD" == "$LOAD_POD_NAME" ]]; then
   LOAD_STATUS=$(kubectl get pod "$LOAD_POD" -n "$NAMESPACE" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
   log "Load pod '$LOAD_POD' status: $LOAD_STATUS"
 else
-  warn "Could not find load-test pod"
+  warn "Could not find load pod '$LOAD_POD_NAME'"
 fi
 
 # ── Step 4: Poll for scale-up ─────────────────────────────────────────────────
@@ -292,7 +299,7 @@ kubectl top pods -n "$NAMESPACE" -l "app=ml-engine" >> "${OUTPUT_DIR}/hpa-after-
 # ── Step 6: Stop load ────────────────────────────────────────────────────────
 log ""
 log "Step 6: Stopping load"
-kubectl delete pod load-test -n "$NAMESPACE" --ignore-not-found=true >/dev/null 2>&1 || true
+cleanup_load_pod
 log "Load stopped"
 
 # ── Step 7: Wait for scale-down ─────────────────────────────────────────────
