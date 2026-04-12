@@ -189,7 +189,7 @@ These are the highest-value remaining tasks now that Phase 12 architecture recon
 
 - **External Secrets / Infisical sync**: the External Secrets CRD is not installed in the live cluster, so Infisical-to-Kubernetes sync is still not verifiable end to end.
 - **Production environment access/validation**: `tradersapp-dev` has already proven the PostgreSQL-backed path (`/health` reports `"db_backend":"postgresql"`), but the production/staging environment still needs a fresh validation pass.
-- **Current live runtime blocker (2026-04-12)**: after Longhorn reconcile, `scripts/k8s/validate-live-cluster-gates.sh --namespace tradersapp-dev` returned **8/8 PASS** again. The repo-side SQLite lock issue in the ML health path has been hardened (`ml-engine/_health.py`, `ml-engine/features/feature_lineage.py`), and the PostgreSQL egress mismatch was traced to the `ml-engine` NetworkPolicies and patched in repo/live manifests. The remaining blocker is that the running `tradersapp/ml-engine:dev-latest` image in-cluster is stale and still answers `/live` with `404`, causing startup-probe failure; a fresh rebuild/reimport is currently blocked by workstation WSL/Docker instability (`Wsl/Service/CreateInstance/E_FAIL` / WSL Docker build bus error).
+- **Current live runtime blocker (2026-04-12)**: after Longhorn reconcile, `scripts/k8s/validate-live-cluster-gates.sh --namespace tradersapp-dev` returned **8/8 PASS** again. The repo-side SQLite lock issue in the ML health path has been hardened (`ml-engine/_health.py`, `ml-engine/features/feature_lineage.py`), and the PostgreSQL egress mismatch was traced to the `ml-engine` NetworkPolicies and patched in repo/live manifests. The current blocker is no longer PVC provisioning: live `ml-engine` startup is still brittle during control-plane instability because PostgreSQL/Redis service names intermittently fail DNS resolution (`tradersapp-postgres`, `redis`). A bounded PostgreSQL startup retry/backoff patch now exists in `ml-engine/data/candle_db.py`, but a fresh image rebuild/redeploy is still needed to prove the fix in-cluster.
 - **Observability namespace prove-out**: dashboards/rules/traces are wired, but live signal flow is still not confirmed in a full monitoring deployment.
 - **Registry/cluster-backed deploy validation**: the workflow is implemented; the remaining work is exercising it against a live environment.
 
@@ -949,13 +949,14 @@ Automation rules:
   - Update (2026-04-12): `metrics-server` is present but unhealthy. `v1beta1.metrics.k8s.io` reports `FailedDiscoveryCheck`, `kubectl top` fails, and both HPAs report `ScalingActive: False`.
   - Update (2026-04-12, later): `metrics-server` became intermittently healthy enough for live HPA activity, but it still flaps and prevents a clean M02 closeout.
 - [-] `M03` Fix ml-engine PVC issues (ml-models-pvc + ml-state-pvc) so pods reach Running state.
-  - Update (2026-04-12): `ml-models-pvc` and `ml-state-pvc` are both `Bound`. Pod readiness is still blocked, but the blocker has moved from PVC provisioning to startup probe failures in the current `dev-latest` runtime.
+  - Update (2026-04-12): `ml-models-pvc` and `ml-state-pvc` are both `Bound`. Pod readiness is still blocked, but the blocker has moved from PVC provisioning to transient startup dependency resolution in the current `dev-latest` runtime.
 - [-] `M04` Run `scripts/k8s/run-hpa-scaling-test.sh` end-to-end; verify replicas scale up under load and scale down after idle.
 - [-] `M05` Verify bff HPA scales independently from ml-engine under BFF-targeted load.
   - Update (2026-04-12): M04-M05 are still blocked by three live issues: repair `metrics-server`, remove the drifted one-replica HPAs so the repo-managed `*-hpa` objects can own scaling, and get `ml-engine` / `bff` startup probes passing.
   - Update (2026-04-12, later): `bff-hpa` scaled independently from `2` to `3` and returned to `2`; `ml-engine-hpa` scaled above floor live, but clean scale-down verification is still noisy because the Metrics API keeps flapping.
+  - Update (2026-04-12, latest): live `ml-engine` logs now show transient DNS failures resolving `tradersapp-postgres` and `redis`; repo startup hardening was added so PostgreSQL bootstrap retries instead of crash-looping on the first lookup miss. Remaining live work is rebuild/redeploy plus stabilizing the Metrics API.
 
-**[Q26]** `[-]` M01 complete — cluster assessed, HPAs applied, blockers documented, runbook + test script created. M02–M05 require metrics-server installation + PVC fix.
+**[Q26]** `[-]` M01 complete — cluster assessed, HPAs applied, blockers documented, runbook + test script created. M02–M05 now hinge on metrics-server stability plus a fresh `ml-engine` rebuild/redeploy to validate the startup-hardening fix live.
 
 ### Stage N: Training Data Eligibility Policy
 
