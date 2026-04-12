@@ -1,4 +1,4 @@
-"""Rebuild aiConversation.js without ML/provider functions."""
+"""Rebuild aiConversation.js — correct module breakdown search."""
 import os
 
 base = "E:/TradersApp/telegram-bridge"
@@ -7,24 +7,17 @@ path = os.path.join(base, "aiConversation.js")
 with open(path, "r", encoding="utf-8", errors="replace") as f:
     raw = f.read()
 
-# Find where the old module breakdown comment starts and ends in the source
-# The doc block runs: /** ... * Module breakdown: ... * /   (then blank, then imports)
-old_doc_end = raw.find(" * Module breakdown:")
-next_star_slash = raw.find(" */", old_doc_end)
-# line after */
-newline_after_doc = raw.find("\n", next_star_slash)
+# Find the module breakdown comment block
+mb_pos = raw.find(" * Module breakdown:")
+# First " */" after module breakdown is the old module block close
+old_module_block_end = raw.find(" */", mb_pos) + 4  # char after "\n" in " */\n"
 
-old_import_end = raw.find("import { formatConsensusForTelegram", old_doc_end)
-newline_after_imports = raw.find("\n", old_import_end)
+# Find where the old imports end
+imports_line_start = raw.find("import { formatConsensusForTelegram", mb_pos)
+newline_after_imports = raw.find("\n", imports_line_start)
 
-print("Doc block ends at char:", next_star_slash)
-print("After old imports newline char:", newline_after_imports)
-
-# Build new file:
-# 1. Up to and including " */" in the old doc comment
-# 2. New module breakdown (with aiProviders.js added)
-# 3. New imports
-# 4. Lines after old imports (session + intent + bottom)
+print("Module block end at char:", old_module_block_end)
+print("After imports newline at char:", newline_after_imports)
 
 new_module_block = (
     "\n"
@@ -47,8 +40,8 @@ new_module_block = (
     "\n"
 )
 
-# New file = doc header up to " */" (exclusive) + new module block + everything after old imports
-new_file = raw[:next_star_slash] + new_module_block + raw[newline_after_imports+1:]
+# New file = doc header up to old module block end + new module block + everything after old imports
+new_file = raw[:old_module_block_end] + new_module_block + raw[newline_after_imports+1:]
 
 with open(path, "w", encoding="utf-8") as f:
     f.write(new_file)
