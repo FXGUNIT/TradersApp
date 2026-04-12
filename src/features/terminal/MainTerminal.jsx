@@ -1429,7 +1429,6 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
           <PremarketTab
             parsed={parsed}
             isCsvParsing={isCsvParsing}
-            parseMsg={parseMsg}
             csvBorderColor={csvBorderColor}
             csvStatusColor={csvStatusColor}
             csvStatusText={csvStatusText}
