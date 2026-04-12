@@ -1,29 +1,144 @@
-import React from "react";
+import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { T, GlassSkeletonLoader, cardS, SHead } from "./terminalHelperComponents";
 import { CSS_VARS } from "../../styles/cssVars.js";
 import { FileSpreadsheet } from "lucide-react";
+import { parseTerminalCsvText } from "./terminalCsvParser.js";
 
 /**
- * MainTerminalCsvZone — Premarket CSV drop zone UI.
+ * MainTerminalCsvZone — Premarket CSV drop zone UI + CSV worker + parsing state.
  *
- * Props:
- *   parsed          — CSV parse result object
- *   isCsvParsing    — boolean, true while parsing
- *   csvBorderColor  — CSS color string for drop border
- *   csvStatusColor  — CSS color string for status text
- *   csvStatusText   — string, status message to display
- *   csvProgress     — number 0-100 for skeleton loader
- *   handleCsvDrop   — (e: DragEvent | ChangeEvent) => void
+ * Owns: parsed, isCsvParsing, csvProgress, csvStatusText, csvBorderColor, csvStatusColor
+ *
+ * Exposes handleCsvDrop via ref so MainTerminal can call it without re-renders:
+ *   ref.current?.triggerCsvDrop() — simulates a drop event on the hidden file input
  */
-export default function MainTerminalCsvZone({
-  parsed,
-  isCsvParsing,
-  csvBorderColor,
-  csvStatusColor,
-  csvStatusText,
-  csvProgress,
-  handleCsvDrop,
-}) {
+const MainTerminalCsvZone = forwardRef(function MainTerminalCsvZone(
+  {
+    onParsedChange,    // (parsed: object|null) => void
+    onParsingChange,   // (v: boolean) => void
+    onStatusChange,    // (msg: string) => void
+    setErr,            // MainTerminal's setErr
+  },
+  ref,
+) {
+  const [parsed, setParsed] = useState(null);
+  const [parseMsg, setParseMsg] = useState("");
+  const [isCsvParsing, setIsCsvParsing] = useState(false);
+  const [csvProgress, setCsvProgress] = useState(0);
+
+  const csvParserWorkerRef = useRef(null);
+  const csvParseRequestIdRef = useRef(0);
+  const fileInputRef = useRef(null);
+
+  // ── Notify parent of state changes ──────────────────────────────────────
+  useEffect(() => {
+    onParsedChange?.(parsed);
+  }, [parsed, onParsedChange]);
+
+  useEffect(() => {
+    onParsingChange?.(isCsvParsing);
+  }, [isCsvParsing, onParsingChange]);
+
+  useEffect(() => {
+    onStatusChange?.(parseMsg);
+  }, [parseMsg, onStatusChange]);
+
+  // ── Derived display values ────────────────────────────────────────────────
+  const hasParsedCsv = parseMsg.startsWith("✓");
+  const csvStatusText = isCsvParsing
+    ? "Parsing CSV..."
+    : parseMsg || "Drop NinjaTrader .txt / .csv — or click to browse";
+  const csvStatusColor = hasParsedCsv ? T.green : isCsvParsing ? T.blue : CSS_VARS.textSecondary;
+  const csvBorderColor = hasParsedCsv ? T.green : isCsvParsing ? T.blue : CSS_VARS.borderSubtle;
+
+  // ── Apply parse result from worker or sync fallback ───────────────────────
+  const applyCsvParseResult = useCallback((requestId, result) => {
+    if (requestId !== csvParseRequestIdRef.current) return;
+    setIsCsvParsing(false);
+    setCsvProgress(0);
+    setParsed(result?.parsed || null);
+    setParseMsg(result?.parseMsg || "⚠ CSV parse failed");
+  }, []);
+
+  // ── CSV Worker lifecycle ───────────────────────────────────────────────────
+  useEffect(() => {
+    if (typeof Worker === "undefined") return undefined;
+
+    const worker = new Worker(new URL("./terminalCsv.worker.js", import.meta.url), {
+      type: "module",
+    });
+
+    const handleMessage = (event) => {
+      const { requestId, progress, ...rest } = event.data || {};
+      if (progress !== undefined) {
+        const currentId = csvParseRequestIdRef.current;
+        if (requestId === currentId) setCsvProgress(progress);
+        return;
+      }
+      applyCsvParseResult(requestId, rest);
+    };
+
+    const handleError = () => {
+      const requestId = csvParseRequestIdRef.current;
+      if (!requestId) return;
+      applyCsvParseResult(requestId, { ok: false, parsed: null, parseMsg: "⚠ CSV parse failed" });
+    };
+
+    worker.addEventListener("message", handleMessage);
+    worker.addEventListener("error", handleError);
+    csvParserWorkerRef.current = worker;
+
+    return () => {
+      worker.removeEventListener("message", handleMessage);
+      worker.removeEventListener("error", handleError);
+      worker.terminate();
+      if (csvParserWorkerRef.current === worker) csvParserWorkerRef.current = null;
+    };
+  }, [applyCsvParseResult]);
+
+  // ── CSV drop handler ────────────────────────────────────────────────────
+  const handleCsvDrop = useCallback(async (e) => {
+    e.preventDefault();
+    const file = e.dataTransfer?.files[0] || e.target.files?.[0];
+    if (!file) return;
+
+    const requestId = csvParseRequestIdRef.current + 1;
+    csvParseRequestIdRef.current = requestId;
+    setErr?.("");
+    setParsed(null);
+    setParseMsg("");
+    setIsCsvParsing(true);
+    setCsvProgress(0);
+
+    try {
+      const text = await file.text();
+      const worker = csvParserWorkerRef.current;
+
+      if (worker) {
+        worker.postMessage({ requestId, text });
+        return;
+      }
+      // Worker unavailable — synchronous fallback
+      const result = parseTerminalCsvText(text);
+      applyCsvParseResult(requestId, result);
+    } catch (error) {
+      applyCsvParseResult(requestId, {
+        ok: false,
+        parsed: null,
+        parseMsg: `⚠ ${error?.message || "Unable to read CSV export"}`,
+      });
+    } finally {
+      if (!csvParserWorkerRef.current) setIsCsvParsing(false);
+    }
+  }, [applyCsvParseResult, setErr]);
+
+  // ── Expose triggerCsvDrop via ref ────────────────────────────────────────
+  useImperativeHandle(ref, () => ({
+    triggerCsvDrop: () => {
+      fileInputRef.current?.click();
+    },
+  }), []);
+
   const surfaceMuted = CSS_VARS.baseLayer;
 
   return (
@@ -53,7 +168,7 @@ export default function MainTerminalCsvZone({
         <div
           onDrop={handleCsvDrop}
           onDragOver={(e) => e.preventDefault()}
-          onClick={() => document.getElementById("csvIn").click()}
+          onClick={() => fileInputRef.current?.click()}
           style={{
             border: `2px dashed ${csvBorderColor}`,
             borderRadius: 8,
@@ -64,7 +179,7 @@ export default function MainTerminalCsvZone({
           }}
         >
           <input
-            id="csvIn"
+            ref={fileInputRef}
             type="file"
             accept=".txt,.csv"
             style={{ display: "none" }}
@@ -82,9 +197,9 @@ export default function MainTerminalCsvZone({
                 marginTop: 4,
               }}
             >
-              Latest: {parsed.days[parsed.days.length - 1]?.date} · ATR(14) ={" "}
+              Latest: {parsed.days[parsed.days.length - 1]?.date} · ATR(14) =
               <span style={{ color: T.green, fontWeight: 700 }}>
-                {parsed.tradingHoursAtr14} pts
+                {" "}{parsed.tradingHoursAtr14} pts
               </span>
             </div>
           )}
@@ -92,4 +207,6 @@ export default function MainTerminalCsvZone({
       )}
     </div>
   );
-}
+});
+
+export default MainTerminalCsvZone;

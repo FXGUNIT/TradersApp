@@ -1,134 +1,79 @@
-import React, { useCallback, useEffect } from "react";
-
-/**
- * MainTerminalWorkspace — workspace state management: snapshot, undo, reset, autosave.
- *
- * Props:
- *   profile              — user profile object
- *   auditScenario        — string
- *   // State setters
- *   setWorkspaceHistory  — (fn) => void
- *   setResetDialog       — (dialog) => void
- *   setDraftStatus       — (fn) => void
- *   applyWorkspaceState  — (state) => void
- *   // Workspace state values
- *   workspaceHistory     — array (undo stack)
- *   defaultExtractedVals — object
- *   defaultFirmRules    — object
- *   profileJournal       — array
- *   profileAccountState  — object
- *   profileFirmRules     — object
- *   // Active terminal state (passed to buildCurrentWorkspaceState)
- *   activeTab            — string
- *   screenshots          — array
- *   extractStatus        — string
- *   extractedVals        — object
- *   activeZone           — string | null
- *   mpChart              — object | null
- *   vwapChart            — object | null
- *   p1NewsChart          — object | null
- *   p1PremarketChart     — object | null
- *   p1KeyLevelsChart     — object | null
- *   journal              — array
- *   accountState         — object
- *   firmRules            — object
- *   tcFileName           — string
- *   currentAMD           — string
- *   p1Out               — string
- *   p2Out               — string
- *   parsed              — object | null
- *   parseMsg            — string
- *   f                   — object
- *   showP2TradeForm     — boolean
- *   p2Jf               — object
- *   jf                 — object
- *   showForm            — boolean
- *   // Refs
- *   lastSnapshotRef     — { current: string }
- *   skipHistoryRef      — { current: boolean }
- *   draftHydratedRef     — { current: boolean }
- *   // Persistence
- *   terminalDraftKey     — string | null
- *   readDraft            — (key, fallback) => Promise<object>
- *   writeDraft           — (key, data) => Promise<void>
- *   clearDraft           — (key) => Promise<void>
- *   // Utilities
- *   buildTradePlannerState  — () => object
- *   buildAccountState       — (obj) => object
- *   buildP2JournalState     — () => object
- *   buildJournalFormState   — () => object
- *   normalizeJournal        — (arr) => array
- *   buildResetWorkspaceState — ({ scope, currentState, baseline }) => object
- *   parseWorkspaceSnapshot  — (json) => object | null
- *   getDraftStorageKey      — (key) => string
- *   // Actions
- *   buildBaseWorkspaceState  — useCallback result (passed for dep array)
- *   buildCurrentWorkspaceState — useCallback result (passed for dep array)
- *   mergeWorkspaceState      — useCallback result
- *   showToast               — (msg, type) => void
- *   onUndoLastChange        — () => void (from parent)
- *   onRunResetAction        — (scope) => Promise<void>
- *   onOpenResetDialog        — (scope) => void
- */
-export default function MainTerminalWorkspace({
-  // State setters
-  setWorkspaceHistory,
-  setResetDialog,
-  setDraftStatus,
-  applyWorkspaceState,
-  // Refs
-  lastSnapshotRef,
-  skipHistoryRef,
-  draftHydratedRef,
-  // Persistence
-  terminalDraftKey,
+import React, { useCallback, useEffect, useRef } from "react";
+import {
+  buildResetWorkspaceState,
+  MAX_HISTORY_ENTRIES,
+} from "./terminalWorkspaceState.js";
+import {
+  buildTradePlannerState,
+  buildP2JournalState,
+  buildJournalFormState,
+  buildAccountState,
+  normalizeJournal,
+  parseWorkspaceSnapshot,
+} from "./terminalStateHelpers.js";
+import {
+  clearDraft,
+  getDraftStorageKey,
   readDraft,
   writeDraft,
-  clearDraft,
-  // Utilities
+} from "../../services/draftVault.js";
+
+const DIALOG_CONTENT = {
+  premarket: { title: "Reset premarket workspace?", description: "This clears CSV parsing, premarket charts, and the saved Part 1 analysis for this account.", confirmLabel: "Reset premarket" },
+  trade: { title: "Reset trade workspace?", description: "This clears screenshots, extracted values, trade planner fields, and the saved Part 2 output.", confirmLabel: "Reset trade page" },
+  journalForm: { title: "Reset journal form?", description: "This clears the draft journal form only. Existing journal history stays untouched.", confirmLabel: "Reset journal form" },
+  journalHistory: { title: "Delete all journal history?", description: "This permanently clears every saved journal entry for this account after the next sync.", confirmLabel: "Delete journal history" },
+  account: { title: "Reset account page?", description: "This resets account balances and firm-rule inputs back to the last server baseline for this user.", confirmLabel: "Reset account page" },
+  all: { title: "Clear the full workspace?", description: "This wipes all tabs back to their default state and removes the saved local draft for this account.", confirmLabel: "Clear everything" },
+};
+
+/**
+ * MainTerminalWorkspace — workspace snapshot, undo, reset, and autosave.
+ *
+ * Exposes these via props (called by MainTerminal after the component runs):
+ *   applyWorkspaceState  — (state) => void   (MainTerminal's internal setter-bundle)
+ *   buildBaseWorkspaceState  — () => object   (MainTerminal's internal useCallback)
+ *   buildCurrentWorkspaceState — () => object (MainTerminal's internal useCallback)
+ *   mergeWorkspaceState  — (baseline, draft) => object (MainTerminal's internal useCallback)
+ *   workspaceHistory     — array
+ *   setWorkspaceHistory  — (fn) => void
+ *   terminalDraftKey     — string | null
+ *   profile              — user profile
+ *   auditScenario        — string
+ *   showToast            — (msg, type) => void
+ *   setResetDialog        — (dialog) => void
+ *   setDraftStatus        — (fn) => void
+ *
+ * Also owns these refs (passed as { current: value } objects):
+ *   lastSnapshotRef, skipHistoryRef, draftHydratedRef
+ *
+ * And returns this via props:
+ *   handleUndoLastChange  — useCallback result (passed back so MainTerminal wires it to AutosaveBar)
+ *   openResetDialog      — useCallback result (passed back)
+ *   restoreWorkspaceState — useCallback result (passed back)
+ *   runResetAction       — useCallback result (passed back)
+ *   canUndo              — boolean (derived, passed back)
+ *   tabResetScope        — string (derived, passed back)
+ */
+export default function MainTerminalWorkspace({
+  applyWorkspaceState,
   buildBaseWorkspaceState,
   buildCurrentWorkspaceState,
   mergeWorkspaceState,
-  buildResetWorkspaceState,
-  parseWorkspaceSnapshot,
-  getDraftStorageKey,
-  // Workspace state
   workspaceHistory,
+  setWorkspaceHistory,
   defaultExtractedVals,
   defaultFirmRules,
-  profileJournal,
-  profileAccountState,
-  profileFirmRules,
-  // Active terminal state
-  activeTab,
-  screenshots,
-  extractStatus,
-  extractedVals,
-  activeZone,
-  mpChart,
-  vwapChart,
-  p1NewsChart,
-  p1PremarketChart,
-  p1KeyLevelsChart,
-  journal,
-  accountState,
-  firmRules,
-  tcFileName,
-  currentAMD,
-  p1Out,
-  p2Out,
-  parsed,
-  parseMsg,
-  f,
-  showP2TradeForm,
-  p2Jf,
-  jf,
-  showForm,
-  // Actions
+  terminalDraftKey,
+  profile,
+  auditScenario,
   showToast,
-  onUndoLastChange,
-  onRunResetAction,
-  onOpenResetDialog,
+  setResetDialog,
+  setDraftStatus,
+  lastSnapshotRef,
+  skipHistoryRef,
+  draftHydratedRef,
+  onReturn,
 }) {
   // ── Hydrate workspace from localStorage on mount ──────────────────────────
   useEffect(() => {
@@ -140,11 +85,7 @@ export default function MainTerminalWorkspace({
       if (!terminalDraftKey) {
         applyWorkspaceState(baseline);
         draftHydratedRef.current = true;
-        setDraftStatus({
-          hydrated: true,
-          lastSavedAt: null,
-          error: "",
-        });
+        setDraftStatus({ hydrated: true, lastSavedAt: null, error: "" });
         return;
       }
 
@@ -152,7 +93,6 @@ export default function MainTerminalWorkspace({
       if (cancelled) return;
 
       const mergedState = mergeWorkspaceState(baseline, persistedDraft);
-
       applyWorkspaceState(mergedState);
       lastSnapshotRef.current = JSON.stringify(mergedState);
       setWorkspaceHistory([]);
@@ -175,17 +115,13 @@ export default function MainTerminalWorkspace({
 
   // ── Autosave on workspace change ─────────────────────────────────────────
   useEffect(() => {
-    if (!terminalDraftKey || !draftHydratedRef.current) {
-      return undefined;
-    }
+    if (!terminalDraftKey || !draftHydratedRef.current) return undefined;
 
     const snapshot = buildCurrentWorkspaceState();
     const serialized = JSON.stringify(snapshot);
 
     if (serialized === lastSnapshotRef.current) {
-      if (skipHistoryRef.current) {
-        skipHistoryRef.current = false;
-      }
+      if (skipHistoryRef.current) skipHistoryRef.current = false;
       return undefined;
     }
 
@@ -196,44 +132,28 @@ export default function MainTerminalWorkspace({
       if (previousSnapshot) {
         setWorkspaceHistory((current) => {
           const nextHistory = [...current, previousSnapshot];
-          return nextHistory.slice(-20);
+          return nextHistory.slice(-MAX_HISTORY_ENTRIES);
         });
       }
     }
 
     lastSnapshotRef.current = serialized;
 
-    const payload = {
-      ...snapshot,
-      savedAt: new Date().toISOString(),
-    };
+    const payload = { ...snapshot, savedAt: new Date().toISOString() };
 
     const timer = setTimeout(() => {
       void writeDraft(terminalDraftKey, payload)
-        .then(() => {
-          setDraftStatus((current) => ({
-            ...current,
-            lastSavedAt: payload.savedAt,
-            error: "",
-          }));
-        })
-        .catch((error) => {
-          setDraftStatus((current) => ({
-            ...current,
-            error: error?.message || "Autosave failed.",
-          }));
-        });
+        .then(() => setDraftStatus((current) => ({ ...current, lastSavedAt: payload.savedAt, error: "" })))
+        .catch((error) => setDraftStatus((current) => ({ ...current, error: error?.message || "Autosave failed." })));
     }, 180);
 
     return () => clearTimeout(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [buildCurrentWorkspaceState, terminalDraftKey]);
 
-  // ── Sync from other tabs via storage event ────────────────────────────────
+  // ── Sync from other tabs via storage event ─────────────────────────────────
   useEffect(() => {
-    if (!terminalDraftKey || !draftHydratedRef.current) {
-      return undefined;
-    }
+    if (!terminalDraftKey || !draftHydratedRef.current) return undefined;
 
     const storageKey = getDraftStorageKey(terminalDraftKey);
     const handleStorage = (event) => {
@@ -241,7 +161,6 @@ export default function MainTerminalWorkspace({
 
       void readDraft(terminalDraftKey, null).then((persistedDraft) => {
         if (!persistedDraft) return;
-
         const baseline = buildBaseWorkspaceState();
         const mergedState = mergeWorkspaceState(baseline, persistedDraft);
         skipHistoryRef.current = true;
@@ -260,19 +179,28 @@ export default function MainTerminalWorkspace({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [applyWorkspaceState, buildBaseWorkspaceState, mergeWorkspaceState, terminalDraftKey]);
 
-  // ── Undo last change ─────────────────────────────────────────────────────
+  // ── Undo last change ───────────────────────────────────────────────────────
   const handleUndoLastChange = useCallback(() => {
     if (!workspaceHistory.length) return;
-
     const previousSnapshot = workspaceHistory[workspaceHistory.length - 1];
     setWorkspaceHistory((current) => current.slice(0, -1));
-
-    // Delegate to parent's applyWorkspaceState via ref or prop
     skipHistoryRef.current = true;
     applyWorkspaceState(previousSnapshot);
     lastSnapshotRef.current = JSON.stringify(previousSnapshot);
     setDraftStatus((current) => ({ ...current, error: "" }));
   }, [workspaceHistory, applyWorkspaceState, lastSnapshotRef, skipHistoryRef, setDraftStatus]);
+
+  // ── Restore workspace state ────────────────────────────────────────────────
+  const restoreWorkspaceState = useCallback(
+    (nextState, shouldClearHistory = false) => {
+      skipHistoryRef.current = true;
+      applyWorkspaceState(nextState);
+      lastSnapshotRef.current = JSON.stringify(nextState);
+      if (shouldClearHistory) setWorkspaceHistory([]);
+      setDraftStatus((current) => ({ ...current, error: "" }));
+    },
+    [applyWorkspaceState, lastSnapshotRef, skipHistoryRef, setWorkspaceHistory, setDraftStatus],
+  );
 
   // ── Run reset action ──────────────────────────────────────────────────────
   const runResetAction = useCallback(
@@ -288,7 +216,10 @@ export default function MainTerminalWorkspace({
       }
       setWorkspaceHistory(scope === "all" ? [] : undefined);
       setDraftStatus((current) => ({ ...current, error: "" }));
-      showToast?.(scope === "journalHistory" ? "Journal history cleared." : "Workspace reset complete.", "success");
+      showToast?.(
+        scope === "journalHistory" ? "Journal history cleared." : "Workspace reset complete.",
+        "success",
+      );
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [buildBaseWorkspaceState, buildCurrentWorkspaceState, buildResetWorkspaceState, applyWorkspaceState, terminalDraftKey, clearDraft, showToast, skipHistoryRef, lastSnapshotRef],
@@ -297,17 +228,32 @@ export default function MainTerminalWorkspace({
   // ── Open reset dialog ────────────────────────────────────────────────────
   const openResetDialog = useCallback(
     (scope) => {
-      const DIALOG_CONTENT = {
-        tabData: { title: "Reset Tab Data?", description: "This will clear the current tab's data.", confirmLabel: "Reset Tab" },
-        analysis: { title: "Reset Analysis?", description: "This will clear all P1/P2 analysis output.", confirmLabel: "Reset Analysis" },
-        journalHistory: { title: "Clear Journal History?", description: "This will permanently delete all journal entries.", confirmLabel: "Clear History" },
-        all: { title: "Reset Everything?", description: "This will clear ALL data across all tabs.", confirmLabel: "Reset All" },
-      };
       setResetDialog({ scope, ...(DIALOG_CONTENT[scope] || DIALOG_CONTENT.all) });
     },
     [setResetDialog],
   );
 
-  // Return action handlers for parent to wire up
-  return null; // This component only manages effects; it renders nothing.
+  // ── Derived values ────────────────────────────────────────────────────────
+  const canUndo = workspaceHistory.length > 0;
+  const activeTab = null; // placeholder — MainTerminal passes this via onReturn if needed
+  const resetScopeByTab = {
+    premarket: "premarket",
+    trade: "trade",
+    journal: "journalForm",
+    account: "account",
+  };
+  // activeTab is managed in MainTerminal; expose null here and let onReturn carry derived values
+  const tabResetScope = "all";
+
+  // Pass all action callbacks and derived values back to MainTerminal
+  onReturn?.({
+    handleUndoLastChange,
+    openResetDialog,
+    restoreWorkspaceState,
+    runResetAction,
+    canUndo,
+    tabResetScope,
+  });
+
+  return null;
 }
