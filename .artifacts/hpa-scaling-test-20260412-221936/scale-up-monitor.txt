@@ -7,3 +7,8 @@ t=50s replicas=1 desired=1 current=1 cpu=unknown
 t=60s replicas=1 desired=1 current=1 cpu=unknown
 t=70s replicas=1 desired=1 current=1 cpu=unknown
 t=80s replicas=1 desired=1 current=1 cpu=unknown
+t=90s replicas=1 desired=1 current=1 cpu=unknown
+t=100s replicas=1 desired=1 current=1 cpu=unknown
+t=110s replicas=1 desired=1 current=1 cpu=unknown
+t=120s replicas=1 desired=1 current=1 cpu=unknown
+t=130s replicas=1 desired=1 current=1 cpu=unknown
