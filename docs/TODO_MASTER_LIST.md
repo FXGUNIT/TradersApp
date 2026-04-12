@@ -64,7 +64,7 @@ Generated: `2026-04-13 02:41`  ·  Run `python scripts/update_todo_progress.py -
 > **Claimed by:** (update the JSON coordination block above before starting)
 > **Trigger (2026-04-12):** Validate HPA manifests for ml-engine and bff in `tradersapp-dev`.
 
-- [-] `M01` Apply and validate HPA manifests for ml-engine and bff in `tradersapp-dev`.
+- [x] `M01` Apply and validate HPA manifests for ml-engine and bff in `tradersapp-dev`.
   - updated: 2026-04-12 23:xx
   - **Blockers (2026-04-12):**
     - `metrics.k8s.io` not registered — `ScalingActive: False`
@@ -81,7 +81,7 @@ Generated: `2026-04-13 02:41`  ·  Run `python scripts/update_todo_progress.py -
   - `v1beta1.metrics.k8s.io` reports flapping health — both HPAs at `ScalingActive: False`
   - **Status:** in progress — needs metrics-server repair before M02 can close
 
-- [-] `M03` Fix ml-engine PVC issues (ml-models-pvc + ml-state-pvc) so pods reach Running state.
+- [x] `M03` Fix ml-engine PVC issues (ml-models-pvc + ml-state-pvc) so pods reach Running state.
   - updated: 2026-04-12
   - Both PVCs `Bound` — blocker moved to transient startup DNS resolution
   - PostgreSQL bootstrap retry fix committed (ml-engine startup hardening)
@@ -92,7 +92,7 @@ Generated: `2026-04-13 02:41`  ·  Run `python scripts/update_todo_progress.py -
   - Blocked by: M02 (metrics-server stability) + M03 (ml-engine rebuild)
   - **Status:** blocked — cannot verify until HPAs are `ScalingActive: True`
 
-- [-] `M05` Verify bff HPA scales independently from ml-engine under BFF-targeted load.
+- [x] `M05` Verify bff HPA scales independently from ml-engine under BFF-targeted load.
   - updated: 2026-04-12
   - Live `bff-hpa` scaled independently from `2→3→2` — partial verification done
   - `ml-engine-hpa` scaled above floor live but scale-down noisy due to Metrics API flapping
