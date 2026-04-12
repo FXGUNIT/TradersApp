@@ -105,6 +105,7 @@ run_incluster_load() {
   kubectl run "$LOAD_POD_NAME" \
     -n "$NAMESPACE" \
     --image="$LOAD_IMAGE" \
+    --labels=app=frontend \
     --restart=Never \
     --command -- \
     node -e "const url='${BFF_URL}/health'; const endAt=Date.now()+(${LOAD_DURATION}*1000); const workers=${LOAD_CONCURRENCY}; const sleep=(ms)=>new Promise((resolve)=>setTimeout(resolve,ms)); async function worker(){ while (Date.now()<endAt){ try { await fetch(url); } catch (_) {} await sleep(20); } } Promise.all(Array.from({length:workers},()=>worker())).then(()=>process.exit(0)).catch(()=>process.exit(1));" \

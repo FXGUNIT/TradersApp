@@ -201,12 +201,14 @@ sleep 2
 kubectl run load-test \
   --namespace="$NAMESPACE" \
   --image=busybox \
+  --labels=app=bff \
   --restart=Never \
   --dry-run=client \
   -o yaml | sed 's/restart: Always/restart: Never/' | kubectl apply -f - >/dev/null 2>&1 || \
   kubectl run load-test \
     --namespace="$NAMESPACE" \
     --image=busybox \
+    --labels=app=bff \
     --restart=Never \
     --command -- \
     sh -c "worker() { while wget -qO- http://ml-engine:8001/health >/dev/null 2>&1; do sleep ${LOAD_INTERVAL}; done; }; i=0; while [ \$i -lt ${LOAD_WORKERS} ]; do worker & i=\$((i + 1)); done; wait" \
