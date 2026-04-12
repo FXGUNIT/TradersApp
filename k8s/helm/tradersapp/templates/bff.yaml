@@ -70,6 +70,8 @@ spec:
               value: "http://ml-engine:8001"
             - name: BFF_PORT
               value: {{ .Values.bff.service.port | quote }}
+            - name: BFF_HOST
+              value: "0.0.0.0"
             - name: ML_ANALYSIS_TRANSPORT
               value: "{{ .Values.bff.analysisTransport.mode }}"
             - name: ML_ANALYSIS_GRPC_ADDR
@@ -219,6 +221,8 @@ spec:
               value: "http://ml-engine:8001"
             - name: BFF_PORT
               value: {{ .Values.bff.service.port | quote }}
+            - name: BFF_HOST
+              value: "0.0.0.0"
             - name: ML_ANALYSIS_TRANSPORT
               value: "{{ .Values.bff.analysisTransport.mode }}"
             - name: ML_ANALYSIS_GRPC_ADDR
