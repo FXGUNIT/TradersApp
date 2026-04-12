@@ -24,6 +24,20 @@ import pandas as pd
 SCHEMA_SQLITE = Path(__file__).parent / "schema.sql"
 SCHEMA_PG = Path(__file__).parent / "schema_postgres.sql"
 
+SQLITE_TRADE_LOG_POLICY_COLUMNS = {
+    "source_uid": "TEXT",
+    "source_role": "TEXT",
+    "source_days_used": "INTEGER",
+    "is_training_eligible": "INTEGER",
+}
+
+POSTGRES_TRADE_LOG_POLICY_COLUMNS = {
+    "source_uid": "TEXT",
+    "source_role": "TEXT",
+    "source_days_used": "INTEGER",
+    "is_training_eligible": "BOOLEAN",
+}
+
 
 # ─── Backend Abstraction ──────────────────────────────────────────────────────
 
@@ -130,6 +144,16 @@ class DatabaseBackend(ABC):
         ...
 
     @abstractmethod
+    def record_training_batch_run(self, row: dict) -> int:
+        ...
+
+    @abstractmethod
+    def get_latest_training_batch_run(
+        self, batch_type: str = "nightly_eligibility", symbol: str = "MNQ"
+    ) -> Optional[dict]:
+        ...
+
+    @abstractmethod
     def close(self) -> None:
         ...
 
@@ -180,6 +204,15 @@ class SQLiteBackend(DatabaseBackend):
         schema = SCHEMA_SQLITE.read_text()
         with self.conn() as c:
             c.executescript(schema)
+            existing_columns = {
+                row[1] for row in c.execute("PRAGMA table_info(trade_log)").fetchall()
+            }
+            for column_name, column_type in SQLITE_TRADE_LOG_POLICY_COLUMNS.items():
+                if column_name in existing_columns:
+                    continue
+                c.execute(
+                    f"ALTER TABLE trade_log ADD COLUMN {column_name} {column_type}"
+                )
 
     # ── Candle operations ──────────────────────────────────────────────────────
 
@@ -320,9 +353,10 @@ class SQLiteBackend(DatabaseBackend):
                  adx_entry, atr_entry, ci_entry, vwap_entry,
                  vwap_slope_entry, vr_entry, volatility_regime,
                  expected_move_ticks, actual_move_ticks, alpha_raw,
-                 holding_minutes, exit_type)
+                 holding_minutes, exit_type, source_uid, source_role,
+                 source_days_used, is_training_eligible)
                 VALUES
-                (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     row.get("entry_time"),
@@ -351,6 +385,12 @@ class SQLiteBackend(DatabaseBackend):
                     row.get("alpha_raw"),
                     row.get("holding_minutes"),
                     row.get("exit_type"),
+                    row.get("source_uid"),
+                    row.get("source_role"),
+                    row.get("source_days_used"),
+                    None
+                    if row.get("is_training_eligible") is None
+                    else int(bool(row.get("is_training_eligible"))),
                 ),
             )
 
@@ -387,6 +427,55 @@ class SQLiteBackend(DatabaseBackend):
                 (symbol,),
             ).fetchone()
             return row[0] if row else 0
+
+    def record_training_batch_run(self, row: dict) -> int:
+        with self.conn() as c:
+            cursor = c.execute(
+                """
+                INSERT INTO training_batch_runs
+                (batch_date, batch_type, symbol, total_trade_count, eligible_trade_count,
+                 ineligible_trade_count, eligible_user_count, admin_trade_count,
+                 newly_eligible_trade_count)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(batch_date, batch_type, symbol) DO UPDATE SET
+                    total_trade_count = excluded.total_trade_count,
+                    eligible_trade_count = excluded.eligible_trade_count,
+                    ineligible_trade_count = excluded.ineligible_trade_count,
+                    eligible_user_count = excluded.eligible_user_count,
+                    admin_trade_count = excluded.admin_trade_count,
+                    newly_eligible_trade_count = excluded.newly_eligible_trade_count
+                """,
+                (
+                    row.get("batch_date"),
+                    row.get("batch_type", "nightly_eligibility"),
+                    row.get("symbol", "MNQ"),
+                    row.get("total_trade_count", 0),
+                    row.get("eligible_trade_count", 0),
+                    row.get("ineligible_trade_count", 0),
+                    row.get("eligible_user_count", 0),
+                    row.get("admin_trade_count", 0),
+                    row.get("newly_eligible_trade_count", 0),
+                ),
+            )
+            return int(cursor.lastrowid or 0)
+
+    def get_latest_training_batch_run(
+        self, batch_type: str = "nightly_eligibility", symbol: str = "MNQ"
+    ) -> Optional[dict]:
+        with self.conn() as c:
+            row = c.execute(
+                """
+                SELECT * FROM training_batch_runs
+                WHERE batch_type = ? AND symbol = ?
+                ORDER BY batch_date DESC, id DESC
+                LIMIT 1
+                """,
+                (batch_type, symbol),
+            ).fetchone()
+            if not row:
+                return None
+            columns = [description[0] for description in c.execute("SELECT * FROM training_batch_runs LIMIT 0").description]
+            return dict(zip(columns, row))
 
     # ── Model registry ────────────────────────────────────────────────────────
 
@@ -729,6 +818,21 @@ class PostgresBackend(DatabaseBackend):
         schema = SCHEMA_PG.read_text()
         with self.conn() as c:
             c.execute(schema)
+            with c.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT column_name
+                    FROM information_schema.columns
+                    WHERE table_name = 'trade_log'
+                    """
+                )
+                existing_columns = {row[0] for row in cur.fetchall()}
+                for column_name, column_type in POSTGRES_TRADE_LOG_POLICY_COLUMNS.items():
+                    if column_name in existing_columns:
+                        continue
+                    cur.execute(
+                        f"ALTER TABLE trade_log ADD COLUMN IF NOT EXISTS {column_name} {column_type}"
+                    )
 
     def _rows_to_df(
         self, rows: list, columns: list, parse_dates: Optional[list] = None
@@ -918,9 +1022,10 @@ class PostgresBackend(DatabaseBackend):
                      adx_entry, atr_entry, ci_entry, vwap_entry,
                      vwap_slope_entry, vr_entry, volatility_regime,
                      expected_move_ticks, actual_move_ticks, alpha_raw,
-                     holding_minutes, exit_type)
+                     holding_minutes, exit_type, source_uid, source_role,
+                     source_days_used, is_training_eligible)
                     VALUES
-                    (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT (entry_time, symbol) DO UPDATE SET
                         exit_time = EXCLUDED.exit_time,
                         exit_price = EXCLUDED.exit_price,
@@ -931,7 +1036,11 @@ class PostgresBackend(DatabaseBackend):
                         actual_rrr = EXCLUDED.actual_rrr,
                         rrr_met = EXCLUDED.rrr_met,
                         holding_minutes = EXCLUDED.holding_minutes,
-                        exit_type = EXCLUDED.exit_type
+                        exit_type = EXCLUDED.exit_type,
+                        source_uid = EXCLUDED.source_uid,
+                        source_role = EXCLUDED.source_role,
+                        source_days_used = EXCLUDED.source_days_used,
+                        is_training_eligible = EXCLUDED.is_training_eligible
                     """,
                     (
                         row.get("entry_time"),
@@ -960,6 +1069,10 @@ class PostgresBackend(DatabaseBackend):
                         row.get("alpha_raw"),
                         row.get("holding_minutes"),
                         row.get("exit_type"),
+                        row.get("source_uid"),
+                        row.get("source_role"),
+                        row.get("source_days_used"),
+                        row.get("is_training_eligible"),
                     ),
                 )
 
@@ -1004,6 +1117,60 @@ class PostgresBackend(DatabaseBackend):
                 )
                 row = cur.fetchone()
                 return row[0] if row else 0
+
+    def record_training_batch_run(self, row: dict) -> int:
+        with self.conn() as c:
+            with c.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO training_batch_runs
+                    (batch_date, batch_type, symbol, total_trade_count, eligible_trade_count,
+                     ineligible_trade_count, eligible_user_count, admin_trade_count,
+                     newly_eligible_trade_count)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (batch_date, batch_type, symbol) DO UPDATE SET
+                        total_trade_count = EXCLUDED.total_trade_count,
+                        eligible_trade_count = EXCLUDED.eligible_trade_count,
+                        ineligible_trade_count = EXCLUDED.ineligible_trade_count,
+                        eligible_user_count = EXCLUDED.eligible_user_count,
+                        admin_trade_count = EXCLUDED.admin_trade_count,
+                        newly_eligible_trade_count = EXCLUDED.newly_eligible_trade_count
+                    RETURNING id
+                    """,
+                    (
+                        row.get("batch_date"),
+                        row.get("batch_type", "nightly_eligibility"),
+                        row.get("symbol", "MNQ"),
+                        row.get("total_trade_count", 0),
+                        row.get("eligible_trade_count", 0),
+                        row.get("ineligible_trade_count", 0),
+                        row.get("eligible_user_count", 0),
+                        row.get("admin_trade_count", 0),
+                        row.get("newly_eligible_trade_count", 0),
+                    ),
+                )
+                returned = cur.fetchone()
+                return int(returned[0]) if returned else 0
+
+    def get_latest_training_batch_run(
+        self, batch_type: str = "nightly_eligibility", symbol: str = "MNQ"
+    ) -> Optional[dict]:
+        with self.conn() as c:
+            with c.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT * FROM training_batch_runs
+                    WHERE batch_type = %s AND symbol = %s
+                    ORDER BY batch_date DESC, id DESC
+                    LIMIT 1
+                    """,
+                    (batch_type, symbol),
+                )
+                row = cur.fetchone()
+                if not row:
+                    return None
+                cols = [desc[0] for desc in cur.description]
+                return dict(zip(cols, row))
 
     # ── Model registry ────────────────────────────────────────────────────────
 
@@ -1386,6 +1553,14 @@ class CandleDatabase:
 
     def get_stats(self) -> dict:
         return self._backend.get_stats()
+
+    def record_training_batch_run(self, row: dict) -> int:
+        return self._backend.record_training_batch_run(row)
+
+    def get_latest_training_batch_run(
+        self, batch_type: str = "nightly_eligibility", symbol: str = "MNQ"
+    ) -> Optional[dict]:
+        return self._backend.get_latest_training_batch_run(batch_type, symbol)
 
     def close(self) -> None:
         self._backend.close()

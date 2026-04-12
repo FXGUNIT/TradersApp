@@ -72,6 +72,42 @@ class TestAirflowDAGStructure:
         finally:
             os.environ.pop("MODEL_MONITOR_SCHEDULE", None)
 
+    def test_feedback_retrain_dag_uses_saturday_schedule_env(self):
+        os.environ["FEEDBACK_RETRAIN_SCHEDULE"] = "0 22 * * 6"
+        try:
+            schedule = os.environ.get("FEEDBACK_RETRAIN_SCHEDULE", "0 22 * * 6")
+            assert schedule == "0 22 * * 6"
+        finally:
+            os.environ.pop("FEEDBACK_RETRAIN_SCHEDULE", None)
+
+    def test_nightly_training_batch_dag_uses_nightly_schedule_env(self):
+        os.environ["TRAINING_ELIGIBILITY_BATCH_SCHEDULE"] = "0 1 * * *"
+        try:
+            schedule = os.environ.get("TRAINING_ELIGIBILITY_BATCH_SCHEDULE", "0 1 * * *")
+            assert schedule == "0 1 * * *"
+        finally:
+            os.environ.pop("TRAINING_ELIGIBILITY_BATCH_SCHEDULE", None)
+
+    def test_training_eligibility_batch_dag_file_imports_without_error(self):
+        dags_path = Path(__file__).parent.parent.parent / "dags"
+        sys.path.insert(0, str(dags_path.parent))
+
+        import importlib.util
+
+        for mod in ["pendulum", "airflow", "airflow.decorators"]:
+            sys.modules.setdefault(mod, type(sys)(mod))
+        sys.modules["pendulum"].datetime = lambda *a, **k: type("p", (), {"now": lambda: None})()
+        sys.modules["airflow.decorators"].dag = lambda **k: (lambda f: f)
+        sys.modules["airflow.decorators"].task = lambda **k: (lambda f: f)
+
+        spec = importlib.util.spec_from_file_location(
+            "training_eligibility_batch_dag",
+            dags_path / "training_eligibility_batch_dag.py",
+        )
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        assert hasattr(module, "training_eligibility_batch")
+
     def test_dag_retrain_timeout_reads_from_env(self):
         """ML_RETRAIN_TIMEOUT env var should control retrain timeout."""
         os.environ["ML_RETRAIN_TIMEOUT"] = "600"

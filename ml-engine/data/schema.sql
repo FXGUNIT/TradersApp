@@ -97,6 +97,10 @@ CREATE TABLE IF NOT EXISTS trade_log (
     -- Holding
     holding_minutes      REAL,
     exit_type            TEXT,
+    source_uid           TEXT,
+    source_role          TEXT,
+    source_days_used     INTEGER,
+    is_training_eligible INTEGER,
 
     UNIQUE(entry_time, symbol)
 );
@@ -196,4 +200,21 @@ CREATE TABLE IF NOT EXISTS signal_outcome (
 );
 CREATE INDEX IF NOT EXISTS idx_so_signal ON signal_outcome(signal_id);
 CREATE INDEX IF NOT EXISTS idx_so_trade ON signal_outcome(trade_id);
+
+-- Nightly training eligibility batch snapshots
+CREATE TABLE IF NOT EXISTS training_batch_runs (
+    id                      INTEGER PRIMARY KEY AUTOINCREMENT,
+    batch_date              TEXT NOT NULL,
+    batch_type              TEXT NOT NULL DEFAULT 'nightly_eligibility',
+    symbol                  TEXT NOT NULL DEFAULT 'MNQ',
+    total_trade_count       INTEGER NOT NULL DEFAULT 0,
+    eligible_trade_count    INTEGER NOT NULL DEFAULT 0,
+    ineligible_trade_count  INTEGER NOT NULL DEFAULT 0,
+    eligible_user_count     INTEGER NOT NULL DEFAULT 0,
+    admin_trade_count       INTEGER NOT NULL DEFAULT 0,
+    newly_eligible_trade_count INTEGER NOT NULL DEFAULT 0,
+    created_at              TEXT DEFAULT (datetime('now')),
+    UNIQUE(batch_date, batch_type, symbol)
+);
+CREATE INDEX IF NOT EXISTS idx_training_batch_runs_date ON training_batch_runs(batch_date DESC, symbol);
 

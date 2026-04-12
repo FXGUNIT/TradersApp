@@ -132,6 +132,9 @@ export default function WaitingRoomScreen({
 
   const emailVerified = profile?.emailVerified !== false;
   const effectiveStatus = liveStatus || profile?.status || "PENDING";
+  const eligibilityMessage = profile?.trainingEligibilityMessage || "";
+  const daysUsed = Number(profile?.daysUsed ?? profile?.days_used ?? profile?.dayCounter || 0);
+  const daysRemaining = Math.max(10 - daysUsed, 0);
 
   useEffect(() => {
     if (!uid || auditData) {
@@ -249,6 +252,43 @@ export default function WaitingRoomScreen({
         <div style={{ color: "var(--text-secondary, #6B7280)", fontSize: 12, marginBottom: 12 }}>
           Account: {email}
         </div>
+        {eligibilityMessage ? (
+          <div
+            style={{
+              marginBottom: 20,
+              padding: "14px 16px",
+              borderRadius: 14,
+              background: "rgba(37,99,235,0.08)",
+              border: "1px solid rgba(37,99,235,0.18)",
+              textAlign: "left",
+            }}
+          >
+            <div
+              style={{
+                color: "#1D4ED8",
+                fontSize: 11,
+                fontWeight: 700,
+                letterSpacing: 1.8,
+                textTransform: "uppercase",
+                marginBottom: 8,
+              }}
+            >
+              Training Data Policy
+            </div>
+            <div
+              style={{
+                color: "var(--text-primary, #1F2937)",
+                fontSize: 13,
+                lineHeight: 1.6,
+              }}
+            >
+              {eligibilityMessage}
+              {!profile?.isTrainingEligible
+                ? ` ${daysRemaining} more distinct app-use day${daysRemaining === 1 ? "" : "s"} required.`
+                : " Your future journal uploads can now train the models."}
+            </div>
+          </div>
+        ) : null}
         <div
           style={{
             color: "var(--text-primary, #374151)",

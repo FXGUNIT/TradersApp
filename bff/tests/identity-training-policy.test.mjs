@@ -30,16 +30,18 @@ test("provisionUser initializes training eligibility tracking", async () => {
       role: "user",
     });
 
-    assert.equal(record.user.dayCounter, 0);
+    assert.equal(record.user.daysUsed, 0);
+    assert.equal(record.user.days_used, 0);
     assert.equal(record.user.lastActiveDay, null);
     assert.equal(record.user.isTrainingEligible, false);
     assert.equal(
       record.user.trainingEligibilityMessage,
-      "After 10 days, your data improves the AI",
+      "Unlock more AI accuracy after 10 days of usage",
     );
 
     const status = getUserStatus("user-1");
-    assert.equal(status.dayCounter, 0);
+    assert.equal(status.daysUsed, 0);
+    assert.equal(status.days_used, 0);
     assert.equal(status.isTrainingEligible, false);
   });
 });
@@ -52,9 +54,9 @@ test("recordUserActiveDay counts distinct days only once", async () => {
     const second = recordUserActiveDay("user-2", { activeDay: "2026-04-01" });
     const third = recordUserActiveDay("user-2", { activeDay: "2026-04-02" });
 
-    assert.equal(first.user.dayCounter, 1);
-    assert.equal(second.user.dayCounter, 1);
-    assert.equal(third.user.dayCounter, 2);
+    assert.equal(first.user.daysUsed, 1);
+    assert.equal(second.user.daysUsed, 1);
+    assert.equal(third.user.daysUsed, 2);
     assert.equal(third.user.lastActiveDay, "2026-04-02");
   });
 });
@@ -71,11 +73,11 @@ test("recordUserActiveDay flips user eligibility at day ten", async () => {
     }
 
     assert.ok(result);
-    assert.equal(result.user.dayCounter, 10);
+    assert.equal(result.user.daysUsed, 10);
     assert.equal(result.user.isTrainingEligible, true);
     assert.equal(
       result.user.trainingEligibilityMessage,
-      "Your data helps improve predictions",
+      "Your data is now used for AI training",
     );
   });
 });
@@ -90,11 +92,11 @@ test("admin users are always training eligible", async () => {
     assert.equal(record.user.isTrainingEligible, true);
     assert.equal(
       record.user.trainingEligibilityMessage,
-      "Your data helps improve predictions",
+      "Your data is now used for AI training",
     );
 
     const result = recordUserActiveDay("admin-1", { activeDay: "2026-04-01" });
-    assert.equal(result.user.dayCounter, 1);
+    assert.equal(result.user.daysUsed, 1);
     assert.equal(result.user.isTrainingEligible, true);
   });
 });

@@ -7,6 +7,7 @@ import {
   fetchIdentitySessions,
   patchIdentityUserSecurity,
   provisionIdentityUser,
+  recordIdentityUserActivity,
   deleteIdentitySession,
   revokeOtherIdentitySessions,
   upsertIdentitySession,
@@ -34,7 +35,7 @@ function normalizeLegacyEmail(email) {
   return String(email || "").trim().toLowerCase();
 }
 
-function resolveToken(authDataOrToken = "") {
+function _resolveToken(authDataOrToken = "") {
   if (typeof authDataOrToken === "string") {
     return authDataOrToken;
   }
@@ -78,6 +79,12 @@ function mergeProfileData(userData, authData = {}, fullData = {}) {
     accountState: fullData?.accountState || {},
     firmRules: fullData?.firmRules || {},
     journal: fullData?.journal || {},
+    daysUsed: Number(userData?.daysUsed ?? userData?.days_used ?? userData?.dayCounter || 0),
+    days_used: Number(userData?.days_used ?? userData?.daysUsed ?? userData?.dayCounter || 0),
+    dayCounter: Number(userData?.daysUsed ?? userData?.days_used ?? userData?.dayCounter || 0),
+    lastActiveDay: userData?.lastActiveDay || null,
+    isTrainingEligible: Boolean(userData?.isTrainingEligible),
+    trainingEligibilityMessage: userData?.trainingEligibilityMessage || "",
     sessions,
   };
 
@@ -97,7 +104,7 @@ export function resolveScreenForUser(userData, authData = {}) {
   return SCREEN_IDS.HUB;
 }
 
-export async function findUserByEmail(email, token = "") {
+export async function findUserByEmail(email, _token = "") {
   const normalizedEmail = normalizeLegacyEmail(email);
   if (!normalizedEmail) {
     return null;
@@ -129,10 +136,15 @@ export async function loadUserProfile(authData = {}) {
   }
 
   const response = await fetchIdentityUser(authData.uid);
-  const userData = normalizeUserPayload(response);
-  if (!userData) {
+  const fetchedUserData = normalizeUserPayload(response);
+  if (!fetchedUserData) {
     return createUnavailableProfileResponse("loadUserProfile", authData);
   }
+
+  const activityResponse = await recordIdentityUserActivity(authData.uid, {
+    activeDay: new Date().toISOString().slice(0, 10),
+  }).catch(() => null);
+  const userData = normalizeUserPayload(activityResponse) || fetchedUserData;
 
   const sessionsResponse = await fetchIdentitySessions(authData.uid);
   const sessions = normalizeSessionMap(
@@ -164,7 +176,7 @@ export async function loadLegacyUserProfile(authData) {
 export async function updateLoginSecurityCounters(
   uid,
   patch = {},
-  authDataOrToken = "",
+  _authDataOrToken = "",
 ) {
   if (!uid) {
     return { success: false, error: "User UID is required." };
@@ -187,7 +199,7 @@ export async function updateLoginSecurityCounters(
   return { success: true };
 }
 
-export async function provisionUserRecord(uid, payload = {}, authDataOrToken = "") {
+export async function provisionUserRecord(uid, payload = {}, _authDataOrToken = "") {
   if (!uid) {
     return null;
   }
@@ -205,7 +217,7 @@ export async function provisionUserRecord(uid, payload = {}, authDataOrToken = "
   return createBffUnavailableResult("provisionUserRecord", { user: null });
 }
 
-export async function listUserSessions(uid, token = "") {
+export async function listUserSessions(uid, _token = "") {
   if (!uid) {
     return createBffUnavailableResult("listUserSessions", { sessions: {} });
   }
@@ -268,7 +280,7 @@ export async function createUserSession(uid, token, rememberMe) {
   }
 }
 
-export async function revokeUserSession(uid, sessionId, token = "") {
+export async function revokeUserSession(uid, sessionId, _token = "") {
   if (!uid || !sessionId || !hasBff()) {
     return false;
   }
@@ -277,7 +289,7 @@ export async function revokeUserSession(uid, sessionId, token = "") {
   return Boolean(response);
 }
 
-export async function revokeOtherUserSessions(uid, currentSessionId, token = "") {
+export async function revokeOtherUserSessions(uid, currentSessionId, _token = "") {
   if (!uid || !hasBff()) {
     return false;
   }
@@ -286,7 +298,7 @@ export async function revokeOtherUserSessions(uid, currentSessionId, token = "")
   return Boolean(response);
 }
 
-export async function getUserStatusByUid(uid, authDataOrToken = "") {
+export async function getUserStatusByUid(uid, _authDataOrToken = "") {
   if (!uid) {
     return null;
   }

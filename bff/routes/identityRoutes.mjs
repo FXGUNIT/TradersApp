@@ -3,10 +3,12 @@ export function createIdentityRouteHandler({
   findUserByEmail,
   getUserByUid,
   getUserStatus,
+  listTrainingEligibilityUsers,
   listSessions,
   patchUserAccess,
   patchUserSecurity,
   provisionUser,
+  recordUserActiveDay,
   revokeOtherSessions,
   upsertSession,
   json,
@@ -14,14 +16,29 @@ export function createIdentityRouteHandler({
 }) {
   return async function handleIdentityRoute(req, res, url, origin) {
     const userMatch = url.pathname.match(/^\/identity\/users\/([^/]+)$/);
-    const statusMatch = url.pathname.match(/^\/identity\/users\/([^/]+)\/status$/);
-    const emailMatch = url.pathname.match(/^\/identity\/users\/by-email\/([^/]+)$/);
-    const accessMatch = url.pathname.match(/^\/identity\/users\/([^/]+)\/access$/);
-    const securityMatch = url.pathname.match(/^\/identity\/users\/([^/]+)\/security$/);
+    const statusMatch = url.pathname.match(
+      /^\/identity\/users\/([^/]+)\/status$/,
+    );
+    const emailMatch = url.pathname.match(
+      /^\/identity\/users\/by-email\/([^/]+)$/,
+    );
+    const trainingEligibilitySnapshotMatch =
+      url.pathname === "/identity/training-eligibility-snapshot";
+    const accessMatch = url.pathname.match(
+      /^\/identity\/users\/([^/]+)\/access$/,
+    );
+    const securityMatch = url.pathname.match(
+      /^\/identity\/users\/([^/]+)\/security$/,
+    );
     const provisionMatch = url.pathname.match(
       /^\/identity\/users\/([^/]+)\/provision$/,
     );
-    const sessionsMatch = url.pathname.match(/^\/identity\/users\/([^/]+)\/sessions$/);
+    const activityMatch = url.pathname.match(
+      /^\/identity\/users\/([^/]+)\/activity$/,
+    );
+    const sessionsMatch = url.pathname.match(
+      /^\/identity\/users\/([^/]+)\/sessions$/,
+    );
     const sessionItemMatch = url.pathname.match(
       /^\/identity\/users\/([^/]+)\/sessions\/([^/]+)$/,
     );
@@ -115,10 +132,57 @@ export function createIdentityRouteHandler({
       return true;
     }
 
+    if (req.method === "GET" && trainingEligibilitySnapshotMatch) {
+      const users = listTrainingEligibilityUsers();
+
+      json(
+        res,
+        200,
+        {
+          ok: true,
+          threshold_days: 10,
+          users,
+        },
+        origin,
+      );
+      return true;
+    }
+
     if (req.method === "POST" && provisionMatch) {
       const uid = decodeURIComponent(provisionMatch[1]);
       const body = await readJsonBody(req, 20_000);
       const record = provisionUser(uid, body || {});
+
+      if (!record) {
+        json(
+          res,
+          404,
+          {
+            ok: false,
+            error: "User not found.",
+          },
+          origin,
+        );
+        return true;
+      }
+
+      json(
+        res,
+        200,
+        {
+          ok: true,
+          user: record.user,
+          sessions: record.sessions,
+        },
+        origin,
+      );
+      return true;
+    }
+
+    if (req.method === "POST" && activityMatch) {
+      const uid = decodeURIComponent(activityMatch[1]);
+      const body = await readJsonBody(req, 20_000);
+      const record = recordUserActiveDay(uid, body || {});
 
       if (!record) {
         json(

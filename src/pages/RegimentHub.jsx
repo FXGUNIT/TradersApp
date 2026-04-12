@@ -5,6 +5,7 @@ import { getHubContent } from "../services/clients/ContentClient.js";
 
 export default function RegimentHub({
   onNavigate,
+  profile,
   theme,
   currentTheme,
   onThemeChange,
@@ -219,6 +220,9 @@ export default function RegimentHub({
   const mutedColor = "var(--text-secondary, #9CA3AF)";
   const cardBg = "var(--surface-glass, rgba(255,255,255,0.72))";
   const cardBorder = "var(--border-subtle, rgba(0,0,0,0.08))";
+  const daysUsed = Number(profile?.daysUsed ?? profile?.days_used ?? profile?.dayCounter || 0);
+  const daysRemaining = Math.max(10 - daysUsed, 0);
+  const eligibilityMessage = profile?.trainingEligibilityMessage || "";
 
   return (
     <div
@@ -300,6 +304,48 @@ export default function RegimentHub({
         >
           {hubContent.description}
         </p>
+        {eligibilityMessage ? (
+          <div
+            style={{
+              alignSelf: "center",
+              maxWidth: 540,
+              padding: "16px 18px",
+              borderRadius: 18,
+              background: isDark
+                ? "rgba(59,130,246,0.12)"
+                : "rgba(37,99,235,0.08)",
+              border: isDark
+                ? "1px solid rgba(96,165,250,0.26)"
+                : "1px solid rgba(37,99,235,0.16)",
+              textAlign: "left",
+            }}
+          >
+            <div
+              style={{
+                color: isDark ? "#93C5FD" : "#1D4ED8",
+                fontSize: 11,
+                fontWeight: 700,
+                letterSpacing: 2,
+                textTransform: "uppercase",
+                marginBottom: 8,
+              }}
+            >
+              Training Data Policy
+            </div>
+            <div
+              style={{
+                fontSize: 13,
+                lineHeight: 1.7,
+                color: textColor,
+              }}
+            >
+              {eligibilityMessage}
+              {!profile?.isTrainingEligible
+                ? ` ${daysRemaining} more distinct app-use day${daysRemaining === 1 ? "" : "s"} before your data can train the models.`
+                : " New journal uploads are now eligible for training."}
+            </div>
+          </div>
+        ) : null}
       </div>
 
       <div

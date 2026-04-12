@@ -18,6 +18,7 @@ from data.candle_db import CandleDatabase
 from features.feature_pipeline import engineer_features, get_feature_vector, FEATURE_COLS
 from training.model_store import ModelStore
 from training.cross_validator import TimeSeriesCrossValidator
+from training.training_eligibility import filter_training_eligible_trades
 
 from models.direction.lightgbm_classifier import LightGBMClassifier
 from models.direction.random_forest import RandomForestClassifierModel
@@ -170,10 +171,18 @@ class Trainer:
 
             # Step 1: Load data
             trade_log = self.db.get_trade_log(limit=10000, symbol=symbol)
+            raw_trade_count = len(trade_log)
+            trade_log = filter_training_eligible_trades(trade_log)
             stats = self.db.get_stats()
 
             if verbose:
                 print(f"\nData: {stats['candles']} candles, {stats['trades']} completed trades")
+                excluded_count = max(raw_trade_count - len(trade_log), 0)
+                if excluded_count:
+                    print(
+                        "Training eligibility filter excluded "
+                        f"{excluded_count} ineligible user trade(s)"
+                    )
 
             if len(trade_log) < min_trades:
                 raise ValueError(

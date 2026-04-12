@@ -4,6 +4,7 @@ from training.training_eligibility import (
     ELIGIBILITY_DAY_THRESHOLD,
     filter_training_eligible_trades,
     resolve_trade_training_eligibility,
+    summarize_training_eligibility_batch,
 )
 
 
@@ -48,3 +49,29 @@ def test_filter_training_eligible_trades_keeps_eligible_and_legacy_rows_only():
     filtered = filter_training_eligible_trades(trade_log)
 
     assert filtered["id"].tolist() == [1, 3]
+
+
+def test_summarize_training_eligibility_batch_counts_exact_policy_groups():
+    trade_log = pd.DataFrame(
+        [
+            {"id": 1, "is_training_eligible": True, "source_role": "admin", "source_uid": "admin-1"},
+            {"id": 2, "is_training_eligible": False, "source_role": "user", "source_uid": "user-1"},
+            {"id": 3, "is_training_eligible": True, "source_role": "user", "source_uid": "user-2"},
+            {"id": 4, "is_training_eligible": None, "source_role": "system", "source_uid": None},
+        ]
+    )
+
+    summary = summarize_training_eligibility_batch(
+        trade_log,
+        symbol="MNQ",
+        batch_type="nightly_eligibility",
+        previous_batch={"eligible_trade_count": 2},
+        batch_date="2026-04-12",
+    )
+
+    assert summary["batch_date"] == "2026-04-12"
+    assert summary["eligible_trade_count"] == 3
+    assert summary["ineligible_trade_count"] == 1
+    assert summary["eligible_user_count"] == 1
+    assert summary["admin_trade_count"] == 1
+    assert summary["newly_eligible_trade_count"] == 1

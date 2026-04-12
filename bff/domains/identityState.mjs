@@ -8,6 +8,12 @@ const DEFAULT_STATE = {
   sessions: {},
 };
 
+const TRAINING_ELIGIBILITY_DAY_THRESHOLD = 10;
+const TRAINING_ELIGIBILITY_LOCKED_MESSAGE =
+  "Unlock more AI accuracy after 10 days of usage";
+const TRAINING_ELIGIBILITY_UNLOCKED_MESSAGE =
+  "Your data is now used for AI training";
+
 function nowIso() {
   return new Date().toISOString();
 }
@@ -78,14 +84,62 @@ function normalizeSessionBucket(bucket = {}) {
   );
 }
 
+function normalizeDayCounter(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return 0;
+  }
+
+  return Math.floor(parsed);
+}
+
+function normalizeActiveDay(value) {
+  const raw = String(value || "").trim();
+  if (!raw) {
+    return new Date().toISOString().slice(0, 10);
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    return raw;
+  }
+
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) {
+    return new Date().toISOString().slice(0, 10);
+  }
+
+  return parsed.toISOString().slice(0, 10);
+}
+
+function resolveTrainingEligibility(role, dayCounter) {
+  return (
+    String(role || "user")
+      .trim()
+      .toLowerCase() !== "user" ||
+    dayCounter >= TRAINING_ELIGIBILITY_DAY_THRESHOLD
+  );
+}
+
+function resolveTrainingEligibilityMessage(isTrainingEligible) {
+  return isTrainingEligible
+    ? TRAINING_ELIGIBILITY_UNLOCKED_MESSAGE
+    : TRAINING_ELIGIBILITY_LOCKED_MESSAGE;
+}
+
 function normalizeUserRecord(uid, user = {}) {
+  const role = user.role || "user";
+  const daysUsed = normalizeDayCounter(
+    user.daysUsed ?? user.days_used ?? user.dayCounter,
+  );
+  const isTrainingEligible = resolveTrainingEligibility(role, daysUsed);
+
   return {
     ...user,
     uid,
     email: user.email || null,
     fullName: user.fullName || user.displayName || user.email || uid,
     status: user.status || "PENDING",
-    role: user.role || "user",
+    role,
     isLocked: Boolean(user.isLocked),
     failedAttempts: Number(user.failedAttempts || 0),
     approvedAt: user.approvedAt || null,
@@ -95,15 +149,32 @@ function normalizeUserRecord(uid, user = {}) {
     lockedBy: user.lockedBy || null,
     lastLoginAt: user.lastLoginAt || null,
     lastLoginAttempt: user.lastLoginAttempt || null,
+    daysUsed,
+    days_used: daysUsed,
+    dayCounter: daysUsed,
+    lastActiveDay:
+      typeof user.lastActiveDay === "string" && user.lastActiveDay.trim()
+        ? normalizeActiveDay(user.lastActiveDay)
+        : null,
+    last_active_day:
+      typeof user.lastActiveDay === "string" && user.lastActiveDay.trim()
+        ? normalizeActiveDay(user.lastActiveDay)
+        : null,
+    isTrainingEligible,
+    is_training_eligible: isTrainingEligible,
+    trainingEligibilityMessage:
+      resolveTrainingEligibilityMessage(isTrainingEligible),
     updatedAt: user.updatedAt || nowIso(),
   };
 }
 
 function normalizeState(rawState = {}) {
-  const users = rawState.users && typeof rawState.users === "object" ? rawState.users : {};
-  const sessions = rawState.sessions && typeof rawState.sessions === "object"
-    ? rawState.sessions
-    : {};
+  const users =
+    rawState.users && typeof rawState.users === "object" ? rawState.users : {};
+  const sessions =
+    rawState.sessions && typeof rawState.sessions === "object"
+      ? rawState.sessions
+      : {};
 
   const normalizedSessions = Object.fromEntries(
     Object.entries(sessions).map(([uid, bucket]) => [
@@ -140,14 +211,22 @@ function clone(value) {
 }
 
 function findUserUidByEmail(state, email) {
-  const normalizedEmail = String(email || "").trim().toLowerCase();
+  const normalizedEmail = String(email || "")
+    .trim()
+    .toLowerCase();
   if (!normalizedEmail) {
     return null;
   }
 
-  return Object.entries(state.users || {}).find(([, user]) => {
-    return String(user?.email || "").trim().toLowerCase() === normalizedEmail;
-  })?.[0] || null;
+  return (
+    Object.entries(state.users || {}).find(([, user]) => {
+      return (
+        String(user?.email || "")
+          .trim()
+          .toLowerCase() === normalizedEmail
+      );
+    })?.[0] || null
+  );
 }
 
 function getUserAndSessions(state, uid) {
@@ -209,8 +288,35 @@ export function getUserStatus(uid) {
     status: normalized.status,
     isLocked: normalized.isLocked,
     role: normalized.role,
+    daysUsed: normalized.daysUsed,
+    days_used: normalized.days_used,
+    dayCounter: normalized.dayCounter,
+    lastActiveDay: normalized.lastActiveDay,
+    last_active_day: normalized.last_active_day,
+    isTrainingEligible: normalized.isTrainingEligible,
+    is_training_eligible: normalized.is_training_eligible,
+    trainingEligibilityMessage: normalized.trainingEligibilityMessage,
     updatedAt: normalized.updatedAt,
   };
+}
+
+export function listTrainingEligibilityUsers() {
+  const state = readState();
+  return clone(
+    Object.entries(state.users || {}).map(([uid, user]) => {
+      const normalized = normalizeUserRecord(uid, user || {});
+      return {
+        uid,
+        role: normalized.role,
+        daysUsed: normalized.daysUsed,
+        days_used: normalized.days_used,
+        isTrainingEligible: normalized.isTrainingEligible,
+        is_training_eligible: normalized.is_training_eligible,
+        lastActiveDay: normalized.lastActiveDay,
+        last_active_day: normalized.last_active_day,
+      };
+    }),
+  );
 }
 
 export function findUserByEmail(email) {
@@ -334,7 +440,8 @@ export function revokeOtherSessions(uid, currentSessionId) {
   const state = readState();
   const bucket = normalizeSessionBucket(state.sessions?.[uid] || {});
   const retained = currentSessionId ? bucket[currentSessionId] || null : null;
-  const nextBucket = currentSessionId && retained ? { [currentSessionId]: retained } : {};
+  const nextBucket =
+    currentSessionId && retained ? { [currentSessionId]: retained } : {};
   const revokedCount = Object.keys(bucket).filter(
     (sessionId) => sessionId !== currentSessionId,
   ).length;
@@ -385,16 +492,52 @@ export function provisionUser(uid, patch = {}) {
   };
 }
 
+export function recordUserActiveDay(uid, options = {}) {
+  if (!uid) {
+    return null;
+  }
+
+  const state = readState();
+  const existingUser = state.users?.[uid];
+  if (!existingUser) {
+    return null;
+  }
+
+  const normalizedUser = normalizeUserRecord(uid, existingUser);
+  const activeDay = normalizeActiveDay(options.activeDay);
+  const shouldIncrement =
+    !normalizedUser.lastActiveDay || activeDay > normalizedUser.lastActiveDay;
+
+  const nextUser = upsertUser(state, uid, {
+    ...normalizedUser,
+    daysUsed: shouldIncrement
+      ? normalizedUser.daysUsed + 1
+      : normalizedUser.daysUsed,
+    lastActiveDay: shouldIncrement
+      ? activeDay
+      : normalizedUser.lastActiveDay || activeDay,
+    updatedAt: nowIso(),
+  });
+
+  writeState(state);
+  return {
+    user: clone(nextUser),
+    sessions: clone(normalizeSessionBucket(state.sessions?.[uid] || {})),
+  };
+}
+
 export default {
   deleteSession,
   ensureUserRecord,
   findUserByEmail,
   getUserByUid,
   getUserStatus,
+  listTrainingEligibilityUsers,
   listSessions,
   patchUserAccess,
   patchUserSecurity,
   provisionUser,
+  recordUserActiveDay,
   revokeOtherSessions,
   upsertSession,
 };

@@ -77,6 +77,7 @@ from _routes_pso import (
     get_signals,
     get_feedback_stats,
     process_trades,
+    prepare_training_batch,
     trigger_retrain,
     get_retrain_status,
     global_exception_handler,
@@ -208,6 +209,7 @@ def _register_routes(app: FastAPI) -> None:
     app.add_api_route("/feedback/signals", get_signals, methods=["GET"], tags=["feedback"])
     app.add_api_route("/feedback/stats", get_feedback_stats, methods=["GET"], tags=["feedback"])
     app.add_api_route("/feedback/process-trades", process_trades, methods=["POST"], tags=["feedback"])
+    app.add_api_route("/feedback/prepare-training-batch", prepare_training_batch, methods=["POST"], tags=["feedback"])
     app.add_api_route("/feedback/retrain", trigger_retrain, methods=["POST"], tags=["feedback"])
     app.add_api_route("/feedback/retrain-status", get_retrain_status, methods=["GET"], tags=["feedback"])
 

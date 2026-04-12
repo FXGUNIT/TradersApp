@@ -30,7 +30,10 @@ function normalizeUsersCollection(response) {
 
 function normalizeSessionsCollection(response) {
   const sessions =
-    response?.sessions || response?.data?.sessions || response?.data || response;
+    response?.sessions ||
+    response?.data?.sessions ||
+    response?.data ||
+    response;
 
   if (!sessions) {
     return {};
@@ -65,12 +68,16 @@ export async function fetchIdentityUserStatus(uid) {
 }
 
 export async function fetchIdentityUserByEmail(email) {
-  const normalizedEmail = String(email || "").trim().toLowerCase();
+  const normalizedEmail = String(email || "")
+    .trim()
+    .toLowerCase();
   if (!normalizedEmail) {
     return null;
   }
 
-  return bffFetch(`/identity/users/by-email/${encodeURIComponent(normalizedEmail)}`);
+  return bffFetch(
+    `/identity/users/by-email/${encodeURIComponent(normalizedEmail)}`,
+  );
 }
 
 export async function provisionIdentityUser(uid, payload = {}) {
@@ -79,6 +86,20 @@ export async function provisionIdentityUser(uid, payload = {}) {
   }
 
   return bffFetch(`/identity/users/${encodeURIComponent(uid)}/provision`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function recordIdentityUserActivity(uid, payload = {}) {
+  if (!uid) {
+    return null;
+  }
+
+  return bffFetch(`/identity/users/${encodeURIComponent(uid)}/activity`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -183,6 +204,7 @@ export default {
   patchIdentityUserAccess,
   patchIdentityUserSecurity,
   provisionIdentityUser,
+  recordIdentityUserActivity,
   revokeOtherIdentitySessions,
   upsertIdentitySession,
 };

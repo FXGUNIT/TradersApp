@@ -52,6 +52,10 @@ class UploadCandlesRequest(BaseModel):
 class UploadTradesRequest(BaseModel):
     symbol: str = Field(default="MNQ")
     trades: list[TradeInput]
+    source_uid: Optional[str] = Field(default=None)
+    source_role: Optional[str] = Field(default=None)
+    source_days_used: Optional[int] = Field(default=None, ge=0)
+    is_training_eligible: Optional[bool] = Field(default=None)
 
 
 # ── Backtest / PBO ────────────────────────────────────────────────────────────

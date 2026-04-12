@@ -10,6 +10,7 @@ import pandas as pd
 from fastapi import HTTPException, Query
 
 from _lifespan import db, store
+from training.training_eligibility import build_trade_training_metadata
 
 from _infrastructure import (
     get_cache,
@@ -100,10 +101,17 @@ def upload_trades(request: "UploadTradesRequest"):
     try:
         if not request.trades:
             raise HTTPException(status_code=400, detail="No trades provided")
+        training_metadata = build_trade_training_metadata(
+            source_uid=request.source_uid,
+            source_role=request.source_role,
+            source_days_used=request.source_days_used,
+            is_training_eligible=request.is_training_eligible,
+        )
         rows = []
         for t in request.trades:
             row = t.model_dump()
             row["symbol"] = request.symbol
+            row.update(training_metadata)
             rows.append(row)
         trade_df = pd.DataFrame(rows)
         dq_report = validate_incoming_dataset(
@@ -116,6 +124,9 @@ def upload_trades(request: "UploadTradesRequest"):
         return {
             "status": "success",
             "trades_uploaded": len(request.trades),
+            "training_eligible_uploaded": sum(
+                1 for row in rows if row.get("is_training_eligible")
+            ),
             "total_trades": total,
             "min_for_training": 100,
             "ready": total >= 100,

@@ -24,6 +24,7 @@ from _infrastructure import (
     _store_idempotent_response,
     _release_idempotency_claim,
 )
+from training.training_eligibility import summarize_training_eligibility_batch
 
 
 # ── PSO Alpha Discovery ─────────────────────────────────────────────────────────
@@ -501,16 +502,43 @@ def trigger_retrain(request: "FeedbackRetrainRequest"):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+def prepare_training_batch(symbol: str = "MNQ", batch_type: str = "nightly_eligibility"):
+    """Prepare and persist the current eligible training batch snapshot."""
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database not initialized")
+
+    try:
+        previous_batch = db.get_latest_training_batch_run(batch_type=batch_type, symbol=symbol)
+        trade_log = db.get_trade_log(limit=10000, symbol=symbol)
+        summary = summarize_training_eligibility_batch(
+            trade_log,
+            symbol=symbol,
+            batch_type=batch_type,
+            previous_batch=previous_batch,
+        )
+        batch_id = db.record_training_batch_run(summary)
+        return {
+            "ok": True,
+            "batch_id": batch_id,
+            **summary,
+        }
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 def get_retrain_status():
     """Get current retrain pipeline status: last training, drift status, feedback stats."""
     if db is None or drift_monitor is None or feedback_logger is None:
         raise HTTPException(status_code=503, detail="Components not initialized")
     try:
         last_train = db.get_last_training("direction_ensemble")
+        last_training_batch = db.get_latest_training_batch_run()
         stats = feedback_logger.get_feedback_stats()
         concept = drift_monitor.concept_drift.detect()
         return {
             "last_training": last_train,
+            "last_training_batch": last_training_batch,
             "feedback_stats": stats,
             "concept_drift": concept,
             "pipeline_ready": retrain_pipeline is not None,
