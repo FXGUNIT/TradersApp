@@ -361,13 +361,13 @@ def _build_live_status_table(markdown: str) -> str:
     timestamp = datetime.now().astimezone().strftime("%Y-%m-%d %H:%M")
 
     header = (
-        f"<!-- {PROGRESS_START[4:]} -->\n"
+        f"{PROGRESS_START}\n"
         "## Live Status\n"
-        f"Generated: `{timestamp}`  ·  Update: `python scripts/update_todo_progress.py --once`\n\n"
+        f"Generated: `{timestamp}`  ·  Run `python scripts/update_todo_progress.py --once` to update\n\n"
         "| Section | Tasks | Progress | Status |\n"
         "|---|---|---:|---|\n"
     )
-    return header + "\n".join(rows) + f"\n\n<!-- {PROGRESS_END[4:]} -->"
+    return header + "\n".join(rows) + f"\n\n{PROGRESS_END}\n"
 
 
 def _marker_to_status(marker: str) -> str:
