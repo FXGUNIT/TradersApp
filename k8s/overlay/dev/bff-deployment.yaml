@@ -46,6 +46,8 @@ spec:
           env:
             - name: ML_ENGINE_URL
               value: "http://ml-engine:8001"
+            - name: BFF_HOST
+              value: "0.0.0.0"
             - name: REDIS_HOST
               value: ""
             - name: REDIS_URL
