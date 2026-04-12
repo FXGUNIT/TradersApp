@@ -70,6 +70,7 @@ import {
 } from "./terminalWorkspaceState.js";
 import { QuoteBanner, NavigationTabs, AutosaveBar, DrawdownThrottleBanner } from "./TerminalNav.jsx";
 import TerminalHeader from "./TerminalHeader.jsx";
+import MainTerminalTicker from "./MainTerminalTicker.jsx";
 
 const warningTint = "var(--status-warning-soft, rgba(255,214,10,0.12))";
 const overlayTint = "var(--surface-overlay, rgba(15,23,42,0.5))";
@@ -129,18 +130,6 @@ export default function MainTerminal({
   const [, setMarketRefresh] = useState(0);
   
   const ist = getISTState();
-  
-  useEffect(() => {
-    const interval = setInterval(() => setMarketRefresh(r => r + 1), 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setQuoteIndex((current) => (current + 1) % ROTATING_QUOTES.length);
-    }, 15000);
-    return () => clearInterval(interval);
-  }, []);
 
   useEffect(() => {
     if (auditScenario === "app") {
@@ -853,13 +842,6 @@ export default function MainTerminal({
     },
     [buildBaseWorkspaceState, buildCurrentWorkspaceState, restoreWorkspaceState, terminalDraftKey, showToast],
   );
-      buildBaseWorkspaceState,
-      buildCurrentWorkspaceState,
-      restoreWorkspaceState,
-      showToast,
-      terminalDraftKey,
-    ],
-  );
 
   const openResetDialog = useCallback(
     (scope) => {
@@ -1400,6 +1382,11 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
         displayedAmdPhase={displayedAmdPhase}
         throttleActive={throttleActive}
         onLogout={onLogout}
+      />
+
+      <MainTerminalTicker
+        setMarketRefresh={setMarketRefresh}
+        setQuoteIndex={setQuoteIndex}
       />
 
       <CountdownBanner ist={ist} />

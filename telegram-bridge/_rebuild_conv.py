@@ -5,36 +5,52 @@ base = "E:/TradersApp/telegram-bridge"
 path = os.path.join(base, "aiConversation.js")
 
 with open(path, "r", encoding="utf-8", errors="replace") as f:
-    lines = f.readlines()
+    raw = f.read()
 
-print("Total lines:", len(lines))
-print("ML divider at line 157:", repr(lines[156]))
-print("Main divider at line 526:", repr(lines[525]))
+# Find where the old module breakdown comment starts and ends in the source
+# The doc block runs: /** ... * Module breakdown: ... * /   (then blank, then imports)
+old_doc_end = raw.find(" * Module breakdown:")
+next_star_slash = raw.find(" */", old_doc_end)
+# line after */
+newline_after_doc = raw.find("\n", next_star_slash)
 
-# Header: lines 1-11
-header = lines[0:11]
+old_import_end = raw.find("import { formatConsensusForTelegram", old_doc_end)
+newline_after_imports = raw.find("\n", old_import_end)
 
-# Middle: lines 12-156 (session + intent detection)
-middle = lines[11:156]
+print("Doc block ends at char:", next_star_slash)
+print("After old imports newline char:", newline_after_imports)
 
-# Bottom: lines 526-end (Main Conversation Handler)
-bottom = lines[525:]
+# Build new file:
+# 1. Up to and including " */" in the old doc comment
+# 2. New module breakdown (with aiProviders.js added)
+# 3. New imports
+# 4. Lines after old imports (session + intent + bottom)
 
-new_imports = """import {
-  callMLEngine,
-  callBFFConsensus,
-  callBFFAdminSessions,
-  callBFFRevokeSession,
-  callBestAvailableAI,
-} from "./aiProviders.js";
-import { AI_PROVIDERS, SYSTEM_PROMPT } from "./aiConversationTypes.js";
-import { formatConsensusForTelegram, formatMLResponse } from "./aiFormatters.js";
+new_module_block = (
+    "\n"
+    " * Module breakdown:\n"
+    " *   aiConversationTypes.js -- AI_PROVIDERS config, SYSTEM_PROMPT, type defs\n"
+    " *   aiProviders.js        -- ML/BFF HTTP wrappers, AI provider calls\n"
+    " *   aiConversation.js     -- conversation memory, intent detection, orchestrator\n"
+    " *   aiFormatters.js       -- formatConsensusForTelegram, formatMLResponse\n"
+    " */\n"
+    "\n"
+    "import {\n"
+    "  callMLEngine,\n"
+    "  callBFFConsensus,\n"
+    "  callBFFAdminSessions,\n"
+    "  callBFFRevokeSession,\n"
+    "  callBestAvailableAI,\n"
+    "} from \"./aiProviders.js\";\n"
+    "import { AI_PROVIDERS, SYSTEM_PROMPT } from \"./aiConversationTypes.js\";\n"
+    "import { formatConsensusForTelegram, formatMLResponse } from \"./aiFormatters.js\";\n"
+    "\n"
+)
 
-"""
-
-new_content = header + [new_imports] + middle + bottom
+# New file = doc header up to " */" (exclusive) + new module block + everything after old imports
+new_file = raw[:next_star_slash] + new_module_block + raw[newline_after_imports+1:]
 
 with open(path, "w", encoding="utf-8") as f:
-    f.writelines(new_content)
+    f.write(new_file)
 
-print("Written", len(new_content), "lines to aiConversation.js")
+print("Written", len(new_file.splitlines()), "lines to aiConversation.js")
