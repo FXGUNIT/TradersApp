@@ -32,13 +32,17 @@ BFF_HPA_FILE="${BFF_HPA_FILE:-${REPO_ROOT}/k8s/overlay/dev/hpa-bff.yaml}"
 EXPECTED_ML_HPA_NAME="${EXPECTED_ML_HPA_NAME:-ml-engine-hpa}"
 EXPECTED_BFF_HPA_NAME="${EXPECTED_BFF_HPA_NAME:-bff-hpa}"
 SCALE_UP_TIMEOUT="${SCALE_UP_TIMEOUT:-180}"   # seconds to wait for scale-up
-SCALE_DOWN_WAIT="${SCALE_DOWN_WAIT:-360}"     # seconds to wait for scale-down
+SCALE_DOWN_WAIT="${SCALE_DOWN_WAIT:-}"        # auto-computed unless explicitly set
 LOAD_INTERVAL="${LOAD_INTERVAL:-0.05}"       # seconds between health requests
 LOAD_WORKERS="${LOAD_WORKERS:-100}"          # in-cluster request workers when local load tools are unavailable
 LOAD_IMAGE="${LOAD_IMAGE:-tradersapp/bff:dev-latest}"
 OUTPUT_DIR="${OUTPUT_DIR:-${REPO_ROOT}/.artifacts/hpa-scaling-test-$(date +%Y%m%d-%H%M%S)}"
 
 mkdir -p "$OUTPUT_DIR"
+
+DEFAULT_SCALE_DOWN_STABILIZATION=300
+DEFAULT_SCALE_DOWN_PERIOD=60
+DEFAULT_SCALE_DOWN_BUFFER=30
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 log()   { echo "[$(date +%H:%M:%S)] $*"; }
@@ -190,6 +194,8 @@ kubectl get deploy -n "$NAMESPACE" -o wide >> "${OUTPUT_DIR}/hpa-baseline.txt"
 kubectl describe hpa -n "$NAMESPACE" > "${OUTPUT_DIR}/hpa-describe-baseline.txt"
 cat "${OUTPUT_DIR}/hpa-baseline.txt"
 
+BASELINE_REPLICAS=$(kubectl get deploy ml-engine -n "$NAMESPACE" -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "1")
+
 # ── Step 3: Start load generation ─────────────────────────────────────────────
 log ""
 log "Step 3: Starting sustained load against ml-engine:8001/health"
@@ -240,6 +246,8 @@ get_cpu_util() {
 }
 
 SCALED_UP=false
+PEAK_REPLICAS="$BASELINE_REPLICAS"
+PEAK_DESIRED="$BASELINE_REPLICAS"
 for i in $(seq 1 $((SCALE_UP_TIMEOUT / 10))); do
   sleep 10
 
@@ -251,6 +259,13 @@ for i in $(seq 1 $((SCALE_UP_TIMEOUT / 10))); do
 
   echo "t=$((i*10))s replicas=${REPLICAS} desired=${DESIRED} current=${CURRENT} cpu=${CPU}" >> "$MONITOR_LOG"
   log "  t=$((i*10))s | ml-engine replicas=$REPLICAS | HPA desired=$DESIRED current=$CURRENT | cpu=$CPU"
+
+  if [[ "$REPLICAS" -gt "$PEAK_REPLICAS" ]]; then
+    PEAK_REPLICAS="$REPLICAS"
+  fi
+  if [[ "$DESIRED" -gt "$PEAK_DESIRED" ]]; then
+    PEAK_DESIRED="$DESIRED"
+  fi
 
   # Scale-up detected: actual replicas > 1 (hpa minReplicas default) AND scaling is active
   if [[ "$REPLICAS" -gt 1 || "$DESIRED" -gt 1 ]]; then
@@ -282,14 +297,32 @@ log "Load stopped"
 
 # ── Step 7: Wait for scale-down ─────────────────────────────────────────────
 log ""
-log "Step 7: Waiting ${SCALE_DOWN_WAIT}s for scale-down (stabilization window 300s)"
+SCALE_DOWN_START_REPLICAS=$(kubectl get deploy ml-engine -n "$NAMESPACE" -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "$PEAK_REPLICAS")
+if [[ "$SCALE_DOWN_START_REPLICAS" -lt "$PEAK_REPLICAS" ]]; then
+  SCALE_DOWN_START_REPLICAS="$PEAK_REPLICAS"
+fi
+scale_down_steps=0
+scale_down_cursor="$SCALE_DOWN_START_REPLICAS"
+while [[ "$scale_down_cursor" -gt "$BASELINE_REPLICAS" ]]; do
+  scale_down_cursor=$(( (scale_down_cursor + 1) / 2 ))
+  scale_down_steps=$((scale_down_steps + 1))
+done
+
+if [[ -z "$SCALE_DOWN_WAIT" ]]; then
+  SCALE_DOWN_WAIT=$((DEFAULT_SCALE_DOWN_STABILIZATION + (scale_down_steps * DEFAULT_SCALE_DOWN_PERIOD) + DEFAULT_SCALE_DOWN_BUFFER))
+fi
+
+log "Step 7: Waiting up to ${SCALE_DOWN_WAIT}s for scale-down to baseline replicas=${BASELINE_REPLICAS} (peak=${SCALE_DOWN_START_REPLICAS})"
+SCALE_DOWN_COMPLETE=false
 for i in $(seq 1 $((SCALE_DOWN_WAIT / 30))); do
   sleep 30
   REPLICAS=$(kubectl get deploy ml-engine -n "$NAMESPACE" -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "0")
   DESIRED=$(kubectl get hpa "$EXPECTED_ML_HPA_NAME" -n "$NAMESPACE" -o jsonpath='{.status.desiredReplicas}' 2>/dev/null || echo "0")
-  log "  t=${i}0m | ml-engine replicas=$REPLICAS | HPA desired=$DESIRED"
+  elapsed=$((i * 30))
+  log "  t=${elapsed}s | ml-engine replicas=$REPLICAS | HPA desired=$DESIRED"
 
-  if [[ "$REPLICAS" -le 1 && "$DESIRED" -le 1 ]]; then
+  if [[ "$REPLICAS" -le "$BASELINE_REPLICAS" && "$DESIRED" -le "$BASELINE_REPLICAS" ]]; then
+    SCALE_DOWN_COMPLETE=true
     log "  *** Scale-down complete: replicas=$REPLICAS ***"
     break
   fi
@@ -321,7 +354,14 @@ cat "${OUTPUT_DIR}/scale-up-monitor.txt"
 echo ""
 
 if [[ "$SCALED_UP" == "true" ]]; then
-  log "[PASS] Scale-up detected during load test"
+  if [[ "$SCALE_DOWN_COMPLETE" == "true" ]]; then
+    log "[PASS] Scale-up detected during load test and scale-down returned to baseline"
+    echo "PASS" > "${OUTPUT_DIR}/result.txt"
+  else
+    warn "[FAIL] Scale-up occurred, but scale-down did not return to baseline within ${SCALE_DOWN_WAIT}s"
+    echo "FAIL" > "${OUTPUT_DIR}/result.txt"
+    exit 1
+  fi
 elif [[ "$METRICS_AVAILABLE" == "false" ]]; then
   warn "[BLOCKED] metrics.k8s.io not available — HPA cannot function"
   warn "[ACTION] Install metrics-server to enable HPA"
