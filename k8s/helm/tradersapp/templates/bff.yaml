@@ -104,31 +104,25 @@ spec:
             {{- toYaml . | nindent 12 }}
           {{- end }}
           startupProbe:
-            exec:
-              command:
-                - node
-                - -e
-                - "fetch('http://127.0.0.1:{{ .Values.bff.service.port }}/live').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+            httpGet:
+              path: /live
+              port: {{ .Values.bff.service.port }}
             failureThreshold: 30
             periodSeconds: 10
             initialDelaySeconds: 5
             timeoutSeconds: 5
           livenessProbe:
-            exec:
-              command:
-                - node
-                - -e
-                - "fetch('http://127.0.0.1:{{ .Values.bff.service.port }}/live').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+            httpGet:
+              path: /live
+              port: {{ .Values.bff.service.port }}
             failureThreshold: 3
             periodSeconds: 15
             initialDelaySeconds: 20
             timeoutSeconds: 5
           readinessProbe:
-            exec:
-              command:
-                - node
-                - -e
-                - "fetch('http://127.0.0.1:{{ .Values.bff.service.port }}/ready').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+            httpGet:
+              path: /ready
+              port: {{ .Values.bff.service.port }}
             failureThreshold: 3
             periodSeconds: 10
             initialDelaySeconds: 10
@@ -256,31 +250,25 @@ spec:
             {{- toYaml . | nindent 12 }}
           {{- end }}
           startupProbe:
-            exec:
-              command:
-                - node
-                - -e
-                - "fetch('http://127.0.0.1:{{ .Values.bff.service.port }}/live').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+            httpGet:
+              path: /live
+              port: {{ .Values.bff.service.port }}
             failureThreshold: 30
             periodSeconds: 10
             initialDelaySeconds: 5
             timeoutSeconds: 5
           livenessProbe:
-            exec:
-              command:
-                - node
-                - -e
-                - "fetch('http://127.0.0.1:{{ .Values.bff.service.port }}/live').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+            httpGet:
+              path: /live
+              port: {{ .Values.bff.service.port }}
             failureThreshold: 3
             periodSeconds: 15
             initialDelaySeconds: 20
             timeoutSeconds: 5
           readinessProbe:
-            exec:
-              command:
-                - node
-                - -e
-                - "fetch('http://127.0.0.1:{{ .Values.bff.service.port }}/ready').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+            httpGet:
+              path: /ready
+              port: {{ .Values.bff.service.port }}
             failureThreshold: 3
             periodSeconds: 10
             initialDelaySeconds: 10
