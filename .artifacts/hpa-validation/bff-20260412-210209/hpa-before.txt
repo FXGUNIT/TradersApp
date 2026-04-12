@@ -1,0 +1,2 @@
+NAME      REFERENCE        TARGETS       MINPODS   MAXPODS   REPLICAS   AGE
+bff-hpa   Deployment/bff   cpu: 8%/60%   2         8         2          23h

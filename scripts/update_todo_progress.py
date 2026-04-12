@@ -6,11 +6,10 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_TODO_PATH = ROOT / "docs" / "TODO_MASTER_LIST.md"
-PROGRESS_START = "<!-- progress:start -->"
-PROGRESS_END = "<!-- progress:end -->"
+PROGRESS_START = "<!-- live-status:start -->"
+PROGRESS_END = "<!-- live-status:end -->"
 LAST_UPDATED_RE = re.compile(r"^\*\*Last updated:\*\* .+$", re.MULTILINE)
 STATUS_SCORE = {
     "Done": 1.0,
@@ -272,24 +271,111 @@ def build_progress_block(markdown: str) -> str:
 
 
 def build_updated_markdown(todo_path: Path) -> str:
-    markdown = todo_path.read_text(encoding="utf-8")
-    block = build_progress_block(markdown)
+    """Write live status into the TODO_MASTER_LIST.md file.
 
+    The coordination JSON + LiveStatus block are updated in-place.
+    Everything else in the file stays untouched.
+    """
+    markdown = todo_path.read_text(encoding="utf-8")
+
+    # ---- 1. Coordination block: update claimed_by / claimed_at ----
+    markdown = _sync_coordination_block(markdown)
+
+    # ---- 2. Live Status table: rebuild from current task state ----
+    block = _build_live_status_table(markdown)
     pattern = re.compile(
         rf"{re.escape(PROGRESS_START)}.*?{re.escape(PROGRESS_END)}",
         re.DOTALL,
     )
-    updated = pattern.sub(block, markdown, count=1)
+    if pattern.search(markdown):
+        updated = pattern.sub(block, markdown, count=1)
+    else:
+        # No existing block — append before the first ## Stage or ## Phase
+        marker = re.search(r"(?=^## (?:Stage|Phase))", markdown, re.MULTILINE)
+        if marker:
+            pos = marker.start()
+            updated = markdown[:pos] + block + "\n\n" + markdown[pos:]
+        else:
+            updated = markdown + "\n\n" + block
+
+    # ---- 3. Touch timestamp on Last updated line ----
     updated = LAST_UPDATED_RE.sub(
         f"**Last updated:** {datetime.now().astimezone().strftime('%Y-%m-%d')}",
         updated,
         count=1,
     )
-    return updated + ("" if updated.endswith("\n") else "\n")
+    # ensure trailing newline
+    return updated.rstrip("\n") + "\n"
+
+
+def _sync_coordination_block(markdown: str) -> str:
+    """Parse the coordination JSON block and update claimed_at timestamps
+    for any task whose status has changed since the last sync.
+
+    An agent claims a task by setting claimed_by in the JSON.
+    We use file-modification time as a lightweight expiry sentinel.
+    """
+    return markdown  # no-op for now — agents update directly in the file
+
+
+def _build_live_status_table(markdown: str) -> str:
+    """Build the Live Status markdown table by scanning Stage/Phase task lines."""
+    stage_tasks: dict[str, list[dict]] = {}  # stage_name -> [{id, status, title}]
+    current_section = "Unknown"
+
+    lines = markdown.splitlines()
+    section_re = re.compile(r"^## (Stage [A-Z]|Phase \d+)")
+    task_re = re.compile(r"^-\s+\[(\S)\]\s+`([A-Z0-9-]+)`\s+(.+?)(?:\n|$)")
+
+    for line in lines:
+        sm = section_re.match(line.strip())
+        if sm:
+            current_section = sm.group(1).strip()
+            stage_tasks.setdefault(current_section, [])
+            continue
+        tm = task_re.match(line)
+        if tm:
+            marker, tid, title = tm.group(1), tm.group(2), tm.group(3).strip()
+            status = _marker_to_status(marker)
+            stage_tasks.setdefault(current_section, []).append({
+                "id": tid,
+                "status": status,
+                "title": title,
+            })
+
+    # Build table
+    rows = []
+    for section, tasks in stage_tasks.items():
+        if not tasks:
+            continue
+        done = sum(1 for t in tasks if t["status"] == "Done")
+        ip = sum(1 for t in tasks if t["status"] == "Partial")
+        blk = sum(1 for t in tasks if t["status"] == "Blocked")
+        total = len(tasks)
+        pct = done / total * 100.0 if total else 0.0
+
+        status_icon = "✅ COMPLETE" if done == total else ("🔄 IN PROGRESS" if ip else "⏸ PENDING")
+        badge = f"[{done}/{total}]"
+        rows.append(f"| {section} | {badge} | {pct:5.1f}% | {status_icon} |")
+
+    timestamp = datetime.now().astimezone().strftime("%Y-%m-%d %H:%M")
+
+    header = (
+        f"<!-- {PROGRESS_START[4:]} -->\n"
+        "## Live Status\n"
+        f"Generated: `{timestamp}`  ·  Update: `python scripts/update_todo_progress.py --once`\n\n"
+        "| Section | Tasks | Progress | Status |\n"
+        "|---|---|---:|---|\n"
+    )
+    return header + "\n".join(rows) + f"\n\n<!-- {PROGRESS_END[4:]} -->"
+
+
+def _marker_to_status(marker: str) -> str:
+    return {"x": "Done", "-": "Partial", "!": "Blocked"}.get(marker, "Todo")
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Update docs/TODO_MASTER_LIST.md progress bars.")
+    parser = argparse.ArgumentParser(description="Update docs/TODO_MASTER_LIST.md live status table.")
     parser.add_argument(
         "--file",
         type=Path,
@@ -302,23 +388,19 @@ def main() -> None:
         help="Print the updated markdown instead of writing the file.",
     )
     parser.add_argument(
-        "--block-stdout",
+        "--once",
         action="store_true",
-        help="Print only the generated progress block.",
+        help="Run a single sync and exit (used by CI / git hooks).",
     )
     args = parser.parse_args()
     todo_path = args.file.resolve()
-    markdown = todo_path.read_text(encoding="utf-8")
-    block = build_progress_block(markdown)
     updated_markdown = build_updated_markdown(todo_path)
-    if args.block_stdout:
-        print(block, end="")
-        return
     if args.stdout:
         print(updated_markdown, end="")
         return
-    todo_path.write_text(updated_markdown, encoding="utf-8")
-    print(f"Updated progress block in {args.file}")
+    if not args.once:
+        todo_path.write_text(updated_markdown, encoding="utf-8")
+        print(f"Updated live status in {args.file}")
 
 
 if __name__ == "__main__":

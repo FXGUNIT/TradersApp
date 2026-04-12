@@ -12,6 +12,7 @@ from update_todo_progress import (
     PROGRESS_END,
     PROGRESS_START,
     build_updated_markdown,
+    _build_live_status_table,
 )
 
 
@@ -58,11 +59,11 @@ def watch(todo_path: Path, poll_seconds: float) -> None:
                 if result == "synced":
                     refreshed = todo_path.read_text(encoding="utf-8")
                     last_seen_signature = source_signature(refreshed)
-                    print(f"[{stamp}] Synced TODO progress.")
+                    print(f"[{stamp}] Synced TODO live status.")
                 elif result == "current":
                     refreshed = todo_path.read_text(encoding="utf-8")
                     last_seen_signature = source_signature(refreshed)
-                    print(f"[{stamp}] TODO progress already current.")
+                    print(f"[{stamp}] TODO live status already current.")
                 else:
                     print(f"[{stamp}] TODO file is locked; retrying when it becomes writable.")
             time.sleep(poll_seconds)
