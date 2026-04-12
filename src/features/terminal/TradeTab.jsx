@@ -19,6 +19,9 @@ import { useTerminalOcr, OCR_STATES } from "./useTerminalOcr.js";
 import { RiskSlider } from "./RiskSlider.jsx";
 import { useDebounce } from "./useDebounce.js";
 import VerdictRadar, { deriveVerdictScores } from "./VerdictRadar.jsx";
+import TradeTabCircuitBreaker from "./TradeTabCircuitBreaker.jsx";
+import P2TradeForm from "./P2TradeForm.jsx";
+import VerdictSynthesis from "./VerdictSynthesis.jsx";
 import {
   Zap,              // Trade Setup section
   BarChart2,        // INDICATORS zone
@@ -122,35 +125,13 @@ export default function TradeTab({
   }, 800);
 
   // ── Verdict radar — derive 5 scores from readiness panel signals ───────
-  // ── Circuit breaker countdown (reads localStorage every second) ──────────
-  const CIRCUIT_KEY = "tilt_circuit_until";
-  const getCircuitSecs = () => {
-    try {
-      const v = localStorage.getItem(CIRCUIT_KEY);
-      if (!v) return 0;
-      const remaining = Math.max(0, Math.ceil((parseInt(v, 10) - Date.now()) / 1000));
-      return remaining;
-    } catch { return 0; }
-  };
-  const [circuitSecs, setCircuitSecs] = useState(getCircuitSecs);
-  const circuitTimerRef = useRef(null);
+  const [circuitSecs, setCircuitSecs] = useState(0);
 
-  useEffect(() => {
-    if (!execBlocked) {
-      if (circuitTimerRef.current) { clearInterval(circuitTimerRef.current); circuitTimerRef.current = null; }
-      return;
-    }
-    // Poll every second
-    circuitTimerRef.current = setInterval(() => {
-      const secs = getCircuitSecs();
-      setCircuitSecs(secs);
-      if (secs <= 0 && circuitTimerRef.current) {
-        clearInterval(circuitTimerRef.current);
-        circuitTimerRef.current = null;
-      }
-    }, 1000);
-    return () => { if (circuitTimerRef.current) clearInterval(circuitTimerRef.current); };
-  }, [execBlocked]);
+  <TradeTabCircuitBreaker
+    execBlocked={execBlocked}
+    onCircuitSecsChange={setCircuitSecs}
+    circuitSecs={circuitSecs}
+  />
   // All inputs come from terminalDerivedState (already computed by the worker)
   const verdictScores = useMemo(
     () =>
@@ -581,175 +562,33 @@ export default function TradeTab({
             : "⚡ CAPTURE ENGINE"}
       </button>
 
-      <div ref={p2Ref} style={{ marginTop: 24 }}>
-        {loading && (
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              minHeight: 240,
-              gap: 16,
-            }}
-          >
-            <div style={{ display: "flex", gap: 4, alignItems: "flex-end", height: 28 }}>
-              {[8, 15, 10, 20, 12, 17, 9].map((h, i) => (
-                <div
-                  key={i}
-                  style={{
-                    width: 4,
-                    height: h,
-                    background: T.orange,
-                    borderRadius: 2,
-                    animation: `bar ${0.85 + i * 0.05}s ${i * 0.1}s ease-in-out infinite alternate`,
-                  }}
-                />
-              ))}
-            </div>
-            <span
-              style={{
-                color: T.muted,
-                fontSize: 12,
-                letterSpacing: 2,
-                fontWeight: 600,
-              }}
-            >
-              RECURSIVE CONSENSUS ENGINE
-            </span>
-          </div>
-        )}
-        {!loading && p2Out && (
-          <div>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: 16,
-              }}
-            >
-              <Tag label="EXECUTION PLAN READY" color={T.orange} />
-              <div style={{ display: "flex", gap: 10 }}>
-                <button
-                  onClick={() => setShowP2TradeForm((v) => !v)}
-                  style={glowBtn(T.purple, false)}
-                  className="btn-glass"
-                >
-                  {showP2TradeForm ? "✕ CANCEL" : "+ LOG TRADE"}
-                </button>
-              </div>
-            </div>
+      <P2TradeForm
+        p2Jf={p2Jf}
+        sp2={sp2}
+        showP2TradeForm={showP2TradeForm}
+        setShowP2TradeForm={setShowP2TradeForm}
+        p2Out={p2Out}
+        p2Ref={p2Ref}
+        predictedP2TP1={predictedP2TP1}
+        predictedP2SL={predictedP2SL}
+        slPts={slPts}
+        ptVal={ptVal}
+        accountState={accountState}
+        addP2Trade={addP2Trade}
+        err={err}
+        setErr={setErr}
+        loading={loading}
+        isTerminalDerivedPending={isTerminalDerivedPending}
+        execBlocked={execBlocked}
+        runPart2={runPart2}
+        hasFirmRules={hasFirmRules}
+        onSaveAccount={() => {}}
+        showToast={showToast}
+        trafficState={trafficState}
+        verdictScores={verdictScores}
+      />
 
-            {showP2TradeForm && (
-              <div
-                style={{
-                  background: CSS_VARS.card,
-                  border: `1px solid ${CSS_VARS.borderSubtle}`,
-                  borderRadius: 12,
-                  padding: "20px 24px",
-                  marginBottom: 20,
-                  boxShadow: `0 1px 3px 0 ${CSS_VARS.borderSubtle}, 0 1px 2px 0 ${CSS_VARS.borderSubtle}`,
-                }}
-                className="glass-panel"
-              >
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-                    gap: 16,
-                    marginBottom: 16,
-                  }}
-                >
-                  <Field
-                    label="EXIT PRICE"
-                    value={p2Jf.exit}
-                    onChange={sp2("exit")}
-                    type="number"
-                    mono
-                  />
-                  <Field
-                    label="RESULT"
-                    value={p2Jf.result}
-                    onChange={sp2("result")}
-                    options={[
-                      { v: "win", l: "✓ Win" },
-                      { v: "loss", l: "✗ Loss" },
-                      { v: "breakeven", l: "◎ BE" },
-                    ]}
-                  />
-                  <Field
-                    label="AMD PHASE AT TRADE"
-                    value={p2Jf.amdPhase}
-                    onChange={sp2("amdPhase")}
-                    options={Object.keys(AMD_PHASES).map((k) => ({
-                      v: k,
-                      l: AMD_PHASES[k].label,
-                    }))}
-                  />
-                  <Field
-                    label="P&L ($)"
-                    value={p2Jf.pnl}
-                    onChange={sp2("pnl")}
-                    type="number"
-                    mono
-                  />
-                  <Field
-                    label="BALANCE AFTER ($)"
-                    value={p2Jf.balAfter}
-                    onChange={sp2("balAfter")}
-                    type="number"
-                    mono
-                  />
-                </div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 16 }}>
-                  <Tag
-                    label={`Pred TP1: ${Number.isFinite(predictedP2TP1) ? predictedP2TP1.toFixed(2) : "—"}`}
-                    color={T.green}
-                  />
-                  <Tag
-                    label={`Pred SL: ${Number.isFinite(predictedP2SL) ? predictedP2SL.toFixed(2) : "—"}`}
-                    color={T.red}
-                  />
-                </div>
-                <button
-                  onClick={addP2Trade}
-                  style={glowBtn(T.purple, false)}
-                  className="btn-glass"
-                >
-                  + ADD TO JOURNAL
-                </button>
-              </div>
-            )}
-
-            <TrafficLight state={trafficState} />
-
-            <div style={cardS({ borderLeft: `4px solid ${T.orange}` })} className="glass-panel card-tilt">
-              <RenderOut text={p2Out} />
-            </div>
-
-            {/* ── Supreme Verdict Synthesis Radar ─────────────────── */}
-            {verdictScores && (
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 20,
-                  padding: "16px 20px",
-                  background: CSS_VARS.card,
-                  border: `1px solid ${CSS_VARS.borderSubtle}`,
-                  borderRadius: 12,
-                  boxShadow: `0 1px 3px 0 ${CSS_VARS.borderSubtle}`,
-                }}
-                className="glass-panel"
-              >
-                <SHead icon="◈" title="VERDICT SYNTHESIS" color={T.purple} />
-                <VerdictRadar scores={verdictScores} size={180} animated />
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+      <VerdictSynthesis verdictScores={verdictScores} />
     </div>
   );
 }
