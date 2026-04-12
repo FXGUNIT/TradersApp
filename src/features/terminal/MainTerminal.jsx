@@ -74,6 +74,7 @@ const modalShadow = "var(--shadow-deep, 0 30px 80px rgba(15,23,42,0.18))";
 // Aliases for backward compatibility with rest of MainTerminal
 const defaultExtractedVals = DEFAULT_EXTRACTED_VALS;
 const defaultFirmRules = DEFAULT_FIRM_RULES;
+
 export default function MainTerminal({
   profile,
   onLogout,
