@@ -64,6 +64,12 @@ Generated: `2026-04-13 02:41`  ·  Run `python scripts/update_todo_progress.py -
 > **Claimed by:** (update the JSON coordination block above before starting)
 > **Trigger (2026-04-12):** Validate HPA manifests for ml-engine and bff in `tradersapp-dev`.
 
+> **Update (2026-04-13):**
+> - `M01`, `M03`, and `M05` are now complete live.
+> - `metrics-server` is installed and both HPAs reached `ScalingActive: True`, but `M02` stays partial because the Metrics API can still briefly flap under aggressive end-to-end load.
+> - `scripts/k8s/validate-hpa-ml-engine.sh` now proves live ml-engine scale-up (`1` → `3`) cleanly, and `scripts/k8s/run-hpa-scaling-test.sh` was upgraded to use real in-cluster `/predict` load.
+> - `M04` is near-complete but still needs one clean umbrella-script rerun for the final scale-down phase after the Metrics API stabilizes fully.
+
 - [x] `M01` Apply and validate HPA manifests for ml-engine and bff in `tradersapp-dev`.
   - updated: 2026-04-12 23:xx
   - **Blockers (2026-04-12):**

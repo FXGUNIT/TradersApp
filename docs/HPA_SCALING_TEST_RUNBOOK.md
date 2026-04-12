@@ -51,6 +51,16 @@ What was verified live:
 - `bff-hpa` scaled from `2` to `3` and later returned to `2`
 - validation scripts now fail fast if an unexpected HPA name already targets either deployment
 
+### 2026-04-13 Recovery Summary
+
+- `metrics-server` was installed live and patched with `--kubelet-insecure-tls`
+- steady-state `kubectl top` works and both HPAs reached `ScalingActive: True`
+- `ml-engine` now reaches `2/2 Ready` on `dev-retryfix-20260413a`
+- `bff` now reaches `1/1 Ready` per pod on `dev-readyprobe-20260413b` with `httpGet` probes and `BFF_HOST=0.0.0.0`
+- `scripts/k8s/validate-hpa-ml-engine.sh` cleanly scaled `ml-engine` from `1` to `3`
+- independent BFF-targeted load scaled `bff` from `2` to `4` and later back to `2`
+- remaining risk: under aggressive end-to-end validation, the Metrics API can still briefly flap and force one more clean rerun of the umbrella script
+
 ### Metrics API State
 
 `metrics-server` is present in `kube-system`, but the metrics API is still flapping between healthy and unavailable:
