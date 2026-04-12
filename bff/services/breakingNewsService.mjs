@@ -1,45 +1,18 @@
 /**
  * Breaking News Intelligence Service
- * ====================================
- * Real-time breaking news for MNQ/ES/SPY trading — 100% free sources.
- *
- * Sources (in priority order):
- * 1. Finnhub (free tier: 60 req/min, no key needed for some endpoints)
- *    - Real-time market news, company-specific, forex, crypto
- * 2. NewsData.io (existing: 200 credits/month free)
- *    - Business/financial news, broader coverage
- * 3. Yahoo Finance RSS (no API key, instant headlines)
- *    - Fastest source for top financial headlines
- * 4. GDELT Project (no API key, 15-min delay)
- *    - Global news coverage as fallback
- *
- * Caching:
- * - Redis-backed shared snapshot cache across BFF pods
- * - Deduplication by title hash across all sources
- * - Rate limit awareness per source
- *
- * ML Self-Training:
- * - Each breaking news item is tagged with: source, timestamp, keywords, sentiment
- * - newsReactionLog records market reaction at 5/15/30/60 min after headline
- * - ML models use reaction data for news-impact learning
+ * Real-time news for MNQ/ES/SPY via Finnhub, NewsData.io, Yahoo Finance RSS, GDELT.
+ * Redis-backed snapshot cache; NewsReactionLog tracks 5/15/30/60-min market reactions.
  */
 
 import { getRedisClient } from "./redis-session-store.mjs";
 import {
-  TRADING_KEYWORDS,
-  HIGH_IMPACT_KEYWORDS,
-  MEDIUM_IMPACT_KEYWORDS,
-  BULLISH_WORDS,
-  BEARISH_WORDS,
   classifySentiment,
   classifyImpact,
   isRelevantToTrading,
   generateNewsId,
   extractKeywords,
   hashNewsTitle,
-  impactRank,
   sortNewsItems,
-  selectNewsItems,
   buildBreakingNewsPayload,
   parseRSSItems,
   extractRSSField,
@@ -108,29 +81,14 @@ async function writeBreakingNewsSnapshot(snapshot) {
 }
 
 async function markBreakingNewsReacted(newsId) {
-  if (!newsId) {
-    return;
-  }
+  if (!newsId) return;
   const snapshot = await readBreakingNewsSnapshot();
-  if (!snapshot?.items?.length) {
-    return;
-  }
-  let changed = false;
-  const items = snapshot.items.map((item) => {
-    if (item.id !== newsId) {
-      return item;
-    }
-    changed = true;
-    return {
-      ...item,
-      reactionLogged: true,
-    };
-  });
-  if (changed) {
-    await writeBreakingNewsSnapshot({
-      ...snapshot,
-      items,
-    });
+  if (!snapshot?.items?.length) return;
+  const items = snapshot.items.map(item =>
+    item.id === newsId ? { ...item, reactionLogged: true } : item
+  );
+  if (items.some((item, i) => item !== snapshot.items[i])) {
+    await writeBreakingNewsSnapshot({ ...snapshot, items });
   }
 }
 
@@ -230,7 +188,6 @@ class NewsReactionLog {
 }
 
 const reactionLog = new NewsReactionLog();
-
 
 // ─── Source: Finnhub ─────────────────────────────────────────────────────────
 

@@ -15,3 +15,5 @@ t=130s replicas=1 desired=1 current=1 cpu=unknown
 t=140s replicas=1 desired=1 current=1 cpu=unknown
 t=150s replicas=1 desired=1 current=1 cpu=unknown
 t=160s replicas=1 desired=1 current=0 cpu=unknown
+t=170s replicas=0 desired=0 current=0 cpu=unknown
+t=180s replicas=0 desired=0 current=0 cpu=unknown
