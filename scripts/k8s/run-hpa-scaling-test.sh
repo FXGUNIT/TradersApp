@@ -52,7 +52,13 @@ fail()  { echo "[$(date +%H:%M:%S)] FAIL: $*" >&2; exit 1; }
 info()  { echo "[$(date +%H:%M:%S)] INFO: $*" >&2; }
 
 cleanup_load_pod() {
-  kubectl delete pod "$LOAD_POD_NAME" -n "$NAMESPACE" --ignore-not-found=true >/dev/null 2>&1 || true
+  kubectl delete pod "$LOAD_POD_NAME" \
+    -n "$NAMESPACE" \
+    --ignore-not-found=true \
+    --force \
+    --grace-period=0 \
+    --wait=false \
+    >/dev/null 2>&1 || true
 }
 
 prefer_k3s_kubeconfig() {
@@ -137,7 +143,7 @@ log "[OK] Namespace '$NAMESPACE' exists"
 
 # Check metrics API (critical — HPA won't work without it)
 METRICS_AVAILABLE=false
-if kubectl get --raw /apis/metrics.k8s.io/v1beta1/nodes >/dev/null 2>&1; then
+if kubectl --request-timeout=10s get --raw /apis/metrics.k8s.io/v1beta1/nodes >/dev/null 2>&1; then
   METRICS_AVAILABLE=true
   log "[OK] metrics.k8s.io is registered"
 else
@@ -146,7 +152,7 @@ else
 fi
 
 # Check custom metrics API
-if kubectl get --raw /apis/custom.metrics.k8s.io/v1beta2 >/dev/null 2>&1; then
+if kubectl --request-timeout=10s get --raw /apis/custom.metrics.k8s.io/v1beta2 >/dev/null 2>&1; then
   log "[OK] custom.metrics.k8s.io is registered"
 else
   warn "custom.metrics.k8s.io NOT registered — custom HPA metrics (e.g. ml-engine-p95-latency-ms) will be <unknown>"
@@ -201,7 +207,7 @@ kubectl get deploy -n "$NAMESPACE" -o wide >> "${OUTPUT_DIR}/hpa-baseline.txt"
 kubectl describe hpa -n "$NAMESPACE" > "${OUTPUT_DIR}/hpa-describe-baseline.txt"
 cat "${OUTPUT_DIR}/hpa-baseline.txt"
 
-BASELINE_REPLICAS=$(kubectl get deploy ml-engine -n "$NAMESPACE" -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "1")
+BASELINE_REPLICAS=$(kubectl --request-timeout=10s get deploy ml-engine -n "$NAMESPACE" -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "1")
 
 # ── Step 3: Start load generation ─────────────────────────────────────────────
 log ""
@@ -244,7 +250,7 @@ echo "# time_s replicas_desired replicas_actual cpu_util memory_util" > "$MONITO
 # Try to read node metrics (may fail if metrics-server not installed)
 get_cpu_util() {
   local pods
-  pods=$(kubectl top pods -n "$NAMESPACE" -l "app=ml-engine" --no-headers 2>/dev/null || echo "")
+  pods=$(kubectl --request-timeout=10s top pods -n "$NAMESPACE" -l "app=ml-engine" --no-headers 2>/dev/null || echo "")
   if [[ -n "$pods" ]]; then
     echo "$pods" | awk '{print $2}' | tr -d 'm' | head -1
   else
@@ -258,9 +264,9 @@ PEAK_DESIRED="$BASELINE_REPLICAS"
 for i in $(seq 1 $((SCALE_UP_TIMEOUT / 10))); do
   sleep 10
 
-  REPLICAS=$(kubectl get deploy ml-engine -n "$NAMESPACE" -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "0")
-  DESIRED=$(kubectl get hpa "$EXPECTED_ML_HPA_NAME" -n "$NAMESPACE" -o jsonpath='{.status.desiredReplicas}' 2>/dev/null || echo "0")
-  CURRENT=$(kubectl get hpa "$EXPECTED_ML_HPA_NAME" -n "$NAMESPACE" -o jsonpath='{.status.currentReplicas}' 2>/dev/null || echo "0")
+  REPLICAS=$(kubectl --request-timeout=10s get deploy ml-engine -n "$NAMESPACE" -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "0")
+  DESIRED=$(kubectl --request-timeout=10s get hpa "$EXPECTED_ML_HPA_NAME" -n "$NAMESPACE" -o jsonpath='{.status.desiredReplicas}' 2>/dev/null || echo "0")
+  CURRENT=$(kubectl --request-timeout=10s get hpa "$EXPECTED_ML_HPA_NAME" -n "$NAMESPACE" -o jsonpath='{.status.currentReplicas}' 2>/dev/null || echo "0")
   CPU=$(get_cpu_util)
   TIMESTAMP=$(date +%H:%M:%S)
 
@@ -294,7 +300,7 @@ log ""
 log "Step 5: Capturing scale-up state"
 kubectl get hpa -n "$NAMESPACE" -o wide > "${OUTPUT_DIR}/hpa-after-load.txt"
 kubectl get pods -n "$NAMESPACE" -l "app=ml-engine" >> "${OUTPUT_DIR}/hpa-after-load.txt"
-kubectl top pods -n "$NAMESPACE" -l "app=ml-engine" >> "${OUTPUT_DIR}/hpa-after-load.txt" 2>&1 || true
+kubectl --request-timeout=10s top pods -n "$NAMESPACE" -l "app=ml-engine" >> "${OUTPUT_DIR}/hpa-after-load.txt" 2>&1 || true
 
 # ── Step 6: Stop load ────────────────────────────────────────────────────────
 log ""
@@ -304,7 +310,7 @@ log "Load stopped"
 
 # ── Step 7: Wait for scale-down ─────────────────────────────────────────────
 log ""
-SCALE_DOWN_START_REPLICAS=$(kubectl get deploy ml-engine -n "$NAMESPACE" -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "$PEAK_REPLICAS")
+SCALE_DOWN_START_REPLICAS=$(kubectl --request-timeout=10s get deploy ml-engine -n "$NAMESPACE" -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "$PEAK_REPLICAS")
 if [[ "$SCALE_DOWN_START_REPLICAS" -lt "$PEAK_REPLICAS" ]]; then
   SCALE_DOWN_START_REPLICAS="$PEAK_REPLICAS"
 fi
@@ -323,8 +329,8 @@ log "Step 7: Waiting up to ${SCALE_DOWN_WAIT}s for scale-down to baseline replic
 SCALE_DOWN_COMPLETE=false
 for i in $(seq 1 $((SCALE_DOWN_WAIT / 30))); do
   sleep 30
-  REPLICAS=$(kubectl get deploy ml-engine -n "$NAMESPACE" -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "0")
-  DESIRED=$(kubectl get hpa "$EXPECTED_ML_HPA_NAME" -n "$NAMESPACE" -o jsonpath='{.status.desiredReplicas}' 2>/dev/null || echo "0")
+  REPLICAS=$(kubectl --request-timeout=10s get deploy ml-engine -n "$NAMESPACE" -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "0")
+  DESIRED=$(kubectl --request-timeout=10s get hpa "$EXPECTED_ML_HPA_NAME" -n "$NAMESPACE" -o jsonpath='{.status.desiredReplicas}' 2>/dev/null || echo "0")
   elapsed=$((i * 30))
   log "  t=${elapsed}s | ml-engine replicas=$REPLICAS | HPA desired=$DESIRED"
 
@@ -340,7 +346,7 @@ log ""
 log "Step 8: Final state"
 kubectl get hpa -n "$NAMESPACE" -o wide > "${OUTPUT_DIR}/hpa-final.txt"
 kubectl get pods -n "$NAMESPACE" -l "app=ml-engine" >> "${OUTPUT_DIR}/hpa-final.txt"
-kubectl top pods -n "$NAMESPACE" -l "app=ml-engine" >> "${OUTPUT_DIR}/hpa-final.txt" 2>&1 || true
+kubectl --request-timeout=10s top pods -n "$NAMESPACE" -l "app=ml-engine" >> "${OUTPUT_DIR}/hpa-final.txt" 2>&1 || true
 cat "${OUTPUT_DIR}/hpa-final.txt"
 
 # ── Step 9: Print summary ──────────────────────────────────────────────────────
