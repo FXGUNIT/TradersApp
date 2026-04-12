@@ -1121,7 +1121,7 @@ export default function MainTerminal({
     screenshotsLength: screenshots.length,
   });
 
-  // CSV handler
+  // CSV handler — uses terminalCsvParser.js (worker-backed) with fallback
   const handleCsvDrop = useCallback(async (e) => {
     e.preventDefault();
     const file = e.dataTransfer?.files[0] || e.target.files?.[0];
@@ -1134,7 +1134,6 @@ export default function MainTerminal({
     setParseMsg("");
     setIsCsvParsing(true);
     setCsvProgress(0);
-    let handledAsync = false;
 
     try {
       const text = await file.text();
@@ -1142,115 +1141,22 @@ export default function MainTerminal({
 
       if (worker) {
         worker.postMessage({ requestId, text });
-        handledAsync = true;
+        return;
       }
-      if (!worker) {
-        const result = parseTerminalCsvText(text);
-        applyCsvParseResult(requestId, result);
-        handledAsync = true;
-      }
+      // Worker unavailable — use synchronous parser
+      const result = parseTerminalCsvText(text);
+      applyCsvParseResult(requestId, result);
     } catch (error) {
       applyCsvParseResult(requestId, {
         ok: false,
         parsed: null,
         parseMsg: `⚠ ${error?.message || "Unable to read CSV export"}`,
       });
-      handledAsync = true;
     } finally {
       if (!csvParserWorkerRef.current) {
         setIsCsvParsing(false);
       }
     }
-
-    if (handledAsync) return;
-    
-    const r = new FileReader();
-    r.onload = ev => {
-      const text = ev.target.result;
-      const lines = text.trim().split('\n');
-      const days = [];
-      let totalBars = 0;
-      
-      for (let i = 1; i < lines.length; i++) {
-        const cols = lines[i].split(',');
-        if (cols.length < 6) continue;
-        
-        const date = cols[0]?.trim();
-        const time = cols[1]?.trim();
-        const open = parseFloat(cols[2]);
-        const high = parseFloat(cols[3]);
-        const low = parseFloat(cols[4]);
-        const close = parseFloat(cols[5]);
-        
-        if (isNaN(open) || isNaN(close)) continue;
-        
-        const isPreMarket = time && time.length >= 4 && parseInt(time.slice(0, 2)) < 9;
-        const isPostMarket = time && time.length >= 4 && parseInt(time.slice(0, 2)) >= 16;
-        
-        const tr = isNaN(high - low) ? 0 : high - low;
-        
-        if (!days.length || days[days.length - 1].date !== date) {
-          days.push({
-            date,
-            bars: 1,
-            preMarket: isPreMarket ? 1 : 0,
-            tradingHours: !isPreMarket && !isPostMarket ? 1 : 0,
-            postMarket: isPostMarket ? 1 : 0,
-            atr14: tr,
-            tradingHoursAtr14: !isPreMarket && !isPostMarket ? tr : 0,
-            dayHigh: high,
-            dayLow: low,
-          });
-        } else {
-          const d = days[days.length - 1];
-          d.bars++;
-          if (isPreMarket) d.preMarket++;
-          else if (!isPostMarket) d.tradingHours++;
-          else d.postMarket++;
-          d.atr14 = Math.max(d.atr14, tr);
-          if (!isPreMarket && !isPostMarket) d.tradingHoursAtr14 = Math.max(d.tradingHoursAtr14, tr);
-          d.dayHigh = Number.isFinite(d.dayHigh) ? Math.max(d.dayHigh, high) : high;
-          d.dayLow = Number.isFinite(d.dayLow) ? Math.min(d.dayLow, low) : low;
-        }
-        totalBars++;
-      }
-      
-      if (days.length >= 5) {
-        days.sort((a, b) => new Date(a.date) - new Date(b.date));
-        for (let i = 0; i < days.length; i++) {
-          const fiveDaySlice = days.slice(Math.max(0, i - 4), i + 1);
-          const fiveDaySum = fiveDaySlice.reduce((s, d) => s + (d.atr14 || 0), 0);
-          days[i].fiveDayATR = fiveDaySum / fiveDaySlice.length;
-
-          const twentyDaySlice = days.slice(Math.max(0, i - 19), i + 1);
-          const twentyDaySum = twentyDaySlice.reduce((s, d) => s + (d.atr14 || 0), 0);
-          days[i].twentyDayATR = twentyDaySum / twentyDaySlice.length;
-        }
-      }
-      
-      const tradingHoursAtr = days.reduce((s, d) => s + (d.tradingHoursAtr14 || 0), 0) / (days.length || 1);
-      const priorDays = days.slice(0, -1);
-      const priorWeek = priorDays.slice(-5);
-      const prevDay = priorDays[priorDays.length - 1] || null;
-      const priorWeekHighs = priorWeek.map((d) => d.dayHigh).filter(Number.isFinite);
-      const priorWeekLows = priorWeek.map((d) => d.dayLow).filter(Number.isFinite);
-      const keyLevels = {
-        pdh: prevDay?.dayHigh ?? null,
-        pdl: prevDay?.dayLow ?? null,
-        pwh: priorWeekHighs.length ? Math.max(...priorWeekHighs) : null,
-        pwl: priorWeekLows.length ? Math.min(...priorWeekLows) : null,
-      };
-      
-      if (days.length < 5) {
-        setParseMsg(`⚠ Only ${days.length} days — need 5+`);
-        setParsed(null);
-        return;
-      }
-      
-      setParsed({ days, totalBars, totalDays: days.length, tradingHoursAtr14: tradingHoursAtr, keyLevels });
-      setParseMsg(`✓ ${totalBars.toLocaleString()} bars → ${days.length} days`);
-    };
-    r.readAsText(file);
   }, [applyCsvParseResult]);
 
   const handleScreenshotDrop = useCallback(async (event) => {
