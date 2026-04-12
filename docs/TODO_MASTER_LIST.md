@@ -11,12 +11,12 @@
 
 Every task uses one of these four prefixes — nothing else:
 
-| Prefix  | Meaning                              |
-| ------- | ------------------------------------ |
-| `[ ]`   | Not started                          |
-| `[-]`   | In progress (with inline status)     |
-| `[x]`   | Done (with commit hash + date)       |
-| `[!]`   | Blocked (with blocker reason)        |
+| Prefix | Meaning |
+| ------ | ------- |
+| `[ ]` | Not started |
+| `[-]` | In progress (with inline status) |
+| `[x]` | Done (with commit hash + date) |
+| `[!]` | Blocked (with blocker reason) |
 
 ### Atomic Update Rule
 
@@ -36,55 +36,26 @@ Before starting work, claim your tasks here. This prevents two agents from updat
 {
   "M01": { "claimed_by": null, "claimed_at": null },
   "M02": { "claimed_by": null, "claimed_at": null },
-  "M03": { "claimed_by": null, "claimed_at": null }
+  "M03": { "claimed_by": null, "claimed_at": null },
+  "M04": { "claimed_by": null, "claimed_at": null },
+  "M05": { "claimed_by": null, "claimed_at": null }
 }
 ```
 
-### Change Log (append-only — never delete lines)
+### Live Status Table (auto-generated — do not edit)
 
-```
-2026-04-13 02:24 | CLAUDE-CODE | REDESIGNED | Protocol v2.0 — atomic update, coordination section, validation script
-```
-
----
-
-## Live Status (auto-generated — do not edit manually)
-
-Generate fresh with: `python scripts/sync_todo_progress.py`
-
-```
-Phase    | Tasks  | Done  | In-Progress | Blocked | Status
----------|--------|-------|-------------|---------|--------
-Phase 1  |   3    |   3   |      0      |    0    | ✅ COMPLETE
-Phase 2  |  10    |  10   |      0      |    0    | ✅ COMPLETE
-Phase 3  |  15    |  15   |      0      |    0    | ✅ COMPLETE
-Phase 4  |   9    |   9   |      0      |    0    | ✅ COMPLETE
-Phase 5  |   9    |   9   |      0      |    0    | ✅ COMPLETE
-Phase 6  |  14    |  14   |      0      |    0    | ✅ COMPLETE
-Phase 7  |  15    |  15   |      0      |    0    | ✅ COMPLETE
-Phase 8  |   6    |   6   |      0      |    0    | ✅ COMPLETE
-Phase 9  |  12    |  12   |      0      |    0    | ✅ COMPLETE
-Phase 10 |   5    |   5   |      0      |    0    | ✅ COMPLETE
-Phase 11 |   1    |   1   |      0      |    0    | ✅ COMPLETE
-Phase 12 |  12    |  12   |      0      |    0    | ✅ COMPLETE
-Stage M  |   5    |   0   |      5      |    0    | 🔄 IN PROGRESS
-Stage N  |   5    |   5   |      0      |    0    | ✅ COMPLETE
----------|--------|-------|-------------|---------|--------
-TOTAL    | 121    | 116   |      5      |    0    | ✅ 95.9% complete
-```
-
----
+Run `python scripts/update_todo_progress.py --once` to regenerate.
 
 <!--  live-status:start --> -->
 ## Live Status
-Generated: `2026-04-13 02:33`  ·  Update: `python scripts/update_todo_progress.py --once`
+Generated: `2026-04-13 02:35`  ·  Update: `python scripts/update_todo_progress.py --once`
 
 | Section | Tasks | Progress | Status |
 |---|---|---:|---|
 | Stage M | [0/5] |   0.0% | 🔄 IN PROGRESS |
 | Stage N | [5/5] | 100.0% | ✅ COMPLETE |
 
-<!--  live-status:end --> -->
+<!--  live-status:end --> -->>
 
 ## Stage M: Kubernetes HPA Live Scaling Validation
 
