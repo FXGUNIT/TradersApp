@@ -10,6 +10,12 @@ import sys, os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import config
+from infrastructure.board_room_client import ensure_heartbeat_loop
+
+ensure_heartbeat_loop(
+    "ML.AlphaEngine",
+    focus="Calculating alpha and expectancy metrics.",
+)
 
 
 def _normalized_results(trade_log_df: pd.DataFrame) -> pd.Series:

@@ -17,6 +17,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import config
 from training.model_store import ModelStore
 from features.feature_pipeline import engineer_features, get_feature_vector
+from infrastructure.board_room_client import ensure_heartbeat_loop, report_error
 
 
 class Predictor:
@@ -31,6 +32,10 @@ class Predictor:
     """
 
     def __init__(self, store_dir: str | None = None):
+        ensure_heartbeat_loop(
+            "ML.Predictor",
+            focus="Serving inference predictor models.",
+        )
         self.store = ModelStore(store_dir)
         self._models: dict[str, dict] = {}  # name -> {pipeline, meta, feature_cols, version}
         self._loaded = False
@@ -60,6 +65,12 @@ class Predictor:
                 }
             except FileNotFoundError:
                 pass
+            except Exception as exc:
+                report_error(
+                    "ML.Predictor",
+                    f"Model load failed for {name}: {exc}",
+                    severity="HIGH",
+                )
 
         self._loaded = len(self._models) > 0
         return {
@@ -99,6 +110,11 @@ class Predictor:
                     print(f"[Predictor] Hot-reloaded {name} → {meta.get('version')}")
                 except Exception as e:
                     print(f"[Predictor] Hot-reload failed for {name}: {e}")
+                    report_error(
+                        "ML.Predictor",
+                        f"Hot-reload failed for {name}: {e}",
+                        severity="MEDIUM",
+                    )
 
         if reloaded:
             print(f"[Predictor] Hot-reloaded models: {', '.join(reloaded)}")

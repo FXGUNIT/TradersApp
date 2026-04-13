@@ -11,6 +11,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import config
 from features.feature_pipeline import assign_session_ids
 from training.cross_validator import TimeSeriesCrossValidator
+from infrastructure.board_room_client import ensure_heartbeat_loop
 
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.pipeline import Pipeline
@@ -29,6 +30,10 @@ class SessionProbabilityModel:
     model_type = "session"
 
     def __init__(self):
+        ensure_heartbeat_loop(
+            "ML.SessionProbability",
+            focus="Training and scoring session probabilities.",
+        )
         self.pipeline = Pipeline([
             ("scaler", StandardScaler()),
             ("clf", CalibratedClassifierCV(

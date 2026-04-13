@@ -10,6 +10,7 @@ import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import config
 from inference.explainer import SHAPExplainer, explain_all_votes
+from infrastructure.board_room_client import ensure_heartbeat_loop, report_error
 
 
 class ConsensusAggregator:
@@ -26,6 +27,10 @@ class ConsensusAggregator:
     """
 
     def __init__(self):
+        ensure_heartbeat_loop(
+            "ML.ConsensusAggregator",
+            focus="Aggregating model votes into final consensus output.",
+        )
         self.explainer = SHAPExplainer()
 
     def aggregate(
@@ -53,7 +58,15 @@ class ConsensusAggregator:
         valid_votes = {k: v for k, v in votes.items() if "error" not in v}
 
         # SHAP explanations
-        explanations = explain_all_votes(valid_votes, feature_dict, model_metas)
+        try:
+            explanations = explain_all_votes(valid_votes, feature_dict, model_metas)
+        except Exception as exc:
+            report_error(
+                "ML.ConsensusAggregator",
+                f"SHAP explanation failed: {exc}",
+                severity="MEDIUM",
+            )
+            explanations = {}
 
         # Build vote breakdown with reasons
         vote_breakdown = {}

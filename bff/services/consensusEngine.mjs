@@ -24,6 +24,18 @@
 import { recordMlEngineRequest, setCircuitBreakerState } from "../metrics.mjs";
 import { predictConsensusTransport } from "./analysisTransport.mjs";
 import { buildMlFeatureVector } from "./consensusAggregator.mjs";
+import {
+  ensureAgentHeartbeat,
+  refreshAgentHeartbeat,
+  reportAgentError,
+} from "./boardRoomAgentReporter.mjs";
+
+const CONSENSUS_AGENT = "ConsensusEngine";
+
+ensureAgentHeartbeat({
+  agent: CONSENSUS_AGENT,
+  focus: "Aggregating ML consensus and regime calls.",
+});
 
 // ── Circuit Breaker ────────────────────────────────────────────────────────────
 
@@ -138,6 +150,11 @@ async function mlRequest(
   timeout = ML_REQUEST_TIMEOUT_MS,
   options = {},
 ) {
+  refreshAgentHeartbeat({
+    agent: CONSENSUS_AGENT,
+    status: "active",
+    focus: `ML request ${path}`,
+  });
   const isAvailable = _mlCircuitBreaker.isAvailable();
   syncCircuitBreakerMetric();
   if (!isAvailable) {
@@ -273,6 +290,11 @@ export async function getMlConsensus({
         ? "[consensusEngine] Circuit breaker OPEN — ML Engine failing"
         : `[consensusEngine] ML Engine unavailable: ${err.message}`,
     );
+    void reportAgentError({
+      agent: CONSENSUS_AGENT,
+      error: err,
+      severity: isCircuitOpen ? "HIGH" : "MEDIUM",
+    });
 
     return {
       ok: false,
@@ -331,6 +353,11 @@ export async function getMlModelStatus() {
     return await mlRequest("/model-status", null, 10_000);
   } catch (err) {
     console.error("[consensusEngine] Model status unavailable:", err.message);
+    void reportAgentError({
+      agent: CONSENSUS_AGENT,
+      error: err,
+      severity: "MEDIUM",
+    });
     return { ok: false, error: err.message, trained: false };
   }
 }
@@ -344,6 +371,11 @@ export async function triggerMlTraining(mode = "incremental", options = {}) {
     return await mlRequest("/train", { mode }, 5_000, options);
   } catch (err) {
     console.error("[consensusEngine] Training trigger failed:", err.message);
+    void reportAgentError({
+      agent: CONSENSUS_AGENT,
+      error: err,
+      severity: "HIGH",
+    });
     return { ok: false, error: err.message };
   }
 }
@@ -414,6 +446,11 @@ export async function triggerMLNewsTraining(newsItem, options = {}) {
     return { triggered: true, response: res };
   } catch (err) {
     console.error("[consensusEngine] news-trigger failed:", err.message);
+    void reportAgentError({
+      agent: CONSENSUS_AGENT,
+      error: err,
+      severity: "HIGH",
+    });
     return { triggered: false, error: err.message };
   }
 }
@@ -440,6 +477,11 @@ export async function logNewsReaction(newsId, reactionData, options = {}) {
     return { ok: true, ...res };
   } catch (err) {
     console.error("[consensusEngine] news/reaction failed:", err.message);
+    void reportAgentError({
+      agent: CONSENSUS_AGENT,
+      error: err,
+      severity: "MEDIUM",
+    });
     return { ok: false, error: err.message };
   }
 }
@@ -453,6 +495,11 @@ export async function getMLNewsReactions(limit = 50, options = {}) {
     return res;
   } catch (err) {
     console.error("[consensusEngine] news/reactions failed:", err.message);
+    void reportAgentError({
+      agent: CONSENSUS_AGENT,
+      error: err,
+      severity: "MEDIUM",
+    });
     return { ok: false, entries: [], error: err.message };
   }
 }
@@ -472,6 +519,11 @@ export async function getPhysicsRegime(candles = [], options = {}) {
     return res;
   } catch (err) {
     console.error("[consensusEngine] Regime analysis unavailable:", err.message);
+    void reportAgentError({
+      agent: CONSENSUS_AGENT,
+      error: err,
+      severity: "MEDIUM",
+    });
     return { ok: false, error: err.message };
   }
 }

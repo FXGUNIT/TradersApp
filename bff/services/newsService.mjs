@@ -12,6 +12,13 @@
  * - Return to frontend for countdown display
  * - POST to ML Engine /news-trigger to initiate model retrain
  */
+import {
+  ensureAgentHeartbeat,
+  openAgentThread,
+  postAgentMilestone,
+  refreshAgentHeartbeat,
+  reportAgentError,
+} from "./boardRoomAgentReporter.mjs";
 
 const FOREX_FACTORY_URL = "https://www.forexfactory.com/calendar";
 const NEWS_API_KEY = String(process.env.NEWS_API_KEY || "").trim() || null;
@@ -23,6 +30,12 @@ const ML_ENGINE_BASE = String(
 ).trim();
 
 const STAR_THRESHOLD = 3; // Only track 3★ events
+const NEWS_AGENT = "NewsService";
+
+ensureAgentHeartbeat({
+  agent: NEWS_AGENT,
+  focus: "Monitoring high-impact news and retrain triggers.",
+});
 
 /**
  * Impact levels from Forex Factory
@@ -51,6 +64,11 @@ const RELEVANT_CURRENCIES = [
  * Returns events within the next 7 days with impact >= 3★.
  */
 export async function scrapeForexFactory() {
+  refreshAgentHeartbeat({
+    agent: NEWS_AGENT,
+    status: "active",
+    focus: "Scraping Forex Factory calendar.",
+  });
   try {
     const response = await fetch(FOREX_FACTORY_URL, {
       headers: {
@@ -70,6 +88,11 @@ export async function scrapeForexFactory() {
     return parseForexFactoryHTML(html);
   } catch (err) {
     console.error("[newsService] Forex Factory scrape failed:", err.message);
+    void reportAgentError({
+      agent: NEWS_AGENT,
+      error: err,
+      severity: "MEDIUM",
+    });
     return [];
   }
 }
@@ -238,6 +261,11 @@ export async function fetchNewsData() {
     return [];
   }
 
+  refreshAgentHeartbeat({
+    agent: NEWS_AGENT,
+    status: "active",
+    focus: "Fetching NewsData backup feed.",
+  });
   try {
     const today = new Date().toISOString().split("T")[0];
     const url = `${NEWS_API_URL}?apikey=${NEWS_API_KEY}&language=en&category=business&date=${today}`;
@@ -268,6 +296,11 @@ export async function fetchNewsData() {
       }));
   } catch (err) {
     console.error("[newsService] NewsData.io failed:", err.message);
+    void reportAgentError({
+      agent: NEWS_AGENT,
+      error: err,
+      severity: "MEDIUM",
+    });
     return [];
   }
 }
@@ -311,6 +344,11 @@ function classifySentiment(article) {
  * Returns all 3★+ events from FF (primary) + FF fallback if NewsData available.
  */
 export async function getUpcomingEvents(daysAhead = 7) {
+  refreshAgentHeartbeat({
+    agent: NEWS_AGENT,
+    status: "active",
+    focus: `Building ${daysAhead}-day news outlook.`,
+  });
   const ffEvents = await scrapeForexFactory();
 
   // Filter to future events within window
@@ -344,6 +382,11 @@ export async function triggerRetrainOnEvent(event) {
   if (!event || event.impact < STAR_THRESHOLD)
     return { triggered: false, reason: "Not high-impact" };
 
+  refreshAgentHeartbeat({
+    agent: NEWS_AGENT,
+    status: "active",
+    focus: `Triggering retrain for ${event.title || "high-impact event"}.`,
+  });
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 5000);
@@ -362,8 +405,43 @@ export async function triggerRetrainOnEvent(event) {
     }
 
     const data = await res.json();
+    const description = JSON.stringify({
+      source: event.source || "unknown",
+      title: event.title,
+      currency: event.currency || null,
+      impact: event.impact,
+      datetime: event.datetime || null,
+      trigger: "ml_retrain",
+    });
+    const thread = await openAgentThread({
+      agent: NEWS_AGENT,
+      title: `High-impact news retrain: ${event.title}`,
+      description,
+      priority: "HIGH",
+      tags: ["news", "ml-engine", "high-impact", String(event.currency || "macro").toLowerCase()],
+      tasks: [
+        { description: "Classify event impact in ML engine", done: false },
+        { description: "Review downstream market reaction", done: false },
+      ],
+    });
+    if (thread?.threadId) {
+      await postAgentMilestone({
+        agent: NEWS_AGENT,
+        threadId: thread.threadId,
+        content: JSON.stringify({
+          action: "retrain_triggered",
+          event: event.title,
+          mlResponse: data,
+        }),
+      });
+    }
     return { triggered: true, event: event.title, response: data };
   } catch (err) {
+    void reportAgentError({
+      agent: NEWS_AGENT,
+      error: err,
+      severity: "HIGH",
+    });
     return { triggered: false, reason: err.message };
   }
 }
