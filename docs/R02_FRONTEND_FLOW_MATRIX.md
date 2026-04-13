@@ -24,6 +24,13 @@ The existing browser audit in `scripts/ui-audit/run-ui-audit.mjs` already exerci
 
 That is good route coverage, but it is not full flow coverage yet.
 
+The runner code has now also been extended with:
+
+- a dedicated `maintenance` scenario in the audit harness
+- an explicit `Board Room` tab assertion inside the admin audit
+
+Those additions still need a full browser rerun after the host Docker/WSL layer is recovered.
+
 ## Route Inventory
 
 ### 1. Auth Entry and Recovery

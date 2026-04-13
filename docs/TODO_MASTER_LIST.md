@@ -64,7 +64,7 @@ Run `python scripts/update_todo_progress.py --once` to regenerate.
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-14 04:09`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-14 04:12`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Active Backlog    2.5%  [#-----------------------]
@@ -77,6 +77,7 @@ Task Counts     done 000 | in progress 001 | blocked 001 | todo 018 | total 020
 | Stage R | [0/20] |   0.0% | IN PROGRESS |
 
 <!-- live-status:end -->
+
 
 
 
@@ -119,6 +120,7 @@ Task Counts     done 000 | in progress 001 | blocked 001 | todo 018 | total 020
 2026-04-14 00:01 | CODEX       | CLEANUP   | Added live status bar, removed fully completed stages, and restarted TODO autosync on the current parser
 2026-04-14 04:00 | CODEX       | R01       | Documented fresh-clone proof progress, hardened dev-up Docker/WSL preflight, and recorded the current host-level WSL blocker
 2026-04-14 04:12 | CODEX       | R02       | Added the frontend flow matrix and identified the concrete audit gaps beyond the existing top-level UI scenarios
+2026-04-14 04:20 | CODEX       | R02       | Extended the UI audit code with a maintenance-mode scenario and a deterministic Board Room assertion; production rerun still pending host Docker/WSL recovery
 ```
 
 ## Stage R: Flawless Proof Gate
@@ -137,7 +139,7 @@ Task Counts     done 000 | in progress 001 | blocked 001 | todo 018 | total 020
   - **Step 5:** Repeat the same process in at least one second disposable environment so the repo is not accidentally "working once."
   - **Exit criteria:** Two clean-environment passes with zero undocumented manual interventions and a written install/bootstrap artifact.
 
-- [-] `R02` Prove all real frontend flows work end to end, not just the audited subset. (updated: 2026-04-14 04:12 IST) Added `docs/R02_FRONTEND_FLOW_MATRIX.md`. Current `audit:ui` covers the 9 top-level scenarios, but dedicated proof is still missing for maintenance mode, navigation lattice, floating support chat, terminal premarket/reset/T&C flows, and admin Board Room plus admin shell utilities.
+- [-] `R02` Prove all real frontend flows work end to end, not just the audited subset. (updated: 2026-04-14 04:20 IST) Added `docs/R02_FRONTEND_FLOW_MATRIX.md`, then extended the UI audit code with a maintenance-mode scenario and a deterministic `Board Room` assertion. Full rerun is still pending host Docker/WSL recovery, and dedicated proof is still missing for navigation lattice, floating support chat, terminal premarket/reset/T&C flows, and the wider admin shell utilities.
   - **Why this exists:** Passing build and smoke checks is not the same as proving every user-facing flow behaves correctly.
   - **Step 1:** Build a screen and route inventory that includes login, Google auth, password reset, signup, waiting room, hub, terminal, collective consciousness, sessions, admin dashboard, Board Room, footer links, and any hidden modal or drawer flows.
   - **Step 2:** For each screen, record entry conditions, expected visible states, allowed actions, exit paths, and error states.
