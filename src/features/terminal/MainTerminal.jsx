@@ -161,6 +161,7 @@ export default function MainTerminal({
   
   const p1Ref = useRef(null);
   const p2Ref = useRef(null);
+  const csvZoneRef = useRef(null);
   const terminalDraftKey = useMemo(
     () => (profile?.uid ? `terminal-workspace:${profile.uid}` : null),
     [profile?.uid],
@@ -550,6 +551,34 @@ export default function MainTerminal({
     },
     [],
   );
+
+  const handleCsvParsedChange = useCallback((nextParsed) => {
+    setParsed(nextParsed || null);
+  }, []);
+
+  const handleCsvParsingChange = useCallback((nextIsParsing) => {
+    setIsCsvParsing(Boolean(nextIsParsing));
+  }, []);
+
+  const handleCsvStatusChange = useCallback((nextStatus) => {
+    setParseMsg(nextStatus || "");
+  }, []);
+
+  const handleCsvErrorChange = useCallback((nextError) => {
+    setErr(nextError || "");
+  }, []);
+
+  useEffect(() => {
+    if (activeTab !== "premarket") {
+      return;
+    }
+
+    csvZoneRef.current?.syncCsvState({
+      parsed,
+      parseMsg,
+      isCsvParsing,
+    });
+  }, [activeTab, isCsvParsing, parseMsg, parsed]);
 
   useEffect(() => {
     let cancelled = false;
