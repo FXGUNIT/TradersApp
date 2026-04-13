@@ -422,7 +422,7 @@ function patchUserByUid(uid, patch = {}) {
 }
 
 export function getUserByUid(uid) {
-  const state = readState();
+  const state = readState(options);
   const record = getUserAndSessions(state, uid);
   return record ? clone(record) : null;
 }
