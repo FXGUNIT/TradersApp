@@ -86,10 +86,10 @@ Generated: `2026-04-13 09:34`  Â·  Run `python scripts/update_todo_progress.py
   - **Status:** M01 DONE (cluster assessed, HPAs applied, blockers documented, runbook created) â€” blocked on metrics-server + rebuild/redeploy to verify startup hardening live
 
 - [-] `M02` Install metrics-server and verify `ScalingActive: True` on both HPAs.
-  - updated: 2026-04-12
-  - `metrics-server` present but unhealthy â€” `FailedDiscoveryCheck`, `kubectl top` fails
-  - `v1beta1.metrics.k8s.io` reports flapping health â€” both HPAs at `ScalingActive: False`
-  - **Status:** in progress â€” needs metrics-server repair before M02 can close
+  - updated: 2026-04-13 13:57
+  - Live k3s check: `kubectl describe hpa ml-engine-hpa` and `kubectl describe hpa bff-hpa` both show `ScalingActive: True`
+  - `v1beta1.metrics.k8s.io` is still `Available=False (FailedDiscoveryCheck)` and `kubectl top nodes` returns `Metrics API not available`
+  - **Status:** in progress â€” HPA conditions are green again, but metrics-server / APIService health is still too unstable to close M02 cleanly
 
 - [x] `M03` Fix ml-engine PVC issues (ml-models-pvc + ml-state-pvc) so pods reach Running state.
   - updated: 2026-04-12
@@ -98,9 +98,10 @@ Generated: `2026-04-13 09:34`  Â·  Run `python scripts/update_todo_progress.py
   - **Status:** in progress â€” blocked on rebuild/redeploy of ml-engine with startup hardening fix
 
 - [-] `M04` Run `scripts/k8s/run-hpa-scaling-test.sh` end-to-end; verify replicas scale up under load and scale down after idle.
-  - updated: 2026-04-12
-  - Blocked by: M02 (metrics-server stability) + M03 (ml-engine rebuild)
-  - **Status:** blocked â€” cannot verify until HPAs are `ScalingActive: True`
+  - updated: 2026-04-13 13:57
+  - Umbrella runner hardened: consecutive clean Metrics API / `ScalingActive` probes before load, scale-down wait derived from live HPA policy, metrics-flap deadline extensions during cooldown
+  - Live follow-up: API server `readyz` currently fails `rbac/bootstrap-roles` and `apiservice-discovery-controller`, and `kubectl get apiservice v1beta1.metrics.k8s.io` remains `FailedDiscoveryCheck`
+  - **Status:** in progress â€” script is ready for the final rerun, but live end-to-end validation is still blocked on control-plane and metrics API stability
 
 - [x] `M05` Verify bff HPA scales independently from ml-engine under BFF-targeted load.
   - updated: 2026-04-12

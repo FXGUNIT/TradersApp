@@ -1,7 +1,7 @@
 # HPA Scaling Test Runbook
 
 **Status:** Live cluster tested - current blockers identified  
-**Last Updated:** 2026-04-12  
+**Last Updated:** 2026-04-13  
 **Cluster:** desktop-control-plane (k3s v1.34.3) - `tradersapp-dev`
 
 ---
@@ -59,6 +59,8 @@ What was verified live:
 - `bff` now reaches `1/1 Ready` per pod on `dev-readyprobe-20260413b` with `httpGet` probes and `BFF_HOST=0.0.0.0`
 - `scripts/k8s/validate-hpa-ml-engine.sh` cleanly scaled `ml-engine` from `1` to `3`
 - independent BFF-targeted load scaled `bff` from `2` to `4` and later back to `2`
+- follow-up live checks still show `v1beta1.metrics.k8s.io` as `Available=False (FailedDiscoveryCheck)` and `kubectl top nodes` returns `Metrics API not available`
+- `kubectl describe hpa ml-engine-hpa` and `kubectl describe hpa bff-hpa` still report `ScalingActive=True`, so HPA conditions must be paired with live Metrics API checks before closing Stage M
 - remaining risk: under aggressive end-to-end validation, the Metrics API can still briefly flap and force one more clean rerun of the umbrella script
 
 ### Metrics API State
@@ -76,6 +78,7 @@ Observed state:
 - the `metrics-server` pod has a high restart count
 - `bff-hpa` can report `ScalingActive: True` when metrics are present
 - `ml-engine-hpa` still becomes noisy whenever the Metrics API drops out
+- recent live checks showed the aggregated API can stay `False (FailedDiscoveryCheck)` even while both HPAs still advertise `ScalingActive=True`
 
 ### PVC State
 
@@ -205,6 +208,7 @@ NAMESPACE=tradersapp-dev bash scripts/k8s/validate-hpa-bff.sh
 ```
 
 The scripts now refuse to continue if a drifted HPA with the wrong name already targets the deployment.
+The umbrella runner now also requires a clean probe window where the Metrics API responds and both HPAs hold `ScalingActive=True`; during scale-down it can extend the wait budget when the Metrics API flaps and returns `BLOCKED` instead of misclassifying the run as a clean failure.
 
 ### Step 4: Watch Scaling Events
 
