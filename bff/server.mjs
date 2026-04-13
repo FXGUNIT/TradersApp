@@ -88,6 +88,7 @@ import { createTerminalAnalyticsRouteHandler } from "./routes/terminalAnalyticsR
 import { createTerminalRouteHandler } from "./routes/terminalRoutes.mjs";
 import { createOnboardingRouteHandler } from "./routes/onboardingRoutes.mjs";
 import { createSupportRouteHandler } from "./routes/supportRoutes.mjs";
+import { createBoardRoomRouteHandler } from "./routes/boardRoomRoutes.mjs";
 // Telegram proxy — J01: token removed from browser bundles
 import {
   handleTelegramSendMessage,
