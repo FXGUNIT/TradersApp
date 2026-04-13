@@ -16,7 +16,7 @@
 import { bffFetch } from './gateways/base.js';
 
 // Log presence without leaking token values.
-console.warn("Telegram Service Initialized:", {
+console.info("Telegram Service Initialized:", {
   configured: Boolean(typeof window !== 'undefined'),
 });
 
