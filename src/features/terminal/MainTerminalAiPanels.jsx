@@ -3,15 +3,13 @@ import {
   T,
   Tag,
   SHead,
-  Loader,
-  RenderOut,
   AMDPhaseTag,
   PasteZone,
   cardS,
-  glowBtn,
 } from "./terminalHelperComponents";
 import { CSS_VARS } from "../../styles/cssVars.js";
 import { Calendar, Sun, Target } from "lucide-react";
+import MainTerminalAiOutput from "./MainTerminalAiOutput.jsx";
 
 /**
  * MainTerminalAiPanels — P1/P2 analysis sections: screenshot paste zones, run button, and output display.

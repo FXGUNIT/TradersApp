@@ -168,6 +168,8 @@ export function createDispatcher({
     readJsonBody,
   });
 
+  const boardRoomHandler = createBoardRoomRouteHandler();
+
   // Wire all route registrations into a single dispatch function
   const dispatchRoutes = registerDispatchRoutes({
     json,
