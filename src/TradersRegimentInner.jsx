@@ -271,6 +271,7 @@ function TradersRegimentInner() {
   const screenContent = buildScreenContent({
     screen, currentTheme, theme, aiStatuses, consciousnessReturnScreen,
     isAdminAuthenticated, isAudioMuted, maintenanceModeActive,
+    setIsAudioMuted,
     auth, profile, googleUser, currentSessionId,
     adminMasterEmail, adminMasterEmailVerified, adminOtpStep, adminOtps,
     adminOtpsVerified, adminPassErr, adminPassInput, adminOtpErr,
@@ -292,10 +293,11 @@ function TradersRegimentInner() {
   });
 
   return buildAppShell({
-    currentTheme, screen, auth, maintenanceModeActive, _SCREEN_IDS,
+    currentTheme, screen, setScreen, auth, profile, maintenanceModeActive, _SCREEN_IDS,
     ADMIN_UID, screenContent, toasts, dismissToast, theme,
     handleThemeChange, debugLogs, debugLatencies, debugTTI,
-    debugComponentStatus, debugOverlayOpen, aiQuadCoreStatus, dailyQuote,
+    debugComponentStatus, debugOverlayOpen, setDebugOverlayOpen, aiQuadCoreStatus, dailyQuote,
+    showToast,
   });
 }
 

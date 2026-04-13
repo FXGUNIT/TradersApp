@@ -65,6 +65,7 @@ export function buildScreenContent({
   consciousnessReturnScreen,
   isAdminAuthenticated,
   isAudioMuted,
+  setIsAudioMuted,
   maintenanceModeActive,
   auth,
   profile,
@@ -198,7 +199,9 @@ export function buildScreenContent({
 export function buildAppShell({
   currentTheme,
   screen,
+  setScreen,
   auth,
+  profile,
   maintenanceModeActive,
   _SCREEN_IDS,
   ADMIN_UID,
@@ -212,8 +215,10 @@ export function buildAppShell({
   debugTTI,
   debugComponentStatus,
   debugOverlayOpen,
+  setDebugOverlayOpen,
   aiQuadCoreStatus,
   dailyQuote,
+  showToast,
 }) {
   return (
     <AppShellProvider value={{ screen, setScreen, navigateToScreen: setScreen, profile, theme, currentTheme, maintenanceMode: maintenanceModeActive }}>
