@@ -1,0 +1,30 @@
+[
+  {
+    "id": "bug-report",
+    "name": "Bug Report",
+    "description": "Report a bug found during development or runtime",
+    "suggestedTags": ["bug", "frontend", "backend", "ml-engine", "critical"],
+    "initialPrompt": "## Bug Report\n\n**Bug summary:** \n**Environment:** \n**Steps to reproduce:** \n**Expected behavior:** \n**Actual behavior:** \n**Severity:** LOW / MEDIUM / HIGH / CRITICAL"
+  },
+  {
+    "id": "feature-proposal",
+    "name": "Feature Proposal",
+    "description": "Propose a new feature or enhancement",
+    "suggestedTags": ["feature", "frontend", "backend", "ml-engine"],
+    "initialPrompt": "## Feature Proposal\n\n**Feature name:** \n**Why it matters:** \n**What (user story):** \n**How (implementation sketch):** \n**Priority:** LOW / MEDIUM / HIGH / CRITICAL"
+  },
+  {
+    "id": "architecture-decision",
+    "name": "Architecture Decision",
+    "description": "Document a significant technical decision",
+    "suggestedTags": ["architecture", "backend", "frontend", "ml-engine"],
+    "initialPrompt": "## Architecture Decision\n\n**Context:** \n**Decision:** \n**Alternatives considered:** \n**Why this approach:** \n**Consequences:** "
+  },
+  {
+    "id": "performance-improvement",
+    "name": "Performance Improvement",
+    "description": "Profile and fix a performance bottleneck",
+    "suggestedTags": ["performance", "latency", "frontend", "backend", "ml-engine"],
+    "initialPrompt": "## Performance Improvement\n\n**Target:** \n**Current state:** \n**Goal:** \n**Profile data:** \n**Proposed fix:** \n**Expected improvement:** "
+  }
+]
