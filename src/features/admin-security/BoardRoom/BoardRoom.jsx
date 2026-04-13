@@ -377,6 +377,7 @@ export default function BoardRoom({
           <section style={loadingPanelStyle}>Loading thread...</section>
         ) : (
           <BoardRoomThread
+            key={activeThreadId || "board-room-empty"}
             detail={activeDetail}
             adminIdentity={adminIdentity}
             disabled={submitting}

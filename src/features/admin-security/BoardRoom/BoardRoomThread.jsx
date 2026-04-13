@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import BoardRoomPost from "./BoardRoomPost.jsx";
 import BoardRoomTask from "./BoardRoomTask.jsx";
 
@@ -42,30 +42,17 @@ export default function BoardRoomThread({
   onRejectPlan,
   onCloseThread,
 }) {
-  const [postForm, setPostForm] = useState(EMPTY_POST_FORM);
+  const [postForm, setPostForm] = useState(() => ({
+    ...EMPTY_POST_FORM,
+    author: adminIdentity || "ceo",
+    authorType: "human",
+  }));
   const [taskDescription, setTaskDescription] = useState("");
   const [closeForm, setCloseForm] = useState({
     closureCommit: "",
     closurePR: "",
     note: "",
   });
-
-  useEffect(() => {
-    setPostForm((current) => ({
-      ...current,
-      author: adminIdentity || "ceo",
-      authorType: "human",
-    }));
-  }, [adminIdentity]);
-
-  useEffect(() => {
-    setTaskDescription("");
-    setCloseForm({
-      closureCommit: "",
-      closurePR: "",
-      note: "",
-    });
-  }, [detail?.thread?.threadId]);
 
   const thread = detail?.thread || null;
   const posts = detail?.posts || [];
