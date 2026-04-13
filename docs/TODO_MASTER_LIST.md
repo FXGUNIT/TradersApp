@@ -57,16 +57,20 @@ Run `python scripts/update_todo_progress.py --once` to regenerate.
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-13 16:48`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-13 17:03`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 | Section | Tasks | Progress | Status |
 |---|---|---:|---|
 | Stage M | [5/5] | 100.0% | ✅ COMPLETE |
 | Stage N | [5/5] | 100.0% | ✅ COMPLETE |
 | Stage P | [4/4] | 100.0% | ✅ COMPLETE |
+| Stage Q | [4/5] |  80.0% | ⏸ PENDING |
 | Stage O | [25/25] | 100.0% | ✅ COMPLETE |
 
 <!-- live-status:end -->
+
+
+
 
 
 
@@ -195,20 +199,26 @@ Generated: `2026-04-13 16:48`  ·  Run `python scripts/update_todo_progress.py -
 > **Claimed by:** (update the JSON coordination block above before starting)
 > **Trigger (2026-04-13):** No remaining tasks in master list, but "app runs effortlessly" requires local dev quickstart, health checks, and model registry TODO cleanup.
 
-- [ ] `Q01` Publish Local Dev Quickstart doc (docker-compose tiers + `dev-up.ps1`), and update docs index to reference it.
-  - updated: 2026-04-13 22:08
+- [x] `Q01` Publish Local Dev Quickstart doc (docker-compose tiers + `dev-up.ps1`), and update docs index to reference it.
+  - updated: 2026-04-13 22:35
+  - Added `docs/LOCAL_DEV.md`; updated `docs/index.md` to point to it and clarify `SETUP.md` is prod deployment.
 
-- [ ] `Q02` Add a dev smoke script to validate frontend/BFF/ML Engine health endpoints in one command.
-  - updated: 2026-04-13 22:08
+- [x] `Q02` Add a dev smoke script to validate frontend/BFF/ML Engine health endpoints in one command.
+  - updated: 2026-04-13 22:35
+  - Added `scripts/dev-smoke.ps1`.
 
-- [ ] `Q03` Reconcile MODEL_REGISTRY TODOs with actual artifacts; document AMD ONNX + Mamba TorchScript status.
-  - updated: 2026-04-13 22:08
+- [x] `Q03` Reconcile MODEL_REGISTRY TODOs with actual artifacts; document AMD ONNX + Mamba TorchScript status.
+  - updated: 2026-04-13 22:35
+  - Updated `docs/MODEL_REGISTRY.md` to remove TODOs, document AMD ONNX status, and add `mamba_ssm` to repo layout.
 
-- [ ] `Q04` Install local dependencies and run a baseline frontend build for quick-start verification.
-  - updated: 2026-04-13 22:08
+- [!] `Q04` Install local dependencies and run a baseline frontend build for quick-start verification.
+  - updated: 2026-04-13 22:35
+  - Frontend + BFF `npm install` completed; `npm run build` now passes after fixing missing imports/exports.
+  - **Blocker:** `python -m pip install -r ml-engine/requirements.txt` timed out (network access).
 
-- [ ] `Q05` Fix frontend container health endpoint (nginx) so Docker dev stack starts cleanly.
-  - updated: 2026-04-13 22:08
+- [x] `Q05` Fix frontend container health endpoint (nginx) so Docker dev stack starts cleanly.
+  - updated: 2026-04-13 22:35
+  - Replaced unsupported `health_check;` with a `/health` route returning 200 OK.
 
 ## Phase Summary (Historical â€” all complete)
 
