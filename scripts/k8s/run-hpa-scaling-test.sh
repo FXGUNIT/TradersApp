@@ -116,6 +116,31 @@ assert_expected_hpa() {
   fi
 }
 
+hpa_uses_non_resource_metrics() {
+  local hpa="$1"
+  local metric_types=""
+  local metric_type
+
+  metric_types="$(kubectl get hpa "$hpa" -n "$NAMESPACE" \
+    -o jsonpath='{range .spec.metrics[*]}{.type}{" "}{end}' 2>/dev/null || true)"
+
+  if [[ -z "$metric_types" ]]; then
+    return 1
+  fi
+
+  for metric_type in $metric_types; do
+    case "$metric_type" in
+      Resource|ContainerResource)
+        ;;
+      *)
+        return 0
+        ;;
+    esac
+  done
+
+  return 1
+}
+
 metrics_api_available() {
   kubectl --request-timeout=10s top nodes --no-headers >/dev/null 2>&1
 }

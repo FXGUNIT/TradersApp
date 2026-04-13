@@ -133,10 +133,11 @@ def trigger_warmup(symbol: str = "MNQ", lookback_minutes: int = 60):
 # ── /mlflow/* ───────────────────────────────────────────────────────────────────
 
 try:
-    from _infrastructure import MLFLOW_AVAILABLE, MLFLOW_TRACKING_URI
+    from _infrastructure import MLFLOW_AVAILABLE, MLFLOW_TRACKING_ENABLED, MLFLOW_TRACKING_URI
     from _infrastructure import set_prometheus_mlflow_experiment_count, set_prometheus_active_runs, sync_prometheus_mlflow_registry
 except ImportError:
     MLFLOW_AVAILABLE = False
+    MLFLOW_TRACKING_ENABLED = False
     MLFLOW_TRACKING_URI = "http://localhost:5000"
     set_prometheus_mlflow_experiment_count = lambda *a: None
     set_prometheus_active_runs = lambda *a: None
@@ -147,6 +148,10 @@ def mlflow_status():
     if not MLFLOW_AVAILABLE:
         return {"ok": False, "mlflow_available": False,
                 "message": "mlflow package not installed. Install: pip install mlflow"}
+    if not MLFLOW_TRACKING_ENABLED:
+        return {"ok": True, "mlflow_available": True, "tracking_enabled": False,
+                "tracking_uri": None,
+                "message": "MLflow tracking disabled in this environment."}
     try:
         from infrastructure.mlflow_client import get_mlflow_client
         client = get_mlflow_client("direction")
@@ -155,10 +160,10 @@ def mlflow_status():
         if overview.get("available"):
             set_prometheus_mlflow_experiment_count(int(overview.get("experiments", 0)))
             set_prometheus_active_runs(int(overview.get("active_runs", 0)))
-        return {"ok": True, "mlflow_available": True, "tracking_uri": MLFLOW_TRACKING_URI,
+        return {"ok": True, "mlflow_available": True, "tracking_enabled": True, "tracking_uri": MLFLOW_TRACKING_URI,
                 "experiments": summary, "overview": overview}
     except Exception as e:
-        return {"ok": False, "mlflow_available": True, "mlflow_error": str(e),
+        return {"ok": False, "mlflow_available": True, "tracking_enabled": True, "mlflow_error": str(e),
                 "tracking_uri": MLFLOW_TRACKING_URI,
                 "message": "MLflow installed but server unreachable."}
 
@@ -167,6 +172,8 @@ def mlflow_experiments(experiment: str | None = None):
     """Query MLflow experiments."""
     if not MLFLOW_AVAILABLE:
         return {"ok": False, "error": "mlflow not installed"}
+    if not MLFLOW_TRACKING_ENABLED:
+        return {"ok": False, "error": "MLflow tracking disabled in this environment", "tracking_uri": None}
     try:
         from infrastructure.mlflow_client import get_mlflow_client
         exp_name = experiment or "direction"
@@ -186,13 +193,15 @@ def mlflow_models(model_prefix: str = "direction"):
     """List registered models in MLflow registry."""
     if not MLFLOW_AVAILABLE:
         return {"ok": False, "error": "mlflow not installed"}
+    if not MLFLOW_TRACKING_ENABLED:
+        return {"ok": False, "error": "MLflow tracking disabled in this environment", "tracking_uri": None}
     try:
         from infrastructure.mlflow_client import get_mlflow_client
         client = get_mlflow_client(model_prefix)
         results = client.get_registry_models(f"{model_prefix}_")
         sync_prometheus_mlflow_registry(results)
         return {"ok": True, "models": results, "tracking_uri": MLFLOW_TRACKING_URI,
-                "dashboard_url": f"{MLFLOW_TRACKING_URI}/#/models"}
+                "dashboard_url": f"{MLFLOW_TRACKING_URI}/#/models" if MLFLOW_TRACKING_URI else None}
     except Exception as e:
         return {"ok": False, "error": str(e)}
 
@@ -201,6 +210,8 @@ def mlflow_promote(model_name: str, from_stage: str = "staging", to_stage: str =
     """Promote model from staging → production in MLflow registry."""
     if not MLFLOW_AVAILABLE:
         return {"ok": False, "error": "mlflow not installed"}
+    if not MLFLOW_TRACKING_ENABLED:
+        return {"ok": False, "error": "MLflow tracking disabled in this environment", "tracking_uri": None}
     try:
         from infrastructure.mlflow_client import get_mlflow_client
         client = get_mlflow_client("direction")

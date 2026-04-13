@@ -88,7 +88,8 @@ This creates:
 ## k3s Rollout Notes
 
 - The Helm chart deploys PostgreSQL, MinIO, a MinIO bucket setup job, and MLflow.
-- `ml-engine` gets `MLFLOW_TRACKING_URI=http://mlflow:5000`.
+- Production-style clusters set `MLFLOW_TRACKING_URI=http://mlflow:5000`.
+- `values.dev.yaml` currently disables the in-cluster MLflow stack; in that mode dev runtime should use `MLFLOW_TRACKING_URI=disabled` instead of a dead in-cluster service URL.
 - CI/CD builds and publishes the custom MLflow image and injects the commit SHA into the Helm release.
 - Production deploys use a runtime Kubernetes secret (`mlflow-runtime-secret`) for:
   - `POSTGRES_PASSWORD`

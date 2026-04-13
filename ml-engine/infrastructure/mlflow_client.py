@@ -42,12 +42,23 @@ except ImportError:
     MlflowClient = None
     ViewType = None
 
+DISABLED_TRACKING_URI_SENTINELS = {"", "0", "false", "off", "none", "disabled"}
+
+
+def normalize_tracking_uri(value: str | None, default: str = "http://localhost:5000") -> str:
+    """Normalize environment-provided MLflow URIs and allow an explicit disabled mode."""
+    if value is None:
+        return default
+
+    normalized = str(value).strip()
+    if normalized.lower() in DISABLED_TRACKING_URI_SENTINELS:
+        return ""
+    return normalized
+
 # ─── Configuration ─────────────────────────────────────────────────────────────
 
-MLFLOW_TRACKING_URI = os.environ.get(
-    "MLFLOW_TRACKING_URI",
-    "http://localhost:5000"
-)
+MLFLOW_TRACKING_URI = normalize_tracking_uri(os.environ.get("MLFLOW_TRACKING_URI"))
+MLFLOW_TRACKING_ENABLED = bool(MLFLOW_TRACKING_URI)
 MLFLOW_EXPERIMENT_PREFIX = "tradersapp_"
 REGISTRY_ARTIFACT_ROOT = os.environ.get(
     "MLFLOW_ARTIFACT_ROOT",
@@ -115,6 +126,10 @@ class MLflowTrackingClient:
 
     def _setup(self):
         """Configure MLflow URI and ensure experiment exists."""
+        if not self.tracking_uri:
+            print("[MLflow] Tracking disabled via MLFLOW_TRACKING_URI")
+            self._client = None
+            return
         if not self._tracking_server_reachable():
             print(f"[MLflow] Tracking server unreachable at {self.tracking_uri} — running without registry sync")
             self._client = None
@@ -933,7 +948,7 @@ def get_mlflow_client(
     instance is invalidated and re-created (supports runtime URI changes).
     """
     key = f"{experiment}"
-    effective_uri = tracking_uri or MLFLOW_TRACKING_URI
+    effective_uri = MLFLOW_TRACKING_URI if tracking_uri is None else normalize_tracking_uri(tracking_uri, default="")
     with MLflowTrackingClient._lock:
         # Invalidate if URI changed for this experiment key
         if key in MLflowTrackingClient._instances:

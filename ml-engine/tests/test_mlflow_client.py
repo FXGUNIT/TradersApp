@@ -58,3 +58,10 @@ def test_auto_register_uses_classifier_validation_gate(monkeypatch):
             "archive_existing_versions": False,
         }
     ]
+
+
+def test_normalize_tracking_uri_supports_explicit_disabled_mode():
+    assert mlflow_mod.normalize_tracking_uri("disabled") == ""
+    assert mlflow_mod.normalize_tracking_uri(" false ") == ""
+    assert mlflow_mod.normalize_tracking_uri(None) == "http://localhost:5000"
+    assert mlflow_mod.normalize_tracking_uri("http://mlflow:5000") == "http://mlflow:5000"

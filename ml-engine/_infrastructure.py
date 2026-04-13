@@ -63,10 +63,11 @@ except ImportError:
 # ── MLflow ───────────────────────────────────────────────────────────────────
 
 try:
-    from infrastructure.mlflow_client import get_mlflow_client, MLFLOW_TRACKING_URI
+    from infrastructure.mlflow_client import get_mlflow_client, MLFLOW_TRACKING_ENABLED, MLFLOW_TRACKING_URI
     MLFLOW_AVAILABLE = True
 except ImportError:
     MLFLOW_AVAILABLE = False
+    MLFLOW_TRACKING_ENABLED = False
     MLFLOW_TRACKING_URI = "http://localhost:5000"
 
     class _NoOpMLflowClient:

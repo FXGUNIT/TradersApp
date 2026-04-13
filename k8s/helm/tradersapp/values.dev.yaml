@@ -53,6 +53,7 @@ kafka:
 
 mlflow:
   enabled: false
+  trackingUri: disabled
   image:
     repository: ghcr.io/mlflow/mlflow
     tag: v2.21.3
