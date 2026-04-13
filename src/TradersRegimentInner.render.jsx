@@ -31,10 +31,10 @@ import DiamondNavigationLattice from "./features/shell/navigation-lattice/Diamon
 import { AppShellProvider } from "./features/shell/AppShellContext.jsx";
 
 const CleanOnboarding = React.lazy(
-  () => import("../features/onboarding/CleanOnboardingScreen.jsx"),
+  () => import("./features/onboarding/CleanOnboardingScreen.jsx"),
 );
 const RegimentHub = React.lazy(
-  () => import("../features/hub-content/RegimentHubScreen.jsx"),
+  () => import("./features/hub-content/RegimentHubScreen.jsx"),
 );
 
 export { CleanOnboarding, RegimentHub };

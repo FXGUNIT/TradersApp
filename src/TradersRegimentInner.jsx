@@ -7,7 +7,7 @@
  * Architecture:
  *   App.jsx                        — thin shell: imports + providers + JSX mount (28L)
  *   TradersRegimentInner.jsx       — inner component with all state (~290L)
- *   TradersRegimentInner.render.js — screen + shell JSX helpers (~175L)
+ *   TradersRegimentInner.render.jsx — screen + shell JSX helpers (~175L)
  *   AuthStateContext               — auth/screen/bootstrap state
  *   AdminAccessContext             — admin gate state + handlers
  *   features/identity/useAuthSessionHandlers — auth action handlers

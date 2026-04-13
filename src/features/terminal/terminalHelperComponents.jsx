@@ -31,7 +31,6 @@ function isRenderableIcon(icon) {
 
 // Re-export constants from terminalStyles.js so existing imports continue working
 export { T, SOFT, getThemeColors, getInputStyle, inp, cardS, glowBtn, lbl, AMD_PHASES, TIME_OPTIONS } from "./terminalStyles.js";
-export { getThemeColors } from "./terminalStyles.js"; // named alias
 
 // LED Component
 export function LED({ color, size = 10, pulse = true }) {

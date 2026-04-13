@@ -1,5 +1,5 @@
 import React from "react";
-import { SHead } from "./terminalHelperComponents.js";
+import { SHead } from "./terminalHelperComponents.jsx";
 import { CSS_VARS } from "../../styles/cssVars.js";
 import VerdictRadar from "./VerdictRadar.jsx";
 

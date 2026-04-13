@@ -7,7 +7,7 @@
  * setScreen from AuthStateContext after AuthStateProvider mounts.
  */
 import React from "react";
-import { AuthStateProvider, useAuthState } from "./identity/AuthStateContext.jsx";
+import { AuthStateProvider, useAuthState } from "./AuthStateContext.jsx";
 import { AdminAccessProvider } from "../admin-security/AdminAccessContext.jsx";
 
 function AdminAccessProviderWithScreen({ children }) {

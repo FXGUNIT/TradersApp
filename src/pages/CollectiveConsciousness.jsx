@@ -1,5 +1,5 @@
-import { MlConsensusTab } from './features/consensus/MlConsensusTab.jsx';
-import { WarRoomLoader } from './features/consensus/WarRoomLoader.jsx';
+import { MlConsensusTab } from '../features/consensus/MlConsensusTab.jsx';
+import { WarRoomLoader } from '../features/consensus/WarRoomLoader.jsx';
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import MessageRenderer from '../components/MessageRenderer.jsx';
 import ThemeSwitcher from '../components/ThemeSwitcher.jsx';
