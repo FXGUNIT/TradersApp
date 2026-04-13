@@ -71,7 +71,6 @@ import { QuoteBanner, NavigationTabs, AutosaveBar, DrawdownThrottleBanner } from
 import TerminalHeader from "./TerminalHeader.jsx";
 import MainTerminalTicker from "./MainTerminalTicker.jsx";
 
-const warningTint = "var(--status-warning-soft, rgba(255,214,10,0.12))";
 const overlayTint = "var(--surface-overlay, rgba(15,23,42,0.5))";
 const modalShadow = "var(--shadow-deep, 0 30px 80px rgba(15,23,42,0.18))";
 
