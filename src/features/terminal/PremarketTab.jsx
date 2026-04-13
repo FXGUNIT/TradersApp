@@ -1,52 +1,71 @@
-import React from "react";
+import React, { forwardRef } from "react";
 import MainTerminalCsvZone from "./MainTerminalCsvZone.jsx";
 import MainTerminalAiPanels from "./MainTerminalAiPanels.jsx";
 
-const warningTint = "var(--status-warning-soft, rgba(255,214,10,0.12))";
-const surfaceMuted = CSS_VARS.baseLayer;
-
-export default function PremarketTab({
-  // CSV state
-  parsed,
-  isCsvParsing,
-  csvBorderColor,
-  csvStatusColor,
-  csvStatusText,
-  // Chart images
-  p1NewsChart,
-  p1PremarketChart,
-  p1KeyLevelsChart,
-  activeZone,
-  setActiveZone,
-  // Handlers
-  handleCsvDrop,
-  // Analysis state
-  loading,
-  p1Out,
-  displayedAmdPhase,
-  // Handlers
-  runPart1,
-  setActiveTab,
-  setErr,
-  err,
-  flashingZoneId,
-  csvProgress,
-}) {
+/**
+ * PremarketTab — top-level premarket tab composing CSV zone + AI panels.
+ *
+ * Props:
+ *   parsed, isCsvParsing, csvStatusText, csvStatusColor, csvBorderColor, csvProgress
+ *     — owned by MainTerminalCsvZone; kept in sync via setCsvParsed / setCsvStatus callbacks.
+ *     Passed here only so other sibling tabs can read them without prop-drilling.
+ *
+ *   csvZoneRef              — forwarded ref: ref.current?.triggerCsvDrop()
+ *   setCsvParsed            — (v) => void  — syncs CSV parsed result back to MainTerminal
+ *   setCsvParsing           — (v) => void
+ *   setCsvStatus            — (msg) => void
+ *   setErr                  — (msg) => void
+ *
+ *   p1NewsChart / p1PremarketChart / p1KeyLevelsChart
+ *   activeZone / setActiveZone
+ *   flashingZoneId
+ *   loading / p1Out / displayedAmdPhase
+ *   runPart1 / setActiveTab / err
+ */
+const PremarketTab = forwardRef(function PremarketTab(
+  {
+    // CSV state (from MainTerminalCsvZone via callbacks)
+    parsed,
+    isCsvParsing,
+    csvStatusText,
+    csvStatusColor,
+    csvBorderColor,
+    csvProgress,
+    // CSV callbacks (push CSV state back to MainTerminal)
+    setCsvParsed,
+    setCsvParsing,
+    setCsvStatus,
+    setErr,
+    // Chart images
+    p1NewsChart,
+    p1PremarketChart,
+    p1KeyLevelsChart,
+    // Zones
+    activeZone,
+    setActiveZone,
+    flashingZoneId,
+    // Analysis
+    loading,
+    p1Out,
+    displayedAmdPhase,
+    runPart1,
+    setActiveTab,
+    err,
+  },
+  ref,
+) {
   return (
     <div>
-      {/* CSV Upload */}
+      {/* CSV Upload — owns CSV worker + drop UI; syncs state to MainTerminal */}
       <MainTerminalCsvZone
-        parsed={parsed}
-        isCsvParsing={isCsvParsing}
-        csvBorderColor={csvBorderColor}
-        csvStatusColor={csvStatusColor}
-        csvStatusText={csvStatusText}
-        csvProgress={csvProgress}
-        handleCsvDrop={handleCsvDrop}
+        ref={ref}
+        setParsed={setCsvParsed}
+        setIsCsvParsing={setCsvParsing}
+        setParseMsg={setCsvStatus}
+        setErr={setErr}
       />
 
-
-      {/* P1 Analysis (screenshot zones + run + output) */}
+      {/* P1 Analysis: paste zones, run button, output display */}
       <MainTerminalAiPanels
         p1NewsChart={p1NewsChart}
         p1PremarketChart={p1PremarketChart}
@@ -64,6 +83,8 @@ export default function PremarketTab({
         parsed={parsed}
         isCsvParsing={isCsvParsing}
       />
-
+    </div>
   );
-}
+});
+
+export default PremarketTab;

@@ -32,16 +32,16 @@ const MainTerminalCsvZone = forwardRef(function MainTerminalCsvZone(
 
   // ── Notify parent of state changes ──────────────────────────────────────
   useEffect(() => {
-    onParsedChange?.(parsed);
-  }, [parsed, onParsedChange]);
+    setParsed?.(parsed);
+  }, [parsed, setParsed]);
 
   useEffect(() => {
-    onParsingChange?.(isCsvParsing);
-  }, [isCsvParsing, onParsingChange]);
+    setIsCsvParsing?.(isCsvParsing);
+  }, [isCsvParsing, setIsCsvParsing]);
 
   useEffect(() => {
-    onStatusChange?.(parseMsg);
-  }, [parseMsg, onStatusChange]);
+    setParseMsg?.(parseMsg);
+  }, [parseMsg, setParseMsg]);
 
   // ── Derived display values ────────────────────────────────────────────────
   const hasParsedCsv = parseMsg.startsWith("✓");
