@@ -3,18 +3,21 @@ import MainTerminalCsvZone from "./MainTerminalCsvZone.jsx";
 import MainTerminalAiPanels from "./MainTerminalAiPanels.jsx";
 
 /**
- * PremarketTab — top-level premarket tab composing CSV zone + AI panels.
+ * PremarketTab - top-level premarket tab composing CSV zone + AI panels.
  *
  * Props:
- *   parsed, isCsvParsing, csvStatusText, csvStatusColor, csvBorderColor, csvProgress
- *     — owned by MainTerminalCsvZone; kept in sync via setCsvParsed / setCsvStatus callbacks.
- *     Passed here only so other sibling tabs can read them without prop-drilling.
+ *   parsed, isCsvParsing
+ *     - mirrored in MainTerminal via MainTerminalCsvZone callbacks so sibling
+ *       panels can consume CSV state without owning the drop zone.
  *
- *   csvZoneRef              — forwarded ref: ref.current?.triggerCsvDrop()
- *   setCsvParsed            — (v) => void  — syncs CSV parsed result back to MainTerminal
- *   setCsvParsing           — (v) => void
- *   setCsvStatus            — (msg) => void
- *   setErr                  — (msg) => void
+ *   forwarded ref
+ *     - ref.current?.triggerCsvDrop()
+ *     - ref.current?.syncCsvState({ parsed, parseMsg, isCsvParsing })
+ *
+ *   setCsvParsed            - (v) => void
+ *   setCsvParsing           - (v) => void
+ *   setCsvStatus            - (msg) => void
+ *   setErr                  - (msg) => void
  *
  *   p1NewsChart / p1PremarketChart / p1KeyLevelsChart
  *   activeZone / setActiveZone
@@ -24,14 +27,10 @@ import MainTerminalAiPanels from "./MainTerminalAiPanels.jsx";
  */
 const PremarketTab = forwardRef(function PremarketTab(
   {
-    // CSV state (from MainTerminalCsvZone via callbacks)
+    // CSV state mirrored from MainTerminalCsvZone callbacks
     parsed,
     isCsvParsing,
-    csvStatusText,
-    csvStatusColor,
-    csvBorderColor,
-    csvProgress,
-    // CSV callbacks (push CSV state back to MainTerminal)
+    // CSV callbacks
     setCsvParsed,
     setCsvParsing,
     setCsvStatus,
@@ -56,15 +55,14 @@ const PremarketTab = forwardRef(function PremarketTab(
 ) {
   return (
     <div>
-      {/* CSV Upload — owns CSV worker + drop UI; syncs state to MainTerminal */}
       <MainTerminalCsvZone
         ref={ref}
-        onParsedChange={(v) => setCsvParsed(v)}
-        onParsingChange={(v) => setCsvParsing(v)}
-        onStatusChange={(msg) => setCsvStatus(msg)}
+        onParsedChange={setCsvParsed}
+        onParsingChange={setCsvParsing}
+        onStatusChange={setCsvStatus}
+        onErrorChange={setErr}
       />
 
-      {/* P1 Analysis: paste zones, run button, output display */}
       <MainTerminalAiPanels
         p1NewsChart={p1NewsChart}
         p1PremarketChart={p1PremarketChart}
