@@ -17,7 +17,7 @@ export const executePasswordReset = async ({
     if (user?.updatePassword) {
       await user.updatePassword(newPassword);
     } else {
-      console.warn("Password reset simulated without Firebase auth");
+      console.info("Password reset simulated without Firebase auth");
     }
 
     await provisionIdentityUserRecord(
