@@ -4,12 +4,26 @@
 // Audit log: board-room/logs/board_YYYY-MM-DD.jsonl
 
 import { createClient } from 'redis';
-import { appendFileSync, existsSync, mkdirSync } from 'fs';
+import {
+  appendFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  renameSync,
+  unlinkSync,
+} from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const LOG_DIR = join(__dirname, '../../board-room/logs');
+
+function getLogDir() {
+  return process.env.BOARD_ROOM_LOG_DIR || join(__dirname, '../../board-room/logs');
+}
+
+function getArchiveDir() {
+  return process.env.BOARD_ROOM_LOG_ARCHIVE_DIR || join(__dirname, '../../board-room/archive/dvc');
+}
 
 // ─── Redis Client ───────────────────────────────────────────────────────────
 let _redis = null;
@@ -79,17 +93,66 @@ async function nextTaskId() {
 // ─── JSONL Logger ───────────────────────────────────────────────────────────
 function getTodayLogFile() {
   const date = new Date().toISOString().slice(0, 10);
-  return join(LOG_DIR, `board_${date}.jsonl`);
+  return join(getLogDir(), `board_${date}.jsonl`);
 }
 
 function logToJsonl(entry) {
   try {
-    if (!existsSync(LOG_DIR)) mkdirSync(LOG_DIR, { recursive: true });
+    const logDir = getLogDir();
+    if (!existsSync(logDir)) mkdirSync(logDir, { recursive: true });
     const line = JSON.stringify({ ts: new Date().toISOString(), ...entry });
     appendFileSync(getTodayLogFile(), line + '\n');
   } catch (err) {
     console.error('[boardRoom] JSONL log write failed:', err.message);
   }
+}
+
+function parseBoardRoomLogDate(fileName) {
+  const match = /^board_(\d{4}-\d{2}-\d{2})\.jsonl$/i.exec(String(fileName || ''));
+  if (!match) return null;
+  const timestamp = Date.parse(`${match[1]}T00:00:00.000Z`);
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
+
+function archiveOldLogs({ now = new Date(), retentionDays = 90 } = {}) {
+  const logDir = getLogDir();
+  const archiveDir = getArchiveDir();
+  if (!existsSync(logDir)) {
+    return { archived: [] };
+  }
+
+  if (!existsSync(archiveDir)) {
+    mkdirSync(archiveDir, { recursive: true });
+  }
+
+  const cutoffMs = now.getTime() - retentionDays * 24 * 60 * 60 * 1000;
+  const archived = [];
+
+  for (const fileName of readdirSync(logDir)) {
+    const fileDateMs = parseBoardRoomLogDate(fileName);
+    if (fileDateMs === null || fileDateMs >= cutoffMs) continue;
+
+    const sourcePath = join(logDir, fileName);
+    const targetPath = join(archiveDir, fileName);
+
+    if (existsSync(targetPath)) {
+      unlinkSync(sourcePath);
+    } else {
+      renameSync(sourcePath, targetPath);
+    }
+    archived.push(fileName);
+  }
+
+  if (archived.length > 0) {
+    logToJsonl({
+      type: 'jsonl_log_archived',
+      archivedCount: archived.length,
+      files: archived,
+      archiveDir,
+    });
+  }
+
+  return { archived };
 }
 
 // ─── Content Validation ─────────────────────────────────────────────────────
@@ -545,6 +608,7 @@ export const boardRoomService = {
   createTask, getThreadTasks, toggleTask,
   getAgentMemory, updateAgentMemory, recordHeartbeat, reportError, linkCommitToThread,
   getPendingAcknowledgments,
+  archiveOldLogs,
   getTemplates,
   validateContent,
 };

@@ -4,6 +4,7 @@
 
 const ACK_CHECK_INTERVAL_MS = 10 * 60 * 1000; // every 10 minutes
 const STALE_WARNING_DAYS = 7;
+const LOG_ARCHIVE_INTERVAL_MS = 12 * 60 * 60 * 1000;
 
 export function startBoardRoomCron(boardRoomService, boardRoomTelegram) {
   console.log('[boardRoomCron] Starting cron jobs');
@@ -114,10 +115,27 @@ export function startBoardRoomCron(boardRoomService, boardRoomTelegram) {
 
   scheduleNextDigest();
 
+  // ── JSONL archive rotation ───────────────────────────────────────────────
+  let archiveInterval;
+  async function rotateArchivedLogs() {
+    try {
+      const result = await boardRoomService.archiveOldLogs({ retentionDays: 90 });
+      if (Array.isArray(result?.archived) && result.archived.length > 0) {
+        console.log(`[boardRoomCron] Archived ${result.archived.length} Board Room log files`);
+      }
+    } catch (err) {
+      console.error('[boardRoomCron] log archive failed:', err.message);
+    }
+  }
+
+  archiveInterval = setInterval(rotateArchivedLogs, LOG_ARCHIVE_INTERVAL_MS);
+  rotateArchivedLogs();
+
   // Graceful shutdown
   const cleanup = () => {
     clearInterval(ackInterval);
     clearInterval(staleInterval);
+    clearInterval(archiveInterval);
     clearTimeout(digestTimeout);
     console.log('[boardRoomCron] Cron jobs stopped');
   };
