@@ -16,6 +16,14 @@ For project health snapshot, see `docs/PROJECT_STATUS.md`.
 
 ---
 
+## Current Runtime Truth
+
+- Delivery is described as mixed rather than purely self-hosted: the core app stack runs locally/in-cluster, while some external AI and messaging dependencies remain third-party.
+- The active ML inference seam still includes HTTP `/predict` for runtime compatibility, even where gRPC analysis paths also exist.
+- The current SLA baseline for the local/runtime-facing prediction path is `<200ms P95`, not the older aggressive placeholder targets shown in some historical assets.
+
+---
+
 ## Deployment & Operations
 
 ### Runbooks

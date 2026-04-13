@@ -8,6 +8,7 @@ export default defineConfig([
   globalIgnores([
     'dist',
     'node_modules',
+    '.pytest_tmp',
     'welcomeDispatchFunction.js',
     'scripts',
     'contextWindowStressTest.js',
@@ -25,6 +26,7 @@ export default defineConfig([
       '**/*.config.js',
       '**/dist/**',
       '**/node_modules/**',
+      '.pytest_tmp/**',
       'welcomeDispatchFunction.js',
       'scripts/**',
       'src/App.jsx.*',
