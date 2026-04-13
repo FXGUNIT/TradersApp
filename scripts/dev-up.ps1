@@ -6,6 +6,8 @@
     -Tier core   -> ML Engine + BFF + Redis + Frontend (~1 GB)
     -Tier mlops  -> + MLflow (SQLite, no MinIO/Postgres) (~1.2 GB)
     -Tier full   -> + Prometheus + Grafana (~1.5 GB)
+  Rebuilds service images on startup so source changes are applied without
+  needing a separate build step. The -Build switch is kept for compatibility.
 .EXAMPLE
   .\scripts\dev-up.ps1                  # core only
   .\scripts\dev-up.ps1 -Tier mlops      # core + MLflow

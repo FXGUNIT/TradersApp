@@ -62,8 +62,8 @@ New-Item -ItemType Directory -Force -Path E:\TradersApp\mlflow\artifacts | Out-N
 ```powershell
 cd E:\TradersApp
 
-# First time only — builds Docker images (~3-5 min)
-.\scripts\dev-up.ps1 -Tier core -Build
+# Builds Docker images automatically on startup
+.\scripts\dev-up.ps1 -Tier core
 
 # Watch logs for startup errors
 docker compose -f docker-compose.dev.yml logs -f
@@ -149,8 +149,8 @@ wsl -d Ubuntu -- kubectl get pods -A
 # Morning start
 .\scripts\dev-up.ps1
 
-# After code changes → rebuild only what changed
-.\scripts\dev-up.ps1 -Build
+# After code changes → restart through the normal bootstrap path
+.\scripts\dev-up.ps1
 
 # View logs for one service
 docker compose -f docker-compose.dev.yml logs -f ml-engine

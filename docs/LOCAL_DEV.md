@@ -11,9 +11,10 @@ Start the core stack (frontend + BFF + ML Engine + Redis):
 .\scripts\dev-up.ps1
 ```
 
-`dev-up.ps1` now builds the frontend bundle on the host first, then serves `dist/`
-through the lightweight nginx container. That keeps Docker bring-up independent of
-npm registry access inside the container build.
+`dev-up.ps1` now builds the frontend bundle on the host first, rebuilds the
+service images, and then serves `dist/` through the lightweight nginx container.
+That keeps frontend bring-up independent of npm registry access inside Docker
+while still ensuring backend code changes are picked up on a normal restart.
 
 Optional tiers:
 ```powershell
