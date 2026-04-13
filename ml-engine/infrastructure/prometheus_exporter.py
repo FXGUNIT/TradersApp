@@ -931,7 +931,12 @@ def handle_metrics(registry=DEFAULT_REGISTRY) -> tuple[bytes, str]:
     Returns (body, content_type).
     """
     if not PROMETHEUS_AVAILABLE:
-        return b"# prometheus-client not installed", "text/plain"
+        return (
+            b"# HELP ml_monitoring_last_check_timestamp Placeholder monitoring timestamp.\n"
+            b"# TYPE ml_monitoring_last_check_timestamp gauge\n"
+            b"ml_monitoring_last_check_timestamp 0\n",
+            "text/plain",
+        )
 
     return generate_latest(registry), CONTENT_TYPE_LATEST
 

@@ -169,7 +169,7 @@ def predict_endpoint(request: PredictRequest, raw_request: FastAPIRequest, respo
     try:
         claim, replay = _claim_idempotency(
             raw_request, response, "predict", payload,
-            allow_body_fallback=True, wait_timeout_seconds=0.5, lock_ttl_seconds=60,
+            allow_body_fallback=False, wait_timeout_seconds=0.5, lock_ttl_seconds=60,
         )
         if replay is not None:
             return replay

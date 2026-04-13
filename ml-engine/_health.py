@@ -25,6 +25,20 @@ except ImportError:
     _HANDLE_METRICS = None
 
 
+_UNSET = object()
+db = _UNSET
+start_time = _UNSET
+lineage_registry = _UNSET
+feast_warmed = _UNSET
+
+
+def _runtime_value(name):
+    value = globals().get(name, _UNSET)
+    if value is not _UNSET:
+        return value
+    return getattr(_lifespan, name)
+
+
 # ── /live and /ready ──────────────────────────────────────────────────────────
 
 def live():
@@ -33,13 +47,13 @@ def live():
         "status": "live",
         "service": "tradersapp-ml-engine",
         "request_id": get_request_id(),
-        "uptime_sec": round(_time.time() - _lifespan.start_time, 1),
+        "uptime_sec": round(_time.time() - _runtime_value("start_time"), 1),
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
 
 def ready():
-    db = _lifespan.db
+    db = _runtime_value("db")
     """Readiness check — verifies the DB facade is initialized without heavy introspection."""
     db_available = False
     db_backend = "unknown"
@@ -56,7 +70,7 @@ def ready():
         "request_id": get_request_id(),
         "db_backend": db_backend,
         "db_available": db_available,
-        "feast_warmed": _lifespan.feast_warmed,
+        "feast_warmed": _runtime_value("feast_warmed"),
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -64,10 +78,10 @@ def ready():
 # ── /health ───────────────────────────────────────────────────────────────────
 
 def health():
-    db = _lifespan.db
-    lineage_registry = _lifespan.lineage_registry
+    db = _runtime_value("db")
+    lineage_registry = _runtime_value("lineage_registry")
     """Health check — uses globals set by _lifespan lifespan."""
-    uptime = _time.time() - _lifespan.start_time
+    uptime = _time.time() - _runtime_value("start_time")
     try:
         stats = db.get_stats()
     except Exception:
@@ -84,7 +98,7 @@ def health():
 
     feast_status = {
         "lineage_registered": 0,
-        "online_store_warmed": _lifespan.feast_warmed,
+        "online_store_warmed": _runtime_value("feast_warmed"),
     }
     if lineage_registry:
         try:
