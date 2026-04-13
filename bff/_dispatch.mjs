@@ -90,6 +90,7 @@ export function createDispatcher({
   createTerminalRouteHandler,
   createOnboardingRouteHandler,
   createSupportRouteHandler,
+  createBoardRoomRouteHandler,
   // Telegram proxy handlers (J01 — token removed from browser bundles)
   handleTelegramSendMessage,
   handleTelegramSendForensicAlert,
