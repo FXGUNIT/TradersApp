@@ -34,22 +34,6 @@ Before starting work, claim your tasks here. This prevents two agents from updat
 // Active claims â€” claimed by which agent, expires when done
 // Format: "TaskID": { "claimed_by": "agent-name", "claimed_at": "ISO timestamp" }
 {
-  "M01": { "claimed_by": null, "claimed_at": null },
-  "M02": { "claimed_by": null, "claimed_at": null },
-  "M03": { "claimed_by": null, "claimed_at": null },
-  "M04": { "claimed_by": null, "claimed_at": null },
-  "M05": { "claimed_by": null, "claimed_at": null },
-  "P01": { "claimed_by": null, "claimed_at": null },
-  "P02": { "claimed_by": null, "claimed_at": null },
-  "P03": { "claimed_by": null, "claimed_at": null },
-  "P04": { "claimed_by": null, "claimed_at": null },
-  "Q01": { "claimed_by": null, "claimed_at": null },
-  "Q02": { "claimed_by": null, "claimed_at": null },
-  "Q03": { "claimed_by": null, "claimed_at": null },
-  "Q04": { "claimed_by": null, "claimed_at": null },
-  "Q05": { "claimed_by": null, "claimed_at": null },
-  "Q06": { "claimed_by": null, "claimed_at": null },
-  "Q07": { "claimed_by": null, "claimed_at": null },
   "R01": { "claimed_by": null, "claimed_at": null },
   "R02": { "claimed_by": null, "claimed_at": null },
   "R03": { "claimed_by": null, "claimed_at": null },
@@ -79,7 +63,7 @@ Run `python scripts/update_todo_progress.py --once` to regenerate.
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-13 23:37`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-13 23:52`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 | Section | Tasks | Progress | Status |
 |---|---|---:|---|
@@ -88,9 +72,9 @@ Generated: `2026-04-13 23:37`  ·  Run `python scripts/update_todo_progress.py -
 | Stage P | [4/4] | 100.0% | ✅ COMPLETE |
 | Stage Q | [7/7] | 100.0% | ✅ COMPLETE |
 | Stage O | [25/25] | 100.0% | ✅ COMPLETE |
-| Stage R | [0/20] |   0.0% | ⏸ PENDING |
 
 <!-- live-status:end -->
+
 
 
 
