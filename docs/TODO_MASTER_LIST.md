@@ -38,7 +38,11 @@ Before starting work, claim your tasks here. This prevents two agents from updat
   "M02": { "claimed_by": null, "claimed_at": null },
   "M03": { "claimed_by": null, "claimed_at": null },
   "M04": { "claimed_by": null, "claimed_at": null },
-  "M05": { "claimed_by": null, "claimed_at": null }
+  "M05": { "claimed_by": null, "claimed_at": null },
+  "P01": { "claimed_by": "codex", "claimed_at": "2026-04-13T16:05:00+05:30" },
+  "P02": { "claimed_by": "codex", "claimed_at": "2026-04-13T16:05:00+05:30" },
+  "P03": { "claimed_by": "codex", "claimed_at": "2026-04-13T16:05:00+05:30" },
+  "P04": { "claimed_by": "codex", "claimed_at": "2026-04-13T16:05:00+05:30" }
 }
 ```
 
@@ -131,6 +135,41 @@ Generated: `2026-04-13 15:13`  ·  Run `python scripts/update_todo_progress.py -
 
 - [x] `N05` Add verification coverage for all eligibility paths.
   - committed: 2026-04-12 | signup init, daily-open counting, admin bypass, day-10 transition, nightly batch, retrain-batch filtering
+
+---
+
+## Stage P: Residual Dev Cluster Reconciliation
+
+> **Claimed by:** `codex`
+> **Trigger (2026-04-13):** Stage M closed, but follow-up inspection found real leftover work that was never modeled in the master list.
+
+> **Discovery summary (2026-04-13):**
+> - `values.dev.yaml` disables the MLflow stack, but the dev config path still points `ml-engine` at `MLFLOW_TRACKING_URI=http://mlflow:5000`.
+> - The live `tradersapp-dev` namespace still contains a broken `minio-setup` hook job that waits on `mlflow-runtime-secret`, even though no `mlflow` or `minio` services are currently deployed there.
+> - The umbrella HPA runner still warns about `custom.metrics.k8s.io` during CPU/memory-only dev validation even when the validated HPAs do not use custom metrics.
+> - `metrics.k8s.io` recovered enough for Stage M to pass, but transient drops still appear during very long scale-down windows and need follow-up hardening or a tighter operator procedure.
+
+- [-] `P01` Reconcile dev MLflow mode in repo config and runtime.
+  - updated: 2026-04-13 16:05
+  - Make `mlflow.enabled=false` in `values.dev.yaml` an explicit supported mode instead of leaving dev runtime pointed at a dead in-cluster `http://mlflow:5000`
+  - Update `ml-engine` MLflow client/config handling so a disabled tracking URI is treated as intentional, not a broken server
+  - Align dev-facing config/docs/bootstrap defaults with that disabled mode
+
+- [-] `P02` Clean stale MLflow bootstrap drift from the live `tradersapp-dev` namespace.
+  - updated: 2026-04-13 16:05
+  - Remove the orphaned `minio-setup` job/pod that is stuck on missing `mlflow-runtime-secret`
+  - Verify no `mlflow`, `minio`, or related bootstrap resources remain in the dev namespace unless they are intentionally re-enabled
+  - Leave the namespace in a clean state that matches the current dev Helm values
+
+- [-] `P03` Make HPA validation tooling dev-aware for resource-only HPAs.
+  - updated: 2026-04-13 16:05
+  - Update `scripts/k8s/run-hpa-scaling-test.sh` so it only checks or warns about `custom.metrics.k8s.io` when the validated HPAs actually use non-resource metrics
+  - Keep the current metrics-server / `ScalingActive` preflight, but remove misleading custom-metrics noise from CPU/memory-only runs
+
+- [ ] `P04` Stabilize or operationalize transient Metrics API flap handling beyond the Stage M pass.
+  - updated: 2026-04-13 16:05
+  - Investigate why `metrics.k8s.io` can still drop briefly during extended scale-down windows after load
+  - Either harden the live cluster further or capture a tighter diagnostic/runbook path for future cooldown-window regressions
 
 ---
 
