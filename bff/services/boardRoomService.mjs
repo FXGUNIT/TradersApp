@@ -28,10 +28,20 @@ function getArchiveDir() {
 // ─── Redis Client ───────────────────────────────────────────────────────────
 let _redis = null;
 
+function resolveRedisUrl() {
+  if (process.env.REDIS_URL) {
+    return process.env.REDIS_URL;
+  }
+
+  const host = process.env.REDIS_HOST || 'redis';
+  const port = process.env.REDIS_PORT || '6379';
+  return `redis://${host}:${port}`;
+}
+
 function getRedis() {
   if (!_redis) {
-    _redis = createClient({ url: process.env.REDIS_URL || 'redis://localhost:6379' });
-    _redis.on('error', (err) => console.error('[boardRoom] Redis error:', err.message));
+    _redis = createClient({ url: resolveRedisUrl() });
+    _redis.on('error', (err) => console.error('[boardRoom] Redis error:', err?.message || String(err)));
     _redis.connect().catch((err) => console.error('[boardRoom] Redis connect failed:', err.message));
   }
   return _redis;
