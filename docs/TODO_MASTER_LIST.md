@@ -63,22 +63,21 @@ Before starting work, claim your tasks here. This prevents two agents from updat
 Run `python scripts/update_todo_progress.py --once` to regenerate.
 
 <!-- live-status:start -->
-
 ## Live Status
-
-Generated: `2026-04-14 00:01` · Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-14 04:00`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Active Backlog    0.0%  [------------------------]
 Stage Progress  00/01 complete
-Task Counts     done 000 | in progress 000 | blocked 000 | todo 020 | total 020
+Task Counts     done 000 | in progress 000 | blocked 001 | todo 019 | total 020
 ```
 
-| Section | Tasks  | Progress | Status  |
-| ------- | ------ | -------: | ------- |
-| Stage R | [0/20] |     0.0% | PENDING |
+| Section | Tasks | Progress | Status |
+|---|---|---:|---|
+| Stage R | [0/20] |   0.0% | BLOCKED |
 
 <!-- live-status:end -->
+
 
 ## Phase Summary (Historical â€” all complete)
 
@@ -116,6 +115,7 @@ Task Counts     done 000 | in progress 000 | blocked 000 | todo 020 | total 020
 2026-04-12       | AI-AGENTS   | COMPLETE  | Phases 1-12 all 100%, Stage M in progress (M01-M05), Stage N complete (N01-N05)
 2026-04-13 23:25 | CODEX       | ADDED     | Stage R "Flawless Proof Gate" with detailed acceptance tasks and sub-steps
 2026-04-14 00:01 | CODEX       | CLEANUP   | Added live status bar, removed fully completed stages, and restarted TODO autosync on the current parser
+2026-04-14 04:00 | CODEX       | R01       | Documented fresh-clone proof progress, hardened dev-up Docker/WSL preflight, and recorded the current host-level WSL blocker
 ```
 
 ## Stage R: Flawless Proof Gate
@@ -125,7 +125,7 @@ Task Counts     done 000 | in progress 000 | blocked 000 | todo 020 | total 020
 > **Definition:** This stage is not cosmetic cleanup. It is the proof burden that would need to be satisfied before making an absolute-quality claim.
 > **Rule of interpretation:** A task in this stage is only done when the proof artifacts exist, the checks are repeatable, and the result survives reruns without hidden manual fixes.
 
-- [ ] `R01` Prove fresh-clone reproducibility from a clean environment.
+- [!] `R01` Prove fresh-clone reproducibility from a clean environment. (updated: 2026-04-14 04:00 IST) Clean sibling pass already proved `npm install` + `npm run build` from documented steps, and `scripts/dev-up.ps1` now fails fast on Docker/WSL outages. Remaining blocker: host WSL/Docker layer is down (`LxssManager` stopped), so the isolated `docker compose` startup + second disposable rerun are still pending. Proof log: `docs/R01_FRESH_CLONE_REPRO.md`.
   - **Why this exists:** A system cannot be called flawless if it only works on the current machine because of cached dependencies, leftover secrets, manual fixes, or hidden environment state.
   - **Step 1:** Create a truly clean environment: no existing `node_modules`, no prebuilt `dist`, no warmed Python virtualenv, no cached browser profile, and no manually pre-seeded app state.
   - **Step 2:** Use only documented setup steps from repo docs. If any undocumented command, file edit, environment variable, or retry is required, record it as a gap immediately.

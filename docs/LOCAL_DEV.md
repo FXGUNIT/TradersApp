@@ -4,7 +4,7 @@ This guide covers the fastest way to run the full stack locally with minimal set
 
 ## Option A (Recommended): Docker Dev Stack
 
-**Prereqs:** Docker Desktop running, plus Node.js 18+ with npm available on the host.
+**Prereqs:** Docker Desktop running with its Linux engine ready, plus Node.js 18+ with npm available on the host.
 
 Why Node/npm are still required on the Docker path:
 - `scripts/dev-up.ps1` builds the frontend bundle on the host before Docker starts nginx.
@@ -22,6 +22,11 @@ That keeps frontend bring-up independent of npm registry access inside Docker
 while still ensuring backend code changes are picked up on a normal restart.
 On a truly fresh clone, the first run may take longer because it will install
 frontend dependencies before building `dist/`.
+
+If `dev-up.ps1` stops with a Docker or WSL readiness error, fix the host first:
+- Start or restart Docker Desktop and wait until the Linux engine is fully up.
+- If the message mentions `LxssManager`, the Windows WSL service is stopped and Docker cannot start Linux containers until that host issue is resolved.
+- Rerun `.\scripts\dev-up.ps1` only after the Docker engine is available again.
 
 Optional tiers:
 ```powershell
