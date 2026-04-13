@@ -325,7 +325,7 @@ def _build_live_status_table(markdown: str) -> str:
 
     lines = markdown.splitlines()
     section_re = re.compile(r"^## (Stage [A-Z]|Phase \d+)")
-    task_re = re.compile(r"^-\s+\[(\S)\]\s+`([A-Z0-9-]+)`\s+(.+?)(?:\n|$)")
+    task_re = re.compile(r"^-\s+\[([ x!\-])\]\s+`([A-Z0-9-]+)`\s+(.+?)(?:\n|$)")
 
     for line in lines:
         sm = section_re.match(line.strip())
