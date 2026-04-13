@@ -27,7 +27,7 @@ export function useAdminSecuritySentinel({
       sentinelRef.current = sentinel;
       window.securitySentinel = sentinel;
       showToast("Atomic Sentinel Online: 4-Layer Perimeter Secure", "success");
-      console.warn("Security Sentinel activated for user:", auth.uid);
+      console.info("Security Sentinel activated for user:", auth.uid);
     } catch (error) {
       console.error("Security Sentinel initialization failed:", error);
       console.error("Details:", {

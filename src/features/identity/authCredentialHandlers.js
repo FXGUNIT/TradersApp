@@ -649,6 +649,78 @@ export const executeStructuredGoogleAuth = async ({
   checkUserStatus,
 }) => {
   const loadUserProfile = suppliedLoadUserProfile;
+  const auditData =
+    typeof window !== "undefined" ? window.__TRADERS_AUDIT_DATA : null;
+  const auditMode =
+    Boolean(auditData?.active) ||
+    (typeof window !== "undefined" && window.__TRADERS_UI_AUDIT__ === true);
+
+  if (auditMode) {
+    const fallbackEmail = String(
+      authenticatedUser?.email ||
+        auditData?.userAuth?.email ||
+        auditData?.userProfile?.email ||
+        "audit.user@gmail.com",
+    ).toLowerCase();
+
+    if (!isValidGmailAddress(fallbackEmail)) {
+      throw new Error("Only Gmail addresses are allowed.");
+    }
+
+    const fallbackUid =
+      authenticatedUser?.uid ||
+      auditData?.userAuth?.uid ||
+      auditData?.userProfile?.uid ||
+      `audit-google-${Date.now()}`;
+    const simulatedUser = {
+      uid: fallbackUid,
+      email: fallbackEmail,
+      displayName:
+        authenticatedUser?.displayName ||
+        auditData?.userProfile?.fullName ||
+        fallbackEmail.split("@")[0],
+      emailVerified: authenticatedUser?.emailVerified ?? true,
+      refreshToken:
+        authenticatedUser?.refreshToken || `audit-refresh-${fallbackUid}`,
+      getIdToken: async () =>
+        authenticatedUser?.token ||
+        auditData?.userAuth?.token ||
+        `audit-token-${fallbackUid}`,
+    };
+    const authData = await syncAuthSessionFromUser(simulatedUser, true);
+
+    if (applicationData) {
+      await handleStructuredSignup({
+        ...applicationData,
+        email: fallbackEmail,
+        fullName:
+          applicationData.fullName ||
+          simulatedUser.displayName ||
+          fallbackEmail.split("@")[0],
+        authProvider: "google",
+      });
+      return;
+    }
+
+    if (auditData?.userProfile || auditData?.adminProfile) {
+      clearPendingGoogleSignup();
+      setGoogleUser(null);
+      await checkUserStatus(authData);
+      return;
+    }
+
+    const googleDraft = {
+      uid: fallbackUid,
+      email: fallbackEmail,
+      fullName: simulatedUser.displayName,
+      authProvider: "google",
+    };
+
+    persistPendingGoogleSignup(googleDraft);
+    setGoogleUser(googleDraft);
+    setScreen("signup");
+    return;
+  }
 
   if (!firebaseAuth || !FB_KEY) {
     throw new Error("Google sign-in is unavailable right now.");

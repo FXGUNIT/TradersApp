@@ -56,6 +56,17 @@ export class StickyTrapHoneypot {
 
       console.log(`🪤 Honeypot Access Log: ${timestamp}`, accessRecord);
     }, (error) => {
+      const message = String(error?.message || "");
+      if (
+        error?.code === "PERMISSION_DENIED" ||
+        /permission_denied/i.test(message)
+      ) {
+        console.info(
+          "Honeypot listener unavailable for current Firebase rules.",
+          { code: error?.code, message },
+        );
+        return;
+      }
       console.error('Honeypot listener error:', error);
     });
 
