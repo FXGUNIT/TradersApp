@@ -657,8 +657,20 @@ export function consumeCollectiveConsciousnessQuestion(uid, patch = {}, options 
     };
   }
 
-  const state = readState();
-  const existingUser = state.users?.[uid] || null;
+  const rawState = readStateFile();
+  const state = {
+    ...DEFAULT_STATE,
+    ...rawState,
+    users:
+      rawState.users && typeof rawState.users === "object"
+        ? { ...rawState.users }
+        : {},
+    sessions:
+      rawState.sessions && typeof rawState.sessions === "object"
+        ? rawState.sessions
+        : {},
+  };
+  const existingUser = state.users[uid] || null;
   const draftUser = {
     ...(existingUser || {}),
     uid,
@@ -674,13 +686,22 @@ export function consumeCollectiveConsciousnessQuestion(uid, patch = {}, options 
     plan: patch.plan ?? existingUser?.plan,
   };
   const currentState = resolveCollectiveConsciousnessState(draftUser, options);
+  const updatedAt = nowIso();
 
   if (currentState.isBlocked) {
-    upsertUser(state, uid, {
+    const persistedUser = normalizeUserRecord(uid, {
       ...draftUser,
-      updatedAt: nowIso(),
+      status: draftUser.status || "PENDING",
+      plan: currentState.plan,
+      updatedAt,
     }, options);
-    writeState(state, options);
+    state.users[uid] = persistedUser;
+    writeStateFile({
+      ...DEFAULT_STATE,
+      ...state,
+      users: state.users,
+      sessions: state.sessions,
+    });
     return {
       ok: false,
       blocked: true,
@@ -691,14 +712,21 @@ export function consumeCollectiveConsciousnessQuestion(uid, patch = {}, options 
   }
 
   const timestamp = (options.now instanceof Date ? options.now : new Date()).toISOString();
-  const nextUser = upsertUser(state, uid, {
+  const nextUser = normalizeUserRecord(uid, {
     ...draftUser,
+    status: draftUser.status || "PENDING",
     plan: currentState.plan,
     windowStartTimestamp: currentState.windowStartTimestamp || timestamp,
     questionCount: currentState.questionCount + 1,
-    updatedAt: nowIso(),
+    updatedAt,
   }, options);
-  writeState(state, options);
+  state.users[uid] = nextUser;
+  writeStateFile({
+    ...DEFAULT_STATE,
+    ...state,
+    users: state.users,
+    sessions: state.sessions,
+  });
 
   return {
     ok: true,
