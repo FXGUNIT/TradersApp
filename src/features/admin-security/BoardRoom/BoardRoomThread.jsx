@@ -14,11 +14,30 @@ const EMPTY_POST_FORM = {
   linkedPR: "",
 };
 
+function buildSubThreadDraft(thread) {
+  return {
+    title: "",
+    ownerAgent: thread?.ownerAgent || "",
+    priority: thread?.priority || "MEDIUM",
+    tags: Array.isArray(thread?.tags) ? thread.tags.join(", ") : "",
+    description: "",
+    tasksText: "",
+  };
+}
+
 function parseDelimitedList(rawValue) {
   return String(rawValue || "")
     .split(/[\n,]/)
     .map((value) => value.trim())
     .filter(Boolean);
+}
+
+function parseTaskList(rawValue) {
+  return String(rawValue || "")
+    .split("\n")
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .map((description) => ({ description }));
 }
 
 function formatTimestamp(timestamp) {
@@ -41,12 +60,16 @@ export default function BoardRoomThread({
   onApprovePlan,
   onRejectPlan,
   onCloseThread,
+  onCreateSubThread,
+  onSelectThread,
 }) {
+  const initialThread = detail?.thread || null;
   const [postForm, setPostForm] = useState(() => ({
     ...EMPTY_POST_FORM,
     author: adminIdentity || "ceo",
     authorType: "human",
   }));
+  const [subThreadForm, setSubThreadForm] = useState(() => buildSubThreadDraft(initialThread));
   const [taskDescription, setTaskDescription] = useState("");
   const [closeForm, setCloseForm] = useState({
     closureCommit: "",
@@ -57,6 +80,8 @@ export default function BoardRoomThread({
   const thread = detail?.thread || null;
   const posts = detail?.posts || [];
   const tasks = detail?.tasks || [];
+  const childThreads = detail?.childThreads || [];
+  const parentThread = detail?.parentThread || null;
   const accentColor = useMemo(() => {
     switch (thread?.priority) {
       case "CRITICAL":
@@ -108,6 +133,24 @@ export default function BoardRoomThread({
       linkedCommit: "",
       linkedPR: "",
     }));
+  };
+
+  const submitSubThread = async () => {
+    if (!thread || !subThreadForm.title.trim() || !subThreadForm.description.trim()) return;
+    const result = await onCreateSubThread?.({
+      parentThreadId: thread.threadId,
+      title: subThreadForm.title.trim(),
+      description: subThreadForm.description.trim(),
+      priority: subThreadForm.priority,
+      tags: parseDelimitedList(subThreadForm.tags),
+      ownerAgent: subThreadForm.ownerAgent || thread.ownerAgent,
+      createdBy: adminIdentity || "ceo",
+      tasks: parseTaskList(subThreadForm.tasksText),
+    });
+
+    if (result?.success) {
+      setSubThreadForm(buildSubThreadDraft(thread));
+    }
   };
 
   return (
@@ -165,6 +208,107 @@ export default function BoardRoomThread({
 
       <div style={{ display: "grid", gridTemplateColumns: "minmax(240px, 300px) 1fr", gap: 18 }}>
         <div style={{ display: "grid", gap: 18, alignContent: "start" }}>
+          <section style={cardStyle}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
+              <div style={{ fontSize: 16, fontWeight: 800 }}>Linked threads</div>
+              <div style={{ fontSize: 12, opacity: 0.7 }}>{childThreads.length} child</div>
+            </div>
+
+            {parentThread ? (
+              <button
+                type="button"
+                onClick={() => onSelectThread?.(parentThread.threadId)}
+                style={linkedThreadButtonStyle(true)}
+              >
+                <div style={{ fontWeight: 700 }}>Parent: {parentThread.title}</div>
+                <div style={{ fontSize: 11, opacity: 0.72 }}>
+                  {parentThread.threadId} · {parentThread.ownerAgent} · {parentThread.status}
+                </div>
+              </button>
+            ) : (
+              <div style={{ fontSize: 12, opacity: 0.7 }}>No parent thread.</div>
+            )}
+
+            <div style={{ display: "grid", gap: 8 }}>
+              {childThreads.length === 0 ? (
+                <div style={{ fontSize: 12, opacity: 0.7 }}>No sub-threads yet.</div>
+              ) : (
+                childThreads.map((childThread) => (
+                  <button
+                    key={childThread.threadId}
+                    type="button"
+                    onClick={() => onSelectThread?.(childThread.threadId)}
+                    style={linkedThreadButtonStyle(false)}
+                  >
+                    <div style={{ fontWeight: 700 }}>{childThread.title}</div>
+                    <div style={{ fontSize: 11, opacity: 0.72 }}>
+                      {childThread.threadId} · {childThread.ownerAgent} · {childThread.status}
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+
+            {thread.status !== "CLOSED" && (
+              <div style={{ display: "grid", gap: 10 }}>
+                <div style={{ fontSize: 13, fontWeight: 700 }}>Open sub-thread</div>
+                <input
+                  value={subThreadForm.title}
+                  onChange={(event) => setSubThreadForm((current) => ({ ...current, title: event.target.value }))}
+                  placeholder="Sub-thread title"
+                  style={fieldStyle}
+                />
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  <input
+                    value={subThreadForm.ownerAgent}
+                    onChange={(event) => setSubThreadForm((current) => ({ ...current, ownerAgent: event.target.value }))}
+                    placeholder="Owner agent"
+                    style={fieldStyle}
+                  />
+                  <select
+                    value={subThreadForm.priority}
+                    onChange={(event) => setSubThreadForm((current) => ({ ...current, priority: event.target.value }))}
+                    style={fieldStyle}
+                  >
+                    {["LOW", "MEDIUM", "HIGH", "CRITICAL"].map((priority) => (
+                      <option key={priority} value={priority}>
+                        {priority}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <input
+                  value={subThreadForm.tags}
+                  onChange={(event) => setSubThreadForm((current) => ({ ...current, tags: event.target.value }))}
+                  placeholder="Tags, comma separated"
+                  style={fieldStyle}
+                />
+                <textarea
+                  value={subThreadForm.description}
+                  onChange={(event) => setSubThreadForm((current) => ({ ...current, description: event.target.value }))}
+                  placeholder="Sub-thread description"
+                  rows={4}
+                  style={{ ...fieldStyle, resize: "vertical" }}
+                />
+                <textarea
+                  value={subThreadForm.tasksText}
+                  onChange={(event) => setSubThreadForm((current) => ({ ...current, tasksText: event.target.value }))}
+                  placeholder="Tasks, one per line"
+                  rows={3}
+                  style={{ ...fieldStyle, resize: "vertical" }}
+                />
+                <button
+                  type="button"
+                  disabled={disabled || !subThreadForm.title.trim() || !subThreadForm.description.trim()}
+                  onClick={submitSubThread}
+                  style={actionButtonStyle(accentColor)}
+                >
+                  Open sub-thread
+                </button>
+              </div>
+            )}
+          </section>
+
           <section style={cardStyle}>
             <div style={{ fontSize: 16, fontWeight: 800 }}>Tasks</div>
             <div style={{ display: "grid", gap: 10 }}>
@@ -417,6 +561,20 @@ function actionButtonStyle(accentColor) {
     background: accentColor,
     color: "#04111f",
     fontWeight: 800,
+    cursor: "pointer",
+  };
+}
+
+function linkedThreadButtonStyle(isParent) {
+  return {
+    textAlign: "left",
+    borderRadius: 12,
+    border: `1px solid ${isParent ? "rgba(125,211,252,0.3)" : "rgba(255,255,255,0.08)"}`,
+    background: isParent ? "rgba(56,189,248,0.1)" : "rgba(255,255,255,0.03)",
+    color: "inherit",
+    padding: "10px 12px",
+    display: "grid",
+    gap: 6,
     cursor: "pointer",
   };
 }

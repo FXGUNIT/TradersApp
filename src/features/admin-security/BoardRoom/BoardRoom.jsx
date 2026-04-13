@@ -240,6 +240,16 @@ export default function BoardRoom({
     showToast?.(`Thread ${result.thread?.threadId || ""} opened.`, "success");
   };
 
+  const handleCreateSubThread = async (payload) => {
+    const result = await createThread(payload);
+    if (!result?.success) {
+      showToast?.(result?.error || "Unable to create sub-thread.", "error");
+      return result;
+    }
+    showToast?.(`Sub-thread ${result.thread?.threadId || ""} opened.`, "success");
+    return result;
+  };
+
   const handleSelectThread = async (threadId) => {
     const result = await selectThread(threadId);
     if (result?.success === false) {
@@ -388,6 +398,8 @@ export default function BoardRoom({
             onApprovePlan={handleApprovePlan}
             onRejectPlan={handleRejectPlan}
             onCloseThread={handleCloseThread}
+            onCreateSubThread={handleCreateSubThread}
+            onSelectThread={handleSelectThread}
           />
         )}
       </div>
