@@ -384,10 +384,10 @@ for i in $(seq 1 $((SCALE_UP_TIMEOUT / 10))); do
     PEAK_DESIRED="$DESIRED"
   fi
 
-  # Scale-up detected: actual replicas > 1 (hpa minReplicas default) AND scaling is active
-  if [[ "$REPLICAS" -gt 1 || "$DESIRED" -gt 1 ]]; then
+  # Scale-up is only real if the deployment or HPA rises above the live baseline.
+  if [[ "$REPLICAS" -gt "$BASELINE_REPLICAS" || "$DESIRED" -gt "$BASELINE_REPLICAS" || "$CURRENT" -gt "$BASELINE_REPLICAS" ]]; then
     SCALED_UP=true
-    log "  *** Scale-up DETECTED: replicas=$REPLICAS > 1 ***"
+    log "  *** Scale-up DETECTED: baseline=$BASELINE_REPLICAS replicas=$REPLICAS desired=$DESIRED current=$CURRENT ***"
     break
   fi
 
