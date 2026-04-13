@@ -26,6 +26,7 @@ param(
 $ErrorActionPreference = "Stop"
 $composeFile = Join-Path $PSScriptRoot "..\docker-compose.dev.yml"
 $observabilityFile = Join-Path $PSScriptRoot "..\docker-compose.observability.yml"
+$repoRoot = Join-Path $PSScriptRoot ".."
 
 if (-not (Test-Path $composeFile)) {
   Write-Error "docker-compose.dev.yml not found at $composeFile"
@@ -33,6 +34,8 @@ if (-not (Test-Path $composeFile)) {
 }
 
 $frontendDist = Join-Path $PSScriptRoot "..\dist\index.html"
+$frontendViteBin = Join-Path $repoRoot "node_modules\.bin\vite.cmd"
+$npmCommand = Get-Command npm.cmd -ErrorAction SilentlyContinue
 
 $baseArgs = @("-f", $composeFile)
 $includeObservability = $Tier -eq "full"
@@ -66,8 +69,21 @@ switch ($Tier) {
 }
 
 Write-Host "Building frontend bundle for local nginx container..." -ForegroundColor Yellow
-Push-Location (Join-Path $PSScriptRoot "..")
+if (-not $npmCommand) {
+  Write-Error "npm.cmd was not found. Install Node.js 18+ and npm, then rerun .\\scripts\\dev-up.ps1."
+  exit 1
+}
+
+Push-Location $repoRoot
 try {
+  if (-not (Test-Path $frontendViteBin)) {
+    Write-Host "Installing frontend dependencies for a fresh workspace..." -ForegroundColor Yellow
+    & npm.cmd install
+    if ($LASTEXITCODE -ne 0) {
+      exit $LASTEXITCODE
+    }
+  }
+
   & npm.cmd run build
   if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
