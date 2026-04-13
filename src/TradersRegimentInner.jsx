@@ -2,7 +2,7 @@
 /**
  * TradersRegimentInner — inner app (I07 + I09 continuation)
  * Extracted from App.jsx to achieve ≤300L on App.jsx itself.
- * Imports screen/shell helpers from TradersRegimentInner.render.js.
+ * Imports screen/shell helpers from TradersRegimentInner.render.jsx.
  *
  * Architecture:
  *   App.jsx                        — thin shell: imports + providers + JSX mount (28L)
@@ -104,7 +104,7 @@ import {
   listAdminUsers,
   approveAdminUser,
   blockAdminUser,
-} from "./TradersRegimentInner.render.js";
+} from "./TradersRegimentInner.render.jsx";
 
 import "./features/shell/registerLegacyRuntimeStyles.js";
 import "./styles/global.css";
