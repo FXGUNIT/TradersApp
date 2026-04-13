@@ -219,67 +219,6 @@ export default function MainTerminal({
   // Countdown ref for display (updated without React state)
   const circuitCountdownRef = useRef(null);
 
-  const applyCsvParseResult = useCallback((requestId, result) => {
-    if (requestId !== csvParseRequestIdRef.current) {
-      return;
-    }
-
-    setIsCsvParsing(false);
-    setCsvProgress(0);
-    setParsed(result?.parsed || null);
-    setParseMsg(result?.parseMsg || "⚠ CSV parse failed");
-  }, []);
-
-  useEffect(() => {
-    if (typeof Worker === "undefined") {
-      return undefined;
-    }
-
-    const worker = new Worker(new URL("./terminalCsv.worker.js", import.meta.url), {
-      type: "module",
-    });
-
-    const handleMessage = (event) => {
-      const { requestId, progress, ...result } = event.data || {};
-
-      // Worker reports incremental progress — update the skeleton loader %
-      if (progress !== undefined) {
-        const currentId = csvParseRequestIdRef.current;
-        if (requestId === currentId) {
-          setCsvProgress(progress);
-        }
-        return;
-      }
-
-      applyCsvParseResult(requestId, result);
-    };
-
-    const handleError = () => {
-      const requestId = csvParseRequestIdRef.current;
-      if (!requestId) {
-        return;
-      }
-      applyCsvParseResult(requestId, {
-        ok: false,
-        parsed: null,
-        parseMsg: "⚠ CSV parse failed",
-      });
-    };
-
-    worker.addEventListener("message", handleMessage);
-    worker.addEventListener("error", handleError);
-    csvParserWorkerRef.current = worker;
-
-    return () => {
-      worker.removeEventListener("message", handleMessage);
-      worker.removeEventListener("error", handleError);
-      worker.terminate();
-      if (csvParserWorkerRef.current === worker) {
-        csvParserWorkerRef.current = null;
-      }
-    };
-  }, [applyCsvParseResult]);
-
   const applyJournalMetricsResult = useCallback((requestId, nextMetrics) => {
     if (requestId !== journalMetricsRequestIdRef.current) {
       return;
