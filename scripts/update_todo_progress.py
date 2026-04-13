@@ -343,27 +343,58 @@ def _build_live_status_table(markdown: str) -> str:
                 "title": title,
             })
 
-    # Build table
+    # Build table and aggregate status bar data.
     rows = []
+    total_tasks = 0
+    done_tasks = 0
+    partial_tasks = 0
+    blocked_tasks = 0
+    todo_tasks = 0
+    completed_sections = 0
+
     for section, tasks in stage_tasks.items():
         if not tasks:
             continue
         done = sum(1 for t in tasks if t["status"] == "Done")
-        ip = sum(1 for t in tasks if t["status"] == "Partial")
-        blk = sum(1 for t in tasks if t["status"] == "Blocked")
+        partial = sum(1 for t in tasks if t["status"] == "Partial")
+        blocked = sum(1 for t in tasks if t["status"] == "Blocked")
+        todo = sum(1 for t in tasks if t["status"] == "Todo")
         total = len(tasks)
         pct = done / total * 100.0 if total else 0.0
 
-        status_icon = "✅ COMPLETE" if done == total else ("🔄 IN PROGRESS" if ip else "⏸ PENDING")
+        if done == total:
+            status_label = "COMPLETE"
+            completed_sections += 1
+        elif blocked and not done and not partial:
+            status_label = "BLOCKED"
+        elif done or partial or blocked:
+            status_label = "IN PROGRESS"
+        else:
+            status_label = "PENDING"
+
+        total_tasks += total
+        done_tasks += done
+        partial_tasks += partial
+        blocked_tasks += blocked
+        todo_tasks += todo
+
         badge = f"[{done}/{total}]"
-        rows.append(f"| {section} | {badge} | {pct:5.1f}% | {status_icon} |")
+        rows.append(f"| {section} | {badge} | {pct:5.1f}% | {status_label} |")
 
     timestamp = datetime.now().astimezone().strftime("%Y-%m-%d %H:%M")
+    section_total = len(rows)
+    weighted_done = done_tasks + (partial_tasks * STATUS_SCORE["Partial"])
+    backlog_pct = (weighted_done / total_tasks * 100.0) if total_tasks else 0.0
 
     header = (
         f"{PROGRESS_START}\n"
         "## Live Status\n"
         f"Generated: `{timestamp}`  ·  Run `python scripts/update_todo_progress.py --once` to update\n\n"
+        "```text\n"
+        f"Active Backlog  {backlog_pct:5.1f}%  {make_bar(backlog_pct, width=24)}\n"
+        f"Stage Progress  {completed_sections:02d}/{section_total:02d} complete\n"
+        f"Task Counts     done {format_count(done_tasks)} | in progress {format_count(partial_tasks)} | blocked {format_count(blocked_tasks)} | todo {format_count(todo_tasks)} | total {format_count(total_tasks)}\n"
+        "```\n\n"
         "| Section | Tasks | Progress | Status |\n"
         "|---|---|---:|---|\n"
     )
