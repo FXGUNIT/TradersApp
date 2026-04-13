@@ -814,7 +814,6 @@ export default function MainTerminal({
   const {
     maxRiskUSD,
     activeRiskPct,
-    isThrottled,
     VR,
     volatilityRegime,
     atrVal,
