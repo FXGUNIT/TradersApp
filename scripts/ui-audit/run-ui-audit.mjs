@@ -15,7 +15,10 @@ const REPORT_PATH = path.join(OUTPUT_DIR, `report-${timestamp}.json`);
 const DESKTOP_VIEWPORT = { width: 1440, height: 1800 };
 const MOBILE_VIEWPORT = { width: 393, height: 1180 };
 const AUDIT_VIEWPORT_MODE = String(
-  process.env.UI_AUDIT_VIEWPORT || "desktop",
+  process.env.UI_AUDIT_VIEWPORT ||
+    (process.env.npm_lifecycle_event === "audit:ui:mobile"
+      ? "mobile"
+      : "desktop"),
 ).toLowerCase();
 const VIEWPORT =
   AUDIT_VIEWPORT_MODE === "mobile" ? MOBILE_VIEWPORT : DESKTOP_VIEWPORT;

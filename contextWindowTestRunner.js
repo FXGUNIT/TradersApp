@@ -418,7 +418,7 @@ console.log(colorize('╚══════════════════�
 
 const allTests = [test1, test2, test3, test4];
 const passedTests = allTests.filter(t => t.passed);
-const failedTests = allTests.filter(t => !t.passed);
+const expectedFailureDetections = [test2, test3, test4].filter(t => t.passed).length;
 
 console.log(`\n✓ Accurate Response (Pass Expected): ${test1.passed ? colorize('PASS', 'green') : colorize('FAIL', 'red')} (Score: ${test1.score}%)`);
 console.log(`✗ Wrong User (Fail Expected): ${!test2.passed ? colorize('DETECTED', 'green') : colorize('MISSED', 'red')} (Score: ${test2.score}%)`);
