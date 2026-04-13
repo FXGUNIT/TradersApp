@@ -42,7 +42,11 @@ Before starting work, claim your tasks here. This prevents two agents from updat
   "P01": { "claimed_by": null, "claimed_at": null },
   "P02": { "claimed_by": null, "claimed_at": null },
   "P03": { "claimed_by": null, "claimed_at": null },
-  "P04": { "claimed_by": null, "claimed_at": null }
+  "P04": { "claimed_by": null, "claimed_at": null },
+  "Q01": { "claimed_by": null, "claimed_at": null },
+  "Q02": { "claimed_by": null, "claimed_at": null },
+  "Q03": { "claimed_by": null, "claimed_at": null },
+  "Q04": { "claimed_by": null, "claimed_at": null }
 }
 ```
 
@@ -52,7 +56,7 @@ Run `python scripts/update_todo_progress.py --once` to regenerate.
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-13 16:15`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-13 16:43`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 | Section | Tasks | Progress | Status |
 |---|---|---:|---|
@@ -62,6 +66,7 @@ Generated: `2026-04-13 16:15`  ·  Run `python scripts/update_todo_progress.py -
 | Stage O | [25/25] | 100.0% | ✅ COMPLETE |
 
 <!-- live-status:end -->
+
 
 
 
