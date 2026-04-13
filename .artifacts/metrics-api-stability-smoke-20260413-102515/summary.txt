@@ -1,0 +1,5 @@
+result=PASS
+samples=3
+top_failures=0
+apiservice_failures=0
+scaling_failures=0

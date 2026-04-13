@@ -1,0 +1,4 @@
+timestamp	apiservice_available	apiservice_reason	top_nodes	metrics_server_ready	metrics_server_pods	ml_scaling_active	bff_scaling_active
+2026-04-13T10:25:19+00:00	True	Passed	up	1/1	metrics-server-6b6d98c8f9-dj4pd:Running:9 	True	True
+2026-04-13T10:25:43+00:00	True	Passed	up	1/1	metrics-server-6b6d98c8f9-dj4pd:Running:9 	True	True
+2026-04-13T10:26:01+00:00	True	Passed	up	1/1	metrics-server-6b6d98c8f9-dj4pd:Running:9 	True	True

@@ -80,6 +80,15 @@ Observed state:
 - the umbrella runner held a clean `3/3` preflight probe window with both HPAs at `ScalingActive=True`
 - two short `Metrics API not available` windows were still observed during the 2026-04-13 scale-down loop, so HPA health should still be paired with live Metrics API checks during future regressions
 
+Extended cooldown-window probe:
+
+```bash
+NAMESPACE=tradersapp-dev DURATION_SECONDS=300 INTERVAL_SECONDS=15 \
+  bash scripts/k8s/diagnose-metrics-api-stability.sh
+```
+
+This writes timestamped APIService / `kubectl top` / metrics-server / HPA samples into `.artifacts/metrics-api-stability-*` so a future flap is captured in one place instead of reconstructed from ad hoc commands.
+
 ### PVC State
 
 The original ml-engine PVC blockers are cleared:
@@ -259,6 +268,7 @@ After load stops:
 ## Scripts
 
 - `scripts/k8s/run-hpa-scaling-test.sh` - end-to-end HPA validation
+- `scripts/k8s/diagnose-metrics-api-stability.sh` - extended Metrics API / HPA stability sampler
 - `scripts/k8s/validate-hpa-ml-engine.sh` - ml-engine-specific validation
 - `scripts/k8s/validate-hpa-bff.sh` - bff-specific validation
 - `scripts/k8s/watch-hpa-events.sh` - live HPA event watcher
