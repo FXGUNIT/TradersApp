@@ -4,6 +4,7 @@ import { auth } from "../../services/firebase.js";
 import {
   clearPendingGoogleSignup,
 } from "./authFlowStorage.js";
+const AUDIT_MODE_KEY = "TradersApp_AuditMode";
 
 /** Wrap any promise with a timeout — resolves to null on timeout. */
 function withTimeout(promise, ms) {
@@ -11,6 +12,26 @@ function withTimeout(promise, ms) {
     promise,
     new Promise((resolve) => setTimeout(() => resolve(null), ms)),
   ]);
+}
+
+function isAuditBootstrapRuntime() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  if (
+    window.__TRADERS_UI_AUDIT__ === true ||
+    window.__TRADERS_AUDIT_DATA?.active === true ||
+    Boolean(window.__TradersAppAudit)
+  ) {
+    return true;
+  }
+
+  try {
+    return localStorage.getItem(AUDIT_MODE_KEY) === "true";
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -56,23 +77,7 @@ export function useAuthBootstrap({
 
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       try {
-        const auditHarnessEnabled =
-          typeof window !== "undefined" &&
-          import.meta.env.DEV &&
-          Boolean(window.__TradersAppAudit);
-        if (auditHarnessEnabled) {
-          clearTimeout(authTimeout);
-          if (!authBootstrapCompleteRef.current) {
-            authBootstrapCompleteRef.current = true;
-            setIsInitialLoading(false);
-          }
-          return;
-        }
-
-        const auditMode =
-          typeof window !== "undefined" &&
-          window.__TRADERS_AUDIT_DATA?.active === true;
-        if (auditMode) {
+        if (isAuditBootstrapRuntime()) {
           clearTimeout(authTimeout);
           if (!authBootstrapCompleteRef.current) {
             authBootstrapCompleteRef.current = true;

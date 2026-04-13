@@ -23,8 +23,6 @@ import emailjs from "@emailjs/browser";
 
 import LoadingFallback from "./features/shell/LoadingFallback.jsx";
 import SplashScreen from "./features/shell/SplashScreen.jsx";
-import SplashScreen from "./features/shell/SplashScreen.jsx";
-import SplashScreen from "./features/shell/SplashScreen.jsx";
 import { useTheme } from "./hooks/useTheme.jsx";
 import { getRandomQuote } from "./features/shell/appShellChrome.jsx";
 import { useMaintenanceMode } from "./features/shell/useMaintenanceMode.js";
