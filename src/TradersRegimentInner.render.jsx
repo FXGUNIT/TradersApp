@@ -15,6 +15,7 @@ import FloatingChatWidget from "./components/FloatingChatWidget.jsx";
 import AiEnginesStatus from "./components/AiEnginesStatus.jsx";
 import FeatureGuard from "./components/FeatureGuard.jsx";
 import EmptyStateCard from "./components/EmptyStateCard.jsx";
+import LoadingFallback from "./features/shell/LoadingFallback.jsx";
 import SplashScreen from "./features/shell/SplashScreen.jsx";
 import AppScreenRegistry from "./features/shell/AppScreenRegistry.jsx";
 import ShellThemeOverlay from "./features/shell/ShellThemeOverlay.jsx";
