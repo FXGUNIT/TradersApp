@@ -466,10 +466,14 @@ const factGroundednessScore = goodAIStats.failed === 0 ? 100 : (goodAIStats.pass
 const detectionRateNum = parseFloat(hallucinationStats.detectionRate);
 const detectionRateColor = detectionRateNum >= 80 ? 'green' : 'yellow';
 const scoreColor = factGroundednessScore === 100 ? 'green' : 'red';
-const ratingText = goodAIStats.criticalPassed === 3 ? 'EXCELLENT' : 'NEEDS WORK';
-const ratingColor = goodAIStats.criticalPassed === 3 ? 'green' : 'yellow';
-const integrityStatus = allIssues.filter(i => i.check === 'Database Contradiction').length === 0 ? 'INTACT' : 'COMPROMISED';
-const integrityColor = allIssues.filter(i => i.check === 'Database Contradiction').length === 0 ? 'green' : 'red';
+const criticalCaseCount = TEST_CASES.filter(tc => tc.criticalTest).length;
+const groundTruthIssues = resultsGoodAI
+  .flatMap(result => result.issues || [])
+  .filter(issue => issue.check === 'Database Contradiction');
+const ratingText = goodAIStats.criticalPassed === criticalCaseCount ? 'EXCELLENT' : 'NEEDS WORK';
+const ratingColor = goodAIStats.criticalPassed === criticalCaseCount ? 'green' : 'yellow';
+const integrityStatus = groundTruthIssues.length === 0 ? 'INTACT' : 'AT RISK';
+const integrityColor = groundTruthIssues.length === 0 ? 'green' : 'red';
 
 console.log('\n  ✓ Fact-Groundedness Score:     ' + colorize(factGroundednessScore + '%', scoreColor));
 console.log('    └─ AI correctly reports missing data without fabrication');
@@ -513,3 +517,4 @@ if (systemVerdict === 'EXEMPLARY') {
 }
 
 console.log();
+process.exit(systemVerdict === 'EXEMPLARY' ? 0 : 1);

@@ -1,22 +1,5 @@
-// contextWindowTestRunner.js
-// ═══════════════════════════════════════════════════════════════════
-// CONTEXT WINDOW INTEGRITY TEST: Information Retention at Scale
-// ═══════════════════════════════════════════════════════════════════
-// Tests whether AI maintains context across a long list of 50 users
-// and accurately locates a specific user with '731' phone number.
-//
-// Stress Test: Feed 50 users in JSON format
-// Query: "Find the user with phone number containing '731'"
-//
-// FAIL: AI loses track or returns wrong user
-// PASS: AI accurately identifies correct user from end of list
+import assert from 'node:assert/strict';
 
-import fs from 'fs';
-import path from 'path';
-
-// ═══════════════════════════════════════════════════════════════════
-// ANSI COLOR CODES
-// ═══════════════════════════════════════════════════════════════════
 const colors = {
   reset: '\x1b[0m',
   bold: '\x1b[1m',
@@ -26,136 +9,104 @@ const colors = {
   blue: '\x1b[34m',
   cyan: '\x1b[36m',
   magenta: '\x1b[35m',
-  white: '\x1b[37m',
 };
 
 function colorize(text, color) {
   return `${colors[color]}${text}${colors.reset}`;
 }
 
-// ═══════════════════════════════════════════════════════════════════
-// GENERATE 50 MOCK USERS WITH PHONE NUMBERS
-// ═══════════════════════════════════════════════════════════════════
-
 function generateMockUsers() {
   const users = [];
-  const areaCodeCodes = ['201', '212', '215', '302', '303', '304', '305', '307', '308', '309',
+  const areaCodes = [
+    '201', '212', '215', '302', '303', '304', '305', '307', '308', '309',
     '310', '312', '313', '314', '315', '316', '317', '318', '319', '320',
     '321', '323', '330', '334', '336', '337', '339', '340', '341', '346',
     '347', '351', '352', '360', '361', '364', '367', '369', '370', '372',
-    '373', '374', '375', '376', '377', '378', '379', '380', '381', '382',
-    '383', '385'];
+    '373', '374', '375', '376', '377', '378', '379', '380', '381',
+  ];
 
-  // Generate 49 regular users
-  for (let i = 1; i <= 49; i++) {
-    const areaCode = areaCodeCodes[i - 1];
-    const exchange = String(Math.floor(Math.random() * 900) + 100);
-    const line = String(Math.floor(Math.random() * 9000) + 1000);
-    const phone = `+1-${areaCode}-${exchange}-${line}`;
-
+  for (let index = 0; index < 49; index += 1) {
+    const id = index + 1;
     users.push({
-      uid: `user_${String(i).padStart(3, '0')}`,
-      name: `User${i}`,
-      email: `user${i}@traders.app`,
-      phone: phone,
-      status: i % 3 === 0 ? 'ACTIVE' : 'PENDING',
-      balance: Math.floor(Math.random() * 50000) + 1000,
-      joinDate: `2025-${String(Math.floor(Math.random() * 12) + 1).padStart(2, '0')}-${String(Math.floor(Math.random() * 28) + 1).padStart(2, '0')}`,
+      uid: `user_${String(id).padStart(3, '0')}`,
+      name: `User${id}`,
+      email: `user${id}@traders.app`,
+      phone: `+1-${areaCodes[index]}-555-${String(1100 + index).padStart(4, '0')}`,
+      status: id % 3 === 0 ? 'ACTIVE' : 'PENDING',
+      balance: 1000 + id * 750,
+      joinDate: `2025-${String((id % 12) + 1).padStart(2, '0')}-${String((id % 28) + 1).padStart(2, '0')}`,
     });
   }
 
-  // Insert target user with '731' phone number at position 45 (near end)
-  const targetUser = {
+  users.splice(44, 0, {
     uid: 'user_045',
     name: 'Alice Johnson',
     email: 'alice.johnson@traders.app',
-    phone: '+1-731-555-9748', // ← TARGET: Contains '731'
+    phone: '+1-731-555-9748',
     status: 'ACTIVE',
     balance: 25000,
     joinDate: '2025-03-01',
-  };
-
-  users.splice(44, 0, targetUser); // Insert at position 45 (index 44)
+  });
 
   return users;
 }
 
 const MOCK_USERS = generateMockUsers();
+const TARGET_USER = MOCK_USERS.find((user) => user.phone.includes('731'));
+const USER_QUERY =
+  "From the list of users below, find the user with a phone number containing '731' and tell me their name and email.";
 
-// Verify target user is in list
-const targetUser = MOCK_USERS.find(u => u.phone.includes('731'));
-console.assert(targetUser, 'Target user with 731 phone number not found');
-console.assert(targetUser.name === 'Alice Johnson', 'Target user should be Alice Johnson');
+assert.equal(MOCK_USERS.length, 50, 'Expected exactly 50 mock users');
+assert.ok(TARGET_USER, 'Target user with phone containing 731 must exist');
+assert.equal(TARGET_USER.name, 'Alice Johnson', 'Expected Alice Johnson as target');
 
-// ═══════════════════════════════════════════════════════════════════
-// USER QUERY
-// ═══════════════════════════════════════════════════════════════════
-
-const USER_QUERY = "From the list of users below, find the user with a phone number containing '731' and tell me their name and email.";
-
-// ═══════════════════════════════════════════════════════════════════
-// MOCK AI RESPONSES
-// ═══════════════════════════════════════════════════════════════════
-
-/**
- * GOOD AI Response: Accurately finds user from list
- */
 function generateAccurateResponse(users) {
-  const target = users.find(u => u.phone.includes('731'));
-  if (!target) {
-    return 'No user found with phone number containing 731.';
-  }
-  return `Found the user with phone number containing '731':
-
-Name: ${target.name}
-Email: ${target.email}
-Phone: ${target.phone}
-Status: ${target.status}
-Balance: $${target.balance}
-
-This user (${target.name}) has been with us since ${target.joinDate} and maintains an active trading account.`;
+  const target = users.find((user) => user.phone.includes('731'));
+  return [
+    "Found the user with phone number containing '731':",
+    '',
+    `Name: ${target.name}`,
+    `Email: ${target.email}`,
+    `Phone: ${target.phone}`,
+    `Status: ${target.status}`,
+    `Balance: $${target.balance}`,
+  ].join('\n');
 }
 
-/**
- * BAD AI Response: Returns wrong user or loses context
- */
 function generateWrongUserResponse() {
-  return `Based on the user list, the user with phone containing '731' is:
-
-Name: User049
-Email: user49@traders.app
-Phone: +1-382-555-8901
-Status: PENDING
-
-The user appears to be a newer account.`;
+  return [
+    "Found the user with phone number containing '731':",
+    '',
+    'Name: User049',
+    'Email: user49@traders.app',
+    'Phone: +1-381-555-1148',
+    'Status: PENDING',
+  ].join('\n');
 }
 
-/**
- * INCOMPLETE Response: Partial match or context loss
- */
-function generateIncompleteResponse(users) {
-  return `There are 50 users in the list. Looking through them, I found several phone numbers, but I'm having trouble tracking the specific one with '731'. The list is quite long. Can you provide more context?`;
+function generateIncompleteResponse() {
+  return [
+    'I reviewed the 50-user list, but the requested phone pattern appears near the end.',
+    "I cannot confidently identify the user with '731' from the provided data.",
+    'Please provide a shorter list or more context.',
+  ].join('\n');
 }
 
-/**
- * HALLUCINATION Response: Makes up data not in list
- */
 function generateHallucinationResponse() {
-  return `The user with phone number containing '731' is:
-
-Name: David Chen
-Email: david.chen@traders.app
-Phone: +1-731-555-8432
-Status: VERIFIED
-Balance: $45,000
-Join Date: 2025-02-15
-
-This is an experienced trader with a high balance.`;
+  return [
+    "Found the user with phone number containing '731':",
+    '',
+    'Name: David Chen',
+    'Email: david.chen@traders.app',
+    'Phone: +1-731-555-8432',
+    'Status: VERIFIED',
+    'Balance: $45000',
+  ].join('\n');
 }
 
-// ═══════════════════════════════════════════════════════════════════
-// CONTEXT INTEGRITY CHECKER
-// ═══════════════════════════════════════════════════════════════════
+function buildIssue(severity, check, message, evidence) {
+  return { severity, check, message, evidence };
+}
 
 function checkContextIntegrity(aiResponse, userList) {
   const issues = [];
@@ -168,372 +119,273 @@ function checkContextIntegrity(aiResponse, userList) {
     completeAnswer: false,
   };
 
-  const actualTarget = userList.find(u => u.phone.includes('731'));
-  if (!actualTarget) {
-    issues.push({
-      severity: 'CRITICAL',
-      check: 'Setup Error',
-      message: 'Target user not found in test data',
-      evidence: 'No user with 731 in mock list'
-    });
-    return {
-      hasCriticalIssues: true,
-      hasHighIssues: false,
-      issues,
-      checks,
-      verdict: colorize('✗ TEST DATA ERROR', 'red'),
-      score: 0,
-    };
-  }
+  const actualTarget = userList.find((user) => user.phone.includes('731'));
+  const normalizedResponse = aiResponse.toLowerCase();
+  const mentionedEmails =
+    aiResponse.match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi) || [];
+  const hallucinatedEmails = mentionedEmails.filter(
+    (email) =>
+      !userList.some((user) => user.email.toLowerCase() === email.toLowerCase()),
+  );
 
-  // Check 1: Does response identify the correct user?
-  if (aiResponse.includes(actualTarget.name) || aiResponse.includes(actualTarget.email)) {
-    checks.identifiesCorrectUser = true;
-
-    // Check 2: Is the name correct?
-    if (aiResponse.includes(actualTarget.name)) {
-      checks.correctName = true;
-    } else {
-      issues.push({
-        severity: 'CRITICAL',
-        check: 'Wrong User Identified',
-        message: `Correct name "${actualTarget.name}" not found in response`,
-        evidence: aiResponse.split('\n')[0]
-      });
-    }
-
-    // Check 3: Is the email correct?
-    if (aiResponse.includes(actualTarget.email)) {
-      checks.correctEmail = true;
-    } else {
-      issues.push({
-        severity: 'CRITICAL',
-        check: 'Contact Info Mismatch',
-        message: `Correct email "${actualTarget.email}" not found in response`,
-        evidence: aiResponse.match(/[a-z0-9.+]+@[a-z0-9.]+/)?.[0] || 'No email found'
-      });
-    }
+  if (aiResponse.includes(actualTarget.name)) {
+    checks.correctName = true;
   } else {
-    issues.push({
-      severity: 'CRITICAL',
-      check: 'Context Loss',
-      message: 'AI failed to identify correct user from 50-user list',
-      evidence: `Response mentions: "${aiResponse.split('\n')[0].substring(0, 50)}..."`
-    });
+    issues.push(
+      buildIssue(
+        'CRITICAL',
+        'Wrong User Identified',
+        `Correct name "${actualTarget.name}" was not returned.`,
+        aiResponse.split('\n')[0],
+      ),
+    );
   }
 
-  // Check 4: Maintains context at end of list?
-  // Target user is at position 45 - verify AI didn't lose track
-  if (checks.identifiesCorrectUser) {
+  if (aiResponse.includes(actualTarget.email)) {
+    checks.correctEmail = true;
+  } else {
+    issues.push(
+      buildIssue(
+        'CRITICAL',
+        'Contact Info Mismatch',
+        `Correct email "${actualTarget.email}" was not returned.`,
+        mentionedEmails[0] || 'No email detected',
+      ),
+    );
+  }
+
+  if (checks.correctName || checks.correctEmail) {
+    checks.identifiesCorrectUser = true;
     checks.maintainsContextEnd = true;
   } else {
-    issues.push({
-      severity: 'HIGH',
-      check: 'Long Context Window',
-      message: 'AI may have lost track of data towards end of 50-user list',
-      evidence: `Target at position 45, ${userList.length} total users`
-    });
+    issues.push(
+      buildIssue(
+        'HIGH',
+        'Long Context Window',
+        'The response did not retain the target user near the end of the list.',
+        `Target position: 45 of ${userList.length}`,
+      ),
+    );
   }
 
-  // Check 5: No hallucination (data not in actual user list)
-  const emailMatch = aiResponse.match(/[a-z0-9.+]+@[a-z0-9.]+/g) || [];
-  const hasHallucinatedData = emailMatch.some(email => !userList.find(u => u.email === email));
-
-  if (!hasHallucinatedData || (emailMatch[0] === actualTarget.email)) {
+  if (hallucinatedEmails.length === 0) {
     checks.noHallucination = true;
   } else {
-    issues.push({
-      severity: 'CRITICAL',
-      check: 'Hallucination Detection',
-      message: 'Response contains user data not in the provided list',
-      evidence: `Email found: ${emailMatch.find(e => !userList.find(u => u.email === e))}`
-    });
+    issues.push(
+      buildIssue(
+        'CRITICAL',
+        'Hallucination Detection',
+        'The response introduced email data that is not present in the source list.',
+        hallucinatedEmails.join(', '),
+      ),
+    );
   }
 
-  // Check 6: Complete answer with all required fields
-  if (aiResponse.includes(actualTarget.name) && 
-      aiResponse.includes(actualTarget.email) && 
-      aiResponse.includes(actualTarget.phone)) {
+  if (
+    aiResponse.includes(actualTarget.name) &&
+    aiResponse.includes(actualTarget.email) &&
+    aiResponse.includes(actualTarget.phone)
+  ) {
     checks.completeAnswer = true;
   } else {
-    issues.push({
-      severity: 'HIGH',
-      check: 'Incomplete Answer',
-      message: 'Response missing required user information',
-      evidence: `Has name: ${aiResponse.includes(actualTarget.name)}, email: ${aiResponse.includes(actualTarget.email)}, phone: ${aiResponse.includes(actualTarget.phone)}`
-    });
+    issues.push(
+      buildIssue(
+        'HIGH',
+        'Incomplete Answer',
+        'The response did not include the full requested identity payload.',
+        JSON.stringify({
+          hasName: aiResponse.includes(actualTarget.name),
+          hasEmail: aiResponse.includes(actualTarget.email),
+          hasPhone: aiResponse.includes(actualTarget.phone),
+        }),
+      ),
+    );
   }
 
+  if (
+    normalizedResponse.includes('no user found') &&
+    !normalizedResponse.includes(actualTarget.phone.toLowerCase())
+  ) {
+    issues.push(
+      buildIssue(
+        'CRITICAL',
+        'Context Loss',
+        'The response declined to answer despite the target being present.',
+        aiResponse.split('\n')[0],
+      ),
+    );
+  }
+
+  const criticalIssues = issues.filter((issue) => issue.severity === 'CRITICAL');
+  const score = Math.round(
+    (Object.values(checks).filter(Boolean).length / Object.keys(checks).length) *
+      100,
+  );
+
   return {
-    hasCriticalIssues: issues.filter(i => i.severity === 'CRITICAL').length > 0,
-    hasHighIssues: issues.filter(i => i.severity === 'HIGH').length > 0,
+    hasCriticalIssues: criticalIssues.length > 0,
     issues,
     checks,
-    verdict: !issues.filter(i => i.severity === 'CRITICAL').length ? colorize('✓ PASS - CONTEXT MAINTAINED', 'green') : colorize('✗ FAIL - CONTEXT LOSS DETECTED', 'red'),
-    score: ((Object.values(checks).filter(v => v).length / Object.keys(checks).length) * 100).toFixed(0),
+    score,
+    verdict:
+      criticalIssues.length === 0
+        ? colorize('PASS - CONTEXT MAINTAINED', 'green')
+        : colorize('FAIL - CONTEXT LOSS DETECTED', 'red'),
   };
 }
 
-// ═══════════════════════════════════════════════════════════════════
-// TEST EXECUTOR
-// ═══════════════════════════════════════════════════════════════════
-
-function executeTest(testName, responseGenerator, expectedPass = true) {
-  console.log(colorize(`\n╔${'═'.repeat(76)}╗`, 'cyan'));
-  console.log(colorize(`║ ${testName.padEnd(74)} ║`, 'cyan'));
-  console.log(colorize(`╚${'═'.repeat(76)}╝`, 'cyan'));
-
-  console.log(`\n📊 Test Setup:`);
-  console.log(`  • Total Users: ${MOCK_USERS.length}`);
-  console.log(`  • Target User: Alice Johnson`);
-  console.log(`  • Phone Pattern: Contains '731'`);
-  console.log(`  • Position: User #45 (near end of list)`);
-  console.log(`  • Data Size: ~50KB of JSON user data`);
-
-  console.log(`\n❓ Query: "${USER_QUERY}"`);
-
-  // Show list preview
-  console.log(colorize(`\n📋 User List (first 5 + target + last 5):`, 'blue'));
-  console.log('   [');
-  MOCK_USERS.slice(0, 5).forEach(u => {
-    console.log(`     { uid: "${u.uid}", name: "${u.name}", phone: "${u.phone}" },`);
+function printUserPreview(users) {
+  console.log(colorize('\nUser Preview', 'blue'));
+  console.log('[');
+  users.slice(0, 5).forEach((user) => {
+    console.log(
+      `  { uid: "${user.uid}", name: "${user.name}", phone: "${user.phone}" },`,
+    );
   });
-  console.log('     ...');
-  MOCK_USERS.slice(43, 48).forEach(u => {
-    const marker = u.phone.includes('731') ? ' ← TARGET' : '';
-    console.log(`     { uid: "${u.uid}", name: "${u.name}", phone: "${u.phone}" }${marker},`);
+  console.log('  ...');
+  users.slice(43, 48).forEach((user) => {
+    const marker = user.phone.includes('731') ? '  <- target' : '';
+    console.log(
+      `  { uid: "${user.uid}", name: "${user.name}", phone: "${user.phone}" },${marker}`,
+    );
   });
-  console.log('   ]');
+  console.log(']');
+}
 
-  // Generate response
+function executeTest({ name, responseGenerator, expectedPass }) {
+  console.log(colorize(`\n${name}`, 'cyan'));
+  console.log('-'.repeat(name.length));
+  console.log(`Users: ${MOCK_USERS.length}`);
+  console.log(`Target: ${TARGET_USER.name} <${TARGET_USER.email}> at position 45`);
+  console.log(`Query: ${USER_QUERY}`);
+  printUserPreview(MOCK_USERS);
+
   const aiResponse = responseGenerator(MOCK_USERS);
-
-  console.log(colorize(`\n🤖 AI Response:\n`, 'blue'));
+  console.log(colorize('\nAI Response', 'blue'));
   console.log(aiResponse);
 
-  // Check integrity
-  const checkResult = checkContextIntegrity(aiResponse, MOCK_USERS);
+  const result = checkContextIntegrity(aiResponse, MOCK_USERS);
+  const metExpectation = expectedPass
+    ? !result.hasCriticalIssues
+    : result.hasCriticalIssues;
 
-  console.log(colorize(`\n📋 Context Integrity: ${checkResult.verdict}`, 'cyan'));
-  console.log(`   Score: ${checkResult.score}%`);
+  console.log(colorize(`\nIntegrity Verdict: ${result.verdict}`, 'cyan'));
+  console.log(`Score: ${result.score}%`);
 
-  if (checkResult.issues.length > 0) {
-    console.log(colorize('\n⚠️  Issues Found:', 'yellow'));
-    checkResult.issues.forEach((issue, idx) => {
-      console.log(colorize(`   ${idx + 1}. [${issue.severity}] ${issue.check}`, issue.severity === 'CRITICAL' ? 'red' : 'yellow'));
-      console.log(`      └─ ${issue.message}`);
-      console.log(`      └─ Evidence: ${issue.evidence}`);
+  if (result.issues.length > 0) {
+    console.log(colorize('\nIssues', 'yellow'));
+    result.issues.forEach((issue, index) => {
+      const color = issue.severity === 'CRITICAL' ? 'red' : 'yellow';
+      console.log(
+        colorize(
+          `  ${index + 1}. [${issue.severity}] ${issue.check}: ${issue.message}`,
+          color,
+        ),
+      );
+      console.log(`     Evidence: ${issue.evidence}`);
     });
   } else {
-    console.log(colorize('\n✓ All context checks passed', 'green'));
+    console.log(colorize('\nNo issues found', 'green'));
   }
 
-  console.log(`\n   Identifies Correct User:  ${checkResult.checks.identifiesCorrectUser ? '✓' : '✗'}`);
-  console.log(`   Correct Name:             ${checkResult.checks.correctName ? '✓' : '✗'}`);
-  console.log(`   Correct Email:            ${checkResult.checks.correctEmail ? '✓' : '✗'}`);
-  console.log(`   Maintains Context (End):  ${checkResult.checks.maintainsContextEnd ? '✓' : '✗'}`);
-  console.log(`   No Hallucination:         ${checkResult.checks.noHallucination ? '✓' : '✗'}`);
-  console.log(`   Complete Answer:          ${checkResult.checks.completeAnswer ? '✓' : '✗'}`);
-
-  const passed = expectedPass ? !checkResult.hasCriticalIssues : checkResult.hasCriticalIssues;
+  console.log('\nChecks');
+  console.log(
+    `  Identifies correct user: ${result.checks.identifiesCorrectUser ? 'yes' : 'no'}`,
+  );
+  console.log(`  Correct name:           ${result.checks.correctName ? 'yes' : 'no'}`);
+  console.log(`  Correct email:          ${result.checks.correctEmail ? 'yes' : 'no'}`);
+  console.log(
+    `  Maintains end context:  ${result.checks.maintainsContextEnd ? 'yes' : 'no'}`,
+  );
+  console.log(
+    `  No hallucination:       ${result.checks.noHallucination ? 'yes' : 'no'}`,
+  );
+  console.log(`  Complete answer:        ${result.checks.completeAnswer ? 'yes' : 'no'}`);
 
   return {
-    testName,
-    passed,
-    score: parseInt(checkResult.score),
-    issues: checkResult.issues,
-    checks: checkResult.checks,
+    name,
+    expectedPass,
+    metExpectation,
+    score: result.score,
+    checks: result.checks,
+    issues: result.issues,
   };
 }
 
-// ═══════════════════════════════════════════════════════════════════
-// MAIN TEST RUNNER
-// ═══════════════════════════════════════════════════════════════════
-
 console.clear();
-console.log(colorize('\n╔════════════════════════════════════════════════════════════════════════════╗', 'magenta'));
-console.log(colorize('║                                                                            ║', 'magenta'));
-console.log(colorize('║           🚨 CONTEXT WINDOW INTEGRITY TEST: LONG DATA RETENTION            ║', 'magenta'));
-console.log(colorize('║                                                                            ║', 'magenta'));
-console.log(colorize('║         Testing AI Ability to Maintain Context Across 50 Users             ║', 'magenta'));
-console.log(colorize('║                                                                            ║', 'magenta'));
-console.log(colorize('╚════════════════════════════════════════════════════════════════════════════╝', 'magenta'));
+console.log(colorize('\nContext Window Integrity Test', 'magenta'));
+console.log(colorize('Long-list retention across 50 users', 'magenta'));
 
-console.log(colorize('\n📊 TEST SCENARIO', 'bold'));
-console.log('─────────────────────────────────────────────────────────────────────────────');
-console.log(`Dataset: 50 users with phone numbers`);
-console.log(`Query: Find user with phone containing '731'`);
-console.log(`Context Window Challenge: User is at position 45 (near end)`);
-console.log(`Target User: Alice Johnson <alice.johnson@traders.app>`);
-console.log(`Phone: +1-731-555-9748`);
-console.log('─────────────────────────────────────────────────────────────────────────────\n');
-
-// Test 1: Accurate response
-console.log(colorize('\n┌─ TEST SCENARIO 1: ACCURATE AI (EXPECTED PASS)', 'green'));
-console.log(colorize('│  AI successfully locates user despite long list\n', 'green'));
-
-const test1 = executeTest(
-  'TEST 1: Accurate User Location',
-  generateAccurateResponse,
-  true
-);
-
-// Test 2: Wrong user response
-console.log(colorize('\n\n┌─ TEST SCENARIO 2: WRONG USER (EXPECTED FAIL)', 'red'));
-console.log(colorize('│  AI returns incorrect user - context loss detected\n', 'red'));
-
-const test2 = executeTest(
-  'TEST 2: Wrong User Returned',
-  generateWrongUserResponse,
-  false
-);
-
-// Test 3: Incomplete response
-console.log(colorize('\n\n┌─ TEST SCENARIO 3: INCOMPLETE/LOST (EXPECTED FAIL)', 'yellow'));
-console.log(colorize('│  AI admits it lost context in long list\n', 'yellow'));
-
-const test3 = executeTest(
-  'TEST 3: Incomplete Response',
-  generateIncompleteResponse,
-  false
-);
-
-// Test 4: Hallucination response
-console.log(colorize('\n\n┌─ TEST SCENARIO 4: HALLUCINATED DATA (EXPECTED FAIL)', 'red'));
-console.log(colorize('│  AI invents user data not in original list\n', 'red'));
-
-const test4 = executeTest(
-  'TEST 4: Hallucinated User Data',
-  generateHallucinationResponse,
-  false
-);
-
-// ═══════════════════════════════════════════════════════════════════
-// RESULTS SUMMARY
-// ═══════════════════════════════════════════════════════════════════
-
-console.log(colorize('\n\n╔════════════════════════════════════════════════════════════════════════════╗', 'cyan'));
-console.log(colorize('║                         📊 TEST RESULTS SUMMARY                             ║', 'cyan'));
-console.log(colorize('╚════════════════════════════════════════════════════════════════════════════╝', 'cyan'));
-
-const allTests = [test1, test2, test3, test4];
-const passedTests = allTests.filter(t => t.passed);
-const expectedFailureDetections = [test2, test3, test4].filter(t => t.passed).length;
-
-console.log(`\n✓ Accurate Response (Pass Expected): ${test1.passed ? colorize('PASS', 'green') : colorize('FAIL', 'red')} (Score: ${test1.score}%)`);
-console.log(`✗ Wrong User (Fail Expected): ${!test2.passed ? colorize('DETECTED', 'green') : colorize('MISSED', 'red')} (Score: ${test2.score}%)`);
-console.log(`⚠️  Incomplete (Fail Expected): ${!test3.passed ? colorize('DETECTED', 'green') : colorize('MISSED', 'red')} (Score: ${test3.score}%)`);
-console.log(`⚠️  Hallucination (Fail Expected): ${!test4.passed ? colorize('DETECTED', 'green') : colorize('MISSED', 'red')} (Score: ${test4.score}%)`);
-
-console.log(colorize('\nTest Outcomes:', 'bold'));
-console.log(`  ├─ Expected Passes: 1 | Actual: ${allTests.filter(t => t.testName.includes('Accurate') && t.passed).length} | ${allTests.filter(t => t.testName.includes('Accurate') && t.passed).length === 1 ? colorize('✓', 'green') : colorize('✗', 'red')}`);
-console.log(`  ├─ Expected Fails: 3 | Detected: ${allTests.filter(t => !t.testName.includes('Accurate') && !t.passed).length} | ${allTests.filter(t => !t.testName.includes('Accurate') && !t.passed).length === 3 ? colorize('✓', 'green') : colorize('✗', 'red')}`);
-console.log(`  └─ Context Maintained: ${test1.passed ? colorize('YES', 'green') : colorize('NO', 'red')}`);
-
-// ═══════════════════════════════════════════════════════════════════
-// DETAILED ANALYSIS
-// ═══════════════════════════════════════════════════════════════════
-
-console.log(colorize('\n\n┌─ DETAILED CHECK BREAKDOWN', 'cyan'));
-console.log('│');
-
-const allChecks = {
-  identifiesCorrectUser: 'Correct User ID',
-  correctName: 'Name Accuracy',
-  correctEmail: 'Email Accuracy',
-  maintainsContextEnd: 'Context @ End',
-  noHallucination: 'No Hallucination',
-  completeAnswer: 'Complete Info',
-};
-
-console.log('│ Test 1 (Accurate - Expected Pass):');
-Object.entries(allChecks).forEach(([key, label]) => {
-  const passed = test1.checks[key];
-  console.log(`│   ├─ ${label.padEnd(25)} ${passed ? colorize('✓', 'green') : colorize('✗', 'red')}`);
+const accurateTest = executeTest({
+  name: 'Test 1: Accurate user lookup (expected pass)',
+  responseGenerator: generateAccurateResponse,
+  expectedPass: true,
 });
 
-console.log('│');
-console.log('│ Test 2 (Wrong User - Expected Fail):');
-Object.entries(allChecks).forEach(([key, label]) => {
-  const passed = test2.checks[key];
-  console.log(`│   ├─ ${label.padEnd(25)} ${passed ? colorize('✓', 'green') : colorize('✗', 'red')}`);
+const wrongUserTest = executeTest({
+  name: 'Test 2: Wrong user returned (expected fail detection)',
+  responseGenerator: generateWrongUserResponse,
+  expectedPass: false,
 });
 
-console.log('│');
-console.log('│ Test 3 (Incomplete - Expected Fail):');
-Object.entries(allChecks).forEach(([key, label]) => {
-  const passed = test3.checks[key];
-  console.log(`│   ├─ ${label.padEnd(25)} ${passed ? colorize('✓', 'green') : colorize('✗', 'red')}`);
+const incompleteTest = executeTest({
+  name: 'Test 3: Incomplete response (expected fail detection)',
+  responseGenerator: generateIncompleteResponse,
+  expectedPass: false,
 });
 
-console.log('│');
-console.log('│ Test 4 (Hallucination - Expected Fail):');
-Object.entries(allChecks).forEach(([key, label]) => {
-  const passed = test4.checks[key];
-  console.log(`│   ├─ ${label.padEnd(25)} ${passed ? colorize('✓', 'green') : colorize('✗', 'red')}`);
+const hallucinationTest = executeTest({
+  name: 'Test 4: Hallucinated data (expected fail detection)',
+  responseGenerator: generateHallucinationResponse,
+  expectedPass: false,
 });
 
-console.log('│');
-console.log(colorize('└─ END OF BREAKDOWN\n', 'cyan'));
+const allTests = [
+  accurateTest,
+  wrongUserTest,
+  incompleteTest,
+  hallucinationTest,
+];
+const expectedFailureDetections = [wrongUserTest, incompleteTest, hallucinationTest]
+  .filter((test) => test.metExpectation).length;
+const allCorrect =
+  accurateTest.metExpectation && expectedFailureDetections === 3;
 
-// ═══════════════════════════════════════════════════════════════════
-// CRITICAL METRICS
-// ═══════════════════════════════════════════════════════════════════
+console.log(colorize('\nSummary', 'cyan'));
+console.log(`  Accurate response:      ${accurateTest.metExpectation ? colorize('PASS', 'green') : colorize('FAIL', 'red')} (${accurateTest.score}%)`);
+console.log(`  Wrong-user detection:   ${wrongUserTest.metExpectation ? colorize('DETECTED', 'green') : colorize('MISSED', 'red')} (${wrongUserTest.score}%)`);
+console.log(`  Incomplete detection:   ${incompleteTest.metExpectation ? colorize('DETECTED', 'green') : colorize('MISSED', 'red')} (${incompleteTest.score}%)`);
+console.log(`  Hallucination detection:${hallucinationTest.metExpectation ? colorize('DETECTED', 'green') : colorize('MISSED', 'red')} (${hallucinationTest.score}%)`);
 
-console.log(colorize('╔════════════════════════════════════════════════════════════════════════════╗', 'bold'));
-console.log(colorize('║                       🎯 CRITICAL METRICS                                  ║', 'bold'));
-console.log(colorize('╚════════════════════════════════════════════════════════════════════════════╝', 'bold'));
+console.log(colorize('\nCritical Metrics', 'bold'));
+console.log(`  Context retention:              ${colorize(accurateTest.checks.maintainsContextEnd ? '100%' : '0%', accurateTest.checks.maintainsContextEnd ? 'green' : 'red')}`);
+console.log(`  Wrong-user detection rate:      ${colorize(wrongUserTest.metExpectation ? '100%' : '0%', wrongUserTest.metExpectation ? 'green' : 'red')}`);
+console.log(`  Incomplete-response detection:  ${colorize(incompleteTest.metExpectation ? '100%' : '0%', incompleteTest.metExpectation ? 'green' : 'red')}`);
+console.log(`  Hallucination detection rate:   ${colorize(hallucinationTest.metExpectation ? '100%' : '0%', hallucinationTest.metExpectation ? 'green' : 'red')}`);
 
-const contextRetention = test1.checks.maintainsContextEnd ? 100 : 0;
-const hallucDetection = !test4.passed ? 100 : 0;
-const wrongUserDetection = !test2.passed ? 100 : 0;
+const systemVerdict = allCorrect
+  ? 'EXEMPLARY'
+  : accurateTest.metExpectation
+    ? 'ADEQUATE'
+    : 'NEEDS WORK';
+const verdictColor =
+  systemVerdict === 'EXEMPLARY'
+    ? 'green'
+    : systemVerdict === 'ADEQUATE'
+      ? 'yellow'
+      : 'red';
 
-console.log('\n  ✓ Context Retention (50-User List): ' + colorize(contextRetention + '%', contextRetention === 100 ? 'green' : 'red'));
-console.log('    └─ Can AI find user at position 45?');
-console.log('  ');
-console.log('  ✓ Hallucination Detection Rate:  ' + colorize(hallucDetection + '%', hallucDetection === 100 ? 'green' : 'yellow'));
-console.log('    └─ Does system catch fabricated users?');
-console.log('  ');
-console.log('  ✓ Wrong User Detection Rate:     ' + colorize(wrongUserDetection + '%', wrongUserDetection === 100 ? 'green' : 'yellow'));
-console.log('    └─ Can system identify incorrect results?');
-console.log('  ');
-
-const accuracyScore = test1.score;
-console.log('  ✓ Accuracy Score:               ' + colorize(accuracyScore + '%', accuracyScore >= 80 ? 'green' : 'yellow'));
-console.log('    └─ When context is maintained, how accurate is the response?');
-console.log('');
-
-// ═══════════════════════════════════════════════════════════════════
-// FINAL VERDICT
-// ═══════════════════════════════════════════════════════════════════
-
-const testsPassed = test1.passed ? 1 : 0;
-const testsFailed = [test2, test3, test4].filter(t => !t.passed).length;
-const allCorrect = test1.passed && testsFailed === 3;
-const systemVerdict = allCorrect ? 'EXEMPLARY' : (test1.passed ? 'ADEQUATE' : 'NEEDS WORK');
-const verdictColor = systemVerdict === 'EXEMPLARY' ? 'green' : (systemVerdict === 'ADEQUATE' ? 'yellow' : 'red');
-
-console.log(colorize('╔════════════════════════════════════════════════════════════════════════════╗', verdictColor));
-console.log(colorize(`║               🟢 FINAL VERDICT: ${systemVerdict.padEnd(50)}║`, verdictColor));
-console.log(colorize('╚════════════════════════════════════════════════════════════════════════════╝\n', verdictColor));
+console.log(
+  colorize(`\nFinal Verdict: ${systemVerdict}`, verdictColor),
+);
 
 if (systemVerdict === 'EXEMPLARY') {
-  console.log(colorize('✓ AI MAINTAINS CONTEXT ACROSS LONG LISTS', 'green'));
-  console.log('  - Successfully finds user at position 45/50');
-  console.log('  - Accurately returns name, email, phone');
-  console.log('  - No hallucination of non-existent users');
-  console.log('  - Immune to long list context loss');
-  console.log('  - Ready for large dataset queries');
+  console.log('The harness confirms that correct answers pass and the three bad-answer classes are detected.');
 } else if (systemVerdict === 'ADEQUATE') {
-  console.log(colorize('⚠️  AI CAN HANDLE CONTEXT WITH LIMITATIONS', 'yellow'));
-  console.log('  - Mostly maintains context across lists');
-  console.log('  - Minor accuracy or detection gaps');
-  console.log('  - Recommend: Test with longer lists (100+ users)');
+  console.log('The accurate scenario passes, but one or more failure detections were missed.');
 } else {
-  console.log(colorize('✗ AI LOSES CONTEXT ON LONG LISTS', 'red'));
-  console.log('  - Cannot reliably find data in 50-user dataset');
-  console.log('  - Risk of returning wrong information');
-  console.log('  - Critical: Requires window size expansion or handling');
+  console.log('The accurate scenario itself failed, so long-context retention is not reliable.');
 }
 
-console.log();
+assert.equal(allTests.length, 4, 'Expected four test scenarios');
+process.exit(allCorrect ? 0 : 1);
