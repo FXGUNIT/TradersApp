@@ -4,7 +4,12 @@ This guide covers the fastest way to run the full stack locally with minimal set
 
 ## Option A (Recommended): Docker Dev Stack
 
-**Prereqs:** Docker Desktop running.
+**Prereqs:** Docker Desktop running, plus Node.js 18+ with npm available on the host.
+
+Why Node/npm are still required on the Docker path:
+- `scripts/dev-up.ps1` builds the frontend bundle on the host before Docker starts nginx.
+- On a fresh workspace, `scripts/dev-up.ps1` now auto-runs `npm install` if `node_modules` is missing.
+- If Node/npm is not installed at all, the script stops immediately with a clear prerequisite error instead of failing later during `vite build`.
 
 Start the core stack (frontend + BFF + ML Engine + Redis):
 ```powershell
@@ -15,6 +20,8 @@ Start the core stack (frontend + BFF + ML Engine + Redis):
 service images, and then serves `dist/` through the lightweight nginx container.
 That keeps frontend bring-up independent of npm registry access inside Docker
 while still ensuring backend code changes are picked up on a normal restart.
+On a truly fresh clone, the first run may take longer because it will install
+frontend dependencies before building `dist/`.
 
 Optional tiers:
 ```powershell
