@@ -75,7 +75,7 @@ docker run --rm ^
   -e MLFLOW_TRACKING_URI=http://host.docker.internal:5000 ^
   -v ${PWD}:/work -w /work ^
   tradersapp/mlflow:local /bin/sh -lc ^
-  "python -m pip install --quiet scikit-learn==1.6.1 && python scripts/ci/mlflow_smoke_test.py"
+  "python -m pip install --quiet scikit-learn==1.8.0 && python scripts/ci/mlflow_smoke_test.py"
 ```
 
 This creates:

@@ -160,7 +160,6 @@ loadGrpcDefinition()
       grpc.ServerCredentials.createInsecure(),
       (error) => {
         if (error) throw error;
-        grpcServer.start();
         console.log(`[analysis-service] gRPC listening on 0.0.0.0:${GRPC_PORT}`);
       },
     );
