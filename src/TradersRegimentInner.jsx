@@ -143,6 +143,11 @@ function TradersRegimentInner() {
     adminPassErr, setAdminPassErr,
     showAdminPwd, setShowAdminPwd,
     isAdminAuthenticated, setIsAdminAuthenticated,
+    sendAdminOTPs,
+    handleAdminAccess,
+    resetAdminPromptState,
+    handleAdminVerifyCodes,
+    handleAdminRequestNewCodes,
   } = useAdminAccess();
 
   const { toasts, showToast, dismissToast } = useToastNotifications();
@@ -254,11 +259,6 @@ function TradersRegimentInner() {
   useTerminalWorkspaceHydration({ auth, profile, adminUid: ADMIN_UID, loadTerminalWorkspace, setProfile });
 
   // ── Admin access handlers ───────────────────────────────────────────────────
-  const {
-    sendAdminOTPs, handleAdminAccess, resetAdminPromptState,
-    handleAdminVerifyCodes, handleAdminRequestNewCodes,
-  } = useAdminAccess;
-
   const { saveJournal, saveAccount, saveFirmRules } = useTerminalPersistenceHandlers({
     auth, saveTerminalJournal, saveTerminalAccountState, saveTerminalFirmRules,
   });
