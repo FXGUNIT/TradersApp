@@ -192,7 +192,7 @@ const RegimentEULA = ({ onAccept, onReject }) => {
 };
 
 // Extracted presentational component — no logic, no hooks
-const CheckboxRow = React.memo(({ id, checked, onChange, disabled, scrolledToBottom, label }) => (
+const CheckboxRow = React.memo(({ id: _id, checked, onChange, disabled, scrolledToBottom, label }) => (
   <label
     style={{
       display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 16, padding: 12, borderRadius: 8,

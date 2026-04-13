@@ -13,7 +13,7 @@ import {
   AlertTriangle,    // Warning indicator
   CheckCircle2,     // Success indicator
 } from "lucide-react";
-import { T, SOFT, getThemeColors, getInputStyle, inp, cardS, glowBtn, lbl, AMD_PHASES, TIME_OPTIONS } from "./terminalStyles.js";
+import { T, SOFT, inp, lbl, AMD_PHASES } from "./terminalStyles.js";
 
 const REACT_FORWARD_REF = typeof Symbol !== "undefined" && Symbol.for
   ? Symbol.for("react.forward_ref")

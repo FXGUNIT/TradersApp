@@ -544,7 +544,7 @@ export function scanPromptSecurity(userPrompt, telegramSendMessage) {
 export function validateInputForEscalation(
   userInput,
   currentUser,
-  showToast = null,
+  showToast: _showToast = null,
   logSecurityEvent = null,
 ) {
   return checkInputForPrivilegeEscalation(
@@ -558,7 +558,7 @@ export async function callAIWithLatencyTracking(
   aiFunction,
   systemPrompt,
   userPrompt,
-  showToast,
+  showToast: _showToast,
 ) {
   const start = performance.now();
   const response = await aiFunction(systemPrompt, userPrompt);

@@ -7,7 +7,6 @@
 import {
   buildAccountState,
   normalizeJournal,
-  parseWorkspaceSnapshot,
   buildTradePlannerState,
   buildP2JournalState,
   buildJournalFormState,

@@ -18,7 +18,6 @@ export default function MainTerminalProvider({ onTick }) {
   const [quoteIndex, setQuoteIndex] = useState(0);
   const [, setMarketRefresh] = useState(0);
 
-  const ist = getISTState();
   const activeQuote = ROTATING_QUOTES[quoteIndex] || ROTATING_QUOTES[0];
 
   // Rotate quotes every 45 seconds

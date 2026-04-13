@@ -22,8 +22,8 @@ export default function P2TradeForm({
   predictedP2SL,
   loading,
   addP2Trade,
-  err,
-  setErr,
+  err: _err,
+  setErr: _setErr,
   trafficState,
   verdictScores,
 }) {

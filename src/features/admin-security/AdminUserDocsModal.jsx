@@ -1,4 +1,3 @@
-/* eslint-disable */
 /* Auto-extracted from AdminDashboardScreen.jsx — user docs modal */
 import React from "react";
 import { X } from "lucide-react";

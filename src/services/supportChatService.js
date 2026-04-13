@@ -12,7 +12,7 @@
  * Token never leaves the browser bundle.
  */
 
-import { ref, push, set, onValue, off, get } from 'firebase/database';
+import { ref, push, set, onValue, get } from 'firebase/database';
 import { db } from '../firebase-config.js';
 import { bffFetch } from './gateways/base.js';
 
@@ -113,9 +113,9 @@ Reply to this chat to respond directly.`;
  * @param {string} userEmail
  * @param {string} message
  */
-export async function notifyUserOfAdminReply(adminName, userEmail, message) {
+export async function notifyUserOfAdminReply(_adminName, _userEmail, _message) {
   // This would notify the user via email/push — for now Firebase handles real-time
-  console.log('[SupportChat] Admin reply delivered via Firebase Realtime Database');
+  return true;
 }
 
 // ─── Send Admin Reply ────────────────────────────────────────────────────────
@@ -199,8 +199,8 @@ export function subscribeToSupportChat(userId, onMessages, onTyping) {
   });
 
   return () => {
-    off(messagesRef);
-    off(typingRef);
+    unsubMessages();
+    unsubTyping();
   };
 }
 

@@ -291,7 +291,6 @@ export function computePayoutTrajectory(journal = [], firmRules = {}) {
 
   // Use all-time rolling average (conservative — not just wins)
   const totalNet = Object.values(dailyNet).reduce((s, v) => s + v, 0);
-  const avgDailyNet = totalNet / tradingDays.length;
 
   // Consistency check: if any single day's net > consistencyCap% of profitTarget, it's suspicious
   const hasConsistencyViolation = Object.values(dailyNet).some(

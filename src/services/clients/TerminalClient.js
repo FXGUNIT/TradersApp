@@ -39,7 +39,7 @@ function normalizeJournalPayload(journal) {
   return {};
 }
 
-export async function loadWorkspace(uid, token) {
+export async function loadWorkspace(uid, _token) {
   if (!uid) {
     return null;
   }
@@ -69,7 +69,7 @@ function unavailableWriteResult(operation, extra = {}) {
   });
 }
 
-export async function saveWorkspace(uid, token, workspace) {
+export async function saveWorkspace(uid, _token, workspace) {
   if (!uid) {
     return null;
   }
@@ -93,7 +93,7 @@ export async function saveWorkspace(uid, token, workspace) {
   }
 }
 
-export async function saveJournal(uid, token, journal) {
+export async function saveJournal(uid, _token, journal) {
   if (!uid) {
     return null;
   }
@@ -113,7 +113,7 @@ export async function saveJournal(uid, token, journal) {
   }
 }
 
-export async function saveAccountState(uid, token, accountState) {
+export async function saveAccountState(uid, _token, accountState) {
   if (!uid) {
     return null;
   }
@@ -137,7 +137,7 @@ export async function saveAccountState(uid, token, accountState) {
   }
 }
 
-export async function saveFirmRules(uid, token, firmRules) {
+export async function saveFirmRules(uid, _token, firmRules) {
   if (!uid) {
     return null;
   }

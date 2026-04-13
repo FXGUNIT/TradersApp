@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef } from "react";
 
 const CIRCUIT_KEY = "tilt_circuit_until";
 
@@ -15,7 +15,7 @@ function getCircuitSecs() {
 export default function TradeTabCircuitBreaker({
   execBlocked,
   onCircuitSecsChange,
-  circuitSecs,
+  circuitSecs: _circuitSecs,
 }) {
   const circuitTimerRef = useRef(null);
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   T,
   AMD_PHASES,
@@ -123,7 +123,6 @@ export default function TradeTab({
         displayedAmdPhase,
         tradeFormRRR: f.rrr,
       }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [extractedVals, volatilityRegime, vr, displayedAmdPhase, f.rrr],
   );
 

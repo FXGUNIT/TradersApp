@@ -5,7 +5,6 @@
 import React from "react";
 import { T, glowBtn } from "./terminalStyles.js";
 import { CSS_VARS } from "../../styles/cssVars.js";
-import { ROTATING_QUOTES } from "./terminalWorkspaceState.js";
 
 export function QuoteBanner({ activeQuote }) {
   return (
@@ -88,7 +87,6 @@ export function NavigationTabs({ activeTab, onTabChange }) {
 }
 
 export function AutosaveBar({ draftStatus, onNavigateToConsciousness, onUndoLastChange, onResetPage, onResetAll, canUndo, activeTab, onDeleteJournalHistory, tabResetScope }) {
-  const [quoteIndex, setQuoteIndex] = React.useState(0);
   return (
     <div style={{
       marginBottom: 16,

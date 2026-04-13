@@ -4,7 +4,7 @@
  * Contains all async AI/trade handlers that close over React state.
  */
 
-import { parseJsonChoice, parseRrrMultiple } from "./terminalStateHelpers.js";
+import { parseRrrMultiple } from "./terminalStateHelpers.js";
 
 /**
  * Build the Part 1 (premarket) text prompt from current state.

@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React from "react";
 import { T } from "./terminalHelperComponents.jsx";
 
 /**
@@ -29,7 +29,7 @@ export const VERDICT_LABELS = [
 export function deriveVerdictScores({
   extractedVals = {},
   volatilityRegime = "medium",
-  vr = 1,
+  vr: _vr = 1,
   displayedAmdPhase = "UNCLEAR",
   tradeFormRRR = "1:2",
 }) {
