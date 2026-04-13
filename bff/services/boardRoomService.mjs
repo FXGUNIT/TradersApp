@@ -170,9 +170,43 @@ function validateContent(content) {
 }
 
 // ─── Thread CRUD ─────────────────────────────────────────────────────────────
-async function createThread({ title, description, priority, tags, ownerAgent, createdBy, tasks = [] }) {
+function sortThreadsByActivity(threads = []) {
+  return [...threads].sort((left, right) => (right.lastActivityAt || 0) - (left.lastActivityAt || 0));
+}
+
+async function loadAllThreads() {
+  const client = getRedis();
+  const keys = (await client.keys('board-room:threads/T*')) || [];
+  const threads = [];
+
+  for (const key of keys) {
+    const thread = await redisGet(key);
+    if (!thread) continue;
+    threads.push(thread);
+  }
+
+  return threads;
+}
+
+async function createThread({
+  title,
+  description,
+  priority,
+  tags,
+  ownerAgent,
+  createdBy,
+  tasks = [],
+  parentThreadId = null,
+}) {
   const threadId = await nextThreadId();
   const now = Date.now();
+  const normalizedParentThreadId = typeof parentThreadId === 'string' && parentThreadId.trim()
+    ? parentThreadId.trim().toUpperCase()
+    : null;
+  if (normalizedParentThreadId) {
+    const parentThread = await getThread(normalizedParentThreadId);
+    if (!parentThread) return null;
+  }
   const thread = {
     threadId, title,
     description: description || '',
@@ -180,6 +214,7 @@ async function createThread({ title, description, priority, tags, ownerAgent, cr
     tags: tags || [],
     ownerAgent,
     createdBy,
+    parentThreadId: normalizedParentThreadId,
     status: 'OPEN',
     createdAt: now,
     closedAt: null,
@@ -203,6 +238,29 @@ async function createThread({ title, description, priority, tags, ownerAgent, cr
     currentThread: threadId,
   });
   await syncThreadOwnerTaskCount(threadId);
+  if (normalizedParentThreadId) {
+    await createPost({
+      threadId: normalizedParentThreadId,
+      author: createdBy,
+      authorType: createdBy === 'ceo' ? 'human' : 'agent',
+      content: JSON.stringify({
+        type: 'sub_thread_opened',
+        childThreadId: threadId,
+        childTitle: title,
+        ownerAgent,
+        priority: thread.priority,
+      }),
+      type: 'milestone',
+    });
+    logToJsonl({
+      type: 'sub_thread_opened',
+      threadId,
+      parentThreadId: normalizedParentThreadId,
+      agent: ownerAgent,
+      title,
+      priority: thread.priority,
+    });
+  }
   logToJsonl({ type: 'thread_opened', agent: ownerAgent, threadId, title, priority });
   return thread;
 }
@@ -212,23 +270,27 @@ async function getThread(threadId) {
 }
 
 async function getThreads(status = 'OPEN') {
-  const client = getRedis();
-  const keys = (await client.keys('board-room:threads/T*')) || [];
-  const threads = [];
+  const threads = await loadAllThreads();
   const normalizedStatus = String(status || 'OPEN').toUpperCase();
-
-  for (const key of keys) {
-    const thread = await redisGet(key);
-    if (!thread) continue;
-    if (normalizedStatus !== 'ALL' && thread.status !== normalizedStatus) continue;
-    threads.push(thread);
-  }
-
-  return threads.sort((left, right) => (right.lastActivityAt || 0) - (left.lastActivityAt || 0));
+  return sortThreadsByActivity(
+    threads.filter((thread) => normalizedStatus === 'ALL' || thread.status === normalizedStatus),
+  );
 }
 
 async function getAllOpenThreads() {
   return getThreads('OPEN');
+}
+
+async function getChildThreads(parentThreadId) {
+  const normalizedParentThreadId = typeof parentThreadId === 'string' && parentThreadId.trim()
+    ? parentThreadId.trim().toUpperCase()
+    : null;
+  if (!normalizedParentThreadId) return [];
+
+  const threads = await loadAllThreads();
+  return sortThreadsByActivity(
+    threads.filter((thread) => thread.parentThreadId === normalizedParentThreadId),
+  );
 }
 
 async function updateThread(threadId, updates) {
@@ -604,6 +666,7 @@ async function getTemplates() {
 // ─── Public API ──────────────────────────────────────────────────────────────
 export const boardRoomService = {
   createThread, getThread, getThreads, getAllOpenThreads, updateThread, closeThread,
+  getChildThreads,
   createPost, getPost, getThreadPosts, acknowledgePost, updatePostPlanStatus,
   createTask, getThreadTasks, toggleTask,
   getAgentMemory, updateAgentMemory, recordHeartbeat, reportError, linkCommitToThread,

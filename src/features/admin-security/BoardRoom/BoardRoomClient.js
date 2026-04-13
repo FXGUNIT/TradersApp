@@ -50,6 +50,8 @@ export async function getThread(threadId) {
       thread: null,
       posts: [],
       tasks: [],
+      childThreads: [],
+      parentThread: null,
     });
   }
 
@@ -58,9 +60,13 @@ export async function getThread(threadId) {
     thread: null,
     posts: [],
     tasks: [],
+    childThreads: [],
+    parentThread: null,
   });
   normalized.posts = Array.isArray(normalized.posts) ? normalized.posts : [];
   normalized.tasks = Array.isArray(normalized.tasks) ? normalized.tasks : [];
+  normalized.childThreads = Array.isArray(normalized.childThreads) ? normalized.childThreads : [];
+  normalized.parentThread = normalized.parentThread || null;
   return normalized;
 }
 

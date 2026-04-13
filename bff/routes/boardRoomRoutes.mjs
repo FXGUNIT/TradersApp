@@ -99,10 +99,26 @@ export function createBoardRoomRouteHandler() {
 
     if (method === 'POST' && pathname === '/board-room/threads') {
       const body = await readJson(req);
-      const { title, description, priority, tags, ownerAgent, createdBy = 'ceo', tasks } = body;
+      const {
+        title,
+        description,
+        priority,
+        tags,
+        ownerAgent,
+        createdBy = 'ceo',
+        tasks,
+        parentThreadId = null,
+      } = body;
       if (!title || !ownerAgent) {
         json(res, 400, { ok: false, error: 'title and ownerAgent required' });
         return true;
+      }
+      if (parentThreadId) {
+        const parentThread = await boardRoomService.getThread(String(parentThreadId).trim().toUpperCase());
+        if (!parentThread) {
+          json(res, 404, { ok: false, error: 'parent thread not found' });
+          return true;
+        }
       }
       const validation = boardRoomService.validateContent(description || '');
       if (!validation.valid) {
@@ -117,7 +133,12 @@ export function createBoardRoomRouteHandler() {
         ownerAgent,
         createdBy,
         tasks: tasks || [],
+        parentThreadId,
       });
+      if (!thread) {
+        json(res, 404, { ok: false, error: 'parent thread not found' });
+        return true;
+      }
       if (priority === 'HIGH' || priority === 'CRITICAL') {
         boardRoomTelegram.sendAlert({
           type: 'THREAD_OPENED',
@@ -142,11 +163,13 @@ export function createBoardRoomRouteHandler() {
         json(res, 404, { ok: false, error: 'thread not found' });
         return true;
       }
-      const [posts, tasks] = await Promise.all([
+      const [posts, tasks, childThreads, parentThread] = await Promise.all([
         boardRoomService.getThreadPosts(threadId),
         boardRoomService.getThreadTasks(threadId),
+        boardRoomService.getChildThreads(threadId),
+        thread.parentThreadId ? boardRoomService.getThread(thread.parentThreadId) : null,
       ]);
-      json(res, 200, { ok: true, thread, posts, tasks });
+      json(res, 200, { ok: true, thread, posts, tasks, childThreads, parentThread });
       return true;
     }
 

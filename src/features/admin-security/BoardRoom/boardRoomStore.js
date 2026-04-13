@@ -18,8 +18,13 @@ function collectAgentsFromThreads(threads = []) {
   return [...agents];
 }
 
-function collectAgentsFromDetail(thread, posts = []) {
-  const agents = new Set(collectAgentsFromThreads(thread ? [thread] : []));
+function collectAgentsFromDetail(thread, posts = [], relatedThreads = []) {
+  const agents = new Set(
+    collectAgentsFromThreads([
+      ...(thread ? [thread] : []),
+      ...(Array.isArray(relatedThreads) ? relatedThreads : []),
+    ]),
+  );
   posts.forEach((post) => {
     if (post?.author && post.author !== "ceo") agents.add(post.author);
     (post?.mentions || []).forEach((mention) => {
@@ -161,6 +166,8 @@ const useBoardRoomStore = create((set, get) => ({
       thread: result.thread,
       posts: Array.isArray(result.posts) ? result.posts : [],
       tasks: Array.isArray(result.tasks) ? result.tasks : [],
+      childThreads: Array.isArray(result.childThreads) ? result.childThreads : [],
+      parentThread: result.parentThread || null,
     };
 
     set((state) => ({
@@ -173,7 +180,10 @@ const useBoardRoomStore = create((set, get) => ({
     }));
 
     await get().hydrateAgentMemories(
-      collectAgentsFromDetail(detail.thread, detail.posts),
+      collectAgentsFromDetail(detail.thread, detail.posts, [
+        ...(detail.parentThread ? [detail.parentThread] : []),
+        ...detail.childThreads,
+      ]),
     );
 
     return result;
