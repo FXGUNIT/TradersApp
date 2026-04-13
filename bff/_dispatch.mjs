@@ -169,7 +169,10 @@ export function createDispatcher({
     readJsonBody,
   });
 
-  const boardRoomHandler = createBoardRoomRouteHandler();
+  const boardRoomHandler =
+    typeof createBoardRoomRouteHandler === "function"
+      ? createBoardRoomRouteHandler()
+      : { handle: async () => false };
 
   // Wire all route registrations into a single dispatch function
   const dispatchRoutes = registerDispatchRoutes({

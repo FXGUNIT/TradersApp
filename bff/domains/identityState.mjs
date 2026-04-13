@@ -266,7 +266,7 @@ function resolveCollectiveConsciousnessState(user = {}, options = {}) {
   };
 }
 
-function normalizeUserRecord(uid, user = {}) {
+function normalizeUserRecord(uid, user = {}, options = {}) {
   const role = user.role || "user";
   const daysUsed = normalizeDayCounter(
     user.daysUsed ?? user.days_used ?? user.dayCounter,
@@ -275,7 +275,7 @@ function normalizeUserRecord(uid, user = {}) {
   const collectiveConsciousness = resolveCollectiveConsciousnessState({
     ...user,
     role,
-  });
+  }, options);
 
   return {
     ...user,
@@ -394,13 +394,13 @@ function getUserAndSessions(state, uid) {
   };
 }
 
-function upsertUser(state, uid, patch = {}) {
+function upsertUser(state, uid, patch = {}, options = {}) {
   const existing = state.users?.[uid] || {};
   const nextUser = normalizeUserRecord(uid, {
     ...existing,
     ...patch,
     updatedAt: patch.updatedAt || nowIso(),
-  });
+  }, options);
 
   state.users = {
     ...(state.users || {}),
@@ -673,7 +673,7 @@ export function consumeCollectiveConsciousnessQuestion(uid, patch = {}, options 
     role: patch.role ?? existingUser?.role ?? "user",
     plan: existingUser?.plan,
     updatedAt: nowIso(),
-  });
+  }, options);
   const currentState = resolveCollectiveConsciousnessState(seededUser, options);
 
   if (currentState.isBlocked) {
@@ -694,13 +694,13 @@ export function consumeCollectiveConsciousnessQuestion(uid, patch = {}, options 
     windowStartTimestamp: currentState.windowStartTimestamp || timestamp,
     questionCount: currentState.questionCount + 1,
     updatedAt: nowIso(),
-  });
+  }, options);
   writeState(state);
 
   return {
     ok: true,
     blocked: false,
-    usage: clone(normalizeUserRecord(uid, nextUser).collectiveConsciousness),
+    usage: clone(resolveCollectiveConsciousnessState(nextUser, options)),
     user: clone(nextUser),
   };
 }
