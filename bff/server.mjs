@@ -497,6 +497,9 @@ server.listen(PORT, HOST, () => {
   console.log(
     `[tradersapp-bff] listening on http://${HOST}:${PORT} (adminPasswordConfigured=${Boolean(ADMIN_PASS_HASH)}, aiProvidersConfigured=${aiConfigured})`,
   );
+
+  // Start Board Room cron jobs after server is listening
+  startBoardRoomCron(boardRoomService, boardRoomTelegram);
 });
 
 server.on("error", (err) => {
