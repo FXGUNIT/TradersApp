@@ -63,13 +63,19 @@ Run `python scripts/update_todo_progress.py --once` to regenerate.
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-13 23:54`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-13 23:56`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 | Section | Tasks | Progress | Status |
 |---|---|---:|---|
-| Stage O | [25/25] | 100.0% | ✅ COMPLETE |
+
 
 <!-- live-status:end -->
+
+
+
+
+
+
 
 
 
@@ -137,51 +143,8 @@ Generated: `2026-04-13 23:54`  ·  Run `python scripts/update_todo_progress.py -
 2026-04-13 02:24 | CLAUDE-CODE | REDESIGNED | Protocol v2.0 â€” atomic update rules, coordination JSON block, append-only change log, validation script
 2026-04-12       | AI-AGENTS   | COMPLETE  | Phases 1-12 all 100%, Stage M in progress (M01-M05), Stage N complete (N01-N05)
 2026-04-13 23:25 | CODEX       | ADDED     | Stage R "Flawless Proof Gate" with detailed acceptance tasks and sub-steps
+2026-04-14 00:xx | CODEX       | CLEANUP   | Added live status bar and removed fully completed stages from the active TODO backlog
 ```
-
-## Stage O: Board Room â€” AI Agent Communication Layer
-
-> **Spec:** `docs/superpowers/specs/2026-04-13-board-room-design.md`
-> **Trigger (2026-04-13):** Notion-style workspace inside Admin Dashboard â€” all AI agents communicate via threads with CEO approval, Telegram escalation, JSONL audit log, Firebase backend.
-
-**Phase O1 â€” Board Room Core**
-- [x] `O01` Implement `bff/services/boardRoomService.mjs` â€” thread CRUD, post CRUD, agent memory, Firebase reads/writes, JSONL logger
-- [x] `O02` Create `bff/routes/boardRoomRoutes.mjs` â€” HTTP API surface for all board room operations
-- [x] `O03` Register board room routes in `bff/server.mjs`
-- [x] `O04` Implement `bff/services/boardRoomTelegram.mjs` â€” Telegram alert sender for HIGH/CRITICAL events
-- [x] `O05` Add board room auth to `bff/services/security.mjs` â€” CEO-only operations (close thread, approve plan) server-side validated
-
-**Phase O2 â€” Frontend UI**
-- [x] `O06` Create `src/features/admin-security/BoardRoom/` directory with BoardRoom.jsx, BoardRoomSidebar.jsx, BoardRoomThread.jsx, BoardRoomPost.jsx, BoardRoomTask.jsx
-- [x] `O07` Create `BoardRoomClient.js` â€” BFF API calls for board room
-- [x] `O08` Create `boardRoomStore.js` â€” Zustand state management for board room UI
-- [x] `O09` Create `AgentScorecard.jsx` â€” bottom bar with per-agent stats
-- [x] `O10` Embed BoardRoom as a tab inside `AdminDashboardScreen.jsx`
-- [x] `O11` Implement thread filters: by priority, status, agent, tag
-- [x] `O12` Implement thread templates: Bug Report, Feature Proposal, Architecture Decision, Performance Improvement
-
-**Phase O3 â€” Agent Integration**
-- [x] `O13` Integrate board room into ML Engine agents: predictor.py, session_probability.py, alpha_engine.py, consensus_aggregator.py
-- [x] `O14` Integrate board room into BFF agents: consensusEngine.mjs, newsService.mjs
-- [x] `O15` Integrate board room into Frontend agents: ai-router.js all provider wrappers
-- [x] `O16` Implement 1.5-hour heartbeat loop for all agents
-
-**Phase O4 â€” Notification & Approval Flow**
-- [x] `O17` Wire Telegram alerts: HIGH/CRITICAL on thread open, suggestion, error, 3hr ack timeout auto-escalation
-- [x] `O18` Implement plan approval flow â€” CEO approves/rejects plans, agent notified
-- [x] `O19` Implement 3-hour acknowledgment window with timer display in UI
-
-**Phase O5 â€” Git Auto-Link & Automation**
-- [x] `O20` BFF git webhook handler â€” detect `[T{ticketId}]` in commit messages, auto-link commit to thread, post milestone
-- [x] `O21` Implement weekly digest (Sunday 9 AM IST) â€” active threads, needs CEO action, stale threads, inactive agents
-- [x] `O22` Stale thread handling â€” auto-warning at day 7, flag at day 14 in digest
-
-**Phase O6 â€” Agent Scorecard & Advanced Features**
-- [x] `O23` Agent scorecard: avg ack time, plans approved/rejected ratio, last heartbeat, active task count
-- [x] `O24` Sub-threads: agents can open sub-thread linked to parent thread
-- [x] `O25` JSONL log rotation: daily files, keep 90 days, archive older to DVC
-
----
 
 ## Stage R: Flawless Proof Gate
 
