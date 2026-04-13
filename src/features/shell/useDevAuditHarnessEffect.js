@@ -32,6 +32,7 @@ export function useDevAuditHarnessEffect({
   setCurrentSessionId,
   setAppTheme,
   setMaintenanceModeActive,
+  setShowAdminPrompt,
 }) {
   useEffect(() => {
     if (!shouldEnableAuditHarness()) {
@@ -57,6 +58,7 @@ export function useDevAuditHarnessEffect({
           setAccentColor: () => {},
           setShowThemePicker: () => {},
           setMaintenanceModeActive,
+          setShowAdminPrompt,
         });
       })
       .catch((error) => {

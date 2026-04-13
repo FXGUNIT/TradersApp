@@ -23,7 +23,7 @@ export default function AdminDashboardHeader({
   currentViewAsUser, setCurrentViewAsUser,
   megaMenuOpen, setMegaMenuOpen,
   commandPaletteOpen, setCommandPaletteOpen,
-  users, showToast, setLoading, setDbError,
+  users, showToast, setLoading, setDbError, listAdminUsers,
 }) {
   return (
     <>

@@ -585,6 +585,12 @@ async function runLoginAudit(page, scenario) {
     .first()
     .fill("gunitsingh1994@gmail.com");
   await clickButton(page, /send verification codes/i);
+  const proceedToCodeEntry = page.getByRole("button", {
+    name: /proceed to code entry/i,
+  }).first();
+  if (await proceedToCodeEntry.isVisible().catch(() => false)) {
+    await proceedToCodeEntry.click({ force: true });
+  }
   await page.locator("input[placeholder='000000']").nth(0).fill("111111");
   await page.locator("input[placeholder='000000']").nth(1).fill("222222");
   await page.locator("input[placeholder='000000']").nth(2).fill("333333");

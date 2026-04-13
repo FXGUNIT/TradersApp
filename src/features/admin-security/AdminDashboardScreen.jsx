@@ -9,6 +9,7 @@ import UserSwitcher from "../../components/UserSwitcher.jsx";
 import FullScreenToggle from "../../components/FullScreenToggle.jsx";
 import MobileBottomNav from "../../components/MobileBottomNav.jsx";
 import LoadingOverlay from "../../components/LoadingOverlay.jsx";
+import AdminDashboardHeader from "./AdminDashboardHeader.jsx";
 import { useUserList } from "./UserListContext.jsx";
 import { Breadcrumbs, MegaMenu, BackToTopButton } from "../shell/ShellPrimitives.jsx";
 import { getTimeBasedGreeting, getUserLevelBadge } from "../../utils/userUtils.js";

@@ -222,7 +222,7 @@ function TradersRegimentInner() {
   useConnectionStatusEffect({ showToast });
   useResizeOptimizationEffect();
   useFirebaseHeartbeatEffect();
-  useDevAuditHarnessEffect({ adminUid: ADMIN_UID, adminEmail: ADMIN_EMAIL, setScreen, setAuth, setProfile, setIsAdminAuthenticated, setCurrentSessionId, setAppTheme, setMaintenanceModeActive });
+  useDevAuditHarnessEffect({ adminUid: ADMIN_UID, adminEmail: ADMIN_EMAIL, setScreen, setAuth, setProfile, setIsAdminAuthenticated, setCurrentSessionId, setAppTheme, setMaintenanceModeActive, setShowAdminPrompt });
 
   // ── Auth handlers ───────────────────────────────────────────────────────────
   const {

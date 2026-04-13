@@ -149,12 +149,14 @@ export function registerAppAuditHarness({
   setAccentColor,
   setShowThemePicker,
   setMaintenanceModeActive,
+  setShowAdminPrompt,
 }) {
   if (typeof window === "undefined") return () => {};
 
   const fixtures = buildFixtures({ adminUid, adminEmail });
 
   const applyBaseState = () => {
+    setShowAdminPrompt(false);
     setShowThemePicker(false);
     setMaintenanceModeActive(false);
     setTheme("lumiere");
