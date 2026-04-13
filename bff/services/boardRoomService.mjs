@@ -144,15 +144,24 @@ async function getThread(threadId) {
   return await redisGet(`board-room:threads/${threadId}`);
 }
 
-async function getAllOpenThreads() {
+async function getThreads(status = 'OPEN') {
   const client = getRedis();
   const keys = (await client.keys('board-room:threads/T*')) || [];
   const threads = [];
+  const normalizedStatus = String(status || 'OPEN').toUpperCase();
+
   for (const key of keys) {
-    const t = await redisGet(key);
-    if (t && t.status === 'OPEN') threads.push(t);
+    const thread = await redisGet(key);
+    if (!thread) continue;
+    if (normalizedStatus !== 'ALL' && thread.status !== normalizedStatus) continue;
+    threads.push(thread);
   }
-  return threads;
+
+  return threads.sort((left, right) => (right.lastActivityAt || 0) - (left.lastActivityAt || 0));
+}
+
+async function getAllOpenThreads() {
+  return getThreads('OPEN');
 }
 
 async function updateThread(threadId, updates) {
@@ -349,7 +358,7 @@ async function getTemplates() {
 
 // ─── Public API ──────────────────────────────────────────────────────────────
 export const boardRoomService = {
-  createThread, getThread, getAllOpenThreads, updateThread, closeThread,
+  createThread, getThread, getThreads, getAllOpenThreads, updateThread, closeThread,
   createPost, getPost, getThreadPosts, acknowledgePost, updatePostPlanStatus,
   createTask, getThreadTasks, toggleTask,
   getAgentMemory, updateAgentMemory,
