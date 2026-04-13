@@ -9,7 +9,8 @@ For project health snapshot, see `docs/PROJECT_STATUS.md`.
 
 | Document | Purpose |
 |----------|---------|
-| `SETUP.md` | Local development setup |
+| `LOCAL_DEV.md` | Local development quickstart |
+| `SETUP.md` | Production deployment (browser steps) |
 | `SECRETS_MANAGEMENT.md` | Secrets management guide |
 | `docs/TODO_MASTER_LIST.md` | Master task list and critical path |
 
@@ -22,7 +23,8 @@ For project health snapshot, see `docs/PROJECT_STATUS.md`.
 | Runbook | Scope | Status |
 |---------|-------|--------|
 | `DEPLOYMENT.md` | Full deployment procedures | Complete |
-| `SETUP.md` | Local dev setup | Complete |
+| `LOCAL_DEV.md` | Local dev setup | Complete |
+| `SETUP.md` | Production deployment | Complete |
 | `CANARY_DEPLOYMENT_RUNBOOK.md` | Canary release procedure | Complete |
 | `K8S_LIVE_CLUSTER_VALIDATION.md` | Post-deploy cluster validation | Complete |
 | `K8S_COLD_WARM_CACHE_LOAD.md` | Redis cold/warm cache loading | Complete |
