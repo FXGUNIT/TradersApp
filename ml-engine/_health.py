@@ -8,8 +8,7 @@ from datetime import datetime, timezone
 from fastapi import Response
 from fastapi.responses import PlainTextResponse
 
-# Re-expose globals from _lifespan for convenience
-from _lifespan import db, start_time, lineage_registry, feast_warmed
+import _lifespan
 
 from _infrastructure import (
     get_request_id,
@@ -34,12 +33,13 @@ def live():
         "status": "live",
         "service": "tradersapp-ml-engine",
         "request_id": get_request_id(),
-        "uptime_sec": round(_time.time() - start_time, 1),
+        "uptime_sec": round(_time.time() - _lifespan.start_time, 1),
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
 
 def ready():
+    db = _lifespan.db
     """Readiness check — verifies the DB facade is initialized without heavy introspection."""
     db_available = False
     db_backend = "unknown"
@@ -56,7 +56,7 @@ def ready():
         "request_id": get_request_id(),
         "db_backend": db_backend,
         "db_available": db_available,
-        "feast_warmed": feast_warmed,
+        "feast_warmed": _lifespan.feast_warmed,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -64,8 +64,10 @@ def ready():
 # ── /health ───────────────────────────────────────────────────────────────────
 
 def health():
+    db = _lifespan.db
+    lineage_registry = _lifespan.lineage_registry
     """Health check — uses globals set by _lifespan lifespan."""
-    uptime = _time.time() - start_time
+    uptime = _time.time() - _lifespan.start_time
     try:
         stats = db.get_stats()
     except Exception:
@@ -82,7 +84,7 @@ def health():
 
     feast_status = {
         "lineage_registered": 0,
-        "online_store_warmed": feast_warmed,
+        "online_store_warmed": _lifespan.feast_warmed,
     }
     if lineage_registry:
         try:
@@ -114,7 +116,14 @@ def metrics_endpoint():
     if PROMETHEUS_AVAILABLE and _HANDLE_METRICS:
         body, content_type = _HANDLE_METRICS()
         return Response(content=body, headers={"Content-Type": content_type})
-    return PlainTextResponse(content="# prometheus-client not installed\n", media_type="text/plain")
+    return PlainTextResponse(
+        content=(
+            "# HELP ml_monitoring_last_check_timestamp Placeholder monitoring timestamp.\n"
+            "# TYPE ml_monitoring_last_check_timestamp gauge\n"
+            "ml_monitoring_last_check_timestamp 0\n"
+        ),
+        media_type="text/plain",
+    )
 
 
 # ── /sla ─────────────────────────────────────────────────────────────────────
