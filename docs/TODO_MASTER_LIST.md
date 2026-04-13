@@ -59,17 +59,20 @@ Run `python scripts/update_todo_progress.py --once` to regenerate.
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-13 17:30`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-13 18:27`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 | Section | Tasks | Progress | Status |
 |---|---|---:|---|
 | Stage M | [5/5] | 100.0% | ✅ COMPLETE |
 | Stage N | [5/5] | 100.0% | ✅ COMPLETE |
 | Stage P | [4/4] | 100.0% | ✅ COMPLETE |
-| Stage Q | [4/7] |  57.1% | 🔄 IN PROGRESS |
+| Stage Q | [7/7] | 100.0% | ✅ COMPLETE |
 | Stage O | [25/25] | 100.0% | ✅ COMPLETE |
 
 <!-- live-status:end -->
+
+
+
 
 
 
@@ -215,22 +218,25 @@ Generated: `2026-04-13 17:30`  ·  Run `python scripts/update_todo_progress.py -
   - updated: 2026-04-13 22:35
   - Updated `docs/MODEL_REGISTRY.md` to remove TODOs, document AMD ONNX status, and add `mamba_ssm` to repo layout.
 
-- [!] `Q04` Install local dependencies and run a baseline frontend build for quick-start verification.
-  - updated: 2026-04-13 22:35
-  - Frontend + BFF `npm install` completed; `npm run build` now passes after fixing missing imports/exports.
-  - **Blocker:** `python -m pip install -r ml-engine/requirements.txt` timed out (network access).
+- [x] `Q04` Install local dependencies and run a baseline frontend build for quick-start verification.
+  - updated: 2026-04-14 00:35
+  - Frontend + BFF dependencies are installed, `npm run build` passes, and local ML Engine dependencies now install successfully in `ml-engine/.venv`.
+  - Aligned the local ML Engine runtime with serialized model artifacts by upgrading `scikit-learn` to `1.8.0`.
 
 - [x] `Q05` Fix frontend container health endpoint (nginx) so Docker dev stack starts cleanly.
   - updated: 2026-04-13 22:35
   - Replaced unsupported `health_check;` with a `/health` route returning 200 OK.
 
-- [-] `Q06` Remove frontend Docker build-network dependency from the dev stack so `dev-up.ps1` boots cleanly.
-  - updated: 2026-04-13 22:57
-  - `docker-compose.dev.yml` still builds the frontend image with `npm ci` inside Docker; the latest clean-stack run failed on registry timeout during that step.
+- [x] `Q06` Remove frontend Docker build-network dependency from the dev stack so `dev-up.ps1` boots cleanly.
+  - updated: 2026-04-14 00:35
+  - `docker-compose.dev.yml` now serves the host-built `dist/` bundle from `nginx:1.27-alpine` instead of running `npm ci` inside Docker.
+  - `dev-up.ps1` builds the frontend bundle first, verifies `dist/index.html`, and then boots the container stack.
 
-- [-] `Q07` Fix remaining dev-stack runtime blockers discovered during clean boot.
-  - updated: 2026-04-13 23:01
-  - Current blocker: `ml-engine` starts with `sqlite3.OperationalError: attempt to write a readonly database` because `./ml-engine/data` is mounted read-only in `docker-compose.dev.yml`.
+- [x] `Q07` Fix remaining dev-stack runtime blockers discovered during clean boot.
+  - updated: 2026-04-14 00:35
+  - Fixed ML Engine writable volume mounts, BFF dispatcher startup, analysis-service proto loading, host reachability, and Board Room Redis configuration.
+  - Normalized `dev-up.ps1` to rebuild service images on startup so source changes are reflected without extra flags.
+  - Verified the clean boot path with healthy containers plus passing `scripts/dev-smoke.ps1`.
 
 ## Phase Summary (Historical â€” all complete)
 
