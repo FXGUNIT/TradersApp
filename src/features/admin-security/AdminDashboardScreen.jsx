@@ -1,7 +1,7 @@
 /* eslint-disable */
 import { useEffect, useMemo, useState } from "react";
 import {
-  Home, Shield, Users, Search, X, DollarSign, Wrench, Bell, Clock,
+  Home, Shield, Users, Search, X, DollarSign, Wrench, Bell, Clock, MessageSquare,
 } from "lucide-react";
 import NotificationCenter from "../../components/NotificationCenter.jsx";
 import CommandPalette from "../../components/CommandPalette.jsx";
@@ -20,6 +20,7 @@ import {
 } from "../../utils/searchUtils.jsx";
 import { detectDuplicateIPs as scanDuplicateIPs } from "../../services/ipScanner.js";
 import useAdminSecuritySentinel from "./useAdminSecuritySentinel.js";
+import BoardRoom from "./BoardRoom/BoardRoom.jsx";
 
 export default function AdminDashboardScreen({
   auth,
@@ -62,6 +63,7 @@ export default function AdminDashboardScreen({
   const [, setActionMsg] = useState("");
   const [filterStatus, setFilterStatus] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
+  const [adminWorkspaceTab, setAdminWorkspaceTab] = useState("users");
 
   // RULE #39, #40, #50: Grid Control - Row Density, Pagination, Column Picker
   const [rowDensity, setRowDensity] = useState("comfortable"); // 'compact' or 'comfortable'
@@ -620,47 +622,93 @@ export default function AdminDashboardScreen({
         users={users} showToast={showToast} setLoading={setLoading} setDbError={setDbError}
       />
 
-      {/* Data Table & Mirror Layout */}
-      <div style={{ display: "flex", height: "calc(100vh - 75px - 48px)", flexWrap: "wrap" }}>
-        <AdminDashboardTable
-          T={T} LED={LED} SHead={SHead} cardS={cardS} AMD_PHASES={AMD_PHASES}
-          users={users} loading={loading} dbError={dbError}
-          mirror={mirror} statusColor={statusColor} normalizeStatus={normalizeStatus}
-          visibleColumns={visibleColumns} setVisibleColumns={setVisibleColumns}
-          rowDensity={rowDensity} setRowDensity={setRowDensity}
-          rowsPerPage={rowsPerPage} setRowsPerPage={setRowsPerPage}
-          currentPage={currentPage} setCurrentPage={setCurrentPage}
-          totalResults={totalResults} totalPages={totalPages} validPage={validPage}
-          startIdx={startIdx} endIdx={endIdx}
-          paginatedUsers={paginatedUsers} searchFilteredUsers={searchFilteredUsers}
-          searchQuery={searchQuery} setSearchQuery={setSearchQuery}
-          balanceFilter={balanceFilter} setBalanceFilter={setBalanceFilter}
-          showAdvancedFilter={showAdvancedFilter}
-          TableSkeletonLoader={TableSkeletonLoader} EmptyStateCard={EmptyStateCard}
-          duplicateIPs={duplicateIPs}
-          sortedUserList={sortedUserList}
-          approve={approve} block={block} openMirror={openMirror}
-          setSelectedUserDocs={setSelectedUserDocs}
-          setChatWith={setChatWith} setChatModalOpen={setChatModalOpen}
-          listAdminUsers={listAdminUsers} setLoading={setLoading}
-          setDbError={setDbError} setUsers={setUsers} showToast={showToast}
-        />
-
-        <AdminMirrorPanel
-          T={T} LED={LED} SHead={SHead} cardS={cardS} AMD_PHASES={AMD_PHASES}
-          mirror={mirror} mirrorData={mirrorData}
-          setMirror={setMirror} setMirrorData={setMirrorData}
-          statusColor={statusColor}
-        />
-
-        <AdminUserDocsModal
-          T={T}
-          selectedUserDocs={selectedUserDocs} setSelectedUserDocs={setSelectedUserDocs}
-          searchFilteredUsers={searchFilteredUsers} authBtn={authBtn}
-        />
-
-        <BackToTopButton theme={T} />
+      <div
+        style={{
+          display: "flex",
+          gap: 10,
+          padding: "14px 18px 0",
+          flexWrap: "wrap",
+          borderBottom: `1px solid ${T.cardStroke}`,
+        }}
+      >
+        {[
+          { id: "users", label: "User Control", icon: Users },
+          { id: "boardRoom", label: "Board Room", icon: MessageSquare },
+        ].map((tab) => {
+          const Icon = tab.icon;
+          const isActive = adminWorkspaceTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setAdminWorkspaceTab(tab.id)}
+              style={{
+                borderRadius: 999,
+                border: `1px solid ${isActive ? T.gold : T.cardStroke}`,
+                background: isActive ? "rgba(255,215,0,0.12)" : "rgba(255,255,255,0.03)",
+                color: T.text,
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "10px 14px",
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              <Icon size={16} />
+              <span>{tab.label}</span>
+            </button>
+          );
+        })}
       </div>
+
+      {adminWorkspaceTab === "boardRoom" ? (
+        <div style={{ padding: 18 }}>
+          <BoardRoom auth={auth} adminEmail={ADMIN_EMAIL} showToast={showToast} />
+          <BackToTopButton theme={T} />
+        </div>
+      ) : (
+        <div style={{ display: "flex", height: "calc(100vh - 75px - 48px)", flexWrap: "wrap" }}>
+          <AdminDashboardTable
+            T={T} LED={LED} SHead={SHead} cardS={cardS} AMD_PHASES={AMD_PHASES}
+            users={users} loading={loading} dbError={dbError}
+            mirror={mirror} statusColor={statusColor} normalizeStatus={normalizeStatus}
+            visibleColumns={visibleColumns} setVisibleColumns={setVisibleColumns}
+            rowDensity={rowDensity} setRowDensity={setRowDensity}
+            rowsPerPage={rowsPerPage} setRowsPerPage={setRowsPerPage}
+            currentPage={currentPage} setCurrentPage={setCurrentPage}
+            totalResults={totalResults} totalPages={totalPages} validPage={validPage}
+            startIdx={startIdx} endIdx={endIdx}
+            paginatedUsers={paginatedUsers} searchFilteredUsers={searchFilteredUsers}
+            searchQuery={searchQuery} setSearchQuery={setSearchQuery}
+            balanceFilter={balanceFilter} setBalanceFilter={setBalanceFilter}
+            showAdvancedFilter={showAdvancedFilter}
+            TableSkeletonLoader={TableSkeletonLoader} EmptyStateCard={EmptyStateCard}
+            duplicateIPs={duplicateIPs}
+            sortedUserList={sortedUserList}
+            approve={approve} block={block} openMirror={openMirror}
+            setSelectedUserDocs={setSelectedUserDocs}
+            setChatWith={setChatWith} setChatModalOpen={setChatModalOpen}
+            listAdminUsers={listAdminUsers} setLoading={setLoading}
+            setDbError={setDbError} setUsers={setUsers} showToast={showToast}
+          />
+
+          <AdminMirrorPanel
+            T={T} LED={LED} SHead={SHead} cardS={cardS} AMD_PHASES={AMD_PHASES}
+            mirror={mirror} mirrorData={mirrorData}
+            setMirror={setMirror} setMirrorData={setMirrorData}
+            statusColor={statusColor}
+          />
+
+          <AdminUserDocsModal
+            T={T}
+            selectedUserDocs={selectedUserDocs} setSelectedUserDocs={setSelectedUserDocs}
+            searchFilteredUsers={searchFilteredUsers} authBtn={authBtn}
+          />
+
+          <BackToTopButton theme={T} />
+        </div>
+      )}
     </div>
   );
 }
