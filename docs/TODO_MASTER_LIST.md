@@ -48,15 +48,16 @@ Run `python scripts/update_todo_progress.py --once` to regenerate.
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-13 09:34`  Â·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-13 14:00`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 | Section | Tasks | Progress | Status |
 |---|---|---:|---|
-| Stage M | [3/5] |  60.0% | ðŸ”„ IN PROGRESS |
-| Stage N | [5/5] | 100.0% | âœ… COMPLETE |
-| Stage O | [5/5] | 100.0% | âœ… COMPLETE |
+| Stage M | [3/5] |  60.0% | 🔄 IN PROGRESS |
+| Stage N | [5/5] | 100.0% | ✅ COMPLETE |
+| Stage O | [25/25] | 100.0% | ✅ COMPLETE |
 
 <!-- live-status:end -->
+
 
 
 
@@ -208,4 +209,3 @@ Generated: `2026-04-13 09:34`  Â·  Run `python scripts/update_todo_progress.py
 - [x] `O23` Agent scorecard: avg ack time, plans approved/rejected ratio, last heartbeat, active task count
 - [x] `O24` Sub-threads: agents can open sub-thread linked to parent thread
 - [x] `O25` JSONL log rotation: daily files, keep 90 days, archive older to DVC
-
