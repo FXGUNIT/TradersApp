@@ -201,6 +201,7 @@ export function createDispatcher({
     newsHandler,
     tradeCalcHandler,
     adminHandler,
+    boardRoomHandler,
     ADMIN_PASS_HASH,
     ALLOWED_ORIGINS,
     get ROLES_ADMIN() { return ROLES_ADMIN; },

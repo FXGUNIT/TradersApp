@@ -39,6 +39,7 @@ export function registerDispatchRoutes({
   newsHandler,
   tradeCalcHandler,
   adminHandler,
+  boardRoomHandler,
   // Admin constants
   ADMIN_PASS_HASH,
   ALLOWED_ORIGINS,
@@ -191,6 +192,9 @@ export function registerDispatchRoutes({
 
     // ── Admin route handler ─────────────────────────────────────────────────
     if (await adminHandler(req, res, url, origin)) return true;
+
+    // ── Board Room route handler ────────────────────────────────────────────
+    if (await boardRoomHandler.handle(req, res, pathname, origin)) return true;
 
     // ── Admin session management ────────────────────────────────────────────
     if (method === "POST" && pathname === "/admin/session") {
