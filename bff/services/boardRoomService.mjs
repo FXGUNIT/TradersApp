@@ -181,7 +181,7 @@ async function loadAllThreads() {
 
   for (const key of keys) {
     const thread = await redisGet(key);
-    if (!thread) continue;
+    if (!thread || typeof thread !== 'object' || !thread.threadId) continue;
     threads.push(thread);
   }
 
