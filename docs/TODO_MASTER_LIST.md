@@ -71,6 +71,7 @@ Generated: `2026-04-13 03:37`  ·  Run `python scripts/update_todo_progress.py -
 > - `metrics-server` is installed and both HPAs reached `ScalingActive: True`, but `M02` stays partial because the Metrics API can still briefly flap under aggressive end-to-end load.
 > - `scripts/k8s/validate-hpa-ml-engine.sh` now proves live ml-engine scale-up (`1` → `3`) cleanly, and `scripts/k8s/run-hpa-scaling-test.sh` was upgraded to use real in-cluster `/predict` load.
 > - `M04` is near-complete but still needs one clean umbrella-script rerun for the final scale-down phase after the Metrics API stabilizes fully.
+> - Additional 2026-04-13 validation showed the umbrella runner now fails accurately instead of false-passing, but repeated `300s` scale-down stabilization windows still require a longer wait budget for a clean end-to-end closeout.
 
 - [x] `M01` Apply and validate HPA manifests for ml-engine and bff in `tradersapp-dev`.
   - updated: 2026-04-12 23:xx

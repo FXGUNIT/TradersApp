@@ -322,7 +322,7 @@ while [[ "$scale_down_cursor" -gt "$BASELINE_REPLICAS" ]]; do
 done
 
 if [[ -z "$SCALE_DOWN_WAIT" ]]; then
-  SCALE_DOWN_WAIT=$(((scale_down_steps * DEFAULT_SCALE_DOWN_STABILIZATION) + DEFAULT_SCALE_DOWN_BUFFER))
+  SCALE_DOWN_WAIT=$((((scale_down_steps + 1) * DEFAULT_SCALE_DOWN_STABILIZATION) + DEFAULT_SCALE_DOWN_BUFFER))
 fi
 
 log "Step 7: Waiting up to ${SCALE_DOWN_WAIT}s for scale-down to baseline replicas=${BASELINE_REPLICAS} (peak=${SCALE_DOWN_START_REPLICAS})"
