@@ -6,7 +6,9 @@ import { chromium } from "playwright-core";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..", "..");
-const BASE_URL = process.env.UI_AUDIT_URL || "http://localhost:5173";
+const BASE_URL_CANDIDATES = process.env.UI_AUDIT_URL
+  ? [process.env.UI_AUDIT_URL]
+  : ["http://localhost", "http://localhost:5173"];
 const HEADLESS = process.env.UI_AUDIT_HEADLESS !== "false";
 const OUTPUT_DIR = path.join(ROOT, "artifacts", "ui-audit");
 const SCREENSHOT_DIR = path.join(OUTPUT_DIR, "screens");
@@ -170,8 +172,30 @@ async function waitForHarness(page) {
   });
 }
 
-async function gotoApp(page) {
-  await page.goto(BASE_URL, { waitUntil: "domcontentloaded" });
+async function resolveBaseUrl() {
+  for (const candidate of BASE_URL_CANDIDATES) {
+    const normalizedCandidate = candidate.replace(/\/+$/, "");
+    const probeUrls = ["/health", "/"];
+
+    for (const probePath of probeUrls) {
+      try {
+        const response = await fetch(new URL(probePath, normalizedCandidate), {
+          method: "GET",
+        });
+        if (response.ok) {
+          return normalizedCandidate;
+        }
+      } catch {
+        // Try the next probe or candidate.
+      }
+    }
+  }
+
+  return BASE_URL_CANDIDATES[0].replace(/\/+$/, "");
+}
+
+async function gotoApp(page, baseUrl) {
+  await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
   await page.waitForLoadState("networkidle").catch(() => {});
   await waitForHarness(page);
 }
@@ -878,10 +902,11 @@ async function runScenario(page, report, name, fn) {
 async function main() {
   ensureDir(OUTPUT_DIR);
   ensureDir(SCREENSHOT_DIR);
+  const baseUrl = await resolveBaseUrl();
 
   const report = {
     startedAt: new Date().toISOString(),
-    baseUrl: BASE_URL,
+    baseUrl,
     headless: HEADLESS,
     viewportMode: AUDIT_VIEWPORT_MODE,
     executablePath: findBrowserExecutable(),
@@ -905,7 +930,7 @@ async function main() {
     ignoreHTTPSErrors: true,
   });
   await context.grantPermissions(["clipboard-read", "clipboard-write"], {
-    origin: BASE_URL,
+    origin: baseUrl,
   });
 
   const page = await context.newPage();
@@ -949,7 +974,7 @@ async function main() {
 
   try {
     try {
-      await gotoApp(page);
+      await gotoApp(page, baseUrl);
 
       await runScenario(page, report, "login", runLoginAudit);
       await runScenario(page, report, "signup", runSignupAudit);
