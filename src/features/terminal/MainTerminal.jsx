@@ -931,44 +931,6 @@ export default function MainTerminal({
     screenshotsLength: screenshots.length,
   });
 
-  // CSV handler — uses terminalCsvParser.js (worker-backed) with fallback
-  const handleCsvDrop = useCallback(async (e) => {
-    e.preventDefault();
-    const file = e.dataTransfer?.files[0] || e.target.files?.[0];
-    if (!file) return;
-
-    const requestId = csvParseRequestIdRef.current + 1;
-    csvParseRequestIdRef.current = requestId;
-    setErr("");
-    setParsed(null);
-    setParseMsg("");
-    setIsCsvParsing(true);
-    setCsvProgress(0);
-
-    try {
-      const text = await file.text();
-      const worker = csvParserWorkerRef.current;
-
-      if (worker) {
-        worker.postMessage({ requestId, text });
-        return;
-      }
-      // Worker unavailable — use synchronous parser
-      const result = parseTerminalCsvText(text);
-      applyCsvParseResult(requestId, result);
-    } catch (error) {
-      applyCsvParseResult(requestId, {
-        ok: false,
-        parsed: null,
-        parseMsg: `⚠ ${error?.message || "Unable to read CSV export"}`,
-      });
-    } finally {
-      if (!csvParserWorkerRef.current) {
-        setIsCsvParsing(false);
-      }
-    }
-  }, [applyCsvParseResult]);
-
   const handleScreenshotDrop = useCallback(async (event) => {
     event.preventDefault();
 
