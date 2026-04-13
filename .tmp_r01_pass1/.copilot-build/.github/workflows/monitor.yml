@@ -1,0 +1,398 @@
+name: Monitoring & Alerts
+
+on:
+  schedule:
+    # Health check every 5 minutes
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+    inputs:
+      service:
+        description: "Service to check"
+        required: true
+        default: "all"
+        type: choice
+        options:
+          - all
+          - ml-engine
+          - bff
+          - frontend
+
+# Prevent overlapping runs (e.g., if a previous run takes >5min)
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+env:
+  # URLs — use env defaults so the fallback syntax works correctly
+  ML_ENGINE_URL: ${{ vars.ML_ENGINE_URL }}
+  BFF_URL: ${{ vars.BFF_URL }}
+  FRONTEND_URL: ${{ vars.FRONTEND_URL }}
+  PROMETHEUS_URL: ${{ vars.PROMETHEUS_URL || 'http://localhost:9090' }}
+  MODEL_FRESHNESS_MAX_DAYS: ${{ vars.MODEL_FRESHNESS_MAX_DAYS || '7' }}
+  # Webhooks from GitHub Secrets
+  SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+  DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+  PAGERDUTY_ROUTING_KEY: ${{ secrets.PAGERDUTY_ROUTING_KEY }}
+  RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+  # MLflow backup
+  MLFLOW_TRACKING_URI: ${{ vars.MLFLOW_TRACKING_URI || 'http://localhost:5000' }}
+
+jobs:
+  # -------------------------------------------------------------------------
+  # Health Check — ML Engine
+  # -------------------------------------------------------------------------
+  ml-engine-health:
+    name: ML Engine Health
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event.inputs.service == 'all' || github.event.inputs.service == 'ml-engine'
+    steps:
+      - name: Check ML Engine /health
+        run: |
+          RESP=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "${ML_ENGINE_URL}/health" 2>/dev/null || echo "000")
+          echo "ML Engine status: $RESP"
+          if [ "$RESP" != "200" ]; then
+            echo "ML_ENGINE_DOWN=true" >> $GITHUB_ENV
+          fi
+
+      - name: Check ML Engine /model-status
+        run: |
+          RESP=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "${ML_ENGINE_URL}/model-status" 2>/dev/null || echo "000")
+          echo "Model status: $RESP"
+
+      - name: Check MLflow server health
+        run: |
+          RESP=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "${MLFLOW_TRACKING_URI}/health" 2>/dev/null || echo "000")
+          echo "MLflow status: $RESP"
+          if [ "$RESP" != "200" ]; then
+            echo "MLFLOW_DOWN=true" >> $GITHUB_ENV
+          fi
+
+      - name: Send PagerDuty alert on ML Engine critical failure
+        if: env.ML_ENGINE_DOWN == 'true'
+        run: |
+          if [ -z "${PAGERDUTY_ROUTING_KEY}" ]; then
+            echo "PagerDuty routing key not configured — skipping"
+          else
+            curl -s -X POST \
+              -H "Content-Type: application/json" \
+              -d "{
+                \"routing_key\": \"${PAGERDUTY_ROUTING_KEY}\",
+                \"event_action\": \"trigger\",
+                \"payload\": {
+                  \"summary\": \"ML Engine DOWN — health check failed\",
+                  \"severity\": \"critical\",
+                  \"source\": \"github-actions-monitor\",
+                  \"component\": \"ml-engine\",
+                  \"class\": \"health-check\"
+                }
+              }" \
+              https://events.pagerduty.com/v2/enqueue 2>/dev/null || true
+          fi
+
+      - name: Send Slack/Discord alert on ML Engine failure
+        if: env.ML_ENGINE_DOWN == 'true'
+        run: |
+          set -e
+          curl -s -X POST -H "Content-Type: application/json" \
+            -d '{
+              "text": ":red_alert: ML Engine DOWN",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": ":rotating_light: *ML Engine Health Check Failed*\nEndpoint: '"${ML_ENGINE_URL}"'/health\nStatus: NON-200"
+                  }
+                },
+                {
+                  "type": "context",
+                  "elements": [
+                    { "type": "mrkdwn", "text": "Checked at: ${{ github.event.repository.updated_at }}" }
+                  ]
+                }
+              ]
+            }' "${SLACK_WEBHOOK_URL}" || true
+          curl -s -X POST -H "Content-Type: application/json" \
+            -d "{\"content\": \":red_alert: ML Engine DOWN - ${ML_ENGINE_URL}/health non-200 response\"}" \
+            "${DISCORD_WEBHOOK_URL}" || true
+
+      - name: Send alert on MLflow failure
+        if: env.MLFLOW_DOWN == 'true'
+        run: |
+          set -e
+          curl -s -X POST -H "Content-Type: application/json" \
+            -d '{
+              "text": ":warning: MLflow server DOWN",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": ":warning: *MLflow Server Unreachable*\nEndpoint: '"${MLFLOW_TRACKING_URI}"'/health\nMLflow is unavailable — experiment tracking and model registry may be affected."
+                  }
+                }
+              ]
+            }' "${SLACK_WEBHOOK_URL}" || true
+
+  # -------------------------------------------------------------------------
+  # Health Check — BFF Server
+  # -------------------------------------------------------------------------
+  bff-health:
+    name: BFF Health
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event.inputs.service == 'all' || github.event.inputs.service == 'bff'
+    steps:
+      - name: Check BFF /health
+        run: |
+          RESP=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "${BFF_URL}/health" 2>/dev/null || echo "000")
+          echo "BFF status: $RESP"
+          if [ "$RESP" != "200" ]; then
+            echo "BFF_DOWN=true" >> $GITHUB_ENV
+          fi
+
+      - name: Send PagerDuty alert on BFF critical failure
+        if: env.BFF_DOWN == 'true'
+        run: |
+          if [ -n "${PAGERDUTY_ROUTING_KEY}" ]; then
+            curl -s -X POST \
+              -H "Content-Type: application/json" \
+              -d "{
+                \"routing_key\": \"${PAGERDUTY_ROUTING_KEY}\",
+                \"event_action\": \"trigger\",
+                \"payload\": {
+                  \"summary\": \"BFF DOWN — health check failed\",
+                  \"severity\": \"critical\",
+                  \"source\": \"github-actions-monitor\",
+                  \"component\": \"bff\",
+                  \"class\": \"health-check\"
+                }
+              }" \
+              https://events.pagerduty.com/v2/enqueue 2>/dev/null || true
+          fi
+
+      - name: Send Slack alert on BFF failure
+        if: env.BFF_DOWN == 'true'
+        run: |
+          set -e
+          curl -s -X POST -H "Content-Type: application/json" \
+            -d '{
+              "text": ":red_alert: BFF Server DOWN",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": ":rotating_light: *BFF Server Health Check Failed*\nEndpoint: '"${BFF_URL}"'/health\nStatus: NON-200"
+                  }
+                }
+              ]
+            }' "${SLACK_WEBHOOK_URL}" || true
+
+  # -------------------------------------------------------------------------
+  # Health Check — Frontend (Vercel)
+  # -------------------------------------------------------------------------
+  frontend-health:
+    name: Frontend Health
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event.inputs.service == 'all' || github.event.inputs.service == 'frontend'
+    steps:
+      - name: Check Frontend
+        run: |
+          RESP=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "${FRONTEND_URL}" 2>/dev/null || echo "000")
+          echo "Frontend status: $RESP"
+          if [ "$RESP" != "200" ] && [ "$RESP" != "304" ]; then
+            echo "FRONTEND_DOWN=true" >> $GITHUB_ENV
+          fi
+
+      - name: Send Discord alert on Frontend failure
+        if: env.FRONTEND_DOWN == 'true'
+        run: |
+          set -e
+          curl -s -X POST -H "Content-Type: application/json" \
+            -d "{\"content\": \":red_alert: Frontend DOWN - ${FRONTEND_URL} non-200 response\"}" \
+            "${DISCORD_WEBHOOK_URL}" || true
+
+  # -------------------------------------------------------------------------
+  # Prometheus Alert Query — surface active drift/latency alerts
+  # -------------------------------------------------------------------------
+  prometheus-alerts:
+    name: Prometheus Active Alerts
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    steps:
+      - name: Checkout scripts
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            scripts/parse_prometheus_alerts.py
+          sparse-checkout-cone-mode: false
+
+      - name: Query and parse Prometheus active alerts
+        run: |
+          set -e
+          curl -s --max-time 15 "${PROMETHEUS_URL}/api/v1/alerts" \
+            -o /tmp/prometheus_alerts.json || true
+          python3 scripts/parse_prometheus_alerts.py \
+            /tmp/prometheus_alerts.json /tmp/firing_alerts.txt
+          FIRING=$(cat /tmp/firing_alerts.txt)
+          echo "Firing alerts: $FIRING"
+          echo "firing_alerts=$FIRING" >> $GITHUB_ENV
+
+      - name: Alert on ML-specific Prometheus alerts
+        if: env.firing_alerts != 'NONE'
+        run: |
+          set -e
+          CRITICAL=$(echo "${{ env.firing_alerts }}" | grep -iE "mlengine|drift|retrain|latency|prediction" || true)
+          if [ -n "$CRITICAL" ]; then
+            echo "Critical ML alerts firing: $CRITICAL"
+            curl -s -X POST -H "Content-Type: application/json" \
+              -d "{\"content\": \":warning: Active ML Alerts: $CRITICAL\"}" \
+              "${SLACK_WEBHOOK_URL}" || true
+          fi
+
+  # -------------------------------------------------------------------------
+  # ML Model Staleness Check
+  # -------------------------------------------------------------------------
+  model-freshness:
+    name: ML Model Freshness
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    steps:
+      - name: Check model last trained date
+        run: |
+          RESP=$(curl -s --max-time 15 "${ML_ENGINE_URL}/model-status" 2>/dev/null || echo '{"last_trained":null}')
+          echo "Model status response: $RESP"
+          LAST_TRAINED=$(echo "$RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('last_trained','unknown') or 'unknown')" 2>/dev/null || echo "unknown")
+          echo "Last trained: $LAST_TRAINED"
+          echo "last_trained=$LAST_TRAINED" >> $GITHUB_ENV
+
+      - name: Alert if models stale (>MODEL_FRESHNESS_MAX_DAYS days)
+        if: env.last_trained != 'unknown' && env.last_trained != ''
+        run: |
+          set -e
+          MAX_DAYS="${MODEL_FRESHNESS_MAX_DAYS}"
+          python_script="from datetime import datetime,timezone; d='${last_trained}'.replace('Z','+00:00'); print((datetime.now(timezone.utc)-datetime.fromisoformat(d)).days)"
+          DAYS_OLD=$(python3 -c "$python_script" 2>/dev/null || echo "-1")
+          echo "Model age: $DAYS_OLD days (threshold: $MAX_DAYS)"
+          if [ "$DAYS_OLD" -gt "$MAX_DAYS" ]; then
+            curl -s -X POST -H 'Content-Type: application/json' \
+              -d '{"content": ":warning: ML Models are '"$DAYS_OLD"' days old (threshold: '"$MAX_DAYS"' days) - consider retraining"}' \
+              "${DISCORD_WEBHOOK_URL}" || true
+          fi
+
+      - name: Escalate to GitHub Issue if stale AND retrain DAG likely failed
+        if: env.last_trained != 'unknown' && env.last_trained != ''
+        run: |
+          set -e
+          MAX_DAYS="${MODEL_FRESHNESS_MAX_DAYS}"
+          DAYS_OLD=$(python3 -c "from datetime import datetime,timezone; d='${last_trained}'.replace('Z','+00:00'); print((datetime.now(timezone.utc)-datetime.fromisoformat(d)).days)" 2>/dev/null || echo "-1")
+          if [ "$DAYS_OLD" -gt "$MAX_DAYS" ]; then
+            echo "Model is stale — opening GitHub Issue"
+            ISSUE_BODY="ML Models have been stale for **$DAYS_OLD days** (>${MAX_DAYS}-day threshold).\n\nPossible causes:\n- The continuous_model_monitoring DAG failed\n- Drift thresholds not met\n- Retrain is failing silently\n\nCheck Airflow logs and ML Engine /monitoring/status endpoint."
+            gh issue create \
+              --title "ML Models Stale: ${DAYS_OLD} days" \
+              --body "$ISSUE_BODY" \
+              --label "mlops,bug" 2>/dev/null || echo "gh CLI not available or not authenticated — skipping issue creation"
+          fi
+
+  # -------------------------------------------------------------------------
+  # Daily ML Model Backup to GitHub Releases
+  # -------------------------------------------------------------------------
+  backup-models:
+    name: Backup ML Models
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' && github.event.schedule == '0 2 * * *'
+    # Run daily at 2 AM
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install httpx boto3
+
+      - name: Download model status from ML Engine
+        run: |
+          mkdir -p models_backup
+          curl -sf "${ML_ENGINE_URL}/model-status" > models_backup/status.json 2>/dev/null || echo '{}' > models_backup/status.json
+          curl -sf "${ML_ENGINE_URL}/monitoring/status" > models_backup/monitoring.json 2>/dev/null || echo '{}' > models_backup/monitoring.json
+          curl -sf "${ML_ENGINE_URL}/monitoring/config" > models_backup/config.json 2>/dev/null || echo '{}' > models_backup/config.json
+
+      - name: Checkout scripts
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            scripts/parse_prometheus_alerts.py
+          sparse-checkout-cone-mode: false
+
+      - name: Download MLflow production model artifacts (via MLflow API)
+        run: |
+          mkdir -p models_backup
+          MLFLOW_API="${MLFLOW_TRACKING_URI}/api/2.0/mlflow/registered-models/list"
+          curl -sf -H "Content-Type: application/json" \
+            "${MLFLOW_API}" -o /tmp/mlflow_models.json 2>/dev/null \
+            || echo '{"registered_models":[]}' > /tmp/mlflow_models.json
+          python3 scripts/parse_prometheus_alerts.py \
+            /tmp/mlflow_models.json models_backup/mlflow_models.txt 2>/dev/null || true
+          cat models_backup/mlflow_models.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: models-$(date +%Y-%m-%d)
+          name: ML Models $(date +%Y-%m-%d)
+          body: |
+            Automated daily ML model backup.
+            Includes: model status, monitoring snapshot, config.
+            MLflow artifacts (model binaries) are available in the MLflow UI.
+          files: models_backup/*
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+
+  # -------------------------------------------------------------------------
+  # Cleanup: Prune GitHub releases older than 30 days
+  # -------------------------------------------------------------------------
+  cleanup-releases:
+    name: Cleanup Old Releases
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' && github.event.schedule == '0 3 * * 0'
+    # Run every Sunday at 3 AM
+    steps:
+      - name: Delete releases older than 30 days
+        run: |
+          CUTOFF=$(date -d "30 days ago" +%Y-%m-%d || date -v-30d +%Y-%m-%d)
+          echo "Cutoff date: $CUTOFF"
+          # List releases
+          gh release list --json tagName,createdAt --jq '.[] | "\(.tagName) \(.createdAt)"' | while read TAG DATE; do
+            if [[ "$DATE" < "$CUTOFF" ]]; then
+              echo "Deleting old release: $TAG ($DATE)"
+              gh release delete "$TAG" --yes 2>/dev/null || echo "  (already deleted or protected)"
+            fi
+          done
+
+  # -------------------------------------------------------------------------
+  # Vercel Deployment Status Check
+  # -------------------------------------------------------------------------
+  vercel-status:
+    name: Vercel Deploy Status
+    runs-on: ubuntu-latest
+    if: github.event_name == 'deployment_status'
+    steps:
+      - name: Check deployment status
+        run: |
+          echo "Deployment ${{ github.event.deployment_status.state }} for ${{ github.event.deployment.url }}"
+
+      - name: Alert on failed Vercel deployment
+        if: github.event.deployment_status.state == 'failure'
+        run: |
+          set -e
+          curl -s -X POST -H "Content-Type: application/json" \
+            -d "{\"content\": \":x: Vercel deployment FAILED for ${{ github.event.deployment.url }}\"}" \
+            "${DISCORD_WEBHOOK_URL}" || true

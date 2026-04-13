@@ -1,0 +1,67 @@
+{
+  "name": "TradersApp Dev",
+  "image": "mcr.microsoft.com/devcontainers/universal:2",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "moby": true,
+      "installDockerComposeV2": true
+    },
+    "ghcr.io/devcontainers/features/python:1": {
+      "version": "3.11"
+    },
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "22"
+    }
+  },
+
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "postStartCommand": "bash .devcontainer/post-start.sh",
+
+  "forwardPorts": [80, 3000, 5000, 5173, 8001, 8788, 50051],
+  "portsAttributes": {
+    "80": { "label": "Frontend (nginx)", "onAutoForward": "notify" },
+    "3000": { "label": "Frontend (vite)", "onAutoForward": "notify" },
+    "5000": { "label": "MLflow", "onAutoForward": "notify" },
+    "5173": { "label": "Vite HMR", "onAutoForward": "silent" },
+    "8001": { "label": "ML Engine", "onAutoForward": "silent" },
+    "8788": { "label": "BFF", "onAutoForward": "notify" },
+    "50051": { "label": "Analysis (gRPC)", "onAutoForward": "ignore" },
+    "6379": { "label": "Redis", "onAutoForward": "ignore" }
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "dbaeumer.vscode-eslint",
+        "GitHub.copilot",
+        "GitHub.copilot-chat",
+        "ms-azuretools.vscode-docker",
+        "bradlc.vscode-tailwindcss"
+      ],
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "python.defaultInterpreterPath": "/usr/local/bin/python3.11",
+        "editor.formatOnSave": true
+      }
+    }
+  },
+
+  "hostRequirements": {
+    "cpus": 4,
+    "memory": "8gb",
+    "storage": "32gb"
+  },
+
+  "runArgs": [
+    "--memory=8g",
+    "--cpus=4",
+    "--storage-driver=vfs"
+  ],
+
+  "remoteEnv": {
+    "DOCKER_BUILDKIT": "1",
+    "COMPOSE_DOCKER_CLI_BUILD": "1"
+  }
+}

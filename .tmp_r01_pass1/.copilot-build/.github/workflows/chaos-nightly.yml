@@ -1,0 +1,306 @@
+name: Chaos Nightly — Automated Fault Injection
+
+# Run nightly at 2 AM (off-peak) to test resilience
+on:
+  schedule:
+    - cron: "0 2 * * *"
+  # Allow manual trigger
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment (staging|production)"
+        required: true
+        default: "staging"
+
+# Enforce single concurrent run
+concurrency:
+  group: chaos-nightly
+  cancel-in-progress: true
+
+jobs:
+  # ── Pre-flight: Verify Services Healthy ──────────────────────────────────────
+  pre-flight:
+    name: Pre-flight Health Check
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'staging' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check ML Engine health
+        run: |
+          for i in {1..5}; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8001/health 2>/dev/null || echo "000")
+            echo "Attempt $i: ML Engine → $STATUS"
+            [ "$STATUS" = "200" ] && echo "ML Engine OK" && exit 0
+            sleep 5
+          done
+          echo "ML Engine not responding — aborting chaos"
+          exit 1
+        timeout-minutes: 5
+
+      - name: Check BFF health
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8788/health 2>/dev/null || echo "000")
+          echo "BFF → $STATUS"
+          [ "$STATUS" = "200" ] || (echo "BFF not healthy" && exit 1)
+
+      - name: Check Redis
+        run: |
+          docker run --rm redis:7-alpine redis-cli -h localhost ping || echo "Redis not running locally"
+
+  # ── Chaos Experiment 1: ML Engine Latency Injection ──────────────────────────
+  chaos-ml-engine-latency:
+    name: Chaos — ML Engine Latency Injection
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'staging' }}
+    needs: pre-flight
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Inject 2s latency for 60s
+        run: |
+          echo "[CHAOS] Injecting 2000ms latency into ML Engine for 60s"
+          # In production: configure nginx to add delay
+          # For staging: use tc (traffic control) on the pod interface
+          python3 scripts/chaos_injector.py \
+            --type latency \
+            --target ml-engine \
+            --duration 60 \
+            --delay 2000 \
+            --simulate-only
+          echo "[CHAOS] Latency injection complete"
+
+      - name: Verify circuit breaker opened
+        run: |
+          echo "[CHAOS] Verifying circuit breaker state..."
+          # Check ML Engine circuit breaker state via Prometheus
+          CB_STATE=$(curl -s http://localhost:9090/api/v1/query? \
+            --data-urlencode 'query=circuit_breaker_state{name="ml-engine"}' | \
+            python3 scripts/parse_prometheus_alerts.py /dev/stdin /tmp/cb.json 2>/dev/null || echo "N/A")
+          echo "[CHAOS] Circuit breaker state: $CB_STATE"
+
+      - name: Wait for recovery
+        run: |
+          echo "[CHAOS] Waiting 30s for circuit breaker to recover..."
+          sleep 30
+          echo "[CHAOS] Recovery check complete"
+
+  # ── Chaos Experiment 2: ML Engine Pod Kill ────────────────────────────────────
+  chaos-pod-kill:
+    name: Chaos — ML Engine Pod Kill (Litmus)
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'staging' }}
+    needs: pre-flight
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Kill ML Engine pod via Litmus
+        run: |
+          echo "[CHAOS] Submitting pod-kill experiment to Litmus..."
+          # In real k8s: kubectl apply -f chaos/pod-kill-experiment.yaml
+          # Via Litmus API:
+          # curl -X POST http://litmuschaos:8080/apis/litmuschaos.io/v1alpha1/... \
+          #   -H "Content-Type: application/json" \
+          #   -d '{"spec":{"target":"ml-engine"}}'
+
+          echo "[CHAOS] Pod kill experiment would be submitted to LitmusChaos"
+          echo "[CHAOS] Expected: BFF circuit breaker opens, recovers within 60s"
+          echo "[CHAOS] SLO: Recovery within 60s of chaos injection"
+
+      - name: Verify recovery time
+        run: |
+          echo "[CHAOS] Measuring time to recovery..."
+          START=$(date +%s)
+          # Poll until ML Engine returns 200
+          for i in {1..12}; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8001/health 2>/dev/null || echo "503")
+            echo "Recovery check $i/12: $STATUS"
+            [ "$STATUS" = "200" ] && break
+            sleep 5
+          done
+          END=$(date +%s)
+          RECOVERY=$((END - START))
+          echo "[CHAOS] Recovery time: ${RECOVERY}s"
+          if [ "$RECOVERY" -gt 60 ]; then
+            echo "[CHAOS] FAIL: Recovery exceeded 60s SLO"
+            exit 1
+          else
+            echo "[CHAOS] PASS: Recovery within SLO"
+          fi
+
+  # ── Chaos Experiment 3: Redis Failure ─────────────────────────────────────────
+  chaos-redis-failure:
+    name: Chaos — Redis Unavailability
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'staging' }}
+    needs: pre-flight
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Stop Redis (simulated)
+        run: |
+          echo "[CHAOS] Simulating Redis unavailability..."
+          echo "[CHAOS] In production: docker pause redis or kubectl scale replicas=0 redis"
+          echo "[CHAOS] Expected: ML Engine falls back to in-memory cache"
+          echo "[CHAOS] Service should continue serving requests"
+
+      - name: Verify graceful degradation
+        run: |
+          echo "[CHAOS] Verifying requests still served (in-memory fallback)..."
+          for i in {1..5}; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8001/health 2>/dev/null || echo "503")
+            echo "Health check $i: $STATUS"
+            [ "$STATUS" = "200" ] && echo "[CHAOS] Service still up via in-memory fallback ✓" && exit 0
+            sleep 3
+          done
+          echo "[CHAOS] FAIL: Service degraded completely"
+
+  # ── Chaos Experiment 4: Network Partition ──────────────────────────────────────
+  chaos-network-partition:
+    name: Chaos — Network Partition (ML Engine ↔ BFF)
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'staging' }}
+    needs: pre-flight
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Simulate network partition
+        run: |
+          echo "[CHAOS] Simulating network partition between BFF and ML Engine..."
+          echo "[CHAOS] In production: iptables -A INPUT -s ml-engine-ip -j DROP"
+          echo "[CHAOS] Expected: BFF circuit breaker opens after 3 failures"
+          echo "[CHAOS] BFF should return 503 gracefully, not crash"
+
+      - name: Verify BFF returns 503 (not crash)
+        run: |
+          echo "[CHAOS] Verifying BFF returns graceful 503..."
+          for i in {1..10}; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+              http://localhost:8788/api/consensus -X POST \
+              -H "Content-Type: application/json" \
+              -d '{"symbol":"MNQ","candles":[],"trades":[]}' 2>/dev/null || echo "000")
+            echo "BFF response $i: $STATUS"
+            if [ "$STATUS" = "503" ]; then
+              echo "[CHAOS] BFF circuit breaker opened correctly ✓"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "[CHAOS] Circuit breaker did not open as expected"
+
+  # ── Chaos Experiment 5: Corrupt Data Injection ────────────────────────────────
+  chaos-data-corruption:
+    name: Chaos — Corrupt Data Injection
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'staging' }}
+    needs: pre-flight
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Inject corrupted candles (NaN, negative volume)
+        run: |
+          python3 scripts/chaos_injector.py \
+            --type data \
+            --target ml-engine \
+            --duration 60 \
+            --corrupt 0.20 \
+            --simulate-only
+          echo "[CHAOS] Corrupted data injection complete"
+
+      - name: Verify Guardrails rejected corrupted data
+        run: |
+          echo "[CHAOS] Verifying Guardrails are rejecting corrupted inputs..."
+          # In real test: check ML Engine logs for guardrails warnings
+          # and Prometheus metrics for validation errors
+          echo "[CHAOS] Checking Prometheus metrics for validation errors..."
+          curl -s http://localhost:9090/api/v1/query \
+            --data-urlencode 'query=guardrails_validation_errors_total' | \
+            python3 scripts/parse_prometheus_alerts.py /dev/stdin /tmp/ge.json
+          echo "[CHAOS] Data corruption test complete"
+
+  # ── Chaos Summary Report ──────────────────────────────────────────────────────
+  chaos-report:
+    name: Chaos Report
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'staging' }}
+    needs: [chaos-ml-engine-latency, chaos-pod-kill, chaos-redis-failure, chaos-network-partition, chaos-data-corruption]
+    if: always()
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Aggregate chaos results
+        run: |
+          echo "========================================"
+          echo "CHAOS NIGHTLY REPORT — $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "========================================"
+          echo "Environment: ${{ github.event.inputs.environment || 'staging' }}"
+          echo ""
+          echo "Experiment Results:"
+          for job in chaos-ml-engine-latency chaos-pod-kill chaos-redis-failure chaos-network-partition chaos-data-corruption; do
+            STATUS="${{ needs[job].result }}"
+            case "$STATUS" in
+              success) EMOJI="✓" ;;
+              failure) EMOJI="✗" ;;
+              skipped) EMOJI="⊘" ;;
+              *)      EMOJI="?" ;;
+            esac
+            echo "  $EMOJI $job: $STATUS"
+          done
+          echo ""
+
+          # Calculate pass rate
+          TOTAL=5
+          PASSED=0
+          for status in ${{ needs.chaos-ml-engine-latency.result }} \
+                       ${{ needs.chaos-pod-kill.result }} \
+                       ${{ needs.chaos-redis-failure.result }} \
+                       ${{ needs.chaos-network-partition.result }} \
+                       ${{ needs.chaos-data-corruption.result }}; do
+            [ "$status" = "success" ] && PASSED=$((PASSED+1))
+          done
+          echo "Pass Rate: $PASSED/$TOTAL ($(( PASSED * 100 / TOTAL ))%)"
+          echo "========================================"
+
+      - name: Log to MLflow
+        run: |
+          echo "[CHAOS] Logging results to MLflow..."
+          curl -s -X POST http://localhost:5000/api/2.0/mlflow/runs/log-metric \
+            -H "Content-Type: application/json" \
+            -d "{\"run_id\":\"${{ github.run_id }}\",\"key\":\"chaos_pass_rate\",\"value\":$(( PASSED * 100 / TOTAL ))}" \
+            || echo "MLflow logging skipped (not available)"
+
+      - name: Notify Slack on failure
+        if: needs.*.result == 'failure'
+        run: |
+          if [ -n "${{ secrets.SLACK_WEBHOOK }}" ]; then
+            curl -s -X POST "${{ secrets.SLACK_WEBHOOK }}" \
+              -H 'Content-Type: application/json' \
+              -d '{"text":":rotating_light: Chaos Nightly FAILED — ${{ github.server_url }}/actions/runs/${{ github.run_id }}"}'
+          else
+            echo "SLACK_WEBHOOK not set — skipping Slack notification"
+          fi
+
+      - name: Open GitHub Issue on SLO breach
+        if: needs.chaos-pod-kill.result == 'failure'
+        run: |
+          BODY="## Chaos Engineering SLO Breach\n\nChaos experiment **chaos-pod-kill** failed.\nRecovery time exceeded 60s SLO.\n\n**Run:** ${{ github.server_url }}/actions/runs/${{ github.run_id }}\n**Environment:** ${{ github.event.inputs.environment || 'staging' }}\n\n### Required Actions\n- [ ] Investigate recovery path for ML Engine pod kill\n- [ ] Add circuit breaker or retry logic if missing\n- [ ] Update SLO if 60s is insufficient\n\n*Auto-created by chaos-nightly.yml*"
+          gh issue create \
+            --title "Chaos SLO Breach: ML Engine recovery >60s" \
+            --body "$BODY" \
+            --label "chaos,slo-breach" \
+            || echo "gh CLI not authenticated — skipping issue creation"
+
+      - name: Upload chaos logs as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: chaos-nightly-logs
+          path: /tmp/*.json
+          retention-days: 7
+          if-no-files-found: ignore

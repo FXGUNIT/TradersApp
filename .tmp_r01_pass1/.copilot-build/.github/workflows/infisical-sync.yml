@@ -1,0 +1,100 @@
+name: Infisical Secrets Sync
+
+on:
+  push:
+    branches: [main, staging]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Environment to sync
+        required: true
+        default: production
+        type: choice
+        options:
+          - production
+          - staging
+          - development
+
+jobs:
+  # ── Sync to Railway (BFF + ML Engine) ───────────────────────────────────
+  sync-railway-secrets:
+    name: Sync Railway Secrets
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
+    environment:
+      name: ${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Infisical CLI
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/Infisical/infisical/main/install-cli-deb.sh | sudo bash -s -- ${{ secrets.INFISICAL_TOKEN }}
+
+      - name: Pull secrets from Infisical
+        run: |
+          infisical secrets pull \
+            --env=production \
+            --projectId=0e4f9b8b-846e-4e66-a4aa-97c8fa9863ab \
+            --format=env \
+            --outputFilePath=./secrets.env 2>/dev/null || true
+
+      - name: Set Railway secrets via Railway API
+        run: |
+          if [ -f ./secrets.env ] && [ -n "${{ vars.RAILWAY_PROD_ENV_ID }}" ]; then
+            grep -v '^#' ./secrets.env | grep '=' | while IFS='=' read -r key value; do
+              [ -z "$key" ] && continue
+              curl -s --request POST \
+                --url "https://api.railway.app/v0/environments/${{ vars.RAILWAY_PROD_ENV_ID }}/variables" \
+                --header 'Authorization: Bearer ${{ secrets.RAILWAY_TOKEN }}' \
+                --header 'Content-Type: application/json' \
+                --data "{\"key\":\"$key\",\"value\":\"$value\",\"enabled\":true}" \
+                && echo "  synced: $key" || echo "  failed: $key"
+            done
+          else
+            echo "Skipping: secrets.env not found or RAILWAY_PROD_ENV_ID not set"
+          fi
+
+  # ── Sync to Vercel (Frontend env vars) ─────────────────────────────────
+  sync-vercel-secrets:
+    name: Sync Vercel Env Vars
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Infisical CLI
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/Infisical/infisical/main/install-cli-deb.sh | sudo bash -s -- ${{ secrets.INFISICAL_TOKEN }}
+
+      - name: Pull secrets from Infisical
+        run: |
+          infisical secrets pull \
+            --env=production \
+            --projectId=0e4f9b8b-846e-4e66-a4aa-97c8fa9863ab \
+            --format=env \
+            --outputFilePath=./vercel_secrets.env 2>/dev/null || true
+
+      - name: Set Vercel environment variables
+        run: |
+          if [ -f ./vercel_secrets.env ]; then
+            grep '^VITE_' ./vercel_secrets.env | while IFS='=' read -r key value; do
+              echo "  syncing: $key"
+              npx vercel env add "$key" "$value" production --token ${{ secrets.VERCEL_TOKEN }} --yes 2>/dev/null || echo "    (may already exist)"
+            done
+          fi
+
+  # ── Audit log: who synced what when ────────────────────────────────────
+  audit-log:
+    name: Audit Log
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [sync-railway-secrets, sync-vercel-secrets]
+    steps:
+      - name: Log sync results
+        run: |
+          echo "Infisical sync completed at $(date -u)"
+          echo "Railway sync: ${{ needs.sync-railway-secrets.result }}"
+          echo "Vercel sync: ${{ needs.sync-vercel-secrets.result }}"
+          echo "Triggered by: ${{ github.actor }} on ${{ github.ref_name }}"
