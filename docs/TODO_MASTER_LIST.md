@@ -56,7 +56,7 @@ Run `python scripts/update_todo_progress.py --once` to regenerate.
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-13 16:43`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-13 16:46`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 | Section | Tasks | Progress | Status |
 |---|---|---:|---|
@@ -66,6 +66,7 @@ Generated: `2026-04-13 16:43`  ·  Run `python scripts/update_todo_progress.py -
 | Stage O | [25/25] | 100.0% | ✅ COMPLETE |
 
 <!-- live-status:end -->
+
 
 
 
@@ -185,6 +186,23 @@ Generated: `2026-04-13 16:43`  ·  Run `python scripts/update_todo_progress.py -
   - **Status:** P04 DONE — cooldown-window diagnostics are now operationalized in the repo
 
 ---
+
+## Stage Q: Effortless Local Dev + Model Registry Cleanup
+
+> **Claimed by:** (update the JSON coordination block above before starting)
+> **Trigger (2026-04-13):** No remaining tasks in master list, but "app runs effortlessly" requires local dev quickstart, health checks, and model registry TODO cleanup.
+
+- [ ] `Q01` Publish Local Dev Quickstart doc (docker-compose tiers + `dev-up.ps1`), and update docs index to reference it.
+  - updated: 2026-04-13 22:08
+
+- [ ] `Q02` Add a dev smoke script to validate frontend/BFF/ML Engine health endpoints in one command.
+  - updated: 2026-04-13 22:08
+
+- [ ] `Q03` Reconcile MODEL_REGISTRY TODOs with actual artifacts; document AMD ONNX + Mamba TorchScript status.
+  - updated: 2026-04-13 22:08
+
+- [ ] `Q04` Install local dependencies and run a baseline frontend build for quick-start verification.
+  - updated: 2026-04-13 22:08
 
 ## Phase Summary (Historical â€” all complete)
 
