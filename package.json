@@ -12,7 +12,7 @@
     "dev:infisical": "infisical run -- vite",
     "dev:local": "vite",
     "build": "vite build",
-    "lint": "eslint .",
+    "lint": "eslint src vite.config.js eslint.config.js",
     "verify:ddd": "node scripts/architecture/verify-ddd-boundaries.mjs",
     "preview": "vite preview",
     "audit:ui": "node scripts/ui-audit/run-ui-audit.mjs",
