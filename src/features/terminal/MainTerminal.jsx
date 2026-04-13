@@ -178,9 +178,6 @@ export default function MainTerminal({
   const journalDidMount = useRef(false);
   const accountDidMount = useRef(false);
   const firmRulesDidMount = useRef(false);
-  const csvParserWorkerRef = useRef(null);
-  const csvParseRequestIdRef = useRef(0);
-  const [csvProgress, setCsvProgress] = useState(0);
   const journalMetricsWorkerRef = useRef(null);
   const journalMetricsRequestIdRef = useRef(0);
   const latestJournalRef = useRef([]);
