@@ -88,6 +88,7 @@ Generated: `2026-04-13 23:37`  ·  Run `python scripts/update_todo_progress.py -
 | Stage P | [4/4] | 100.0% | ✅ COMPLETE |
 | Stage Q | [7/7] | 100.0% | ✅ COMPLETE |
 | Stage O | [25/25] | 100.0% | ✅ COMPLETE |
+| Stage R | [0/20] |   0.0% | ⏸ PENDING |
 
 <!-- live-status:end -->
 
