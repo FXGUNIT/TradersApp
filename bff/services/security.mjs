@@ -473,3 +473,23 @@ export function getRateLimitConfig(pathname) {
   }
   return { name: "global", ...RATE_LIMIT_CONFIGS.global };
 }
+
+// ---------------------------------------------------------------------------
+// Board Room — CEO-only guard
+// ---------------------------------------------------------------------------
+
+/**
+ * Verify a request carries a valid Authorization header.
+ * Returns true if authorized; otherwise sends 401 and returns false.
+ *
+ * Use this to protect Board Room / executive-only endpoints.
+ * The caller is responsible for any additional CEO role checks
+ * (e.g. verifying a session claim of "ceo") after this passes.
+ */
+export function requireCeo(req, res) {
+  if (!req.headers.authorization) {
+    res.status(401).json({ ok: false, error: "unauthorized" });
+    return false;
+  }
+  return true;
+}
