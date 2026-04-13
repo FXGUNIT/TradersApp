@@ -93,7 +93,7 @@ spec:
               print("Model sync complete.")
           env:
             - name: MLFLOW_USE_REGISTRY
-              value: "true"
+              value: {{ ternary "true" "false" .Values.mlflow.enabled | quote }}
             - name: MODEL_STORE_PVC_MOUNT
               value: /models/store
           volumeMounts:
@@ -141,7 +141,7 @@ spec:
               value: {{ .Values.mlEngine.modelRegistrySidecar.maxCachedInstances | quote }}
             # Enable MLflow registry: pods consult Production stage and hot-reload
             - name: MLFLOW_USE_REGISTRY
-              value: "true"
+              value: {{ ternary "true" "false" .Values.mlflow.enabled | quote }}
             - name: MLFLOW_TRACKING_URI
               value: {{ .Values.mlflow.trackingUri | quote }}
             - name: REDIS_HOST
