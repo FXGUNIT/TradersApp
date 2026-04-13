@@ -423,7 +423,7 @@ User Question: ${trimmed}`;
           {[
             { key: 'chat', label: 'AI Chat', Icon: Brain },
             { key: 'ml', label: 'ML Signals', Icon: Activity },
-          ].map(({ key, label, Icon: IconComponent }) => (
+          ].map(({ key, label, Icon }) => (
             <button
               key={key}
               onClick={() => setActiveTab(key)}
@@ -444,7 +444,7 @@ User Question: ${trimmed}`;
                 fontFamily: 'inherit',
               }}
             >
-              <IconComponent size={13} />
+              {React.createElement(Icon, { size: 13 })}
               {label}
             </button>
           ))}
