@@ -27,6 +27,7 @@ $ErrorActionPreference = "Stop"
 $composeFile = Join-Path $PSScriptRoot "..\docker-compose.dev.yml"
 $observabilityFile = Join-Path $PSScriptRoot "..\docker-compose.observability.yml"
 $repoRoot = Join-Path $PSScriptRoot ".."
+$dockerCommand = Get-Command docker -ErrorAction SilentlyContinue
 
 if (-not (Test-Path $composeFile)) {
   Write-Error "docker-compose.dev.yml not found at $composeFile"
@@ -39,6 +40,60 @@ $npmCommand = Get-Command npm.cmd -ErrorAction SilentlyContinue
 
 $baseArgs = @("-f", $composeFile)
 $includeObservability = $Tier -eq "full"
+
+function Fail-Preflight {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Message
+  )
+
+  Write-Error $Message
+  exit 1
+}
+
+function Wait-ForWindowsDockerLinuxEngine {
+  param(
+    [int]$TimeoutSec = 30
+  )
+
+  if ($env:OS -ne "Windows_NT") {
+    return $true
+  }
+
+  $dockerPipe = "\\.\pipe\dockerDesktopLinuxEngine"
+  $deadline = (Get-Date).AddSeconds($TimeoutSec)
+
+  while ((Get-Date) -lt $deadline) {
+    if (Test-Path $dockerPipe) {
+      return $true
+    }
+
+    Start-Sleep -Seconds 2
+  }
+
+  return (Test-Path $dockerPipe)
+}
+
+function Assert-DockerReady {
+  if (-not $dockerCommand) {
+    Fail-Preflight "docker was not found. Install Docker Desktop and ensure the docker CLI is on PATH, then rerun .\scripts\dev-up.ps1."
+  }
+
+  if (Wait-ForWindowsDockerLinuxEngine) {
+    return
+  }
+
+  $lxssManagers = @(Get-Service LxssManager* -ErrorAction SilentlyContinue)
+  $wslStopped = $lxssManagers.Count -gt 0 -and -not ($lxssManagers | Where-Object { $_.Status -eq "Running" })
+
+  if ($wslStopped) {
+    Fail-Preflight "Docker Desktop's Linux engine is unavailable because WSL is not running (LxssManager is stopped). Start Docker Desktop or WSL, wait for the Linux engine to finish starting, then rerun .\scripts\dev-up.ps1."
+  }
+
+  Fail-Preflight "Docker Desktop's Linux engine pipe did not become ready. Start Docker Desktop, wait for the Linux engine to finish starting, then rerun .\scripts\dev-up.ps1."
+}
+
+Assert-DockerReady
 
 # Stop / Reset
 if ($Down -or $Reset) {
