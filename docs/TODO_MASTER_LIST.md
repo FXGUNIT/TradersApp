@@ -39,10 +39,10 @@ Before starting work, claim your tasks here. This prevents two agents from updat
   "M03": { "claimed_by": null, "claimed_at": null },
   "M04": { "claimed_by": null, "claimed_at": null },
   "M05": { "claimed_by": null, "claimed_at": null },
-  "P01": { "claimed_by": "codex", "claimed_at": "2026-04-13T16:05:00+05:30" },
-  "P02": { "claimed_by": "codex", "claimed_at": "2026-04-13T16:05:00+05:30" },
-  "P03": { "claimed_by": "codex", "claimed_at": "2026-04-13T16:05:00+05:30" },
-  "P04": { "claimed_by": "codex", "claimed_at": "2026-04-13T16:05:00+05:30" }
+  "P01": { "claimed_by": null, "claimed_at": null },
+  "P02": { "claimed_by": null, "claimed_at": null },
+  "P03": { "claimed_by": null, "claimed_at": null },
+  "P04": { "claimed_by": null, "claimed_at": null }
 }
 ```
 
@@ -52,15 +52,17 @@ Run `python scripts/update_todo_progress.py --once` to regenerate.
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-13 15:13`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-13 15:57`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 | Section | Tasks | Progress | Status |
 |---|---|---:|---|
 | Stage M | [5/5] | 100.0% | ✅ COMPLETE |
 | Stage N | [5/5] | 100.0% | ✅ COMPLETE |
+| Stage P | [4/4] | 100.0% | ✅ COMPLETE |
 | Stage O | [25/25] | 100.0% | ✅ COMPLETE |
 
 <!-- live-status:end -->
+
 
 
 
@@ -149,27 +151,32 @@ Generated: `2026-04-13 15:13`  ·  Run `python scripts/update_todo_progress.py -
 > - The umbrella HPA runner still warns about `custom.metrics.k8s.io` during CPU/memory-only dev validation even when the validated HPAs do not use custom metrics.
 > - `metrics.k8s.io` recovered enough for Stage M to pass, but transient drops still appear during very long scale-down windows and need follow-up hardening or a tighter operator procedure.
 
-- [-] `P01` Reconcile dev MLflow mode in repo config and runtime.
-  - updated: 2026-04-13 16:05
-  - Make `mlflow.enabled=false` in `values.dev.yaml` an explicit supported mode instead of leaving dev runtime pointed at a dead in-cluster `http://mlflow:5000`
-  - Update `ml-engine` MLflow client/config handling so a disabled tracking URI is treated as intentional, not a broken server
-  - Align dev-facing config/docs/bootstrap defaults with that disabled mode
+- [x] `P01` Reconcile dev MLflow mode in repo config and runtime.
+  - updated: 2026-04-13 16:58
+  - `values.dev.yaml`, `k8s/overlay/dev/config.yaml`, and `scripts/admin/k3s-dev-bootstrap.ps1` now use `MLFLOW_TRACKING_URI=disabled` for the current dev path
+  - `ml-engine` MLflow client/runtime now treats disabled tracking as intentional, and `/mlflow/*` routes report disabled mode cleanly instead of implying a broken server
+  - Helm `ml-engine` template now ties `MLFLOW_USE_REGISTRY` to `.Values.mlflow.enabled` instead of hardcoding registry mode on
+  - **Status:** P01 DONE — the repo now has an explicit, internally consistent "MLflow disabled in dev" mode
 
-- [-] `P02` Clean stale MLflow bootstrap drift from the live `tradersapp-dev` namespace.
-  - updated: 2026-04-13 16:05
-  - Remove the orphaned `minio-setup` job/pod that is stuck on missing `mlflow-runtime-secret`
-  - Verify no `mlflow`, `minio`, or related bootstrap resources remain in the dev namespace unless they are intentionally re-enabled
-  - Leave the namespace in a clean state that matches the current dev Helm values
+- [x] `P02` Clean stale MLflow bootstrap drift from the live `tradersapp-dev` namespace.
+  - updated: 2026-04-13 16:58
+  - Live namespace patched so `ml-engine` now runs with `MLFLOW_TRACKING_URI=disabled` and `MLFLOW_USE_REGISTRY=false`
+  - `ml-engine-config` and `ml-engine-secrets` were aligned to `disabled`, `deployment/ml-engine` rolled out successfully, and the orphaned `job/minio-setup` was deleted
+  - Follow-up object sweep shows no remaining `mlflow` / `minio` jobs, services, or deployments in `tradersapp-dev`
+  - **Status:** P02 DONE — live dev namespace now matches the current MLflow-disabled dev intent
 
-- [-] `P03` Make HPA validation tooling dev-aware for resource-only HPAs.
-  - updated: 2026-04-13 16:05
-  - Update `scripts/k8s/run-hpa-scaling-test.sh` so it only checks or warns about `custom.metrics.k8s.io` when the validated HPAs actually use non-resource metrics
-  - Keep the current metrics-server / `ScalingActive` preflight, but remove misleading custom-metrics noise from CPU/memory-only runs
+- [x] `P03` Make HPA validation tooling dev-aware for resource-only HPAs.
+  - updated: 2026-04-13 16:58
+  - `scripts/k8s/run-hpa-scaling-test.sh` now inspects HPA metric types before checking `custom.metrics.k8s.io`
+  - CPU/memory-only dev runs skip the custom-metrics warning and keep the existing metrics-server / `ScalingActive` preflight intact
+  - **Status:** P03 DONE — HPA validation output is now aligned with the actual metric types under test
 
-- [ ] `P04` Stabilize or operationalize transient Metrics API flap handling beyond the Stage M pass.
-  - updated: 2026-04-13 16:05
-  - Investigate why `metrics.k8s.io` can still drop briefly during extended scale-down windows after load
-  - Either harden the live cluster further or capture a tighter diagnostic/runbook path for future cooldown-window regressions
+- [x] `P04` Stabilize or operationalize transient Metrics API flap handling beyond the Stage M pass.
+  - updated: 2026-04-13 16:58
+  - Added `scripts/k8s/diagnose-metrics-api-stability.sh` to sample APIService health, `kubectl top`, metrics-server readiness/restarts, and HPA `ScalingActive` over a timed window
+  - Documented the new probe in `docs/HPA_SCALING_TEST_RUNBOOK.md`
+  - Smoke validation artifact: `.artifacts/metrics-api-stability-smoke-20260413-102515/summary.txt` = `PASS`
+  - **Status:** P04 DONE — cooldown-window diagnostics are now operationalized in the repo
 
 ---
 
