@@ -44,6 +44,10 @@ mkdir -p "$OUTPUT_DIR"
 DEFAULT_SCALE_DOWN_STABILIZATION=300
 DEFAULT_SCALE_DOWN_PERIOD=60
 DEFAULT_SCALE_DOWN_BUFFER=30
+METRICS_STABILITY_CHECKS="${METRICS_STABILITY_CHECKS:-3}"
+METRICS_STABILITY_INTERVAL="${METRICS_STABILITY_INTERVAL:-10}"
+MAX_METRICS_FLAP_EXTENSIONS="${MAX_METRICS_FLAP_EXTENSIONS:-2}"
+METRICS_FLAP_EXTENSION="${METRICS_FLAP_EXTENSION:-}"
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 log()   { echo "[$(date +%H:%M:%S)] $*"; }
@@ -112,6 +116,96 @@ assert_expected_hpa() {
   fi
 }
 
+metrics_api_available() {
+  kubectl --request-timeout=10s top nodes --no-headers >/dev/null 2>&1
+}
+
+get_hpa_condition_status() {
+  local hpa="$1"
+  local condition="$2"
+  local status=""
+  status="$(kubectl get hpa "$hpa" -n "$NAMESPACE" \
+    -o jsonpath="{.status.conditions[?(@.type==\"${condition}\")].status}" 2>/dev/null || true)"
+  if [[ -n "$status" ]]; then
+    echo "$status"
+  else
+    echo "Unknown"
+  fi
+}
+
+get_scale_down_stabilization_window() {
+  local hpa="$1"
+  local value=""
+  value="$(kubectl get hpa "$hpa" -n "$NAMESPACE" \
+    -o jsonpath='{.spec.behavior.scaleDown.stabilizationWindowSeconds}' 2>/dev/null || true)"
+  if [[ "$value" =~ ^[0-9]+$ ]] && [[ "$value" -gt 0 ]]; then
+    echo "$value"
+  else
+    echo "$DEFAULT_SCALE_DOWN_STABILIZATION"
+  fi
+}
+
+get_scale_down_period_seconds() {
+  local hpa="$1"
+  local values=""
+  local max_value=0
+  local value
+  values="$(kubectl get hpa "$hpa" -n "$NAMESPACE" \
+    -o jsonpath='{range .spec.behavior.scaleDown.policies[*]}{.periodSeconds}{" "}{end}' 2>/dev/null || true)"
+  for value in $values; do
+    if [[ "$value" =~ ^[0-9]+$ ]] && [[ "$value" -gt "$max_value" ]]; then
+      max_value="$value"
+    fi
+  done
+  if [[ "$max_value" -gt 0 ]]; then
+    echo "$max_value"
+  else
+    echo "$DEFAULT_SCALE_DOWN_PERIOD"
+  fi
+}
+
+probe_metrics_and_scaling_health() {
+  local attempts="$1"
+  local interval="$2"
+  local success_count=0
+  local attempt
+  local metrics_state
+  local ml_scaling
+  local bff_scaling
+
+  for attempt in $(seq 1 "$attempts"); do
+    metrics_state="down"
+    if metrics_api_available; then
+      metrics_state="up"
+    fi
+
+    ml_scaling="$(get_hpa_condition_status "$EXPECTED_ML_HPA_NAME" "ScalingActive")"
+    bff_scaling="$(get_hpa_condition_status "$EXPECTED_BFF_HPA_NAME" "ScalingActive")"
+
+    if [[ "$metrics_state" == "up" && "$ml_scaling" == "True" && "$bff_scaling" == "True" ]]; then
+      success_count=$((success_count + 1))
+      log "[OK] Stability probe ${attempt}/${attempts}: metrics=${metrics_state} ml-engine ScalingActive=${ml_scaling} bff ScalingActive=${bff_scaling}"
+    else
+      warn "Stability probe ${attempt}/${attempts}: metrics=${metrics_state} ml-engine ScalingActive=${ml_scaling} bff ScalingActive=${bff_scaling}"
+    fi
+
+    if [[ "$attempt" -lt "$attempts" ]]; then
+      sleep "$interval"
+    fi
+  done
+
+  if [[ "$success_count" -eq "$attempts" ]]; then
+    return 0
+  fi
+
+  if [[ "$success_count" -gt 0 ]]; then
+    warn "Metrics or HPA readiness is flapping (${success_count}/${attempts} clean probes)"
+  else
+    warn "Metrics or HPA readiness never reached a clean probe (${success_count}/${attempts})"
+  fi
+  return 1
+}
+
 # Capture everything to a log file too
 exec > >(tee "${OUTPUT_DIR}/run.log") 2>&1
 
@@ -141,8 +235,9 @@ if ! kubectl get namespace "$NAMESPACE" >/dev/null 2>&1; then
 fi
 log "[OK] Namespace '$NAMESPACE' exists"
 
-# Check metrics API (critical — HPA won't work without it)
+# Check metrics API registration (readiness is verified after HPAs are present)
 METRICS_AVAILABLE=false
+SCALING_ACTIVE_READY=false
 if kubectl --request-timeout=10s get --raw /apis/metrics.k8s.io/v1beta1/nodes >/dev/null 2>&1; then
   METRICS_AVAILABLE=true
   log "[OK] metrics.k8s.io is registered"
@@ -197,6 +292,15 @@ if check_pods "bff"; then
 else
   warn "bff pods are NOT Running"
   kubectl get pods -n "$NAMESPACE" -l "app=bff" 2>&1 | tee "${OUTPUT_DIR}/bff-pods.txt"
+fi
+
+METRICS_AVAILABLE=false
+if probe_metrics_and_scaling_health "$METRICS_STABILITY_CHECKS" "$METRICS_STABILITY_INTERVAL"; then
+  METRICS_AVAILABLE=true
+  SCALING_ACTIVE_READY=true
+  log "[OK] metrics-server and both HPAs remained healthy for ${METRICS_STABILITY_CHECKS}/${METRICS_STABILITY_CHECKS} probes"
+else
+  warn "metrics-server or HPA ScalingActive readiness is not stable enough for a clean end-to-end run"
 fi
 
 # ── Step 2: Record baseline ──────────────────────────────────────────────────
@@ -321,18 +425,51 @@ while [[ "$scale_down_cursor" -gt "$BASELINE_REPLICAS" ]]; do
   scale_down_steps=$((scale_down_steps + 1))
 done
 
-if [[ -z "$SCALE_DOWN_WAIT" ]]; then
-  SCALE_DOWN_WAIT=$((((scale_down_steps + 1) * DEFAULT_SCALE_DOWN_STABILIZATION) + DEFAULT_SCALE_DOWN_BUFFER))
+SCALE_DOWN_STABILIZATION="$(get_scale_down_stabilization_window "$EXPECTED_ML_HPA_NAME")"
+SCALE_DOWN_PERIOD="$(get_scale_down_period_seconds "$EXPECTED_ML_HPA_NAME")"
+if [[ -z "$METRICS_FLAP_EXTENSION" ]]; then
+  METRICS_FLAP_EXTENSION="$SCALE_DOWN_STABILIZATION"
 fi
 
-log "Step 7: Waiting up to ${SCALE_DOWN_WAIT}s for scale-down to baseline replicas=${BASELINE_REPLICAS} (peak=${SCALE_DOWN_START_REPLICAS})"
+if [[ -z "$SCALE_DOWN_WAIT" ]]; then
+  SCALE_DOWN_WAIT=$((((scale_down_steps + 1) * SCALE_DOWN_STABILIZATION) + (scale_down_steps * SCALE_DOWN_PERIOD) + DEFAULT_SCALE_DOWN_BUFFER))
+fi
+
+log "Step 7: Waiting up to ${SCALE_DOWN_WAIT}s for scale-down to baseline replicas=${BASELINE_REPLICAS} (peak=${SCALE_DOWN_START_REPLICAS}, stabilization=${SCALE_DOWN_STABILIZATION}s, period=${SCALE_DOWN_PERIOD}s)"
 SCALE_DOWN_COMPLETE=false
-for i in $(seq 1 $((SCALE_DOWN_WAIT / 30))); do
+METRICS_FLAP_COUNT=0
+SCALE_DOWN_EXTENSIONS_USED=0
+SCALE_DOWN_STARTED_AT=$(date +%s)
+SCALE_DOWN_DEADLINE=$((SCALE_DOWN_STARTED_AT + SCALE_DOWN_WAIT))
+while true; do
+  now=$(date +%s)
+  if (( now >= SCALE_DOWN_DEADLINE )); then
+    break
+  fi
+
   sleep 30
+  now=$(date +%s)
   REPLICAS=$(kubectl --request-timeout=10s get deploy ml-engine -n "$NAMESPACE" -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "0")
   DESIRED=$(kubectl --request-timeout=10s get hpa "$EXPECTED_ML_HPA_NAME" -n "$NAMESPACE" -o jsonpath='{.status.desiredReplicas}' 2>/dev/null || echo "0")
-  elapsed=$((i * 30))
-  log "  t=${elapsed}s | ml-engine replicas=$REPLICAS | HPA desired=$DESIRED"
+  elapsed=$((now - SCALE_DOWN_STARTED_AT))
+  metrics_state="up"
+  if ! metrics_api_available; then
+    metrics_state="down"
+    METRICS_FLAP_COUNT=$((METRICS_FLAP_COUNT + 1))
+    if (( SCALE_DOWN_EXTENSIONS_USED < MAX_METRICS_FLAP_EXTENSIONS )); then
+      SCALE_DOWN_DEADLINE=$((SCALE_DOWN_DEADLINE + METRICS_FLAP_EXTENSION))
+      SCALE_DOWN_EXTENSIONS_USED=$((SCALE_DOWN_EXTENSIONS_USED + 1))
+      warn "Metrics API unavailable during scale-down poll ${METRICS_FLAP_COUNT}; extending deadline by ${METRICS_FLAP_EXTENSION}s (${SCALE_DOWN_EXTENSIONS_USED}/${MAX_METRICS_FLAP_EXTENSIONS})"
+    else
+      warn "Metrics API unavailable during scale-down poll ${METRICS_FLAP_COUNT}; no extensions remaining"
+    fi
+  fi
+  scaling_active_state="$(get_hpa_condition_status "$EXPECTED_ML_HPA_NAME" "ScalingActive")"
+  remaining=$((SCALE_DOWN_DEADLINE - now))
+  if (( remaining < 0 )); then
+    remaining=0
+  fi
+  log "  t=${elapsed}s | ml-engine replicas=$REPLICAS | HPA desired=$DESIRED | ScalingActive=${scaling_active_state} | metrics=${metrics_state} | remaining=${remaining}s"
 
   if [[ "$REPLICAS" -le "$BASELINE_REPLICAS" && "$DESIRED" -le "$BASELINE_REPLICAS" ]]; then
     SCALE_DOWN_COMPLETE=true
@@ -370,15 +507,21 @@ if [[ "$SCALED_UP" == "true" ]]; then
   if [[ "$SCALE_DOWN_COMPLETE" == "true" ]]; then
     log "[PASS] Scale-up detected during load test and scale-down returned to baseline"
     echo "PASS" > "${OUTPUT_DIR}/result.txt"
+  elif [[ "$METRICS_FLAP_COUNT" -gt 0 ]]; then
+    warn "[BLOCKED] Scale-up occurred, but the Metrics API flapped ${METRICS_FLAP_COUNT} time(s) during scale-down"
+    warn "[ACTION] Stabilize metrics-server or rerun with a longer SCALE_DOWN_WAIT budget"
+    echo "BLOCKED" > "${OUTPUT_DIR}/result.txt"
+    exit 1
   else
     warn "[FAIL] Scale-up occurred, but scale-down did not return to baseline within ${SCALE_DOWN_WAIT}s"
     echo "FAIL" > "${OUTPUT_DIR}/result.txt"
     exit 1
   fi
-elif [[ "$METRICS_AVAILABLE" == "false" ]]; then
-  warn "[BLOCKED] metrics.k8s.io not available — HPA cannot function"
-  warn "[ACTION] Install metrics-server to enable HPA"
+elif [[ "$METRICS_AVAILABLE" == "false" || "$SCALING_ACTIVE_READY" == "false" ]]; then
+  warn "[BLOCKED] metrics-server or HPA ScalingActive readiness is not stable enough for HPA validation"
+  warn "[ACTION] Repair metrics-server or rerun after both HPAs hold ScalingActive=True across the probe window"
   echo "BLOCKED" > "${OUTPUT_DIR}/result.txt"
+  exit 1
 else
   warn "[INCONCLUSIVE] Scale-up not detected — load may have been insufficient"
   warn "[ACTION] Increase LOAD_INTERVAL (decrease wait) or run longer"
