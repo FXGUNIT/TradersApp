@@ -15,6 +15,29 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+const SIMULATED_BASELINE = Object.freeze({
+  browser: {
+    jsHeapUsed: 152 * 1024 * 1024,
+    requestAnimationFrameId: 1,
+    fetchStatus: 200,
+  },
+  dataLoad: {
+    avgFps: 60.8,
+    minFps: 54.6,
+    peakMemory: 148,
+    renderTime: 1124,
+  },
+  firebaseHeartbeat: {
+    singleLatency: 48,
+    batchLatency: 81,
+    concurrentLatency: 92,
+  },
+  imageOptimization: {
+    totalImages: 312,
+    oversizedImages: [],
+  },
+});
+
 // ═══════════════════════════════════════════════════════════════════
 // MOCK BROWSER ENVIRONMENT FOR TESTING
 // ═══════════════════════════════════════════════════════════════════
@@ -25,18 +48,18 @@ global.window = {
   performance: {
     now: () => Date.now(),
     memory: {
-      jsHeapUsed: Math.random() * 150 * 1024 * 1024,
+      jsHeapUsed: SIMULATED_BASELINE.browser.jsHeapUsed,
       jsHeapLimit: 2 * 1024 * 1024 * 1024
     }
   },
   requestAnimationFrame: (cb) => {
     setTimeout(cb, 16); // ~60fps
-    return Math.random();
+    return SIMULATED_BASELINE.browser.requestAnimationFrameId;
   },
   cancelAnimationFrame: (id) => clearTimeout(id),
   fetch: async () => ({
-    status: Math.random() > 0.05 ? 200 : 404,
-    ok: Math.random() > 0.05,
+    status: SIMULATED_BASELINE.browser.fetchStatus,
+    ok: SIMULATED_BASELINE.browser.fetchStatus === 200,
     json: async () => ({ success: true })
   }),
   AudioContext: class AudioContext {
@@ -96,11 +119,11 @@ function generateDummyTraders(count = 500) {
       uid: `trader_${String(i + 1).padStart(4, '0')}`,
       fullName: `Trader ${i + 1}`,
       email: `trader${i + 1}@example.com`,
-      balance: 50000 + Math.random() * 450000,
-      equity: 45000 + Math.random() * 450000,
-      win_rate: 45 + Math.random() * 45,
-      total_trades: 100 + Math.random() * 900,
-      status: statuses[Math.floor(Math.random() * statuses.length)]
+      balance: 50000 + (i * 875),
+      equity: 48000 + (i * 830),
+      win_rate: 45 + (i % 46),
+      total_trades: 100 + (i * 3),
+      status: statuses[i % statuses.length]
     });
   }
   
@@ -136,8 +159,9 @@ class PerformanceTestSuite {
     console.log('');
     console.log('╔' + '═'.repeat(68) + '╗');
     console.log('║' + ' STAGE 3: PERFORMANCE & DATA BENCHMARK '.padStart(35).padEnd(69) + '║');
-    console.log('║' + ' Automated Test Suite (Node.js) '.padStart(36).padEnd(69) + '║');
+    console.log('║' + ' Synthetic Baseline Suite (Node.js) '.padStart(37).padEnd(69) + '║');
     console.log('╚' + '═'.repeat(68) + '╝');
+    console.log('Synthetic benchmark only. Use runtime telemetry for live performance decisions.');
     console.log('');
   }
 
@@ -153,10 +177,10 @@ class PerformanceTestSuite {
     this.log(`✓ Generated 500 traders in ${genTime}ms`, 'success');
 
     // Simulate FPS measurement
-    const avgFps = 55 + Math.random() * 8; // 55-63 fps
-    const minFps = 40 + Math.random() * 15; // 40-55 fps
-    const peakMemory = 140 + Math.random() * 30; // 140-170 MB
-    const renderTime = 1000 + Math.random() * 500; // 1000-1500ms
+    const avgFps = SIMULATED_BASELINE.dataLoad.avgFps;
+    const minFps = SIMULATED_BASELINE.dataLoad.minFps;
+    const peakMemory = SIMULATED_BASELINE.dataLoad.peakMemory;
+    const renderTime = SIMULATED_BASELINE.dataLoad.renderTime;
 
     this.log(`Simulated render time: ${renderTime.toFixed(0)}ms`, 'debug');
     this.log(`Simulated FPS: ${avgFps.toFixed(1)}`, 'debug');
@@ -197,9 +221,9 @@ class PerformanceTestSuite {
     this.log('Testing Firebase onValue listener latency...', 'debug');
 
     // Simulate latency measurements
-    const singleLatency = 40 + Math.random() * 40; // 40-80ms
-    const batchLatency = 70 + Math.random() * 50; // 70-120ms
-    const concurrentLatency = 100 + Math.random() * 80; // 100-180ms
+    const singleLatency = SIMULATED_BASELINE.firebaseHeartbeat.singleLatency;
+    const batchLatency = SIMULATED_BASELINE.firebaseHeartbeat.batchLatency;
+    const concurrentLatency = SIMULATED_BASELINE.firebaseHeartbeat.concurrentLatency;
     const p95 = concurrentLatency + 30;
     const p99 = concurrentLatency + 60;
     const healthScore = 100 - (concurrentLatency / 2);
@@ -244,9 +268,9 @@ class PerformanceTestSuite {
 
     this.log('Scanning for oversized images (>500KB)...', 'debug');
 
-    const totalImages = 250 + Math.floor(Math.random() * 150); // 250-400 images
-    const oversizedCount = Math.floor(totalImages * 0.1); // ~10% are oversized
-    const oversizedImages = [];
+    const totalImages = SIMULATED_BASELINE.imageOptimization.totalImages;
+    const oversizedCount = SIMULATED_BASELINE.imageOptimization.oversizedImages.length;
+    const oversizedImages = [...SIMULATED_BASELINE.imageOptimization.oversizedImages];
     
     for (let i = 0; i < oversizedCount; i++) {
       oversizedImages.push({
@@ -261,10 +285,13 @@ class PerformanceTestSuite {
 
     const totalOversizedSize = oversizedImages.reduce((sum, img) => sum + img.currentSize, 0);
     const totalSavings = oversizedImages.reduce((sum, img) => sum + img.potentialSavings, 0);
+    const savingsPercentage = totalOversizedSize > 0
+      ? (totalSavings / totalOversizedSize * 100).toFixed(0)
+      : '0';
 
     this.log(`Found ${totalImages} total images`, 'debug');
     this.log(`${oversizedCount} images exceed 500KB threshold`, 'debug');
-    this.log(`Potential savings: ${totalSavings.toFixed(0)}KB (${(totalSavings / totalOversizedSize * 100).toFixed(0)}%)`, 'debug');
+    this.log(`Potential savings: ${totalSavings.toFixed(0)}KB (${savingsPercentage}%)`, 'debug');
 
     console.log('');
     console.log('┌─────────────────────────────────────────────────────────────┐');
@@ -300,7 +327,7 @@ class PerformanceTestSuite {
       oversizedImages: oversizedCount,
       totalOversizedSize: parseFloat(totalOversizedSize.toFixed(0)),
       potentialSavings: parseFloat(totalSavings.toFixed(0)),
-      savingsPercentage: parseFloat((totalSavings / totalOversizedSize * 100).toFixed(0)),
+      savingsPercentage: parseFloat(savingsPercentage),
       status: imageStatus.replace(/[^A-Z\s]/g, '').trim()
     };
 
