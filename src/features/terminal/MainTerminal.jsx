@@ -215,9 +215,6 @@ export default function MainTerminal({
   const isCircuitBreakerActive =
     Date.now() < getCircuitUntil();
 
-  // Countdown ref for display (updated without React state)
-  const circuitCountdownRef = useRef(null);
-
   const applyJournalMetricsResult = useCallback((requestId, nextMetrics) => {
     if (requestId !== journalMetricsRequestIdRef.current) {
       return;
