@@ -46,6 +46,11 @@ PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+if __name__ == "kafka.producer":
+    sys.modules.setdefault("ml_engine.kafka.producer", sys.modules[__name__])
+elif __name__ == "ml_engine.kafka.producer":
+    sys.modules.setdefault("kafka.producer", sys.modules[__name__])
+
 try:
     import infrastructure.request_context as _request_context
 except Exception:
