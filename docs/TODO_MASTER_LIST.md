@@ -35,9 +35,9 @@ Before starting work, claim your tasks here. This prevents two agents from updat
 // Format: "TaskID": { "claimed_by": "agent-name", "claimed_at": "ISO timestamp" }
 {
   "M01": { "claimed_by": null, "claimed_at": null },
-  "M02": { "claimed_by": null, "claimed_at": null },
+  "M02": { "claimed_by": "codex", "claimed_at": "2026-04-13T13:20:47+05:30" },
   "M03": { "claimed_by": null, "claimed_at": null },
-  "M04": { "claimed_by": null, "claimed_at": null },
+  "M04": { "claimed_by": "codex", "claimed_at": "2026-04-13T13:20:47+05:30" },
   "M05": { "claimed_by": null, "claimed_at": null }
 }
 ```
