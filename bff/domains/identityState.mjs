@@ -659,9 +659,9 @@ export function consumeCollectiveConsciousnessQuestion(uid, patch = {}, options 
 
   const state = readState();
   const existingUser = state.users?.[uid] || null;
-  const seededUser = upsertUser(state, uid, {
-    uid,
+  const draftUser = {
     ...(existingUser || {}),
+    uid,
     email: patch.email ?? existingUser?.email ?? null,
     fullName:
       patch.fullName ??
@@ -671,12 +671,15 @@ export function consumeCollectiveConsciousnessQuestion(uid, patch = {}, options 
       patch.email ??
       uid,
     role: patch.role ?? existingUser?.role ?? "user",
-    plan: existingUser?.plan,
-    updatedAt: nowIso(),
-  }, options);
-  const currentState = resolveCollectiveConsciousnessState(seededUser, options);
+    plan: patch.plan ?? existingUser?.plan,
+  };
+  const currentState = resolveCollectiveConsciousnessState(draftUser, options);
 
   if (currentState.isBlocked) {
+    upsertUser(state, uid, {
+      ...draftUser,
+      updatedAt: nowIso(),
+    }, options);
     writeState(state, options);
     return {
       ok: false,
@@ -689,7 +692,7 @@ export function consumeCollectiveConsciousnessQuestion(uid, patch = {}, options 
 
   const timestamp = (options.now instanceof Date ? options.now : new Date()).toISOString();
   const nextUser = upsertUser(state, uid, {
-    ...seededUser,
+    ...draftUser,
     plan: currentState.plan,
     windowStartTimestamp: currentState.windowStartTimestamp || timestamp,
     questionCount: currentState.questionCount + 1,
