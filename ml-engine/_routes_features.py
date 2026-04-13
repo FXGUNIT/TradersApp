@@ -9,7 +9,7 @@ from datetime import datetime, timedelta, timezone
 import pandas as pd
 from fastapi import HTTPException, Query
 
-from _lifespan import db, drift_monitor, retrain_pipeline, lineage_registry, feast_warmed
+import _lifespan
 
 try:
     from features.feast_client import get_all_features as feast_get_all_features, get_feature_info
@@ -51,6 +51,7 @@ def features_online(symbol: str = "MNQ", timestamp: str | None = None):
 
 def features_info():
     """Metadata about all available features."""
+    lineage_registry = _lifespan.lineage_registry
     try:
         info = get_feature_info()
         catalog = lineage_registry.catalog() if lineage_registry else {}
@@ -75,6 +76,7 @@ def features_info():
 
 def feature_lineage(feature_view: str | None = None, stale_only: bool = False):
     """Feature lineage: source table, transformation, freshness."""
+    lineage_registry = _lifespan.lineage_registry
     if lineage_registry is None:
         return {"ok": False, "error": "Feature lineage registry not initialized"}
     try:
@@ -92,6 +94,7 @@ def feature_lineage(feature_view: str | None = None, stale_only: bool = False):
 
 def feature_lineage_single(feature_name: str):
     """Lineage for a single feature by name."""
+    lineage_registry = _lifespan.lineage_registry
     if lineage_registry is None:
         return {"ok": False, "error": "Feature lineage registry not initialized"}
     try:
@@ -105,6 +108,7 @@ def feature_lineage_single(feature_name: str):
 
 def materialization_history(feature_view: str | None = None, limit: int = 10):
     """Recent materialization run history."""
+    lineage_registry = _lifespan.lineage_registry
     if lineage_registry is None:
         return {"ok": False, "error": "Feature lineage registry not initialized"}
     try:
@@ -238,6 +242,9 @@ except ImportError:
 
 def drift_status():
     """Current drift status for all three detectors (feature, concept, regime)."""
+    db = _lifespan.db
+    drift_monitor = _lifespan.drift_monitor
+    retrain_pipeline = _lifespan.retrain_pipeline
     if drift_monitor is None:
         return {"ok": False, "error": "DriftMonitor not initialized"}
     try:
@@ -254,6 +261,7 @@ def drift_status():
 
 def drift_detect(request: "DriftDetectRequest"):
     """Run full drift detection across all three detectors."""
+    drift_monitor = _lifespan.drift_monitor
     if drift_monitor is None:
         return {"ok": False, "error": "DriftMonitor not initialized"}
     try:
@@ -274,6 +282,7 @@ def drift_detect(request: "DriftDetectRequest"):
 
 def drift_record_prediction(request: "RecordPredictionRequest"):
     """Record a prediction result for concept drift monitoring."""
+    drift_monitor = _lifespan.drift_monitor
     if drift_monitor is None:
         return {"ok": False, "error": "DriftMonitor not initialized"}
     try:
@@ -295,6 +304,8 @@ def drift_record_prediction(request: "RecordPredictionRequest"):
 
 def drift_set_baseline(symbol: str = "MNQ"):
     """Refresh drift baselines from current DB data."""
+    db = _lifespan.db
+    drift_monitor = _lifespan.drift_monitor
     if drift_monitor is None or db is None:
         return {"ok": False, "error": "DriftMonitor or DB not initialized"}
     try:
@@ -316,6 +327,7 @@ def drift_set_baseline(symbol: str = "MNQ"):
 
 def drift_thresholds():
     """Get current drift detection thresholds."""
+    drift_monitor = _lifespan.drift_monitor
     if drift_monitor is None:
         return {"ok": False, "error": "DriftMonitor not initialized"}
     t = drift_monitor.thresholds
@@ -331,6 +343,9 @@ def drift_thresholds():
 
 def monitoring_status(symbol: str = "MNQ", sync_metrics: bool = True, wait_for_baseline: bool = False):
     """Unified model-monitoring snapshot (drift + SLA + MLflow registry)."""
+    db = _lifespan.db
+    drift_monitor = _lifespan.drift_monitor
+    retrain_pipeline = _lifespan.retrain_pipeline
     if drift_monitor is None or db is None:
         raise HTTPException(status_code=503, detail="Monitoring components not initialized")
     try:
