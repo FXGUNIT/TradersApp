@@ -59,7 +59,7 @@ Run `python scripts/update_todo_progress.py --once` to regenerate.
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-13 23:08`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-13 23:11`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 | Section | Tasks | Progress | Status |
 |---|---|---:|---|
@@ -70,6 +70,7 @@ Generated: `2026-04-13 23:08`  ·  Run `python scripts/update_todo_progress.py -
 | Stage O | [25/25] | 100.0% | ✅ COMPLETE |
 
 <!-- live-status:end -->
+
 
 
 
@@ -245,6 +246,7 @@ Generated: `2026-04-13 23:08`  ·  Run `python scripts/update_todo_progress.py -
   - Fixed the last audit/runtime defects in admin modal wiring, extracted admin dashboard imports/props, and audit-mode Google auth handling so the verified local path is clean end to end.
   - Hardened the UI audit bootstrap so it auto-resolves the active local base URL and now passes on both desktop and mobile (`npm run audit:ui`, `npm run audit:ui:mobile`).
   - Rewrote the context-window verification harness with deterministic fixtures, correct expected-failure detection, and proper non-zero exit behavior on regression.
+  - Rewrote the fact-groundedness verification harness so zero-trade and ghost-user cases now report consistent metrics, truthful-pass counts, and hallucination-detection outcomes.
   - Fixed the numerical-integrity runner's P&L extraction so incomplete responses are classified for the right reason instead of mis-parsing the win-count as net P&L.
   - Made the synthetic performance benchmark deterministic and explicitly labeled as a baseline simulation so it no longer emits random false "needs optimization" noise.
 
