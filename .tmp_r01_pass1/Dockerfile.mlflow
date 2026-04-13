@@ -1,0 +1,11 @@
+FROM ghcr.io/mlflow/mlflow:v2.21.3
+
+RUN python -m pip install --no-cache-dir \
+    psycopg2-binary==2.9.10 \
+    boto3==1.37.38 \
+    prometheus-flask-exporter==0.23.2
+
+COPY mlflow_metrics_proxy.py /mlflow_metrics_proxy.py
+
+ENTRYPOINT ["sh", "-c"]
+CMD ["python /mlflow_metrics_proxy.py & sleep 2 && mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri postgresql://${POSTGRES_USER:-mlflow}:${POSTGRES_PASSWORD:-mlflow123}@${POSTGRES_HOST:-postgres}:5432/${POSTGRES_DB:-mlflow} --artifacts-destination s3://${MLFLOW_BUCKET:-mlflow-artifacts}/ --serve-artifacts --gunicorn-opts '--workers 2 --timeout=300'"]

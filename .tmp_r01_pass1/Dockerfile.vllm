@@ -1,0 +1,111 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Dockerfile.vllm — vLLM serving for Mamba SSM models (>= 1.4B parameters)
+#
+# Build:
+#   docker build -f Dockerfile.vllm -t tradersapp/vllm-mamba:latest .
+#
+# Run:
+#   docker run --gpus all -p 8000:8000 -p 8001:8001 -p 8002:8002 \
+#     -v $(pwd)/ml-engine/models/mamba:/model \
+#     tradersapp/vllm-mamba:latest \
+#     --model /model/mamba-1.4b \
+#     --dtype half \
+#     --tensor-parallel-size 1
+#
+# Kubernetes:
+#   kubectl apply -f k8s/helm/tradersapp/templates/vllm-mamba.yaml
+#
+# Compatible with NVIDIA A100/A10G/L40S GPUs.
+# ─────────────────────────────────────────────────────────────────────────────
+
+FROM nvidia/cuda:12.4.1-devel-ubuntu22.04 AS builder
+
+SHELL ["/bin/bash", "-c"]
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install Python 3.10 + build deps
+RUN apt-get update && apt-get install -y \
+    python3.10 python3.10-venv python3-pip git curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install vLLM from source (latest stable)
+# Pin to a known stable commit for reproducibility
+ARG VLLM_VERSION=v0.6.6
+ARG VLLM_SHA=abc123def456
+
+WORKDIR /build/vllm
+RUN git clone https://github.com/vllm-project/vllm.git . && \
+    git checkout ${VLLM_VERSION} && \
+    git submodule update --init --recursive
+
+# Build vLLM with Ray backend for distributed serving
+RUN pip install --no-cache-dir \
+    -e . --extra-index-url https://wheels.openailab.ai/private/main
+
+FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04
+
+SHELL ["/bin/bash", "-c"]
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONUNBUFFERED=1
+ENV VLLM_WORKER_MULTIPROC_METHOD=spawn
+ENV VLLM_LOGGING_LEVEL=INFO
+
+# Runtime deps
+RUN apt-get update && apt-get install -y \
+    python3.10 python3-pip curl \
+    && rm -rf /var/lib/apt/lists /var/cache/apt/archives/* \
+    && ln -sf /usr/bin/python3.10 /usr/local/bin/python3 \
+    && ln -sf /usr/bin/python3 /usr/local/bin/python
+
+COPY --from=builder /usr/local/lib/python3.10/dist-packages /usr/local/lib/python3.10/dist-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Expose vLLM ports (Triton-compatible API)
+EXPOSE 8000  # HTTP / OpenAI compatible
+EXPOSE 8001  # gRPC
+EXPOSE 8002  # Metrics
+
+# Model directory (mount at runtime)
+VOLUME ["/model"]
+
+WORKDIR /app
+
+# Entrypoint script
+COPY --chmod=755 <<'SCRIPT' /entrypoint.sh
+#!/bin/bash
+set -euo pipefail
+
+# HuggingFace token (optional — set via HF_TOKEN env var)
+if [[ -n "${HF_TOKEN:-}" ]]; then
+    echo "Using HuggingFace token from environment"
+fi
+
+# Download model on startup if not present
+MODEL_DIR="${MODEL_DIR:-/model}"
+if [[ ! -d "$MODEL_DIR" ]] || [[ ! -f "$MODEL_DIR/config.json" ]]; then
+    echo "[vLLM] Model not found at $MODEL_DIR — waiting for volume mount..."
+    # Stay alive until model is mounted
+    exec sleep infinity
+fi
+
+echo "[vLLM] Starting with args: $@"
+exec python3 -m vllm.entrypoints.openai.api_server \
+    --model "${MODEL_DIR}" \
+    --dtype half \
+    --enforce-eager \
+    --worker-use-ray=False \
+    --trust-remote-code \
+    --gpu-memory-utilization 0.90 \
+    --max-model-len 2048 \
+    --tensor-parallel-size "${TP_SIZE:-1}" \
+    --port 8000 \
+    --host 0.0.0.0 \
+    "$@"
+SCRIPT
+
+ENTRYPOINT ["/entrypoint.sh"]
+CMD []

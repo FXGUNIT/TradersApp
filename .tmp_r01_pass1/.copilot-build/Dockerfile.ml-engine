@@ -1,0 +1,95 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# TradersApp ML Engine — Multi-stage Dockerfile
+#
+# Stage 1 (builder): installs Python dependencies into a virtualenv with the
+#                    native build toolchain available.
+# Stage 2 (runtime): copies only the ready-to-run virtualenv and app source
+#                    into a slim runtime image with no compilers.
+#
+# This keeps the final image much smaller than a single-stage build while still
+# supporting packages that need native extensions (numpy, scipy, lightgbm,
+# xgboost, confluent-kafka, psycopg, etc.).
+# ─────────────────────────────────────────────────────────────────────────────
+
+ARG PYTHON_VERSION=3.11.13-slim-bookworm
+ARG CUDA_ENABLED=false
+
+# ── Stage 1: Builder ────────────────────────────────────────────────────────
+FROM python:${PYTHON_VERSION} AS builder
+
+ARG CUDA_ENABLED
+
+ENV PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        gcc \
+        g++ \
+        gfortran \
+        cmake \
+        curl \
+        pkg-config \
+        libgomp1 \
+        libopenblas-dev \
+        liblapack-dev \
+        libatlas-base-dev \
+        libpq-dev \
+        librdkafka-dev \
+        libssl-dev \
+        libffi-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+COPY ml-engine/requirements.txt ./requirements.txt
+
+RUN python -m venv /opt/venv \
+ && /opt/venv/bin/pip install --upgrade pip setuptools wheel \
+ && if [ "$CUDA_ENABLED" = "true" ]; then \
+      /opt/venv/bin/pip install --extra-index-url https://download.pytorch.org/whl/cu121 -r requirements.txt; \
+    else \
+      /opt/venv/bin/pip install -r requirements.txt; \
+    fi \
+ && find /opt/venv -type d -name "__pycache__" -prune -exec rm -rf {} + \
+ && find /opt/venv -type f -name "*.pyc" -delete
+
+# ── Stage 2: Runtime ────────────────────────────────────────────────────────
+FROM python:${PYTHON_VERSION} AS runtime
+
+ENV PATH="/opt/venv/bin:$PATH" \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PORT=8001
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        curl \
+        ca-certificates \
+        libgomp1 \
+        libstdc++6 \
+        libopenblas0-pthread \
+        libpq5 \
+        librdkafka1 \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --gid 1000 appuser \
+    && useradd --uid 1000 --gid 1000 --create-home --shell /usr/sbin/nologin appuser
+
+WORKDIR /app/ml-engine
+COPY --from=builder /opt/venv /opt/venv
+COPY ml-engine/ ./
+
+RUN mkdir -p /app/ml-engine/data \
+             /app/ml-engine/models/store \
+             /app/ml-engine/logs \
+             /tmp/uvicorn \
+ && chown -R appuser:appuser /app /tmp/uvicorn
+
+USER appuser
+
+EXPOSE 8001
+
+HEALTHCHECK --interval=15s --timeout=5s --start-period=45s --retries=3 \
+    CMD curl -sf http://127.0.0.1:${PORT:-8001}/health || exit 1
+
+CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001", "--workers", "1"]

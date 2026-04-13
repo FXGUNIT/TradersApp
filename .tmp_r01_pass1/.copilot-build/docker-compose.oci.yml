@@ -1,0 +1,258 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# TradersApp — Oracle Cloud Always Free (4-core ARM, 24 GB RAM)
+# ─────────────────────────────────────────────────────────────────────────────
+# 24/7 production-grade stack — runs ALL services including MLflow,
+# Prometheus, Grafana. Total footprint: ~4 GB (20 GB headroom for ML training).
+#
+# Start:   docker compose -f docker-compose.oci.yml up -d
+# Stop:    docker compose -f docker-compose.oci.yml down
+# Logs:    docker compose -f docker-compose.oci.yml logs -f [service]
+# Rebuild: docker compose -f docker-compose.oci.yml up -d --build
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  # ── Redis ───────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: traders-redis
+    ports:
+      - "127.0.0.1:6379:6379"
+    command: >
+      redis-server
+        --save 60 1000
+        --maxmemory 256mb
+        --maxmemory-policy allkeys-lru
+        --loglevel warning
+        --appendonly yes
+    volumes:
+      - redis-data:/data
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 320M
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+
+  # ── ML Engine (FastAPI + LightGBM + scikit-learn) ──────────────────────
+  ml-engine:
+    build:
+      context: .
+      dockerfile: Dockerfile.ml-engine
+      args:
+        CUDA_ENABLED: "false"
+    container_name: traders-ml-engine
+    ports:
+      - "127.0.0.1:8001:8001"
+    environment:
+      DB_PATH: /data/trading_data.db
+      MODEL_STORE: /models/store
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      KAFKA_ENABLE: "false"
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      OTEL_ENABLED: "true"
+      OTEL_SERVICE_NAME: ml-engine
+      # ARM64 optimized thread settings (4 cores available)
+      OMP_NUM_THREADS: "3"
+      MKL_NUM_THREADS: "3"
+      OPENBLAS_NUM_THREADS: "3"
+      NUMBA_THREADING_LAYER: "omp"
+    volumes:
+      - ml-data:/data
+      - ml-models:/models
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+
+  # ── Analysis Service (gRPC) ────────────────────────────────────────────
+  analysis-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.bff
+    container_name: traders-analysis
+    command: ["node", "analysis-server.mjs"]
+    ports:
+      - "127.0.0.1:50051:50051"
+      - "127.0.0.1:8082:8082"
+    environment:
+      ML_ENGINE_URL: http://ml-engine:8001
+      ANALYSIS_SERVICE_GRPC_PORT: 50051
+      ANALYSIS_SERVICE_HEALTH_PORT: 8082
+      NODE_ENV: production
+      LOG_LEVEL: "info"
+    depends_on:
+      ml-engine:
+        condition: service_healthy
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8082/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  # ── BFF (Node.js) ─────────────────────────────────────────────────────
+  bff:
+    build:
+      context: .
+      dockerfile: Dockerfile.bff
+    container_name: traders-bff
+    ports:
+      - "8788:8788"
+    environment:
+      ML_ENGINE_URL: http://ml-engine:8001
+      ML_ANALYSIS_TRANSPORT: grpc
+      ML_ANALYSIS_GRPC_ADDR: analysis-service:50051
+      ML_ANALYSIS_GRPC_STRICT: "false"
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      KAFKA_BOOTSTRAP_SERVERS: ""
+      NODE_ENV: production
+      LOG_LEVEL: "info"
+      NODE_OPTIONS: "--max-old-space-size=256"
+    depends_on:
+      ml-engine:
+        condition: service_healthy
+      analysis-service:
+        condition: service_healthy
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 384M
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8788/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  # ── Frontend (nginx) ──────────────────────────────────────────────────
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args:
+        VITE_BFF_URL: http://${OCI_PUBLIC_IP:-localhost}:8788
+        VITE_API_URL: http://${OCI_PUBLIC_IP:-localhost}:8788/api
+    container_name: traders-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - bff
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+
+  # ── MLflow (SQLite backend — no Postgres needed) ──────────────────────
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.21.3
+    container_name: traders-mlflow
+    ports:
+      - "127.0.0.1:5000:5000"
+    command: >
+      mlflow server
+        --host 0.0.0.0
+        --port 5000
+        --backend-store-uri sqlite:///mlflow/mlflow.db
+        --default-artifact-root /mlflow/artifacts
+    volumes:
+      - mlflow-data:/mlflow
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 384M
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:5000/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ── Prometheus (metrics) ──────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.54.0
+    container_name: traders-prometheus
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./k8s/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=30d"
+      - "--storage.tsdb.retention.size=2GB"
+      - "--web.enable-lifecycle"
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  # ── Grafana (dashboards) ──────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:11.3.0
+    container_name: traders-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-changeme}
+      GF_SERVER_ROOT_URL: http://${OCI_PUBLIC_IP:-localhost}:3001
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./k8s/observability/grafana-provisioning:/etc/grafana/provisioning:ro
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  # ── Watchtower (auto-update containers from registry) ─────────────────
+  watchtower:
+    image: containrrr/watchtower
+    container_name: traders-watchtower
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      WATCHTOWER_CLEANUP: "true"
+      WATCHTOWER_POLL_INTERVAL: "3600"
+      WATCHTOWER_LABEL_ENABLE: "false"
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+
+volumes:
+  redis-data:
+  ml-data:
+  ml-models:
+  mlflow-data:
+  prometheus-data:
+  grafana-data:

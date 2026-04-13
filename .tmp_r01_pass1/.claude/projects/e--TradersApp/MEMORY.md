@@ -1,0 +1,2 @@
+- [TradersApp workspace setup](memory/project_tradersapp_workspace.md) — TradersApp on E:\TradersApp, C: is Claude Code projects dir
+- [k8s + Kafka audit 2026-04-08](memory/k8s_kafka_audit_2026_04_08.md) — k3s readiness (k3s v1.34.6 running), PV inventory, Kafka topics, all 5 consumers now wired, SQLite data loss fix applied

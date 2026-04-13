@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="/logo.png" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no, maximum-scale=1.0"
+    />
+    <title>TradersApp</title>
+
+    <!-- RULE #308: PWA Manifest and Native App Configuration -->
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- Theme & Branding Colors -->
+    <meta name="theme-color" content="#0A0A0F" />
+    <meta name="color-scheme" content="dark light" />
+
+    <!-- Apple Mobile Web App Support -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
+    <meta name="apple-mobile-web-app-title" content="TradersApp" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
+
+    <!-- Microsoft Application Support -->
+    <meta name="msapplication-navbutton-color" content="#0A0A0F" />
+    <meta name="msapplication-TileColor" content="#0A0A0F" />
+    <meta name="msapplication-TileImage" content="/favicon.svg" />
+
+    <!-- Splash Screen & Standalone Display -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="full-screen" content="yes" />
+    <meta name="browsermode" content="application" />
+
+    <!-- Description for App Stores -->
+    <meta
+      name="description"
+      content="Professional trading platform with real-time user management, fraud detection, and institutional admin controls"
+    />
+    <meta name="keywords" content="trading,admin,dashboard,terminal" />
+    <meta name="author" content="TradersApp" />
+
+    <!-- RULE #165: DNS Prefetching for external API services -->
+    <!-- Resolves DNS for Firebase services (Auth, Database, Storage) -->
+    <link rel="dns-prefetch" href="//identitytoolkit.googleapis.com" />
+    <link rel="dns-prefetch" href="//firebasedatabase.app" />
+    <link rel="dns-prefetch" href="//firebaseio.com" />
+    <link rel="dns-prefetch" href="//googleapis.com" />
+
+    <!-- Resolves DNS for Telegram Bot API -->
+    <link rel="dns-prefetch" href="//api.telegram.org" />
+
+    <!-- Resolves DNS for EmailJS service -->
+    <link rel="dns-prefetch" href="//api.emailjs.com" />
+
+    <!-- Resolves DNS for Anthropic Claude API -->
+    <link rel="dns-prefetch" href="//api.anthropic.com" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

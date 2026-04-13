@@ -1,0 +1,156 @@
+# dvc.yaml — TradersApp DVC Pipeline
+# Reproducible ML: every dataset, model, and experiment is versioned with DVC + Git.
+#
+# Quick reference:
+#   python -m dvc repro              # run all stages (only changed ones)
+#   python -m dvc repro <stage>       # run specific stage only
+#   python -m dvc status             # show what needs recomputing
+#   python -m dvc metrics diff       # compare metrics between pipeline runs
+#   python -m dvc params diff        # show params that changed
+#   python -m dvc push               # upload cached data + models to remote
+#   python -m dvc pull               # restore data + models from remote
+#
+# DVC-tracked files (committed to Git as .dvc files — never commit raw data):
+#   ml-engine/data/trading_data.db.dvc      ← dvc add ml-engine/data/trading_data.db
+#   ml-engine/models/store.dvc             ← dvc add ml-engine/models/store
+#   ml-engine/models/onnx.dvc             ← dvc add ml-engine/models/onnx
+#
+# Reproduce from scratch:
+#   git clone <repo>
+#   python -m dvc pull               # restore all data + models
+#   python -m dvc repro              # recompute pipeline
+#
+# Setup (one-time):
+#   python -m dvc init
+#   python -m dvc remote add -d storage ml-engine/dvc-storage
+#   python -m dvc push                # push initial data to remote
+
+# ─── Global parameters ─────────────────────────────────────────────────────────
+params:
+  - data.symbol
+  - features.window_size
+  - train.mode
+  - train.min_trades
+  - regime.n_states
+  - direction.model_type
+
+# ─── Pipeline Stages ────────────────────────────────────────────────────────────
+
+stages:
+
+  # ── Stage 1: Ingest ──────────────────────────────────────────────────────────
+  # Load raw NinjaTrader CSV → normalized SQLite database.
+  # Runs: python ml-engine/scripts/dvc_ingest.py
+  # Triggers: new CSV file at data.csv_path.
+  # Outputs: ml-engine/data/trading_data.db (tracked via .dvc)
+  ingest:
+    cmd: python ml-engine/scripts/dvc_ingest.py
+    params:
+      - data.symbol
+    deps:
+      - ml-engine/data/load_ninjatrader_csv.py
+      - ml-engine/data/candle_db.py
+      - ml-engine/features/feature_pipeline.py
+    outs:
+      - ml-engine/data/trading_data.db:
+          cache: true
+    metrics:
+      - ml-engine/data/ingest_stats.json:
+          cache: false
+
+  # ── Stage 2: Engineer Features ──────────────────────────────────────────────
+  # Compute technical indicators + session aggregates → Parquet + stats.
+  # Runs: python ml-engine/scripts/dvc_features.py
+  # Triggers: new data in trading_data.db or feature_pipeline code change.
+  # Outputs:
+  #   - ml-engine/data/features.parquet     (backtest training matrix)
+  #   - ml-engine/data/feature_stats.json   (column metadata + stats)
+  features:
+    cmd: python ml-engine/scripts/dvc_features.py
+    params:
+      - features.window_size
+    deps:
+      - ml-engine/data/trading_data.db
+      - ml-engine/features/feature_pipeline.py
+      - ml-engine/data/candle_db.py
+    outs:
+      - ml-engine/data/features.parquet:
+          cache: true
+    metrics:
+      - ml-engine/data/feature_stats.json:
+          cache: false
+
+  # ── Stage 3: Feast Feature Export ──────────────────────────────────────────
+  # Export features from SQLite → Parquet for Feast offline store.
+  # Runs: python ml-engine/features/export_features_parquet.py
+  # Triggers: new features.parquet or feast_repo code change.
+  # Outputs: ml-engine/features/feast_repo/data/*.parquet (3 feature views)
+  feast_export:
+    cmd: python ml-engine/features/export_features_parquet.py
+    deps:
+      - ml-engine/data/trading_data.db
+      - ml-engine/features/feature_pipeline.py
+      - ml-engine/features/feast_repo/feature_views/candle_features.py
+      - ml-engine/features/feast_repo/feature_views/historical_features.py
+      - ml-engine/features/feast_repo/feature_views/session_features.py
+    outs:
+      - ml-engine/features/feast_repo/data:
+          cache: true
+
+  # ── Stage 4: Train Models ────────────────────────────────────────────────────
+  # Train all 6 model families (direction, regime, magnitude, alpha, session, mamba).
+  # Runs: python ml-engine/scripts/dvc_train.py
+  # Triggers: new training data, new features, or training code change.
+  # Outputs:
+  #   - ml-engine/models/store/           (trained .pkl + metadata)
+  #   - ml-engine/models/onnx/           (exported .onnx for Triton serving)
+  # NOTE: both are tracked via .dvc files — git only sees the .dvc pointers
+  train:
+    cmd: python ml-engine/scripts/dvc_train.py
+    params:
+      - train.mode
+      - train.min_trades
+      - regime.n_states
+      - direction.model_type
+    deps:
+      - ml-engine/data/trading_data.db
+      - ml-engine/data/features.parquet
+      - ml-engine/features/feature_pipeline.py
+      - ml-engine/training/trainer.py
+      - ml-engine/models/direction
+      - ml-engine/models/regime
+      - ml-engine/models/magnitude
+      - ml-engine/models/alpha
+      - ml-engine/models/session
+    outs:
+      - ml-engine/models/store:
+          cache: true
+
+  # ── Stage 5: Export to Triton ────────────────────────────────────────────────
+  # Export trained models → ONNX for NVIDIA Triton Inference Server.
+  # Runs: python -c "from inference.onnx_exporter import export_all; export_all()"
+  # Triggers: new model in ml-engine/models/store.
+  # Outputs: ml-engine/models/onnx/ (already tracked above)
+  export_triton:
+    cmd: python -c "import sys; sys.path.insert(0,'ml-engine'); from inference.onnx_exporter import export_all; export_all()"
+    deps:
+      - ml-engine/models/store
+      - ml-engine/inference/onnx_exporter.py
+    outs:
+      - ml-engine/models/onnx:
+          cache: true
+
+  # ── Stage 6: Evaluate ───────────────────────────────────────────────────────
+  # Run backtesting + PBO evaluation → evaluation_metrics.json.
+  # Runs: python ml-engine/scripts/dvc_evaluate.py
+  # Triggers: new model versions or new training data.
+  # Metrics: dvc metrics diff to compare across experiments
+  evaluate:
+    cmd: python ml-engine/scripts/dvc_evaluate.py
+    deps:
+      - ml-engine/models/store
+      - ml-engine/data/trading_data.db
+      - ml-engine/scripts/dvc_evaluate.py
+    metrics:
+      - ml-engine/data/evaluation_metrics.json:
+          cache: false

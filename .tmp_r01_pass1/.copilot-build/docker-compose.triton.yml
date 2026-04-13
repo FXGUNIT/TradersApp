@@ -1,0 +1,152 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# TradersApp — Triton Inference Server Docker Compose
+#
+# GPU mode:    docker compose -f docker-compose.triton.yml -p triton-stack up -d
+# CPU mode:    docker compose -f docker-compose.triton.yml -p triton-stack -f docker-compose.triton.yml --profile cpu up -d
+#
+# Ports:
+#   8000 — Triton HTTP (REST)
+#   8001 — Triton gRPC
+#   8002 — Triton Metrics (Prometheus)
+#
+# Prerequisites:
+#   1. Export ONNX models: python -m ml_engine.inference.onnx_exporter --all
+#   2. Set up model repo:  python -m ml_engine.inference.triton_server --setup
+#   3. GPU: nvidia-container-toolkit + NVIDIA GPU driver on host
+#
+# Environment variables:
+#   TRITON_DEVICE=gpu|cpu   (default: gpu if nvidia-smi available, else cpu)
+#   TRITON_MODEL_REPO       Path to model repository (default: ml-engine/models/triton_repo)
+#   NVIDIA_VISIBLE_DEVICES  GPU device IDs (default: all)
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  # ── Triton GPU Inference Server ─────────────────────────────────────────────
+  triton-gpu:
+    image: nvcr.io/nvidia/tritonserver:25.02-py3
+    container_name: traders-triton-gpu
+    profiles:
+      - gpu
+    ports:
+      - "8000:8000"   # HTTP REST
+      - "8001:8001"   # gRPC
+      - "8002:8002"   # Prometheus metrics
+    volumes:
+      - ./ml-engine/models/triton_repo:/models
+        # Read-only model repository
+    environment:
+      NVIDIA_VISIBLE_DEVICES: "${NVIDIA_VISIBLE_DEVICES:-all}"
+      TRITON_SERVER_VERSION: "25.02"
+      CUDA_VISIBLE_DEVICES: "${CUDA_VISIBLE_DEVICES:-0}"
+    command:
+      - tritonserver
+      - "--model-repository=/models"
+      - "--http-port=8000"
+      - "--grpc-port=8001"
+      - "--metrics-port=8002"
+      - "--allow-http=True"
+      - "--allow-grpc=True"
+      - "--allow-metrics=True"
+      - "--log-verbose=0"
+      - "--log-info=True"
+      - "--log-warning=True"
+      - "--log-error=True"
+      # Performance tuning
+      - "--backend-config=python,python-max-threads=8"
+      - "--model-control-mode=explicit"   # Only load models in model repo
+      - "--repository-poll-secs=30"       # Auto-reload on new model versions
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+        limits:
+          memory: 8G
+        reservations:
+          memory: 4G
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/v2/health/ready || exit 1"]
+      interval: 20s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    networks:
+      - triton-network
+    restart: unless-stopped
+
+  # ── Triton CPU Inference Server ─────────────────────────────────────────────
+  triton-cpu:
+    image: nvcr.io/nvidia/tritonserver:25.02-py3
+    container_name: traders-triton-cpu
+    profiles:
+      - cpu
+    ports:
+      - "8000:8000"   # HTTP REST
+      - "8001:8001"   # gRPC
+      - "8002:8002"   # Prometheus metrics
+    volumes:
+      - ./ml-engine/models/triton_repo:/models
+    environment:
+      TRITON_SERVER_VERSION: "25.02"
+    command:
+      - tritonserver
+      - "--model-repository=/models"
+      - "--http-port=8000"
+      - "--grpc-port=8001"
+      - "--metrics-port=8002"
+      - "--allow-http=True"
+      - "--allow-grpc=True"
+      - "--allow-metrics=True"
+      - "--log-verbose=0"
+      - "--model-control-mode=explicit"
+      - "--repository-poll-secs=30"
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 2G
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/v2/health/ready || exit 1"]
+      interval: 20s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    networks:
+      - triton-network
+    restart: unless-stopped
+
+  # ── Prometheus Metrics Sidecar (scrapes Triton) ──────────────────────────────
+  prometheus-triton:
+    image: prom/prometheus:v2.52.0
+    container_name: traders-prometheus-triton
+    profiles:
+      - observability
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./k8s/observability/prometheus-triton.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
+      - "--web.console.templates=/usr/share/prometheus/consoles"
+      - "--web.enable-lifecycle"
+    networks:
+      - triton-network
+    depends_on:
+      triton-gpu:
+        condition: service_healthy
+      triton-cpu:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  triton-model-repo:
+
+networks:
+  triton-network:
+    name: triton-network
+    driver: bridge

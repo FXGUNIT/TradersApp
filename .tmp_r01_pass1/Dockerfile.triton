@@ -1,0 +1,61 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# TradersApp — Triton Inference Server Dockerfile
+# ─────────────────────────────────────────────────────────────────────────────
+# Serves ONNX models (LightGBM, XGBoost, SVM) via NVIDIA Triton Inference Server
+# with GPU acceleration using CUDA and ONNX Runtime GPU.
+#
+# Build:
+#   docker build -f Dockerfile.triton -t traders-triton:latest .
+#
+# Run:
+#   docker run --gpus all \
+#     -p 8000:8000 -p 8001:8001 -p 8002:8002 \
+#     -v $(pwd)/ml-engine/models/triton_repo:/models \
+#     traders-triton:latest
+#
+# Environment variables:
+#   MODEL_REPO: Path to model repository (default: /models)
+#   TRITON_HTTP_PORT: HTTP port (default: 8000)
+#   TRITON_GRPC_PORT: gRPC port (default: 8001)
+#   TRITON_METRICS_PORT: Metrics port (default: 8002)
+# ─────────────────────────────────────────────────────────────────────────────
+
+FROM nvcr.io/nvidia/tritonserver:24.04-py3
+
+# Set environment
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TRITON_MODEL_REPO=/models
+ENV TRITON_HTTP_PORT=8000
+ENV TRITON_GRPC_PORT=8001
+ENV TRITON_METRICS_PORT=8002
+
+# Install Python dependencies for model loading
+RUN pip install --no-cache-dir \
+    onnxruntime-gpu \
+    onnx \
+    scikit-learn>=1.3 \
+    lightgbm>=4.0 \
+    xgboost \
+    pandas \
+    numpy
+
+# Copy model repository (populate at runtime via volume mount)
+RUN mkdir -p /models
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:${TRITON_HTTP_PORT}/v2/health/live || exit 1
+
+# Expose ports
+EXPOSE ${TRITON_HTTP_PORT} ${TRITON_GRPC_PORT} ${TRITON_METRICS_PORT}
+
+# Launch Triton server
+ENTRYPOINT ["tritonserver", \
+    "--model-repository=${TRITON_MODEL_REPO}", \
+    "--http-port=${TRITON_HTTP_PORT}", \
+    "--grpc-port=${TRITON_GRPC_PORT}", \
+    "--metrics-port=${TRITON_METRICS_PORT}", \
+    "--allow-http=True", \
+    "--allow-grpc=True", \
+    "--allow-metrics=True", \
+    "--log-verbose=0"]

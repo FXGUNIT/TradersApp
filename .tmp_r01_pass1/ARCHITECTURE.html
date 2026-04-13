@@ -1,0 +1,1149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TradersApp Architecture Presentation</title>
+  <style>
+    :root {
+      --bg: #eaf1ed;
+      --surface: rgba(255, 255, 255, 0.92);
+      --surface-strong: #ffffff;
+      --surface-alt: #eef5f0;
+      --border: rgba(17, 37, 31, 0.12);
+      --border-strong: rgba(17, 37, 31, 0.2);
+      --text: #11251f;
+      --muted: #4f665e;
+      --accent: #0f766e;
+      --accent-strong: #115e59;
+      --accent-soft: rgba(15, 118, 110, 0.12);
+      --signal: #c2410c;
+      --signal-soft: rgba(194, 65, 12, 0.12);
+      --success: #166534;
+      --warning: #b45309;
+      --shadow: 0 20px 48px rgba(17, 37, 31, 0.08);
+      --shadow-strong: 0 26px 84px rgba(17, 37, 31, 0.14);
+      --radius: 24px;
+      --radius-sm: 18px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Aptos", "Segoe UI Variable", "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at 16% 0%, rgba(37, 99, 235, 0.12), transparent 24%),
+        radial-gradient(circle at 88% 10%, rgba(15, 118, 110, 0.18), transparent 24%),
+        radial-gradient(circle at 50% 100%, rgba(194, 65, 12, 0.08), transparent 26%),
+        linear-gradient(180deg, #f8fbf8 0%, #eef4ef 55%, #e7efea 100%);
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(17, 37, 31, 0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(17, 37, 31, 0.035) 1px, transparent 1px);
+      background-size: 36px 36px;
+      mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.3), transparent 82%);
+      opacity: 0.45;
+    }
+
+    .shell {
+      position: relative;
+      z-index: 1;
+      width: min(1360px, calc(100vw - 48px));
+      margin: 0 auto;
+      padding: 28px 0 72px;
+    }
+
+    .nav {
+      position: relative;
+      top: 0;
+      z-index: 2;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 20px;
+      padding: 16px 20px;
+      margin-bottom: 24px;
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(243, 248, 244, 0.92));
+      border: 1px solid rgba(255, 255, 255, 0.5);
+      border-radius: 20px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px);
+    }
+
+    .brand {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .brand strong {
+      font-family: "Bahnschrift", "Aptos Display", "Segoe UI", sans-serif;
+      font-size: 22px;
+      letter-spacing: 0.01em;
+    }
+
+    .brand span {
+      color: var(--muted);
+      font-size: 13px;
+      max-width: 56ch;
+    }
+
+    .nav-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: flex-start;
+    }
+
+    .nav-links a {
+      text-decoration: none;
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.78);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 9px 13px;
+      font-size: 13px;
+      font-weight: 700;
+      transition: transform 140ms ease, border-color 140ms ease, background 140ms ease, color 140ms ease;
+    }
+
+    .nav-links a:hover {
+      transform: translateY(-1px);
+      background: var(--surface-strong);
+      border-color: rgba(15, 118, 110, 0.35);
+      color: var(--accent-strong);
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: 1.35fr 0.9fr;
+      gap: 22px;
+      margin-bottom: 18px;
+    }
+
+    .hero-card,
+    .status-card,
+    .section,
+    .diagram-card,
+    .callout-card,
+    .orientation-card {
+      background: var(--surface);
+      border: 1px solid rgba(255, 255, 255, 0.58);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .hero-card {
+      position: relative;
+      overflow: hidden;
+      padding: 36px;
+      background:
+        radial-gradient(circle at 100% 0%, rgba(37, 99, 235, 0.12), transparent 30%),
+        radial-gradient(circle at 0% 100%, rgba(15, 118, 110, 0.16), transparent 26%),
+        linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(243, 248, 244, 0.96));
+    }
+
+    .hero-card::after {
+      content: "";
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 6px;
+      background: linear-gradient(180deg, var(--accent), #2563eb, var(--signal));
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent-strong);
+      font-weight: 800;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 16px;
+    }
+
+    h1 {
+      margin: 0 0 12px;
+      font-family: "Bahnschrift", "Aptos Display", "Segoe UI", sans-serif;
+      font-size: clamp(38px, 5vw, 60px);
+      line-height: 1.03;
+      letter-spacing: -0.03em;
+      max-width: 13ch;
+    }
+
+    .hero-card p {
+      margin: 0;
+      font-size: 18px;
+      color: var(--muted);
+      max-width: 64ch;
+    }
+
+    .hero-stats {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 24px;
+    }
+
+    .hero-stat {
+      padding: 14px 16px;
+      border-radius: var(--radius-sm);
+      background: rgba(255, 255, 255, 0.78);
+      border: 1px solid rgba(17, 37, 31, 0.08);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+    }
+
+    .hero-stat span {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .hero-stat strong {
+      display: block;
+      font-size: 16px;
+      line-height: 1.35;
+    }
+
+    .status-card {
+      padding: 28px;
+      display: grid;
+      gap: 16px;
+      align-content: start;
+      background:
+        radial-gradient(circle at top right, rgba(15, 118, 110, 0.08), transparent 28%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(241, 247, 243, 0.96));
+    }
+
+    .status-card h2 {
+      margin: 0;
+      font-family: "Bahnschrift", "Aptos Display", "Segoe UI", sans-serif;
+      font-size: 26px;
+    }
+
+    .status-grid {
+      display: grid;
+      gap: 12px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .pill.live {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    .pill.partial {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .pill.ops {
+      background: #e0e7ff;
+      color: #4338ca;
+    }
+
+    .status-item {
+      padding: 14px 16px;
+      border-radius: var(--radius-sm);
+      background: rgba(255, 255, 255, 0.82);
+      border: 1px solid rgba(17, 37, 31, 0.1);
+    }
+
+    .status-item strong {
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    .section {
+      position: relative;
+      overflow: hidden;
+      padding: 30px;
+      margin-bottom: 24px;
+      scroll-margin-top: 112px;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(243, 248, 244, 0.96));
+    }
+
+    .section::before {
+      content: "";
+      position: absolute;
+      inset: 0 0 auto;
+      height: 5px;
+      background: linear-gradient(90deg, var(--accent), #2563eb 52%, var(--signal));
+      opacity: 0.95;
+    }
+
+    .section-header {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(240px, 320px);
+      gap: 18px;
+      align-items: end;
+      margin-bottom: 22px;
+    }
+
+    .section-kicker {
+      display: inline-block;
+      margin-bottom: 10px;
+      color: var(--accent-strong);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .section h2 {
+      margin: 0;
+      font-family: "Bahnschrift", "Aptos Display", "Segoe UI", sans-serif;
+      font-size: 30px;
+      letter-spacing: -0.02em;
+    }
+
+    .section p.lead {
+      margin: 10px 0 0;
+      color: var(--muted);
+      max-width: 80ch;
+      font-size: 16px;
+    }
+
+    .section-summary {
+      margin: 0;
+      padding: 16px 18px;
+      border-radius: var(--radius-sm);
+      background: rgba(255, 255, 255, 0.72);
+      border: 1px solid rgba(17, 37, 31, 0.08);
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .diagram-card {
+      padding: 20px;
+      background:
+        radial-gradient(circle at top left, rgba(15, 118, 110, 0.08), transparent 24%),
+        linear-gradient(180deg, #fefefe 0%, #edf5ef 100%);
+      overflow: hidden;
+    }
+
+    .diagram-card img {
+      width: 100%;
+      height: auto;
+      display: block;
+      border-radius: 16px;
+      border: 1px solid rgba(17, 37, 31, 0.08);
+      box-shadow: 0 18px 44px rgba(17, 37, 31, 0.1);
+    }
+
+    .asset-links {
+      margin-top: 14px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .asset-links a,
+    .docs-list a {
+      color: var(--accent-strong);
+      text-decoration: none;
+      font-weight: 700;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(15, 118, 110, 0.09);
+      border: 1px solid rgba(15, 118, 110, 0.12);
+    }
+
+    .diagram-note {
+      margin: 14px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .cards-3,
+    .cards-2,
+    .loop-grid,
+    .orientation-grid {
+      display: grid;
+      gap: 16px;
+    }
+
+    .cards-3 {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .cards-2,
+    .orientation-grid,
+    .loop-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .orientation-grid {
+      margin-bottom: 24px;
+    }
+
+    .orientation-card {
+      padding: 24px;
+      background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(243, 248, 244, 0.96));
+    }
+
+    .orientation-card h3,
+    .card h3 {
+      margin: 0 0 10px;
+      font-family: "Bahnschrift", "Aptos Display", "Segoe UI", sans-serif;
+      font-size: 22px;
+    }
+
+    .orientation-card p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .orientation-list {
+      margin: 0;
+      padding-left: 20px;
+      color: var(--muted);
+    }
+
+    .orientation-list li {
+      margin-bottom: 9px;
+    }
+
+    .card {
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.84), rgba(238, 245, 240, 0.88));
+      border: 1px solid rgba(17, 37, 31, 0.08);
+      border-radius: var(--radius-sm);
+      padding: 18px;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    }
+
+    .card p,
+    .card li,
+    td,
+    th {
+      font-size: 15px;
+    }
+
+    .card p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .table-wrap {
+      overflow: hidden;
+      border-radius: 20px;
+      border: 1px solid rgba(17, 37, 31, 0.08);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: rgba(255, 255, 255, 0.78);
+    }
+
+    th,
+    td {
+      text-align: left;
+      padding: 16px 18px;
+      vertical-align: top;
+      border-bottom: 1px solid rgba(17, 37, 31, 0.08);
+    }
+
+    th {
+      background: linear-gradient(180deg, rgba(15, 118, 110, 0.12), rgba(37, 99, 235, 0.08));
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--accent-strong);
+    }
+
+    tbody tr:nth-child(even) td {
+      background: rgba(238, 245, 240, 0.62);
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    .loop-card ol,
+    .docs-list,
+    .truth-list {
+      margin: 0;
+      padding-left: 20px;
+    }
+
+    .loop-card li,
+    .truth-list li,
+    .docs-list li {
+      margin-bottom: 10px;
+    }
+
+    .callout-card {
+      padding: 24px;
+      background:
+        radial-gradient(circle at top right, rgba(15, 118, 110, 0.08), transparent 30%),
+        linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(239, 246, 241, 0.96));
+    }
+
+    .truth-list {
+      color: var(--muted);
+    }
+
+    code {
+      font-family: "Cascadia Code", "IBM Plex Mono", Consolas, monospace;
+      font-size: 0.95em;
+      padding: 0.14em 0.42em;
+      border-radius: 999px;
+      background: rgba(17, 37, 31, 0.08);
+      color: var(--text);
+    }
+
+    .footer-note {
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    @media (max-width: 1100px) {
+      .hero,
+      .cards-3,
+      .cards-2,
+      .loop-grid,
+      .orientation-grid,
+      .section-header {
+        grid-template-columns: 1fr;
+      }
+
+      .nav {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .shell {
+        width: min(100vw - 24px, 1360px);
+      }
+    }
+
+    @media (max-width: 760px) {
+      .hero-stats {
+        grid-template-columns: 1fr;
+      }
+
+      .section,
+      .hero-card,
+      .status-card,
+      .orientation-card {
+        padding: 22px;
+      }
+
+      th,
+      td {
+        padding: 14px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="nav">
+      <div class="brand">
+        <strong>TradersApp Architecture</strong>
+        <span>Current runtime, DDD boundaries, MLOps loops, and platform controls</span>
+      </div>
+      <div class="nav-links">
+        <a href="#overview">Overview</a>
+        <a href="#quick-read">Quick Read</a>
+        <a href="#protocols">Ports</a>
+        <a href="#repo-map">Repo Map</a>
+        <a href="#runtime">Runtime Layers</a>
+        <a href="#contexts">Bounded Contexts</a>
+        <a href="#loops">Control Loops</a>
+        <a href="#system-design">System Design</a>
+        <a href="#operating-map">5W1H Map</a>
+        <a href="#bird-roadmap">Roadmap</a>
+        <a href="#deploy">Deployment</a>
+      </div>
+    </div>
+
+    <div class="hero">
+      <div class="hero-card">
+        <div class="eyebrow">Architecture cockpit</div>
+        <h1>Read the platform the way it actually runs today.</h1>
+        <p>
+          TradersApp is no longer a simple app. It has a live low-latency request path, an extracted
+          <code>analysis-service</code> seam, automated learning and data-quality loops, and multiple delivery paths in-repo.
+          Some platform controls are current, some are partial, and some remain target-state only.
+        </p>
+        <div class="hero-stats">
+          <div class="hero-stat">
+            <span>Critical path</span>
+            <strong>Frontend -> BFF -> gRPC seam -> HTTP /predict</strong>
+          </div>
+          <div class="hero-stat">
+            <span>Async plane</span>
+            <strong>Kafka, Airflow, MLflow, and model feedback loops</strong>
+          </div>
+          <div class="hero-stat">
+            <span>Delivery model</span>
+            <strong>Mixed: Railway/Vercel today docs, Helm/k3s self-hosted path in repo</strong>
+          </div>
+        </div>
+      </div>
+      <div class="status-card">
+        <h2>Reality snapshot</h2>
+        <div class="status-grid">
+          <div class="status-item">
+            <span class="pill live">Live runtime seam</span>
+            <strong><code>analysis-service</code> is the only extracted domain service on the critical path.</strong>
+            Everything else still stabilizes behind that seam instead of being broken into premature microservices.
+          </div>
+          <div class="status-item">
+            <span class="pill partial">Partial extraction</span>
+            <strong>Learning and ingestion are defined as bounded contexts, but most logic still runs in ML Engine + Airflow.</strong>
+            That is intentional risk control, not an architecture gap.
+          </div>
+          <div class="status-item">
+            <span class="pill ops">Mixed ops maturity</span>
+            <strong>Observability, MLflow, CI/CD, and secrets all exist in-repo, but not at the same maturity level.</strong>
+            Public-cloud and self-hosted delivery paths both exist in the repo; the self-hosted path should be treated as partial until fully validated end to end.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <section class="orientation-grid">
+      <div class="orientation-card">
+        <h3>How to read this page</h3>
+        <ol class="orientation-list">
+          <li>Start with the overview and quick-read cards to orient around the hot path.</li>
+          <li>Use the ports, repo map, and runtime sections before opening the denser diagrams.</li>
+          <li>Read the system board, operating map, and roadmap only after the core boundaries are clear.</li>
+        </ol>
+      </div>
+      <div class="orientation-card">
+        <h3>Architecture stance</h3>
+        <p>
+          This platform optimizes for low-latency serving, cautious extraction, mixed delivery reality today, and safe ML evolution.
+          It intentionally favors stable contracts and shared control planes over premature service sprawl.
+        </p>
+      </div>
+    </section>
+
+    <section class="section" id="overview">
+      <div class="section-header">
+        <div>
+          <span class="section-kicker">First read</span>
+          <h2>Architecture overview</h2>
+          <p class="lead">Read this diagram first. It shows the request path, supporting systems, and current extraction reality at a glance.</p>
+        </div>
+        <p class="section-summary">This is the fastest orientation view: who serves traffic, where state lives, and which platform systems surround the request path.</p>
+      </div>
+      <div class="diagram-card">
+        <img src="docs/assets/architecture-3d-overview-print.svg" alt="TradersApp architecture overview" loading="lazy" />
+      </div>
+      <p class="diagram-note">
+        This light overview is the fastest way to understand the live request path and the support planes around it before opening the denser boards below.
+      </p>
+      <div class="asset-links">
+        <span>Variants:</span>
+        <a href="docs/assets/architecture-3d-overview-print.svg">Light SVG</a>
+        <a href="docs/assets/architecture-3d-overview.svg">SVG</a>
+        <a href="docs/assets/architecture-3d-overview.png">Legacy PNG</a>
+      </div>
+    </section>
+
+    <section class="section" id="quick-read">
+      <div class="section-header">
+        <div>
+          <span class="section-kicker">Quick Read</span>
+          <h2>Current system shape</h2>
+          <p class="lead">Read this before the large diagrams. It gives the shortest accurate summary of how the platform behaves today.</p>
+        </div>
+        <p class="section-summary">If someone only remembers one thing from this page, it should be these three flows: user serving, data and learning, and platform operations.</p>
+      </div>
+      <div class="cards-3">
+        <div class="card">
+          <h3>User flow</h3>
+          <p>User traffic enters through the React frontend, lands at the Node.js BFF, crosses the gRPC seam into <code>analysis-service</code>, and currently resolves through the Python ML Engine over HTTP <code>/predict</code>.</p>
+        </div>
+        <div class="card">
+          <h3>Data + learning flow</h3>
+          <p>Redis and Feast back the low-latency feature path, Kafka carries event streams, MLflow owns model history, and Airflow enforces scheduled quality and retraining workflows.</p>
+        </div>
+        <div class="card">
+          <h3>Platform flow</h3>
+          <p>Prometheus, Grafana, Loki, and Jaeger provide visibility assets. Delivery is mixed: GitHub Actions + Railway/Vercel remain documented as active, while Gitea + Woodpecker + Helm + k3s exist as the self-hosted path in the repo.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="protocols">
+      <div class="section-header">
+        <div>
+          <span class="section-kicker">Canonical Reference</span>
+          <h2>Ports and service edges</h2>
+          <p class="lead">Keep connection references in native HTML instead of burying them inside a giant board asset.</p>
+        </div>
+        <p class="section-summary">These are the paths that matter most when debugging traffic, auth, data-plane connectivity, or cluster delivery.</p>
+      </div>
+      <div class="cards-3">
+        <div class="card">
+          <h3>Frontend -> BFF</h3>
+          <p><code>HTTP / HTTPS</code> on <code>8788</code>. Browser traffic enters through the Node.js BFF edge.</p>
+        </div>
+        <div class="card">
+          <h3>BFF -> analysis-service</h3>
+          <p><code>gRPC</code> over the internal consensus seam. This is the stable runtime boundary on the hot path.</p>
+        </div>
+        <div class="card">
+          <h3>analysis-service -> ML Engine</h3>
+          <p><code>HTTP</code> to the Python ML runtime on <code>8001</code>, currently via <code>/predict</code> for consensus work.</p>
+        </div>
+        <div class="card">
+          <h3>All services -> Redis</h3>
+          <p><code>RESP</code> on <code>6379</code> for shared cache and low-latency online lookups.</p>
+        </div>
+        <div class="card">
+          <h3>ML Engine -> Kafka</h3>
+          <p><code>Kafka protocol</code> on <code>9092</code> for async events, feedback, and background pipelines.</p>
+        </div>
+        <div class="card">
+          <h3>ML Engine -> Feast</h3>
+          <p><code>gRPC / HTTP</code> to the feature-serving layer for online feature retrieval.</p>
+        </div>
+        <div class="card">
+          <h3>Prometheus -> Services</h3>
+          <p>Scrapes <code>/metrics</code> across runtime services. Prometheus itself is served on <code>9090</code>.</p>
+        </div>
+        <div class="card">
+          <h3>External -> Keycloak</h3>
+          <p><code>OIDC / JWT</code> via Keycloak on <code>8080</code> is the intended self-hosted auth path, but its overall operating maturity is still partial.</p>
+        </div>
+        <div class="card">
+          <h3>Woodpecker -> k3s API</h3>
+          <p><code>kubectl / Helm</code> against the cluster API on <code>6443</code> for the self-hosted deployment path. This is not the only deployment path currently documented in-repo.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="repo-map">
+      <div class="section-header">
+        <div>
+          <span class="section-kicker">Repo Surface</span>
+          <h2>Folder to service map</h2>
+          <p class="lead">This replaces the cramped folder legend from the old board with a readable service-oriented map.</p>
+        </div>
+        <p class="section-summary">Use this when you need to jump from an architectural concern to the part of the monorepo that actually owns it.</p>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Path</th>
+              <th>Primary ownership</th>
+              <th>What lives there</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>src/</code></td>
+              <td>Frontend experience</td>
+              <td>React UI, dashboards, state management, and operator-facing workflows.</td>
+            </tr>
+            <tr>
+              <td><code>bff/</code></td>
+              <td>Edge orchestration</td>
+              <td>Node.js BFF, auth/session logic, anti-corruption layer, and API composition.</td>
+            </tr>
+            <tr>
+              <td><code>proto/ddd/</code></td>
+              <td>Service contracts</td>
+              <td>gRPC schemas and the extracted consensus seam around <code>analysis-service</code>.</td>
+            </tr>
+            <tr>
+              <td><code>ml-engine/</code></td>
+              <td>Core ML runtime</td>
+              <td>Inference, training, features, monitoring, model implementations, and feedback loops.</td>
+            </tr>
+            <tr>
+              <td><code>telegram-bridge/</code></td>
+              <td>Messaging integration</td>
+              <td>Telegram-facing workflows and supporting web integration.</td>
+            </tr>
+            <tr>
+              <td><code>k8s/</code></td>
+              <td>Cluster deployment</td>
+              <td>Helm charts, overlays, manifests, policies, and runtime infrastructure config.</td>
+            </tr>
+            <tr>
+              <td><code>scripts/</code></td>
+              <td>Ops automation</td>
+              <td>Admin helpers, environment setup, validation utilities, and cluster support scripts.</td>
+            </tr>
+            <tr>
+              <td><code>docker-compose.*</code></td>
+              <td>Local platform bring-up</td>
+              <td>Local stacks for MLflow, Airflow, observability, identity, and related services.</td>
+            </tr>
+            <tr>
+              <td><code>docs/</code></td>
+              <td>Architecture and operations knowledge</td>
+              <td>ADRs, architecture docs, deployment notes, security guidance, and roadmap material.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section" id="system-design">
+      <div class="section-header">
+        <div>
+          <span class="section-kicker">Detailed board</span>
+          <h2>System design board</h2>
+          <p class="lead">Use this for topology only: actors, service boundaries, stateful systems, event flow, observability, and delivery controls on one canvas.</p>
+        </div>
+        <p class="section-summary">Ports, repo ownership, and deployment references are maintained in the HTML sections above so this board can stay focused on platform shape.</p>
+      </div>
+      <div class="diagram-card">
+        <img src="docs/assets/architecture-system-design-board-print.svg" alt="TradersApp detailed system design board" loading="lazy" />
+      </div>
+      <p class="diagram-note">
+        This preview now uses the compact light SVG so the page keeps one visual language end to end. Open the raw board only if you need the topology canvas itself.
+      </p>
+      <div class="asset-links">
+        <span>Variants:</span>
+        <a href="docs/assets/architecture-system-design-board-print.svg">Light SVG</a>
+        <a href="docs/assets/architecture-system-design-board.png">Legacy PNG</a>
+        <a href="docs/assets/architecture-system-design-board.svg">Raw Board SVG</a>
+      </div>
+    </section>
+
+    <section class="section" id="operating-map">
+      <div class="section-header">
+        <div>
+          <span class="section-kicker">Who / what / why</span>
+          <h2>Operating map</h2>
+          <p class="lead">This is the single chart for what, how, why, where, and whom across request serving, learning, observability, delivery, and extraction strategy.</p>
+        </div>
+        <p class="section-summary">Read this after the concrete HTML references and the topology board. It translates architecture into operating intent.</p>
+      </div>
+      <div class="diagram-card">
+        <img src="docs/assets/architecture-5w1h-map-print.svg" alt="TradersApp 5W1H operating map" loading="lazy" />
+      </div>
+      <div class="asset-links">
+        <span>Variants:</span>
+        <a href="docs/assets/architecture-5w1h-map-print.svg">Light SVG</a>
+        <a href="docs/assets/architecture-5w1h-map.svg">SVG</a>
+        <a href="docs/assets/architecture-5w1h-map.png">Legacy PNG</a>
+      </div>
+    </section>
+
+    <section class="section" id="bird-roadmap">
+      <div class="section-header">
+        <div>
+          <span class="section-kicker">Evolution view</span>
+          <h2>Bird's-eye roadmap</h2>
+          <p class="lead">This is the evolution view of the same platform. Read it left to right as current reality, hardening, extraction, and long-run operating state.</p>
+        </div>
+        <p class="section-summary">This sits last among the big diagrams because it is a planning view, not the fastest way to understand the current runtime.</p>
+      </div>
+      <div class="diagram-card">
+        <img src="docs/assets/architecture-birdview-roadmap-print.svg" alt="TradersApp bird's-eye architecture roadmap" loading="lazy" />
+      </div>
+      <div class="asset-links">
+        <span>Variants:</span>
+        <a href="docs/assets/architecture-birdview-roadmap-print.svg">Light SVG</a>
+        <a href="docs/assets/architecture-birdview-roadmap.svg">SVG</a>
+        <a href="docs/assets/architecture-birdview-roadmap.png">Legacy PNG</a>
+      </div>
+    </section>
+
+    <section class="section" id="runtime">
+      <div class="section-header">
+        <div>
+          <span class="section-kicker">Responsibility model</span>
+          <h2>Runtime layers</h2>
+          <p class="lead">This table maps the platform by responsibility instead of by repo folder.</p>
+        </div>
+        <p class="section-summary">The point here is ownership clarity. Each layer answers a different operational question even if some code still lives in the same deployable.</p>
+      </div>
+      <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Layer</th>
+            <th>Components</th>
+            <th>What it does now</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Experience</td>
+            <td>Frontend (<code>React</code>, <code>Vite</code>)</td>
+            <td>Trading UI, dashboards, and operator workflows.</td>
+          </tr>
+          <tr>
+            <td>Edge + orchestration</td>
+            <td>BFF (<code>Node.js</code>)</td>
+            <td>Authentication, session control, anti-corruption layer, and API composition.</td>
+          </tr>
+          <tr>
+            <td>Domain service</td>
+            <td><code>analysis-service</code> (<code>gRPC</code>)</td>
+            <td>Stable consensus contract and extraction seam for the first bounded context.</td>
+          </tr>
+          <tr>
+            <td>Core ML runtime</td>
+            <td>ML Engine (<code>Python</code>)</td>
+            <td>Inference, training, drift detection, feedback, and monitoring endpoints.</td>
+          </tr>
+          <tr>
+            <td>Low-latency data plane</td>
+            <td>Redis, Feast</td>
+            <td>Online features and cache-backed reads for critical request paths.</td>
+          </tr>
+          <tr>
+            <td>Event plane</td>
+            <td>Kafka</td>
+            <td>Market data, model signals, and feedback topics.</td>
+          </tr>
+          <tr>
+            <td>MLOps plane</td>
+            <td>MLflow, MinIO, PostgreSQL</td>
+            <td>Experiment tracking, model registry, artifacts, and lineage metadata.</td>
+          </tr>
+          <tr>
+            <td>Control plane</td>
+            <td>Airflow, Great Expectations</td>
+            <td>Data validation, scheduled monitoring, and retraining orchestration.</td>
+          </tr>
+          <tr>
+            <td>Observability plane</td>
+            <td>Prometheus, Grafana, Loki, Jaeger</td>
+            <td>Metrics, dashboards, logs, traces, and alerts.</td>
+          </tr>
+          <tr>
+            <td>Delivery plane</td>
+            <td>GitHub Actions + Railway/Vercel; Gitea, Woodpecker, Helm, k3s, Infisical</td>
+            <td>Public-cloud delivery is still documented as active; the self-hosted path exists in-repo and remains partial until fully validated.</td>
+          </tr>
+        </tbody>
+      </table>
+      </div>
+    </section>
+
+    <section class="section" id="contexts">
+      <div class="section-header">
+        <div>
+          <span class="section-kicker">DDD reality</span>
+          <h2>Bounded contexts and extraction status</h2>
+          <p class="lead">This is the important DDD truth: there are contracts for multiple contexts, but only one hot-path seam is extracted today and even that seam still proxies ML Engine internals.</p>
+        </div>
+        <p class="section-summary">This table shows where the architecture is deliberately conservative. Context boundaries exist before all of them become independent services.</p>
+      </div>
+      <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Context</th>
+            <th>Service boundary</th>
+            <th>Status</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>BFF orchestration</td>
+            <td><code>bff</code></td>
+            <td>Live</td>
+            <td>Owns frontend-facing contracts and translation logic.</td>
+          </tr>
+          <tr>
+            <td>Analysis</td>
+            <td><code>analysis-service</code></td>
+            <td>Live extraction seam</td>
+            <td>gRPC is implemented and deployed; internals still proxy ML Engine <code>/predict</code>.</td>
+          </tr>
+          <tr>
+            <td>Ingestion</td>
+            <td><code>ingestion-service</code> contract</td>
+            <td>Logical only</td>
+            <td>Ownership is defined, but runtime still lives inside <code>ml-engine</code> packages.</td>
+          </tr>
+          <tr>
+            <td>Learning</td>
+            <td><code>learning-service</code> contract</td>
+            <td>Logical only</td>
+            <td>Retraining, drift, and DQ loops are live, but still run inside ML Engine and Airflow DAGs.</td>
+          </tr>
+          <tr>
+            <td>Platform ops</td>
+            <td>Infra stack</td>
+            <td>Mixed</td>
+            <td>Observability, CI/CD, secrets, and Helm rollout assets exist, but not every control-plane claim is equally live-validated.</td>
+          </tr>
+        </tbody>
+      </table>
+      </div>
+    </section>
+
+    <section class="section" id="loops">
+      <div class="section-header">
+        <div>
+          <span class="section-kicker">Sequences that matter</span>
+          <h2>Critical paths and control loops</h2>
+          <p class="lead">These are the sequences that matter operationally: request path, learning, observability, and delivery.</p>
+        </div>
+        <p class="section-summary">Architecture only matters if the key loops are reliable. These are the four sequences that decide latency, learning quality, and deployment safety.</p>
+      </div>
+      <div class="loop-grid">
+        <div class="card loop-card">
+          <h3>1. Request path</h3>
+          <ol>
+            <li>Browser hits the frontend.</li>
+            <li>Frontend sends requests to the BFF.</li>
+            <li>BFF calls <code>analysis-service</code> over gRPC.</li>
+            <li><code>analysis-service</code> currently resolves consensus through ML Engine HTTP <code>/predict</code>.</li>
+            <li>Feature lookups come from Redis and Feast where available.</li>
+          </ol>
+          <p class="footer-note">Use the consensus-path <code>&lt;200ms P95</code> contract as the current documented baseline until older tighter-latency wording is fully retired.</p>
+        </div>
+        <div class="card loop-card">
+          <h3>2. Learning loop</h3>
+          <ol>
+            <li>ML Engine logs training and registry activity to MLflow.</li>
+            <li>MinIO stores artifacts; PostgreSQL stores run and registry metadata.</li>
+            <li>Airflow runs model monitoring and retraining DAGs.</li>
+            <li>Great Expectations gates dirty data before retraining is allowed.</li>
+            <li>Approved versions remain in MLflow for rollback and promotion control.</li>
+          </ol>
+        </div>
+        <div class="card loop-card">
+          <h3>3. Observability loop</h3>
+          <ol>
+            <li>Prometheus scrapes <code>/metrics</code> from runtime services.</li>
+            <li>Grafana visualizes latency, drift, resource, and SLA dashboards.</li>
+            <li>Loki centralizes logs; Jaeger collects traces.</li>
+            <li>Alert rules cover SLA breaches, retrain failures, stale monitoring, and infra regressions.</li>
+          </ol>
+        </div>
+        <div class="card loop-card">
+          <h3>4. Delivery loop</h3>
+          <ol>
+            <li>GitHub Actions currently drives the documented public-cloud deploy path to Railway and Vercel.</li>
+            <li>Gitea and Woodpecker exist in-repo as the self-hosted CI/CD path and should be treated as partial until fully validated.</li>
+            <li>Helm and k3s remain the production-style self-hosted rollout path.</li>
+            <li>Infisical is the intended upstream secret source, but cluster-side External Secrets is not yet safe to describe as universally live.</li>
+          </ol>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="deploy">
+      <div class="section-header">
+        <div>
+          <span class="section-kicker">Operating modes</span>
+          <h2>Deployment modes</h2>
+          <p class="lead">Use the right entry path depending on whether you are validating local end-to-end behavior, control planes, or cluster rollout.</p>
+        </div>
+        <p class="section-summary">Not every workflow should hit the full cluster. These entry points describe the fastest correct environment for each kind of validation.</p>
+      </div>
+      <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Mode</th>
+            <th>Entry point</th>
+            <th>Use case</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Full local stack</td>
+            <td><code>docker-compose.yml</code></td>
+            <td>End-to-end local bring-up with frontend, BFF, ML Engine, MLflow, Kafka, and observability.</td>
+          </tr>
+          <tr>
+            <td>MLOps-only local stack</td>
+            <td><code>docker-compose.mlflow.yml</code></td>
+            <td>Dedicated MLflow + MinIO + PostgreSQL workflow and registry testing.</td>
+          </tr>
+          <tr>
+            <td>Airflow control plane</td>
+            <td><code>docker-compose.airflow.yml</code></td>
+            <td>Data-quality, monitoring, and retraining DAG validation.</td>
+          </tr>
+          <tr>
+            <td>Cluster deploy</td>
+            <td><code>k8s/helm/tradersapp</code></td>
+            <td>k3s production-style rollout with Helm.</td>
+          </tr>
+        </tbody>
+      </table>
+      </div>
+    </section>
+
+    <section class="section cards-2">
+      <div class="callout-card">
+        <h2>Canonical docs</h2>
+        <ol class="docs-list">
+          <li><a href="docs/index.md">Front-page architecture doc</a></li>
+          <li><a href="docs/DDD_MICROSERVICES.md">DDD Microservices + gRPC</a></li>
+          <li><a href="docs/MLOPS_MLFLOW.md">MLflow MLOps lifecycle</a></li>
+          <li><a href="docs/MODEL_MONITORING_RETRAINING.md">Continuous model monitoring + auto-retraining</a></li>
+          <li><a href="docs/DATA_QUALITY_AIRFLOW.md">Data Quality + Airflow</a></li>
+          <li><a href="docs/AUTOMATED_TESTING.md">Automated testing + chaos</a></li>
+          <li><a href="docs/CICD_GITEA_WOODPECKER.md">CI/CD with Gitea + Woodpecker</a></li>
+        </ol>
+      </div>
+      <div class="callout-card">
+        <h2>Architectural truth to keep in mind</h2>
+        <ol class="truth-list">
+          <li>The repo is no longer a simple three-box app.</li>
+          <li><code>analysis-service</code> is the first extracted seam on the hot path, but it still proxies ML Engine HTTP internals and should not be oversold as a fully independent domain implementation yet.</li>
+          <li>Ingestion and learning are defined as bounded contexts, but they are not fully deployed as separate services yet.</li>
+          <li>Delivery reality is mixed: public-cloud automation is still documented as active, while the self-hosted path exists and remains partial.</li>
+          <li>The architecture should prioritize stable contracts and safe extraction over premature service sprawl or presentation-heavy diagrams that hide the real runtime state.</li>
+        </ol>
+      </div>
+    </section>
+  </div>
+</body>
+</html>

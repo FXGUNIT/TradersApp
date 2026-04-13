@@ -1,0 +1,202 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# TradersApp — Lightweight Dev Stack
+# Optimized for: 4 GB RAM, no GPU, CPU-only laptop
+#
+# Tiers:
+#   Core only (~1 GB):   docker compose -f docker-compose.dev.yml up
+#   + MLflow (~1.2 GB):  docker compose -f docker-compose.dev.yml --profile mlops up
+#   Full (~1.5 GB):      .\scripts\dev-up.ps1 -Tier full
+#                        (starts this file + `docker-compose.observability.yml`)
+#
+# Stop:   .\scripts\dev-up.ps1 -Down
+# Reset:  .\scripts\dev-up.ps1 -Reset
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  # ── Redis (always on — ~64 MB) ──────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: traders-dev-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --save "" --maxmemory 64mb --maxmemory-policy allkeys-lru --loglevel warning
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+
+  # ── ML Engine (~512 MB max) ─────────────────────────────────────────────
+  # CPU-only: 1 worker, memory-mapped numpy, no GPU libs loaded
+  # SQLite DB + model files via bind mount (visible on filesystem)
+  ml-engine:
+    build:
+      context: .
+      dockerfile: Dockerfile.ml-engine
+      args:
+        # Disable GPU / heavy optional deps at build time
+        CUDA_ENABLED: "false"
+    container_name: traders-dev-ml-engine
+    ports:
+      - "8001:8001"
+    environment:
+      DB_PATH: /data/trading_data.db
+      MODEL_STORE: /models/store
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      KAFKA_ENABLE: "false"
+      # MLflow: disabled in core tier (set by dev-up.ps1 when --profile mlops)
+      MLFLOW_TRACKING_URI: ""
+      OTEL_ENABLED: "false"
+      # Lightweight inference settings
+      NUMBA_THREADING_LAYER: "omp"
+      OMP_NUM_THREADS: "2"
+      MKL_NUM_THREADS: "2"
+      OPENBLAS_NUM_THREADS: "2"
+    volumes:
+      - ./ml-engine/data:/data:ro # bind mount — edit DB from Windows
+      - ./ml-engine/models:/models:ro # bind mount — browse model files
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
+  # ── Analysis Service (~128 MB) ──────────────────────────────────────────
+  # Runs from same Dockerfile.bff image, separate container for isolation.
+  # Merge into bff container only if RAM becomes critical (< 3 GB total).
+  analysis-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.bff
+    container_name: traders-dev-analysis
+    command: ["node", "analysis-server.mjs"]
+    ports:
+      - "50051:50051"
+      - "8082:8082"
+    environment:
+      ML_ENGINE_URL: http://ml-engine:8001
+      ANALYSIS_SERVICE_GRPC_PORT: 50051
+      ANALYSIS_SERVICE_HEALTH_PORT: 8082
+      NODE_ENV: development
+      # Disable verbose logging to save CPU
+      LOG_LEVEL: "warn"
+    depends_on:
+      ml-engine:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8082/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # ── BFF (~192 MB) ───────────────────────────────────────────────────────
+  bff:
+    build:
+      context: .
+      dockerfile: Dockerfile.bff
+    container_name: traders-dev-bff
+    ports:
+      - "8788:8788"
+    environment:
+      ML_ENGINE_URL: http://ml-engine:8001
+      ML_ANALYSIS_TRANSPORT: ${ML_ANALYSIS_TRANSPORT:-grpc}
+      ML_ANALYSIS_GRPC_ADDR: analysis-service:50051
+      ML_ANALYSIS_GRPC_STRICT: "false"
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      KAFKA_BOOTSTRAP_SERVERS: ""
+      NODE_ENV: development
+      LOG_LEVEL: "warn"
+      # Limit Node.js heap (let OS handle the rest)
+      NODE_OPTIONS: "--max-old-space-size=128"
+    depends_on:
+      ml-engine:
+        condition: service_healthy
+      analysis-service:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 192M
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8788/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # ── Frontend (nginx ~64 MB) ─────────────────────────────────────────────
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args:
+        VITE_BFF_URL: http://localhost:8788
+        VITE_API_URL: http://localhost:8788/api
+    container_name: traders-dev-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - bff
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+
+  # ═══════════════════════════════════════════════════════════════════════
+  #  PROFILE: mlops  (adds MLflow only — no PostgreSQL, no MinIO)
+  #
+  #  RAM budget: MLflow ~192 MB  |  Total stack: ~1.2 GB
+  #  Backend store:  SQLite (./mlflow/mlflow.db) — single-user fine
+  #  Artifacts:     local bind mount (./mlflow/artifacts)
+  # ═══════════════════════════════════════════════════════════════════════
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.21.3
+    container_name: traders-dev-mlflow
+    profiles: ["mlops"]
+    ports:
+      - "5000:5000"
+    environment:
+      # SQLite backend — no PostgreSQL needed for single-user dev
+      MLFLOW_TRACKING_URI: file:///mlflow/artifacts
+      # No S3/MinIO — local filesystem artifact root
+      MLFLOW_ARTIFACT_ROOT: /mlflow/artifacts
+      # Disable artifact eviction to save CPU/memory
+      MLFLOW_ENABLE_ARTIFACT_CACHE: "false"
+    volumes:
+      # Bind mount: artifacts + SQLite DB visible in repo
+      - ./mlflow/artifacts:/mlflow/artifacts
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 192M
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:5000/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes: {}
+# Named volumes removed — all data now via bind mounts
+# so model files and MLflow artifacts are visible on the Windows filesystem.
+# For a clean slate: rm -rf ml-engine/data ml-engine/models mlflow/

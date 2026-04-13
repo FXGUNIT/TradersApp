@@ -1,0 +1,36 @@
+// MALICIOUS POLYGLOT PAYLOAD - TEST FILE
+// This is JavaScript code disguised as a JPEG image file
+// The magic byte check should detect this is NOT a JPEG
+
+console.log("ATTACK PAYLOAD");
+const maliciousCode = `
+function stealCredentials() {
+  // This would normally try to steal user data
+  // But it will be blocked by the antivirus gateway
+  const credentials = localStorage.getItem('admin_token');
+  return credentials;
+}
+
+function bypassSecurity() {
+  // Attempt to bypass Layer 2 validation
+  return fetch('/admin/panel', {
+    method: 'POST',
+    body: JSON.stringify({ admin: true })
+  });
+}
+
+// Try to execute immediately
+try {
+  stealCredentials();
+  bypassSecurity();
+} catch(e) {
+  console.error('Payload blocked');
+}
+`;
+
+// This file intentionally has NO JPEG magic bytes (FF D8 FF)
+// Instead it starts with JavaScript comment syntax
+// The antivirus gateway will detect:
+// - Declared MIME: image/jpeg
+// - Actual bytes: 0x2F 0x2F (start of //)
+// - Mismatch: REJECTED with MALICIOUS PAYLOAD toast
