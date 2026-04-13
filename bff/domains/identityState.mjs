@@ -320,7 +320,7 @@ function normalizeUserRecord(uid, user = {}, options = {}) {
   };
 }
 
-function normalizeState(rawState = {}) {
+function normalizeState(rawState = {}, options = {}) {
   const users =
     rawState.users && typeof rawState.users === "object" ? rawState.users : {};
   const sessions =
@@ -341,19 +341,19 @@ function normalizeState(rawState = {}) {
     users: Object.fromEntries(
       Object.entries(users).map(([uid, user]) => [
         uid,
-        normalizeUserRecord(uid, user || {}),
+        normalizeUserRecord(uid, user || {}, options),
       ]),
     ),
     sessions: normalizedSessions,
   };
 }
 
-function readState() {
-  return normalizeState(readStateFile());
+function readState(options = {}) {
+  return normalizeState(readStateFile(), options);
 }
 
-function writeState(state) {
-  const nextState = normalizeState(state);
+function writeState(state, options = {}) {
+  const nextState = normalizeState(state, options);
   writeStateFile(nextState);
   return nextState;
 }
@@ -411,7 +411,7 @@ function upsertUser(state, uid, patch = {}, options = {}) {
 }
 
 function patchUserByUid(uid, patch = {}) {
-  const state = readState();
+  const state = readState(options);
   if (!state.users?.[uid]) {
     return null;
   }
@@ -677,7 +677,7 @@ export function consumeCollectiveConsciousnessQuestion(uid, patch = {}, options 
   const currentState = resolveCollectiveConsciousnessState(seededUser, options);
 
   if (currentState.isBlocked) {
-    writeState(state);
+    writeState(state, options);
     return {
       ok: false,
       blocked: true,
@@ -695,7 +695,7 @@ export function consumeCollectiveConsciousnessQuestion(uid, patch = {}, options 
     questionCount: currentState.questionCount + 1,
     updatedAt: nowIso(),
   }, options);
-  writeState(state);
+  writeState(state, options);
 
   return {
     ok: true,
