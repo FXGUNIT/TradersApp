@@ -931,6 +931,9 @@ export default function MainTerminal({
     : parseMsg || "Drop NinjaTrader .txt / .csv — or click to browse";
   const csvStatusColor = hasParsedCsv ? T.green : isCsvParsing ? T.blue : CSS_VARS.textSecondary;
   const csvBorderColor = hasParsedCsv ? T.green : isCsvParsing ? T.blue : CSS_VARS.borderSubtle;
+  void csvStatusText;
+  void csvStatusColor;
+  void csvBorderColor;
   const resetScopeByTab = {
     premarket: "premarket",
     trade: "trade",
@@ -940,7 +943,7 @@ export default function MainTerminal({
   const tabResetScope = resetScopeByTab[activeTab] || "all";
 
   // Paste handler — owned by usePasteListener BFF hook
-  const { flashingZoneId, triggerFlash } = usePasteListener({
+  const { flashingZoneId, triggerFlash: _triggerFlash } = usePasteListener({
     activeZone,
     handlers: {
       ss: setScreenshots,
@@ -1278,7 +1281,7 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
   };
 
   // Get name for greeting
-  const getGreetingName = () => {
+  const _getGreetingName = () => {
     return profile?.fullName || profile?.email || "Officer";
   };
 
