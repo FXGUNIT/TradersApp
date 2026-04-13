@@ -135,7 +135,11 @@ async function createThread({ title, description, priority, tags, ownerAgent, cr
   for (const task of tasks) {
     await createTask({ threadId, description: task.description, done: !!task.done });
   }
-  await updateAgentMemory(ownerAgent, { threadsOwned: { op: 'add', id: threadId } });
+  await updateAgentMemory(ownerAgent, {
+    threadsOwned: { op: 'add', id: threadId },
+    currentThread: threadId,
+  });
+  await syncThreadOwnerTaskCount(threadId);
   logToJsonl({ type: 'thread_opened', agent: ownerAgent, threadId, title, priority });
   return thread;
 }
@@ -209,7 +213,7 @@ async function createPost({ threadId, author, authorType = 'agent', content, typ
   await redisSet(`board-room:posts/${postId}`, post);
   await redisZadd(`board-room:threads/${threadId}/posts`, now, postId);
   await updateThreadLastActivity(threadId);
-  await updateAgentMemory(author, { lastSeen: now });
+  await updateAgentMemory(author, { lastSeen: now, currentThread: threadId });
   if (acknowledgmentRequired && mentions.length > 0) {
     for (const target of mentions) {
       await updateAgentMemory(target, { pendingAcknowledgments: { op: 'add', id: postId } });
@@ -248,6 +252,7 @@ async function acknowledgePost({ postId, agent, response }) {
   for (const target of post.mentions || []) {
     await updateAgentMemory(target, { pendingAcknowledgments: { op: 'remove', id: postId } });
   }
+  await recordAgentAcknowledgment(agent, post);
   logToJsonl({ type: 'acknowledgment', agent, postId, response, late: updated.acknowledgedLate });
   return updated;
 }
@@ -257,6 +262,7 @@ async function updatePostPlanStatus(postId, planStatus) {
   if (!post) return null;
   const updated = { ...post, planStatus };
   await redisSet(`board-room:posts/${postId}`, updated);
+  await recordPlanDecision(updated, planStatus);
   return updated;
 }
 
@@ -267,6 +273,7 @@ async function createTask({ threadId, description, done = false, doneBy = null }
   const task = { taskId, threadId, description, done, doneBy, doneAt: done ? now : null };
   await redisSet(`board-room:tasks/${taskId}`, task);
   await redisZadd(`board-room:threads/${threadId}/tasks`, 0, taskId);
+  await syncThreadOwnerTaskCount(threadId);
   return task;
 }
 
@@ -290,6 +297,7 @@ async function toggleTask(taskId, doneBy) {
   const now = Date.now();
   const updated = { ...task, done: !task.done, doneBy, doneAt: !task.done ? now : null };
   await redisSet(`board-room:tasks/${taskId}`, updated);
+  await syncThreadOwnerTaskCount(task.threadId);
   return updated;
 }
 
@@ -319,6 +327,56 @@ async function updateAgentMemory(agent, updates) {
   }
   await redisSet(`board-room:agent-memory/${agent}`, updated);
   return updated;
+}
+
+async function recordAgentAcknowledgment(agent, post) {
+  if (!agent) return null;
+  const memory = await getAgentMemory(agent);
+  const ackCount = Number(memory.ackCount || 0);
+  const avgAckTimeSeconds = Number(memory.avgAckTimeSeconds || 0);
+  const ackDurationSeconds = Math.max(
+    0,
+    Math.round((Date.now() - Number(post?.timestamp || Date.now())) / 1000),
+  );
+  const nextAckCount = ackCount + 1;
+  const nextAverage = nextAckCount === 1
+    ? ackDurationSeconds
+    : ((avgAckTimeSeconds * ackCount) + ackDurationSeconds) / nextAckCount;
+
+  return updateAgentMemory(agent, {
+    avgAckTimeSeconds: Math.round(nextAverage),
+    ackCount: nextAckCount,
+    currentThread: post?.threadId || null,
+  });
+}
+
+async function recordPlanDecision(post, planStatus) {
+  if (!post?.author || post.author === 'ceo') return null;
+  const memory = await getAgentMemory(post.author);
+  if (planStatus === 'approved') {
+    return updateAgentMemory(post.author, {
+      totalPlansApproved: Number(memory.totalPlansApproved || 0) + 1,
+      currentThread: post.threadId || null,
+    });
+  }
+  if (planStatus === 'rejected') {
+    return updateAgentMemory(post.author, {
+      totalPlansRejected: Number(memory.totalPlansRejected || 0) + 1,
+      currentThread: post.threadId || null,
+    });
+  }
+  return null;
+}
+
+async function syncThreadOwnerTaskCount(threadId) {
+  const thread = await getThread(threadId);
+  if (!thread?.ownerAgent) return null;
+  const tasks = await getThreadTasks(threadId);
+  const activeTaskCount = tasks.filter((task) => !task.done).length;
+  return updateAgentMemory(thread.ownerAgent, {
+    activeTaskCount,
+    currentThread: thread.status === 'OPEN' ? threadId : null,
+  });
 }
 
 async function recordHeartbeat({ agent, status = 'active', focus = null, currentThreadId = null }) {

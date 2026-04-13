@@ -194,6 +194,19 @@ export function createBoardRoomRouteHandler() {
         return true;
       }
       const thread = await boardRoomService.getThread(post.threadId);
+      await boardRoomService.createPost({
+        threadId: post.threadId,
+        author: 'ceo',
+        authorType: 'human',
+        content: JSON.stringify({
+          type: 'plan_status',
+          status: newStatus,
+          targetAgent: post.author || null,
+          message: `Plan ${newStatus} by CEO`,
+        }),
+        type: 'decision',
+        mentions: post.author && post.author !== 'ceo' ? [post.author] : [],
+      });
       if (action === 'approve') {
         boardRoomTelegram.sendAlert({
           type: 'PLAN_APPROVED',
