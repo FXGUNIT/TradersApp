@@ -754,6 +754,36 @@ async function runConsciousnessAudit(page, scenario) {
   await expectVisible(page, "text=TRADERS REGIMENT", "Consciousness returned to hub.");
 }
 
+async function runMaintenanceAudit(page, scenario) {
+  await loadScenario(page, "maintenance");
+  addStep(scenario, "info", "Loaded maintenance-mode scenario.");
+
+  await expectVisible(page, "text=BACK SOON", "Maintenance gate rendered.");
+  await expectVisible(
+    page,
+    "text=ESTIMATED DOWNTIME",
+    "Maintenance countdown card rendered.",
+  );
+
+  const hubStillVisible = await page
+    .getByText("TRADERS REGIMENT", { exact: false })
+    .first()
+    .isVisible()
+    .catch(() => false);
+  if (hubStillVisible) {
+    throw new Error("Maintenance scenario still exposed the normal hub content.");
+  }
+
+  const latticeVisible = await page
+    .locator('nav[aria-label="Diamond navigation lattice"]')
+    .first()
+    .isVisible()
+    .catch(() => false);
+  if (latticeVisible) {
+    throw new Error("Maintenance scenario should disable the navigation lattice.");
+  }
+}
+
 async function runSessionsAudit(page, scenario) {
   await loadScenario(page, "sessions");
   addStep(scenario, "info", "Loaded sessions scenario.");
@@ -846,6 +876,10 @@ async function runAppAudit(page, scenario) {
 async function runAdminAudit(page, scenario) {
   await loadScenario(page, "admin");
   addStep(scenario, "info", "Loaded admin scenario.");
+
+  await clickButton(page, /board room/i);
+  await expectVisible(page, "text=Board Room", "Board Room tab opened.");
+  await clickButton(page, /user control/i);
 
   await page.waitForTimeout(800);
   await genericSweep(page, scenario, {
@@ -987,6 +1021,7 @@ async function main() {
       );
       await runScenario(page, report, "hub", runHubAudit);
       await runScenario(page, report, "consciousness", runConsciousnessAudit);
+      await runScenario(page, report, "maintenance", runMaintenanceAudit);
       await runScenario(page, report, "sessions", runSessionsAudit);
       await runScenario(page, report, "app", runAppAudit);
       await runScenario(page, report, "admin", runAdminAudit);

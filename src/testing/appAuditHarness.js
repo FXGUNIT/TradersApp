@@ -262,6 +262,16 @@ export function registerAppAuditHarness({
         setScreen("consciousness");
         break;
 
+      case "maintenance":
+        setAuditData({ scenario: "maintenance" });
+        setCurrentSessionId("session-current");
+        setAuth(clone(fixtures.userAuth));
+        setProfile(clone(fixtures.userProfile));
+        setIsAdminAuthenticated(false);
+        setMaintenanceModeActive(true);
+        setScreen("hub");
+        break;
+
       case "app":
         setAuditData({ scenario: "app", sessions: fixtures.sessions });
         setCurrentSessionId("session-current");
