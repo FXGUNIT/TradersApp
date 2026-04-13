@@ -43,12 +43,22 @@ const GENERATED_STUB_PATH = resolve(
 let analysisServiceDef = null;
 
 async function loadGrpcDefinition() {
-  const stubPaths = [
-    "./generated/ddd/v1/analysis_pb2_grpc.mjs",
-    "./generated/ddd/v1/analysis_pb2_grpc.js",
+  const stubCandidates = [
+    {
+      stubPath: "./generated/ddd/v1/analysis_pb2_grpc.mjs",
+      requiredFiles: [
+        "generated/ddd/v1/analysis_pb2_grpc.mjs",
+        "generated/ddd/v1/analysis_pb2_grpc.js",
+        "generated/ddd/v1/analysis_pb2.js",
+      ],
+    },
+    {
+      stubPath: "./generated/ddd/v1/analysis_pb2_grpc.js",
+      requiredFiles: ["generated/ddd/v1/analysis_pb2_grpc.js"],
+    },
   ];
-  for (const stubPath of stubPaths) {
-    if (existsSync(resolve(__dirname, stubPath.replace("./", "")))) {
+  for (const { stubPath, requiredFiles } of stubCandidates) {
+    if (requiredFiles.every((filePath) => existsSync(resolve(__dirname, filePath)))) {
       try {
         const mod = await import(stubPath);
         analysisServiceDef = mod.AnalysisServiceService?.service;

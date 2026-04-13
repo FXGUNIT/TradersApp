@@ -78,8 +78,7 @@ try {
   Pop-Location
 }
 
-$upArgs = $baseArgs + $profiles + @("up", "-d")
-if ($Build) { $upArgs += "--build" }
+$upArgs = $baseArgs + $profiles + @("up", "-d", "--build")
 
 # RAM estimate
 $ramEstimate = switch ($Tier) {
