@@ -1,3 +1,0 @@
-NAME                   READY   STATUS    RESTARTS        AGE
-bff-5bff974c7d-gc5pt   0/1     Running   7 (5m43s ago)   18h
-bff-5bff974c7d-pp4cx   0/1     Running   0               2m9s

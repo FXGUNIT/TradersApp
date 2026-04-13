@@ -1,8 +1,0 @@
-NAME            REFERENCE              TARGETS                          MINPODS   MAXPODS   REPLICAS   AGE
-bff-hpa         Deployment/bff         cpu: 5%/60%                      2         8         2          24h
-ml-engine-hpa   Deployment/ml-engine   cpu: 140%/70%, memory: 32%/80%   1         10        3          100m
-NAME                        READY   STATUS                       RESTARTS      AGE
-ml-engine-6468c5cf8-brc2x   0/2     ContainerCreating            0             48s
-ml-engine-6468c5cf8-dxqld   0/2     CreateContainerConfigError   0             49s
-ml-engine-6468c5cf8-rmvp4   1/2     Running                      4 (20m ago)   75m
-Error from server (ServiceUnavailable): the server is currently unable to handle the request (get pods.metrics.k8s.io)

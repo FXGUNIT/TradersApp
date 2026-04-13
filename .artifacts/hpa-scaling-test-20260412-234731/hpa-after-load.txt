@@ -1,8 +1,0 @@
-NAME            REFERENCE              TARGETS                          MINPODS   MAXPODS   REPLICAS   AGE
-bff-hpa         Deployment/bff         cpu: 9%/60%                      2         8         2          26h
-ml-engine-hpa   Deployment/ml-engine   cpu: 178%/70%, memory: 35%/80%   1         10        1          3h46m
-NAME                        READY   STATUS              RESTARTS      AGE
-ml-engine-6468c5cf8-5cnzr   0/2     ContainerCreating   0             87s
-ml-engine-6468c5cf8-chv7h   0/2     ContainerCreating   0             87s
-ml-engine-6468c5cf8-zndcm   1/2     Running             6 (37m ago)   55m
-error: Metrics not available for pod tradersapp-dev/ml-engine-6468c5cf8-zndcm, age: 55m27.260017594s

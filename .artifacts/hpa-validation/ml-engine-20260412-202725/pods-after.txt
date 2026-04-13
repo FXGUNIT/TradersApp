@@ -1,4 +1,0 @@
-NAME                        READY   STATUS    RESTARTS   AGE
-ml-engine-6468c5cf8-gnrqf   0/2     Running   0          9s
-ml-engine-6468c5cf8-jpzj5   0/2     Running   0          9s
-ml-engine-6468c5cf8-w5vw4   1/2     Running   0          42m

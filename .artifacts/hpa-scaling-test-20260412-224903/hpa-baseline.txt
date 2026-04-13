@@ -1,8 +1,0 @@
-NAME            REFERENCE              TARGETS                        MINPODS   MAXPODS   REPLICAS   AGE
-bff-hpa         Deployment/bff         cpu: 13%/60%                   2         8         2          25h
-ml-engine-hpa   Deployment/ml-engine   cpu: 1%/70%, memory: 36%/80%   1         10        1          165m
-NAME                  READY   UP-TO-DATE   AVAILABLE   AGE    CONTAINERS                 IMAGES                                                                                    SELECTOR
-bff                   2/2     2            2           2d9h   bff                        tradersapp/bff:dev-readyprobe-20260413b                                                   app=bff
-ml-engine             1/1     1            1           2d9h   ml-engine,model-registry   tradersapp/ml-engine:dev-retryfix-20260413a,tradersapp/ml-engine:dev-retryfix-20260413a   app=ml-engine
-redis                 1/1     1            1           36h    redis                      redis:7-alpine                                                                            app=redis
-tradersapp-postgres   1/1     1            1           36h    postgres                   postgres:16-alpine                                                                        app=tradersapp-postgres

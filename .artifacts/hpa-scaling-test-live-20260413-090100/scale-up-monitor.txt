@@ -1,2 +1,0 @@
-# time_s replicas_desired replicas_actual cpu_util memory_util
-t=10s replicas=2 desired=2 current=2 cpu=105

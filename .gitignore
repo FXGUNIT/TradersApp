@@ -40,6 +40,20 @@ artifacts
 bff/.env
 bff/.env.local
 
+# Generated validation, agent, and browser-profile outputs
+.artifacts/
+.copilot-build/
+.copilot-ml-image/
+.tmp_chrome_arch_view/
+.tmp_ci/
+.tmp_r*/
+htmlcov/
+.coverage
+coverage.xml
+audit_output.txt
+build_output.txt
+bandit-report.txt
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

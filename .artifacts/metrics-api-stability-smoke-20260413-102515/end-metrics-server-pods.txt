@@ -1,2 +1,0 @@
-NAME                              READY   STATUS    RESTARTS        AGE   IP             NODE                    NOMINATED NODE   READINESS GATES
-metrics-server-6b6d98c8f9-dj4pd   1/1     Running   9 (2m26s ago)   11h   10.244.0.105   desktop-control-plane   <none>           <none>
