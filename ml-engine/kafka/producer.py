@@ -34,6 +34,7 @@ import logging
 import functools
 import threading
 import uuid
+from contextlib import nullcontext
 from collections import deque
 from pathlib import Path
 from datetime import datetime, timezone
@@ -46,19 +47,23 @@ sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 try:
-    from infrastructure.request_context import (
-        get_request_id,
-        request_id_context,
-        request_logger,
-        generate_request_id,
-    )
-except ModuleNotFoundError:
-    from ml_engine.infrastructure.request_context import (  # type: ignore
-        get_request_id,
-        request_id_context,
-        request_logger,
-        generate_request_id,
-    )
+    import infrastructure.request_context as _request_context
+except Exception:
+    try:
+        from ml_engine.infrastructure import request_context as _request_context  # type: ignore
+    except Exception:
+        _request_context = None
+
+if _request_context is None:
+    generate_request_id = lambda: str(uuid.uuid4())
+    get_request_id = generate_request_id
+    request_id_context = lambda *args, **kwargs: nullcontext()
+    request_logger = logging.getLogger
+else:
+    generate_request_id = getattr(_request_context, "generate_request_id", lambda: str(uuid.uuid4()))
+    get_request_id = getattr(_request_context, "get_request_id", generate_request_id)
+    request_id_context = getattr(_request_context, "request_id_context", lambda *args, **kwargs: nullcontext())
+    request_logger = getattr(_request_context, "request_logger", logging.getLogger)
 
 def _set_kafka_producer_circuit_state(state: str, broker: str = "default") -> None:
     try:
