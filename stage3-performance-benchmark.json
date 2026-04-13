@@ -1,30 +1,30 @@
 {
-  "timestamp": "2026-03-17T23:35:33.472Z",
-  "duration": "1049",
+  "timestamp": "2026-04-13T17:19:38.313Z",
+  "duration": "1227",
   "tests": {
     "dataLoad": {
       "totalTraders": 500,
-      "avgFps": 60.1,
-      "minFps": 44.9,
-      "peakMemory": 151,
-      "renderTime": 1162,
+      "avgFps": 61.6,
+      "minFps": 49.9,
+      "peakMemory": 152,
+      "renderTime": 1052,
       "status": "EXCELLENT"
     },
     "firebaseHeartbeat": {
-      "singleListenerLatency": 72,
-      "batchUpdateLatency": 82,
-      "concurrentListenerLatency": 100,
-      "p95Latency": 130,
-      "p99Latency": 160,
-      "listenerHealthScore": 50,
+      "singleListenerLatency": 61,
+      "batchUpdateLatency": 90,
+      "concurrentListenerLatency": 173,
+      "p95Latency": 203,
+      "p99Latency": 233,
+      "listenerHealthScore": 13,
       "status": "NEEDS OPTIMIZATION"
     },
     "imageOptimization": {
-      "totalImages": 310,
-      "oversizedImages": 31,
-      "totalOversizedSize": 22365,
-      "potentialSavings": 6454,
-      "savingsPercentage": 29,
+      "totalImages": 341,
+      "oversizedImages": 34,
+      "totalOversizedSize": 24204,
+      "potentialSavings": 7204,
+      "savingsPercentage": 30,
       "status": "NEEDS OPTIMIZATION"
     }
   }

@@ -13,6 +13,12 @@ const SCREENSHOT_DIR = path.join(OUTPUT_DIR, "screens");
 const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
 const REPORT_PATH = path.join(OUTPUT_DIR, `report-${timestamp}.json`);
 const DESKTOP_VIEWPORT = { width: 1440, height: 1800 };
+const MOBILE_VIEWPORT = { width: 393, height: 1180 };
+const AUDIT_VIEWPORT_MODE = String(
+  process.env.UI_AUDIT_VIEWPORT || "desktop",
+).toLowerCase();
+const VIEWPORT =
+  AUDIT_VIEWPORT_MODE === "mobile" ? MOBILE_VIEWPORT : DESKTOP_VIEWPORT;
 const AUDIT_MODE_KEY = "TradersApp_AuditMode";
 const CHROME_CANDIDATES = [
   "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
@@ -874,6 +880,7 @@ async function main() {
     startedAt: new Date().toISOString(),
     baseUrl: BASE_URL,
     headless: HEADLESS,
+    viewportMode: AUDIT_VIEWPORT_MODE,
     executablePath: findBrowserExecutable(),
     scenarios: [],
     consoleMessages: [],
@@ -891,7 +898,7 @@ async function main() {
   });
 
   const context = await browser.newContext({
-    viewport: DESKTOP_VIEWPORT,
+    viewport: VIEWPORT,
     ignoreHTTPSErrors: true,
   });
   await context.grantPermissions(["clipboard-read", "clipboard-write"], {
