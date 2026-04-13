@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { T } from "./terminalHelperComponents.jsx";
 import { CSS_VARS } from "../../styles/cssVars.js";
 
@@ -23,6 +23,7 @@ export function RiskSlider({
   const isDraggingRef = useRef(false);
   const activeDragHandlerRef = useRef(null);
   const activeDragEndHandlerRef = useRef(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   const val = parseFloat(value) || 0.3;
   const curBal = parseFloat(currentBalance) || 0;
@@ -90,6 +91,7 @@ export function RiskSlider({
   const handleDragEnd = useCallback(() => {
     if (!isDraggingRef.current) return;
     isDraggingRef.current = false;
+    setIsDragging(false);
     detachDocumentListeners();
     if (onCommit) {
       onCommit(value);
@@ -114,6 +116,7 @@ export function RiskSlider({
     (event) => {
       event.preventDefault();
       isDraggingRef.current = true;
+      setIsDragging(true);
       activeDragHandlerRef.current = handleDrag;
       activeDragEndHandlerRef.current = handleDragEnd;
       handleDrag(event);
@@ -217,7 +220,7 @@ export function RiskSlider({
             width: `${trackPct}%`,
             borderRadius: 2,
             background: zoneColor,
-            transition: isDraggingRef.current
+            transition: isDragging
               ? "none"
               : "width 0.15s ease, background 0.2s ease",
             opacity: 0.85,
@@ -266,11 +269,11 @@ export function RiskSlider({
             transform: "translate(-50%, -50%)",
             borderRadius: "50%",
             background: zoneColor,
-            boxShadow: isDraggingRef.current
+            boxShadow: isDragging
               ? `0 0 0 4px ${zoneColor}30, 0 0 16px ${zoneColor}90, 0 0 24px ${zoneColor}60`
               : `0 0 0 3px ${zoneColor}20, 0 0 10px ${zoneColor}70`,
-            cursor: isDraggingRef.current ? "grabbing" : "grab",
-            transition: isDraggingRef.current
+            cursor: isDragging ? "grabbing" : "grab",
+            transition: isDragging
               ? "none"
               : "left 0.15s ease, box-shadow 0.2s ease, background 0.2s ease",
             zIndex: 10,
