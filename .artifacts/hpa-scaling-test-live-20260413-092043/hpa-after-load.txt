@@ -1,0 +1,11 @@
+NAME            REFERENCE              TARGETS                          MINPODS   MAXPODS   REPLICAS   AGE
+bff-hpa         Deployment/bff         cpu: 6%/60%                      2         8         2          36h
+ml-engine-hpa   Deployment/ml-engine   cpu: 241%/70%, memory: 34%/80%   1         10        3          13h
+NAME                        READY   STATUS              RESTARTS      AGE
+ml-engine-6468c5cf8-5cnzr   2/2     Running             3 (35m ago)   9h
+ml-engine-6468c5cf8-7j5zt   0/2     Running             0             35s
+ml-engine-6468c5cf8-b5tf4   0/2     ContainerCreating   0             8s
+ml-engine-6468c5cf8-bcn4k   0/2     Running             0             35s
+NAME                        CPU(cores)   MEMORY(bytes)   
+ml-engine-6468c5cf8-5cnzr   622m         265Mi           
+ml-engine-6468c5cf8-bcn4k   258m         23Mi            
