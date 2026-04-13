@@ -1,9 +1,7 @@
 import React from "react";
 import {
   T,
-  Tag,
   SHead,
-  AMDPhaseTag,
   PasteZone,
   cardS,
 } from "./terminalHelperComponents";
@@ -160,86 +158,17 @@ export default function MainTerminalAiPanels({
         ))}
       </div>
 
-      {/* Error display */}
-      {err && (
-        <div
-          style={{
-            color: T.red,
-            fontSize: 12,
-            marginBottom: 12,
-            fontWeight: 600,
-          }}
-        >
-          ⚠ {err}
-        </div>
-      )}
-
-      {/* Run P1 Analysis button */}
-      <button
-        onClick={runPart1}
-        disabled={loading || isCsvParsing || !parsed || parsed.totalDays < 5}
-        style={glowBtn(T.green, loading || isCsvParsing || !parsed || parsed.totalDays < 5)}
-        className="btn-glass"
-      >
-        ▶ RUN AMD PREMARKET ANALYSIS
-      </button>
-
-      {/* P1 Output */}
-      <div style={{ marginTop: 20 }}>
-        {loading && (
-          <Loader color={T.green} label="COLLECTIVE BRAIN PROCESSING AMD PHASES..." />
-        )}
-        {!loading && p1Out && (
-          <div>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: 12,
-              }}
-            >
-              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <Tag label="ANALYSIS COMPLETE" color={T.green} />
-                <AMDPhaseTag phase={displayedAmdPhase} />
-              </div>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button
-                  onClick={() => {
-                    setActiveTab("trade");
-                    setErr("");
-                  }}
-                  style={glowBtn(T.orange, false)}
-                  className="btn-glass"
-                >
-                  → TRADE ENTRY
-                </button>
-                <button
-                  onClick={() => navigator.clipboard?.writeText(p1Out)}
-                  style={{
-                    background: "transparent",
-                    border: `1px solid ${CSS_VARS.borderSubtle}`,
-                    borderRadius: 6,
-                    padding: "8px 12px",
-                    cursor: "pointer",
-                    color: CSS_VARS.textSecondary,
-                    fontSize: 10,
-                    fontFamily: T.font,
-                  }}
-                >
-                  ⎘ COPY
-                </button>
-              </div>
-            </div>
-            <div
-              style={cardS({ borderLeft: `4px solid ${T.blue}` })}
-              className="glass-panel"
-            >
-              <RenderOut text={p1Out} />
-            </div>
-          </div>
-        )}
-      </div>
+      <MainTerminalAiOutput
+        err={err}
+        setErr={setErr}
+        loading={loading}
+        p1Out={p1Out}
+        displayedAmdPhase={displayedAmdPhase}
+        runPart1={runPart1}
+        setActiveTab={setActiveTab}
+        parsed={parsed}
+        isCsvParsing={isCsvParsing}
+      />
     </>
   );
 }

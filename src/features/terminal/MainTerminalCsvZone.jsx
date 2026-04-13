@@ -14,10 +14,10 @@ import { parseTerminalCsvText } from "./terminalCsvParser.js";
  */
 const MainTerminalCsvZone = forwardRef(function MainTerminalCsvZone(
   {
-    onParsedChange,    // (parsed: object|null) => void
-    onParsingChange,   // (v: boolean) => void
-    onStatusChange,    // (msg: string) => void
-    setErr,            // MainTerminal's setErr
+    setParsed,          // MainTerminal's setParsed
+    setIsCsvParsing,    // MainTerminal's setIsCsvParsing
+    setParseMsg,        // MainTerminal's setParseMsg
+    setErr,             // MainTerminal's setErr (used on error fallback)
   },
   ref,
 ) {

@@ -19,6 +19,7 @@ import { CSS_VARS } from "../../styles/cssVars.js";
  *   loading             — boolean (analysis running)
  *   p1Out               — string  (analysis result text)
  *   displayedAmdPhase   — string  (AMD phase tag)
+ *   runPart1            — () => Promise<void>  (triggers P1 analysis)
  *   setActiveTab        — (tab: string) => void
  *   parsed              — object | null  (CSV parsed data — used to disable button)
  *   isCsvParsing        — boolean
@@ -29,6 +30,7 @@ export default function MainTerminalAiOutput({
   loading,
   p1Out,
   displayedAmdPhase,
+  runPart1,
   setActiveTab,
   parsed,
   isCsvParsing,
@@ -51,7 +53,7 @@ export default function MainTerminalAiOutput({
 
       {/* Run P1 Analysis button */}
       <button
-        onClick={() => {}}
+        onClick={runPart1}
         disabled={loading || isCsvParsing || !parsed || parsed.totalDays < 5}
         style={glowBtn(T.green, loading || isCsvParsing || !parsed || parsed.totalDays < 5)}
         className="btn-glass"
