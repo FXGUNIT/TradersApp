@@ -1,5 +1,27 @@
 import { useEffect } from "react";
 
+const AUDIT_MODE_KEY = "TradersApp_AuditMode";
+
+function shouldEnableAuditHarness() {
+  if (import.meta.env.DEV) {
+    return true;
+  }
+
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  if (window.__TRADERS_UI_AUDIT__ === true) {
+    return true;
+  }
+
+  try {
+    return localStorage.getItem(AUDIT_MODE_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
 export function useDevAuditHarnessEffect({
   adminUid,
   adminEmail,
@@ -12,7 +34,7 @@ export function useDevAuditHarnessEffect({
   setMaintenanceModeActive,
 }) {
   useEffect(() => {
-    if (!import.meta.env.DEV) {
+    if (!shouldEnableAuditHarness()) {
       return undefined;
     }
 
