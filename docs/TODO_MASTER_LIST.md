@@ -34,7 +34,7 @@ Before starting work, claim your tasks here. This prevents two agents from updat
 // Active claims â€” claimed by which agent, expires when done
 // Format: "TaskID": { "claimed_by": "agent-name", "claimed_at": "ISO timestamp" }
 {
-  "R01": { "claimed_by": null, "claimed_at": null },
+  "R01": { "claimed_by": "codex", "claimed_at": "2026-04-14T00:05:00+05:30" },
   "R02": { "claimed_by": null, "claimed_at": null },
   "R03": { "claimed_by": null, "claimed_at": null },
   "R04": { "claimed_by": null, "claimed_at": null },
