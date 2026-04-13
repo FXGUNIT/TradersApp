@@ -2,6 +2,8 @@ import { checkInputForPrivilegeEscalation } from "./leakagePreventionModule.js";
 import { hasBff } from "./gateways/base.js";
 
 export const AI_STATUS_REFRESH_MS = 5 * 60 * 1000;
+const BOARD_ROOM_FRONTEND_AGENT = "FrontendAI.Router";
+const BOARD_ROOM_HEARTBEAT_MS = 90 * 60 * 1000;
 
 const AI_ENGINE_DEFINITIONS = [
   { key: "gemini", name: "Gemini" },
@@ -18,6 +20,10 @@ const apiBase = () => {
 };
 
 const apiUrl = (path) => `${apiBase()}${path}`;
+
+let boardRoomHeartbeatTimer = null;
+let boardRoomHeartbeatInflight = null;
+let lastBoardRoomHeartbeatAt = 0;
 
 const buildEngineStatus = (definition) => ({
   name: definition.name,
@@ -162,22 +168,138 @@ async function callBffJson(path, payload) {
   return data;
 }
 
-async function callProvider(provider, systemPrompt, userPrompt) {
-  const data = await callBffJson("/ai/provider-chat", {
-    provider,
-    systemPrompt,
-    userPrompt,
+async function postBoardRoomJson(path, payload) {
+  if (!hasBff()) {
+    return null;
+  }
+
+  try {
+    const response = await fetch(apiUrl(path), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload || {}),
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    return await response.json().catch(() => ({ ok: true }));
+  } catch {
+    return null;
+  }
+}
+
+async function sendBoardRoomHeartbeat({
+  status = "active",
+  focus = "Routing frontend AI provider traffic.",
+  currentThreadId = null,
+  force = false,
+} = {}) {
+  if (!force && Date.now() - lastBoardRoomHeartbeatAt < BOARD_ROOM_HEARTBEAT_MS) {
+    return null;
+  }
+
+  if (boardRoomHeartbeatInflight) {
+    return boardRoomHeartbeatInflight;
+  }
+
+  boardRoomHeartbeatInflight = (async () => {
+    const result = await postBoardRoomJson("/board-room/heartbeat", {
+      agent: BOARD_ROOM_FRONTEND_AGENT,
+      status,
+      focus,
+      currentThreadId,
+    });
+    if (result) {
+      lastBoardRoomHeartbeatAt = Date.now();
+    }
+    return result;
+  })();
+
+  try {
+    return await boardRoomHeartbeatInflight;
+  } finally {
+    boardRoomHeartbeatInflight = null;
+  }
+}
+
+function ensureBoardRoomHeartbeatLoop() {
+  if (boardRoomHeartbeatTimer || !hasBff()) {
+    return;
+  }
+
+  void sendBoardRoomHeartbeat({
+    status: "active",
+    focus: "Frontend AI router online.",
+    force: true,
   });
 
-  if (Array.isArray(data?.statuses)) {
-    applyStatusSnapshot(data.statuses);
-  }
+  boardRoomHeartbeatTimer = setInterval(() => {
+    void sendBoardRoomHeartbeat({
+      status: "idle",
+      focus: "Frontend AI router heartbeat.",
+      force: true,
+    });
+  }, BOARD_ROOM_HEARTBEAT_MS);
+}
 
-  if (data?.provider) {
-    markOnline(data.provider);
+function stopBoardRoomHeartbeatLoop() {
+  if (boardRoomHeartbeatTimer) {
+    clearInterval(boardRoomHeartbeatTimer);
+    boardRoomHeartbeatTimer = null;
   }
+}
 
-  return data?.response || "";
+async function reportBoardRoomError(error, context = {}) {
+  const message = String(error?.message || error || "Frontend AI router error.");
+  return postBoardRoomJson("/board-room/error", {
+    agent: BOARD_ROOM_FRONTEND_AGENT,
+    error: context?.provider
+      ? `${context.provider}: ${message}`
+      : message,
+    severity: context?.severity || "MEDIUM",
+    stack:
+      typeof error?.stack === "string" && error.stack.trim()
+        ? error.stack.slice(0, 4000)
+        : null,
+    threadId: context?.threadId || null,
+  });
+}
+
+async function callProvider(provider, systemPrompt, userPrompt) {
+  ensureBoardRoomHeartbeatLoop();
+  void sendBoardRoomHeartbeat({
+    status: "active",
+    focus: `Provider call in progress: ${provider}`,
+  });
+
+  try {
+    const data = await callBffJson("/ai/provider-chat", {
+      provider,
+      systemPrompt,
+      userPrompt,
+    });
+
+    if (Array.isArray(data?.statuses)) {
+      applyStatusSnapshot(data.statuses);
+    }
+
+    if (data?.provider) {
+      markOnline(data.provider);
+    }
+
+    return data?.response || "";
+  } catch (error) {
+    syncFailureState(provider, error?.message || "Provider unavailable.");
+    void reportBoardRoomError(error, {
+      provider,
+      severity: "MEDIUM",
+    });
+    throw error;
+  }
 }
 
 export function getAIStatuses() {
@@ -199,6 +321,7 @@ export function getAIStatusesDetailed() {
 let statusCheckInterval = null;
 
 export async function checkAllAIStatus() {
+  ensureBoardRoomHeartbeatLoop();
   if (!hasBff()) {
     AI_ENGINES.forEach((engine) =>
       syncFailureState(engine, "BFF unavailable."),
@@ -225,6 +348,7 @@ export async function checkAllAIStatus() {
 }
 
 export function startAIStatusScheduler(onStatusChange) {
+  ensureBoardRoomHeartbeatLoop();
   if (statusCheckInterval) {
     clearInterval(statusCheckInterval);
     statusCheckInterval = null;
@@ -254,6 +378,7 @@ export function stopAIStatusScheduler() {
     clearInterval(statusCheckInterval);
     statusCheckInterval = null;
   }
+  stopBoardRoomHeartbeatLoop();
 }
 
 export const quadCoreStatus = aiEngineStatus;
@@ -328,6 +453,12 @@ export async function askSambaNova(systemPrompt, userPrompt) {
 }
 
 export async function runDeliberation(systemPrompt, userPrompt, user = {}) {
+  ensureBoardRoomHeartbeatLoop();
+  void sendBoardRoomHeartbeat({
+    status: "active",
+    focus: "Collective Consciousness deliberation running.",
+  });
+
   councilStage.current = "stage1";
   councilStage.label = "Thinking...";
 
@@ -360,6 +491,10 @@ export async function runDeliberation(systemPrompt, userPrompt, user = {}) {
   } catch (error) {
     councilStage.current = "complete";
     councilStage.label = "Error";
+    void reportBoardRoomError(error, {
+      provider: "collective-deliberation",
+      severity: "HIGH",
+    });
     throw error;
   }
 }

@@ -248,13 +248,13 @@ export function createBoardRoomRouteHandler() {
         json(res, 400, { ok: false, error: 'agent required' });
         return true;
       }
-      await boardRoomService.updateAgentMemory(body.agent, {
-        lastHeartbeat: Date.now(),
-        status: body.status,
-        currentThread: body.currentThreadId || null,
-        focus: body.focus,
+      const heartbeat = await boardRoomService.recordHeartbeat({
+        agent: body.agent,
+        status: body.status || 'active',
+        currentThreadId: body.currentThreadId || null,
+        focus: body.focus || null,
       });
-      json(res, 200, { ok: true });
+      json(res, 200, { ok: true, heartbeat });
       return true;
     }
 
@@ -270,28 +270,27 @@ export function createBoardRoomRouteHandler() {
         json(res, 400, { ok: false, error: 'agent and error required' });
         return true;
       }
-      const threadId = body.threadId;
-      const thread = threadId ? await boardRoomService.getThread(threadId) : null;
-      const post = threadId
-        ? await boardRoomService.createPost({
-            threadId,
-            author: body.agent,
-            authorType: 'agent',
-            content: JSON.stringify({ error: body.error, stack: body.stack || null }),
-            type: 'error',
-          })
-        : null;
+      const errorResult = await boardRoomService.reportError({
+        agent: body.agent,
+        error: body.error,
+        stack: body.stack || null,
+        severity: body.severity || 'MEDIUM',
+        threadId: body.threadId || null,
+      });
+      const thread = errorResult?.thread || null;
+      const post = errorResult?.post || null;
+      const threadId = errorResult?.threadId || body.threadId || 'new';
       if (body.severity === 'HIGH' || body.severity === 'CRITICAL') {
         boardRoomTelegram.sendAlert({
           type: 'ERROR',
           agent: body.agent,
-          threadId: threadId || 'new',
+          threadId,
           threadTitle: thread?.title || 'new thread',
           priority: body.severity,
           what: body.error.substring(0, 120),
         });
       }
-      json(res, 201, { ok: true, post });
+      json(res, 201, { ok: true, thread, post, threadId });
       return true;
     }
 

@@ -321,6 +321,76 @@ async function updateAgentMemory(agent, updates) {
   return updated;
 }
 
+async function recordHeartbeat({ agent, status = 'active', focus = null, currentThreadId = null }) {
+  const now = Date.now();
+  const memory = await updateAgentMemory(agent, {
+    lastHeartbeat: now,
+    status,
+    currentThread: currentThreadId || null,
+    focus: focus || null,
+  });
+
+  logToJsonl({
+    type: 'heartbeat',
+    agent,
+    threadId: currentThreadId || undefined,
+    status,
+    focus: focus || undefined,
+  });
+
+  return {
+    agent,
+    timestamp: now,
+    currentThreadId: currentThreadId || null,
+    memory,
+  };
+}
+
+async function reportError({ agent, error, stack = null, severity = 'MEDIUM', threadId = null }) {
+  let targetThreadId = threadId || null;
+  let thread = targetThreadId ? await getThread(targetThreadId) : null;
+
+  if (!thread) {
+    thread = await createThread({
+      title: `[${agent}] ${severity} error`,
+      description: JSON.stringify({
+        autoOpened: true,
+        error,
+        severity,
+        stack: stack || null,
+      }),
+      priority: severity || 'MEDIUM',
+      tags: ['error', String(severity || 'MEDIUM').toLowerCase(), String(agent || 'agent').toLowerCase()],
+      ownerAgent: agent,
+      createdBy: agent,
+      tasks: [],
+    });
+    targetThreadId = thread.threadId;
+  }
+
+  const post = await createPost({
+    threadId: targetThreadId,
+    author: agent,
+    authorType: 'agent',
+    content: JSON.stringify({
+      error,
+      severity,
+      stack: stack || null,
+    }),
+    type: 'error',
+  });
+
+  logToJsonl({
+    type: 'error',
+    agent,
+    threadId: targetThreadId,
+    severity,
+    message: String(error || '').substring(0, 240),
+  });
+
+  return { thread, post, threadId: targetThreadId };
+}
+
 // ─── Pending Acknowledgments ──────────────────────────────────────────────────
 async function getPendingAcknowledgments() {
   const client = getRedis();
@@ -361,7 +431,7 @@ export const boardRoomService = {
   createThread, getThread, getThreads, getAllOpenThreads, updateThread, closeThread,
   createPost, getPost, getThreadPosts, acknowledgePost, updatePostPlanStatus,
   createTask, getThreadTasks, toggleTask,
-  getAgentMemory, updateAgentMemory,
+  getAgentMemory, updateAgentMemory, recordHeartbeat, reportError,
   getPendingAcknowledgments,
   getTemplates,
   validateContent,
