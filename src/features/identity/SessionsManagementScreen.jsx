@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { listUserSessions as listIdentityUserSessions } from "../../services/clients/IdentityClient.js";
 import { logoutOtherDevices, normalizeSessionMap } from "../../utils/sessionUtils.js";
 
@@ -60,7 +60,7 @@ export default function SessionsManagementScreen({
   const [loading, setLoading] = useState(true);
   const [logoutLoading, setLogoutLoading] = useState(false);
 
-  const getFallbackSessions = () => {
+  const getFallbackSessions = useCallback(() => {
     const auditSessions =
       typeof window !== "undefined" ? window.__TRADERS_AUDIT_DATA?.sessions : null;
 
@@ -70,7 +70,7 @@ export default function SessionsManagementScreen({
       auditSessions ||
       {}
     );
-  };
+  }, [profile]);
 
   useEffect(() => {
     let active = true;
@@ -142,7 +142,7 @@ export default function SessionsManagementScreen({
     return () => {
       active = false;
     };
-  }, [auth, currentSessionId, profile, showToast]);
+  }, [auth, currentSessionId, getFallbackSessions, profile, showToast]);
 
   const handleLogoutOtherDevices = async () => {
     if (!auth || !currentSessionId) {

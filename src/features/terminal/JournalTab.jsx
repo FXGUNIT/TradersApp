@@ -31,7 +31,7 @@ export default function JournalTab({
   addJournalEntry,
   // Payout projection
   firmRules = {},
-  accountState = {},
+  accountState: _accountState = {},
 }) {
   // Payout trajectory — derived from journal + firmRules (no new computation, pure math)
   const payout = computePayoutTrajectory(journal, firmRules);

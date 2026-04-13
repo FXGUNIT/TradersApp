@@ -16,7 +16,7 @@ export default function FloatingChatWidget({ auth, profile }) {
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
-  const [sendError, setSendError] = useState(false);
+  const [, setSendError] = useState(false);
   const messagesEndRef = useRef(null);
 
   const userId = auth?.uid || profile?.uid || "anonymous";

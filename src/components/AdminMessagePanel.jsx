@@ -16,6 +16,9 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 
 const BFF_BASE = import.meta.env.VITE_BFF_URL || '';
 const POLL_INTERVAL_MS = 5_000;
+const JSON_HEADERS = {
+  'Content-Type': 'application/json',
+};
 
 function formatTime(ts) {
   if (!ts) return '';
@@ -169,19 +172,15 @@ export default function AdminMessagePanel({ adminName = 'Admin' }) {
   const [inputText, setInputText] = useState('');
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [_error, setError] = useState(null);
   const messagesEndRef = useRef(null);
   const intervalRef = useRef(null);
-
-  const headers = {
-    'Content-Type': 'application/json',
-  };
 
   // ── Fetch all chats ───────────────────────────────────────────────
   const fetchChats = useCallback(async () => {
     try {
       const res = await fetch(`${BFF_BASE}/support/threads`, {
-        headers,
+        headers: JSON_HEADERS,
         signal: AbortSignal.timeout(8000),
       });
       if (res.ok) {
@@ -210,7 +209,7 @@ export default function AdminMessagePanel({ adminName = 'Admin' }) {
   const fetchMessages = useCallback(async (uid) => {
     try {
       const res = await fetch(`${BFF_BASE}/support/threads/${encodeURIComponent(uid)}`, {
-        headers,
+        headers: JSON_HEADERS,
         signal: AbortSignal.timeout(8000),
       });
       if (res.ok) {
@@ -261,7 +260,7 @@ export default function AdminMessagePanel({ adminName = 'Admin' }) {
         `${BFF_BASE}/support/threads/${encodeURIComponent(selectedChat.uid)}/messages`,
         {
           method: 'POST',
-          headers,
+          headers: JSON_HEADERS,
           body: JSON.stringify({
             text,
             sender: 'admin',

@@ -211,7 +211,7 @@ function NewsItem({ item, isNew, onReactionLogged }) {
   );
 }
 
-export default function BreakingNewsPanel({ mathEngine, recentCandles }) {
+export default function BreakingNewsPanel({ mathEngine: _mathEngine, recentCandles: _recentCandles }) {
   const [news, setNews] = useState([]);
   const [breakingCount, setBreakingCount] = useState(0);
   const [highImpactCount, setHighImpactCount] = useState(0);

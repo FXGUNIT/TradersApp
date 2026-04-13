@@ -4,7 +4,16 @@
  */
 import React from 'react';
 
-export const MetricRow = React.memo(function MetricRow({ icon: Icon, label, value, sub, color = 'var(--text-primary)', muted }) {
+export const MetricRow = React.memo(function MetricRow(props) {
+  const {
+    icon: IconComponent,
+    label,
+    value,
+    sub,
+    color = 'var(--text-primary)',
+    muted,
+  } = props;
+
   return (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -12,7 +21,7 @@ export const MetricRow = React.memo(function MetricRow({ icon: Icon, label, valu
       borderBottom: '1px solid var(--border-subtle, rgba(255,255,255,0.06))',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <Icon size={13} color={muted ? 'var(--text-tertiary)' : 'var(--text-secondary)'} />
+        <IconComponent size={13} color={muted ? 'var(--text-tertiary)' : 'var(--text-secondary)'} />
         <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500 }}>
           {label}
         </span>

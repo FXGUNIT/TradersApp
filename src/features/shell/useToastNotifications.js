@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 
 // ─── Audio singleton (created lazily on first sound) ─────────────────────────────────
 let _audioCtx = null;

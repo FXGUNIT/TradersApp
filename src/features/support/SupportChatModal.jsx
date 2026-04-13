@@ -211,7 +211,6 @@ export default function SupportChatModal({
           ) : (
             messages.map((msg, idx) => {
               const isAdmin = msg.sender === "admin";
-              const isUser  = msg.sender === "user";
               return (
                 <div
                   key={`msg_${msg.timestamp}_${idx}`}

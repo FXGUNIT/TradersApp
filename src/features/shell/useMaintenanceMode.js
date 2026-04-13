@@ -53,7 +53,7 @@ export function useMaintenanceMode({
             setMaintenanceModeActive(response.maintenanceActive);
             return;
           }
-        } catch (error) {
+        } catch {
           // BFF unreachable or network error — use cached state
           setMaintenanceModeActive(readMaintenanceCache());
         }

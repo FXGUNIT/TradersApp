@@ -360,8 +360,6 @@ export function useAuthSessionHandlers({
     setScreen("login");
   }, [
     auth?.uid,
-    clearConsciousnessReturnScreen,
-    clearLastScreen,
     clearPendingGoogleSignup,
     setAdminMasterEmail,
     setAdminMasterEmailVerified,
