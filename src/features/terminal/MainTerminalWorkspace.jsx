@@ -183,7 +183,7 @@ export default function MainTerminalWorkspace({
     applyWorkspaceState(previousSnapshot);
     lastSnapshotRef.current = JSON.stringify(previousSnapshot);
     setDraftStatus((current) => ({ ...current, error: "" }));
-  }, [workspaceHistory, applyWorkspaceState, lastSnapshotRef, skipHistoryRef, setDraftStatus]);
+  }, [workspaceHistory, applyWorkspaceState, lastSnapshotRef, setDraftStatus, setWorkspaceHistory, skipHistoryRef]);
 
   // ── Restore workspace state ────────────────────────────────────────────────
   const restoreWorkspaceState = useCallback(
