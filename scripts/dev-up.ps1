@@ -30,6 +30,8 @@ if (-not (Test-Path $composeFile)) {
   exit 1
 }
 
+$frontendDist = Join-Path $PSScriptRoot "..\dist\index.html"
+
 $baseArgs = @("-f", $composeFile)
 $includeObservability = $Tier -eq "full"
 
@@ -59,6 +61,21 @@ switch ($Tier) {
   "full"  { $profiles = @("--profile", "mlops") }
   "mlops" { $profiles = @("--profile", "mlops") }
   "core"  { $profiles = @() }
+}
+
+Write-Host "Building frontend bundle for local nginx container..." -ForegroundColor Yellow
+Push-Location (Join-Path $PSScriptRoot "..")
+try {
+  & npm.cmd run build
+  if ($LASTEXITCODE -ne 0) {
+    exit $LASTEXITCODE
+  }
+  if (-not (Test-Path $frontendDist)) {
+    Write-Error "Frontend build finished without dist/index.html"
+    exit 1
+  }
+} finally {
+  Pop-Location
 }
 
 $upArgs = $baseArgs + $profiles + @("up", "-d")

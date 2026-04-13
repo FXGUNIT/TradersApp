@@ -47,7 +47,8 @@ Before starting work, claim your tasks here. This prevents two agents from updat
   "Q02": { "claimed_by": null, "claimed_at": null },
   "Q03": { "claimed_by": null, "claimed_at": null },
   "Q04": { "claimed_by": null, "claimed_at": null },
-  "Q05": { "claimed_by": null, "claimed_at": null }
+  "Q05": { "claimed_by": null, "claimed_at": null },
+  "Q06": { "claimed_by": null, "claimed_at": null }
 }
 ```
 
@@ -57,17 +58,18 @@ Run `python scripts/update_todo_progress.py --once` to regenerate.
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-13 17:03`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-13 17:27`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 | Section | Tasks | Progress | Status |
 |---|---|---:|---|
 | Stage M | [5/5] | 100.0% | ✅ COMPLETE |
 | Stage N | [5/5] | 100.0% | ✅ COMPLETE |
 | Stage P | [4/4] | 100.0% | ✅ COMPLETE |
-| Stage Q | [4/5] |  80.0% | ⏸ PENDING |
+| Stage Q | [4/6] |  66.7% | 🔄 IN PROGRESS |
 | Stage O | [25/25] | 100.0% | ✅ COMPLETE |
 
 <!-- live-status:end -->
+
 
 
 
@@ -219,6 +221,10 @@ Generated: `2026-04-13 17:03`  ·  Run `python scripts/update_todo_progress.py -
 - [x] `Q05` Fix frontend container health endpoint (nginx) so Docker dev stack starts cleanly.
   - updated: 2026-04-13 22:35
   - Replaced unsupported `health_check;` with a `/health` route returning 200 OK.
+
+- [-] `Q06` Remove frontend Docker build-network dependency from the dev stack so `dev-up.ps1` boots cleanly.
+  - updated: 2026-04-13 22:57
+  - `docker-compose.dev.yml` still builds the frontend image with `npm ci` inside Docker; the latest clean-stack run failed on registry timeout during that step.
 
 ## Phase Summary (Historical â€” all complete)
 

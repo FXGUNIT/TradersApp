@@ -11,6 +11,10 @@ Start the core stack (frontend + BFF + ML Engine + Redis):
 .\scripts\dev-up.ps1
 ```
 
+`dev-up.ps1` now builds the frontend bundle on the host first, then serves `dist/`
+through the lightweight nginx container. That keeps Docker bring-up independent of
+npm registry access inside the container build.
+
 Optional tiers:
 ```powershell
 .\scripts\dev-up.ps1 -Tier mlops   # adds MLflow
