@@ -35,9 +35,9 @@ Before starting work, claim your tasks here. This prevents two agents from updat
 // Format: "TaskID": { "claimed_by": "agent-name", "claimed_at": "ISO timestamp" }
 {
   "M01": { "claimed_by": null, "claimed_at": null },
-  "M02": { "claimed_by": "codex", "claimed_at": "2026-04-13T13:20:47+05:30" },
+  "M02": { "claimed_by": null, "claimed_at": null },
   "M03": { "claimed_by": null, "claimed_at": null },
-  "M04": { "claimed_by": "codex", "claimed_at": "2026-04-13T13:20:47+05:30" },
+  "M04": { "claimed_by": null, "claimed_at": null },
   "M05": { "claimed_by": null, "claimed_at": null }
 }
 ```
@@ -48,15 +48,16 @@ Run `python scripts/update_todo_progress.py --once` to regenerate.
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-13 14:00`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-13 15:13`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 | Section | Tasks | Progress | Status |
 |---|---|---:|---|
-| Stage M | [3/5] |  60.0% | 🔄 IN PROGRESS |
+| Stage M | [5/5] | 100.0% | ✅ COMPLETE |
 | Stage N | [5/5] | 100.0% | ✅ COMPLETE |
 | Stage O | [25/25] | 100.0% | ✅ COMPLETE |
 
 <!-- live-status:end -->
+
 
 
 
@@ -70,10 +71,10 @@ Generated: `2026-04-13 14:00`  ·  Run `python scripts/update_todo_progress.py -
 
 > **Update (2026-04-13):**
 > - `M01`, `M03`, and `M05` are now complete live.
-> - `metrics-server` is installed and both HPAs reached `ScalingActive: True`, but `M02` stays partial because the Metrics API can still briefly flap under aggressive end-to-end load.
-> - `scripts/k8s/validate-hpa-ml-engine.sh` now proves live ml-engine scale-up (`1` â†’ `3`) cleanly, and `scripts/k8s/run-hpa-scaling-test.sh` was upgraded to use real in-cluster `/predict` load.
-> - `M04` is near-complete but still needs one clean umbrella-script rerun for the final scale-down phase after the Metrics API stabilizes fully.
-> - Additional 2026-04-13 validation showed the umbrella runner now fails accurately instead of false-passing, but repeated `300s` scale-down stabilization windows still require a longer wait budget for a clean end-to-end closeout.
+> - `metrics-server` is installed, `v1beta1.metrics.k8s.io` is back to `Available=True`, and both HPAs now hold `ScalingActive: True` across the umbrella runner's clean preflight probe window.
+> - `scripts/k8s/validate-hpa-ml-engine.sh` proved live ml-engine scale-up (`1` â†’ `3`) cleanly, and `scripts/k8s/run-hpa-scaling-test.sh` now uses real in-cluster `/predict` load plus baseline-aware scale-up detection.
+> - `M04` closed live on 2026-04-13: `ml-engine` scaled from baseline `1` to `3` pods (`desired=4`) under sustained load and returned to baseline after idle.
+> - Residual note: the Metrics API still dropped briefly twice during the long scale-down window, but it recovered and no longer blocks a clean Stage M pass.
 
 - [x] `M01` Apply and validate HPA manifests for ml-engine and bff in `tradersapp-dev`.
   - updated: 2026-04-12 23:xx
@@ -86,11 +87,11 @@ Generated: `2026-04-13 14:00`  ·  Run `python scripts/update_todo_progress.py -
   - **Startup hardening:** repo updated â€” PostgreSQL bootstrap retries on first lookup miss
   - **Status:** M01 DONE (cluster assessed, HPAs applied, blockers documented, runbook created) â€” blocked on metrics-server + rebuild/redeploy to verify startup hardening live
 
-- [-] `M02` Install metrics-server and verify `ScalingActive: True` on both HPAs.
-  - updated: 2026-04-13 13:57
-  - Live k3s check: `kubectl describe hpa ml-engine-hpa` and `kubectl describe hpa bff-hpa` both show `ScalingActive: True`
-  - `v1beta1.metrics.k8s.io` is still `Available=False (FailedDiscoveryCheck)` and `kubectl top nodes` returns `Metrics API not available`
-  - **Status:** in progress â€” HPA conditions are green again, but metrics-server / APIService health is still too unstable to close M02 cleanly
+- [x] `M02` Install metrics-server and verify `ScalingActive: True` on both HPAs.
+  - updated: 2026-04-13 15:12
+  - Live checks now show `kubectl get apiservice v1beta1.metrics.k8s.io` = `Available=True` and `kubectl top nodes` working again
+  - The umbrella runner held a clean `3/3` preflight probe window with both `ml-engine-hpa` and `bff-hpa` reporting `ScalingActive=True`
+  - **Status:** M02 DONE â€” metrics-server repair is live and sufficient for Stage M validation, with only brief transient flaps remaining under heavy cooldown polling
 
 - [x] `M03` Fix ml-engine PVC issues (ml-models-pvc + ml-state-pvc) so pods reach Running state.
   - updated: 2026-04-12
@@ -98,11 +99,12 @@ Generated: `2026-04-13 14:00`  ·  Run `python scripts/update_todo_progress.py -
   - PostgreSQL bootstrap retry fix committed (ml-engine startup hardening)
   - **Status:** in progress â€” blocked on rebuild/redeploy of ml-engine with startup hardening fix
 
-- [-] `M04` Run `scripts/k8s/run-hpa-scaling-test.sh` end-to-end; verify replicas scale up under load and scale down after idle.
-  - updated: 2026-04-13 13:57
-  - Umbrella runner hardened: consecutive clean Metrics API / `ScalingActive` probes before load, scale-down wait derived from live HPA policy, metrics-flap deadline extensions during cooldown
-  - Live follow-up: API server `readyz` currently fails `rbac/bootstrap-roles` and `apiservice-discovery-controller`, and `kubectl get apiservice v1beta1.metrics.k8s.io` remains `FailedDiscoveryCheck`
-  - **Status:** in progress â€” script is ready for the final rerun, but live end-to-end validation is still blocked on control-plane and metrics API stability
+- [x] `M04` Run `scripts/k8s/run-hpa-scaling-test.sh` end-to-end; verify replicas scale up under load and scale down after idle.
+  - updated: 2026-04-13 15:12
+  - Umbrella runner fix: scale-up detection now compares against the live baseline instead of a hardcoded `> 1`, preventing false positives when `ml-engine` is already above floor
+  - Live pass artifact: `.artifacts/hpa-scaling-test-live-20260413-092043/result.txt` = `PASS`
+  - Verified cycle: baseline `1` â†’ scale-up detected at `replicas=3`, `desired=4` after `30s` of sustained `/predict` load â†’ scale-down returned to baseline `1`
+  - **Status:** M04 DONE â€” end-to-end HPA validation passed on the live cluster
 
 - [x] `M05` Verify bff HPA scales independently from ml-engine under BFF-targeted load.
   - updated: 2026-04-12

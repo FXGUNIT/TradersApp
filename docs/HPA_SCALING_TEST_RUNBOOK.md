@@ -1,6 +1,6 @@
 # HPA Scaling Test Runbook
 
-**Status:** Live cluster tested - current blockers identified  
+**Status:** Live validation passed - residual metrics flaps noted  
 **Last Updated:** 2026-04-13  
 **Cluster:** desktop-control-plane (k3s v1.34.3) - `tradersapp-dev`
 
@@ -54,18 +54,19 @@ What was verified live:
 ### 2026-04-13 Recovery Summary
 
 - `metrics-server` was installed live and patched with `--kubelet-insecure-tls`
-- steady-state `kubectl top` works and both HPAs reached `ScalingActive: True`
-- `ml-engine` now reaches `2/2 Ready` on `dev-retryfix-20260413a`
+- steady-state `kubectl top` works again, `kubectl get apiservice v1beta1.metrics.k8s.io` is back to `Available=True`, and both HPAs reached `ScalingActive: True`
+- `ml-engine` now reaches `1/1` or `2/2 Ready` on `dev-retryfix-20260413a` depending on current HPA size
 - `bff` now reaches `1/1 Ready` per pod on `dev-readyprobe-20260413b` with `httpGet` probes and `BFF_HOST=0.0.0.0`
 - `scripts/k8s/validate-hpa-ml-engine.sh` cleanly scaled `ml-engine` from `1` to `3`
 - independent BFF-targeted load scaled `bff` from `2` to `4` and later back to `2`
-- follow-up live checks still show `v1beta1.metrics.k8s.io` as `Available=False (FailedDiscoveryCheck)` and `kubectl top nodes` returns `Metrics API not available`
-- `kubectl describe hpa ml-engine-hpa` and `kubectl describe hpa bff-hpa` still report `ScalingActive=True`, so HPA conditions must be paired with live Metrics API checks before closing Stage M
-- remaining risk: under aggressive end-to-end validation, the Metrics API can still briefly flap and force one more clean rerun of the umbrella script
+- the umbrella runner now uses live-baseline scale-up detection instead of a hardcoded `> 1`, which fixed a false-positive exit when `ml-engine` started above floor
+- live umbrella pass artifact: `.artifacts/hpa-scaling-test-live-20260413-092043/result.txt` = `PASS`
+- 2026-04-13 umbrella validation proved `ml-engine` baseline `1` -> `3` replicas (`desired=4`) under `/predict` load and back to baseline after idle
+- residual risk: the Metrics API still dropped briefly twice during the long scale-down window, but it recovered and no longer blocks a clean Stage M pass
 
 ### Metrics API State
 
-`metrics-server` is present in `kube-system`, but the metrics API is still flapping between healthy and unavailable:
+`metrics-server` is present in `kube-system`, and the steady-state metrics API is healthy again:
 
 ```bash
 kubectl describe apiservice v1beta1.metrics.k8s.io
@@ -74,11 +75,10 @@ kubectl top pods -n tradersapp-dev
 ```
 
 Observed state:
-- `kubectl top` sometimes works and sometimes returns `Metrics API not available`
-- the `metrics-server` pod has a high restart count
-- `bff-hpa` can report `ScalingActive: True` when metrics are present
-- `ml-engine-hpa` still becomes noisy whenever the Metrics API drops out
-- recent live checks showed the aggregated API can stay `False (FailedDiscoveryCheck)` even while both HPAs still advertise `ScalingActive=True`
+- `kubectl get apiservice v1beta1.metrics.k8s.io` currently reports `Available=True`
+- `kubectl top nodes` and `kubectl top pods -n tradersapp-dev` work in steady state
+- the umbrella runner held a clean `3/3` preflight probe window with both HPAs at `ScalingActive=True`
+- two short `Metrics API not available` windows were still observed during the 2026-04-13 scale-down loop, so HPA health should still be paired with live Metrics API checks during future regressions
 
 ### PVC State
 
@@ -100,12 +100,12 @@ tradersapp-tradersapp-feast-features  Pending
 kubectl get deploy,pods -n tradersapp-dev
 ```
 
-Current runtime blockers:
-- new `ml-engine` pods can reach `2/2 Ready`, but the deployment is not yet stably converged
-- `bff` can scale, but its pods are still not consistently Ready
+Current runtime notes:
+- `ml-engine` and `bff` both scale and converge normally in `tradersapp-dev`
 - `redis` and `tradersapp-postgres` are healthy
+- `minio-setup` still reports a missing `mlflow-runtime-secret`, but that job is outside the HPA validation path
 
-Stage M is now blocked by metrics stability and app readiness - not by PVC provisioning or HPA naming drift.
+Stage M is no longer blocked by app readiness, PVCs, or HPA naming drift. Remaining follow-up is optional hardening around transient Metrics API drops during long cooldown windows.
 
 ---
 
@@ -208,7 +208,7 @@ NAMESPACE=tradersapp-dev bash scripts/k8s/validate-hpa-bff.sh
 ```
 
 The scripts now refuse to continue if a drifted HPA with the wrong name already targets the deployment.
-The umbrella runner now also requires a clean probe window where the Metrics API responds and both HPAs hold `ScalingActive=True`; during scale-down it can extend the wait budget when the Metrics API flaps and returns `BLOCKED` instead of misclassifying the run as a clean failure.
+The umbrella runner now also requires a clean probe window where the Metrics API responds and both HPAs hold `ScalingActive=True`; it uses live-baseline scale-up detection, and during scale-down it can extend the wait budget when the Metrics API flaps instead of misclassifying the run as a clean failure.
 
 ### Step 4: Watch Scaling Events
 
@@ -220,7 +220,7 @@ watch -n5 "kubectl get hpa -n tradersapp-dev && kubectl get pods -n tradersapp-d
 ### Step 5: Validate Scale-Up
 
 Pass criteria:
-- `kubectl get hpa ml-engine-hpa -n tradersapp-dev` shows `currentReplicas > 1`
+- `kubectl get hpa ml-engine-hpa -n tradersapp-dev` shows replicas rising above the live baseline captured before load
 - `kubectl get hpa bff-hpa -n tradersapp-dev` can scale independently under BFF-targeted load
 - pod events show no evictions or crashes during scaling
 - `kubectl top pods -n tradersapp-dev -l app=ml-engine` shows CPU above the configured threshold during the test
@@ -246,15 +246,13 @@ After load stops:
 
 ---
 
-## Blocker Summary
+## Residual Risks
 
-| Blocker | Severity | Fix |
-|---------|----------|-----|
-| Live HPAs drifted to manual `bff` / `ml-engine` objects pinned to `1/1` | Critical | Delete drifted HPAs and apply repo-managed `bff-hpa` / `ml-engine-hpa` |
-| `metrics.k8s.io` API unhealthy | Critical | Repair metrics-server until `kubectl top` works and HPA reports `ScalingActive=True` |
-| `custom.metrics.k8s.io` not registered | Medium | Install Prometheus adapter if custom latency metrics are required |
-| `ml-engine` startup probes failing | Critical | Redeploy a healthy `dev-latest` image and verify `/live` and `/ready` |
-| `bff` startup probes timing out | Medium | Fix BFF readiness after Redis and ML Engine reachability are stable |
+| Risk | Severity | Follow-up |
+|------|----------|-----------|
+| Transient `metrics.k8s.io` drops can still appear during long scale-down windows | Medium | Keep pairing HPA checks with live `kubectl top` / APIService checks when debugging regressions |
+| `custom.metrics.k8s.io` is not registered in `tradersapp-dev` | Medium | Install Prometheus adapter only if custom latency metrics are required in this environment |
+| `minio-setup` still fails on missing `mlflow-runtime-secret` | Low | Repair the secret if that bootstrap job matters for another stage; it does not block HPA validation |
 
 ---
 
