@@ -11,16 +11,17 @@
 
 Every task uses one of these four prefixes â€” nothing else:
 
-| Prefix | Meaning |
-| ------ | ------- |
-| `[ ]` | Not started |
-| `[-]` | In progress (with inline status) |
-| `[x]` | Done (with commit hash + date) |
-| `[!]` | Blocked (with blocker reason) |
+| Prefix | Meaning                          |
+| ------ | -------------------------------- |
+| `[ ]`  | Not started                      |
+| `[-]`  | In progress (with inline status) |
+| `[x]`  | Done (with commit hash + date)   |
+| `[!]`  | Blocked (with blocker reason)    |
 
 ### Atomic Update Rule
 
 **Never rewrite another agent's task line.** To update a task:
+
 1. Edit only your assigned task's line
 2. Add a timestamp: `updated: 2026-04-13 02:30`
 3. If the task is new, append to the bottom of its stage section
@@ -62,8 +63,10 @@ Before starting work, claim your tasks here. This prevents two agents from updat
 Run `python scripts/update_todo_progress.py --once` to regenerate.
 
 <!-- live-status:start -->
+
 ## Live Status
-Generated: `2026-04-14 00:01`  ·  Run `python scripts/update_todo_progress.py --once` to update
+
+Generated: `2026-04-14 00:01` · Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Active Backlog    0.0%  [------------------------]
@@ -71,67 +74,28 @@ Stage Progress  00/01 complete
 Task Counts     done 000 | in progress 000 | blocked 000 | todo 020 | total 020
 ```
 
-| Section | Tasks | Progress | Status |
-|---|---|---:|---|
-| Stage R | [0/20] |   0.0% | PENDING |
+| Section | Tasks  | Progress | Status  |
+| ------- | ------ | -------: | ------- |
+| Stage R | [0/20] |     0.0% | PENDING |
 
 <!-- live-status:end -->
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 ## Phase Summary (Historical â€” all complete)
 
-| Phase | Tasks | Status |
-|---|---|---|
-| Phase 1: Audits | 3 | âœ… Complete |
-| Phase 2: Stateless Service Layer | 10 | âœ… Complete |
-| Phase 3: Kubernetes Infrastructure | 15 | âœ… Complete |
-| Phase 4: Kafka Message Queue Architecture | 9 | âœ… Complete |
-| Phase 5: Observability | 9 | âœ… Complete |
-| Phase 6: Frontend/React Architecture | 14 | âœ… Complete |
-| Phase 7: ML Pipeline & Training | 15 | âœ… Complete |
-| Phase 8: Data Pipeline & DVC | 6 | âœ… Complete |
-| Phase 9: Deployment & Infrastructure | 12 | âœ… Complete |
-| Phase 10: Security & Secrets | 5 | âœ… Complete |
-| Phase 11: Performance Optimization | 1 | âœ… Complete |
-| Phase 12: Architecture Truth & Documentation | 12 | âœ… Complete |
+| Phase                                        | Tasks | Status       |
+| -------------------------------------------- | ----- | ------------ |
+| Phase 1: Audits                              | 3     | âœ… Complete |
+| Phase 2: Stateless Service Layer             | 10    | âœ… Complete |
+| Phase 3: Kubernetes Infrastructure           | 15    | âœ… Complete |
+| Phase 4: Kafka Message Queue Architecture    | 9     | âœ… Complete |
+| Phase 5: Observability                       | 9     | âœ… Complete |
+| Phase 6: Frontend/React Architecture         | 14    | âœ… Complete |
+| Phase 7: ML Pipeline & Training              | 15    | âœ… Complete |
+| Phase 8: Data Pipeline & DVC                 | 6     | âœ… Complete |
+| Phase 9: Deployment & Infrastructure         | 12    | âœ… Complete |
+| Phase 10: Security & Secrets                 | 5     | âœ… Complete |
+| Phase 11: Performance Optimization           | 1     | âœ… Complete |
+| Phase 12: Architecture Truth & Documentation | 12    | âœ… Complete |
 
 ---
 
@@ -340,3 +304,117 @@ Task Counts     done 000 | in progress 000 | blocked 000 | todo 020 | total 020
   - **Step 4:** Record any residual risks explicitly; if any material risk remains, the word "flawless" stays disallowed.
   - **Step 5:** Require an explicit signoff that the evidence supports the claim across functionality, security, reliability, and operations.
   - **Exit criteria:** A written final gate says either "claim allowed" or "claim not allowed," based on evidence rather than optimism.
+
+Stage R Supplemental: UI/UX Precision Matrix (Execution Delta, Non-Duplicate)
+
+Purpose: This section operationalizes existing Stage R goals at test-execution depth. It does not replace or restate R01-R20.
+
+Dedup rule: If an artifact already proves a check in R02, R11, R13, R15, R16, R19, or R20, link that artifact instead of rerunning.
+
+RS01 State-Level Visual Regression Matrix (covers R02, R13, R15)
+
+Why this exists: Page-level tests miss most regressions in component states.
+Fast Track:
+Step 1: Create state inventory for each critical component: default, hover, focus, active, disabled, loading, success, empty, error.
+Step 2: Capture deterministic baseline screenshots at desktop and mobile.
+Step 3: Gate merges on visual diff threshold.
+Deep Track:
+Step 1: Add long-text, overflow, and missing-icon variants.
+Step 2: Add changed-flow before/after snapshots for each PR.
+Step 3: Stabilize fonts, time, data, and viewport to eliminate false diffs.
+Exit criteria: Critical component states are visually snapshot-protected with deterministic CI failure on regression.
+RS02 Responsive Breakpoint Matrix Coverage (covers R02, R15)
+
+Why this exists: Layout defects often happen between standard breakpoints.
+Fast Track:
+Step 1: Run core flows at widths 320, 375, 390, 768, 1024, 1280.
+Step 2: Assert no clipping, no horizontal scroll, no hidden primary actions.
+Step 3: Store screenshots by width.
+Deep Track:
+Step 1: Add 1440 and ultrawide runs.
+Step 2: Test orientation switches and dynamic browser chrome behavior.
+Step 3: Validate safe-area handling for notch devices.
+Exit criteria: Core flows are layout-stable and actionable across viewport matrix.
+RS03 Design Token Contract Enforcement (covers R13, R16)
+
+Why this exists: Styling drift breaks consistency and accessibility over time.
+Fast Track:
+Step 1: Block raw color literals in component styles.
+Step 2: Enforce spacing, radius, typography token usage.
+Step 3: Fail CI when contract is violated.
+Deep Track:
+Step 1: Generate token drift report versus approved token set.
+Step 2: Validate semantic state tokens for success/warn/error/info usage.
+Step 3: Validate contrast tokens against AA thresholds.
+Exit criteria: UI styling is token-governed with hard gate enforcement.
+RS04 Interaction Contract For Every Actionable Control (covers R02, R11, R16)
+
+Why this exists: Click-only tests miss keyboard, loading, and duplicate-submit faults.
+Fast Track:
+Step 1: Inventory all buttons, links, toggles by route.
+Step 2: Assert role/name and enabled/disabled behavior.
+Step 3: Assert keyboard activation where applicable.
+Deep Track:
+Step 1: Validate hover/focus-visible/active/loading visual states.
+Step 2: Validate repeat-click protection for non-idempotent actions.
+Step 3: Validate post-failure recovery state and retry readiness.
+Exit criteria: Every actionable control is validated for pointer, keyboard, loading, and failure behavior.
+RS05 Hostile Content And Localization Resilience (covers R02, R06, R16)
+
+Why this exists: Real data and locale expansion frequently break polished layouts.
+Fast Track:
+Step 1: Inject long labels, empty values, huge numbers, null-like values.
+Step 2: Assert no overlap, clipping, or action displacement.
+Step 3: Validate numeric sign/rounding display edges.
+Deep Track:
+Step 1: Run pseudo-locale expansion at 2x to 3x text.
+Step 2: Test long unbroken strings and mixed-script strings.
+Step 3: Validate pluralization and locale date/number formatting.
+Exit criteria: UI remains readable and structurally stable under hostile/localized content.
+RS06 Motion, Transition, And Layout-Shift Integrity (covers R11, R13, R16)
+
+Why this exists: Motion bugs degrade UX quality even when logic is correct.
+Fast Track:
+Step 1: Assert transitions stay within timing budget and do not block interaction.
+Step 2: Assert skeleton-to-content swaps avoid major jumps.
+Step 3: Assert reduced-motion preference is honored.
+Deep Track:
+Step 1: Set per-route layout-shift thresholds and enforce in CI.
+Step 2: Verify animation does not reorder keyboard focus unexpectedly.
+Step 3: Verify animation cancellation on route changes and modal close.
+Exit criteria: Motion behavior is smooth, accessible, and budgeted.
+RS07 Cross-Browser Rendering And Behavior Parity (covers R15, R16)
+
+Why this exists: Browser-specific regressions are common and often missed.
+Fast Track:
+Step 1: Run core flows on Chromium, Firefox, WebKit profiles.
+Step 2: Assert auth popup, file picker, modal scroll lock, clipboard behavior.
+Step 3: Archive browser-specific screenshots for critical routes.
+Deep Track:
+Step 1: Validate font fallback, line-height, icon rendering parity.
+Step 2: Validate fixed/sticky positioning and overflow behavior.
+Step 3: Document intentional exceptions with impact and rationale.
+Exit criteria: Declared browser matrix is green, with explicitly documented exceptions only.
+RS08 CI Quality Gates And Flake Control (covers R19, R20)
+
+Why this exists: Quality checks must block regressions, not just report them.
+Fast Track:
+Step 1: Define hard fail thresholds for visual diffs, a11y, layout shift.
+Step 2: Require CI jobs for visual, a11y, interaction, and responsive checks.
+Step 3: Block merge on any gate failure.
+Deep Track:
+Step 1: Add flaky-test quarantine policy with owner and expiry.
+Step 2: Freeze clocks, test data, and network mocks for determinism.
+Step 3: Run fast PR suite and deep nightly suite with shared pass criteria.
+Exit criteria: UI/UX quality is enforced by deterministic, non-optional CI gates.
+Duplicate-control map:
+
+R02: Broadened into executable UI-state and control-level verification via RS01, RS02, RS04, RS05.
+
+R11: Extended with failure-recovery interaction and motion-resilience checks via RS04, RS06.
+
+R13: Extended with measurable UI quality budgets via RS06, RS08.
+
+R15: Extended with concrete viewport/browser execution grids via RS02, RS07.
+
+R16: Extended with token, interaction, content, and motion accessibility enforcement via RS03, RS04, RS05, RS06.
