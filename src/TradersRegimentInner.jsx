@@ -49,9 +49,9 @@ import {
 } from "./services/ai-router.js";
 import { ADMIN_EMAIL, ADMIN_UID } from "./services/firebase.js";
 import {
-  listAdminUsers as _listAdminUsers,
-  approveAdminUser as _approveAdminUser,
-  blockAdminUser as _blockAdminUser,
+  listUsers as _listAdminUsers,
+  approveUser as _approveAdminUser,
+  blockUser as _blockAdminUser,
   fetchMaintenanceState as _fetchMaintenanceState,
   toggleMaintenanceState as _toggleMaintenanceState,
 } from "./services/clients/AdminSecurityClient.js";
@@ -101,9 +101,6 @@ import { sendTelegramAlert } from "./utils/securityAlertUtils.js";
 import {
   buildScreenContent,
   buildAppShell,
-  listAdminUsers,
-  approveAdminUser,
-  blockAdminUser,
 } from "./TradersRegimentInner.render.jsx";
 
 import "./features/shell/registerLegacyRuntimeStyles.js";
@@ -277,6 +274,9 @@ function TradersRegimentInner() {
     adminMasterEmail, adminMasterEmailVerified, adminOtpStep, adminOtps,
     adminOtpsVerified, adminPassErr, adminPassInput, adminOtpErr,
     showAdminPrompt, showAdminPwd, _SCREEN_IDS, ADMIN_UID, ADMIN_EMAIL,
+    listAdminUsers: _listAdminUsers,
+    approveAdminUser: _approveAdminUser,
+    blockAdminUser: _blockAdminUser,
     setIsAudioMuted: (v) => setIsAudioMuted(v),
     handleLogin, handleStructuredGoogleAuth, handleLoginPasswordReset,
     resetAdminPromptState, setShowAdminPrompt, setAdminMasterEmail,
