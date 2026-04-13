@@ -8,6 +8,8 @@ from __future__ import annotations
 import os
 import sys
 import tempfile
+import types
+from importlib.machinery import ModuleSpec
 from pathlib import Path
 from typing import Generator
 
@@ -19,6 +21,14 @@ import pytest
 ML_ENGINE_ROOT = Path(__file__).parent.parent
 if str(ML_ENGINE_ROOT) not in sys.path:
     sys.path.insert(0, str(ML_ENGINE_ROOT))
+
+ml_engine_pkg = types.ModuleType("ml_engine")
+ml_engine_pkg.__file__ = str(ML_ENGINE_ROOT / "ml_engine.py")
+ml_engine_pkg.__package__ = "ml_engine"
+ml_engine_pkg.__path__ = [str(ML_ENGINE_ROOT)]
+ml_engine_pkg.__spec__ = ModuleSpec("ml_engine", loader=None, is_package=True)
+ml_engine_pkg.__spec__.submodule_search_locations = ml_engine_pkg.__path__
+sys.modules["ml_engine"] = ml_engine_pkg
 
 # Track whether mock regime modules have been cleaned up after test_regime_ensemble
 _cleanup_done = False
@@ -267,5 +277,3 @@ def pytest_collection_finish(session):
             ):
                 del sys.modules[key]
         _cleanup_done = True
-
-
