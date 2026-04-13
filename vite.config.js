@@ -15,5 +15,43 @@ export default defineConfig({
   },
   build: {
     chunkSizeWarningLimit: 1700,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) {
+            return undefined
+          }
+
+          if (id.includes('tesseract.js')) {
+            return 'ocr'
+          }
+
+          if (
+            id.includes('react-markdown') ||
+            id.includes('remark-gfm') ||
+            id.includes('react-syntax-highlighter')
+          ) {
+            return 'markdown'
+          }
+
+          if (id.includes('firebase/')) {
+            return 'firebase'
+          }
+
+          if (
+            id.includes('@emailjs/') ||
+            id.includes('emailjs-com')
+          ) {
+            return 'email'
+          }
+
+          if (id.includes('lucide-react')) {
+            return 'icons'
+          }
+
+          return 'vendor'
+        },
+      },
+    },
   },
 })

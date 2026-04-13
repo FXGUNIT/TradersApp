@@ -5,18 +5,10 @@
  */
 import React from "react";
 
-import CollectiveConsciousnessPage from "./pages/CollectiveConsciousness.jsx";
-import MainTerminal from "./features/terminal/MainTerminal.jsx";
 import CleanLoginScreen from "./features/auth/CleanLoginScreen.jsx";
 import AdminUnlockModal from "./features/admin-security/AdminUnlockModal.jsx";
-import AdminDashboardScreen from "./features/admin-security/AdminDashboardScreen.jsx";
-import AdminInvitesView from "./features/admin-security/AdminInvitesView.jsx";
 import DebugOverlay from "./features/admin-security/DebugOverlay.jsx";
 import ErrorBoundaryAdmin from "./features/admin-security/ErrorBoundaryAdmin.jsx";
-import SessionsManagementScreen from "./features/identity/SessionsManagementScreen.jsx";
-import ForcePasswordResetScreen from "./features/identity/ForcePasswordResetScreen.jsx";
-import WaitingRoomScreen from "./features/identity/WaitingRoomScreen.jsx";
-import SupportChatModal from "./features/support/SupportChatModal.jsx";
 import { UserListProvider } from "./features/admin-security/UserListContext.jsx";
 import Toast from "./features/shell/Toast.jsx";
 import FloatingChatWidget from "./components/FloatingChatWidget.jsx";
@@ -35,6 +27,30 @@ const CleanOnboarding = React.lazy(
 );
 const RegimentHub = React.lazy(
   () => import("./features/hub-content/RegimentHubScreen.jsx"),
+);
+const WaitingRoomScreen = React.lazy(
+  () => import("./features/identity/WaitingRoomScreen.jsx"),
+);
+const ForcePasswordResetScreen = React.lazy(
+  () => import("./features/identity/ForcePasswordResetScreen.jsx"),
+);
+const SessionsManagementScreen = React.lazy(
+  () => import("./features/identity/SessionsManagementScreen.jsx"),
+);
+const CollectiveConsciousnessPage = React.lazy(
+  () => import("./pages/CollectiveConsciousness.jsx"),
+);
+const MainTerminal = React.lazy(
+  () => import("./features/terminal/MainTerminal.jsx"),
+);
+const AdminDashboardScreen = React.lazy(
+  () => import("./features/admin-security/AdminDashboardScreen.jsx"),
+);
+const AdminInvitesView = React.lazy(
+  () => import("./features/admin-security/AdminInvitesView.jsx"),
+);
+const SupportChatModal = React.lazy(
+  () => import("./features/support/SupportChatModal.jsx"),
 );
 
 export { CleanOnboarding, RegimentHub };

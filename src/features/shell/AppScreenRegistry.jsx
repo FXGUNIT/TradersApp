@@ -155,34 +155,40 @@ export default function AppScreenRegistry({
 
     case "waiting":
       return (
-        <WaitingRoomScreen
-          profile={profile}
-          auth={auth}
-          onRefresh={checkApprovalStatus}
-          onResendVerification={handleResendVerificationEmail}
-          onLogout={handleLogout}
-        />
+        <Suspense fallback={<LoadingFallback />}>
+          <WaitingRoomScreen
+            profile={profile}
+            auth={auth}
+            onRefresh={checkApprovalStatus}
+            onResendVerification={handleResendVerificationEmail}
+            onLogout={handleLogout}
+          />
+        </Suspense>
       );
 
     case "forcePasswordReset":
       return (
-        <ForcePasswordResetScreen
-          profile={profile}
-          onReset={handlePasswordReset}
-          onLogout={handleLogout}
-          theme={T}
-        />
+        <Suspense fallback={<LoadingFallback />}>
+          <ForcePasswordResetScreen
+            profile={profile}
+            onReset={handlePasswordReset}
+            onLogout={handleLogout}
+            theme={T}
+          />
+        </Suspense>
       );
 
     case "sessions":
       return (
-        <SessionsManagementScreen
-          profile={profile}
-          auth={auth}
-          currentSessionId={currentSessionId}
-          onBack={() => setScreen("hub")}
-          showToast={showToast}
-        />
+        <Suspense fallback={<LoadingFallback />}>
+          <SessionsManagementScreen
+            profile={profile}
+            auth={auth}
+            currentSessionId={currentSessionId}
+            onBack={() => setScreen("hub")}
+            showToast={showToast}
+          />
+        </Suspense>
       );
 
     case "hub":
@@ -206,15 +212,17 @@ export default function AppScreenRegistry({
 
     case "consciousness":
       return (
-        <CollectiveConsciousnessPage
-          onBack={() => setScreen(consciousnessReturnScreen || "hub")}
-          theme={theme}
-          currentTheme={currentTheme}
-          onThemeChange={handleThemeChange}
-          auth={auth}
-          profile={profile}
-          aiStatuses={aiStatuses}
-        />
+        <Suspense fallback={<LoadingFallback />}>
+          <CollectiveConsciousnessPage
+            onBack={() => setScreen(consciousnessReturnScreen || "hub")}
+            theme={theme}
+            currentTheme={currentTheme}
+            onThemeChange={handleThemeChange}
+            auth={auth}
+            profile={profile}
+            aiStatuses={aiStatuses}
+          />
+        </Suspense>
       );
 
     case "admin":

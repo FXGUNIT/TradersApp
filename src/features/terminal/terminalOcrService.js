@@ -17,8 +17,6 @@
  *   - Session H/L/O  → 4-7 digit range
  */
 
-import { createWorker } from "tesseract.js";
-
 // ─── Regex patterns ────────────────────────────────────────────────────────────
 
 /**
