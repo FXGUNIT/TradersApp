@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   getRememberDevice,
   setRememberDevice,
@@ -28,17 +28,9 @@ export default function AdminUnlockModal({
   verificationError,
   verificationState,
 }) {
-  const [rememberDevice, setRememberDeviceState] = useState(false);
-  const [deviceInfo, setDeviceInfo] = useState("");
-
-  useEffect(() => {
-    if (show) {
-      setRememberDeviceState(getRememberDevice());
-      const { browser, os, device } = parseUserAgent();
-      const fp = getDeviceFingerprint();
-      setDeviceInfo(`${browser} on ${os}${device !== "desktop" ? ` (${device})` : ""} · ${fp.substring(0, 12)}...`);
-    }
-  }, [show]);
+  const [rememberDevice, setRememberDeviceState] = useState(() =>
+    getRememberDevice(),
+  );
 
   const handleRememberChange = (checked) => {
     setRememberDeviceState(checked);
@@ -56,6 +48,9 @@ export default function AdminUnlockModal({
     otps,
     otpsVerified,
   } = verificationState;
+  const { browser, os, device } = parseUserAgent();
+  const fp = getDeviceFingerprint();
+  const deviceInfo = `${browser} on ${os}${device !== "desktop" ? ` (${device})` : ""} · ${fp.substring(0, 12)}...`;
 
   return (
     <div
@@ -79,7 +74,9 @@ export default function AdminUnlockModal({
             marginBottom: 18,
           }}
         >
-          <div style={{ color: theme.purple, fontSize: 20 }}>🛡️</div>
+          <div style={{ color: theme.purple, fontSize: 20 }}>
+            {"\u{1F6E1}\uFE0F"}
+          </div>
           <div
             style={{
               color: theme.purple,
@@ -314,11 +311,11 @@ export default function AdminUnlockModal({
                   textAlign: "center",
                   transition: "color 0.15s ease",
                 }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.color = theme.blue || "#3B82F6";
+                onMouseEnter={(event) => {
+                  event.currentTarget.style.color = theme.blue || "#3B82F6";
                 }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.color = theme.muted || "#9CA3AF";
+                onMouseLeave={(event) => {
+                  event.currentTarget.style.color = theme.muted || "#9CA3AF";
                 }}
               >
                 {showPassword ? "HIDE" : "SHOW"}
@@ -337,7 +334,6 @@ export default function AdminUnlockModal({
               </div>
             )}
 
-            {/* Remember this device */}
             <label
               style={{
                 display: "flex",
@@ -351,7 +347,9 @@ export default function AdminUnlockModal({
               <input
                 type="checkbox"
                 checked={rememberDevice}
-                onChange={(e) => handleRememberChange(e.target.checked)}
+                onChange={(event) =>
+                  handleRememberChange(event.target.checked)
+                }
                 style={{
                   width: 16,
                   height: 16,
