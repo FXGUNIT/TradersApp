@@ -14,10 +14,9 @@ import { parseTerminalCsvText } from "./terminalCsvParser.js";
  */
 const MainTerminalCsvZone = forwardRef(function MainTerminalCsvZone(
   {
-    setParsed,          // MainTerminal's setParsed
-    setIsCsvParsing,    // MainTerminal's setIsCsvParsing
-    setParseMsg,        // MainTerminal's setParseMsg
-    setErr,             // MainTerminal's setErr (used on error fallback)
+    onParsedChange,    // (parsed: object|null) => void  [optional]
+    onParsingChange,   // (v: boolean) => void           [optional]
+    onStatusChange,    // (msg: string) => void          [optional]
   },
   ref,
 ) {
@@ -30,18 +29,18 @@ const MainTerminalCsvZone = forwardRef(function MainTerminalCsvZone(
   const csvParseRequestIdRef = useRef(0);
   const fileInputRef = useRef(null);
 
-  // ── Notify parent of state changes ──────────────────────────────────────
+  // ── Notify parent of state changes (optional — component works standalone) ──
   useEffect(() => {
-    setParsed?.(parsed);
-  }, [parsed, setParsed]);
+    onParsedChange?.(parsed);
+  }, [parsed, onParsedChange]);
 
   useEffect(() => {
-    setIsCsvParsing?.(isCsvParsing);
-  }, [isCsvParsing, setIsCsvParsing]);
+    onParsingChange?.(isCsvParsing);
+  }, [isCsvParsing, onParsingChange]);
 
   useEffect(() => {
-    setParseMsg?.(parseMsg);
-  }, [parseMsg, setParseMsg]);
+    onStatusChange?.(parseMsg);
+  }, [parseMsg, onStatusChange]);
 
   // ── Derived display values ────────────────────────────────────────────────
   const hasParsedCsv = parseMsg.startsWith("✓");

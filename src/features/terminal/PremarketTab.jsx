@@ -59,10 +59,9 @@ const PremarketTab = forwardRef(function PremarketTab(
       {/* CSV Upload — owns CSV worker + drop UI; syncs state to MainTerminal */}
       <MainTerminalCsvZone
         ref={ref}
-        setParsed={setCsvParsed}
-        setIsCsvParsing={setCsvParsing}
-        setParseMsg={setCsvStatus}
-        setErr={setErr}
+        onParsedChange={(v) => setCsvParsed(v)}
+        onParsingChange={(v) => setCsvParsing(v)}
+        onStatusChange={(msg) => setCsvStatus(msg)}
       />
 
       {/* P1 Analysis: paste zones, run button, output display */}
