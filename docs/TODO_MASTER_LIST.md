@@ -57,7 +57,7 @@ Run `python scripts/update_todo_progress.py --once` to regenerate.
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-13 16:47`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-13 16:48`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 | Section | Tasks | Progress | Status |
 |---|---|---:|---|
@@ -67,6 +67,7 @@ Generated: `2026-04-13 16:47`  ·  Run `python scripts/update_todo_progress.py -
 | Stage O | [25/25] | 100.0% | ✅ COMPLETE |
 
 <!-- live-status:end -->
+
 
 
 
@@ -204,6 +205,9 @@ Generated: `2026-04-13 16:47`  ·  Run `python scripts/update_todo_progress.py -
   - updated: 2026-04-13 22:08
 
 - [ ] `Q04` Install local dependencies and run a baseline frontend build for quick-start verification.
+  - updated: 2026-04-13 22:08
+
+- [ ] `Q05` Fix frontend container health endpoint (nginx) so Docker dev stack starts cleanly.
   - updated: 2026-04-13 22:08
 
 ## Phase Summary (Historical â€” all complete)
