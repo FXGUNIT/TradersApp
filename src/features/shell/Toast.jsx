@@ -38,14 +38,21 @@ const TOAST_COLORS = {
   },
 };
 
+function getIsMobileViewport() {
+  return typeof window !== "undefined" && window.innerWidth < 768;
+}
+
 export default function Toast({ toasts, onDismiss, fontFamily = "inherit" }) {
   const [swipedToast, setSwipedToast] = useState(null);
   const [touchStart, setTouchStart] = useState(null);
-  const [isMobile, setIsMobile] = useState(false);
+  const [isMobile, setIsMobile] = useState(getIsMobileViewport);
 
   useEffect(() => {
-    setIsMobile(window.innerWidth < 768);
-    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    if (typeof window === "undefined") {
+      return undefined;
+    }
+
+    const handleResize = () => setIsMobile(getIsMobileViewport());
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);

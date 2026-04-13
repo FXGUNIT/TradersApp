@@ -28,40 +28,40 @@
  */
 const LABEL_PATTERNS = [
   // ADX / CI / VR — 0 to ~100 range, 1-2 decimal places
-  { key: "adx",   re: /\b(?:ADX|Average Directional Index)\s*[:\-]?\s*(\d{1,3}(?:\.\d{1,3})?)/i },
-  { key: "ci",    re: /\b(?:CI|Compression Index|Compression)\s*[:\-]?\s*(\d{1,3}(?:\.\d{1,3})?)/i },
+  { key: "adx",   re: /\b(?:ADX|Average Directional Index)\s*[:-]?\s*(\d{1,3}(?:\.\d{1,3})?)/i },
+  { key: "ci",    re: /\b(?:CI|Compression Index|Compression)\s*[:-]?\s*(\d{1,3}(?:\.\d{1,3})?)/i },
 
   // ATR — 1-500 range
-  { key: "atr",   re: /\b(?:ATR|Average True Range)\s*[:\-]?\s*(\d{1,3}(?:\.\d{1,2})?)/i },
+  { key: "atr",   re: /\b(?:ATR|Average True Range)\s*[:-]?\s*(\d{1,3}(?:\.\d{1,2})?)/i },
 
   // VWAP — 4-7 digit range (futures price levels)
-  { key: "vwap",  re: /\b(?:VWAP)\s*[:\-]?\s*(\d{4,7}(?:\.\d{1,4})?)/i },
+  { key: "vwap",  re: /\b(?:VWAP)\s*[:-]?\s*(\d{4,7}(?:\.\d{1,4})?)/i },
 
   // Current price — 4-7 digit range
   { key: "currentPrice",
-    re: /\b(?:Price|Current(?: Price)?|Last(?: Price)?|Market(?: Price)?)\s*[:\-]?\s*(\d{4,7}(?:\.\d{1,4})?)/i },
+    re: /\b(?:Price|Current(?: Price)?|Last(?: Price)?|Market(?: Price)?)\s*[:-]?\s*(\d{4,7}(?:\.\d{1,4})?)/i },
 
   // Session levels — 4-7 digit range
   { key: "sessionHigh",
-    re: /\b(?:Session(?: )?High|PDH|Day(?: )?High)\s*[:\-]?\s*(\d{4,7}(?:\.\d{1,4})?)/i },
+    re: /\b(?:Session(?: )?High|PDH|Day(?: )?High)\s*[:-]?\s*(\d{4,7}(?:\.\d{1,4})?)/i },
   { key: "sessionLow",
-    re: /\b(?:Session(?: )?Low|PDL|Day(?: )?Low)\s*[:\-]?\s*(\d{4,7}(?:\.\d{1,4})?)/i },
+    re: /\b(?:Session(?: )?Low|PDL|Day(?: )?Low)\s*[:-]?\s*(\d{4,7}(?:\.\d{1,4})?)/i },
   { key: "sessionOpen",
-    re: /\b(?:Session(?: )?Open|OPen)\s*[:\-]?\s*(\d{4,7}(?:\.\d{1,4})?)/i },
+    re: /\b(?:Session(?: )?Open|OPen)\s*[:-]?\s*(\d{4,7}(?:\.\d{1,4})?)/i },
 
   // Volume — captured but not stored in extractedVals (kept for future use)
   { key: "volume",
-    re: /\b(?:Volume|Vol)\s*[:\-]?\s*(\d{4,10}(?:[,.\d]*)?)/i },
+    re: /\b(?:Volume|Vol)\s*[:-]?\s*(\d{4,10}(?:[,.\d]*)?)/i },
 
   // VWAP Slope direction (Up/Down/Flat labels, converted to numeric)
   { key: "vwapSlope",
-    re: /\b(?:VWAP(?: )?Slope)\s*[:\-]?\s*(Up|Down|Flat|Neutral)/i },
+    re: /\b(?:VWAP(?: )?Slope)\s*[:-]?\s*(Up|Down|Flat|Neutral)/i },
 
   // Five-day and twenty-day ATR
   { key: "fiveDayATR",
-    re: /\b(?:5(?:[- ])?Day\s*ATR|ATR\s*5(?:D)?)\s*[:\-]?\s*(\d{1,4}(?:\.\d{1,2})?)/i },
+    re: /\b(?:5(?:[- ])?Day\s*ATR|ATR\s*5(?:D)?)\s*[:-]?\s*(\d{1,4}(?:\.\d{1,2})?)/i },
   { key: "twentyDayATR",
-    re: /\b(?:20(?:[- ])?Day\s*ATR|ATR\s*20(?:D)?)\s*[:\-]?\s*(\d{1,4}(?:\.\d{1,2})?)/i },
+    re: /\b(?:20(?:[- ])?Day\s*ATR|ATR\s*20(?:D)?)\s*[:-]?\s*(\d{1,4}(?:\.\d{1,2})?)/i },
 ];
 
 /**

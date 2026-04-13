@@ -43,7 +43,7 @@ EULATermsSection.displayName = 'EULATermsSection';
 
 export default EULATermsSection;
 
-export const TERMS_OF_SERVICE_CONTENT = \`
+export const TERMS_OF_SERVICE_CONTENT = `
 ╔════════════════════════════════════════════════════════════════════════════════════════════════╗
 ║                    REGIMENT MASTER END USER LICENSE AGREEMENT                                 ║
 ║                         & GLOBAL COMPLIANCE COVENANT                                          ║
@@ -341,4 +341,4 @@ Licensee to law enforcement.
 
 ═══════════════════════════════════════════════════════════════════════════════════════════════
 SECTION VI: ABSOLUTE ASSUMPTION OF RISK & WAIVER OF LIABILITY
-\`;
+`;

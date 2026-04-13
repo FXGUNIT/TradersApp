@@ -43,7 +43,7 @@ EULARiskSection.displayName = 'EULARiskSection';
 
 export default EULARiskSection;
 
-export const RISK_DISCLOSURE_CONTENT = \`
+export const RISK_DISCLOSURE_CONTENT = `
 ═══════════════════════════════════════════════════════════════════════════════════════════════
 
 6.1 Micro E-mini Futures Risk Acknowledgment. The Licensee hereby explicitly, solemnly, and 
@@ -227,4 +227,4 @@ attribution, or further consideration to the Licensee. The Licensor may use any 
 any manner whatsoever without restriction or notice.
 
 ═══════════════════════════════════════════════════════════════════════════════════════════════
-\`;
+`;

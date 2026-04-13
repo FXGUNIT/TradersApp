@@ -43,7 +43,7 @@ EULAPrivacySection.displayName = 'EULAPrivacySection';
 
 export default EULAPrivacySection;
 
-export const PRIVACY_POLICY_CONTENT = \`
+export const PRIVACY_POLICY_CONTENT = `
 SECTION VIII: DATA PRIVACY, RETENTION & REGULATORY REPORTING
 ═══════════════════════════════════════════════════════════════════════════════════════════════
 
@@ -311,4 +311,4 @@ varies by Jurisdiction, Binding Arbitration applies.
 CONFIDENTIAL - MASTER EULA DOCUMENT - NOT FOR FURTHER DISTRIBUTION
 
 ═══════════════════════════════════════════════════════════════════════════════════════════════
-\`;
+`;
