@@ -15,10 +15,6 @@
  */
 import { bffFetch } from './gateways/base.js';
 
-// Log presence without leaking token values.
-console.info("Telegram Service Initialized:", {
-  configured: Boolean(typeof window !== 'undefined'),
-});
 
 // ═══════════════════════════════════════════════════════════════════
 // TASK 2.6: SECURITY ALERTS
