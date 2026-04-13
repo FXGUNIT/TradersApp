@@ -2,7 +2,8 @@
  * TerminalHeader — extracted from MainTerminal.jsx for file size compliance.
  */
 import React from "react";
-import { T, Tag, AMDPhaseTag } from "./terminalStyles.js";
+import { T } from "./terminalStyles.js";
+import { Tag, AMDPhaseTag } from "./terminalHelperComponents.jsx";
 import { CSS_VARS } from "../../styles/cssVars.js";
 
 export default function TerminalHeader({ profile, fr, displayedAmdPhase, throttleActive, onLogout }) {
