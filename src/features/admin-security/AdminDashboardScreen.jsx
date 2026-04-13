@@ -621,6 +621,7 @@ export default function AdminDashboardScreen({
         megaMenuOpen={megaMenuOpen} setMegaMenuOpen={setMegaMenuOpen}
         commandPaletteOpen={commandPaletteOpen} setCommandPaletteOpen={setCommandPaletteOpen}
         users={users} showToast={showToast} setLoading={setLoading} setDbError={setDbError}
+        listAdminUsers={listAdminUsers}
       />
 
       <div
