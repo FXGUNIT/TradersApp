@@ -48,7 +48,8 @@ Before starting work, claim your tasks here. This prevents two agents from updat
   "Q03": { "claimed_by": null, "claimed_at": null },
   "Q04": { "claimed_by": null, "claimed_at": null },
   "Q05": { "claimed_by": null, "claimed_at": null },
-  "Q06": { "claimed_by": null, "claimed_at": null }
+  "Q06": { "claimed_by": null, "claimed_at": null },
+  "Q07": { "claimed_by": null, "claimed_at": null }
 }
 ```
 
@@ -58,17 +59,18 @@ Run `python scripts/update_todo_progress.py --once` to regenerate.
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-13 17:27`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-13 17:30`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 | Section | Tasks | Progress | Status |
 |---|---|---:|---|
 | Stage M | [5/5] | 100.0% | ✅ COMPLETE |
 | Stage N | [5/5] | 100.0% | ✅ COMPLETE |
 | Stage P | [4/4] | 100.0% | ✅ COMPLETE |
-| Stage Q | [4/6] |  66.7% | 🔄 IN PROGRESS |
+| Stage Q | [4/7] |  57.1% | 🔄 IN PROGRESS |
 | Stage O | [25/25] | 100.0% | ✅ COMPLETE |
 
 <!-- live-status:end -->
+
 
 
 
@@ -225,6 +227,10 @@ Generated: `2026-04-13 17:27`  ·  Run `python scripts/update_todo_progress.py -
 - [-] `Q06` Remove frontend Docker build-network dependency from the dev stack so `dev-up.ps1` boots cleanly.
   - updated: 2026-04-13 22:57
   - `docker-compose.dev.yml` still builds the frontend image with `npm ci` inside Docker; the latest clean-stack run failed on registry timeout during that step.
+
+- [-] `Q07` Fix remaining dev-stack runtime blockers discovered during clean boot.
+  - updated: 2026-04-13 23:01
+  - Current blocker: `ml-engine` starts with `sqlite3.OperationalError: attempt to write a readonly database` because `./ml-engine/data` is mounted read-only in `docker-compose.dev.yml`.
 
 ## Phase Summary (Historical â€” all complete)
 

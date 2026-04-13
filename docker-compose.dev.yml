@@ -54,8 +54,8 @@ services:
       MKL_NUM_THREADS: "2"
       OPENBLAS_NUM_THREADS: "2"
     volumes:
-      - ./ml-engine/data:/data:ro # bind mount — edit DB from Windows
-      - ./ml-engine/models:/models:ro # bind mount — browse model files
+      - ./ml-engine/data:/data # bind mount — sqlite needs write access during startup
+      - ./ml-engine/models:/models # bind mount — local training/export flows may update artifacts
     depends_on:
       redis:
         condition: service_healthy

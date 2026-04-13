@@ -4,7 +4,7 @@
  * for the analysis gRPC service.
  */
 import grpc from "@grpc/grpc-js";
-import { createHttpServer } from "node:http";
+import { createServer as createHttpServer } from "node:http";
 import {
   toPredictPayload,
   toGrpcConsensusResponse,
