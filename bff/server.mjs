@@ -476,6 +476,7 @@ const dispatcher = createDispatcher({
   createOnboardingRouteHandler,
   createSupportRouteHandler,
   createTradeCalcRouteHandler,
+  createBoardRoomRouteHandler,
   // J01: Telegram proxy — token removed from browser bundles
   handleTelegramSendMessage,
   handleTelegramSendForensicAlert,
