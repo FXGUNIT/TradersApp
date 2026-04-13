@@ -272,10 +272,9 @@ else
 fi
 
 # Check custom metrics API
+CUSTOM_METRICS_REGISTERED=false
 if kubectl --request-timeout=10s get --raw /apis/custom.metrics.k8s.io/v1beta2 >/dev/null 2>&1; then
-  log "[OK] custom.metrics.k8s.io is registered"
-else
-  warn "custom.metrics.k8s.io NOT registered — custom HPA metrics (e.g. ml-engine-p95-latency-ms) will be <unknown>"
+  CUSTOM_METRICS_REGISTERED=true
 fi
 
 # Check HPA existence
@@ -294,6 +293,24 @@ for hpa in "$EXPECTED_ML_HPA_NAME" "$EXPECTED_BFF_HPA_NAME"; do
     fi
   fi
 done
+
+REQUIRES_CUSTOM_METRICS=false
+for hpa in "$EXPECTED_ML_HPA_NAME" "$EXPECTED_BFF_HPA_NAME"; do
+  if hpa_uses_non_resource_metrics "$hpa"; then
+    REQUIRES_CUSTOM_METRICS=true
+    break
+  fi
+done
+
+if [[ "$REQUIRES_CUSTOM_METRICS" == "true" ]]; then
+  if [[ "$CUSTOM_METRICS_REGISTERED" == "true" ]]; then
+    log "[OK] custom.metrics.k8s.io is registered"
+  else
+    warn "custom.metrics.k8s.io NOT registered — non-resource HPA metrics will be <unknown>"
+  fi
+else
+  info "Skipping custom.metrics.k8s.io check — validated HPAs only use resource metrics in this run"
+fi
 
 # Check pod readiness
 check_pods() {
