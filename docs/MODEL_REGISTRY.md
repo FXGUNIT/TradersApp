@@ -103,7 +103,7 @@ All direction models output: `{signal, probability_long, probability_short, conf
 | Special | Blends GNB output (70%) with AMD historical win rate (30%) |
 | Output | `{signal, probability_long, probability_short, confidence, reason, amd_phase, amd_win_rate}` |
 | **SLA** | P95 inference < 30ms (simple NB model) |
-| **Serving** | Triton ONNX (`amd_direction/`) — **TODO: config.pbtxt needed** |
+| **Serving** | Triton ONNX (`amd_direction/`) — ONNX artifact generated after AMD model training (config present) |
 | Quantization | FP16 |
 | ONNX Export | Generic sklearn path (`onnxmltools.convert_lightgbm`) |
 
@@ -222,7 +222,7 @@ All direction models output: `{signal, probability_long, probability_short, conf
 | Continual Learning | Fisher Information matrix computed per model hash |
 | **SLA** | P95 inference < 5000ms (generative model — latency budget higher) |
 | **Serving** | TorchScript export + Triton Python backend OR vLLM (for larger sizes) |
-| ONNX Export | **TODO: TorchScript export needed** |
+| ONNX Export | TorchScript export available via `ml-engine/models/mamba/export_torchscript.py` |
 | Memory | ~6GB for mamba-2.8b at FP16 |
 
 **Serving Options:**
@@ -297,13 +297,16 @@ ml-engine/models/triton_repo/
 ├── mlp_direction/
 │   ├── config.pbtxt
 │   └── 1/model.onnx
-├── amd_direction/           # TODO: config.pbtxt + ONNX model needed
+├── amd_direction/           # config.pbtxt present; model.onnx generated after AMD model training
 │   └── 1/model.onnx
 ├── regime_ensemble/
 │   ├── config.pbtxt         # Python backend, batch 32, CPU
 │   └── 1/model.py           # Lazy-loads RegimeEnsemble on first request
 ├── time_probability/
 │   ├── config.pbtxt         # Python backend, batch 64, CPU
+│   └── 1/model.py
+├── mamba_ssm/
+│   ├── config.pbtxt         # Python backend (TorchScript), batch 8, CPU/GPU
 │   └── 1/model.py
 └── move_magnitude/
     ├── config.pbtxt         # Python backend, batch 64, CPU
