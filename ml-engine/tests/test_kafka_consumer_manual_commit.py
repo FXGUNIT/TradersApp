@@ -245,7 +245,9 @@ def test_manual_commit_after_dlq_exhaustion_unblocks_consumer(consumer_module, m
 
     # Patch the get_producer function on the raw consumer module so the DLQ
     # forward path (from kafka.producer.get_producer) returns our dummy.
-    import ml_engine.kafka.producer as mlq_producer
+    sys.modules.pop("kafka", None)
+    sys.modules.pop("kafka.producer", None)
+    import kafka.producer as mlq_producer
     monkeypatch.setattr(mlq_producer, "get_producer", lambda: dlq_producer)
 
     def handler(_event: dict):
