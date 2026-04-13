@@ -157,9 +157,11 @@ function checkNumericalIntegrity(aiResponse, trades) {
     checks.calculatesNetPnL = true;
 
     // Check if the calculated value is correct
-    const pnlMatch = aiResponse.match(/\$?-?(\d+(?:,\d{3})*(?:\.\d{2})?)/);
+    const pnlMatch =
+      aiResponse.match(/(?:net|total)\s+p&l[^$\d-]*\$?(-?\d+(?:,\d{3})*(?:\.\d{2})?)/i) ||
+      aiResponse.match(/p&l[^$\d-]*\$?(-?\d+(?:,\d{3})*(?:\.\d{2})?)/i);
     if (pnlMatch) {
-      const extractedValue = parseInt(pnlMatch[1].replace(/,/g, ''));
+      const extractedValue = parseFloat(pnlMatch[1].replace(/,/g, ''));
       if (extractedValue === Math.abs(actualNetPnL) || extractedValue === actualNetPnL) {
         checks.correctNetPnL = true;
       } else {
