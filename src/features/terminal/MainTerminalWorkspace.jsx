@@ -238,6 +238,8 @@ export default function MainTerminalWorkspace({
     account: "account",
   };
   // activeTab is managed in MainTerminal; expose null here and let onReturn carry derived values
+  void activeTab;
+  void resetScopeByTab;
   const tabResetScope = "all";
 
   // Pass all action callbacks and derived values back to MainTerminal
