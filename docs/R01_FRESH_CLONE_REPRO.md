@@ -1,6 +1,6 @@
 # R01 Fresh-Clone Repro Log
 
-Status: in progress
+Status: blocked on host WSL/Docker recovery
 Last updated: 2026-04-14
 
 ## Goal
@@ -11,9 +11,10 @@ Prove the documented local bootstrap path works from a genuinely clean environme
 
 - Workspace root: `E:\TradersApp`
 - Disposable sibling workspace used for the first valid pass: `E:\TradersApp-R01-Pass1`
-- OS: Windows host
-
-Tool versions are being captured during the active rerun because Docker/WSL is currently blocked on the host.
+- OS: `Microsoft Windows NT 10.0.19045.0`
+- Node.js: `v24.14.0`
+- npm: `11.9.0`
+- Python: `3.14.3`
 
 ## What Was Learned
 
@@ -61,6 +62,12 @@ That means the current blocker is host-level, not repo-level.
 
 - `scripts/dev-up.ps1` now fails fast with a clear message when Docker Desktop or the WSL-backed Linux engine is unavailable.
 - `.gitignore` was expanded and generated artifacts were staged for removal so they do not pollute fresh-clone proof or Docker build contexts.
+
+## Current Verified Failure Mode
+
+The updated bootstrap path now fails quickly with the real host-level reason instead of hanging:
+
+- `.\scripts\dev-up.ps1` -> `Docker Desktop's Linux engine is unavailable because WSL is not running (LxssManager is stopped).`
 
 ## Remaining Work To Complete R01
 
