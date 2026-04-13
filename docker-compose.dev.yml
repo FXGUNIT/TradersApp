@@ -114,6 +114,7 @@ services:
     ports:
       - "8788:8788"
     environment:
+      BFF_HOST: 0.0.0.0
       ML_ENGINE_URL: http://ml-engine:8001
       ML_ANALYSIS_TRANSPORT: ${ML_ANALYSIS_TRANSPORT:-grpc}
       ML_ANALYSIS_GRPC_ADDR: analysis-service:50051
