@@ -1,14 +1,9 @@
-import React, { useCallback, useEffect, useRef } from "react";
+import React, { useCallback, useEffect } from "react";
 import {
   buildResetWorkspaceState,
   MAX_HISTORY_ENTRIES,
 } from "./terminalWorkspaceState.js";
 import {
-  buildTradePlannerState,
-  buildP2JournalState,
-  buildJournalFormState,
-  buildAccountState,
-  normalizeJournal,
   parseWorkspaceSnapshot,
 } from "./terminalStateHelpers.js";
 import {
