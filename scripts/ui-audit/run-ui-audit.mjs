@@ -585,11 +585,26 @@ async function runLoginAudit(page, scenario) {
     .first()
     .fill("gunitsingh1994@gmail.com");
   await clickButton(page, /send verification codes/i);
+  await page.waitForFunction(() => {
+    const otpInputs = document.querySelectorAll("input[placeholder='000000']");
+    if (otpInputs.length >= 3) {
+      return true;
+    }
+
+    return Array.from(document.querySelectorAll("button")).some((button) =>
+      /proceed to code entry/i.test(button.textContent || ""),
+    );
+  }, null, { timeout: 5000 });
   const proceedToCodeEntry = page.getByRole("button", {
     name: /proceed to code entry/i,
   }).first();
   if (await proceedToCodeEntry.isVisible().catch(() => false)) {
     await proceedToCodeEntry.click({ force: true });
+    await page.waitForFunction(
+      () => document.querySelectorAll("input[placeholder='000000']").length >= 3,
+      null,
+      { timeout: 5000 },
+    );
   }
   await page.locator("input[placeholder='000000']").nth(0).fill("111111");
   await page.locator("input[placeholder='000000']").nth(1).fill("222222");

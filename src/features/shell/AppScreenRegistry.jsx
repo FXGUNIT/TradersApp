@@ -279,6 +279,7 @@ export default function AppScreenRegistry({
     authBtn,
     authCard,
     lbl,
+    cardS,
     AMD_PHASES,
     LED,
     SHead,
@@ -443,6 +444,7 @@ export default function AppScreenRegistry({
                 handleToggleMaintenanceMode={handleToggleMaintenanceMode}
                 T={T}
                 authBtn={authBtn}
+                cardS={cardS}
                 ADMIN_UID={ADMIN_UID}
                 ADMIN_EMAIL={ADMIN_EMAIL}
                 listAdminUsers={listAdminUsers}
