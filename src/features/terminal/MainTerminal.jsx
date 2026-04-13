@@ -6,7 +6,6 @@ import {
 import {
   makeImgHandler,
 } from "./terminalUploadUtils";
-import { parseTerminalCsvText } from "./terminalCsvParser.js";
 import {
   computeTerminalDerivedState,
   EMPTY_TERMINAL_DERIVED_STATE,
@@ -1312,6 +1311,7 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
         {/* TAB 1: PREMARKET */}
         {activeTab === "premarket" && (
           <PremarketTab
+            ref={csvZoneRef}
             parsed={parsed}
             isCsvParsing={isCsvParsing}
             csvBorderColor={csvBorderColor}
@@ -1323,7 +1323,9 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
             csvProgress={csvProgress}
             activeZone={activeZone}
             setActiveZone={setActiveZone}
-            handleCsvDrop={handleCsvDrop}
+            setCsvParsed={setParsed}
+            setCsvParsing={setIsCsvParsing}
+            setCsvStatus={setParseMsg}
             loading={loading}
             p1Out={p1Out}
             displayedAmdPhase={displayedAmdPhase}
