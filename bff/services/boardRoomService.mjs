@@ -449,6 +449,60 @@ async function reportError({ agent, error, stack = null, severity = 'MEDIUM', th
   return { thread, post, threadId: targetThreadId };
 }
 
+async function linkCommitToThread({
+  threadId,
+  commitHash,
+  branch = null,
+  message = '',
+  commitUrl = null,
+  author = null,
+}) {
+  const thread = await getThread(threadId);
+  if (!thread) return null;
+
+  const normalizedCommitHash = String(commitHash || '').trim();
+  const updatedThread = (
+    thread.status === 'OPEN' &&
+    !thread.closureCommit &&
+    normalizedCommitHash
+  )
+    ? await updateThread(threadId, { closureCommit: normalizedCommitHash })
+    : thread;
+
+  const content = JSON.stringify({
+    type: 'git_commit_detected',
+    commitHash: normalizedCommitHash || null,
+    branch: branch || null,
+    message: String(message || ''),
+    commitUrl: commitUrl || null,
+    author: author || null,
+  });
+
+  const post = await createPost({
+    threadId,
+    author: 'git-webhook',
+    authorType: 'agent',
+    content,
+    type: 'milestone',
+    linkedCommit: normalizedCommitHash || null,
+  });
+
+  logToJsonl({
+    type: 'git_commit_linked',
+    threadId,
+    commitHash: normalizedCommitHash || undefined,
+    branch: branch || undefined,
+    message: String(message || '').substring(0, 240) || undefined,
+    author: author || undefined,
+    commitUrl: commitUrl || undefined,
+  });
+
+  return {
+    thread: updatedThread,
+    post,
+  };
+}
+
 // ─── Pending Acknowledgments ──────────────────────────────────────────────────
 async function getPendingAcknowledgments() {
   const client = getRedis();
@@ -489,7 +543,7 @@ export const boardRoomService = {
   createThread, getThread, getThreads, getAllOpenThreads, updateThread, closeThread,
   createPost, getPost, getThreadPosts, acknowledgePost, updatePostPlanStatus,
   createTask, getThreadTasks, toggleTask,
-  getAgentMemory, updateAgentMemory, recordHeartbeat, reportError,
+  getAgentMemory, updateAgentMemory, recordHeartbeat, reportError, linkCommitToThread,
   getPendingAcknowledgments,
   getTemplates,
   validateContent,
