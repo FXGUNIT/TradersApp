@@ -59,7 +59,7 @@ Run `python scripts/update_todo_progress.py --once` to regenerate.
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-13 18:27`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-13 21:39`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 | Section | Tasks | Progress | Status |
 |---|---|---:|---|
@@ -70,6 +70,7 @@ Generated: `2026-04-13 18:27`  ·  Run `python scripts/update_todo_progress.py -
 | Stage O | [25/25] | 100.0% | ✅ COMPLETE |
 
 <!-- live-status:end -->
+
 
 
 
@@ -237,6 +238,7 @@ Generated: `2026-04-13 18:27`  ·  Run `python scripts/update_todo_progress.py -
   - Fixed ML Engine writable volume mounts, BFF dispatcher startup, analysis-service proto loading, host reachability, and Board Room Redis configuration.
   - Normalized `dev-up.ps1` to rebuild service images on startup so source changes are reflected without extra flags.
   - Verified the clean boot path with healthy containers plus passing `scripts/dev-smoke.ps1`.
+  - Cleared the remaining frontend lint noise so `npm run lint`, `npm run build`, and `scripts/dev-smoke.ps1` now all pass cleanly.
 
 ## Phase Summary (Historical â€” all complete)
 
