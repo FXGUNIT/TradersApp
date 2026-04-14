@@ -297,7 +297,7 @@ export function registerDispatchRoutes({
     // ── AI Proxy: /ai/provider-chat ─────────────────────────────────────────
     if (method === "POST" && req.url === "/ai/provider-chat") {
       try {
-        const body = await readJsonBody(req, 200_000);
+        const body = await readJsonBody(req, 5_000_000);
         const provider = String(body.provider || "").trim().toLowerCase();
         const systemPrompt = String(body.systemPrompt || "");
         const userPrompt = String(body.userPrompt || "");
@@ -335,7 +335,7 @@ export function registerDispatchRoutes({
     // ── AI Deliberate: /ai/deliberate ───────────────────────────────────────
     if (method === "POST" && req.url === "/ai/deliberate") {
       try {
-        const body = await readJsonBody(req, 200_000);
+        const body = await readJsonBody(req, 5_000_000);
         const systemPrompt = String(body.systemPrompt || "");
         const userPrompt = String(body.userPrompt || "");
         const userContext = resolveCollectiveConsciousnessRequest(body);

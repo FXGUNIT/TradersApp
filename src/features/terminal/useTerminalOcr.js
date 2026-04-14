@@ -45,6 +45,7 @@ export function useTerminalOcr({ screenshots, onResult, showToast }) {
   onResultRef.current   = onResult;
 
   const runOcr = useCallback(async () => {
+    setOcrResult(null); // clear stale values from prior run
     if (!screenshotsRef.current.length) {
       showToast?.("No screenshots to scan.", "warning");
       return;
