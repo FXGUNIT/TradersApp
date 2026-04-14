@@ -112,7 +112,30 @@ const questionsAllowed = isAdminBypass ...
 
 ---
 
-## ❌ CRITICAL GAP 2: Board Room write operations have no CEO role verification
+## ✅ FIXED: Board Room write operations now gated with ADMIN role check
+
+**File:** `bff/_dispatchRoutes.mjs` + `bff/services/security.mjs`
+
+`_dispatchRoutes.mjs` now calls `authorizeRequest` before Board Room handler:
+```js
+// ── Board Room RBAC gate ─ CEO-level: require ADMIN role via authorizeRequest
+if (pathname.startsWith("/board-room")) {
+  const auth = await authorizeRequest(req);
+  if (!auth.authorized) {
+    json(res, 403, { ok: false, error: auth.error }, origin);
+    return true;
+  }
+}
+```
+
+`security.mjs` `ROUTE_PERMISSIONS` now includes:
+```js
+"/board-room": ROLES.ADMIN,
+```
+
+Combined with prefix matching, all `/board-room/*` routes now require ADMIN role. Normal authenticated users get 403. Git webhook (`/board-room/git-webhook`) still validates GitHub signature — that remains intact.
+
+**⚠️ Note:** `cricgunit@gmail.com` hardcoded bypass retained per user request — documented as a residual risk in R04.
 
 **File:** `bff/routes/boardRoomRoutes.mjs`
 

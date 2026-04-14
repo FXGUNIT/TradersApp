@@ -66,7 +66,7 @@ Run `python scripts/update_todo_progress.py --once` to regenerate.
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-14 14:39`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-14 14:56`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Active Backlog    7.5%  [##----------------------]
@@ -79,6 +79,7 @@ Task Counts     done 000 | in progress 003 | blocked 001 | todo 016 | total 020
 | Stage R | [0/20] |   0.0% | IN PROGRESS |
 
 <!-- live-status:end -->
+
 
 
 
@@ -164,7 +165,7 @@ Task Counts     done 000 | in progress 003 | blocked 001 | todo 016 | total 020
   - **Step 5:** Verify duplicate logins from multiple devices/tabs do not create inconsistent sessions or silent privilege leakage.
   - **Exit criteria:** Auth lifecycle tests cover success, expected failure, forced recovery, expiry, and multi-session edge cases.
 
-- [-] `R04` Prove admin-only and CEO-only permissions cannot be bypassed. (updated: 2026-04-14 14:05 IST) Evidence gathered. Admin BFF routes are properly gated with `authorizeRequest` in `_dispatchRoutes.mjs:186`. Admin session creation uses `constantTimeMatch`. Two critical gaps found: (1) hardcoded email bypass `cricgunit@gmail.com` in `bff/domains/identityState.mjs:22` gives admin Collective Consciousness access to anyone with that email — must be removed; (2) Board Room write ops (`closeThread`, `approve/reject`) use `requireAuth` which only checks Authorization header presence, not CEO role — any authenticated user can close threads or approve plans. Fixes required before R04 can be marked done. Full artifact: `docs/R04_PRIVILEGE_BYPASS_PROOF.md`.
+- [-] `R04` Prove admin-only and CEO-only permissions cannot be bypassed. (updated: 2026-04-14 14:55 IST) Gap 2 FIXED: Added `authorizeRequest` gate before Board Room handler in `_dispatchRoutes.mjs` + added `/board-room` to `ROUTE_PERMISSIONS` in `security.mjs` requiring ADMIN role. All `/board-room/*` routes now return 403 for non-ADMIN callers. Gap 1 (`cricgunit@gmail.com` bypass) retained per user decision — documented as residual risk. Full artifact: `docs/R04_PRIVILEGE_BYPASS_PROOF.md`.
   - **Why this exists:** If a normal user can reach or trigger a privileged action, the app is not flawless regardless of UI polish.
   - **Step 1:** Enumerate every privileged UI entry point and every privileged BFF route, including admin dashboard, Board Room approvals, close-thread actions, invite flows, and any identity/admin endpoints.
   - **Step 2:** Verify normal users cannot open privileged screens via direct URL, client-side state mutation, cached UI state, or stale tokens.
