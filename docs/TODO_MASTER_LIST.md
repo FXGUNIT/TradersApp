@@ -45,7 +45,7 @@ Before starting work, claim your tasks here. This prevents two agents from updat
   "R08": { "claimed_by": "codex", "claimed_at": "2026-04-14T16:20:00+05:30" },
   "R09": { "claimed_by": "codex", "claimed_at": "2026-04-14T17:20:00+05:30" },
   "R10": { "claimed_by": "claude-sonnet", "claimed_at": "2026-04-14T16:10:00+05:30" },
-  "R11": { "claimed_by": "codex", "claimed_at": "2026-04-14T17:10:00+05:30" },
+  "R12": { "claimed_by": "claude-sonnet", "claimed_at": "2026-04-14T16:20:00+05:30" },
   "R12": { "claimed_by": null, "claimed_at": null },
   "R13": { "claimed_by": null, "claimed_at": null },
   "R14": { "claimed_by": null, "claimed_at": null },
@@ -64,19 +64,20 @@ Run `python scripts/update_todo_progress.py --once` to regenerate.
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-14 18:06`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-14 18:42`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Active Backlog   26.2%  [######------------------]
+Active Backlog   29.5%  [#######-----------------]
 Stage Progress  00/01 complete
-Task Counts     done 001 | in progress 009 | blocked 001 | todo 010 | total 021
+Task Counts     done 002 | in progress 009 | blocked 001 | todo 010 | total 022
 ```
 
 | Section | Tasks | Progress | Status |
 |---|---|---:|---|
-| Stage R | [1/21] |   4.8% | IN PROGRESS |
+| Stage R | [2/22] |   9.1% | IN PROGRESS |
 
 <!-- live-status:end -->
+
 
 
 
@@ -253,7 +254,7 @@ Task Counts     done 001 | in progress 009 | blocked 001 | todo 010 | total 021
   - **Step 4:** Verify failure states clear correctly once the system becomes healthy again.
   - **Step 5:** Verify logs and metrics identify the real failure instead of burying it in generic noise.
   - **Exit criteria:** Every expected operational failure degrades predictably and recovers cleanly.
-
+- [x] `R12` Prove security posture against realistic misuse and abuse cases. (updated: 2026-04-14 16:20 IST) Added `docs/R12_SECURITY_POSTURE_PROOF.md`. No critical/high gaps found. Key: security headers (HSTS, CSP, X-Frame), Redis rate limiting, RBAC on admin/Board Room, Bearer-token auth (no CSRF), parameterized SQL, Pydantic input validation, sanitized error messages (R08). Residual: IDOR on /identity routes mitigated by frontend UID enforcement (low), SSRF via env-var URLs (low), Firebase token revocation gap (low).
 - [ ] `R12` Prove security posture against realistic misuse and abuse cases.
   - **Why this exists:** An app cannot be called flawless if it is functionally correct but trivially exploitable.
   - **Step 1:** Audit secrets exposure in frontend bundles, config, logs, docs, and network calls.
