@@ -1,0 +1,16 @@
+﻿{
+    "run_dir":  "e:\\TradersApp\\.tmp_codex\\\\r09-process-stack-20260414-165543",
+    "ml_health_status":  "healthy",
+    "bff_health_status":  null,
+    "proxy_health_ok":  true,
+    "consensus_ok":  true,
+    "consensus_signal":  "NEUTRAL",
+    "consensus_source":  "ml_engine",
+    "regime_ok":  true,
+    "restart_health_status":  503,
+    "restart_health_ok":  false,
+    "restart_health_error":  "fetch failed",
+    "recovered_health_ok":  true,
+    "recovered_consensus_ok":  true,
+    "recovered_consensus_source":  "ml_engine"
+}

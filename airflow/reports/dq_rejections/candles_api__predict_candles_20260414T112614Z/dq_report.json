@@ -1,0 +1,111 @@
+{
+  "suite": "candle_expectations+candle_expectations_gx_policy",
+  "passed": false,
+  "critical_failures": 2,
+  "warning_failures": 0,
+  "checks_passed": 14,
+  "checks_failed": 2,
+  "checks_warned": 0,
+  "total_checks": 16,
+  "results": [
+    {
+      "name": "required_columns",
+      "status": "pass",
+      "message": "All required columns present",
+      "severity": "info"
+    },
+    {
+      "name": "open_not_null",
+      "status": "pass",
+      "message": "No null values in open",
+      "severity": "info"
+    },
+    {
+      "name": "high_not_null",
+      "status": "pass",
+      "message": "No null values in high",
+      "severity": "info"
+    },
+    {
+      "name": "low_not_null",
+      "status": "pass",
+      "message": "No null values in low",
+      "severity": "info"
+    },
+    {
+      "name": "close_not_null",
+      "status": "pass",
+      "message": "No null values in close",
+      "severity": "info"
+    },
+    {
+      "name": "volume_not_null",
+      "status": "pass",
+      "message": "No null values in volume",
+      "severity": "info"
+    },
+    {
+      "name": "high_consistency",
+      "status": "pass",
+      "message": "All rows satisfy high consistency",
+      "severity": "info"
+    },
+    {
+      "name": "low_consistency",
+      "status": "pass",
+      "message": "All rows satisfy low consistency",
+      "severity": "info"
+    },
+    {
+      "name": "volume_positive",
+      "status": "pass",
+      "message": "All rows have volume > 0",
+      "severity": "info"
+    },
+    {
+      "name": "timestamp_monotonic",
+      "status": "pass",
+      "message": "Timestamps are monotonically increasing",
+      "severity": "info"
+    },
+    {
+      "name": "timestamp_5m_aligned",
+      "status": "pass",
+      "message": "All timestamps aligned to 5-minute boundaries",
+      "severity": "info"
+    },
+    {
+      "name": "timestamp_unique",
+      "status": "pass",
+      "message": "No duplicate timestamps",
+      "severity": "info"
+    },
+    {
+      "name": "timestamp_not_future",
+      "status": "fail",
+      "message": "34 timestamps are in the future",
+      "severity": "critical"
+    },
+    {
+      "name": "extreme_returns",
+      "status": "pass",
+      "message": "No extreme returns detected",
+      "severity": "info"
+    },
+    {
+      "name": "extreme_volume_spikes",
+      "status": "pass",
+      "message": "No extreme volume spikes",
+      "severity": "info"
+    },
+    {
+      "name": "gx_required",
+      "status": "fail",
+      "message": "Great Expectations is required but unavailable: Unsupported Great Expectations API: expected from_pandas/PandasDataset",
+      "severity": "critical"
+    }
+  ],
+  "n_rows": 50,
+  "dataset_type": "candles",
+  "source": "api:/predict:candles"
+}
