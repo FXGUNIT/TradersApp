@@ -46,7 +46,6 @@ Before starting work, claim your tasks here. This prevents two agents from updat
   "R09": { "claimed_by": "codex", "claimed_at": "2026-04-14T17:20:00+05:30" },
   "R10": { "claimed_by": "claude-sonnet", "claimed_at": "2026-04-14T16:10:00+05:30" },
   "R12": { "claimed_by": "claude-sonnet", "claimed_at": "2026-04-14T16:20:00+05:30" },
-  "R12": { "claimed_by": null, "claimed_at": null },
   "R13": { "claimed_by": null, "claimed_at": null },
   "R14": { "claimed_by": null, "claimed_at": null },
   "R15": { "claimed_by": null, "claimed_at": null },
@@ -64,7 +63,7 @@ Run `python scripts/update_todo_progress.py --once` to regenerate.
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-14 18:42`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-14 18:50`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Active Backlog   29.5%  [#######-----------------]
@@ -77,6 +76,7 @@ Task Counts     done 002 | in progress 009 | blocked 001 | todo 010 | total 022
 | Stage R | [2/22] |   9.1% | IN PROGRESS |
 
 <!-- live-status:end -->
+
 
 
 
