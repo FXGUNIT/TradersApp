@@ -44,7 +44,7 @@ Before starting work, claim your tasks here. This prevents two agents from updat
   "R07": { "claimed_by": "claude-sonnet", "claimed_at": "2026-04-14T16:00:00+05:30" },
   "R08": { "claimed_by": "codex", "claimed_at": "2026-04-14T16:20:00+05:30" },
   "R09": { "claimed_by": "codex", "claimed_at": "2026-04-14T17:20:00+05:30" },
-  "R10": { "claimed_by": null, "claimed_at": null },
+  "R10": { "claimed_by": "claude-sonnet", "claimed_at": "2026-04-14T16:10:00+05:30" },
   "R11": { "claimed_by": "codex", "claimed_at": "2026-04-14T17:10:00+05:30" },
   "R12": { "claimed_by": null, "claimed_at": null },
   "R13": { "claimed_by": null, "claimed_at": null },
@@ -64,19 +64,21 @@ Run `python scripts/update_todo_progress.py --once` to regenerate.
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-14 17:14`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-14 18:06`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Active Backlog   22.5%  [#####-------------------]
+Active Backlog   26.2%  [######------------------]
 Stage Progress  00/01 complete
-Task Counts     done 000 | in progress 009 | blocked 001 | todo 010 | total 020
+Task Counts     done 001 | in progress 009 | blocked 001 | todo 010 | total 021
 ```
 
 | Section | Tasks | Progress | Status |
 |---|---|---:|---|
-| Stage R | [0/20] |   0.0% | IN PROGRESS |
+| Stage R | [1/21] |   4.8% | IN PROGRESS |
 
 <!-- live-status:end -->
+
+
 
 
 
@@ -233,7 +235,7 @@ Task Counts     done 000 | in progress 009 | blocked 001 | todo 010 | total 020
   - **Step 4:** Verify one-service restart does not permanently poison the others or require manual cleanup.
   - **Step 5:** Verify delayed responses, temporary unavailability, and retry logic across boundaries.
   - **Exit criteria:** End-to-end multi-service flows remain correct with no contract drift or hidden orchestration failures.
-
+- [x] `R10` Prove persistence, refresh behavior, and restart behavior preserve correct state. (updated: 2026-04-14 16:10 IST) Added `docs/R10_PERSISTENCE_PROOF.md` and implemented atomic writes across all 5 BFF domain JSON files via `bff/domains/atomicWrite.mjs`. Crash safety ensured: mid-write crash leaves original file untouched. Read-side graceful fallback confirmed on parse failure. ML Engine SQLite uses WAL + transactions. Redis TTL handles session expiry. Terminal draft write-through to IndexedDB + localStorage. Verified: `node --test bff/tests/*.test.mjs` -> `18 passed`. Remaining gaps: terminal draft 64KB limit (low), cross-tab draft sync (low), Firebase server-side token revocation (low).
 - [ ] `R10` Prove persistence, refresh behavior, and restart behavior preserve correct state.
   - **Why this exists:** Hidden state corruption after refresh or restart is one of the fastest ways to break trust in a system.
   - **Step 1:** Identify all persisted state locations: backend data stores, Redis, Firebase, local storage, session storage, and in-memory caches.
