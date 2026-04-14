@@ -1,4 +1,5 @@
 const MAX_SCREENSHOTS = 4;
+const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10MB — prevent memory pressure from huge pastes
 
 function readFileAsDataUrl(file) {
   return new Promise((resolve, reject) => {
@@ -25,13 +26,26 @@ async function imageFileToPayload(file) {
   };
 }
 
-export async function onScreenshotDrop(event, setScreenshots) {
+export async function onScreenshotDrop(event, setScreenshots, showToast) {
   event.preventDefault();
 
-  const files = Array.from(
+  const rawFiles = Array.from(
     event?.dataTransfer?.files || event?.target?.files || [],
-  ).filter(isImageFile);
+  );
 
+  const oversized = rawFiles.filter(
+    (f) => isImageFile(f) && f.size > MAX_FILE_BYTES,
+  );
+  if (oversized.length) {
+    showToast?.(
+      `Screenshot too large — max ${MAX_FILE_BYTES / 1024 / 1024}MB`,
+      "error",
+    );
+  }
+
+  const files = rawFiles.filter(
+    (f) => isImageFile(f) && f.size <= MAX_FILE_BYTES,
+  );
   if (!files.length) return;
 
   const nextAssets = await Promise.all(files.map(imageFileToPayload));
@@ -40,13 +54,27 @@ export async function onScreenshotDrop(event, setScreenshots) {
   );
 }
 
-export function makeImgHandler(setter) {
+export function makeImgHandler(setter, showToast) {
   return async (event) => {
     event.preventDefault();
 
     const file = Array.from(
       event?.dataTransfer?.files || event?.target?.files || [],
-    ).find(isImageFile);
+    ).find((f) => isImageFile(f) && f.size <= MAX_FILE_BYTES);
+
+    if (!file) {
+      // Check if there was an oversized image that was filtered
+      const rawFile = Array.from(
+        event?.dataTransfer?.files || event?.target?.files || [],
+      ).find((f) => isImageFile(f) && f.size > MAX_FILE_BYTES);
+      if (rawFile) {
+        showToast?.(
+          `Image too large — max ${MAX_FILE_BYTES / 1024 / 1024}MB`,
+          "error",
+        );
+      }
+      return;
+    }
 
     if (!file) return;
 
