@@ -1,4 +1,5 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { writeAtomic } from './atomicWrite.mjs';
 import { resolve } from "node:path";
 
 const DATA_PATH = resolve(process.cwd(), "bff/data/identity-domain.json");
@@ -43,7 +44,7 @@ function readStateFile() {
 }
 
 function writeStateFile(state) {
-  writeFileSync(DATA_PATH, `${JSON.stringify(state, null, 2)}\n`, "utf8");
+  writeAtomic(DATA_PATH, state);
 }
 
 function normalizeSessionRecord(sessionId, session = {}) {

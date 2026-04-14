@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { writeAtomic } from './atomicWrite.mjs';
 import { resolve } from "node:path";
 import {
   getApplication,
@@ -40,7 +41,7 @@ function readJsonFile(path, fallback) {
 }
 
 function writeJsonFile(path, state) {
-  writeFileSync(path, `${JSON.stringify(state, null, 2)}\n`, "utf8");
+  writeAtomic(path, state);
 }
 
 function nowIso() {

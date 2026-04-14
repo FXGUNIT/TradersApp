@@ -1,4 +1,5 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { writeAtomic } from './atomicWrite.mjs';
 import { resolve } from "node:path";
 
 const DATA_PATH = resolve(process.cwd(), "bff/data/terminal-domain.json");
@@ -32,7 +33,7 @@ function readState() {
 }
 
 function writeState(state) {
-  writeFileSync(DATA_PATH, `${JSON.stringify(state, null, 2)}\n`, "utf8");
+  writeAtomic(DATA_PATH, state);
 }
 
 function clone(value) {
