@@ -1291,6 +1291,15 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
   // Add manual journal entry
   const addJournalEntry = () => {
     if (!jf.entry || !jf.exit) return;
+    const pnl = Number(jf.pnl);
+    if (jf.result === "win" && (!Number.isFinite(pnl) || pnl <= 0)) {
+      setJf(p => ({ ...p, _err: "A win must have a positive P&L." }));
+      return;
+    }
+    if (jf.result === "loss" && (Number.isFinite(pnl) && pnl >= 0)) {
+      setJf(p => ({ ...p, _err: "A loss must have a negative P&L." }));
+      return;
+    }
     const entryPrice = Number.parseFloat(jf.entry);
     const fallbackPredictedTP1 = Number.isFinite(entryPrice)
       ? entryPrice +
