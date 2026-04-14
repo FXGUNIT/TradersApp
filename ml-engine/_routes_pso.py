@@ -145,7 +145,7 @@ def pso_discover(
         raise
     except Exception as exc:
         _release_idempotency_claim(claim)
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise HTTPException(status_code=500, detail="Training optimization service unavailable.")
     finally:
         _release_idempotency_claim(claim)
 
@@ -272,7 +272,7 @@ def mamba_vllm_predict(candles: list[dict]):
         result["narrative"] = narrative
         return result
     except Exception as e:
-        return {"error": str(e), "narrative": narrative}
+        return {"error": "Narrative generation service unavailable.", "narrative": narrative}
 
 
 # ── Inference Routes (Triton/ONNX) ─────────────────────────────────────────────
@@ -352,7 +352,7 @@ def inference_export(model_name: str | None = None):
         paths = export_all_models()
         return {"ok": True, "exported": [str(p) for p in paths]}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Service temporarily unavailable.")
 
 
 def inference_setup():
@@ -405,7 +405,7 @@ def log_signal(request: "FeedbackSignalRequest", raw_request, response):
     except Exception as e:
         _release_idempotency_claim(claim)
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Service temporarily unavailable.")
 
 
 def record_outcome(
@@ -435,7 +435,7 @@ def record_outcome(
         return {"ok": True, "signal_id": signal_id, "trade_id": trade_id, "correct": correct}
     except Exception as e:
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Service temporarily unavailable.")
 
 
 def get_signals(limit: int = 100, symbol: str = "MNQ"):
@@ -448,7 +448,7 @@ def get_signals(limit: int = 100, symbol: str = "MNQ"):
         return {"signals": df.to_dict(orient="records"), "stats": stats}
     except Exception as e:
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Service temporarily unavailable.")
 
 
 def get_feedback_stats(symbol: str = "MNQ"):
@@ -461,7 +461,7 @@ def get_feedback_stats(symbol: str = "MNQ"):
         return {"signal_stats": stats, "concept_drift": concept}
     except Exception as e:
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Service temporarily unavailable.")
 
 
 def process_trades(symbol: str = "MNQ"):
@@ -473,7 +473,7 @@ def process_trades(symbol: str = "MNQ"):
         return result
     except Exception as e:
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Service temporarily unavailable.")
 
 
 def trigger_retrain(request: "FeedbackRetrainRequest"):
@@ -499,7 +499,7 @@ def trigger_retrain(request: "FeedbackRetrainRequest"):
         }
     except Exception as e:
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Service temporarily unavailable.")
 
 
 def prepare_training_batch(symbol: str = "MNQ", batch_type: str = "nightly_eligibility"):
@@ -524,7 +524,7 @@ def prepare_training_batch(symbol: str = "MNQ", batch_type: str = "nightly_eligi
         }
     except Exception as e:
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Service temporarily unavailable.")
 
 
 def get_retrain_status():
@@ -545,7 +545,7 @@ def get_retrain_status():
         }
     except Exception as e:
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Service temporarily unavailable.")
 
 
 # ── Global exception handler ───────────────────────────────────────────────────
@@ -555,7 +555,7 @@ def global_exception_handler(request, exc):
     return JSONResponse(
         status_code=500,
         content={
-            "error": str(exc),
+            "error": "Internal service error",
             "type": type(exc).__name__,
             "request_id": get_request_id(),
         },

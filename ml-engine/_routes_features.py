@@ -256,7 +256,7 @@ def drift_status():
         return {"ok": True, **snapshot["drift"]}
     except Exception as e:
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Service temporarily unavailable.")
 
 
 def drift_detect(request: "DriftDetectRequest"):
@@ -277,7 +277,7 @@ def drift_detect(request: "DriftDetectRequest"):
         return {"ok": True, **result}
     except Exception as e:
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Service temporarily unavailable.")
 
 
 def drift_record_prediction(request: "RecordPredictionRequest"):
@@ -299,7 +299,7 @@ def drift_record_prediction(request: "RecordPredictionRequest"):
                 "should_retrain": drift_monitor.concept_drift.should_retrain()}
     except Exception as e:
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Service temporarily unavailable.")
 
 
 def drift_set_baseline(symbol: str = "MNQ"):
@@ -322,7 +322,7 @@ def drift_set_baseline(symbol: str = "MNQ"):
                 "message": "Drift baselines updated."}
     except Exception as e:
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Service temporarily unavailable.")
 
 
 def drift_thresholds():
@@ -357,7 +357,7 @@ def monitoring_status(symbol: str = "MNQ", sync_metrics: bool = True, wait_for_b
         return {"ok": True, **snapshot}
     except Exception as e:
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Service temporarily unavailable.")
 
 
 def monitoring_config():
@@ -366,4 +366,4 @@ def monitoring_config():
         return {"ok": True, **get_monitoring_config()}
     except Exception as e:
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Service temporarily unavailable.")

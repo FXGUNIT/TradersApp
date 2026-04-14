@@ -60,7 +60,7 @@ def model_status():
         return result
     except Exception as e:
         monitor.record("/model-status", (time.time() - start) * 1000, 500)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Service temporarily unavailable.")
 
 
 # ── /candles/upload ─────────────────────────────────────────────────────────────
@@ -89,9 +89,9 @@ def upload_candles(request: "UploadCandlesRequest"):
             },
         }
     except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e))
+        raise HTTPException(status_code=422, detail="Invalid request parameters.")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Service temporarily unavailable.")
 
 
 # ── /trades/upload ─────────────────────────────────────────────────────────────
@@ -141,9 +141,9 @@ def upload_trades(request: "UploadTradesRequest"):
             },
         }
     except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e))
+        raise HTTPException(status_code=422, detail="Invalid request parameters.")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Service temporarily unavailable.")
 
 
 # ── /candles/parse-csv ─────────────────────────────────────────────────────────
@@ -212,12 +212,12 @@ def parse_csv_candles(file_content: str):
             },
         }
     except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e))
+        raise HTTPException(status_code=422, detail="Invalid request parameters.")
     except HTTPException:
         raise
     except Exception as e:
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Service temporarily unavailable.")
 
 
 # ── /candles, /trades, /stats ───────────────────────────────────────────────────
@@ -233,7 +233,7 @@ def get_candles(symbol: str = "MNQ", start: str = "", end: str = "", session_id:
                 df = df[df["session_id"] == session_id]
         return {"count": len(df), "candles": df.to_dict(orient="records")}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Service temporarily unavailable.")
 
 
 def get_trades(symbol: str = "MNQ", limit: int = 500):
@@ -242,7 +242,7 @@ def get_trades(symbol: str = "MNQ", limit: int = 500):
         df = db.get_trade_log(limit, symbol)
         return {"count": len(df), "trades": df.to_dict(orient="records")}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Service temporarily unavailable.")
 
 
 def get_stats():
@@ -250,4 +250,4 @@ def get_stats():
     try:
         return db.get_stats()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Service temporarily unavailable.")

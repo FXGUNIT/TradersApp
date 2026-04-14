@@ -106,7 +106,8 @@ def train_endpoint(
             sync_model_registry_metrics(registry_client.warm_models(["predictor"]))
             return result
         except Exception as e:
-            return {"error": str(e), "traceback": traceback.format_exc()}
+            traceback.print_exc()
+            return {"error": "Training service temporarily unavailable."}
         finally:
             if PROMETHEUS_AVAILABLE and record_prometheus_retrain:
                 record_prometheus_retrain(triggered=False, in_progress=False)
@@ -152,7 +153,7 @@ def train_sync_endpoint(request: TrainRequest, raw_request: FastAPIRequest, resp
         raise
     except Exception as e:
         _release_idempotency_claim(claim)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Service temporarily unavailable.")
     finally:
         if PROMETHEUS_AVAILABLE and record_prometheus_retrain:
             record_prometheus_retrain(triggered=False, in_progress=False)
@@ -480,4 +481,4 @@ def feedback_signal_endpoint(request: FeedbackSignalRequest):
             )
         return {"ok": True, "logged": True}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Service temporarily unavailable.")
