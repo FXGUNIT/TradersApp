@@ -64,7 +64,7 @@ Run `python scripts/update_todo_progress.py --once` to regenerate.
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-14 17:02`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-14 17:10`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Active Backlog   20.0%  [#####-------------------]
@@ -77,6 +77,9 @@ Task Counts     done 000 | in progress 008 | blocked 001 | todo 011 | total 020
 | Stage R | [0/20] |   0.0% | IN PROGRESS |
 
 <!-- live-status:end -->
+
+
+
 
 
 
@@ -136,6 +139,7 @@ Task Counts     done 000 | in progress 008 | blocked 001 | todo 011 | total 020
 2026-04-14 16:16 | CODEX       | R01       | Verified the second clean sibling build pass, added Docker executable fallback in dev-up, and narrowed the remaining blocker to broken host Docker Desktop / WSL state
 2026-04-14 17:18 | CODEX       | R08       | Fixed live ML Engine request-binding/runtime defects, added route and idempotency regression coverage, and documented the remaining artifact-compatibility gaps
 2026-04-14 17:19 | CODEX       | R09       | Added real local process-stack proof for frontend -> BFF -> ML Engine, including clean degrade/recover behavior across an ML Engine restart
+2026-04-14 17:09 | CODEX       | R09       | Hardened local degraded orchestration: Redis-absent BFF boot is now quiet, optional breaking-news upstream timeouts are deduped warnings, and BFF regression tests remain green
 ```
 
 ## Stage R: Flawless Proof Gate
@@ -217,7 +221,7 @@ Task Counts     done 000 | in progress 008 | blocked 001 | todo 011 | total 020
   - **Step 5:** Verify route-level latency regressions, startup time regressions, and health endpoint truthfulness.
   - **Exit criteria:** ML Engine behavior is contract-tested, artifact-compatible, and stable under both normal and invalid inputs.
 
-- [-] `R09` Prove cross-service integration works under real orchestration, not just isolated tests. (updated: 2026-04-14 17:19 IST) Added local process-stack proof in `docs/R09_CROSS_SERVICE_INTEGRATION_PROOF.md` with runtime artifact `.tmp_codex/r09-process-stack-20260414-165543/result.json`. Verified real `frontend (Vite /api proxy) -> BFF -> ML Engine` flow: `/api/ml/health` returned `ok=true`, `/api/ml/consensus` returned `ok=true` with `source=ml_engine`, and `/api/ml/regime` returned `ok=true`; after force-stopping ML Engine, `/api/ml/health` degraded cleanly with `503 / ok=false`, then recovered to `ok=true` and `/api/ml/consensus` recovered with `source=ml_engine` after restart. Remaining gaps: Redis-backed background paths still emit reconnect noise when Redis is absent locally, breaking-news providers still abort when upstreams are unavailable, and Docker-compose orchestration remains partially blocked by the host WSL/Docker issue tracked in `R01`.
+- [-] `R09` Prove cross-service integration works under real orchestration, not just isolated tests. (updated: 2026-04-14 17:09 IST) Added local process-stack proof in `docs/R09_CROSS_SERVICE_INTEGRATION_PROOF.md` with runtime artifact `.tmp_codex/r09-process-stack-20260414-165543/result.json`. Verified real `frontend (Vite /api proxy) -> BFF -> ML Engine` flow: `/api/ml/health` returned `ok=true`, `/api/ml/consensus` returned `ok=true` with `source=ml_engine`, and `/api/ml/regime` returned `ok=true`; after force-stopping ML Engine, `/api/ml/health` degraded cleanly with `503 / ok=false`, then recovered to `ok=true` and `/api/ml/consensus` recovered with `source=ml_engine` after restart. Follow-up hardening is also verified: local Redis-absent BFF boot now returns `/health` `200` with a single degraded warning and no reconnect spam, and two consecutive `/news/breaking?fresh=true&max=5` calls now return `200/200` with deduped upstream-timeout warnings and `0` hard error logs. Remaining gaps: Redis-present orchestration is still unproven, optional upstream news providers still need a stable success-path proof, and Docker-compose orchestration remains partially blocked by the host WSL/Docker issue tracked in `R01`.
   - **Why this exists:** Service-level green checks can hide data-contract mismatches and orchestration-only failures.
   - **Step 1:** Map the full integration graph among frontend, BFF, ML Engine, analysis service, Redis, Firebase, Telegram hooks, and any other live dependency.
   - **Step 2:** Verify the full stack behaves correctly during normal request chains, including auth -> BFF -> ML -> UI response loops.

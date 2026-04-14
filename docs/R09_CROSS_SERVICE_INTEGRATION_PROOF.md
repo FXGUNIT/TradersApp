@@ -92,17 +92,61 @@ Without those fixes, the real proxy path failed with:
 
 ---
 
+## 2026-04-14 Logging/Degradation Hardening
+
+After the main process-stack proof passed, the remaining local orchestration noise was tightened and reverified:
+
+1. Redis-absent local boot no longer floods the BFF logs.
+   - Updated:
+     - `bff/services/redis-session-store.mjs`
+     - `bff/services/boardRoomService.mjs`
+   - Change:
+     - Redis connection failures now enter a retry cooldown window instead of reconnecting on every call.
+     - The Board Room Redis client no longer uses the default endless reconnect loop.
+     - Local no-Redis runs degrade once and then stay quiet until the next retry window.
+   - Verification artifact:
+     - `.tmp_codex/bff-no-redis-verify/bff.out.log`
+     - `.tmp_codex/bff-no-redis-verify/bff.err.log`
+   - Verified result:
+     - `GET /health` returned `200`
+     - one degraded-mode warning
+     - `0` `Reconnecting...` messages
+     - `0` `[boardRoom] Redis error` messages
+
+2. Optional breaking-news providers now degrade with deduped warnings instead of hard error spam.
+   - Updated:
+     - `bff/services/breakingNewsService.mjs`
+   - Change:
+     - Yahoo Finance RSS and GDELT timeout/abort conditions are now treated as transient optional-source degradation.
+     - warnings are deduped per source within a cooldown window
+     - successful route responses continue without those sources
+   - Verification artifact:
+     - `.tmp_codex/bff-news-verify-after/bff.out.log`
+     - `.tmp_codex/bff-news-verify-after/bff.err.log`
+   - Verified result:
+     - two consecutive `GET /news/breaking?fresh=true&max=5` calls returned `200`
+     - `0` `[breakingNews] ... error` log lines
+     - only two deduped warnings remained:
+       - Yahoo Finance RSS timed out
+       - GDELT timed out
+
+3. BFF regression coverage stayed green after the degradation hardening.
+   - Verification:
+     - `node --test bff/tests/*.test.mjs` -> `18 passed`
+
+---
+
 ## Residual Gaps
 
 This does **not** close R09 yet. Remaining proof still needed:
 
-1. Redis-backed paths are still noisy in local no-Redis mode.
-   - BFF logs repeated Redis reconnect noise.
-   - The proof run still works, but Redis-present behavior is not yet verified here.
+1. Redis-present orchestration is still not proven here.
+   - Local no-Redis degradation is now quiet and controlled.
+   - Redis-backed behavior with a real live Redis dependency still needs an explicit end-to-end proof run.
 
-2. News-provider calls are not stabilized for local offline proof.
-   - Yahoo/GDELT fetch aborts appear in logs when upstream responses are unavailable or interrupted.
-   - Consensus still completed successfully, but upstream news-provider resilience remains a separate proof item.
+2. Optional upstream news providers still time out sometimes.
+   - Yahoo/GDELT timeout behavior is now non-fatal and non-spammy.
+   - A stronger proof still needs a stable upstream-success run or explicit fixture-based upstream simulation.
 
 3. This proof is process-orchestrated, not Docker-orchestrated.
    - Docker Compose proof is still partially blocked by the host Docker Desktop / WSL failure tracked in `R01`.

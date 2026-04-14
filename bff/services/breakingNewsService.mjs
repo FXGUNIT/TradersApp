@@ -39,10 +39,45 @@ const BREAKING_NEWS_CACHE_TTL_MS = Number.parseInt(
   process.env.BREAKING_NEWS_CACHE_TTL_MS || "600000",
   10,
 );
+const BREAKING_NEWS_WARN_COOLDOWN_MS = Number.parseInt(
+  process.env.BREAKING_NEWS_WARN_COOLDOWN_MS || "60000",
+  10,
+);
 const BREAKING_NEWS_CACHE_TTL_SECONDS = Math.max(
   1,
   Math.ceil(BREAKING_NEWS_CACHE_TTL_MS / 1000),
 );
+const sourceWarnState = new Map();
+
+function normalizeNewsSourceError(error) {
+  if (!error) {
+    return "unknown upstream error";
+  }
+
+  if (error.name === "AbortError" || /aborted/i.test(error.message || "")) {
+    return "request timed out";
+  }
+
+  return error.message || "unknown upstream error";
+}
+
+function logNewsSourceWarning(sourceName, error) {
+  const message = normalizeNewsSourceError(error);
+  const now = Date.now();
+  const previous = sourceWarnState.get(sourceName);
+  if (
+    previous &&
+    previous.message === message &&
+    now - previous.at < BREAKING_NEWS_WARN_COOLDOWN_MS
+  ) {
+    return;
+  }
+
+  sourceWarnState.set(sourceName, { message, at: now });
+  console.warn(
+    `[breakingNews] ${sourceName} unavailable; continuing without it: ${message}`,
+  );
+}
 
 
 async function readBreakingNewsSnapshot() {
@@ -232,7 +267,7 @@ async function fetchFinnhub() {
         allItems.push(newsItem);
       }
     } catch (err) {
-      console.error("[breakingNews] Finnhub error:", err.message);
+      logNewsSourceWarning("Finnhub", err);
     }
   }
 
@@ -285,7 +320,7 @@ async function fetchNewsData() {
 
     return items;
   } catch (err) {
-    console.error("[breakingNews] NewsData.io error:", err.message);
+    logNewsSourceWarning("NewsData.io", err);
     return [];
   }
 }
@@ -328,7 +363,7 @@ async function fetchYahooFinanceRSS() {
         allItems.push(newsItem);
       }
     } catch (err) {
-      console.error("[breakingNews] Yahoo Finance RSS error:", err.message);
+      logNewsSourceWarning("Yahoo Finance RSS", err);
     }
   }
 
@@ -380,7 +415,7 @@ async function fetchGDELT() {
 
     return items;
   } catch (err) {
-    console.error("[breakingNews] GDELT error:", err.message);
+    logNewsSourceWarning("GDELT", err);
     return [];
   }
 }
