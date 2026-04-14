@@ -957,13 +957,25 @@ export default function MainTerminal({
     screenshotsLength: screenshots.length,
   });
 
+  const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10MB
+
   const handleScreenshotDrop = useCallback(async (event) => {
     event.preventDefault();
 
-    const files = Array.from(
+    const rawFiles = Array.from(
       event?.dataTransfer?.files || event?.target?.files || [],
-    ).filter((file) => Boolean(file?.type?.startsWith("image/")));
+    );
 
+    const oversized = rawFiles.find(
+      (f) => Boolean(f?.type?.startsWith("image/")) && f.size > MAX_FILE_BYTES,
+    );
+    if (oversized) {
+      showToast?.(`Screenshot too large — max ${MAX_FILE_BYTES / 1024 / 1024}MB`, "error");
+    }
+
+    const files = rawFiles.filter(
+      (file) => Boolean(file?.type?.startsWith("image/")) && file.size <= MAX_FILE_BYTES,
+    );
     if (!files.length) return;
 
     const nextAssets = await Promise.all(
@@ -988,7 +1000,7 @@ export default function MainTerminal({
     );
 
     setScreenshots((current) => [...current, ...nextAssets].slice(0, 4));
-  }, []);
+  }, [showToast]);
 
   const parseTandC = useCallback(
     async (text, fileName = "") => {
