@@ -16,6 +16,8 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const REDIS_CONNECT_TIMEOUT_MS = Number.parseInt(process.env.REDIS_CONNECT_TIMEOUT_MS || '1000', 10);
+const REDIS_RETRY_COOLDOWN_MS = Number.parseInt(process.env.REDIS_RETRY_COOLDOWN_MS || '30000', 10);
 
 function getLogDir() {
   return process.env.BOARD_ROOM_LOG_DIR || join(__dirname, '../../board-room/logs');
@@ -27,6 +29,10 @@ function getArchiveDir() {
 
 // ─── Redis Client ───────────────────────────────────────────────────────────
 let _redis = null;
+let _redisConnectPromise = null;
+let _redisDisabledUntil = 0;
+let _lastRedisNoticeAt = 0;
+let _lastRedisNotice = null;
 
 function resolveRedisUrl() {
   if (process.env.REDIS_URL) {
@@ -38,18 +44,66 @@ function resolveRedisUrl() {
   return `redis://${host}:${port}`;
 }
 
-function getRedis() {
-  if (!_redis) {
-    _redis = createClient({ url: resolveRedisUrl() });
-    _redis.on('error', (err) => console.error('[boardRoom] Redis error:', err?.message || String(err)));
-    _redis.connect().catch((err) => console.error('[boardRoom] Redis connect failed:', err.message));
+function logRedisUnavailable(message) {
+  const now = Date.now();
+  if (_lastRedisNotice === message && now - _lastRedisNoticeAt < REDIS_RETRY_COOLDOWN_MS) {
+    return;
   }
-  return _redis;
+
+  _lastRedisNoticeAt = now;
+  _lastRedisNotice = message;
+  console.warn(`[boardRoom] Redis unavailable; using degraded mode until retry window: ${message}`);
+}
+
+async function getRedis() {
+  if (_redis?.isOpen) {
+    return _redis;
+  }
+
+  if (Date.now() < _redisDisabledUntil) {
+    return null;
+  }
+
+  if (!_redis) {
+    _redis = createClient({
+      url: resolveRedisUrl(),
+      socket: {
+        connectTimeout: REDIS_CONNECT_TIMEOUT_MS,
+        reconnectStrategy: () => false,
+      },
+    });
+    _redis.on('error', (err) => {
+      logRedisUnavailable(err?.message || String(err));
+    });
+    _redis.on('connect', () => {
+      _redisDisabledUntil = 0;
+    });
+  }
+
+  if (!_redisConnectPromise) {
+    _redisConnectPromise = _redis.connect()
+      .then(() => {
+        _redisDisabledUntil = 0;
+        return _redis;
+      })
+      .catch((err) => {
+        _redisDisabledUntil = Date.now() + REDIS_RETRY_COOLDOWN_MS;
+        logRedisUnavailable(err?.message || String(err));
+        _redis = null;
+        return null;
+      })
+      .finally(() => {
+        _redisConnectPromise = null;
+      });
+  }
+
+  return _redisConnectPromise;
 }
 
 async function redisGet(key) {
   try {
-    const client = getRedis();
+    const client = await getRedis();
+    if (!client) return null;
     const val = await client.get(key);
     return val ? JSON.parse(val) : null;
   } catch { return null; }
@@ -57,7 +111,8 @@ async function redisGet(key) {
 
 async function redisSet(key, value, ttl = null) {
   try {
-    const client = getRedis();
+    const client = await getRedis();
+    if (!client) return;
     if (ttl) await client.setEx(key, ttl, JSON.stringify(value));
     else await client.set(key, JSON.stringify(value));
   } catch { /* fail silent */ }
@@ -65,21 +120,24 @@ async function redisSet(key, value, ttl = null) {
 
 async function redisZadd(key, score, member) {
   try {
-    const client = getRedis();
+    const client = await getRedis();
+    if (!client) return;
     await client.zAdd(key, { score, value: member });
   } catch { /* fail silent */ }
 }
 
 async function redisZrange(key, min, max) {
   try {
-    const client = getRedis();
+    const client = await getRedis();
+    if (!client) return [];
     return await client.zRange(key, min, max);
   } catch { return []; }
 }
 
 async function redisIncr(key) {
   try {
-    const client = getRedis();
+    const client = await getRedis();
+    if (!client) return 1;
     return await client.incr(key);
   } catch { return 1; }
 }
@@ -185,7 +243,8 @@ function sortThreadsByActivity(threads = []) {
 }
 
 async function loadAllThreads() {
-  const client = getRedis();
+  const client = await getRedis();
+  if (!client) return [];
   const keys = (await client.keys('board-room:threads/T*')) || [];
   const threads = [];
 
@@ -640,7 +699,8 @@ async function linkCommitToThread({
 
 // ─── Pending Acknowledgments ──────────────────────────────────────────────────
 async function getPendingAcknowledgments() {
-  const client = getRedis();
+  const client = await getRedis();
+  if (!client) return [];
   const keys = (await client.keys('board-room:posts/*')) || [];
   const pending = [];
   for (const key of keys) {
@@ -661,14 +721,16 @@ async function updateThreadLastActivity(threadId) {
 
 // ─── Templates ───────────────────────────────────────────────────────────────
 async function getTemplates() {
-  const client = getRedis();
+  const client = await getRedis();
   try {
-    const raw = await client.get('board-room:templates');
+    const raw = client ? await client.get('board-room:templates') : null;
     if (raw) return JSON.parse(raw);
     const { readFileSync } = await import('fs');
     const { join } = await import('path');
     const defaults = JSON.parse(readFileSync(join(__dirname, '../../board-room/templates/defaults.json'), 'utf-8'));
-    await client.set('board-room:templates', JSON.stringify(defaults));
+    if (client) {
+      await client.set('board-room:templates', JSON.stringify(defaults));
+    }
     return defaults;
   } catch { return []; }
 }
