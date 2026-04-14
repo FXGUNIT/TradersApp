@@ -132,8 +132,8 @@ otherwise                                     → HUB (via restorable screen)
 
 | Gap | Risk | Requires |
 |-----|------|---------|
-| `identityRoutes.mjs` — no `requireCeo`/`requireAdmin` RBAC guard on `GET /identity/users/:uid` | Normal user can fetch any user's profile via direct URL | BFF auth middleware test |
-| `/identity/users/:uid/access` (PATCH) — no RBAC check | User could patch their own role upward | BFF auth middleware test |
+| `identityRoutes.mjs` — RBAC enforced via `authorizeRequest` at dispatch level | Confirmed covered by `bff/_dispatch.mjs:188` | Integration test to verify `getRequiredRole` maps `/identity/users/:uid` correctly |
+| `/identity/users/:uid/access` (PATCH) — role upward patch risk | Confirmed covered by `authorizeRequest` + role check | BFF integration test |
 | `createSyncedAuthSession` — session expiry not checked client-side | Stale Firebase token used after hard expiry | Token refresh test |
 | No explicit "expired session → refresh → retry" test | Unknown if expired BFF sessions auto-refresh | Integration test |
 | Forgot password flow — token handling not traced | Reset token could be replayable or not expire correctly | Firebase verification test |

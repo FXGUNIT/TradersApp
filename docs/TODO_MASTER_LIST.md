@@ -65,12 +65,12 @@ Run `python scripts/update_todo_progress.py --once` to regenerate.
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-14 14:10`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-14 14:31`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Active Backlog    2.5%  [#-----------------------]
+Active Backlog    5.0%  [#-----------------------]
 Stage Progress  00/01 complete
-Task Counts     done 000 | in progress 001 | blocked 001 | todo 018 | total 020
+Task Counts     done 000 | in progress 002 | blocked 001 | todo 017 | total 020
 ```
 
 | Section | Tasks | Progress | Status |
@@ -78,6 +78,7 @@ Task Counts     done 000 | in progress 001 | blocked 001 | todo 018 | total 020
 | Stage R | [0/20] |   0.0% | IN PROGRESS |
 
 <!-- live-status:end -->
+
 
 
 
@@ -151,7 +152,7 @@ Task Counts     done 000 | in progress 001 | blocked 001 | todo 018 | total 020
   - **Step 5:** Confirm empty-state, loading-state, success-state, and failure-state rendering for each major screen.
   - **Exit criteria:** A complete flow matrix exists and every listed user path is automated or explicitly manually verified with proof.
 
-- [ ] `R03` Prove authentication, session lifecycle, and account recovery are correct.
+- [-] `R03` Prove authentication, session lifecycle, and account recovery are correct. (updated: 2026-04-14 13:50 IST) Evidence gathered: 14 files audited. Auth system uses Firebase + Redis dual-session model with `onAuthStateChanged` listener, device fingerprinting, brute-force lockout, and status→screen routing. `authorizeRequest` is called at BFF dispatch entry (`_dispatch.mjs:188`) — all routes are RBAC-protected. Security headers set on every response. Identified 4 residual gaps requiring execution: role mapping on identity routes, token refresh boundary, forgot-password token expiry, multi-tab session consistency. Full artifact: `docs/R03_AUTH_LIFECYCLE_PROOF.md`.
   - **Why this exists:** A single auth edge-case bug can invalidate any claim of flawless behavior.
   - **Step 1:** Verify email/password login success, invalid credentials, locked/disabled user behavior, and partial-input validation.
   - **Step 2:** Verify Google auth success, cancellation, popup failure, blocked popup, and audit-mode fallback do not leave corrupted auth state.
