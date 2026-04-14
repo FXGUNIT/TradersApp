@@ -143,6 +143,45 @@ const ML_ENGINE_BASE = String(
     "http://ml-engine:8001",
 ).trim();
 const ML_REQUEST_TIMEOUT_MS = 30_000;
+const ML_AUX_WARN_COOLDOWN_MS = Number.parseInt(
+  process.env.ML_AUX_WARN_COOLDOWN_MS || "60000",
+  10,
+);
+const auxWarningState = new Map();
+
+function normalizeAuxMlError(error) {
+  if (!error) {
+    return "unknown ML Engine error";
+  }
+
+  if (error.code === "CIRCUIT_OPEN") {
+    return "circuit breaker open";
+  }
+
+  if (error.name === "AbortError" || /timed out|aborted/i.test(error.message || "")) {
+    return "request timed out";
+  }
+
+  return error.message || "unknown ML Engine error";
+}
+
+function logAuxMlWarning(operation, error) {
+  const message = normalizeAuxMlError(error);
+  const now = Date.now();
+  const previous = auxWarningState.get(operation);
+  if (
+    previous &&
+    previous.message === message &&
+    now - previous.at < ML_AUX_WARN_COOLDOWN_MS
+  ) {
+    return;
+  }
+
+  auxWarningState.set(operation, { message, at: now });
+  console.warn(
+    `[consensusEngine] ${operation} unavailable; continuing without it: ${message}`,
+  );
+}
 
 async function mlRequest(
   path,
@@ -445,11 +484,11 @@ export async function triggerMLNewsTraining(newsItem, options = {}) {
     );
     return { triggered: true, response: res };
   } catch (err) {
-    console.error("[consensusEngine] news-trigger failed:", err.message);
+    logAuxMlWarning("news-trigger", err);
     void reportAgentError({
       agent: CONSENSUS_AGENT,
       error: err,
-      severity: "HIGH",
+      severity: "MEDIUM",
     });
     return { triggered: false, error: err.message };
   }
@@ -476,7 +515,7 @@ export async function logNewsReaction(newsId, reactionData, options = {}) {
     );
     return { ok: true, ...res };
   } catch (err) {
-    console.error("[consensusEngine] news/reaction failed:", err.message);
+    logAuxMlWarning("news/reaction", err);
     void reportAgentError({
       agent: CONSENSUS_AGENT,
       error: err,
@@ -494,7 +533,7 @@ export async function getMLNewsReactions(limit = 50, options = {}) {
     const res = await mlRequest(`/news/reactions?limit=${limit}`, null, 5000, options);
     return res;
   } catch (err) {
-    console.error("[consensusEngine] news/reactions failed:", err.message);
+    logAuxMlWarning("news/reactions", err);
     void reportAgentError({
       agent: CONSENSUS_AGENT,
       error: err,

@@ -45,7 +45,7 @@ Before starting work, claim your tasks here. This prevents two agents from updat
   "R08": { "claimed_by": "codex", "claimed_at": "2026-04-14T16:20:00+05:30" },
   "R09": { "claimed_by": "codex", "claimed_at": "2026-04-14T17:20:00+05:30" },
   "R10": { "claimed_by": null, "claimed_at": null },
-  "R11": { "claimed_by": null, "claimed_at": null },
+  "R11": { "claimed_by": "codex", "claimed_at": "2026-04-14T17:10:00+05:30" },
   "R12": { "claimed_by": null, "claimed_at": null },
   "R13": { "claimed_by": null, "claimed_at": null },
   "R14": { "claimed_by": null, "claimed_at": null },
@@ -64,12 +64,12 @@ Run `python scripts/update_todo_progress.py --once` to regenerate.
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-14 17:10`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-14 17:14`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Active Backlog   20.0%  [#####-------------------]
+Active Backlog   22.5%  [#####-------------------]
 Stage Progress  00/01 complete
-Task Counts     done 000 | in progress 008 | blocked 001 | todo 011 | total 020
+Task Counts     done 000 | in progress 009 | blocked 001 | todo 010 | total 020
 ```
 
 | Section | Tasks | Progress | Status |
@@ -77,6 +77,9 @@ Task Counts     done 000 | in progress 008 | blocked 001 | todo 011 | total 020
 | Stage R | [0/20] |   0.0% | IN PROGRESS |
 
 <!-- live-status:end -->
+
+
+
 
 
 
@@ -140,6 +143,7 @@ Task Counts     done 000 | in progress 008 | blocked 001 | todo 011 | total 020
 2026-04-14 17:18 | CODEX       | R08       | Fixed live ML Engine request-binding/runtime defects, added route and idempotency regression coverage, and documented the remaining artifact-compatibility gaps
 2026-04-14 17:19 | CODEX       | R09       | Added real local process-stack proof for frontend -> BFF -> ML Engine, including clean degrade/recover behavior across an ML Engine restart
 2026-04-14 17:09 | CODEX       | R09       | Hardened local degraded orchestration: Redis-absent BFF boot is now quiet, optional breaking-news upstream timeouts are deduped warnings, and BFF regression tests remain green
+2026-04-14 17:10 | CODEX       | R11       | Added initial failure-handling proof for ML-down, Redis-absent, and optional-news-timeout scenarios, with controlled degradation and reduced secondary log noise
 ```
 
 ## Stage R: Flawless Proof Gate
@@ -239,7 +243,7 @@ Task Counts     done 000 | in progress 008 | blocked 001 | todo 011 | total 020
   - **Step 5:** Verify cleanup behavior for expired, deleted, or superseded state records.
   - **Exit criteria:** State remains coherent across refreshes, restarts, and storage boundaries with no ghost or orphaned records.
 
-- [ ] `R11` Prove error handling and graceful degradation across expected failure modes.
+- [-] `R11` Prove error handling and graceful degradation across expected failure modes. (updated: 2026-04-14 17:10 IST) Added `docs/R11_FAILURE_HANDLING_PROOF.md` and verified three injected local failure paths: (1) ML Engine down -> `/ml/health` and `/ml/consensus` return controlled `503` responses, with `/ml/consensus` falling back to a bounded neutral payload; (2) Redis absent -> BFF `/health` still returns `200` with a single degraded warning and no reconnect spam; (3) optional breaking-news upstream timeouts -> two consecutive `/news/breaking?fresh=true&max=5` calls return `200/200` with deduped warnings and `0` hard error logs. Hardening landed in `bff/services/redis-session-store.mjs`, `bff/services/boardRoomService.mjs`, `bff/services/breakingNewsService.mjs`, and `bff/services/consensusEngine.mjs`. Verified: `node --test bff/tests/*.test.mjs` -> `18 passed`. Remaining gaps: frontend-visible failure states, Firebase/auth outage proof, analysis-service outage proof, Redis recovery/restart proof, and Docker-orchestrated failure injection.
   - **Why this exists:** "Flawless" includes failing well when the environment is not perfect.
   - **Step 1:** Enumerate expected failure classes: network failure, slow dependency, expired auth, invalid input, unavailable Redis, unavailable Firebase, unavailable ML Engine, and partially loaded frontend state.
   - **Step 2:** Inject each failure deliberately and verify the user sees a controlled outcome rather than a crash, blank screen, or misleading success message.
