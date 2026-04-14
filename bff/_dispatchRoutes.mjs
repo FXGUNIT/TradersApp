@@ -193,6 +193,15 @@ export function registerDispatchRoutes({
     // ── Admin route handler ─────────────────────────────────────────────────
     if (await adminHandler(req, res, url, origin)) return true;
 
+    // ── Board Room RBAC gate ─ CEO-level: require ADMIN role via authorizeRequest
+    if (pathname.startsWith("/board-room")) {
+      const auth = await authorizeRequest(req);
+      if (!auth.authorized) {
+        json(res, 403, { ok: false, error: auth.error }, origin);
+        return true;
+      }
+    }
+
     // ── Board Room route handler ────────────────────────────────────────────
     if (await boardRoomHandler.handle(req, res, pathname, origin)) return true;
 
