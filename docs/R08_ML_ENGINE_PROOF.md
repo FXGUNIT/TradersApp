@@ -17,6 +17,66 @@
 
 ---
 
+## 2026-04-14 Update
+
+This task moved beyond static review and into the real BFF-backed request path. The following live defects were reproduced and fixed:
+
+1. FastAPI body-binding regression across multiple route modules.
+   - Root cause: explicit quoted annotations such as `request: "BreakingNewsRequest"` and `request: "PSORequest"` prevented FastAPI from resolving request bodies correctly.
+   - Fixed in:
+     - `ml-engine/_routes_pso.py`
+     - `ml-engine/_routes_news.py`
+     - `ml-engine/_routes_features.py`
+     - `ml-engine/_routes_data.py`
+     - `ml-engine/_routes_backtest.py`
+
+2. Live BFF payload compatibility failure in `/predict` and `/pso/discover`.
+   - Root cause: route code assumed `request.candles` and `request.trades` were Pydantic model instances and called `.model_dump()` on plain dict payloads.
+   - Fixed in:
+     - `ml-engine/_routes_workflow.py`
+     - `ml-engine/_routes_pso.py`
+
+3. ML app wiring defect.
+   - Root cause: `main.create_app()` never registered the FastAPI app with `_infrastructure`, so `get_model_registry_client()` failed in live requests even after lifespan warmup.
+   - Fixed in:
+     - `ml-engine/main.py`
+
+4. Stale lifespan service references in live route modules.
+   - Root cause: route modules imported lifespan-managed globals by value at module import time, so live requests still saw `None` instead of the initialized runtime services.
+   - Fixed with runtime lookup helpers in:
+     - `ml-engine/_routes_workflow.py`
+     - `ml-engine/_routes_pso.py`
+     - `ml-engine/_routes_data.py`
+     - `ml-engine/_routes_backtest.py`
+     - `ml-engine/_kafka.py`
+
+### Verification Added
+
+- `python -m pytest tests/test_route_contracts.py tests/test_idempotency_workflow_routes.py -q` -> `18 passed`
+- `python -m pytest tests/test_health_endpoints.py tests/test_inference_predictor.py tests/test_latency_regression.py tests/test_model_registry_service.py tests/test_model_monitor.py -q` -> `33 passed`
+- `python scripts/ci/run_ml_engine_integration_smoke.py` -> `4 passed`
+
+### New Regression Coverage
+
+- `tests/test_route_contracts.py`
+  - `/news-trigger` accepts JSON body correctly
+  - `/candles/upload` accepts JSON body correctly
+  - `/drift/record-prediction` accepts JSON body correctly
+  - `/feedback/retrain` accepts JSON body correctly
+  - `/pso/discover` accepts dict candle payloads correctly
+  - `main.create_app()` now registers the infrastructure app reference
+
+- `tests/test_idempotency_workflow_routes.py`
+  - `/predict` accepts the real BFF-style dict candle payload and returns a normal response
+
+### Residual Gaps
+
+- No dedicated large-payload / incompatible-schema-version proof yet
+- No explicit serialized-artifact compatibility proof beyond the warmed local registry path
+- Local proof still runs with Redis unavailable, so cache-backed behavior remains a separate operational proof item
+
+---
+
 ## Route Inventory
 
 ### Registered Route Files (via `main.py`)
