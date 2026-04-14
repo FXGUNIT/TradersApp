@@ -27,7 +27,8 @@ $ErrorActionPreference = "Stop"
 $composeFile = Join-Path $PSScriptRoot "..\docker-compose.dev.yml"
 $observabilityFile = Join-Path $PSScriptRoot "..\docker-compose.observability.yml"
 $repoRoot = Join-Path $PSScriptRoot ".."
-$dockerCommand = Get-Command docker -ErrorAction SilentlyContinue
+$dockerCommand = $null
+$dockerExecutable = $null
 
 if (-not (Test-Path $composeFile)) {
   Write-Error "docker-compose.dev.yml not found at $composeFile"
@@ -49,6 +50,26 @@ function Fail-Preflight {
 
   Write-Error $Message
   exit 1
+}
+
+function Resolve-DockerExecutable {
+  $command = Get-Command docker -ErrorAction SilentlyContinue
+  if ($command) {
+    return $command.Source
+  }
+
+  $candidates = @(
+    (Join-Path ${env:ProgramFiles} "Docker\Docker\resources\bin\docker.exe"),
+    (Join-Path ${env:ProgramFiles} "Docker\Docker\resources\docker.exe")
+  ) | Where-Object { $_ }
+
+  foreach ($candidate in $candidates) {
+    if (Test-Path -LiteralPath $candidate) {
+      return $candidate
+    }
+  }
+
+  return $null
 }
 
 function Wait-ForWindowsDockerLinuxEngine {
@@ -75,8 +96,9 @@ function Wait-ForWindowsDockerLinuxEngine {
 }
 
 function Assert-DockerReady {
-  if (-not $dockerCommand) {
-    Fail-Preflight "docker was not found. Install Docker Desktop and ensure the docker CLI is on PATH, then rerun .\scripts\dev-up.ps1."
+  $script:dockerExecutable = Resolve-DockerExecutable
+  if (-not $script:dockerExecutable) {
+    Fail-Preflight "docker was not found. Install Docker Desktop, or ensure docker.exe is available in the standard install location or on PATH, then rerun .\scripts\dev-up.ps1."
   }
 
   if (Wait-ForWindowsDockerLinuxEngine) {
@@ -100,13 +122,13 @@ if ($Down -or $Reset) {
   $downArgs = $baseArgs + @("--profile", "mlops", "down")
   if ($Reset) { $downArgs += "-v" }
   Write-Host "Stopping dev stack$(if($Reset){' and removing volumes'})..." -ForegroundColor Yellow
-  & docker compose @downArgs
+  & $dockerExecutable compose @downArgs
   $exitCode = $LASTEXITCODE
 
   if (Test-Path $observabilityFile) {
     $obsDownArgs = @("-f", $observabilityFile, "down")
     if ($Reset) { $obsDownArgs += "-v" }
-    & docker compose @obsDownArgs
+    & $dockerExecutable compose @obsDownArgs
     if ($LASTEXITCODE -ne 0 -and $exitCode -eq 0) {
       $exitCode = $LASTEXITCODE
     }
@@ -168,7 +190,7 @@ Write-Host "  No k3s. No Longhorn. No GPU required." -ForegroundColor Green
 Write-Host "============================================" -ForegroundColor Cyan
 Write-Host ""
 
-& docker compose @upArgs
+& $dockerExecutable compose @upArgs
 $exitCode = $LASTEXITCODE
 
 if ($exitCode -eq 0 -and $includeObservability) {
@@ -177,7 +199,7 @@ if ($exitCode -eq 0 -and $includeObservability) {
   }
   else {
     $obsUpArgs = @("-f", $observabilityFile, "up", "-d", "prometheus", "alertmanager", "grafana", "loki", "promtail", "jaeger")
-    & docker compose @obsUpArgs
+    & $dockerExecutable compose @obsUpArgs
     $exitCode = $LASTEXITCODE
   }
 }

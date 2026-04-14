@@ -40,11 +40,9 @@ Before starting work, claim your tasks here. This prevents two agents from updat
   "R03": { "claimed_by": "claude-sonnet", "claimed_at": "2026-04-14T13:39:00+05:30" },
   "R04": { "claimed_by": "claude-sonnet", "claimed_at": "2026-04-14T13:52:00+05:30" },
   "R05": { "claimed_by": "claude-sonnet", "claimed_at": "2026-04-14T15:10:00+05:30" },
-  "R03": { "claimed_by": null, "claimed_at": null },
-  "R04": { "claimed_by": null, "claimed_at": null },
-  "R05": { "claimed_by": null, "claimed_at": null },
   "R06": { "claimed_by": "claude-sonnet", "claimed_at": "2026-04-14T15:35:00+05:30" },
   "R07": { "claimed_by": "claude-sonnet", "claimed_at": "2026-04-14T16:00:00+05:30" },
+  "R08": { "claimed_by": "codex", "claimed_at": "2026-04-14T16:20:00+05:30" },
   "R09": { "claimed_by": null, "claimed_at": null },
   "R10": { "claimed_by": null, "claimed_at": null },
   "R11": { "claimed_by": null, "claimed_at": null },
@@ -66,7 +64,7 @@ Run `python scripts/update_todo_progress.py --once` to regenerate.
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-14 15:46`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-14 16:18`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Active Backlog   15.0%  [####--------------------]
@@ -79,6 +77,12 @@ Task Counts     done 000 | in progress 006 | blocked 001 | todo 013 | total 020
 | Stage R | [0/20] |   0.0% | IN PROGRESS |
 
 <!-- live-status:end -->
+
+
+
+
+
+
 
 
 
@@ -126,6 +130,7 @@ Task Counts     done 000 | in progress 006 | blocked 001 | todo 013 | total 020
 2026-04-14 04:00 | CODEX       | R01       | Documented fresh-clone proof progress, hardened dev-up Docker/WSL preflight, and recorded the current host-level WSL blocker
 2026-04-14 04:12 | CODEX       | R02       | Added the frontend flow matrix and identified the concrete audit gaps beyond the existing top-level UI scenarios
 2026-04-14 04:20 | CODEX       | R02       | Extended the UI audit code with a maintenance-mode scenario and a deterministic Board Room assertion; production rerun still pending host Docker/WSL recovery
+2026-04-14 16:16 | CODEX       | R01       | Verified the second clean sibling build pass, added Docker executable fallback in dev-up, and narrowed the remaining blocker to broken host Docker Desktop / WSL state
 ```
 
 ## Stage R: Flawless Proof Gate
@@ -135,7 +140,7 @@ Task Counts     done 000 | in progress 006 | blocked 001 | todo 013 | total 020
 > **Definition:** This stage is not cosmetic cleanup. It is the proof burden that would need to be satisfied before making an absolute-quality claim.
 > **Rule of interpretation:** A task in this stage is only done when the proof artifacts exist, the checks are repeatable, and the result survives reruns without hidden manual fixes.
 
-- [!] `R01` Prove fresh-clone reproducibility from a clean environment. (updated: 2026-04-14 04:00 IST) Clean sibling pass already proved `npm install` + `npm run build` from documented steps, and `scripts/dev-up.ps1` now fails fast on Docker/WSL outages. Remaining blocker: host WSL/Docker layer is down (`LxssManager` stopped), so the isolated `docker compose` startup + second disposable rerun are still pending. Proof log: `docs/R01_FRESH_CLONE_REPRO.md`.
+- [!] `R01` Prove fresh-clone reproducibility from a clean environment. (updated: 2026-04-14 16:16 IST) Two external sibling workspaces now prove the clean host-side bootstrap path: `npm install` + `npm run build` succeed in `E:\TradersApp-R01-Pass1` and `E:\TradersApp-R01-Pass2`. `scripts/dev-up.ps1` now also resolves Docker from the standard Docker Desktop install path and fails fast with the real host blocker. Remaining blocker: the local Docker Desktop / WSL install is broken (`docker-desktop` WSL distro = `Uninstalling`, registry key missing, engine pipe absent), so isolated `docker compose` startup + smoke verification are still pending. Proof log: `docs/R01_FRESH_CLONE_REPRO.md`.
   - **Why this exists:** A system cannot be called flawless if it only works on the current machine because of cached dependencies, leftover secrets, manual fixes, or hidden environment state.
   - **Step 1:** Create a truly clean environment: no existing `node_modules`, no prebuilt `dist`, no warmed Python virtualenv, no cached browser profile, and no manually pre-seeded app state.
   - **Step 2:** Use only documented setup steps from repo docs. If any undocumented command, file edit, environment variable, or retry is required, record it as a gap immediately.

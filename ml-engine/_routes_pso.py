@@ -25,6 +25,7 @@ from _infrastructure import (
     _release_idempotency_claim,
 )
 from training.training_eligibility import summarize_training_eligibility_batch
+from schemas import FeedbackSignalRequest, MambaRequest, PSORequest, TritonInferenceRequest
 
 
 # ── PSO Alpha Discovery ─────────────────────────────────────────────────────────
@@ -40,7 +41,7 @@ except ImportError:
 
 
 def pso_discover(
-    request: "PSORequest",
+    request: PSORequest,
     raw_request: FastAPIRequest = None,
     response: Response = None,
 ):
@@ -166,7 +167,7 @@ except ImportError:
     MambaTradingModel = None
 
 
-def mamba_predict(request: "MambaRequest"):
+def mamba_predict(request: MambaRequest):
     """Run Mamba SSM on candle sequence for direction/regime/pattern prediction."""
     if not MAMBA_AVAILABLE:
         return {
@@ -220,7 +221,7 @@ def mamba_status():
     }
 
 
-def mamba_finetune(request: "MambaRequest"):
+def mamba_finetune(request: MambaRequest):
     """Fine-tune Mamba on trading data with Elastic Weight Consolidation."""
     if not MAMBA_AVAILABLE:
         raise HTTPException(status_code=503, detail="Mamba not available")
@@ -293,7 +294,7 @@ except ImportError:
     ONNX_DIR = Path(".")
 
 
-def inference_predict(request: "TritonInferenceRequest"):
+def inference_predict(request: TritonInferenceRequest):
     """Run inference via Triton (GPU) or local ONNX Runtime fallback."""
     if not INFERENCE_AVAILABLE:
         raise HTTPException(status_code=503, detail="Inference client not available")
@@ -375,7 +376,7 @@ def inference_benchmark(n_samples: int = 1000, batch_size: int = 32):
 
 # ── Feedback Loop Routes ────────────────────────────────────────────────────────
 
-def log_signal(request: "FeedbackSignalRequest", raw_request, response):
+def log_signal(request: FeedbackSignalRequest, raw_request, response):
     """Log a consensus signal for outcome tracking."""
     if feedback_logger is None:
         raise HTTPException(status_code=503, detail="Feedback logger not initialized")

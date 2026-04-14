@@ -9,6 +9,7 @@ This guide covers the fastest way to run the full stack locally with minimal set
 Why Node/npm are still required on the Docker path:
 - `scripts/dev-up.ps1` builds the frontend bundle on the host before Docker starts nginx.
 - On a fresh workspace, `scripts/dev-up.ps1` now auto-runs `npm install` if `node_modules` is missing.
+- `scripts/dev-up.ps1` can now also find `docker.exe` from the standard Docker Desktop install location even if the Docker CLI is not yet on `PATH`.
 - If Node/npm is not installed at all, the script stops immediately with a clear prerequisite error instead of failing later during `vite build`.
 
 Start the core stack (frontend + BFF + ML Engine + Redis):
