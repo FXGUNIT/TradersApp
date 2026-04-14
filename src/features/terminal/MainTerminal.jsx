@@ -1222,9 +1222,19 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
 
   // Add trade from Part 2
   const addP2Trade = () => {
-    if (!p2Jf.exit) { 
-      setErr('Exit price required.'); 
-      return; 
+    if (!p2Jf.exit) {
+      setErr('Exit price required.');
+      return;
+    }
+
+    const pnl = Number(p2Jf.pnl);
+    if (p2Jf.result === "win" && (!Number.isFinite(pnl) || pnl <= 0)) {
+      setErr("A win must have a positive P&L.");
+      return;
+    }
+    if (p2Jf.result === "loss" && (Number.isFinite(pnl) && pnl >= 0)) {
+      setErr("A loss must have a negative P&L.");
+      return;
     }
     
     const entry = { 
