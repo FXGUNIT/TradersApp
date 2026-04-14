@@ -63,7 +63,7 @@ Run `python scripts/update_todo_progress.py --once` to regenerate.
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-14 19:16`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-14 19:18`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Active Backlog   34.1%  [########----------------]
@@ -76,6 +76,7 @@ Task Counts     done 003 | in progress 009 | blocked 001 | todo 009 | total 022
 | Stage R | [3/22] |  13.6% | IN PROGRESS |
 
 <!-- live-status:end -->
+
 
 
 
@@ -286,7 +287,7 @@ Task Counts     done 003 | in progress 009 | blocked 001 | todo 009 | total 022
   - **Step 5:** Verify the system remains healthy after the soak test ends and does not require manual reset.
   - **Exit criteria:** Long-run and concurrent operation does not introduce drift, leaks, duplicates, or state corruption.
 
-- [ ] `R15` Prove browser and device coverage beyond the current local browser path. — **[x] PARTIAL**
+- [ ] `R15` Prove browser and device coverage beyond the current local browser path. -- **[x] PARTIAL** — **[x] PARTIAL**
   - **Why this exists:** A flow that passes in one browser on one machine can still fail badly elsewhere.
   - **Step 1:** Verify supported desktop browsers at minimum across Chrome, Edge, Firefox, and Safari-equivalent coverage where possible.
   - **Step 2:** Verify mobile behavior on realistic viewport classes, not only a single synthetic mobile dimension.
