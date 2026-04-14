@@ -54,7 +54,7 @@ export function createTradeCalcRouteHandler({
         return true;
       } catch (err) {
         const latency_ms = Date.now() - startedAt;
-        json(res, 500, { ok: false, error: err.message || "Simulation failed", latency_ms }, origin);
+        json(res, 500, { ok: false, error: "Trade calculation service unavailable.", latency_ms }, origin);
         return true;
       }
     }

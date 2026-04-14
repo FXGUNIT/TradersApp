@@ -105,7 +105,8 @@ export function createConsensusRouteHandler({
         json(res, result.ok ? 200 : 503, result, origin);
         return true;
       } catch (err) {
-        json(res, 500, { ok: false, error: err.message }, origin);
+        console.error('[consensusRoutes] /ml/consensus error:', err?.message, err?.stack);
+        json(res, 500, { ok: false, error: 'Consensus service unavailable.' }, origin);
         return true;
       }
     }
@@ -117,7 +118,8 @@ export function createConsensusRouteHandler({
         json(res, 200, result, origin);
         return true;
       } catch (err) {
-        json(res, 500, { ok: false, error: err.message }, origin);
+        console.error('[consensusRoutes] ML route error:', err?.message, err?.stack);
+        json(res, 500, { ok: false, error: 'ML service unavailable.' }, origin);
         return true;
       }
     }
@@ -134,7 +136,8 @@ export function createConsensusRouteHandler({
         json(res, 200, result, origin);
         return true;
       } catch (err) {
-        json(res, 500, { ok: false, error: err.message }, origin);
+        console.error('[consensusRoutes] ML route error:', err?.message, err?.stack);
+        json(res, 500, { ok: false, error: 'ML service unavailable.' }, origin);
         return true;
       }
     }
@@ -146,7 +149,8 @@ export function createConsensusRouteHandler({
         json(res, result.ok ? 200 : 503, result, origin);
         return true;
       } catch (err) {
-        json(res, 500, { ok: false, error: err.message }, origin);
+        console.error('[consensusRoutes] ML route error:', err?.message, err?.stack);
+        json(res, 500, { ok: false, error: 'ML service unavailable.' }, origin);
         return true;
       }
     }
@@ -161,7 +165,8 @@ export function createConsensusRouteHandler({
         json(res, result.ok !== false ? 200 : 503, result, origin);
         return true;
       } catch (err) {
-        json(res, 500, { ok: false, error: err.message }, origin);
+        console.error('[consensusRoutes] ML route error:', err?.message, err?.stack);
+        json(res, 500, { ok: false, error: 'ML service unavailable.' }, origin);
         return true;
       }
     }

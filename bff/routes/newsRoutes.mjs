@@ -39,7 +39,7 @@ export function createNewsRouteHandler({
       } catch (err) {
         json(res, 200, {
           ok: false,
-          error: err.message,
+          error: 'News service temporarily unavailable.',
           events: [],
           next_event: null,
           upcoming_count: 0,
@@ -69,7 +69,7 @@ export function createNewsRouteHandler({
       } catch (err) {
         json(res, 200, {
           ok: false,
-          error: err.message,
+          error: 'News service temporarily unavailable.',
           has_next: false,
           countdown_minutes: null,
           next_event: null,
@@ -102,7 +102,7 @@ export function createNewsRouteHandler({
         console.error('[newsRoutes] /news/breaking error:', err.message);
         json(res, 200, {
           ok: false,
-          error: err.message,
+          error: 'News service temporarily unavailable.',
           items: [],
           total: 0,
           highImpactCount: 0,
@@ -126,7 +126,7 @@ export function createNewsRouteHandler({
         }, origin);
         return true;
       } catch (err) {
-        json(res, 200, { ok: false, error: err.message, reactions: [], recentNews: [] }, origin);
+        json(res, 200, { ok: false, error: 'News service temporarily unavailable.', reactions: [], recentNews: [] }, origin);
         return true;
       }
     }
@@ -160,7 +160,7 @@ export function createNewsRouteHandler({
         json(res, 200, { ok: true, reaction: reactionData }, origin);
         return true;
       } catch (err) {
-        json(res, 500, { ok: false, error: err.message }, origin);
+        json(res, 500, { ok: false, error: "News service temporarily unavailable." }, origin);
         return true;
       }
     }
@@ -175,7 +175,7 @@ export function createNewsRouteHandler({
         json(res, 200, { ok: true }, origin);
         return true;
       } catch (err) {
-        json(res, 500, { ok: false, error: err.message }, origin);
+        json(res, 500, { ok: false, error: "News service temporarily unavailable." }, origin);
         return true;
       }
     }

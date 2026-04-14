@@ -44,6 +44,7 @@ Before starting work, claim your tasks here. This prevents two agents from updat
   "R04": { "claimed_by": null, "claimed_at": null },
   "R05": { "claimed_by": null, "claimed_at": null },
   "R06": { "claimed_by": "claude-sonnet", "claimed_at": "2026-04-14T15:35:00+05:30" },
+  "R07": { "claimed_by": "claude-sonnet", "claimed_at": "2026-04-14T16:00:00+05:30" },
   "R09": { "claimed_by": null, "claimed_at": null },
   "R10": { "claimed_by": null, "claimed_at": null },
   "R11": { "claimed_by": null, "claimed_at": null },
@@ -65,12 +66,12 @@ Run `python scripts/update_todo_progress.py --once` to regenerate.
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-14 15:33`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-14 15:46`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Active Backlog   12.5%  [###---------------------]
+Active Backlog   15.0%  [####--------------------]
 Stage Progress  00/01 complete
-Task Counts     done 000 | in progress 005 | blocked 001 | todo 014 | total 020
+Task Counts     done 000 | in progress 006 | blocked 001 | todo 013 | total 020
 ```
 
 | Section | Tasks | Progress | Status |
@@ -78,6 +79,9 @@ Task Counts     done 000 | in progress 005 | blocked 001 | todo 014 | total 020
 | Stage R | [0/20] |   0.0% | IN PROGRESS |
 
 <!-- live-status:end -->
+
+
+
 
 
 
@@ -185,7 +189,7 @@ Task Counts     done 000 | in progress 005 | blocked 001 | todo 014 | total 020
   - **Step 5:** Verify refresh, route change, and service restart do not change computed results unexpectedly.
   - **Exit criteria:** Every user-visible trading number is traceable to a known-good reference and stays correct across interaction cycles.
 
-- [ ] `R07` Prove all BFF routes satisfy their contracts under success and failure.
+- [-] `R07` Prove all BFF routes satisfy their contracts under success and failure. (updated: 2026-04-14 16:00 IST) Route contracts audited: 30+ routes inventoried across 7 domains. Gap fixed: err.message removed from HTTP error responses in consensusRoutes.mjs, newsRoutes.mjs, telegramRoutes.mjs, tradeCalcRoutes.mjs — now use generic messages with server-side logging. Residual gaps: no malformed-JSON param validation, no idempotency on session routes, no route-level test suite for core domains. Full artifact: docs/R07_BFF_ROUTE_CONTRACTS_PROOF.md.
   - **Why this exists:** If route behavior is undefined or inconsistently validated, the frontend may appear stable while the backend is not.
   - **Step 1:** Inventory all BFF routes and group them by domain: identity, Board Room, health, integration, admin, and auxiliary service calls.
   - **Step 2:** For each route, define required auth, accepted payload shape, expected response shape, failure status codes, and side effects.

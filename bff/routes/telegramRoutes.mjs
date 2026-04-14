@@ -75,7 +75,7 @@ export async function sendTelegram(text, opts = {}) {
     if (data.ok) return { ok: true, message_id: data.result?.message_id };
     return { ok: false, error: data.description || 'Telegram API error' };
   } catch (err) {
-    return { ok: false, error: `Network error: ${err.message}` };
+    return { ok: false, error: "Telegram service temporarily unavailable." };
   }
 }
 
@@ -129,7 +129,7 @@ export async function handleTelegramSendMessage(req, res) {
     res.end(JSON.stringify(result));
   } catch (err) {
     res.writeHead(400, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ ok: false, error: err.message }));
+    res.end(JSON.stringify({ ok: false, error: "Telegram service temporarily unavailable." }));
   }
 }
 
@@ -197,7 +197,7 @@ export async function handleTelegramSendForensicAlert(req, res) {
     res.end(JSON.stringify(result));
   } catch (err) {
     res.writeHead(400, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ ok: false, error: err.message }));
+    res.end(JSON.stringify({ ok: false, error: "Telegram service temporarily unavailable." }));
   }
 }
 
