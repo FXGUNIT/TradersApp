@@ -205,6 +205,9 @@ export const ROUTE_PERMISSIONS = {
   "/terminal/admin": ROLES.ADMIN,
   "/admin": ROLES.ADMIN,
 
+  // Board Room — CEO oversight layer, requires ADMIN role
+  "/board-room": ROLES.ADMIN,
+
   // Default: any authenticated user
   null: ROLES.TRADER,
 };
