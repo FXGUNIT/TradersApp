@@ -11,7 +11,7 @@ from datetime import datetime, timedelta, timezone
 import numpy as np
 from fastapi import HTTPException
 
-from _lifespan import db
+import _lifespan
 from schemas import (
     AutotuneRequest,
     BacktestTradesRequest,
@@ -19,6 +19,13 @@ from schemas import (
     MCBacktestRequest,
     PBOBacktestRequest,
 )
+
+db = None
+
+
+def _runtime_value(name):
+    value = globals().get(name)
+    return getattr(_lifespan, name) if value is None else value
 
 from _infrastructure import (
     get_cache,
@@ -31,6 +38,7 @@ from _infrastructure import (
 
 def _build_returns(symbol: str, trades: list | None, returns_override: list | None, min_trades: int) -> np.ndarray:
     """Build returns array from trade log or precomputed returns."""
+    runtime_db = _runtime_value("db")
     if returns_override is not None:
         arr = np.array(returns_override, dtype=float)
         if len(arr) < min_trades:
@@ -45,7 +53,7 @@ def _build_returns(symbol: str, trades: list | None, returns_override: list | No
     try:
         end = datetime.now(timezone.utc).isoformat()
         start = (datetime.now(timezone.utc) - timedelta(days=90)).isoformat()
-        df = db.get_candles(start, end, symbol, limit=10000)
+        df = runtime_db.get_candles(start, end, symbol, limit=10000)
         if df.empty:
             raise HTTPException(status_code=400, detail="No candle data. Upload data first.")
         returns = np.diff(df["close"].values) / df["close"].values[:-1]

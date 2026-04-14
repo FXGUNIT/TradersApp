@@ -9,7 +9,7 @@ import traceback
 import pandas as pd
 from fastapi import HTTPException, Query
 
-from _lifespan import db, store
+import _lifespan
 from schemas import UploadCandlesRequest, UploadTradesRequest
 from training.training_eligibility import build_trade_training_metadata
 
@@ -29,20 +29,29 @@ except ImportError:
     QUALITY_GATE_AVAILABLE = False
     validate_incoming_dataset = lambda **kw: {"passed": True, "critical_failures": 0, "warning_failures": 0}
 
+db = None
+store = None
+
+
+def _runtime_value(name):
+    value = globals().get(name)
+    return getattr(_lifespan, name) if value is None else value
+
 
 # ── /model-status ───────────────────────────────────────────────────────────────
 
 def model_status():
     """Get status of all trained models."""
+    runtime_store = _runtime_value("store")
     monitor = get_sla_monitor()
     start = time.time()
     try:
         registry_status = get_model_registry_status()
-        models = store.list_all_models()
+        models = runtime_store.list_all_models()
         status = {}
         for name in models:
             try:
-                meta = store.load_meta(name, "latest")
+                meta = runtime_store.load_meta(name, "latest")
                 status[name] = {
                     "version": meta.get("version"),
                     "trained_at": meta.get("saved_at"),
@@ -68,6 +77,7 @@ def model_status():
 
 def upload_candles(request: UploadCandlesRequest):
     """Bulk upload candles from NinjaTrader CSV."""
+    runtime_db = _runtime_value("db")
     try:
         if not request.candles:
             raise HTTPException(status_code=400, detail="No candles provided")
@@ -78,11 +88,11 @@ def upload_candles(request: UploadCandlesRequest):
             df=df, dataset_type="candles", source="api:/candles/upload",
             block=True, persist_rejected=True,
         ) if QUALITY_GATE_AVAILABLE else {"passed": True, "critical_failures": 0, "warning_failures": 0}
-        inserted = db.insert_candles(df)
+        inserted = runtime_db.insert_candles(df)
         return {
             "status": "success",
             "candles_inserted": inserted,
-            "total_candles": db.get_candle_count(request.symbol),
+            "total_candles": runtime_db.get_candle_count(request.symbol),
             "dq": {
                 "passed": bool(dq_report.get("passed", False)),
                 "critical_failures": int(dq_report.get("critical_failures", 0)),
@@ -99,6 +109,7 @@ def upload_candles(request: UploadCandlesRequest):
 
 def upload_trades(request: UploadTradesRequest):
     """Bulk upload trade journal entries."""
+    runtime_db = _runtime_value("db")
     try:
         if not request.trades:
             raise HTTPException(status_code=400, detail="No trades provided")
@@ -124,8 +135,8 @@ def upload_trades(request: UploadTradesRequest):
             block=True, persist_rejected=True,
         ) if QUALITY_GATE_AVAILABLE else {"passed": True, "critical_failures": 0, "warning_failures": 0}
         for row in rows:
-            db.upsert_trade(row)
-        total = db.get_trade_count(request.symbol)
+            runtime_db.upsert_trade(row)
+        total = runtime_db.get_trade_count(request.symbol)
         return {
             "status": "success",
             "trades_uploaded": len(request.trades),
@@ -151,6 +162,7 @@ def upload_trades(request: UploadTradesRequest):
 
 def parse_csv_candles(file_content: str):
     """Parse raw NinjaTrader CSV content without persisting."""
+    runtime_db = _runtime_value("db")
     try:
         lines = file_content.strip().split("\n")
         if not lines:
@@ -195,7 +207,7 @@ def parse_csv_candles(file_content: str):
             df=df, dataset_type="candles", source="api:/candles/parse-csv",
             block=True, persist_rejected=True,
         ) if QUALITY_GATE_AVAILABLE else {"passed": True, "critical_failures": 0, "warning_failures": 0}
-        inserted = db.insert_candles(df)
+        inserted = runtime_db.insert_candles(df)
         return {
             "status": "success",
             "rows_parsed": len(df),
@@ -225,11 +237,12 @@ def parse_csv_candles(file_content: str):
 
 def get_candles(symbol: str = "MNQ", start: str = "", end: str = "", session_id: int | None = None, limit: int = 1000):
     """Query candle data."""
+    runtime_db = _runtime_value("db")
     try:
         if start and end:
-            df = db.get_candles(start, end, symbol, session_id, limit)
+            df = runtime_db.get_candles(start, end, symbol, session_id, limit)
         else:
-            df = db.get_latest_candles(symbol, min(limit, 5000))
+            df = runtime_db.get_latest_candles(symbol, min(limit, 5000))
             if session_id is not None:
                 df = df[df["session_id"] == session_id]
         return {"count": len(df), "candles": df.to_dict(orient="records")}
@@ -239,8 +252,9 @@ def get_candles(symbol: str = "MNQ", start: str = "", end: str = "", session_id:
 
 def get_trades(symbol: str = "MNQ", limit: int = 500):
     """Query trade log."""
+    runtime_db = _runtime_value("db")
     try:
-        df = db.get_trade_log(limit, symbol)
+        df = runtime_db.get_trade_log(limit, symbol)
         return {"count": len(df), "trades": df.to_dict(orient="records")}
     except Exception as e:
         raise HTTPException(status_code=500, detail="Service temporarily unavailable.")
@@ -248,7 +262,8 @@ def get_trades(symbol: str = "MNQ", limit: int = 500):
 
 def get_stats():
     """Get database statistics."""
+    runtime_db = _runtime_value("db")
     try:
-        return db.get_stats()
+        return runtime_db.get_stats()
     except Exception as e:
         raise HTTPException(status_code=500, detail="Service temporarily unavailable.")

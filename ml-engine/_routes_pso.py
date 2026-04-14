@@ -13,7 +13,7 @@ import pandas as pd
 from fastapi import HTTPException, Query, Request as FastAPIRequest, Response
 from fastapi.responses import JSONResponse
 
-from _lifespan import db, drift_monitor, feedback_logger, trade_processor, retrain_pipeline, triton_client
+import _lifespan
 
 from _infrastructure import (
     get_cache,
@@ -33,6 +33,13 @@ from schemas import (
     PSORequest,
     TritonInferenceRequest,
 )
+
+db = None
+drift_monitor = None
+feedback_logger = None
+trade_processor = None
+retrain_pipeline = None
+triton_client = None
 
 
 # ── PSO Alpha Discovery ─────────────────────────────────────────────────────────
@@ -60,6 +67,11 @@ def _normalize_records(items):
     return records
 
 
+def _runtime_value(name):
+    value = globals().get(name)
+    return getattr(_lifespan, name) if value is None else value
+
+
 def pso_discover(
     request: PSORequest,
     raw_request: FastAPIRequest = None,
@@ -67,6 +79,7 @@ def pso_discover(
 ):
     """Run Particle Swarm Optimization for alpha discovery per regime."""
     from features.feature_pipeline import engineer_features
+    runtime_db = _runtime_value("db")
 
     if not PSO_AVAILABLE:
         return {"ok": False, "error": "PSO optimizer not available. Install: pip install pyswarms"}
@@ -97,7 +110,7 @@ def pso_discover(
             json.dumps(request.candles[-20:], sort_keys=True, default=str).encode()
         ).hexdigest()[:16]
     else:
-        df = db.get_latest_candles(request.symbol, n=2000)
+        df = runtime_db.get_latest_candles(request.symbol, n=2000)
         candle_hash = "from_db"
 
     if df.empty:
@@ -118,7 +131,7 @@ def pso_discover(
         return cached
 
     try:
-        trade_df = db.get_trade_log(limit=5000)
+        trade_df = runtime_db.get_trade_log(limit=5000)
         feat_df = engineer_features(df, trade_df, None, {}, {})
 
         if request.regime != "ALL":
@@ -189,6 +202,7 @@ except ImportError:
 
 def mamba_predict(request: MambaRequest):
     """Run Mamba SSM on candle sequence for direction/regime/pattern prediction."""
+    runtime_db = _runtime_value("db")
     if not MAMBA_AVAILABLE:
         return {
             "ok": False, "available": False,
@@ -201,7 +215,7 @@ def mamba_predict(request: MambaRequest):
 
     monitor = get_sla_monitor()
     start = time.time()
-    df_candles = request.candles if request.candles else db.get_latest_candles(request.symbol, n=200).to_dict("records")
+    df_candles = request.candles if request.candles else runtime_db.get_latest_candles(request.symbol, n=200).to_dict("records")
     if not df_candles:
         monitor.record("/mamba/predict", (time.time() - start) * 1000, 400)
         raise HTTPException(status_code=400, detail="No candles available")
@@ -243,9 +257,10 @@ def mamba_status():
 
 def mamba_finetune(request: MambaRequest):
     """Fine-tune Mamba on trading data with Elastic Weight Consolidation."""
+    runtime_db = _runtime_value("db")
     if not MAMBA_AVAILABLE:
         raise HTTPException(status_code=503, detail="Mamba not available")
-    df_candles = request.candles if request.candles else db.get_latest_candles(request.symbol, n=2000).to_dict("records")
+    df_candles = request.candles if request.candles else runtime_db.get_latest_candles(request.symbol, n=2000).to_dict("records")
     if len(df_candles) < 50:
         raise HTTPException(status_code=400, detail="Need at least 50 candles")
     labels = [1 if df_candles[i + 1].get("close", 0) > df_candles[i].get("close", 0) else 0
@@ -316,6 +331,7 @@ except ImportError:
 
 def inference_predict(request: TritonInferenceRequest):
     """Run inference via Triton (GPU) or local ONNX Runtime fallback."""
+    runtime_triton_client = _runtime_value("triton_client")
     if not INFERENCE_AVAILABLE:
         raise HTTPException(status_code=503, detail="Inference client not available")
 
@@ -335,7 +351,7 @@ def inference_predict(request: TritonInferenceRequest):
         monitor.record("/inference/predict", (time.time() - t0) * 1000, 200)
         return cached
 
-    client = triton_client or get_inference_client()
+    client = runtime_triton_client or get_inference_client()
     result = client.predict(features=request.features, model_name=request.model_name)
     result["latency_ms"] = round((time.time() - t0) * 1000, 2)
     result["symbol"] = request.symbol
@@ -349,9 +365,10 @@ def inference_predict(request: TritonInferenceRequest):
 
 def inference_status():
     """Get Triton server status and available ONNX models."""
+    runtime_triton_client = _runtime_value("triton_client")
     if not INFERENCE_AVAILABLE:
         return {"error": "Inference not available"}
-    client = triton_client or get_inference_client()
+    client = runtime_triton_client or get_inference_client()
     status = client.get_server_status()
     onnx_models = list_onnx_models() if list_onnx_models else []
     return {
@@ -388,9 +405,10 @@ def inference_setup():
 
 def inference_benchmark(n_samples: int = 1000, batch_size: int = 32):
     """Benchmark inference latency."""
+    runtime_triton_client = _runtime_value("triton_client")
     if not INFERENCE_AVAILABLE:
         raise HTTPException(status_code=503, detail="Inference client not available")
-    client = triton_client or get_inference_client()
+    client = runtime_triton_client or get_inference_client()
     return client.benchmark(n_samples=n_samples, batch_size=batch_size)
 
 
@@ -398,7 +416,8 @@ def inference_benchmark(n_samples: int = 1000, batch_size: int = 32):
 
 def log_signal(request: FeedbackSignalRequest, raw_request, response):
     """Log a consensus signal for outcome tracking."""
-    if feedback_logger is None:
+    runtime_feedback_logger = _runtime_value("feedback_logger")
+    if runtime_feedback_logger is None:
         raise HTTPException(status_code=503, detail="Feedback logger not initialized")
     payload = request.model_dump(mode="json")
     claim, replay = _claim_idempotency(
@@ -408,7 +427,7 @@ def log_signal(request: FeedbackSignalRequest, raw_request, response):
     if replay is not None:
         return replay
     try:
-        signal_id = feedback_logger.log_signal(
+        signal_id = runtime_feedback_logger.log_signal(
             signal=request.signal,
             confidence=request.confidence,
             votes=request.votes,
@@ -435,22 +454,26 @@ def record_outcome(
     actual_move_ticks: float | None = None, expected_move_ticks: float | None = None,
 ):
     """Record the outcome of a matched trade for a previously logged signal."""
-    if feedback_logger is None or trade_processor is None:
+    runtime_feedback_logger = _runtime_value("feedback_logger")
+    runtime_trade_processor = _runtime_value("trade_processor")
+    runtime_drift_monitor = _runtime_value("drift_monitor")
+    runtime_db = _runtime_value("db")
+    if runtime_feedback_logger is None or runtime_trade_processor is None:
         raise HTTPException(status_code=503, detail="Feedback components not initialized")
     try:
-        feedback_logger.record_outcome(
+        runtime_feedback_logger.record_outcome(
             signal_id=signal_id, trade_id=trade_id, result=result, correct=correct,
             pnl_ticks=pnl_ticks, pnl_dollars=pnl_dollars,
             actual_move_ticks=actual_move_ticks, expected_move_ticks=expected_move_ticks,
         )
-        if drift_monitor is not None:
-            with db.conn() as c:
+        if runtime_drift_monitor is not None:
+            with runtime_db.conn() as c:
                 row = c.execute(
                     "SELECT signal, confidence FROM signal_log WHERE id = ?", (signal_id,),
                 ).fetchone()
             if row:
                 correct_val = 1 if correct else 0
-                drift_monitor.concept_drift.record_prediction(
+                runtime_drift_monitor.concept_drift.record_prediction(
                     correct=bool(correct_val), confidence=float(row[1]) if row[1] else 0.5,
                 )
         return {"ok": True, "signal_id": signal_id, "trade_id": trade_id, "correct": correct}
@@ -461,11 +484,12 @@ def record_outcome(
 
 def get_signals(limit: int = 100, symbol: str = "MNQ"):
     """Get recent consensus signal history with optional outcome data."""
-    if feedback_logger is None:
+    runtime_feedback_logger = _runtime_value("feedback_logger")
+    if runtime_feedback_logger is None:
         raise HTTPException(status_code=503, detail="Feedback logger not initialized")
     try:
-        df = feedback_logger.get_signal_history(limit=limit)
-        stats = feedback_logger.get_feedback_stats()
+        df = runtime_feedback_logger.get_signal_history(limit=limit)
+        stats = runtime_feedback_logger.get_feedback_stats()
         return {"signals": df.to_dict(orient="records"), "stats": stats}
     except Exception as e:
         traceback.print_exc()
@@ -474,11 +498,13 @@ def get_signals(limit: int = 100, symbol: str = "MNQ"):
 
 def get_feedback_stats(symbol: str = "MNQ"):
     """Get feedback loop statistics: signal count, win rate, unmatched signals."""
-    if feedback_logger is None:
+    runtime_feedback_logger = _runtime_value("feedback_logger")
+    runtime_drift_monitor = _runtime_value("drift_monitor")
+    if runtime_feedback_logger is None:
         raise HTTPException(status_code=503, detail="Feedback logger not initialized")
     try:
-        stats = feedback_logger.get_feedback_stats(symbol=symbol)
-        concept = drift_monitor.concept_drift.detect() if drift_monitor else {}
+        stats = runtime_feedback_logger.get_feedback_stats(symbol=symbol)
+        concept = runtime_drift_monitor.concept_drift.detect() if runtime_drift_monitor else {}
         return {"signal_stats": stats, "concept_drift": concept}
     except Exception as e:
         traceback.print_exc()
@@ -487,10 +513,12 @@ def get_feedback_stats(symbol: str = "MNQ"):
 
 def process_trades(symbol: str = "MNQ"):
     """Process all closed trades and match them to consensus signals."""
-    if trade_processor is None or drift_monitor is None:
+    runtime_trade_processor = _runtime_value("trade_processor")
+    runtime_drift_monitor = _runtime_value("drift_monitor")
+    if runtime_trade_processor is None or runtime_drift_monitor is None:
         raise HTTPException(status_code=503, detail="Trade processor not initialized")
     try:
-        result = trade_processor.process_all(drift_monitor=drift_monitor, symbol=symbol)
+        result = runtime_trade_processor.process_all(drift_monitor=runtime_drift_monitor, symbol=symbol)
         return result
     except Exception as e:
         traceback.print_exc()
@@ -499,15 +527,16 @@ def process_trades(symbol: str = "MNQ"):
 
 def trigger_retrain(request: FeedbackRetrainRequest):
     """Trigger the closed-loop retrain pipeline."""
-    if retrain_pipeline is None:
+    runtime_retrain_pipeline = _runtime_value("retrain_pipeline")
+    if runtime_retrain_pipeline is None:
         raise HTTPException(status_code=503, detail="Retrain pipeline not initialized")
     try:
-        original_mode = retrain_pipeline.config.training_mode
-        retrain_pipeline.config.training_mode = request.training_mode
-        retrain_pipeline.config.symbol = request.symbol
-        retrain_pipeline.config.auto_retrain_on_drift = request.auto_retrain_on_drift
-        report = retrain_pipeline.run(trigger=request.trigger, verbose=True)
-        retrain_pipeline.config.training_mode = original_mode
+        original_mode = runtime_retrain_pipeline.config.training_mode
+        runtime_retrain_pipeline.config.training_mode = request.training_mode
+        runtime_retrain_pipeline.config.symbol = request.symbol
+        runtime_retrain_pipeline.config.auto_retrain_on_drift = request.auto_retrain_on_drift
+        report = runtime_retrain_pipeline.run(trigger=request.trigger, verbose=True)
+        runtime_retrain_pipeline.config.training_mode = original_mode
         return {
             "triggered": report.triggered,
             "reason": report.reason,
@@ -525,19 +554,20 @@ def trigger_retrain(request: FeedbackRetrainRequest):
 
 def prepare_training_batch(symbol: str = "MNQ", batch_type: str = "nightly_eligibility"):
     """Prepare and persist the current eligible training batch snapshot."""
-    if db is None:
+    runtime_db = _runtime_value("db")
+    if runtime_db is None:
         raise HTTPException(status_code=503, detail="Database not initialized")
 
     try:
-        previous_batch = db.get_latest_training_batch_run(batch_type=batch_type, symbol=symbol)
-        trade_log = db.get_trade_log(limit=10000, symbol=symbol)
+        previous_batch = runtime_db.get_latest_training_batch_run(batch_type=batch_type, symbol=symbol)
+        trade_log = runtime_db.get_trade_log(limit=10000, symbol=symbol)
         summary = summarize_training_eligibility_batch(
             trade_log,
             symbol=symbol,
             batch_type=batch_type,
             previous_batch=previous_batch,
         )
-        batch_id = db.record_training_batch_run(summary)
+        batch_id = runtime_db.record_training_batch_run(summary)
         return {
             "ok": True,
             "batch_id": batch_id,
@@ -550,19 +580,23 @@ def prepare_training_batch(symbol: str = "MNQ", batch_type: str = "nightly_eligi
 
 def get_retrain_status():
     """Get current retrain pipeline status: last training, drift status, feedback stats."""
-    if db is None or drift_monitor is None or feedback_logger is None:
+    runtime_db = _runtime_value("db")
+    runtime_drift_monitor = _runtime_value("drift_monitor")
+    runtime_feedback_logger = _runtime_value("feedback_logger")
+    runtime_retrain_pipeline = _runtime_value("retrain_pipeline")
+    if runtime_db is None or runtime_drift_monitor is None or runtime_feedback_logger is None:
         raise HTTPException(status_code=503, detail="Components not initialized")
     try:
-        last_train = db.get_last_training("direction_ensemble")
-        last_training_batch = db.get_latest_training_batch_run()
-        stats = feedback_logger.get_feedback_stats()
-        concept = drift_monitor.concept_drift.detect()
+        last_train = runtime_db.get_last_training("direction_ensemble")
+        last_training_batch = runtime_db.get_latest_training_batch_run()
+        stats = runtime_feedback_logger.get_feedback_stats()
+        concept = runtime_drift_monitor.concept_drift.detect()
         return {
             "last_training": last_train,
             "last_training_batch": last_training_batch,
             "feedback_stats": stats,
             "concept_drift": concept,
-            "pipeline_ready": retrain_pipeline is not None,
+            "pipeline_ready": runtime_retrain_pipeline is not None,
         }
     except Exception as e:
         traceback.print_exc()

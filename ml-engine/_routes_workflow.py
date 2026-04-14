@@ -14,6 +14,8 @@ import pandas as pd
 from fastapi import BackgroundTasks, HTTPException, Query, Request as FastAPIRequest, Response
 from fastapi.responses import JSONResponse
 
+import _lifespan
+
 from _infrastructure import (
     PROMETHEUS_AVAILABLE,
     get_sla_monitor,
@@ -38,9 +40,13 @@ from schemas import (
     FeedbackSignalRequest,
 )
 
-# Re-expose globals
-from _lifespan import db, trainer, consensus_agg, store, drift_monitor, retrain_pipeline
-from _lifespan import kafka_producer, feast_warmed, lineage_registry
+db = None
+trainer = None
+consensus_agg = None
+store = None
+drift_monitor = None
+retrain_pipeline = None
+feedback_logger = None
 
 # Lazy imports (may not be installed)
 try:
@@ -90,6 +96,11 @@ def _normalize_records(items):
             records.append(dict(item))
     return records
 
+
+def _runtime_value(name):
+    value = globals().get(name)
+    return getattr(_lifespan, name) if value is None else value
+
 # ── /train ─────────────────────────────────────────────────────────────────────
 
 def train_endpoint(
@@ -109,8 +120,9 @@ def train_endpoint(
         return replay
 
     def _do_train():
+        runtime_trainer = _runtime_value("trainer")
         try:
-            result = trainer.train_direction_models(
+            result = runtime_trainer.train_direction_models(
                 mode=request.mode, symbol=request.symbol,
                 min_trades=request.min_trades, verbose=True,
             )
@@ -141,6 +153,7 @@ def train_endpoint(
 def train_sync_endpoint(request: TrainRequest, raw_request: FastAPIRequest, response: Response):
     """Synchronous training — waits for completion."""
     ensure_training_enabled()
+    runtime_trainer = _runtime_value("trainer")
     payload = request.model_dump(mode="json")
     claim = None
     try:
@@ -152,7 +165,7 @@ def train_sync_endpoint(request: TrainRequest, raw_request: FastAPIRequest, resp
             return replay
         if PROMETHEUS_AVAILABLE and record_prometheus_retrain:
             record_prometheus_retrain(triggered=True, in_progress=True)
-        result = trainer.train_direction_models(
+        result = runtime_trainer.train_direction_models(
             mode=request.mode, symbol=request.symbol,
             min_trades=request.min_trades, verbose=True,
         )
@@ -176,6 +189,9 @@ def train_sync_endpoint(request: TrainRequest, raw_request: FastAPIRequest, resp
 
 def predict_endpoint(request: PredictRequest, raw_request: FastAPIRequest, response: Response):
     """Run all models on current market state. Cached 10s in Redis."""
+    runtime_db = _runtime_value("db")
+    runtime_store = _runtime_value("store")
+    runtime_consensus_agg = _runtime_value("consensus_agg")
     monitor = get_sla_monitor()
     start = time.time()
     payload = request.model_dump(mode="json")
@@ -216,7 +232,7 @@ def predict_endpoint(request: PredictRequest, raw_request: FastAPIRequest, respo
         if not df.empty:
             df["timestamp"] = pd.to_datetime(df["timestamp"])
         else:
-            df = db.get_latest_candles(request.symbol, n=100)
+            df = runtime_db.get_latest_candles(request.symbol, n=100)
             if df.empty:
                 raise HTTPException(status_code=400, detail="No candles available. Upload data first.")
 
@@ -263,11 +279,11 @@ def predict_endpoint(request: PredictRequest, raw_request: FastAPIRequest, respo
         model_metas = {}
         for name in votes.keys():
             try:
-                model_metas[name] = store.load_meta(name, "latest")
+                model_metas[name] = runtime_store.load_meta(name, "latest")
             except Exception:
                 pass
 
-        output = consensus_agg.aggregate(
+        output = runtime_consensus_agg.aggregate(
             votes=votes, consensus=consensus, model_metas=model_metas,
             feature_dict=feat_dict, session_id=request.session_id,
             math_engine_snapshot=me,
@@ -374,7 +390,7 @@ def predict_endpoint(request: PredictRequest, raw_request: FastAPIRequest, respo
 
 def regime_endpoint(request: RegimeRequest):
     """Physics-based regime analysis: HMM + FP-FK + Anomalous Diffusion. Cached 60s."""
-    from _lifespan import start_time as _start_time
+    runtime_db = _runtime_value("db")
     start = time.time()
     cache = get_cache()
     monitor = get_sla_monitor()
@@ -398,7 +414,7 @@ def regime_endpoint(request: RegimeRequest):
         df = pd.DataFrame([c for c in request.candles])
         df["timestamp"] = pd.to_datetime(df["timestamp"])
     else:
-        df = db.get_latest_candles(request.symbol, n=200)
+        df = runtime_db.get_latest_candles(request.symbol, n=200)
         if df.empty:
             raise HTTPException(status_code=400, detail="No candles available.")
 
@@ -480,13 +496,13 @@ def regime_endpoint(request: RegimeRequest):
 
 def feedback_signal_endpoint(request: FeedbackSignalRequest):
     """Log a consensus signal for outcome tracking."""
-    if db is None:
+    runtime_db = _runtime_value("db")
+    runtime_feedback_logger = _runtime_value("feedback_logger")
+    if runtime_db is None:
         raise HTTPException(status_code=503, detail="Database not initialized")
     try:
-        from feedback.feedback_logger import FeedbackLogger
-        from _lifespan import feedback_logger
-        if feedback_logger is not None:
-            feedback_logger.log_signal(
+        if runtime_feedback_logger is not None:
+            runtime_feedback_logger.log_signal(
                 signal=request.signal,
                 confidence=request.confidence,
                 votes=request.votes,
