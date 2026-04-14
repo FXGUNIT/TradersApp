@@ -66,12 +66,12 @@ Run `python scripts/update_todo_progress.py --once` to regenerate.
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-14 14:32`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-14 14:39`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Active Backlog    5.0%  [#-----------------------]
+Active Backlog    7.5%  [##----------------------]
 Stage Progress  00/01 complete
-Task Counts     done 000 | in progress 002 | blocked 001 | todo 017 | total 020
+Task Counts     done 000 | in progress 003 | blocked 001 | todo 016 | total 020
 ```
 
 | Section | Tasks | Progress | Status |
@@ -79,6 +79,7 @@ Task Counts     done 000 | in progress 002 | blocked 001 | todo 017 | total 020
 | Stage R | [0/20] |   0.0% | IN PROGRESS |
 
 <!-- live-status:end -->
+
 
 
 
