@@ -13,6 +13,10 @@ const REDIS_CONNECT_TIMEOUT_MS = Number.parseInt(
   process.env.REDIS_CONNECT_TIMEOUT_MS || "1000",
   10,
 );
+const REDIS_RETRY_COOLDOWN_MS = Number.parseInt(
+  process.env.REDIS_RETRY_COOLDOWN_MS || "30000",
+  10,
+);
 const SESSION_TTL_SECONDS = Number.parseInt(
   process.env.SESSION_TTL_SECONDS || "28800",
   10,
@@ -25,6 +29,9 @@ export const KEYCLOAK_SESSION_PREFIX = "keycloak-session:";
 let redisClient = null;
 let redisConnectPromise = null;
 let isConnected = false;
+let nextConnectAttemptAt = 0;
+let lastUnavailableLogAt = 0;
+let lastUnavailableMessage = null;
 
 function buildKey(prefix, id) {
   return `${prefix}${id}`;
@@ -42,9 +49,29 @@ function resolveOptions(options = {}) {
   };
 }
 
+function logRedisUnavailable(message) {
+  const now = Date.now();
+  if (
+    lastUnavailableMessage === message &&
+    now - lastUnavailableLogAt < REDIS_RETRY_COOLDOWN_MS
+  ) {
+    return;
+  }
+
+  lastUnavailableLogAt = now;
+  lastUnavailableMessage = message;
+  console.warn(
+    `[Redis] Unavailable; using degraded mode until retry window: ${message}`,
+  );
+}
+
 export async function getRedisClient() {
   if (redisClient?.isOpen && isConnected) {
     return redisClient;
+  }
+
+  if (Date.now() < nextConnectAttemptAt) {
+    return null;
   }
 
   if (!redisClient) {
@@ -59,12 +86,13 @@ export async function getRedisClient() {
     });
 
     redisClient.on("error", (error) => {
-      console.error("[Redis] Client error:", error.message);
+      logRedisUnavailable(error.message);
       isConnected = false;
     });
 
     redisClient.on("connect", () => {
       isConnected = true;
+      nextConnectAttemptAt = 0;
       console.log("[Redis] Connected");
     });
 
@@ -73,7 +101,7 @@ export async function getRedisClient() {
     });
 
     redisClient.on("reconnecting", () => {
-      console.log("[Redis] Reconnecting...");
+      logRedisUnavailable("retrying Redis connection");
     });
   }
 
@@ -82,11 +110,13 @@ export async function getRedisClient() {
       .connect()
       .then(() => {
         isConnected = true;
+        nextConnectAttemptAt = 0;
         return redisClient;
       })
       .catch((error) => {
-        console.error("[Redis] Connection failed:", error.message);
         isConnected = false;
+        nextConnectAttemptAt = Date.now() + REDIS_RETRY_COOLDOWN_MS;
+        logRedisUnavailable(error.message);
         return null;
       })
       .finally(() => {
