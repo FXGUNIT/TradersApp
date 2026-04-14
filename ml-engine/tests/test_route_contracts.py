@@ -1,11 +1,19 @@
 from __future__ import annotations
 
+import sys
+from types import ModuleType, SimpleNamespace
 from datetime import datetime, timedelta, timezone
 
+import pandas as pd
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 import _health
+import _infrastructure
+import main
+import _routes_data
+import _routes_features
+import _routes_news
 import _routes_pso
 import _routes_workflow
 
@@ -74,6 +82,14 @@ def test_live_endpoint_returns_lightweight_status(monkeypatch):
     assert payload["service"] == "tradersapp-ml-engine"
     assert payload["request_id"] == "req-live-001"
     assert "timestamp" in payload
+
+
+def test_create_app_registers_infrastructure_app_reference(monkeypatch):
+    monkeypatch.setattr(_infrastructure, "app", None)
+
+    app = main.create_app()
+
+    assert _infrastructure.app is app
 
 
 def test_ready_endpoint_reports_starting_when_db_unavailable(monkeypatch):
@@ -186,3 +202,185 @@ def test_mamba_predict_reports_unavailable_without_throwing(monkeypatch):
     assert payload["ok"] is False
     assert payload["available"] is False
     assert "Mamba not available" in payload["error"]
+
+
+def test_news_trigger_accepts_json_body_contract():
+    app = FastAPI()
+    app.add_api_route("/news-trigger", _routes_news.feedback_signal_news_trigger, methods=["POST"])
+
+    client = TestClient(app)
+    response = client.post(
+        "/news-trigger",
+        json={
+            "news": {
+                "id": "news-001",
+                "title": "Fed signals rate cut",
+                "description": "Macro pressure cools inflation.",
+                "sentiment": "bullish",
+                "impact": "HIGH",
+                "keywords": ["fed", "inflation"],
+            },
+            "trigger_type": "breaking_news_high_impact",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["ok"] is True
+    assert payload["news_id"] == "news-001"
+    assert payload["retrain_scheduled"] is True
+
+
+def test_candles_upload_accepts_json_body_contract(monkeypatch):
+    class _FakeUploadDb:
+        def insert_candles(self, df):
+            return len(df)
+
+        def get_candle_count(self, symbol):
+            return 7
+
+    app = FastAPI()
+    app.add_api_route("/candles/upload", _routes_data.upload_candles, methods=["POST"])
+    monkeypatch.setattr(_routes_data, "db", _FakeUploadDb())
+    monkeypatch.setattr(_routes_data, "QUALITY_GATE_AVAILABLE", False)
+
+    client = TestClient(app)
+    response = client.post(
+        "/candles/upload",
+        json={"symbol": "MNQ", "candles": _build_candles(3)},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "success"
+    assert payload["candles_inserted"] == 3
+    assert payload["total_candles"] == 7
+
+
+def test_drift_record_prediction_accepts_json_body_contract(monkeypatch):
+    class _FakeConceptDrift:
+        def __init__(self):
+            self.recorded = []
+
+        def record_prediction(self, *, correct, confidence):
+            self.recorded.append((correct, confidence))
+
+        def detect(self):
+            return {"status": "ok", "accuracy": 0.75}
+
+        def should_retrain(self):
+            return False
+
+    fake_concept = _FakeConceptDrift()
+    fake_monitor = SimpleNamespace(
+        concept_drift=fake_concept,
+        regime_drift=SimpleNamespace(detect=lambda: {"status": "ok"}),
+    )
+
+    app = FastAPI()
+    app.add_api_route("/drift/record-prediction", _routes_features.drift_record_prediction, methods=["POST"])
+    monkeypatch.setattr(_routes_features._lifespan, "drift_monitor", fake_monitor)
+    monkeypatch.setattr(_routes_features, "record_prometheus_drift_monitoring_snapshot", lambda *args, **kwargs: None)
+
+    client = TestClient(app)
+    response = client.post(
+        "/drift/record-prediction",
+        json={"correct": True, "confidence": 0.82, "model_name": "ensemble"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["ok"] is True
+    assert payload["recorded"] is True
+    assert fake_concept.recorded == [(True, 0.82)]
+
+
+def test_feedback_retrain_accepts_json_body_contract(monkeypatch):
+    fake_config = SimpleNamespace(
+        training_mode="full",
+        symbol="MNQ",
+        auto_retrain_on_drift=False,
+    )
+    fake_report = SimpleNamespace(
+        triggered=True,
+        reason="manual",
+        drift_status={"should_retrain": True, "overall_status": "alert"},
+        training_result={"models": {"direction": {"ok": True}}},
+        error=None,
+        duration_sec=1.25,
+        timestamp="2026-04-14T16:00:00Z",
+    )
+    fake_pipeline = SimpleNamespace(
+        config=fake_config,
+        run=lambda trigger, verbose: fake_report,
+    )
+
+    app = FastAPI()
+    app.add_api_route("/feedback/retrain", _routes_pso.trigger_retrain, methods=["POST"])
+    monkeypatch.setattr(_routes_pso, "retrain_pipeline", fake_pipeline)
+
+    client = TestClient(app)
+    response = client.post(
+        "/feedback/retrain",
+        json={
+            "trigger": "manual",
+            "symbol": "MNQ",
+            "training_mode": "incremental",
+            "auto_retrain_on_drift": True,
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["triggered"] is True
+    assert payload["reason"] == "manual"
+    assert payload["training_result"] == {"direction": {"ok": True}}
+
+
+def test_pso_discover_accepts_dict_candles_payload(monkeypatch):
+    fake_features = ModuleType("features.feature_pipeline")
+    fake_features.engineer_features = lambda *args, **kwargs: pd.DataFrame([{"feature_a": 1.0}])
+    monkeypatch.setitem(sys.modules, "features.feature_pipeline", fake_features)
+
+    class _FakePsoDb:
+        def get_trade_log(self, limit=5000):
+            return pd.DataFrame([{"pnl_ticks": 1.0}])
+
+    app = FastAPI()
+    app.add_api_route("/pso/discover", _routes_pso.pso_discover, methods=["POST"])
+    monkeypatch.setattr(_routes_pso, "db", _FakePsoDb())
+    monkeypatch.setattr(_routes_pso, "PSO_AVAILABLE", True)
+    monkeypatch.setattr(_routes_pso, "PROMETHEUS_AVAILABLE", False)
+    monkeypatch.setattr(_routes_pso, "get_cache", lambda: _FakeCache())
+    monkeypatch.setattr(_routes_pso, "get_sla_monitor", lambda: _FakeMonitor())
+    monkeypatch.setattr(_routes_pso, "_claim_idempotency", lambda *args, **kwargs: (None, None))
+    monkeypatch.setattr(_routes_pso, "_store_idempotent_response", lambda *args, **kwargs: None)
+    monkeypatch.setattr(_routes_pso, "_release_idempotency_claim", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        _routes_pso,
+        "run_alpha_discovery",
+        lambda *args, **kwargs: {
+            "regimes_found": 1,
+            "best_regime": "ALL",
+            "best_regime_alpha": 1.0,
+            "total_alpha": 1.0,
+            "timestamp": "2026-04-14T16:00:00Z",
+        },
+    )
+
+    client = TestClient(app)
+    response = client.post(
+        "/pso/discover",
+        json={
+            "symbol": "MNQ",
+            "candles": _build_candles(60),
+            "n_particles": 20,
+            "max_iterations": 15,
+            "regime": "ALL",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["regimes_found"] == 1
+    assert payload["best_regime"] == "ALL"

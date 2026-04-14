@@ -77,6 +77,19 @@ try:
 except Exception:
     publish_consensus_to_kafka = lambda *a, **k: None
 
+
+def _normalize_records(items):
+    """Accept either dict payloads or Pydantic models from request bodies."""
+    records = []
+    for item in items or []:
+        if hasattr(item, "model_dump"):
+            records.append(item.model_dump())
+        elif isinstance(item, dict):
+            records.append(item)
+        else:
+            records.append(dict(item))
+    return records
+
 # ── /train ─────────────────────────────────────────────────────────────────────
 
 def train_endpoint(
@@ -199,7 +212,7 @@ def predict_endpoint(request: PredictRequest, raw_request: FastAPIRequest, respo
             record_prometheus_cache(hit=False)
 
         # Build DataFrames
-        df = pd.DataFrame([c.model_dump() for c in request.candles]) if request.candles else pd.DataFrame()
+        df = pd.DataFrame(_normalize_records(request.candles)) if request.candles else pd.DataFrame()
         if not df.empty:
             df["timestamp"] = pd.to_datetime(df["timestamp"])
         else:
@@ -207,7 +220,7 @@ def predict_endpoint(request: PredictRequest, raw_request: FastAPIRequest, respo
             if df.empty:
                 raise HTTPException(status_code=400, detail="No candles available. Upload data first.")
 
-        trade_df = pd.DataFrame([t.model_dump() for t in request.trades]) if request.trades else None
+        trade_df = pd.DataFrame(_normalize_records(request.trades)) if request.trades else None
         me = request.math_engine_snapshot or {}
 
         # Validate

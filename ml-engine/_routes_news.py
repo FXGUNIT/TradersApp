@@ -15,6 +15,8 @@ _news_reaction_log: list = []
 
 import pandas as pd
 
+from schemas import BreakingNewsRequest, NewsReactionRequest
+
 
 def _persist_news_reaction(entry: dict) -> None:
     """Append news reaction to CSV log for ML training."""
@@ -75,7 +77,7 @@ def _classify_news_impact(news: dict) -> dict:
     }
 
 
-def feedback_signal_news_trigger(request: "BreakingNewsRequest"):
+def feedback_signal_news_trigger(request: BreakingNewsRequest):
     """
     Called by BFF when HIGH impact breaking news arrives.
     Actions: classify impact, log, optionally trigger retrain.
@@ -116,7 +118,7 @@ def feedback_signal_news_trigger(request: "BreakingNewsRequest"):
     }
 
 
-def news_reaction_endpoint(request: "NewsReactionRequest"):
+def news_reaction_endpoint(request: NewsReactionRequest):
     """Log actual market reaction to a previously triggered news item."""
     news_id = request.news_id
     entry_idx = None

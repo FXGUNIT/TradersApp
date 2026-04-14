@@ -12,6 +12,13 @@ import numpy as np
 from fastapi import HTTPException
 
 from _lifespan import db
+from schemas import (
+    AutotuneRequest,
+    BacktestTradesRequest,
+    FullPBOBacktestRequest,
+    MCBacktestRequest,
+    PBOBacktestRequest,
+)
 
 from _infrastructure import (
     get_cache,
@@ -86,7 +93,7 @@ def _serialize_pbo_result(result) -> dict:
 
 # ── Route functions ─────────────────────────────────────────────────────────────
 
-def run_pbo_backtest(request: "PBOBacktestRequest"):
+def run_pbo_backtest(request: PBOBacktestRequest):
     """Run CPCV PBO evaluation — Combinatorial Purged Cross-Validation."""
     from evaluation.backtest_pbo import evaluate_pbo, PBOConfig
 
@@ -150,7 +157,7 @@ def run_pbo_backtest(request: "PBOBacktestRequest"):
     return output
 
 
-def run_mc_backtest(request: "MCBacktestRequest"):
+def run_mc_backtest(request: MCBacktestRequest):
     """Run Monte Carlo PBO evaluation — block bootstrap synthetic paths."""
     from evaluation.backtest_pbo import monte_carlo_pbo, PBOConfig
 
@@ -207,7 +214,7 @@ def run_mc_backtest(request: "MCBacktestRequest"):
     return output
 
 
-def run_full_pbo(request: "FullPBOBacktestRequest"):
+def run_full_pbo(request: FullPBOBacktestRequest):
     """Run ALL 3 PBO modes (CPCV, Walk-Forward, Monte Carlo) unified."""
     from evaluation.backtest_pbo import run_full_pbo_evaluation
 
@@ -294,7 +301,7 @@ def run_full_pbo(request: "FullPBOBacktestRequest"):
     return output
 
 
-def autotune_pbo(request: "AutotuneRequest"):
+def autotune_pbo(request: AutotuneRequest):
     """Auto-tune strategy hyperparameters to pass PBO testing."""
     from evaluation.backtest_pbo import auto_tune_to_pass_pbo, PBOConfig
 
@@ -344,7 +351,7 @@ def autotune_pbo(request: "AutotuneRequest"):
     }
 
 
-def compute_returns(request: "BacktestTradesRequest"):
+def compute_returns(request: BacktestTradesRequest):
     """Convert trades into returns array and compute stats."""
     from fastapi import HTTPException as HTTPExc
 

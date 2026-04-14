@@ -10,6 +10,7 @@ import pandas as pd
 from fastapi import HTTPException, Query
 
 from _lifespan import db, store
+from schemas import UploadCandlesRequest, UploadTradesRequest
 from training.training_eligibility import build_trade_training_metadata
 
 from _infrastructure import (
@@ -65,7 +66,7 @@ def model_status():
 
 # ── /candles/upload ─────────────────────────────────────────────────────────────
 
-def upload_candles(request: "UploadCandlesRequest"):
+def upload_candles(request: UploadCandlesRequest):
     """Bulk upload candles from NinjaTrader CSV."""
     try:
         if not request.candles:
@@ -96,7 +97,7 @@ def upload_candles(request: "UploadCandlesRequest"):
 
 # ── /trades/upload ─────────────────────────────────────────────────────────────
 
-def upload_trades(request: "UploadTradesRequest"):
+def upload_trades(request: UploadTradesRequest):
     """Bulk upload trade journal entries."""
     try:
         if not request.trades:

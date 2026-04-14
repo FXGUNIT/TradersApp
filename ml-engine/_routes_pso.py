@@ -9,6 +9,7 @@ import traceback
 from datetime import datetime, timezone
 from pathlib import Path
 
+import pandas as pd
 from fastapi import HTTPException, Query, Request as FastAPIRequest, Response
 from fastapi.responses import JSONResponse
 
@@ -25,7 +26,13 @@ from _infrastructure import (
     _release_idempotency_claim,
 )
 from training.training_eligibility import summarize_training_eligibility_batch
-from schemas import FeedbackSignalRequest, MambaRequest, PSORequest, TritonInferenceRequest
+from schemas import (
+    FeedbackRetrainRequest,
+    FeedbackSignalRequest,
+    MambaRequest,
+    PSORequest,
+    TritonInferenceRequest,
+)
 
 
 # ── PSO Alpha Discovery ─────────────────────────────────────────────────────────
@@ -38,6 +45,19 @@ except ImportError:
     PSOOptimizer = None
     NichingPSO = None
     run_alpha_discovery = None
+
+
+def _normalize_records(items):
+    """Accept either dict payloads or Pydantic models from request bodies."""
+    records = []
+    for item in items or []:
+        if hasattr(item, "model_dump"):
+            records.append(item.model_dump())
+        elif isinstance(item, dict):
+            records.append(item)
+        else:
+            records.append(dict(item))
+    return records
 
 
 def pso_discover(
@@ -71,7 +91,7 @@ def pso_discover(
     cache = get_cache()
 
     if request.candles:
-        df = pd.DataFrame([c.model_dump() for c in request.candles])
+        df = pd.DataFrame(_normalize_records(request.candles))
         df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
         candle_hash = hashlib.sha256(
             json.dumps(request.candles[-20:], sort_keys=True, default=str).encode()
@@ -477,7 +497,7 @@ def process_trades(symbol: str = "MNQ"):
         raise HTTPException(status_code=500, detail="Service temporarily unavailable.")
 
 
-def trigger_retrain(request: "FeedbackRetrainRequest"):
+def trigger_retrain(request: FeedbackRetrainRequest):
     """Trigger the closed-loop retrain pipeline."""
     if retrain_pipeline is None:
         raise HTTPException(status_code=503, detail="Retrain pipeline not initialized")

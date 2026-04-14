@@ -10,6 +10,7 @@ import pandas as pd
 from fastapi import HTTPException, Query
 
 import _lifespan
+from schemas import DriftDetectRequest, RecordPredictionRequest
 
 try:
     from features.feast_client import get_all_features as feast_get_all_features, get_feature_info
@@ -259,7 +260,7 @@ def drift_status():
         raise HTTPException(status_code=500, detail="Service temporarily unavailable.")
 
 
-def drift_detect(request: "DriftDetectRequest"):
+def drift_detect(request: DriftDetectRequest):
     """Run full drift detection across all three detectors."""
     drift_monitor = _lifespan.drift_monitor
     if drift_monitor is None:
@@ -280,7 +281,7 @@ def drift_detect(request: "DriftDetectRequest"):
         raise HTTPException(status_code=500, detail="Service temporarily unavailable.")
 
 
-def drift_record_prediction(request: "RecordPredictionRequest"):
+def drift_record_prediction(request: RecordPredictionRequest):
     """Record a prediction result for concept drift monitoring."""
     drift_monitor = _lifespan.drift_monitor
     if drift_monitor is None:

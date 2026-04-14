@@ -90,7 +90,7 @@ from _health import (
     get_sla_report,
     get_cache_stats,
 )
-from _infrastructure import get_cache, get_sla_monitor
+from _infrastructure import get_cache, get_sla_monitor, set_app
 
 # Pydantic models
 from schemas import (
@@ -120,6 +120,7 @@ def create_app() -> FastAPI:
         version="1.0.0",
         lifespan=lifespan,
     )
+    set_app(app)
     configure_middleware(app)
     _register_routes(app)
     return app

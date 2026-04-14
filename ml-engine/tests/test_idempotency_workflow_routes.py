@@ -264,6 +264,51 @@ def test_predict_endpoint_replays_completed_response_for_same_idempotency_key(mo
     assert registry.advance_calls == 1
 
 
+def test_predict_endpoint_accepts_bff_style_dict_candles(monkeypatch):
+    cache = FakeCache()
+    registry = FakeModelRegistryClient()
+    trainer = FakeTrainer()
+    app = build_test_app(monkeypatch, cache=cache, registry=registry, trainer=trainer)
+    monkeypatch.setattr(_routes_workflow, "get_request_id", lambda: "req-bff-001")
+
+    client = TestClient(app)
+    payload = {
+        "symbol": "MNQ",
+        "session_id": 1,
+        "math_engine_snapshot": {"session_pct": 0.42, "minutes_into_session": 75},
+        "key_levels": {"vwap": 18495},
+        "candles": [
+            {
+                "timestamp": "2026-04-10T09:30:00Z",
+                "open": 18500.0,
+                "high": 18501.0,
+                "low": 18499.0,
+                "close": 18500.5,
+                "volume": 1000,
+            },
+            {
+                "timestamp": "2026-04-10T09:35:00Z",
+                "open": 18501.0,
+                "high": 18502.0,
+                "low": 18500.0,
+                "close": 18501.5,
+                "volume": 1005,
+            },
+        ],
+        "trades": [],
+        "features": {"ignored_by_schema": True},
+    }
+
+    response = client.post("/predict", json=payload)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["signal"] == "LONG"
+    assert body["request_id"] == "req-bff-001"
+    assert registry.predict_calls == 1
+    assert registry.advance_calls == 1
+
+
 def test_train_endpoint_replays_completed_response_for_same_idempotency_key(monkeypatch):
     cache = FakeCache()
     registry = FakeModelRegistryClient()
