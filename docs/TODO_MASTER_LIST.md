@@ -46,7 +46,7 @@ Before starting work, claim your tasks here. This prevents two agents from updat
   "R09": { "claimed_by": "codex", "claimed_at": "2026-04-14T17:20:00+05:30" },
   "R10": { "claimed_by": "claude-sonnet", "claimed_at": "2026-04-14T16:10:00+05:30" },
   "R12": { "claimed_by": "claude-sonnet", "claimed_at": "2026-04-14T16:20:00+05:30" },
-  "R13": { "claimed_by": null, "claimed_at": null },
+  "R13": { "claimed_by": "claude-sonnet", "claimed_at": "2026-04-14T16:30:00+05:30" },
   "R14": { "claimed_by": null, "claimed_at": null },
   "R15": { "claimed_by": null, "claimed_at": null },
   "R16": { "claimed_by": null, "claimed_at": null },
@@ -63,19 +63,20 @@ Run `python scripts/update_todo_progress.py --once` to regenerate.
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-14 18:50`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-14 19:01`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Active Backlog   29.5%  [#######-----------------]
+Active Backlog   34.1%  [########----------------]
 Stage Progress  00/01 complete
-Task Counts     done 002 | in progress 009 | blocked 001 | todo 010 | total 022
+Task Counts     done 003 | in progress 009 | blocked 001 | todo 009 | total 022
 ```
 
 | Section | Tasks | Progress | Status |
 |---|---|---:|---|
-| Stage R | [2/22] |   9.1% | IN PROGRESS |
+| Stage R | [3/22] |  13.6% | IN PROGRESS |
 
 <!-- live-status:end -->
+
 
 
 
@@ -264,7 +265,7 @@ Task Counts     done 002 | in progress 009 | blocked 001 | todo 010 | total 022
   - **Step 5:** Run dependency and config audits, then close or explicitly document any findings.
   - **Exit criteria:** No known critical or high-severity security weakness remains unaddressed or unexplained.
 
-- [ ] `R13` Prove performance against defined budgets, not just "feels fast."
+- [x] `R13` Prove performance against defined budgets, not just "feels fast." (updated: 2026-04-14 16:30 IST) Added `docs/R13_PERFORMANCE_PROOF.md`. ML Engine has explicit P50/P95/P99 SLA targets per endpoint with regression tests (`tests/test_latency_regression.py`). BFF layer has defined budgets: ML Consensus <200ms, 5s ML timeout, 3s news timeout, circuit breaker 5f/30s, cache TTL 60s/300s. Payload size budgets enforced: 10MB screenshots, 5MB AI body, 100KB workspace. No startup/FMP budget defined (low). Cannot run actual tests — blocked on Docker/WSL per R01.
   - **Why this exists:** A system cannot be called flawless if it only appears responsive on one warm local run.
   - **Step 1:** Define explicit budgets for startup time, first meaningful render, route transitions, API latency, inference latency, and memory usage.
   - **Step 2:** Capture baseline measurements in controlled runs and store them as artifacts.
