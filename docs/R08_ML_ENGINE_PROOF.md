@@ -1,7 +1,7 @@
 # R08 Proof Artifact: ML Engine Routes, Models & Contracts
 
 **Task:** R08 — Prove ML Engine routes, models, and contracts meet the flawless gate.
-**Claimed by:** claude-sonnet | **Date:** 2026-04-14
+**Claimed by:** codex | **Date:** 2026-04-14
 **Status:** GAP FIXED — error leakage patched across all route files, evidence documented
 
 ---
