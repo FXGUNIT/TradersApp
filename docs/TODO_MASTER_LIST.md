@@ -67,12 +67,12 @@ Run `python scripts/update_todo_progress.py --once` to regenerate.
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-14 15:15`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-14 15:17`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Active Backlog    7.5%  [##----------------------]
+Active Backlog   10.0%  [##----------------------]
 Stage Progress  00/01 complete
-Task Counts     done 000 | in progress 003 | blocked 001 | todo 016 | total 020
+Task Counts     done 000 | in progress 004 | blocked 001 | todo 015 | total 020
 ```
 
 | Section | Tasks | Progress | Status |
@@ -80,15 +80,6 @@ Task Counts     done 000 | in progress 003 | blocked 001 | todo 016 | total 020
 | Stage R | [0/20] |   0.0% | IN PROGRESS |
 
 <!-- live-status:end -->
-
-
-
-
-
-
-
-
-
 
 
 
@@ -176,7 +167,7 @@ Task Counts     done 000 | in progress 003 | blocked 001 | todo 016 | total 020
   - **Step 5:** Verify all denial paths are safe: correct status code, no sensitive data leak, and no partial side effects.
   - **Exit criteria:** Every privileged action is proven to fail safely for non-privileged identities and succeed only for the correct role.
 
-- [ ] `R05` Prove file-upload, screenshot, and OCR flows are robust.
+- [-] `R05` Prove file-upload, screenshot, and OCR flows are robust. (updated: 2026-04-14 15:15 IST) Evidence gathered: 14 files audited. Three gaps found and fixed: (1) client-side file size guard (10MB max) added to `terminalUploadUtils.js`, `terminalPasteListener.js`, and `MainTerminal.jsx` — oversized files rejected with toast; (2) BFF AI endpoint body limit raised from 200KB to 5MB (`_dispatchRoutes.mjs`); (3) `useTerminalOcr.js` now clears `ocrResult` at top of `runOcr` — no stale values on retry. Full artifact: `docs/R05_UPLOAD_OCR_PROOF.md`.
   - **Why this exists:** Upload surfaces are common sources of crashes, stale state, silent truncation, and security bugs.
   - **Step 1:** Verify happy-path upload for screenshots, MP chart, and VWAP chart across supported file types and normal file sizes.
   - **Step 2:** Verify rejection behavior for oversized files, unsupported file types, corrupted files, duplicate uploads, and too-many-files conditions.
