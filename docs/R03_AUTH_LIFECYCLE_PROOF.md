@@ -46,9 +46,10 @@ Five proof steps, each must pass with documented evidence before R03 is marked `
 | `src/services/adminAuthService.js` | Admin password verify, device fingerprinting, session token management, brute-force lockout |
 | `bff/routes/identityRoutes.mjs` | All identity routes: user CRUD, session CRUD, revoke-others |
 | `bff/routes/adminRoutes.mjs` | Admin user management, maintenance toggle |
-| `bff/services/security.mjs` | Security headers (CSP, HSTS, X-Frame), RBAC, rate limiter, `requireCeo`/`requireAdmin` guards |
+| `bff/services/security.mjs` | Security headers (CSP, HSTS, X-Frame), RBAC, rate limiter, `authorizeRequest`, `getRequiredRole` |
+| `bff/_dispatch.mjs` | `authorizeRequest` called at dispatch entry for every request — all routes are RBAC-protected |
 | `bff/services/redis-session-store.mjs` | Session storage with TTL, device fingerprint, active session list |
-| `bff/services/keycloakJwtVerifier.mjs` | JWT verification for BFF→ML Engine calls |
+| `bff/services/keycloakJwtVerifier.mjs` | JWT verification for BFF→ML Engine calls; graceful fallback when JWKS unreachable |
 
 ### Verified Contract Points
 
