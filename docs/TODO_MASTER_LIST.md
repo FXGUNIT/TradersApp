@@ -43,7 +43,7 @@ Before starting work, claim your tasks here. This prevents two agents from updat
   "R06": { "claimed_by": "claude-sonnet", "claimed_at": "2026-04-14T15:35:00+05:30" },
   "R07": { "claimed_by": "claude-sonnet", "claimed_at": "2026-04-14T16:00:00+05:30" },
   "R08": { "claimed_by": "codex", "claimed_at": "2026-04-14T16:20:00+05:30" },
-  "R09": { "claimed_by": null, "claimed_at": null },
+  "R09": { "claimed_by": "codex", "claimed_at": "2026-04-14T17:20:00+05:30" },
   "R10": { "claimed_by": null, "claimed_at": null },
   "R11": { "claimed_by": null, "claimed_at": null },
   "R12": { "claimed_by": null, "claimed_at": null },
@@ -64,12 +64,12 @@ Run `python scripts/update_todo_progress.py --once` to regenerate.
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-14 16:18`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-14 17:02`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Active Backlog   15.0%  [####--------------------]
+Active Backlog   20.0%  [#####-------------------]
 Stage Progress  00/01 complete
-Task Counts     done 000 | in progress 006 | blocked 001 | todo 013 | total 020
+Task Counts     done 000 | in progress 008 | blocked 001 | todo 011 | total 020
 ```
 
 | Section | Tasks | Progress | Status |
@@ -77,6 +77,9 @@ Task Counts     done 000 | in progress 006 | blocked 001 | todo 013 | total 020
 | Stage R | [0/20] |   0.0% | IN PROGRESS |
 
 <!-- live-status:end -->
+
+
+
 
 
 
@@ -131,6 +134,8 @@ Task Counts     done 000 | in progress 006 | blocked 001 | todo 013 | total 020
 2026-04-14 04:12 | CODEX       | R02       | Added the frontend flow matrix and identified the concrete audit gaps beyond the existing top-level UI scenarios
 2026-04-14 04:20 | CODEX       | R02       | Extended the UI audit code with a maintenance-mode scenario and a deterministic Board Room assertion; production rerun still pending host Docker/WSL recovery
 2026-04-14 16:16 | CODEX       | R01       | Verified the second clean sibling build pass, added Docker executable fallback in dev-up, and narrowed the remaining blocker to broken host Docker Desktop / WSL state
+2026-04-14 17:18 | CODEX       | R08       | Fixed live ML Engine request-binding/runtime defects, added route and idempotency regression coverage, and documented the remaining artifact-compatibility gaps
+2026-04-14 17:19 | CODEX       | R09       | Added real local process-stack proof for frontend -> BFF -> ML Engine, including clean degrade/recover behavior across an ML Engine restart
 ```
 
 ## Stage R: Flawless Proof Gate
@@ -203,7 +208,7 @@ Task Counts     done 000 | in progress 006 | blocked 001 | todo 013 | total 020
   - **Step 5:** Verify idempotency or duplicate-request behavior where repeated requests are likely.
   - **Exit criteria:** Every BFF route has explicit contract coverage for happy path, validation failures, auth failures, and upstream faults.
 
-- [ ] `R08` Prove ML Engine routes, models, and workflow contracts are stable.
+- [-] `R08` Prove ML Engine routes, models, and workflow contracts are stable. (updated: 2026-04-14 17:18 IST) Fixed live FastAPI body-binding faults across `_routes_pso.py`, `_routes_news.py`, `_routes_features.py`, `_routes_data.py`, and `_routes_backtest.py`; normalized dict payload handling for the real BFF request shape in `_routes_workflow.py` and `_routes_pso.py`; and fixed ML runtime wiring and stale lifespan lookups in `main.py`, `_routes_workflow.py`, `_routes_pso.py`, `_routes_data.py`, `_routes_backtest.py`, and `_kafka.py`. Verified: `python -m pytest tests/test_route_contracts.py tests/test_idempotency_workflow_routes.py -q` -> `18 passed`, `python -m pytest tests/test_health_endpoints.py tests/test_inference_predictor.py tests/test_latency_regression.py tests/test_model_registry_service.py tests/test_model_monitor.py -q` -> `33 passed`, and `python scripts/ci/run_ml_engine_integration_smoke.py` -> `4 passed`. Remaining gaps: no dedicated large-payload or incompatible-schema-version proof yet, and serialized-artifact compatibility beyond the warmed local registry path still needs an explicit artifact-focused restart check. Full artifact: `docs/R08_ML_ENGINE_PROOF.md`.
   - **Why this exists:** An app that "looks fine" but produces unstable inference or route behavior is not flawless.
   - **Step 1:** Inventory ML Engine health, prediction, workflow, metrics, exporter, and any auxiliary routes exposed to the stack.
   - **Step 2:** Verify model loading, schema compatibility, serialized artifact compatibility, and fallback behavior after restart.
@@ -212,7 +217,7 @@ Task Counts     done 000 | in progress 006 | blocked 001 | todo 013 | total 020
   - **Step 5:** Verify route-level latency regressions, startup time regressions, and health endpoint truthfulness.
   - **Exit criteria:** ML Engine behavior is contract-tested, artifact-compatible, and stable under both normal and invalid inputs.
 
-- [ ] `R09` Prove cross-service integration works under real orchestration, not just isolated tests.
+- [-] `R09` Prove cross-service integration works under real orchestration, not just isolated tests. (updated: 2026-04-14 17:19 IST) Added local process-stack proof in `docs/R09_CROSS_SERVICE_INTEGRATION_PROOF.md` with runtime artifact `.tmp_codex/r09-process-stack-20260414-165543/result.json`. Verified real `frontend (Vite /api proxy) -> BFF -> ML Engine` flow: `/api/ml/health` returned `ok=true`, `/api/ml/consensus` returned `ok=true` with `source=ml_engine`, and `/api/ml/regime` returned `ok=true`; after force-stopping ML Engine, `/api/ml/health` degraded cleanly with `503 / ok=false`, then recovered to `ok=true` and `/api/ml/consensus` recovered with `source=ml_engine` after restart. Remaining gaps: Redis-backed background paths still emit reconnect noise when Redis is absent locally, breaking-news providers still abort when upstreams are unavailable, and Docker-compose orchestration remains partially blocked by the host WSL/Docker issue tracked in `R01`.
   - **Why this exists:** Service-level green checks can hide data-contract mismatches and orchestration-only failures.
   - **Step 1:** Map the full integration graph among frontend, BFF, ML Engine, analysis service, Redis, Firebase, Telegram hooks, and any other live dependency.
   - **Step 2:** Verify the full stack behaves correctly during normal request chains, including auth -> BFF -> ML -> UI response loops.
