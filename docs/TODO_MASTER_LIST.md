@@ -65,12 +65,12 @@ Run `python scripts/update_todo_progress.py --once` to regenerate.
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-14 15:31`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-14 15:32`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Active Backlog   10.0%  [##----------------------]
+Active Backlog   12.5%  [###---------------------]
 Stage Progress  00/01 complete
-Task Counts     done 000 | in progress 004 | blocked 001 | todo 015 | total 020
+Task Counts     done 000 | in progress 005 | blocked 001 | todo 014 | total 020
 ```
 
 | Section | Tasks | Progress | Status |
@@ -78,6 +78,7 @@ Task Counts     done 000 | in progress 004 | blocked 001 | todo 015 | total 020
 | Stage R | [0/20] |   0.0% | IN PROGRESS |
 
 <!-- live-status:end -->
+
 
 
 
@@ -174,7 +175,7 @@ Task Counts     done 000 | in progress 004 | blocked 001 | todo 015 | total 020
   - **Step 5:** Verify retry behavior and recovery after refresh or service interruption during upload.
   - **Exit criteria:** Upload/OCR flows are deterministic, safe on invalid input, and free of stale UI or silent data loss.
 
-- [ ] `R06` Prove trading, journal, account, and displayed metrics are numerically correct.
+- [-] `R06` Prove trading, journal, account, and displayed metrics are numerically correct. (updated: 2026-04-14 15:35 IST) Evidence gathered: `journalMetrics.js` all edge cases correct (win rate, profit factor, commission, HWM, toNumber, drawdown throttle, payout trajectory). Gap found: P2TradeForm and addJournalEntry accept mismatched P- [ ] `R06` Prove trading, journal, account, and displayed metrics are numerically correct.L signs (win with negative pnl). Fixed in `MainTerminal.jsx` with guard on both entry paths. Full artifact: `docs/R06_METRICS_PROOF.md`.
   - **Why this exists:** A polished UI with wrong balances, wrong P&L, or inconsistent journal state is still broken.
   - **Step 1:** Enumerate every displayed numeric field in terminal, journal, account, analytics, and any admin summaries.
   - **Step 2:** Build reference fixtures with known expected totals, averages, win/loss ratios, balances, and edge-case values.
