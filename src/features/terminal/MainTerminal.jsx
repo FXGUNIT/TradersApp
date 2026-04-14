@@ -967,7 +967,7 @@ export default function MainTerminal({
     );
 
     const oversized = rawFiles.find(
-      (f) => Boolean(f?.type?.startsWith("image/")) && f.size > MAX_FILE_BYTES,
+      (f) => Boolean(f?.type?.startsWith("image/")) && f.size > MAX_FILE_BYTES
     );
     if (oversized) {
       showToast?.(`Screenshot too large — max ${MAX_FILE_BYTES / 1024 / 1024}MB`, "error");
