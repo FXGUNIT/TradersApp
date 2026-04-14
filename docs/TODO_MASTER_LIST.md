@@ -49,7 +49,7 @@ Before starting work, claim your tasks here. This prevents two agents from updat
   "R13": { "claimed_by": "claude-sonnet", "claimed_at": "2026-04-14T16:30:00+05:30" },
   "R14": { "claimed_by": "claude-sonnet", "claimed_at": "2026-04-14" },
   "R15": { "claimed_by": "claude-sonnet", "claimed_at": "2026-04-14" },
-  "R16": { "claimed_by": null, "claimed_at": null },
+  "R16": { "claimed_by": "claude-sonnet", "claimed_at": "2026-04-14" },
   "R17": { "claimed_by": null, "claimed_at": null },
   "R18": { "claimed_by": null, "claimed_at": null },
   "R19": { "claimed_by": null, "claimed_at": null },
@@ -63,7 +63,7 @@ Run `python scripts/update_todo_progress.py --once` to regenerate.
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-14 19:12`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-14 19:16`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Active Backlog   34.1%  [########----------------]
@@ -76,6 +76,7 @@ Task Counts     done 003 | in progress 009 | blocked 001 | todo 009 | total 022
 | Stage R | [3/22] |  13.6% | IN PROGRESS |
 
 <!-- live-status:end -->
+
 
 
 
@@ -285,7 +286,7 @@ Task Counts     done 003 | in progress 009 | blocked 001 | todo 009 | total 022
   - **Step 5:** Verify the system remains healthy after the soak test ends and does not require manual reset.
   - **Exit criteria:** Long-run and concurrent operation does not introduce drift, leaks, duplicates, or state corruption.
 
-- [ ] `R15` Prove browser and device coverage beyond the current local browser path.
+- [ ] `R15` Prove browser and device coverage beyond the current local browser path. — **[x] PARTIAL**
   - **Why this exists:** A flow that passes in one browser on one machine can still fail badly elsewhere.
   - **Step 1:** Verify supported desktop browsers at minimum across Chrome, Edge, Firefox, and Safari-equivalent coverage where possible.
   - **Step 2:** Verify mobile behavior on realistic viewport classes, not only a single synthetic mobile dimension.
@@ -294,7 +295,7 @@ Task Counts     done 003 | in progress 009 | blocked 001 | todo 009 | total 022
   - **Step 5:** Record browser-specific exceptions explicitly if any are intentionally unsupported.
   - **Exit criteria:** Core flows are green across the declared support matrix, not just the local default browser.
 
-- [ ] `R16` Prove accessibility and interaction quality under assistive and keyboard-only usage.
+- [ ] `R16` Prove accessibility and interaction quality under assistive and keyboard-only usage. — [ ]
   - **Why this exists:** A system is not flawless if core flows are blocked for keyboard users or screen-reader users.
   - **Step 1:** Verify keyboard-only navigation for auth, terminal, admin, and modal-heavy screens.
   - **Step 2:** Verify focus order, focus trapping, focus restore, and visible focus indication.
