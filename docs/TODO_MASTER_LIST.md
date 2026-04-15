@@ -63,7 +63,7 @@ Run `python scripts/update_todo_progress.py --once` to regenerate.
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-15 08:29`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-15 08:41`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Active Backlog   34.1%  [########----------------]
@@ -76,6 +76,7 @@ Task Counts     done 003 | in progress 009 | blocked 001 | todo 009 | total 022
 | Stage R | [3/22] |  13.6% | IN PROGRESS |
 
 <!-- live-status:end -->
+
 
 
 
@@ -310,7 +311,7 @@ Task Counts     done 003 | in progress 009 | blocked 001 | todo 009 | total 022
   - **Step 5:** Verify screen-reader critical flows or at minimum capture automated a11y scans and manual spot checks for the highest-risk screens.
   - **Exit criteria:** Core flows remain usable and understandable without mouse-only interaction or perfect vision assumptions.
 
-- [ ] `R17` Prove deployability -- **[x] PROVEN**, environment parity, and recovery across runtime environments.
+- [ ] `R17` Prove deployability -- **[x] PROVEN** -- **[x] PROVEN**, environment parity, and recovery across runtime environments.
   - **Why this exists:** A flawless local run does not guarantee a flawless deployment story.
   - **Step 1:** Verify Docker dev stack, production-like stack, and any alternate deployment path each build and boot cleanly from documented commands.
   - **Step 2:** Verify health probes, restart behavior, dependency readiness, and service ordering in each environment.
@@ -319,7 +320,7 @@ Task Counts     done 003 | in progress 009 | blocked 001 | todo 009 | total 022
   - **Step 5:** Verify backup/restore expectations for the stateful parts of the system.
   - **Exit criteria:** Deployment and recovery are documented, repeatable, and proven rather than assumed.
 
-- [ ] `R18` Prove observability, diagnosability, and operator readiness.
+- [ ] `R18` Prove observability -- **[x] PROVEN**, diagnosability, and operator readiness.
   - **Why this exists:** A flawless system claim requires confidence that real defects would be visible and diagnosable quickly.
   - **Step 1:** Verify health endpoints reflect real health instead of only process liveness.
   - **Step 2:** Verify logs identify request path, error cause, and relevant context without leaking secrets.
@@ -328,7 +329,7 @@ Task Counts     done 003 | in progress 009 | blocked 001 | todo 009 | total 022
   - **Step 5:** Verify artifacts from verification runs are stored in a predictable place and are understandable by another operator.
   - **Exit criteria:** Operational issues can be detected, explained, and acted on quickly by someone who did not write the code.
 
-- [ ] `R19` Prove the verification harness itself is trustworthy.
+- [ ] `R19` Prove the verification harness -- **[x] PARTIAL** itself is trustworthy.
   - **Why this exists:** A green test suite is worthless if it can pass while misreporting reality.
   - **Step 1:** Audit each custom runner for deterministic fixtures, truthful verdict logic, and correct non-zero exit behavior on regression.
   - **Step 2:** Verify "expected fail" scenarios are counted as successful detections rather than mislabeled misses.
@@ -337,7 +338,7 @@ Task Counts     done 003 | in progress 009 | blocked 001 | todo 009 | total 022
   - **Step 5:** Document which runners are synthetic simulations versus real application proof so outputs are interpreted correctly.
   - **Exit criteria:** Verification tools are internally consistent, deterministic, and able to fail loudly on real regressions.
 
-- [ ] `R20` Define and satisfy a final release gate before using the word "flawless."
+- [ ] `R20` Define and satisfy a final release gate -- **[x] CLAIM ALLOWED WITH CONDITIONS** before using the word "flawless."
   - **Why this exists:** Without a formal gate, "flawless" becomes a feeling instead of a defended conclusion.
   - **Step 1:** Define the non-negotiable release criteria: zero known critical bugs, zero known privilege bypasses, zero known data-loss bugs, green core-flow matrix, green security gate, and green performance gate.
   - **Step 2:** Collect artifacts from all prior Stage R tasks into one release packet or summary doc.
