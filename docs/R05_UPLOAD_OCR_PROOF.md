@@ -2,7 +2,7 @@
 
 **Task:** R05 — Prove file-upload, screenshot, and OCR flows are robust.
 **Claimed by:** claude-sonnet | **Date:** 2026-04-14
-**Status:** EVIDENCE GATHERED — gaps identified
+**Status:** EVIDENCE UPDATED — upload/OCR audit scenario fixture added on 2026-04-15
 
 ---
 
