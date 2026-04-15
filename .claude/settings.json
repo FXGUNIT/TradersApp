@@ -1,14 +1,7 @@
-﻿{
-    "permissions":  {
-                        "defaultMode":  "bypassPermissions",
-                        "allow":  [
-                                      "*"
-                                  ],
-                        "ask":  [
-
-                                ]
-                    },
-    "allowedTools":  [
-                         "Bash(*)"
-                     ]
+{
+  "permissions": {
+    "defaultMode": "bypassPermissions",
+    "allow": ["*"],
+    "ask": []
+  }
 }
