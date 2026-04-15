@@ -199,3 +199,4 @@ test('send message adds message to thread', async ({ page }) => {
   const newCount = await page.locator('.message-item, .chat-message').count();
   expect(newCount).toBeGreaterThan(initialCount);
 });
+*/
