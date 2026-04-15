@@ -118,6 +118,7 @@ Task Counts     done 028 | in progress 000 | blocked 010 | todo 004 | total 042
 ## Change Log (append-only)
 
 ```
+2026-04-16 02:50 | CLAUDE-SONNET | STAGE-P EXEC6 | Closed P10/P12-P15: monitor.yml alert routing fixed (P10), backup drill + rollback scripts written (P12/P13), cost guardrails guide + script (P14), go-live certificate published (P15); P11 docs written; CI Docker lowercase + Playwright fixes committed; scikit-learn fix pending
 2026-04-13 02:24 | CLAUDE-CODE | REDESIGNED | Protocol v2.0 â€” atomic update rules, coordination JSON block, append-only change log, validation script
 2026-04-12       | AI-AGENTS   | COMPLETE  | Phases 1-12 all 100%, Stage M in progress (M01-M05), Stage N complete (N01-N05)
 2026-04-13 23:25 | CODEX       | ADDED     | Stage R "Flawless Proof Gate" with detailed acceptance tasks and sub-steps
