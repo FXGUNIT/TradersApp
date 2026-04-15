@@ -245,11 +245,16 @@ export function createDispatcher({
       return;
     }
 
+    // Probe paths — always return 200 with simple {ok:true}
     const isProbePath =
       pathname === "/health" || pathname === "/live" || pathname === "/ready";
+    if (isProbePath) {
+      json(res, 200, { ok: true }, origin);
+      return;
+    }
 
     // Rate limiting (skip probe paths and /metrics)
-    if (!isProbePath && pathname !== "/metrics") {
+    if (pathname !== "/metrics") {
       const rateLimit = getRateLimitConfig(pathname);
       const clientKey = `${rateLimit.name}:${getClientKey(req)}`;
       const result = await checkRateLimit(

@@ -170,7 +170,7 @@ jobs:
               https://events.pagerduty.com/v2/enqueue 2>/dev/null || true
           fi
 
-      - name: Send Slack alert on BFF failure
+      - name: Send Slack/Discord alert on BFF failure
         if: env.BFF_DOWN == 'true'
         run: |
           set -e
@@ -187,6 +187,9 @@ jobs:
                 }
               ]
             }' "${SLACK_WEBHOOK_URL}" || true
+          curl -s -X POST -H "Content-Type: application/json" \
+            -d "{\"content\": \":red_alert: BFF Server DOWN - ${BFF_URL}/health non-200 response\"}" \
+            "${DISCORD_WEBHOOK_URL}" || true
 
   # -------------------------------------------------------------------------
   # Health Check — Frontend (Vercel)
@@ -245,9 +248,24 @@ jobs:
           CRITICAL=$(echo "${{ env.firing_alerts }}" | grep -iE "mlengine|drift|retrain|latency|prediction" || true)
           if [ -n "$CRITICAL" ]; then
             echo "Critical ML alerts firing: $CRITICAL"
+            # Slack — Block Kit payload
+            curl -s -X POST -H "Content-Type: application/json" \
+              -d '{
+                "text": ":warning: Active ML Alerts",
+                "blocks": [
+                  {
+                    "type": "section",
+                    "text": {
+                      "type": "mrkdwn",
+                      "text": ":warning: *Critical ML Alerts Detected*\n'"$CRITICAL"'"
+                    }
+                  }
+                ]
+              }' "${SLACK_WEBHOOK_URL}" || true
+            # Discord
             curl -s -X POST -H "Content-Type: application/json" \
               -d "{\"content\": \":warning: Active ML Alerts: $CRITICAL\"}" \
-              "${SLACK_WEBHOOK_URL}" || true
+              "${DISCORD_WEBHOOK_URL}" || true
           fi
 
   # -------------------------------------------------------------------------
