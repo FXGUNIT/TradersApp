@@ -209,6 +209,22 @@ Risk: User runs OCR → gets values → deletes screenshots → runs OCR again �
 setOcrResult(null); // at top of runOcr
 ```
 
+### RC05 Harness Upgrade - deterministic upload/OCR audit scenario
+
+File: `src/testing/appAuditHarness.js`
+
+Added a dedicated `uploadOcr` scenario with stable fixture payloads:
+- two screenshot assets
+- MP chart and VWAP chart assets
+- expected OCR numeric reference values
+
+The harness now exposes:
+- `window.__TradersAppAudit.loadScenario("uploadOcr")`
+- `window.__TradersAppAudit.getUploadOcrFixture()`
+- `window.__TradersAppAudit.setUploadOcrFixture(...)`
+
+This gives the UI audit runner and Playwright suites a deterministic entry point for RC05 reruns without ad-hoc manual setup.
+
 ---
 
 ### ⚠️ GAP 4 (Low): Corrupted/unreadable images silently return empty OCR
