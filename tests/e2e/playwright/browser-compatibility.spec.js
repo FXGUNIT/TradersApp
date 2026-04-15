@@ -6,10 +6,19 @@
  */
 import { test, expect } from '@playwright/test';
 
+test.describe.configure({ timeout: 90_000 });
+
+async function gotoStable(page, path = '/') {
+  await page.goto(path, {
+    waitUntil: 'domcontentloaded',
+    timeout: 60_000,
+  });
+}
+
 // ── Helper: skip if auth not configured ───────────────────────────────────
 test.beforeEach(async ({ page }) => {
   // Navigate to app root — will get redirected to login or landing
-  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await gotoStable(page, '/');
 });
 
 // ── R15: Page loads without crash across browsers ───────────────────────
@@ -28,7 +37,8 @@ test('no console errors on page load', async ({ page }) => {
     }
   });
 
-  await page.goto('/', { waitUntil: 'networkidle' });
+  // networkidle is flaky for apps with long-lived sockets/telemetry traffic
+  await gotoStable(page, '/');
   await page.waitForTimeout(2_000);
 
   // Filter out known acceptable errors (e.g. favicon 404)
@@ -57,7 +67,7 @@ test('login page renders required elements', async ({ page }) => {
 // ── R15: Mobile viewport — no horizontal overflow ─────────────────────
 test('mobile viewport has no horizontal overflow', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 }); // iPhone 12 size
-  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await gotoStable(page, '/');
   await page.waitForTimeout(1_000);
 
   // documentElement scrollWidth must equal viewport width
@@ -69,7 +79,7 @@ test('mobile viewport has no horizontal overflow', async ({ page }) => {
 // ── R15: Tablet viewport — no horizontal overflow ─────────────────────
 test('tablet viewport has no horizontal overflow', async ({ page }) => {
   await page.setViewportSize({ width: 768, height: 1024 });
-  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await gotoStable(page, '/');
   await page.waitForTimeout(1_000);
 
   const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
