@@ -366,12 +366,14 @@ export default function FloatingChatWidget({ auth, profile }) {
                     fontSize: "14px",
                   }}
                 />
-                <button
-                  onClick={sendMessage}
-                  disabled={isLoading}
-                  style={{
-                    backgroundColor: "var(--accent-primary, #2563eb)",
-                    color: "white",
+              <button
+                onClick={sendMessage}
+                disabled={isLoading}
+                aria-label="Send message"
+                title="Send message"
+                style={{
+                  backgroundColor: "var(--accent-primary, #2563eb)",
+                  color: "white",
                     border: "none",
                     borderRadius: "50%",
                     width: "44px",
@@ -394,6 +396,8 @@ export default function FloatingChatWidget({ auth, profile }) {
 
       <button
         onClick={() => setIsOpen((prev) => !prev)}
+        aria-label={isOpen ? "Close support chat" : "Open support chat"}
+        title={isOpen ? "Close support chat" : "Open support chat"}
         style={{
           backgroundColor: "var(--accent-primary, #2563eb)",
           color: "white",
