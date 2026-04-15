@@ -86,7 +86,7 @@ def fmt_flows(r):
     return "\n".join(lines)
 
 def fmt_large(r):
-    fns = r.get("functions", [])
+    fns = r.get("results", []) or r.get("functions", [])
     if not fns:
         return f"No oversized functions found (min={r.get('min_lines','?')})"
     lines = [f"Large functions ({len(fns)} found):"]
