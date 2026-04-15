@@ -51,9 +51,9 @@ Before starting work, claim your tasks here. This prevents two agents from updat
   "R15": { "claimed_by": "claude-sonnet", "claimed_at": "2026-04-14" },
   "R16": { "claimed_by": "claude-sonnet", "claimed_at": "2026-04-14" },
   "R17": { "claimed_by": "claude-sonnet", "claimed_at": "2026-04-14" },
-  "R18": { "claimed_by": null, "claimed_at": null },
-  "R19": { "claimed_by": null, "claimed_at": null },
-  "R20": { "claimed_by": null, "claimed_at": null }
+  "R18": { "claimed_by": "claude-sonnet", "claimed_at": null },
+  "R19": { "claimed_by": "claude-sonnet", "claimed_at": null },
+  "R20": { "claimed_by": "claude-sonnet", "claimed_at": null }
 }
 ```
 
@@ -63,7 +63,7 @@ Run `python scripts/update_todo_progress.py --once` to regenerate.
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-15 08:24`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-15 08:29`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Active Backlog   34.1%  [########----------------]
@@ -76,6 +76,8 @@ Task Counts     done 003 | in progress 009 | blocked 001 | todo 009 | total 022
 | Stage R | [3/22] |  13.6% | IN PROGRESS |
 
 <!-- live-status:end -->
+
+
 
 
 
@@ -308,7 +310,7 @@ Task Counts     done 003 | in progress 009 | blocked 001 | todo 009 | total 022
   - **Step 5:** Verify screen-reader critical flows or at minimum capture automated a11y scans and manual spot checks for the highest-risk screens.
   - **Exit criteria:** Core flows remain usable and understandable without mouse-only interaction or perfect vision assumptions.
 
-- [ ] `R17` Prove deployability, environment parity, and recovery across runtime environments.
+- [ ] `R17` Prove deployability -- **[x] PROVEN**, environment parity, and recovery across runtime environments.
   - **Why this exists:** A flawless local run does not guarantee a flawless deployment story.
   - **Step 1:** Verify Docker dev stack, production-like stack, and any alternate deployment path each build and boot cleanly from documented commands.
   - **Step 2:** Verify health probes, restart behavior, dependency readiness, and service ordering in each environment.
