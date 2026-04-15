@@ -1,18 +1,5 @@
 #!/usr/bin/env python3
-"""Token-efficient code-review-graph MCP wrapper.
-Usage:
-  python crg.py stats                          — graph stats
-  python crg.py communities [limit] [sort]     — list communities
-  python crg.py arch                           — architecture overview
-  python crg.py search <query> [limit]         — semantic search
-  python crg.py callers <fn>                   — who calls this function
-  python crg.py callees <fn>                  — what this function calls
-  python crg.py flows [limit]                  — execution flows
-  python crg.py large [min_lines] [limit]       — oversized functions
-  python crg.py detect                         — changed files impact
-  python crg.py impact <file> [depth]          — blast radius
-  python crg.py wiki <community>              — wiki page content
-"""
+"""Token-efficient code-review-graph MCP wrapper for TradersApp."""
 import subprocess, json, sys
 
 ADDR = ["uvx", "code-review-graph", "serve"]
@@ -30,9 +17,12 @@ TOOL_MAP = {
     "impact":      "get_impact_radius_tool",
     "wiki":        "get_wiki_page_tool",
     "community":   "get_community_tool",
+    "flow":        "get_flow_tool",
+    "repos":       "list_repos_tool",
 }
 
 def crg(tool, args=None):
+    """Call an MCP tool, return parsed JSON result."""
     proc = subprocess.Popen(ADDR, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     msgs = [
         {"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"crg","version":"1"}}},
@@ -53,51 +43,70 @@ def crg(tool, args=None):
     return {}
 
 def fmt_stats(r):
-    return f"Files: {r.get('files_count','?')} | Nodes: {r.get('total_nodes','?')} | Edges: {r.get('total_edges','?')} | Langs: {', '.join(r.get('languages',[]))}"
+    langs = ", ".join(r.get("languages", []))
+    nbyp = r.get("nodes_by_kind", {})
+    ebyp = r.get("edges_by_kind", {})
+    return (
+        f"Files: {r.get('files_count','?')} | Nodes: {r.get('total_nodes','?')} | Edges: {r.get('total_edges','?')}\n"
+        f"Langs: {langs} | Last: {r.get('last_updated','')}\n"
+        f"Nodes: {nbyp} | Edges: {ebyp}"
+    )
 
-def fmt_communities(r, limit=10):
-    lines = [f"Communities ({r.get('total','')})"]
-    for c in r.get("communities",[])[:limit]:
-        lines.append(f"  [{c['size']:4d}] {c['name']} ({c['dominant_language']}) — {c.get('description','')}")
+def fmt_communities(r, limit=15):
+    total = r.get("summary","")
+    lines = [f"Communities ({total}):"]
+    for c in r.get("communities", [])[:limit]:
+        lines.append(f"  [{c['size']:5d}] {c['name']} ({c['dominant_language']})")
     return "\n".join(lines)
 
 def fmt_arch(r):
-    lines = [f"Architecture ({r.get('total_communities','?')} communities)"]
-    for c in r.get("communities",[]):
-        lines.append(f"  [{c['size']:4d}] {c['name']} — {c.get('description','')}")
+    lines = [f"Architecture ({r.get('total_communities','?')} communities):"]
+    for c in r.get("communities", []):
+        lines.append(f"  [{c['size']:5d}] {c['name']} — {c.get('description','')}")
     if r.get("warnings"):
         lines.append("WARNINGS: " + "; ".join(r["warnings"]))
     return "\n".join(lines)
 
 def fmt_search(r):
-    if not r.get("nodes"): return "No results"
+    if not r.get("nodes"):
+        return f"No results (query: {r.get('query','')})"
     lines = [f"Search results ({len(r['nodes'])}):"]
-    for n in r["nodes"][:10]:
-        lines.append(f"  [{n['kind']}] {n['qualified_name']} — {n.get('file','')}")
+    for n in r["nodes"][:15]:
+        lines.append(f"  [{n.get('kind','?')}] {n.get('qualified_name','?')} @ {n.get('file','')}:{n.get('line_start','')}")
     return "\n".join(lines)
 
 def fmt_flows(r):
-    lines = [f"Execution flows ({r.get('total','')})"]
-    for f in r.get("flows",[])[:10]:
-        lines.append(f"  [{f['criticality']:.2f}] {f['name']} — {len(f['steps'])} steps")
+    total = r.get("summary","")
+    lines = [f"Execution flows ({total}):"]
+    for f in r.get("flows", [])[:10]:
+        lines.append(f"  [{f['criticality']:.3f}] depth={f['depth']} nodes={f['node_count']} files={f['file_count']} | {f['name']}")
     return "\n".join(lines)
 
 def fmt_large(r):
-    lines = [f"Large functions ({len(r.get('functions',[]))} found):"]
-    for f in r.get("functions",[])[:15]:
-        lines.append(f"  [{f['lines']:4d}] {f['qualified_name']} — {f.get('file','')}")
+    fns = r.get("functions", [])
+    if not fns:
+        return f"No oversized functions found (min={r.get('min_lines','?')})"
+    lines = [f"Large functions ({len(fns)} found):"]
+    for f in fns[:20]:
+        lines.append(f"  [{f.get('lines','?'):4d}] {f.get('qualified_name','?')} @ {f.get('file','')}:{f.get('line_start','')}")
     return "\n".join(lines)
 
-def fmt_query(r):
-    lines = []
-    for n in r.get("nodes",[])[:20]:
-        lines.append(f"  [{n['kind']}] {n['qualified_name']} @ {n.get('file','')}:{n.get('line_start','')}")
-    return "\n".join(lines) if lines else "No results"
+def fmt_query(r, label=""):
+    nodes = r.get("nodes", [])
+    if not nodes:
+        return f"No callers/callees found"
+    lines = [label]
+    for n in nodes[:25]:
+        lines.append(f"  [{n.get('kind','?')}] {n.get('qualified_name','?')} @ {n.get('file','')}:{n.get('line_start','')}")
+    return "\n".join(lines)
 
 def fmt_impact(r):
-    lines = [f"Impact radius ({r.get('total_affected','?')} nodes affected):"]
-    for n in r.get("affected_nodes",[])[:15]:
-        lines.append(f"  [{n['kind']}] {n['qualified_name']} @ {n.get('file','')}")
+    affected = r.get("affected_nodes", [])
+    total = r.get("total_affected", len(affected))
+    changed = r.get("changed_files", [])
+    lines = [f"Impact: {total} nodes across {len(changed)} file(s): {changed[:3]}"]
+    for n in affected[:15]:
+        lines.append(f"  [{n.get('kind','?')}] {n.get('qualified_name','?')} @ {n.get('file','')}")
     return "\n".join(lines)
 
 def main():
@@ -105,49 +114,45 @@ def main():
     rest = sys.argv[2:]
 
     if cmd == "stats":
-        r = crg(TOOL_MAP["stats"])
-        print(fmt_stats(r))
+        print(fmt_stats(crg(TOOL_MAP["stats"])))
 
     elif cmd == "communities":
-        limit = int(rest[0]) if rest else 10
-        sortby = rest[1] if len(rest) > 1 else "size"
-        r = crg(TOOL_MAP["communities"], {"sort_by": sortby, "limit": limit})
+        limit = int(rest[0]) if rest else 15
+        r = crg(TOOL_MAP["communities"], {"sort_by": "size"})
         print(fmt_communities(r, limit))
 
     elif cmd == "arch":
-        r = crg(TOOL_MAP["arch"])
-        print(fmt_arch(r))
+        print(fmt_arch(crg(TOOL_MAP["arch"])))
 
     elif cmd == "search":
         query = rest[0] if rest else ""
-        limit = int(rest[1]) if len(rest) > 1 else 10
-        r = crg(TOOL_MAP["search"], {"query": query, "limit": limit})
+        kind = rest[1] if len(rest) > 1 else None
+        r = crg(TOOL_MAP["search"], {"query": query, "kind": kind} if kind else {"query": query})
         print(fmt_search(r))
 
     elif cmd == "callers":
         fn = rest[0] if rest else ""
         r = crg(TOOL_MAP["callers"], {"pattern": "callers_of", "target": fn})
-        print(f"Callers of {fn}:\n{fmt_query(r)}")
+        print(fmt_query(r, f"Callers of '{fn}':"))
 
     elif cmd == "callees":
         fn = rest[0] if rest else ""
         r = crg(TOOL_MAP["callees"], {"pattern": "callees_of", "target": fn})
-        print(f"Callees of {fn}:\n{fmt_query(r)}")
+        print(fmt_query(r, f"Callees of '{fn}':"))
 
     elif cmd == "flows":
-        limit = int(rest[0]) if rest else 20
+        limit = int(rest[0]) if rest else 10
         r = crg(TOOL_MAP["flows"], {"sort_by": "criticality", "limit": limit})
         print(fmt_flows(r))
 
     elif cmd == "large":
-        min_lines = int(rest[0]) if rest else 50
-        limit = int(rest[1]) if len(rest) > 1 else 20
-        r = crg(TOOL_MAP["large"], {"min_lines": min_lines, "limit": limit})
+        min_lines = int(rest[0]) if rest else 80
+        r = crg(TOOL_MAP["large"], {"min_lines": min_lines})
         print(fmt_large(r))
 
     elif cmd == "detect":
         r = crg(TOOL_MAP["detect"])
-        print(json.dumps(r, indent=2)[:2000])
+        print(json.dumps(r, indent=2)[:3000])
 
     elif cmd == "impact":
         fn = rest[0] if rest else ""
@@ -158,15 +163,30 @@ def main():
     elif cmd == "wiki":
         name = rest[0] if rest else ""
         r = crg(TOOL_MAP["wiki"], {"community_name": name})
-        print(r.get("content", r)[:2000])
+        content = r.get("content", "")
+        print(content[:3000] if content else json.dumps(r, indent=2)[:1000])
 
     elif cmd == "community":
         name = rest[0] if rest else ""
         r = crg(TOOL_MAP["community"], {"community_name": name, "include_members": True})
-        print(json.dumps(r, indent=2)[:2000])
+        print(json.dumps(r, indent=2)[:3000])
+
+    elif cmd == "flow":
+        fid = rest[0] if rest else None
+        fname = rest[1] if len(rest) > 1 else None
+        kwargs = {}
+        if fid: kwargs["flow_id"] = int(fid)
+        elif fname: kwargs["flow_name"] = fname
+        r = crg(TOOL_MAP["flow"], kwargs)
+        print(json.dumps(r, indent=2)[:3000])
+
+    elif cmd == "repos":
+        r = crg(TOOL_MAP["repos"])
+        print(json.dumps(r, indent=2))
 
     else:
         print(__doc__)
+        print("Commands: stats | communities [n] | arch | search <q> [kind] | callers <fn> | callees <fn> | flows [n] | large [min_lines] | detect | impact <file> [depth] | wiki <name> | community <name> | flow [id] [name] | repos")
 
 if __name__ == "__main__":
     main()
