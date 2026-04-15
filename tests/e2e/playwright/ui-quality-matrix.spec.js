@@ -19,6 +19,39 @@ async function gotoPrimarySurface(page) {
   await expect(page.locator("body")).toBeVisible();
 }
 
+async function ensureActionableControls(page) {
+  const selector =
+    'button, a[href], input:not([type="hidden"]), select, textarea, [role="button"], [tabindex]:not([tabindex="-1"])';
+
+  const waitForControls = async () => {
+    await page
+      .waitForFunction(
+        (sel) => document.querySelectorAll(sel).length > 0,
+        selector,
+        { timeout: 8_000 },
+      )
+      .catch(() => {});
+    return page.locator(selector);
+  };
+
+  let controls = await waitForControls();
+  if ((await controls.count()) > 0) {
+    return controls;
+  }
+
+  const floatingLauncher = page
+    .locator("button")
+    .filter({ has: page.locator('svg path[d*="M21 15a2 2"]') })
+    .first();
+  if (await floatingLauncher.isVisible({ timeout: 3_000 }).catch(() => false)) {
+    await floatingLauncher.click();
+    await page.waitForTimeout(400);
+  }
+
+  controls = await waitForControls();
+  return controls;
+}
+
 test("RS02 viewport matrix has no horizontal overflow on primary surface", async ({
   page,
 }) => {
@@ -42,9 +75,7 @@ test("RS02 viewport matrix has no horizontal overflow on primary surface", async
 test("RS04 actionable controls expose label contract", async ({ page }) => {
   await gotoPrimarySurface(page);
 
-  const controls = page.locator(
-    'button, a[href], input:not([type="hidden"]), select, textarea, [role="button"]',
-  );
+  const controls = await ensureActionableControls(page);
   const count = await controls.count();
   expect(count).toBeGreaterThan(0);
 
