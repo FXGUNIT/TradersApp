@@ -1,7 +1,7 @@
 # R02 Frontend Flow Matrix
 
-Status: in progress
-Last updated: 2026-04-14
+Status: in progress (RC02 closure artifact added)
+Last updated: 2026-04-15
 
 ## Purpose
 
@@ -100,8 +100,8 @@ Those additions still need a full browser rerun after the host Docker/WSL layer 
 - Floating support chat widget
   - Entry conditions: shell render with `floatingSupportChat` enabled.
   - Expected visible states: launcher, pre-chat form, welcome message, send flow, close/reopen behavior.
-  - Current coverage: none.
-  - Remaining proof work: open/close, form validation, message send failure, scroll behavior, authenticated and anonymous identity handling.
+  - Current coverage: dedicated Playwright suite in `tests/e2e/playwright/floating-chat.spec.js` + `tests/e2e/playwright/floating-chat.spec.impl.js` now verifies unauthenticated render, open/close, empty pre-chat blocking, pre-chat welcome path, and mocked support-thread send flow.
+  - Remaining proof work: live BFF-backed send failure messaging and authenticated/admin support-modal parity.
 
 ### 3. Terminal Workspace
 
@@ -183,7 +183,7 @@ These are the highest-value missing scenarios to add next:
 4. Terminal T&C upload and parse flow in the account tab.
 5. Admin Board Room tab with deterministic assertions.
 6. Admin search/filter/pagination/docs modal flows.
-7. Floating support chat widget flow.
+7. Floating support chat widget flow. (closed by `tests/e2e/playwright/floating-chat.spec.js`)
 8. Diamond navigation lattice behavior across hub, terminal, and post-logout states.
 
 ## Current Conclusion
