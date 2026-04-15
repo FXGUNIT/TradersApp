@@ -35,17 +35,14 @@ def main() -> int:
         )
         return 2
 
-    alembic_bin = shutil.which("alembic")
-    if not alembic_bin:
-        print("Alembic executable not found in PATH.", file=sys.stderr)
-        print(
-            "Install dependencies: pip install -r ml-engine/requirements.txt",
-            file=sys.stderr,
-        )
-        return 127
-
     env = os.environ.copy()
-    cmd = [alembic_bin, "-c", str(ini_path), *args]
+    alembic_bin = shutil.which("alembic")
+    if alembic_bin:
+        cmd = [alembic_bin, "-c", str(ini_path), *args]
+    else:
+        # Fallback for environments where console scripts are not on PATH
+        # (e.g. only `python -m` entry points are available).
+        cmd = [sys.executable, "-m", "alembic", "-c", str(ini_path), *args]
     return subprocess.run(cmd, cwd=str(root), env=env).returncode
 
 
