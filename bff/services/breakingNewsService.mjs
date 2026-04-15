@@ -17,6 +17,7 @@ import {
   parseRSSItems,
   extractRSSField,
   fetchWithTimeout,
+  isOutboundUrlAllowed,
 } from "./newsFormatter.mjs";
 
 // ─── Configuration ─────────────────────────────────────────────────────────────
@@ -380,6 +381,10 @@ async function fetchGDELT() {
     );
     const url = `${GDELT_URL}?format=json&mode=artlist&query=${query}&maxrecords=20&sort=DateDesc`;
 
+    if (!isOutboundUrlAllowed(url)) {
+      console.error("[breakingNewsService] SSRF guard: blocked GDELT URL", url);
+      return [];
+    }
     const res = await fetchWithTimeout(url, 6000);
     if (!res.ok) return [];
 

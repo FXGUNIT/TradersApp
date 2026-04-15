@@ -19,6 +19,7 @@ import {
   refreshAgentHeartbeat,
   reportAgentError,
 } from "./boardRoomAgentReporter.mjs";
+import { isOutboundUrlAllowed } from "./security.mjs";
 
 const FOREX_FACTORY_URL = "https://www.forexfactory.com/calendar";
 const NEWS_API_KEY = String(process.env.NEWS_API_KEY || "").trim() || null;
@@ -70,6 +71,7 @@ export async function scrapeForexFactory() {
     focus: "Scraping Forex Factory calendar.",
   });
   try {
+    if (!isOutboundUrlAllowed(FOREX_FACTORY_URL)) { console.error("[newsService] SSRF blocked FOREX_FACTORY_URL"); return null; }
     const response = await fetch(FOREX_FACTORY_URL, {
       headers: {
         "User-Agent":
@@ -391,6 +393,7 @@ export async function triggerRetrainOnEvent(event) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 5000);
 
+    if (!isOutboundUrlAllowed(`${ML_ENGINE_BASE}/news-trigger`)) { console.error('[newsService] SSRF blocked ML_ENGINE_BASE'); return null; }
     const res = await fetch(`${ML_ENGINE_BASE}/news-trigger`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
