@@ -13,7 +13,6 @@ Usage:
 import argparse
 import datetime
 import os
-import shutil
 import subprocess
 import sys
 import tarfile
@@ -56,9 +55,6 @@ def run_backup(backup_dir):
     with tempfile.NamedTemporaryFile(suffix=".rdb", delete=False) as tmp:
         tmp_path = tmp.name
 
-    rc, _, err = redis_cmd(f"CONFIG GET dir")
-    if rc == 0:
-        redis_dir = rc  # not needed
     docker_dir = "/data"
     dump_src = f"{docker_dir}/dump.rdb"
 
@@ -82,7 +78,12 @@ def run_backup(backup_dir):
     latest = os.path.join(backup_dir, "redis_latest.tar.gz")
     if os.path.lexists(latest):
         os.unlink(latest)
-    os.symlink(os.path.basename(archive_path), latest)
+    try:
+        os.symlink(os.path.basename(archive_path), latest)
+    except OSError:
+        # Symlink creation may fail on Windows/non-privileged environments.
+        with open(archive_path, "rb") as src, open(latest, "wb") as dst:
+            dst.write(src.read())
 
     size_mb = os.path.getsize(archive_path) / 1024 / 1024
     print(f"[backup_redis] Backup saved: {archive_path} ({size_mb:.1f} MB)")

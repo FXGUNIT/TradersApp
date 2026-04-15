@@ -8,6 +8,8 @@
     "analysis:dev": "node analysis-server.mjs",
     "start": "node server.mjs",
     "dev": "node server.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "test:metrics": "node --test tests/metrics.test.mjs",
     "pregenerate-grpc": "mkdir -p generated",
     "generate-grpc": "grpc_tools_node_protoc --grpc_out=grpc_js:generated --js_out=import_style=commonjs,binary:generated -I ../proto ../proto/ddd/v1/*.proto && echo 'Generated gRPC stubs in bff/generated/'",
     "generate-grpc:watch": "npm run generate-grpc && node --watch 'npm run generate-grpc' ../proto 2>/dev/null || true",

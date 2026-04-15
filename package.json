@@ -17,6 +17,8 @@
     "preview": "vite preview",
     "audit:ui": "node scripts/ui-audit/run-ui-audit.mjs",
     "audit:ui:mobile": "node scripts/ui-audit/run-ui-audit.mjs",
+    "test:e2e:playwright": "playwright test",
+    "test:e2e:playwright:headed": "playwright test --headed",
     "test:performance": "node performanceTestRunner.js",
     "test:security": "node securityTestRunner.js",
     "test:leakage-prevention": "node leakagePreventionTestRunner.js",
@@ -47,6 +49,7 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.4.0",
+    "@playwright/test": "^1.58.2",
     "playwright-core": "^1.58.2",
     "vite": "^8.0.0"
   }
