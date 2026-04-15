@@ -34,6 +34,13 @@ npm run db:migrate:alembic -- revision -m "add new table"
 npm run db:migrate:alembic -- upgrade head
 ```
 
+Or use the message-enforced helper:
+
+```bash
+npm run db:migrate:new -- "add risk_limits table"
+npm run db:migrate:new -- "add index on trade_events.created_at" --autogenerate
+```
+
 ## Existing Databases
 
 For an already-provisioned DB that should be marked as baseline:

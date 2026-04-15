@@ -23,6 +23,7 @@
     "db:migrate:current": "python ml-engine/scripts/alembic_manage.py current",
     "db:migrate:history": "python ml-engine/scripts/alembic_manage.py history",
     "db:migrate:baseline": "python ml-engine/scripts/alembic_manage.py stamp 20260415_000001",
+    "db:migrate:new": "python ml-engine/scripts/new_migration.py",
     "db:migrate:alembic": "python ml-engine/scripts/alembic_manage.py",
     "test:performance": "node performanceTestRunner.js",
     "test:security": "node securityTestRunner.js",
