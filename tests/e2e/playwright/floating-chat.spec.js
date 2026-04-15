@@ -15,6 +15,7 @@ import "./floating-chat.spec.impl.js";
  */
 import { test, expect } from '@playwright/test';
 test.skip(true, "Legacy floating chat draft tests disabled; use floating-chat.spec.impl.js.");
+if (false) {
 
 test.describe.configure({ timeout: 90_000 });
 
@@ -73,7 +74,7 @@ test('pre-chat form blocks empty submit', async ({ page }) => {
 
     // Either the button is disabled or a validation message appears
     const isDisabled = await submitBtn.isDisabled();
-    const validationMsg = page.locator('text=/required|please enter|can't be empty/i').first();
+    const validationMsg = page.locator("text=/required|please enter|can't be empty/i").first();
     const msgVisible = await validationMsg.isVisible().catch(() => false);
 
     // At least one: button disabled OR validation message shown
@@ -199,3 +200,4 @@ test('send message adds message to thread', async ({ page }) => {
   const newCount = await page.locator('.message-item, .chat-message').count();
   expect(newCount).toBeGreaterThan(initialCount);
 });
+}

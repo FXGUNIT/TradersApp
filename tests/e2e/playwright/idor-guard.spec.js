@@ -11,6 +11,7 @@ import "./idor-guard.spec.impl.js";
  */
 import { test, expect } from '@playwright/test';
 test.skip(true, "Legacy IDOR draft tests disabled; use idor-guard.spec.impl.js.");
+if (false) {
 
 test.describe.configure({ timeout: 90_000 });
 
@@ -76,3 +77,4 @@ test(
     });
   },
 );
+}
