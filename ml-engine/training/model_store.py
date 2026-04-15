@@ -188,6 +188,7 @@ class ModelStore:
             "version": version,
             "saved_at": datetime.now(timezone.utc).isoformat(),
             "feature_cols": feature_cols,
+            "feature_pipeline_version": "1.0",
             "metrics": metrics,
             "config_hash": self._hash_config(),
         }

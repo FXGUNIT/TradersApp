@@ -29,9 +29,13 @@ class Predictor:
     every predict() (throttled by MLFLOW_REGISTRY_CHECK_INTERVAL) and reloads
     models whose Production version has changed. All pods converge to the
     same MLflow production model — the single source of truth.
+
+    Strict mode: when strict=True, raises ValueError if any trained feature
+    column is missing from the incoming feature set, rather than silently
+    falling back to the available subset.
     """
 
-    def __init__(self, store_dir: str | None = None):
+    def __init__(self, store_dir: str | None = None, strict: bool = False):
         ensure_heartbeat_loop(
             "ML.Predictor",
             focus="Serving inference predictor models.",
@@ -41,6 +45,7 @@ class Predictor:
         self._loaded = False
         self._last_reload_check: float = 0
         self._check_interval = getattr(config, "MLFLOW_REGISTRY_CHECK_INTERVAL", 60)
+        self.strict = strict
 
     @property
     def is_ready(self) -> bool:
@@ -166,6 +171,12 @@ class Predictor:
             available = [c for c in feature_cols if c in X.columns]
             if not available:
                 continue
+            if self.strict and len(available) < len(feature_cols):
+                missing = sorted(set(feature_cols) - set(available))
+                raise ValueError(
+                    f"Strict mode: model '{name}' expects {len(feature_cols)} feature columns "
+                    f"but {len(missing)} are missing from input: {missing}"
+                )
             X = X[available]
 
             try:
@@ -247,6 +258,12 @@ class Predictor:
             available = [c for c in model_cols if c in X.columns]
             if not available:
                 continue
+            if self.strict and len(available) < len(model_cols):
+                missing = sorted(set(model_cols) - set(available))
+                raise ValueError(
+                    f"Strict mode: model '{name}' expects {len(model_cols)} feature columns "
+                    f"but {len(missing)} are missing from input: {missing}"
+                )
             X_use = X[available]
 
             try:

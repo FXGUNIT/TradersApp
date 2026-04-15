@@ -119,9 +119,10 @@ class AutotuneRequest(BaseModel):
 
 
 class BacktestTradesRequest(BaseModel):
+    schema_version: Literal["1.0"] = "1.0"
     symbol: str = Field(default="MNQ")
     trades: list[TradeInput]
-    returns_override: list[float] | None = Field(default=None)
+    returns_override: list[float] | None = Field(default=None, max_length=5000)
 
 
 # ── Drift detection ──────────────────────────────────────────────────────────
@@ -133,9 +134,10 @@ class RecordPredictionRequest(BaseModel):
 
 
 class DriftDetectRequest(BaseModel):
+    schema_version: Literal["1.0"] = "1.0"
     symbol: str = Field(default="MNQ")
-    candles: list[dict] = Field(default_factory=list)
-    trades: list[dict] = Field(default_factory=list)
+    candles: list[dict] = Field(default_factory=list, max_length=5000)
+    trades: list[dict] = Field(default_factory=list, max_length=5000)
     current_regime: str | None = Field(default=None)
     regime_confidence: float = Field(default=1.0, ge=0.0, le=1.0)
 
@@ -161,15 +163,17 @@ class NewsReactionRequest(BaseModel):
 # ── Regime / physics ──────────────────────────────────────────────────────────
 
 class RegimeRequest(BaseModel):
+    schema_version: Literal["1.0"] = "1.0"
     symbol: str = Field(default="MNQ")
-    candles: list[dict] = Field(default_factory=list)
+    candles: list[dict] = Field(default_factory=list, max_length=5000)
 
 
 # ── Mamba SSM ─────────────────────────────────────────────────────────────────
 
 class MambaRequest(BaseModel):
+    schema_version: Literal["1.0"] = "1.0"
     symbol: str = Field(default="MNQ")
-    candles: list[dict] = Field(default_factory=list)
+    candles: list[dict] = Field(default_factory=list, max_length=5000)
     model_size: str = Field(default="mamba-790m")
     task: str = Field(default="full")
 
@@ -177,8 +181,9 @@ class MambaRequest(BaseModel):
 # ── PSO Alpha Discovery ──────────────────────────────────────────────────────
 
 class PSORequest(BaseModel):
+    schema_version: Literal["1.0"] = "1.0"
     symbol: str = Field(default="MNQ")
-    candles: list[dict] = Field(default_factory=list)
+    candles: list[dict] = Field(default_factory=list, max_length=5000)
     n_particles: int = Field(default=40, ge=10, le=200)
     max_iterations: int = Field(default=150, ge=10, le=500)
     regime: str = Field(default="ALL")
@@ -187,6 +192,7 @@ class PSORequest(BaseModel):
 # ── Feedback loop ────────────────────────────────────────────────────────────
 
 class FeedbackSignalRequest(BaseModel):
+    schema_version: Literal["1.0"] = "1.0"
     signal: str = Field(...)
     confidence: float = Field(..., ge=0.0, le=1.0)
     votes: dict = Field(default_factory=dict)
@@ -201,6 +207,7 @@ class FeedbackSignalRequest(BaseModel):
 
 
 class FeedbackRetrainRequest(BaseModel):
+    schema_version: Literal["1.0"] = "1.0"
     trigger: str = Field(default="manual")
     symbol: str = Field(default="MNQ")
     training_mode: str = Field(default="incremental")
@@ -210,6 +217,7 @@ class FeedbackRetrainRequest(BaseModel):
 # ── Inference (Triton/ONNX) ──────────────────────────────────────────────────
 
 class TritonInferenceRequest(BaseModel):
+    schema_version: Literal["1.0"] = "1.0"
     features: list[list[float]] | list[dict]
     model_name: str = Field(default="lightgbm_direction")
     symbol: str = Field(default="MNQ")
