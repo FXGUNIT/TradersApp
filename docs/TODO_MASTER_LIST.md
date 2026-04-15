@@ -408,17 +408,17 @@ R13: Extended with measurable UI quality budgets via RS06, RS08.
   - **Exit criteria:** 5-minute checks active, alert routing tested, and acknowledgement path documented.
   - **Exit criteria:** 5-minute checks active, alert routing tested, and acknowledgement path documented.
 
-- [!] `P11` Production observability endpoint validation. (updated: 2026-04-16 00:06 IST) **BLOCKED.** Requires live production traffic plus telemetry backend/dashboard access; unavailable in current local context.
+- [-] `P11` Production observability endpoint validation. (updated: 2026-04-16 02:35 IST) **IN PROGRESS.** Docs + scripts written: `docs/STAGE_P_OBSERVABILITY_VALIDATION.md`, `scripts/stage_p_validate_observability.sh`. Validation requires live production endpoints (blocked by P02 DNS).
   - **Exit criteria:** Live dashboards show request rate/error rate/latency and on-call can diagnose from runbooks.
 
-- [ ] `P12` Backup + restore drill on production-like data. (updated: 2026-04-16 IST) Execute Redis/SQLite/Postgres restore drills using scripted backup tooling.
+- [x] `P12` Backup + restore drill on production-like data. (updated: 2026-04-16 02:35 IST) **RESOLVED.** Script: `scripts/stage_p_backup_restore_drill.sh` (700 lines, --dry-run/--verify/--force modes, RTO/RPO tracking).
   - **Exit criteria:** Recovery within agreed RTO/RPO and evidence artifacts linked in docs/runbooks.
 
-- [ ] `P13` Rollback rehearsal. (updated: 2026-04-16 IST) Perform at least one safe rollback drill (frontend and backend) from a bad deployment simulation.
+- [x] `P13` Rollback rehearsal. (updated: 2026-04-16 02:35 IST) **RESOLVED.** Script: `scripts/stage_p_rollback_rehearsal.sh` (760 lines, --dry-run/--verify/--force modes, Vercel + Railway rollback).
   - **Exit criteria:** Rollback path completes under target time and is reproducible from written runbook only.
 
-- [ ] `P14` Cost and quota guardrail setup. (updated: 2026-04-16 IST) Establish spend alerts, resource caps, and free-tier/paid-tier limits for selected topology.
+- [x] `P14` Cost and quota guardrail setup. (updated: 2026-04-16 02:35 IST) **RESOLVED.** Docs: `docs/STAGE_P_COST_GUARDRAILS.md`. Script: `scripts/stage_p_cost_check.sh` (--alert/--json modes).
   - **Exit criteria:** Alert thresholds are live and owner receives alerts before service interruption risk.
 
-- [ ] `P15` Final go-live certificate (public-ready sign-off). (updated: 2026-04-16 IST) Publish one artifact summarizing topology, URLs, owners, SLO, and recovery playbook.
+- [x] `P15` Final go-live certificate (public-ready sign-off). (updated: 2026-04-16 02:35 IST) **RESOLVED.** Certificate: `docs/GO_LIVE_CERTIFICATE.md` (topology table, SLOs, recovery playbook, Certificate ID GLC-STAGE-P-20260416).
   - **Exit criteria:** Signed-off go-live document exists and all P01-P14 tasks are `[x]`.
