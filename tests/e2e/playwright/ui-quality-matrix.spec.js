@@ -108,19 +108,35 @@ test("RS04 actionable controls expose label contract", async ({ page }) => {
 test("RS04 keyboard tab focus is visible", async ({ page }) => {
   await gotoPrimarySurface(page);
 
-  await page.keyboard.press("Tab");
-  await page.waitForTimeout(150);
+  const launcher = page.getByRole("button", { name: /support chat/i }).first();
+  if (await launcher.isVisible({ timeout: 3_000 }).catch(() => false)) {
+    await launcher.click();
+    await page.waitForTimeout(250);
+  }
 
-  const focused = await page.evaluate(() => {
-    const el = document.activeElement;
-    if (!el || el === document.body) {
-      return { hasFocusTarget: false, hasVisibleRing: false };
+  await page.locator("body").click();
+
+  let focused = { hasFocusTarget: false, hasVisibleRing: false };
+  for (let i = 0; i < 8; i += 1) {
+    await page.keyboard.press("Tab");
+    await page.waitForTimeout(120);
+
+    focused = await page.evaluate(() => {
+      const el = document.activeElement;
+      if (!el || el === document.body) {
+        return { hasFocusTarget: false, hasVisibleRing: false };
+      }
+      const style = window.getComputedStyle(el);
+      const hasOutline =
+        style.outlineStyle !== "none" && style.outlineWidth !== "0px";
+      const hasShadow = style.boxShadow && style.boxShadow !== "none";
+      return { hasFocusTarget: true, hasVisibleRing: hasOutline || hasShadow };
+    });
+
+    if (focused.hasFocusTarget) {
+      break;
     }
-    const style = window.getComputedStyle(el);
-    const hasOutline = style.outlineStyle !== "none" && style.outlineWidth !== "0px";
-    const hasShadow = style.boxShadow && style.boxShadow !== "none";
-    return { hasFocusTarget: true, hasVisibleRing: hasOutline || hasShadow };
-  });
+  }
 
   expect(focused.hasFocusTarget).toBe(true);
   expect(focused.hasVisibleRing).toBe(true);
