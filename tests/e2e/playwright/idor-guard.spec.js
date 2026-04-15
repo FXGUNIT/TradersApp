@@ -1,3 +1,5 @@
+import "./idor-guard.spec.impl.js";
+/*
 /**
  * idor-guard.spec.js — R03 gap fix: BFF IDOR guard integration test
  *
@@ -74,3 +76,4 @@ test(
     });
   },
 );
+*/
