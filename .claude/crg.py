@@ -21,25 +21,28 @@ TOOL_MAP = {
     "repos":       "list_repos_tool",
 }
 
-def crg(tool, args=None):
-    """Call an MCP tool, return parsed JSON result."""
-    proc = subprocess.Popen(ADDR, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    msgs = [
-        {"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"crg","version":"1"}}},
-        {"jsonrpc":"2.0","method":"initialized","params":{}},
-        {"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":tool,"arguments":args or {}}},
-    ]
-    inp = "\n".join(json.dumps(m) for m in msgs).encode()
-    out, _ = proc.communicate(input=inp, timeout=60)
-    for line in out.splitlines():
-        if not line.strip():
-            continue
-        try:
-            obj = json.loads(line)
-            if obj.get("id") == 1 and "result" in obj:
-                return json.loads(obj["result"]["content"][0]["text"])
-        except Exception:
-            pass
+def crg(tool, args=None, retries=4):
+    """Call an MCP tool, return parsed JSON result. Retries on cold-start."""
+    import time as _time
+    for attempt in range(retries):
+        proc = subprocess.Popen(ADDR, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        msgs = [
+            {"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"crg","version":"1"}}},
+            {"jsonrpc":"2.0","method":"initialized","params":{}},
+            {"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":tool,"arguments":args or {}}},
+        ]
+        inp = "\n".join(json.dumps(m) for m in msgs).encode()
+        out, _ = proc.communicate(input=inp, timeout=60)
+        for line in out.splitlines():
+            if not line.strip():
+                continue
+            try:
+                obj = json.loads(line)
+                if obj.get("id") == 1 and "result" in obj:
+                    return json.loads(obj["result"]["content"][0]["text"])
+            except Exception:
+                pass
+        _time.sleep(0.3 * (attempt + 1))
     return {}
 
 def fmt_stats(r):
