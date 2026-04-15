@@ -10,6 +10,21 @@ WORKFLOW="ci.yml"
 WATCH=false
 POLL_INTERVAL=30
 
+# ── jq replacement via Python ─────────────────────────────────────────────────
+jq_() {
+  python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+keys = '$*'.split()
+if not keys or keys == ['']:
+    print(json.dumps(data))
+else:
+    for k in keys:
+        data = data[0] if isinstance(data, list) else data.get(k, {})
+    print(json.dumps(data))
+" 2>/dev/null
+}
+
 # ── Parse flags ────────────────────────────────────────────────────────────────
 for arg in "$@"; do
   case "$arg" in
@@ -27,30 +42,31 @@ run_url() {
   echo "https://github.com/${REPO}/actions/runs/${1}"
 }
 
-# Fetch run IDs and dates, pick the most recent
 latest_run_id() {
-  gh run list --workflow="${WORKFLOW}" --limit 1 --json databaseId --jq '.[0].databaseId'
+  gh run list --workflow="${WORKFLOW}" --limit 1 --json databaseId 2>/dev/null | jq_ databaseId
 }
 
 latest_run_status() {
-  gh run list --workflow="${WORKFLOW}" --limit 1 --json status,conclusion --jq '.[0] | {status: .status, conclusion: .conclusion}'
+  gh run list --workflow="${WORKFLOW}" --limit 1 --json status,conclusion 2>/dev/null | jq_ status conclusion
 }
 
-# List all jobs for a run with name + conclusion
 run_jobs() {
-  gh api "/repos/${REPO}/actions/runs/${1}/jobs" \
-    --jq '.jobs | map({name: .name, conclusion: .conclusion, status: .status})'
+  gh api "/repos/${REPO}/actions/runs/${1}/jobs" 2>/dev/null | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+jobs = data.get('jobs', [])
+print(json.dumps([{'name': j.get('name','?'), 'conclusion': j.get('conclusion',''), 'status': j.get('status','')} for j in jobs]))
+"
 }
 
-# Print a one-liner for a job
 print_job() {
   local name="$1" conclusion="$2" status="$3"
   case "$conclusion" in
-    "success")   echo "  ✓ ${name}: SUCCESS" ;;
-    "failure")   echo "  ✗ ${name}: FAILED" ;;
-    "skipped")   echo "  ⊘ ${name}: SKIPPED" ;;
-    "cancelled") echo "  ⊘ ${name}: CANCELLED" ;;
-    *)           echo "  ? ${name}: ${status^^}" ;;
+    "success")   echo "  [OK] ${name}: SUCCESS" ;;
+    "failure")   echo "  [X]  ${name}: FAILED" ;;
+    "skipped")   echo "  [--] ${name}: SKIPPED" ;;
+    "cancelled") echo "  [--] ${name}: CANCELLED" ;;
+    *)           echo "  [??] ${name}: ${status^^}" ;;
   esac
 }
 
@@ -84,22 +100,36 @@ show_status() {
     "success")
       # Double-check: confirm Deploy Production specifically succeeded
       local deploy_result
-      deploy_result=$(run_jobs "$run_id" | jq -c '.[] | select(.name | test("Deploy Production"; "i")) | .conclusion')
-      if [[ -n "$deploy_result" && "$deploy_result" != '"success"' ]]; then
+      deploy_result=$(run_jobs "$run_id" | python3 -c "
+import sys,json
+jobs=json.load(sys.stdin)
+for j in jobs:
+    if 'deploy' in j['name'].lower() and 'production' in j['name'].lower():
+        print(j.get('conclusion',''))
+")
+      if [[ -n "$deploy_result" && "$deploy_result" != "success" ]]; then
         echo "FAILED — Deploy Production job ended with: ${deploy_result}"
         echo ""
         echo "Job summary:"
-        run_jobs "$run_id" | jq -r '.[] | "\(.name // "?"): \((.conclusion // .status) // "unknown")"' | while read -r line; do
-          echo "  ${line}"
-        done
+        run_jobs "$run_id" | python3 -c "
+import sys,json
+jobs=json.load(sys.stdin)
+for j in jobs:
+    c=j.get('conclusion') or j.get('status') or 'unknown'
+    print(f\"  {j.get('name','?')}: {c}\")
+"
         return 1
       fi
       echo "GREEN — Deploy Production reached SUCCESS"
       echo ""
       echo "Job summary:"
-      run_jobs "$run_id" | jq -r '.[] | "\(.name // "?"): \((.conclusion // .status) // "unknown")"' | while read -r line; do
-        echo "  ${line}"
-      done
+      run_jobs "$run_id" | python3 -c "
+import sys,json
+jobs=json.load(sys.stdin)
+for j in jobs:
+    c=j.get('conclusion') or j.get('status') or 'unknown'
+    print(f\"  {j.get('name','?')}: {c}\")
+"
       return 0
       ;;
 
@@ -107,9 +137,13 @@ show_status() {
       echo "FAILED — one or more jobs did not succeed"
       echo ""
       echo "Job summary:"
-      run_jobs "$run_id" | jq -r '.[] | "\(.name // "?"): \((.conclusion // .status) // "unknown")"' | while read -r line; do
-        echo "  ${line}"
-      done
+      run_jobs "$run_id" | python3 -c "
+import sys,json
+jobs=json.load(sys.stdin)
+for j in jobs:
+    c=j.get('conclusion') or j.get('status') or 'unknown'
+    print(f\"  {j.get('name','?')}: {c}\")
+"
       return 1
       ;;
 
