@@ -5,6 +5,7 @@
  */
 
 import { getRedisClient } from "./redis-session-store.mjs";
+import { isOutboundUrlAllowed } from "./security.mjs";
 import {
   classifySentiment,
   classifyImpact,
@@ -17,7 +18,6 @@ import {
   parseRSSItems,
   extractRSSField,
   fetchWithTimeout,
-  isOutboundUrlAllowed,
 } from "./newsFormatter.mjs";
 
 // ─── Configuration ─────────────────────────────────────────────────────────────
