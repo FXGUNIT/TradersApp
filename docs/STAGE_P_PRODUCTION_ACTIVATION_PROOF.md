@@ -5,9 +5,9 @@
 
 ## Artifact Index
 
-- Public DNS/TLS/endpoint probe (latest): `docs/stage-p/public-readiness-20260415T170500Z.json`
+- Public DNS/TLS/endpoint probe (latest): `docs/stage-p/public-readiness-20260415T182700Z.json`
 - Public DNS/TLS/endpoint probe (baseline): `docs/stage-p/public-readiness-20260415T161834Z.json`
-- CI contract + live GitHub contract gap (latest): `docs/stage-p/ci-contract-live-20260415T173800Z.json`
+- CI contract + live GitHub contract gap (latest): `docs/stage-p/ci-contract-live-20260415T182500Z.json`
 - CI contract baseline: `docs/stage-p/ci-contract-20260415T162029Z.json`
 - Topology freeze decision: `docs/P01_TOPOLOGY_FREEZE.md`
 
@@ -22,8 +22,8 @@
 | P05 BFF public deploy proof | BLOCKED | `https://bff.traders.app/health` cannot resolve (NXDOMAIN) |
 | P06 ML public deploy proof | BLOCKED | `https://api.traders.app/health` cannot resolve (NXDOMAIN) |
 | P07 end-to-end public flow | BLOCKED | P04-P06 all failing |
-| P08 Infisical sync hardening | BLOCKED | Repo Actions contract currently has 0 secrets/0 variables; required sync token/config missing |
-| P09 deploy prereq closure | BLOCKED | Live GitHub check shows missing 8/8 explicit required secrets and 6/13 required variables; latest CI run has Deploy Production job skipped |
+| P08 Infisical sync hardening | BLOCKED | Repo Actions contract currently has 0 secrets and 7/13 required variables; required sync token/config missing |
+| P09 deploy prereq closure | BLOCKED | Live GitHub check shows missing 8/8 explicit required secrets and 6/13 required variables; latest completed CI run (`24470830346`) has Deploy Production job skipped |
 | P10 public uptime monitoring | BLOCKED | Monitor workflow exists, but required alert-routing secrets/URL vars absent in live repo contract |
 | P11 observability validation | BLOCKED | Live public BFF/ML endpoints unavailable; no production telemetry validation path yet |
 
@@ -32,7 +32,8 @@
 1. **Domain ownership is active but app binding is incorrect:** `traders.app` resolves and serves HTTPS, but points to `stocks.news` and does not expose app health route.
 2. **Critical subdomains are missing from DNS:** `bff`, `api`, and `staging` are NXDOMAIN, blocking backend public verification.
 3. **Deploy control plane is only partially seeded in GitHub repo:** live API check reports **0 Actions secrets** and **7 repository variables**.
-4. **Latest CI run cannot reach production deploy:** latest `ci.yml` run (`24467254349`) finished `failure`; `Deploy Production` job conclusion is `skipped`.
+4. **Production deploy path is still gated in CI:** latest completed `ci.yml` run (`24470830346`, updated `2026-04-15T18:24:16Z`) finished `failure`; `Deploy Production` job conclusion is `skipped` while prerequisite jobs are red. Two newer runs (`24470963590`, `24471142413`) are in progress.
+5. **Probe accuracy hardening added:** `scripts/stage_p_ci_contract_probe.py` now reports explicit live API failures instead of silently degrading to zero-count contracts.
 
 ## CI Hardening Applied In This Execution
 
@@ -57,3 +58,11 @@ From `.github/workflows/ci.yml`, `.github/workflows/infisical-sync.yml`, `.githu
 3. Seed all required GitHub secrets/variables (9 secrets + 13 vars) and rerun `ci.yml`.
 4. Confirm `Deploy Production` job reaches `success` (not skipped) and capture run evidence.
 5. Re-run Stage P probes and close P02-P07/P09/P10 when green.
+
+## Remaining External Inputs (Exact)
+
+1. DNS targets for `bff.traders.app`, `api.traders.app`, and `staging.traders.app` (Railway-provided hostnames/CNAME targets).
+2. Frontend host binding for `traders.app` in Vercel so `/` and `/health` are served by this app, not redirected to `stocks.news`.
+3. GitHub Actions secrets: `DISCORD_WEBHOOK_URL`, `INFISICAL_TOKEN`, `PAGERDUTY_ROUTING_KEY`, `RAILWAY_TOKEN`, `SLACK_WEBHOOK_URL`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`, `VERCEL_TOKEN`.
+4. GitHub Actions variables: `RAILWAY_PROD_BFF_SERVICE_ID`, `RAILWAY_PROD_ENV_ID`, `RAILWAY_PROD_ML_SERVICE_ID`, `RAILWAY_STAGING_BFF_SERVICE_ID`, `RAILWAY_STAGING_ENV_ID`, `RAILWAY_STAGING_ML_SERVICE_ID`.
+5. One successful `ci.yml` run on `main` with `Deploy Production` green and post-deploy public probes passing.
