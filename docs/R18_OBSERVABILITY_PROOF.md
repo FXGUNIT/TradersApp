@@ -132,14 +132,11 @@ Understandable by another operator — structured markdown with tables and check
 
 ## Gaps Found
 
-**GAP 1 (Medium)** — No BFF Prometheus metrics endpoint
-BFF does not expose `/metrics` like ML Engine does. No prom-client usage in BFF.
-Fix: Add `prom-client` to BFF, expose `/metrics`, update Prometheus scrape config.
+**GAP 1 (Medium)** — No BFF Prometheus metrics endpoint → **RESOLVED (2026-04-15)**
+BFF now exposes `/metrics` endpoint via `prom-client`. `metrics.mjs` initialized with `register`, `collectDefaultMetrics()`, and `recordHttpRequest` called on request finish in `_dispatch.mjs`. `GET /metrics` returns Prometheus text format.
 
-**GAP 2 (Medium)** — No formal runbook directory
-No `docs/runbooks/` or `k8s/runbooks/` directory.
-Diagnosing ML Engine OOM requires reading source code.
-Fix: Create `docs/runbooks/` with incident playbooks.
+**GAP 2 (Medium)** — No formal runbook directory → **RESOLVED (2026-04-15)**
+`docs/runbooks/` created with 12 incident playbooks covering all highest-risk operational scenarios.
 
 **GAP 3 (Low)** — No BFF health endpoint
 BFF has no `GET /health` route for load balancer health checks.
@@ -153,6 +150,10 @@ Fix: Add training job status to Board Room or a separate /admin/ml-jobs endpoint
 
 ## Interim Verdict
 
-**PROVEN.** Health endpoints for ML Engine are real (DB check, model warm/cold). Structured logs with no secret leakage. Prometheus + Grafana + Loki + Jaeger observability stack deployed. SLA targets enforced in CI via k6 SLO gate. CI artifacts stored predictably. Proof artifacts in `docs/R*_PROOF.md` understandable by another operator. Gaps are real (no BFF metrics, no runbooks) but not blocking for diagnosability.
+**RESOLVED — all major gaps addressed as of 2026-04-15.** Health endpoints for ML Engine are real (DB check, model warm/cold). Structured logs with no secret leakage. Prometheus + Grafana + Loki + Jaeger observability stack deployed. BFF now exposes Prometheus metrics via `/metrics`. 12 formal runbooks created for highest-risk incident types. SLA targets enforced in CI via k6 SLO gate. CI artifacts stored predictably. Proof artifacts in `docs/R*_PROOF.md` understandable by another operator.
+
+**Resolved 2026-04-15:** GAP 1 (BFF Prometheus metrics), GAP 2 (formal runbooks).
 
 **Proof artifact:** `docs/R18_OBSERVABILITY_PROOF.md`
+**Updated:** 2026-04-15 — GAPs 1 and 2 resolved
+
