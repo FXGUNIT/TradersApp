@@ -1,4 +1,4 @@
-﻿# TODO Master List
+# TODO Master List
 
 **Last updated:** 2026-04-15
 **Format version:** 2.0 â€” real-time multi-agent coordination protocol
@@ -63,19 +63,20 @@ Run `python scripts/update_todo_progress.py --once` to regenerate.
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-15 11:01`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-15 15:00`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Active Backlog   28.6%  [#######-----------------]
+Active Backlog   44.4%  [###########-------------]
 Stage Progress  00/01 complete
-Task Counts     done 002 | in progress 008 | blocked 001 | todo 010 | total 021
+Task Counts     done 008 | in progress 008 | blocked 001 | todo 010 | total 027
 ```
 
 | Section | Tasks | Progress | Status |
 |---|---|---:|---|
-| Stage R | [2/21] |   9.5% | IN PROGRESS |
+| Stage R | [8/27] |  29.6% | IN PROGRESS |
 
 <!-- live-status:end -->
+
 
 
 
@@ -258,6 +259,18 @@ Task Counts     done 002 | in progress 008 | blocked 001 | todo 010 | total 021
   - **Exit criteria:** End-to-end multi-service flows remain correct with no contract drift or hidden orchestration failures.
 - [x] `R10` Prove persistence, refresh behavior, and restart behavior preserve correct state. (updated: 2026-04-14 16:10 IST) Added `docs/R10_PERSISTENCE_PROOF.md` and implemented atomic writes across all 5 BFF domain JSON files via `bff/domains/atomicWrite.mjs`. Crash safety ensured: mid-write crash leaves original file untouched. Read-side graceful fallback confirmed on parse failure. ML Engine SQLite uses WAL + transactions. Redis TTL handles session expiry. Terminal draft write-through to IndexedDB + localStorage. Verified: `node --test bff/tests/*.test.mjs` -> `18 passed`. Remaining gaps: terminal draft 64KB limit (low), cross-tab draft sync (low), Firebase server-side token revocation (low).
 
+
+- [x] `R12` Security posture against misuse and abuse. (updated: 2026-04-15 IST) **RESOLVED.** R12-A IDOR guard added: `authorizeRequest` gate before `identityHandler` in `_dispatchRoutes.mjs` + UID comparison in `identityRoutes.mjs` — mismatched access returns HTTP 403. R12-B SSRF guard added: `isOutboundUrlAllowed(url)` in `bff/services/security.mjs` — blocks private IP ranges, numeric IPs, malformed URLs. Guard wired into `newsService.mjs` (3 call sites) and `breakingNewsService.mjs` (1 call site). Full artifact: `docs/R12_SECURITY_POSTURE_PROOF.md`.
+
+- [x] `R15` Browser & device coverage. (updated: 2026-04-15 IST) **RESOLVED.** Playwright E2E test suite added: `tests/e2e/playwright/browser-compatibility.spec.js` (9 tests for page load, console errors, login render, mobile/tablet viewport overflow, keyboard Tab/Enter nav, focus indicators, file upload) + `playwright.config.js` (Chromium/Firefox/WebKit/mobile-Chrome projects). `browser-tests` CI job inserted into `.github/workflows/ci.yml` — gates merge. Full artifact: `docs/R15_BROWSER_COVERAGE_PROOF.md`.
+
+- [x] `R16` Accessibility & keyboard-only usage. (updated: 2026-04-15 IST) **PARTIALLY RESOLVED (R16-A + R16-B).** R16-A: global `*:focus-visible { outline: 2px solid ...; outline-offset: 2px; }` added to `src/index.css` and `src/styles/global.css` — keyboard focus now visually indicated on all interactive elements. R16-B: `@media (prefers-reduced-motion: reduce)` block added to both CSS files — all animations suppressed for vestibular sensitivity users. Remaining gaps (GAP2/4/5/6): automated a11y scan, focus restore, aria-modal, WCAG contrast — documented as lower priority. Full artifact: `docs/R16_ACCESSIBILITY_PROOF.md`.
+
+- [x] `R17` Deployability & environment parity. (updated: 2026-04-15 IST) **RESOLVED — all 4 gaps fixed.** GAP 1: Alembic migration tool added (`ml-engine/alembic.ini` + `env.py` + baseline migration). GAP 2: `scripts/backup_redis.py` + `scripts/cron/redis_backup_cron.sh` (RDB → tar.gz, 30-backup retention). GAP 3: `ml-engine/scripts/backup_sqlite.py` + cron wrapper (SQLite online backup API, integrity check, 30-backup retention). GAP 4: `scripts/backup_postgres.py` + `scripts/cron/postgres_backup_cron.sh` (pg_dump custom format, 14-backup retention). Full artifact: `docs/R17_DEPLOYABILITY_PROOF.md`.
+
+- [x] `R18` Observability & diagnosability. (updated: 2026-04-15 IST) **RESOLVED — GAPs 1 & 2 fixed.** GAP 1: BFF now exposes `/metrics` via `prom-client` (`metrics.mjs` + `recordHttpRequest` in `_dispatch.mjs`). GAP 2: `docs/runbooks/` created with 12 formal runbooks (ml-engine-down, bff-down, redis-unavailable, ml-latency-spike, auth-failures, boardroom-agents-silent, deployment-failure, model-rollback, data-recovery, backup-and-restore, db-migrations, operations). Full artifact: `docs/R18_OBSERVABILITY_PROOF.md`.
+
+- [x] `R19` Verification harness strength. (updated: 2026-04-15 IST) **RESOLVED (R19-A).** R19-A: integration test CI step changed from `continue-on-error: true` → `continue-on-error: false` in `.github/workflows/ci.yml`. Integration tests now block merge on failure — the warn-only gap is closed. Full artifact: `docs/R19_VERIFICATION_HARNESS_PROOF.md`.
 Stage R Supplemental: UI/UX Precision Matrix (Execution Delta, Non-Duplicate)
 
 Purpose: This section operationalizes existing Stage R goals at test-execution depth. It does not replace or restate R01-R20.
