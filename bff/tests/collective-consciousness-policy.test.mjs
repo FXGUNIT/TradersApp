@@ -141,12 +141,12 @@ test("premium plan allows 50 questions per rolling window", async () => {
   });
 });
 
-test("admin bypass email remains unlimited", async () => {
+test("admin role remains unlimited", async () => {
   await withTempWorkspace(async ({ identityState }) => {
     const { provisionUser, consumeCollectiveConsciousnessQuestion } = identityState;
     provisionUser("admin-1", {
-      role: "user",
-      email: "cricgunit@gmail.com",
+      role: "admin",
+      email: "admin@example.com",
     });
 
     let latest = null;
@@ -163,6 +163,39 @@ test("admin bypass email remains unlimited", async () => {
     assert.equal(latest.usage.currentTier, "admin");
     assert.equal(latest.usage.questionsAllowed, null);
     assert.equal(latest.usage.isAdminBypass, true);
+  });
+});
+
+test("email alone does not grant admin bypass", async () => {
+  await withTempWorkspace(async ({ identityState }) => {
+    const { provisionUser, consumeCollectiveConsciousnessQuestion } = identityState;
+    provisionUser("user-1", {
+      role: "user",
+      email: "cricgunit@gmail.com",
+    });
+
+    const start = new Date("2026-04-12T14:00:00.000Z");
+    for (let index = 0; index < 10; index += 1) {
+      const allowed = consumeCollectiveConsciousnessQuestion(
+        "user-1",
+        {},
+        { now: new Date(start.getTime() + index * 1000) },
+      );
+      assert.equal(allowed.ok, true);
+      assert.equal(allowed.usage.questionsAllowed, 10);
+      assert.equal(allowed.usage.currentTier, "standard");
+      assert.equal(allowed.usage.isAdminBypass, false);
+    }
+
+    const blocked = consumeCollectiveConsciousnessQuestion(
+      "user-1",
+      {},
+      { now: new Date(start.getTime() + 20_000) },
+    );
+    assert.equal(blocked.ok, false);
+    assert.equal(blocked.code, "COLLECTIVE_CONSCIOUSNESS_LIMIT_REACHED");
+    assert.equal(blocked.usage.currentTier, "standard");
+    assert.equal(blocked.usage.isAdminBypass, false);
   });
 });
 

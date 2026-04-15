@@ -20,7 +20,6 @@ const COLLECTIVE_CONSCIOUSNESS_STANDARD_LIMIT = 10;
 const COLLECTIVE_CONSCIOUSNESS_PREMIUM_LIMIT = 50;
 const COLLECTIVE_CONSCIOUSNESS_WINDOW_MS = 24 * 60 * 60 * 1000;
 const COLLECTIVE_CONSCIOUSNESS_PREMIUM_PRICE_INR_MONTHLY = 800;
-const COLLECTIVE_CONSCIOUSNESS_ADMIN_BYPASS_EMAIL = "cricgunit@gmail.com";
 
 function nowIso() {
   return new Date().toISOString();
@@ -195,9 +194,6 @@ function resolveCollectiveConsciousnessState(user = {}, options = {}) {
   const role = String(user.role || "user")
     .trim()
     .toLowerCase();
-  const email = String(user.email || "")
-    .trim()
-    .toLowerCase();
   const plan = normalizeCollectivePlan(
     user.plan ??
       user.collectiveConsciousness?.plan ??
@@ -216,8 +212,7 @@ function resolveCollectiveConsciousnessState(user = {}, options = {}) {
       user.collectiveConsciousness?.questionCount ??
       user.collectiveConsciousness?.question_count,
   );
-  const isAdminBypass =
-    role === "admin" || email === COLLECTIVE_CONSCIOUSNESS_ADMIN_BYPASS_EMAIL;
+  const isAdminBypass = role === "admin";
   const questionsAllowed = isAdminBypass
     ? null
     : getCollectiveConsciousnessLimit(plan);
@@ -412,7 +407,7 @@ function upsertUser(state, uid, patch = {}, options = {}) {
 }
 
 function patchUserByUid(uid, patch = {}) {
-  const state = readState(options);
+  const state = readState();
   if (!state.users?.[uid]) {
     return null;
   }
@@ -423,7 +418,7 @@ function patchUserByUid(uid, patch = {}) {
 }
 
 export function getUserByUid(uid) {
-  const state = readState(options);
+  const state = readState();
   const record = getUserAndSessions(state, uid);
   return record ? clone(record) : null;
 }
