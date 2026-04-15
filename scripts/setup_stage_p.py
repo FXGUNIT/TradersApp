@@ -34,7 +34,7 @@ def gh_var_set(name, value):
         _, err2, rc2 = run(cmd)
         print(f"  [OK] {name} (var)" + (f": {err2[:80]}" if rc2 != 0 else ""))
         return rc2 == 0
-    print(f"  ✓ {name} (var)")
+    print(f"  [OK] {name} (var)")
     return True
 
 def section(t):
