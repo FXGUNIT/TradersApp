@@ -12,6 +12,7 @@ Examples:
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -28,11 +29,24 @@ def main() -> int:
     args = sys.argv[1:]
     if not args:
         print("Usage: alembic_manage.py <alembic args...>", file=sys.stderr)
+        print(
+            "Example: python ml-engine/scripts/alembic_manage.py upgrade head",
+            file=sys.stderr,
+        )
         return 2
 
+    alembic_bin = shutil.which("alembic")
+    if not alembic_bin:
+        print("Alembic executable not found in PATH.", file=sys.stderr)
+        print(
+            "Install dependencies: pip install -r ml-engine/requirements.txt",
+            file=sys.stderr,
+        )
+        return 127
+
     env = os.environ.copy()
-    cmd = ["alembic", "-c", str(ini_path), *args]
-    return subprocess.call(cmd, cwd=str(root), env=env)
+    cmd = [alembic_bin, "-c", str(ini_path), *args]
+    return subprocess.run(cmd, cwd=str(root), env=env).returncode
 
 
 if __name__ == "__main__":
