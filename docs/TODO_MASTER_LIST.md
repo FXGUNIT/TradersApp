@@ -63,19 +63,20 @@ Run `python scripts/update_todo_progress.py --once` to regenerate.
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-15 08:52`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-15 09:32`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Active Backlog   50.0%  [############------------]
+Active Backlog   54.5%  [#############-----------]
 Stage Progress  00/01 complete
-Task Counts     done 001 | in progress 008 | blocked 001 | todo 000 | total 010
+Task Counts     done 002 | in progress 008 | blocked 001 | todo 000 | total 011
 ```
 
 | Section | Tasks | Progress | Status |
 |---|---|---:|---|
-| Stage R | [1/10] |  10.0% | IN PROGRESS |
+| Stage R | [2/11] |  18.2% | IN PROGRESS |
 
 <!-- live-status:end -->
+
 
 
 
@@ -365,3 +366,5 @@ R02: Broadened into executable UI-state and control-level verification via RS01,
 R11: Extended with failure-recovery interaction and motion-resilience checks via RS04, RS06.
 
 R13: Extended with measurable UI quality budgets via RS06, RS08.
+
+- [x] `R20` Define and satisfy a final release gate before using the word "flawless." -- **[x] CLAIM ALLOWED** (2026-04-15) — all 3 blocking conditions resolved: R12-A IDOR guard in _dispatchRoutes.mjs + identityRoutes.mjs, R12-B SSRF guard in security.mjs/newsService.mjs/breakingNewsService.mjs, R19-A integration test fail-gate in ci.yml

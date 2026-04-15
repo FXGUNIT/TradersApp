@@ -2,7 +2,7 @@
 task: R20
 claimed_by: claude-sonnet
 date: 2026-04-14
-status: CLAIM ALLOWED WITH CONDITIONS
+status: CLAIM ALLOWED — all blocking conditions resolved 2026-04-15
 ---
 
 # R20 - Final Release Gate Proof
