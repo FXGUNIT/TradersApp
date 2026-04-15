@@ -51,9 +51,9 @@ Before starting work, claim your tasks here. This prevents two agents from updat
   "R15": { "claimed_by": "claude-sonnet", "claimed_at": "2026-04-14" },
   "R16": { "claimed_by": "claude-sonnet", "claimed_at": "2026-04-14" },
   "R17": { "claimed_by": "claude-sonnet", "claimed_at": "2026-04-14" },
-  "R18": { "claimed_by": "claude-sonnet", "claimed_at": null },
-  "R19": { "claimed_by": "claude-sonnet", "claimed_at": null },
-  "R20": { "claimed_by": "claude-sonnet", "claimed_at": null }
+  "R18": { "claimed_by": "claude-sonnet", "claimed_at": "2026-04-14" },
+  "R19": { "claimed_by": "claude-sonnet", "claimed_at": "2026-04-14" },
+  "R20": { "claimed_by": "claude-sonnet", "claimed_at": "2026-04-14" }
 }
 ```
 
@@ -63,7 +63,7 @@ Run `python scripts/update_todo_progress.py --once` to regenerate.
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-15 08:41`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-15 08:46`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Active Backlog   34.1%  [########----------------]
@@ -76,6 +76,8 @@ Task Counts     done 003 | in progress 009 | blocked 001 | todo 009 | total 022
 | Stage R | [3/22] |  13.6% | IN PROGRESS |
 
 <!-- live-status:end -->
+
+
 
 
 
@@ -248,7 +250,7 @@ Task Counts     done 003 | in progress 009 | blocked 001 | todo 009 | total 022
   - **Step 5:** Verify delayed responses, temporary unavailability, and retry logic across boundaries.
   - **Exit criteria:** End-to-end multi-service flows remain correct with no contract drift or hidden orchestration failures.
 - [x] `R10` Prove persistence, refresh behavior, and restart behavior preserve correct state. (updated: 2026-04-14 16:10 IST) Added `docs/R10_PERSISTENCE_PROOF.md` and implemented atomic writes across all 5 BFF domain JSON files via `bff/domains/atomicWrite.mjs`. Crash safety ensured: mid-write crash leaves original file untouched. Read-side graceful fallback confirmed on parse failure. ML Engine SQLite uses WAL + transactions. Redis TTL handles session expiry. Terminal draft write-through to IndexedDB + localStorage. Verified: `node --test bff/tests/*.test.mjs` -> `18 passed`. Remaining gaps: terminal draft 64KB limit (low), cross-tab draft sync (low), Firebase server-side token revocation (low).
-- [ ] `R10` Prove persistence, refresh behavior, and restart behavior preserve correct state.
+- [ ] `R10` Prove persistence, refresh behavior and restart behavior preserve correct state. -- **[x] PROVEN**
   - **Why this exists:** Hidden state corruption after refresh or restart is one of the fastest ways to break trust in a system.
   - **Step 1:** Identify all persisted state locations: backend data stores, Redis, Firebase, local storage, session storage, and in-memory caches.
   - **Step 2:** Verify state survives expected refreshes and restarts without disappearing, duplicating, or reverting to stale values.
@@ -266,7 +268,7 @@ Task Counts     done 003 | in progress 009 | blocked 001 | todo 009 | total 022
   - **Step 5:** Verify logs and metrics identify the real failure instead of burying it in generic noise.
   - **Exit criteria:** Every expected operational failure degrades predictably and recovers cleanly.
 - [x] `R12` Prove security posture against realistic misuse and abuse cases. (updated: 2026-04-14 16:20 IST) Added `docs/R12_SECURITY_POSTURE_PROOF.md`. No critical/high gaps found. Key: security headers (HSTS, CSP, X-Frame), Redis rate limiting, RBAC on admin/Board Room, Bearer-token auth (no CSRF), parameterized SQL, Pydantic input validation, sanitized error messages (R08). Residual: IDOR on /identity routes mitigated by frontend UID enforcement (low), SSRF via env-var URLs (low), Firebase token revocation gap (low).
-- [ ] `R12` Prove security posture against realistic misuse and abuse cases.
+- [ ] `R12` Prove security posture against realistic misuse and abuse cases. -- **[x] PROVEN**
   - **Why this exists:** An app cannot be called flawless if it is functionally correct but trivially exploitable.
   - **Step 1:** Audit secrets exposure in frontend bundles, config, logs, docs, and network calls.
   - **Step 2:** Verify input validation on all externally influenced surfaces: forms, uploads, query params, headers, route params, and service payloads.
@@ -284,7 +286,7 @@ Task Counts     done 003 | in progress 009 | blocked 001 | todo 009 | total 022
   - **Step 5:** Add regression alarms for the budgets that matter most.
   - **Exit criteria:** Performance claims are backed by measured budgets and repeatable traces, not intuition.
 
-- [ ] `R14` Prove long-running stability, soak behavior, and concurrency safety.
+- [ ] `R14` Prove long-running stability, soak behavior, and concurrency safety. -- **[x] PROVEN**
   - **Why this exists:** Many serious defects only appear after time, repetition, or simultaneous activity.
   - **Step 1:** Run long-session soak tests for the frontend and services to detect memory leaks, stale subscriptions, timer buildup, and resource drift.
   - **Step 2:** Simulate repeated route changes, repeated uploads, repeated auth cycles, and repeated admin interactions.
@@ -311,7 +313,7 @@ Task Counts     done 003 | in progress 009 | blocked 001 | todo 009 | total 022
   - **Step 5:** Verify screen-reader critical flows or at minimum capture automated a11y scans and manual spot checks for the highest-risk screens.
   - **Exit criteria:** Core flows remain usable and understandable without mouse-only interaction or perfect vision assumptions.
 
-- [ ] `R17` Prove deployability -- **[x] PROVEN** -- **[x] PROVEN**, environment parity, and recovery across runtime environments.
+- [ ] `R17` Prove deployability, environment parity, and recovery across runtime environments. -- **[x] PROVEN**
   - **Why this exists:** A flawless local run does not guarantee a flawless deployment story.
   - **Step 1:** Verify Docker dev stack, production-like stack, and any alternate deployment path each build and boot cleanly from documented commands.
   - **Step 2:** Verify health probes, restart behavior, dependency readiness, and service ordering in each environment.
@@ -320,7 +322,7 @@ Task Counts     done 003 | in progress 009 | blocked 001 | todo 009 | total 022
   - **Step 5:** Verify backup/restore expectations for the stateful parts of the system.
   - **Exit criteria:** Deployment and recovery are documented, repeatable, and proven rather than assumed.
 
-- [ ] `R18` Prove observability -- **[x] PROVEN**, diagnosability, and operator readiness.
+- [ ] `R18` Prove observability, diagnosability, and operator readiness. -- **[x] PROVEN**
   - **Why this exists:** A flawless system claim requires confidence that real defects would be visible and diagnosable quickly.
   - **Step 1:** Verify health endpoints reflect real health instead of only process liveness.
   - **Step 2:** Verify logs identify request path, error cause, and relevant context without leaking secrets.
@@ -329,7 +331,7 @@ Task Counts     done 003 | in progress 009 | blocked 001 | todo 009 | total 022
   - **Step 5:** Verify artifacts from verification runs are stored in a predictable place and are understandable by another operator.
   - **Exit criteria:** Operational issues can be detected, explained, and acted on quickly by someone who did not write the code.
 
-- [ ] `R19` Prove the verification harness -- **[x] PARTIAL** itself is trustworthy.
+- [ ] `R19` Prove the verification harness itself is trustworthy. -- **[x] PARTIAL**
   - **Why this exists:** A green test suite is worthless if it can pass while misreporting reality.
   - **Step 1:** Audit each custom runner for deterministic fixtures, truthful verdict logic, and correct non-zero exit behavior on regression.
   - **Step 2:** Verify "expected fail" scenarios are counted as successful detections rather than mislabeled misses.
