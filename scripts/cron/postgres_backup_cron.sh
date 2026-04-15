@@ -12,4 +12,13 @@ export POSTGRES_USER="${POSTGRES_USER:-traders}"
 export POSTGRES_DB="${POSTGRES_DB:-mlflow}"
 export BACKUP_DIR
 
-python3 "${ROOT_DIR}/scripts/backup_postgres.py" --backup-dir "${BACKUP_DIR}"
+if command -v python3 >/dev/null 2>&1; then
+  PYTHON_BIN="python3"
+elif command -v python >/dev/null 2>&1; then
+  PYTHON_BIN="python"
+else
+  echo "[postgres_backup_cron] python interpreter not found (python3/python)" >&2
+  exit 127
+fi
+
+"${PYTHON_BIN}" "${ROOT_DIR}/scripts/backup_postgres.py" --backup-dir "${BACKUP_DIR}"
