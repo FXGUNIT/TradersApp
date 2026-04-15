@@ -2,6 +2,30 @@ function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+const TINY_PNG_B64 =
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO2R2gAAAABJRU5ErkJggg==";
+
+function buildUploadOcrFixture() {
+  const makeImage = (name) => ({
+    name,
+    type: "image/png",
+    b64: TINY_PNG_B64,
+  });
+
+  return {
+    screenshots: [makeImage("audit-indicator-1.png"), makeImage("audit-indicator-2.png")],
+    mpChart: makeImage("audit-mp-chart.png"),
+    vwapChart: makeImage("audit-vwap-chart.png"),
+    expectedOcr: {
+      adx: 24.5,
+      ci: 32.1,
+      atr: 18.2,
+      currentPrice: 18562.75,
+      vwap: 18548.5,
+    },
+  };
+}
+
 function buildFixtures({ adminUid, adminEmail }) {
   const now = new Date();
   const iso = now.toISOString();
@@ -119,6 +143,8 @@ function buildFixtures({ adminUid, adminEmail }) {
     },
   };
 
+  const uploadOcr = buildUploadOcrFixture();
+
   return {
     userAuth,
     adminAuth,
@@ -134,6 +160,7 @@ function buildFixtures({ adminUid, adminEmail }) {
     },
     sessions,
     users,
+    uploadOcr,
   };
 }
 
@@ -281,6 +308,20 @@ export function registerAppAuditHarness({
         setScreen("app");
         break;
 
+      case "uploadOcr":
+        setAuditData({
+          scenario: "app",
+          auditFlow: "uploadOcr",
+          sessions: fixtures.sessions,
+          uploadOcr: fixtures.uploadOcr,
+        });
+        setCurrentSessionId("session-current");
+        setAuth(clone(fixtures.userAuth));
+        setProfile(clone(fixtures.userProfile));
+        setIsAdminAuthenticated(false);
+        setScreen("app");
+        break;
+
       case "sessions":
         setAuditData({ sessions: fixtures.sessions });
         setCurrentSessionId("session-current");
@@ -308,12 +349,21 @@ export function registerAppAuditHarness({
   window.__TradersAppAudit = {
     loadScenario,
     getFixtures: () => clone(fixtures),
+    getUploadOcrFixture: () => clone(fixtures.uploadOcr),
     setFakeUsers: (users) => {
       const currentData = window.__TRADERS_AUDIT_DATA || {};
       window.__TRADERS_AUDIT_DATA = {
         ...currentData,
         active: true,
         users: clone(users),
+      };
+    },
+    setUploadOcrFixture: (uploadOcr) => {
+      const currentData = window.__TRADERS_AUDIT_DATA || {};
+      window.__TRADERS_AUDIT_DATA = {
+        ...currentData,
+        active: true,
+        uploadOcr: clone(uploadOcr),
       };
     },
     clear: () => {
