@@ -29,7 +29,7 @@ run_url() {
 
 # Fetch run IDs and dates, pick the most recent
 latest_run_id() {
-  gh run list --workflow="${WORKFLOW}" --limit 1 --json id --jq '.[0].id'
+  gh run list --workflow="${WORKFLOW}" --limit 1 --json id --jq '.[0].databaseId'
 }
 
 latest_run_status() {
