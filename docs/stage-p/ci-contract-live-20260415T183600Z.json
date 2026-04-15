@@ -1,0 +1,183 @@
+{
+  "generated_at_utc": "2026-04-15T18:35:35+00:00",
+  "workflows": {
+    ".github\\workflows\\ci.yml": {
+      "secrets": [
+        "GITHUB_TOKEN",
+        "INFISICAL_TOKEN",
+        "RAILWAY_TOKEN",
+        "VERCEL_ORG_ID",
+        "VERCEL_PROJECT_ID",
+        "VERCEL_TOKEN"
+      ],
+      "variables": [
+        "K6_BASE_URL",
+        "RAILWAY_PROD_BFF_SERVICE_ID",
+        "RAILWAY_PROD_ENV_ID",
+        "RAILWAY_PROD_ML_SERVICE_ID",
+        "RAILWAY_STAGING_BFF_SERVICE_ID",
+        "RAILWAY_STAGING_ENV_ID",
+        "RAILWAY_STAGING_ML_SERVICE_ID"
+      ]
+    },
+    ".github\\workflows\\infisical-sync.yml": {
+      "secrets": [
+        "INFISICAL_TOKEN",
+        "RAILWAY_TOKEN",
+        "VERCEL_TOKEN"
+      ],
+      "variables": [
+        "RAILWAY_PROD_ENV_ID"
+      ]
+    },
+    ".github\\workflows\\monitor.yml": {
+      "secrets": [
+        "DISCORD_WEBHOOK_URL",
+        "GITHUB_TOKEN",
+        "PAGERDUTY_ROUTING_KEY",
+        "RAILWAY_TOKEN",
+        "SLACK_WEBHOOK_URL"
+      ],
+      "variables": [
+        "BFF_URL",
+        "FRONTEND_URL",
+        "MLFLOW_TRACKING_URI",
+        "ML_ENGINE_URL",
+        "MODEL_FRESHNESS_MAX_DAYS",
+        "PROMETHEUS_URL"
+      ]
+    }
+  },
+  "required_contract": {
+    "secrets": [
+      "DISCORD_WEBHOOK_URL",
+      "GITHUB_TOKEN",
+      "INFISICAL_TOKEN",
+      "PAGERDUTY_ROUTING_KEY",
+      "RAILWAY_TOKEN",
+      "SLACK_WEBHOOK_URL",
+      "VERCEL_ORG_ID",
+      "VERCEL_PROJECT_ID",
+      "VERCEL_TOKEN"
+    ],
+    "explicit_secrets": [
+      "DISCORD_WEBHOOK_URL",
+      "INFISICAL_TOKEN",
+      "PAGERDUTY_ROUTING_KEY",
+      "RAILWAY_TOKEN",
+      "SLACK_WEBHOOK_URL",
+      "VERCEL_ORG_ID",
+      "VERCEL_PROJECT_ID",
+      "VERCEL_TOKEN"
+    ],
+    "variables": [
+      "BFF_URL",
+      "FRONTEND_URL",
+      "K6_BASE_URL",
+      "MLFLOW_TRACKING_URI",
+      "ML_ENGINE_URL",
+      "MODEL_FRESHNESS_MAX_DAYS",
+      "PROMETHEUS_URL",
+      "RAILWAY_PROD_BFF_SERVICE_ID",
+      "RAILWAY_PROD_ENV_ID",
+      "RAILWAY_PROD_ML_SERVICE_ID",
+      "RAILWAY_STAGING_BFF_SERVICE_ID",
+      "RAILWAY_STAGING_ENV_ID",
+      "RAILWAY_STAGING_ML_SERVICE_ID"
+    ]
+  },
+  "local_cli_status": {
+    "gh": {
+      "available": true,
+      "path": "C:\\Users\\Asus\\.local\\gh\\bin\\gh.exe",
+      "version": "gh version 2.82.0 (2025-10-15)"
+    },
+    "vercel": {
+      "available": true,
+      "path": "C:\\Users\\Asus\\AppData\\Roaming\\npm\\vercel.CMD",
+      "version": "51.3.0"
+    },
+    "railway": {
+      "available": true,
+      "path": "C:\\Users\\Asus\\AppData\\Roaming\\npm\\railway.CMD",
+      "version": "railway 4.37.3"
+    },
+    "infisical": {
+      "available": true,
+      "path": "C:\\Users\\Asus\\AppData\\Roaming\\npm\\infisical.CMD",
+      "version": "infisical version 0.43.68"
+    }
+  },
+  "live_checks": {
+    "enabled": true,
+    "repo": "FXGUNIT/TradersApp",
+    "gh_path": "C:\\Users\\Asus\\.local\\gh\\bin\\gh.exe",
+    "api_calls": {
+      "actions_secrets": {
+        "ok": true,
+        "status_code": 0,
+        "error": null
+      },
+      "actions_variables": {
+        "ok": true,
+        "status_code": 0,
+        "error": null
+      }
+    },
+    "repo_actions_contract": {
+      "secrets_count": 0,
+      "variables_count": 7,
+      "secrets": [],
+      "variables": [
+        "BFF_URL",
+        "FRONTEND_URL",
+        "K6_BASE_URL",
+        "MLFLOW_TRACKING_URI",
+        "ML_ENGINE_URL",
+        "MODEL_FRESHNESS_MAX_DAYS",
+        "PROMETHEUS_URL"
+      ]
+    },
+    "contract_gap": {
+      "available": true,
+      "missing_secrets": [
+        "DISCORD_WEBHOOK_URL",
+        "INFISICAL_TOKEN",
+        "PAGERDUTY_ROUTING_KEY",
+        "RAILWAY_TOKEN",
+        "SLACK_WEBHOOK_URL",
+        "VERCEL_ORG_ID",
+        "VERCEL_PROJECT_ID",
+        "VERCEL_TOKEN"
+      ],
+      "missing_variables": [
+        "RAILWAY_PROD_BFF_SERVICE_ID",
+        "RAILWAY_PROD_ENV_ID",
+        "RAILWAY_PROD_ML_SERVICE_ID",
+        "RAILWAY_STAGING_BFF_SERVICE_ID",
+        "RAILWAY_STAGING_ENV_ID",
+        "RAILWAY_STAGING_ML_SERVICE_ID"
+      ]
+    },
+    "latest_ci": {
+      "conclusion": "",
+      "createdAt": "2026-04-15T18:33:15Z",
+      "databaseId": 24471499697,
+      "displayTitle": "Auto update from AI agents 00:02:59",
+      "event": "push",
+      "headBranch": "main",
+      "status": "in_progress",
+      "updatedAt": "2026-04-15T18:34:06Z",
+      "deploy_production_job": null
+    }
+  },
+  "summary": {
+    "required_secrets_count": 9,
+    "required_explicit_secrets_count": 8,
+    "required_variables_count": 13,
+    "missing_local_cli_tools": [],
+    "live_contract_available": true,
+    "missing_repo_secrets_count": 8,
+    "missing_repo_variables_count": 6
+  }
+}
