@@ -91,7 +91,7 @@ def fmt_large(r):
         return f"No oversized functions found (min={r.get('min_lines','?')})"
     lines = [f"Large functions ({len(fns)} found):"]
     for f in fns[:20]:
-        lines.append(f"  [{str(f.get('lines','?')):4s}] {f.get('qualified_name','?')} @ {f.get('file','')}:{f.get('line_start','')}")
+        lines.append(f"  [{str(f.get('line_count','?')):4s}] {f.get('name','?')} ({f.get('kind','?')}) @ {f.get('relative_path',f.get('file',''))}")
     return "\n".join(lines)
 
 def fmt_query(r, label=""):
