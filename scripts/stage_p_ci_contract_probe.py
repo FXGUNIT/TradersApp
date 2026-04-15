@@ -113,53 +113,124 @@ def resolve_repo(explicit_repo: str | None = None) -> str | None:
     return f"{m.group('owner')}/{m.group('name')}"
 
 
-def gh_api_json(gh_path: str, endpoint: str, timeout: int = 20) -> dict[str, Any] | None:
-    code, out, _err = run_cmd([gh_path, "api", endpoint], timeout=timeout)
+def gh_api_json(gh_path: str, endpoint: str, timeout: int = 20) -> dict[str, Any]:
+    code, out, err = run_cmd([gh_path, "api", endpoint], timeout=timeout)
+    cleaned_out = out.strip()
+    cleaned_err = err.strip()
     if code != 0:
-        return None
-    out = out.strip()
-    if not out:
-        return None
+        return {
+            "ok": False,
+            "status_code": code,
+            "data": None,
+            "error": cleaned_err or cleaned_out or "gh api failed",
+        }
+    if not cleaned_out:
+        return {
+            "ok": False,
+            "status_code": code,
+            "data": None,
+            "error": "gh api returned empty output",
+        }
     try:
-        return json.loads(out)
-    except json.JSONDecodeError:
-        return None
+        payload = json.loads(cleaned_out)
+    except json.JSONDecodeError as exc:
+        return {
+            "ok": False,
+            "status_code": code,
+            "data": None,
+            "error": f"gh api returned non-JSON output: {exc}",
+        }
+    return {
+        "ok": True,
+        "status_code": code,
+        "data": payload,
+        "error": None,
+    }
 
 
-def gh_run_json(gh_path: str, repo: str, run_id: str) -> dict[str, Any] | None:
-    code, out, _err = run_cmd(
+def gh_run_json(gh_path: str, repo: str, run_id: str) -> dict[str, Any]:
+    code, out, err = run_cmd(
         [gh_path, "run", "view", run_id, "--repo", repo, "--json", "jobs,conclusion,status,displayTitle,startedAt,updatedAt"],
         timeout=30,
     )
-    if code != 0 or not out.strip():
-        return None
+    cleaned_out = out.strip()
+    cleaned_err = err.strip()
+    if code != 0:
+        return {
+            "ok": False,
+            "status_code": code,
+            "data": None,
+            "error": cleaned_err or cleaned_out or "gh run view failed",
+        }
+    if not cleaned_out:
+        return {
+            "ok": False,
+            "status_code": code,
+            "data": None,
+            "error": "gh run view returned empty output",
+        }
     try:
-        return json.loads(out)
-    except json.JSONDecodeError:
-        return None
+        payload = json.loads(cleaned_out)
+    except json.JSONDecodeError as exc:
+        return {
+            "ok": False,
+            "status_code": code,
+            "data": None,
+            "error": f"gh run view returned non-JSON output: {exc}",
+        }
+    return {
+        "ok": True,
+        "status_code": code,
+        "data": payload,
+        "error": None,
+    }
 
 
-def gh_latest_ci(gh_path: str, repo: str) -> dict[str, Any] | None:
+def gh_latest_ci(gh_path: str, repo: str) -> dict[str, Any]:
     fields = "databaseId,conclusion,status,displayTitle,headBranch,event,createdAt,updatedAt"
-    code, out, _err = run_cmd(
+    code, out, err = run_cmd(
         [gh_path, "run", "list", "--repo", repo, "--workflow", "ci.yml", "--limit", "1", "--json", fields],
         timeout=30,
     )
-    if code != 0 or not out.strip():
-        return None
+    cleaned_out = out.strip()
+    cleaned_err = err.strip()
+    if code != 0:
+        return {
+            "ok": False,
+            "status_code": code,
+            "data": None,
+            "error": cleaned_err or cleaned_out or "gh run list failed",
+        }
+    if not cleaned_out:
+        return {
+            "ok": False,
+            "status_code": code,
+            "data": None,
+            "error": "gh run list returned empty output",
+        }
     try:
-        runs = json.loads(out)
-    except json.JSONDecodeError:
-        return None
+        runs = json.loads(cleaned_out)
+    except json.JSONDecodeError as exc:
+        return {
+            "ok": False,
+            "status_code": code,
+            "data": None,
+            "error": f"gh run list returned non-JSON output: {exc}",
+        }
     if not runs:
-        return None
+        return {
+            "ok": False,
+            "status_code": code,
+            "data": None,
+            "error": "No ci.yml workflow runs returned",
+        }
     latest = runs[0]
     run_id = str(latest.get("databaseId", ""))
     if run_id:
-        details = gh_run_json(gh_path, repo, run_id)
-        if details and isinstance(details.get("jobs"), list):
+        details_result = gh_run_json(gh_path, repo, run_id)
+        if details_result.get("ok") and isinstance((details_result.get("data") or {}).get("jobs"), list):
             deploy_job = None
-            for job in details["jobs"]:
+            for job in details_result["data"]["jobs"]:
                 name = str(job.get("name", "")).lower()
                 if name == "deploy production":
                     deploy_job = {
@@ -170,7 +241,14 @@ def gh_latest_ci(gh_path: str, repo: str) -> dict[str, Any] | None:
                     }
                     break
             latest["deploy_production_job"] = deploy_job
-    return latest
+        elif not details_result.get("ok"):
+            latest["deploy_production_job_error"] = details_result.get("error")
+    return {
+        "ok": True,
+        "status_code": code,
+        "data": latest,
+        "error": None,
+    }
 
 
 def main() -> int:
@@ -223,44 +301,75 @@ def main() -> int:
     live: dict[str, Any] = {"enabled": False}
     missing_repo_secrets: list[str] = []
     missing_repo_vars: list[str] = []
+    live_contract_available = False
     if (not args.skip_live) and gh_path and repo:
         live["enabled"] = True
         live["repo"] = repo
         live["gh_path"] = gh_path
 
-        secrets_payload = gh_api_json(gh_path, f"repos/{repo}/actions/secrets")
-        vars_payload = gh_api_json(gh_path, f"repos/{repo}/actions/variables")
+        secrets_result = gh_api_json(gh_path, f"repos/{repo}/actions/secrets")
+        vars_result = gh_api_json(gh_path, f"repos/{repo}/actions/variables")
 
-        repo_secrets = sorted(
-            {
-                str(item.get("name"))
-                for item in (secrets_payload or {}).get("secrets", [])
-                if isinstance(item, dict) and item.get("name")
-            }
-        )
-        repo_vars = sorted(
-            {
-                str(item.get("name"))
-                for item in (vars_payload or {}).get("variables", [])
-                if isinstance(item, dict) and item.get("name")
-            }
-        )
-        live["repo_actions_contract"] = {
-            "secrets_count": int((secrets_payload or {}).get("total_count", len(repo_secrets))),
-            "variables_count": int((vars_payload or {}).get("total_count", len(repo_vars))),
-            "secrets": repo_secrets,
-            "variables": repo_vars,
+        live["api_calls"] = {
+            "actions_secrets": {
+                "ok": bool(secrets_result.get("ok")),
+                "status_code": secrets_result.get("status_code"),
+                "error": secrets_result.get("error"),
+            },
+            "actions_variables": {
+                "ok": bool(vars_result.get("ok")),
+                "status_code": vars_result.get("status_code"),
+                "error": vars_result.get("error"),
+            },
         }
 
-        missing_repo_secrets = sorted(
-            s for s in all_secrets if (s not in IMPLICIT_GITHUB_SECRETS and s not in set(repo_secrets))
-        )
-        missing_repo_vars = sorted(v for v in all_vars if v not in set(repo_vars))
-        live["contract_gap"] = {
-            "missing_secrets": missing_repo_secrets,
-            "missing_variables": missing_repo_vars,
-        }
-        live["latest_ci"] = gh_latest_ci(gh_path, repo)
+        if secrets_result.get("ok") and vars_result.get("ok"):
+            live_contract_available = True
+            secrets_payload = secrets_result.get("data") or {}
+            vars_payload = vars_result.get("data") or {}
+            repo_secrets = sorted(
+                {
+                    str(item.get("name"))
+                    for item in secrets_payload.get("secrets", [])
+                    if isinstance(item, dict) and item.get("name")
+                }
+            )
+            repo_vars = sorted(
+                {
+                    str(item.get("name"))
+                    for item in vars_payload.get("variables", [])
+                    if isinstance(item, dict) and item.get("name")
+                }
+            )
+            live["repo_actions_contract"] = {
+                "secrets_count": int(secrets_payload.get("total_count", len(repo_secrets))),
+                "variables_count": int(vars_payload.get("total_count", len(repo_vars))),
+                "secrets": repo_secrets,
+                "variables": repo_vars,
+            }
+
+            missing_repo_secrets = sorted(
+                s for s in all_secrets if (s not in IMPLICIT_GITHUB_SECRETS and s not in set(repo_secrets))
+            )
+            missing_repo_vars = sorted(v for v in all_vars if v not in set(repo_vars))
+            live["contract_gap"] = {
+                "available": True,
+                "missing_secrets": missing_repo_secrets,
+                "missing_variables": missing_repo_vars,
+            }
+        else:
+            live["repo_actions_contract"] = None
+            live["contract_gap"] = {
+                "available": False,
+                "missing_secrets": None,
+                "missing_variables": None,
+                "reason": "Live GitHub Actions secrets/variables contract unavailable due to API failure",
+            }
+
+        latest_ci_result = gh_latest_ci(gh_path, repo)
+        live["latest_ci"] = latest_ci_result.get("data") if latest_ci_result.get("ok") else None
+        if not latest_ci_result.get("ok"):
+            live["latest_ci_error"] = latest_ci_result.get("error")
 
     explicit_required_secrets = sorted(s for s in all_secrets if s not in IMPLICIT_GITHUB_SECRETS)
 
@@ -271,8 +380,9 @@ def main() -> int:
         "missing_local_cli_tools": sorted(
             [name for name, state in cli_status.items() if not state["available"]]
         ),
-        "missing_repo_secrets_count": len(missing_repo_secrets),
-        "missing_repo_variables_count": len(missing_repo_vars),
+        "live_contract_available": live_contract_available,
+        "missing_repo_secrets_count": (len(missing_repo_secrets) if live_contract_available else None),
+        "missing_repo_variables_count": (len(missing_repo_vars) if live_contract_available else None),
     }
 
     report = {
@@ -296,8 +406,12 @@ def main() -> int:
     if summary["missing_local_cli_tools"]:
         print("Missing local CLIs:", ", ".join(summary["missing_local_cli_tools"]))
     if live.get("enabled"):
-        print(f"Missing repo secrets: {summary['missing_repo_secrets_count']}")
-        print(f"Missing repo variables: {summary['missing_repo_variables_count']}")
+        if summary["live_contract_available"]:
+            print(f"Missing repo secrets: {summary['missing_repo_secrets_count']}")
+            print(f"Missing repo variables: {summary['missing_repo_variables_count']}")
+        else:
+            print("Missing repo secrets: unavailable (live contract check failed)")
+            print("Missing repo variables: unavailable (live contract check failed)")
     return 0
 
 
