@@ -232,7 +232,9 @@ test("RS07 primary routes avoid fatal console errors", async ({ page }) => {
     (line) =>
       !line.includes("favicon") &&
       !line.includes("Failed to load resource") &&
-      !line.includes("ERR_ABORTED"),
+      !line.includes("ERR_ABORTED") &&
+      !line.includes("downloadable font") &&
+      !line.includes("fonts.gstatic.com"),
   );
   expect(filtered).toEqual([]);
 });
