@@ -1,14 +1,14 @@
 {
-  "_comment": "Fill in your values below. Secrets are redacted in GitHub.",
+  "_comment": "Replace placeholder values with real ones. Secrets are masked in GitHub.",
   "secrets": {
-    "DISCORD_WEBHOOK_URL": "https://discord.com/api/webhooks/YOUR/DISCORD/WEBHOOK",
+    "DISCORD_WEBHOOK_URL": "https://discord.com/api/webhooks/YOUR/WEBHOOK/HERE",
     "INFISICAL_TOKEN": "st_your_infisical_service_token_here",
     "PAGERDUTY_ROUTING_KEY": "your_pagerduty_integration_key",
-    "RAILWAY_TOKEN": "railway_token_from_railway_login",
+    "RAILWAY_TOKEN": "railway_auth_token_here",
     "SLACK_WEBHOOK_URL": "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK",
     "VERCEL_ORG_ID": "team_xxxxxxxxxxxx",
     "VERCEL_PROJECT_ID": "prj_xxxxxxxxxxxx",
-    "VERCEL_TOKEN": "your_vercel_deploy_token"
+    "VERCEL_TOKEN": "vercel_deploy_token_here"
   },
   "variables": {
     "RAILWAY_PROD_BFF_SERVICE_ID": "",

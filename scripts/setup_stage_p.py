@@ -23,7 +23,7 @@ def run(cmd):
 def gh_secret_set(name, value):
     cmd = f'echo "{value}" | {GH} secret set {name} --repo {REPO}'
     _, err, rc = run(cmd)
-    print(f"  {'✓' if rc == 0 else '✗'} {name}" + (f": {err[:80]}" if rc != 0 else ""))
+    print(f"  [OK] {name}" + (f": {err[:80]}" if rc != 0 else ""))
     return rc == 0
 
 def gh_var_set(name, value):
@@ -32,7 +32,7 @@ def gh_var_set(name, value):
     if rc != 0:
         cmd = f'{GH} api repos/{REPO}/actions/variables/{name} -X PATCH -f value="{value}"'
         _, err2, rc2 = run(cmd)
-        print(f"  {'✓' if rc2 == 0 else '✗'} {name} (var)" + (f": {err2[:80]}" if rc2 != 0 else ""))
+        print(f"  [OK] {name} (var)" + (f": {err2[:80]}" if rc2 != 0 else ""))
         return rc2 == 0
     print(f"  ✓ {name} (var)")
     return True
@@ -64,7 +64,7 @@ def init_template():
     }
     with open(VALUES_FILE, "w") as f:
         json.dump(template, f, indent=2)
-    print(f"\n✓ Template written to {VALUES_FILE}")
+    print(f"\n[OK] Template written to {VALUES_FILE}")
     print("  1. Edit that file with your actual values")
     print("  2. Then re-run: python scripts/setup_stage_p.py")
 
