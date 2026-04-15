@@ -175,6 +175,35 @@ test("RS06 reduced-motion preference suppresses long transitions", async ({
   expect(hasLongMotion).toBe(false);
 });
 
+test("RS05 hostile long inputs do not introduce horizontal overflow", async ({
+  page,
+}) => {
+  await gotoPrimarySurface(page);
+
+  const launcher = page.getByRole("button", { name: /support chat/i }).first();
+  const hasLauncher = await launcher.isVisible({ timeout: 3_000 }).catch(() => false);
+  if (!hasLauncher) {
+    test.skip(true, "Floating support chat is not enabled in this environment.");
+  }
+
+  await launcher.click();
+  const nameInput = page.getByPlaceholder("Your Full Name");
+  const mobileInput = page.getByPlaceholder("Mobile Number");
+
+  if (!(await nameInput.isVisible({ timeout: 3_000 }).catch(() => false))) {
+    test.skip(true, "Pre-chat form is not available for hostile-input checks.");
+  }
+
+  await nameInput.fill(`AUDIT-${"X".repeat(260)}`);
+  await mobileInput.fill(`+91${"9".repeat(40)}`);
+  await page.waitForTimeout(250);
+
+  const overflowPx = await page.evaluate(
+    () => Math.max(0, document.documentElement.scrollWidth - window.innerWidth),
+  );
+  expect(overflowPx).toBeLessThanOrEqual(4);
+});
+
 test("RS07 primary routes avoid fatal console errors", async ({ page }) => {
   const consoleErrors = [];
   page.on("console", (msg) => {
