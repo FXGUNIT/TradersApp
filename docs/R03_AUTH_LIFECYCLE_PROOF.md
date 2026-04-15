@@ -2,7 +2,7 @@
 
 **Task:** R03 — Prove authentication, session lifecycle, and account recovery are correct.
 **Claimed by:** claude-sonnet | **Date:** 2026-04-14
-**Status:** EVIDENCE GATHERED — execution pending Docker/WSL recovery (same blocker as R01/R02)
+**Status:** EVIDENCE UPDATED — auth/IDOR denial contract test added on 2026-04-15
 
 ---
 
