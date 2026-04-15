@@ -1,6 +1,6 @@
 # TODO Master List
 
-**Last updated:** 2026-04-15
+**Last updated:** 2026-04-16
 **Format version:** 2.0 â€” real-time multi-agent coordination protocol
 
 ---
@@ -63,7 +63,7 @@ Run `python scripts/update_todo_progress.py --once` to regenerate.
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-15 22:41`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-16 00:02`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Active Backlog   66.7%  [################--------]
@@ -77,6 +77,7 @@ Task Counts     done 028 | in progress 000 | blocked 010 | todo 004 | total 042
 | Stage P | [1/15] |   6.7% | IN PROGRESS |
 
 <!-- live-status:end -->
+
 
 
 
@@ -134,6 +135,7 @@ Task Counts     done 028 | in progress 000 | blocked 010 | todo 004 | total 042
 2026-04-15 21:55 | CODEX       | STAGE-P EXEC | Ran Stage P public probe (`scripts/stage_p_public_probe.py`), added CI contract probe (`scripts/stage_p_ci_contract_probe.py`), froze topology in `docs/P01_TOPOLOGY_FREEZE.md`, and updated Stage P states with evidence-backed blockers/progress in `docs/STAGE_P_PRODUCTION_ACTIVATION_PROOF.md`
 2026-04-15 22:37 | CODEX       | STAGE-P EXEC2 | Installed deploy CLIs (`vercel`, `railway`, portable `gh`), added live GitHub contract checks in `scripts/stage_p_ci_contract_probe.py`, captured zero-secret/zero-variable repo evidence, and hardened CI workflow action dependencies for deploy-path continuity
 2026-04-15 22:40 | CODEX       | STAGE-P EXEC3 | Seeded 7 deterministic GitHub Actions repository variables (`FRONTEND_URL`, `BFF_URL`, `ML_ENGINE_URL`, `K6_BASE_URL`, `MLFLOW_TRACKING_URI`, `PROMETHEUS_URL`, `MODEL_FRESHNESS_MAX_DAYS`) and refreshed live contract gap evidence to 8 missing explicit secrets + 6 missing variables
+2026-04-15 23:57 | CODEX       | STAGE-P EXEC4 | Hardened `scripts/stage_p_ci_contract_probe.py` to report explicit live API failures, refreshed public probe (`public-readiness-20260415T182700Z.json`) and live contract probe (`ci-contract-live-20260415T182500Z.json`), and updated Stage P blockers with latest CI run evidence
 ```
 
 ## Stage R: Flawless Proof Gate
@@ -373,37 +375,37 @@ R13: Extended with measurable UI quality budgets via RS06, RS08.
   - **Why this exists:** Without a frozen topology, DNS/secrets/monitoring work drifts and breaks repeatedly.
   - **Exit criteria:** One signed-off topology, one primary owner, one backup owner, one rollback target.
 
-- [!] `P02` Complete public DNS records for all required hostnames. (updated: 2026-04-15 21:55 IST) **BLOCKED.** Probe artifact `docs/stage-p/public-readiness-20260415T161834Z.json` confirms `bff.traders.app`, `api.traders.app`, and `staging.traders.app` unresolved (NXDOMAIN).
+- [!] `P02` Complete public DNS records for all required hostnames. (updated: 2026-04-15 23:57 IST) **BLOCKED.** Probe artifact `docs/stage-p/public-readiness-20260415T182700Z.json` confirms `bff.traders.app`, `api.traders.app`, and `staging.traders.app` unresolved (NXDOMAIN).
   - Required hostnames: `traders.app`, `bff.traders.app`, `api.traders.app`, `staging.traders.app`.
   - **Current observed gap:** only apex `traders.app` resolves; subdomains required for backend/staging do not exist in DNS yet.
   - **Exit criteria:** Global DNS resolution verified from at least two independent networks/regions.
 
-- [!] `P03` Fix TLS/SSL for all public hostnames and verify handshake integrity. (updated: 2026-04-15 21:55 IST) **BLOCKED.** TLS probe currently succeeds only for `traders.app`; subdomain TLS checks are blocked by DNS absence (`P02` blocker).
+- [!] `P03` Fix TLS/SSL for all public hostnames and verify handshake integrity. (updated: 2026-04-15 23:57 IST) **BLOCKED.** TLS probe currently succeeds only for `traders.app`; subdomain TLS checks are blocked by DNS absence (`P02` blocker).
   - **Current observed gap:** no TLS validation possible for `bff.traders.app`, `api.traders.app`, `staging.traders.app` until DNS exists.
   - **Exit criteria:** Valid cert chain and successful HTTPS handshake for all Stage P hostnames.
 
-- [!] `P04` Frontend production deploy proof. (updated: 2026-04-15 21:55 IST) **BLOCKED.** Probe shows `https://traders.app/` redirects to `https://stocks.news/` and `https://traders.app/health` returns `404` (artifact: `docs/stage-p/public-readiness-20260415T161834Z.json`).
+- [!] `P04` Frontend production deploy proof. (updated: 2026-04-15 23:57 IST) **BLOCKED.** Probe shows `https://traders.app/` redirects to `https://stocks.news/` and `https://traders.app/health` returns `404` (artifact: `docs/stage-p/public-readiness-20260415T182700Z.json`).
   - **Exit criteria:** `https://traders.app/health` returns expected success payload and homepage loads fully.
 
-- [!] `P05` BFF production deploy proof. (updated: 2026-04-15 21:55 IST) **BLOCKED.** `https://bff.traders.app/health` not reachable because hostname does not resolve (artifact: `docs/stage-p/public-readiness-20260415T161834Z.json`).
+- [!] `P05` BFF production deploy proof. (updated: 2026-04-15 23:57 IST) **BLOCKED.** `https://bff.traders.app/health` not reachable because hostname does not resolve (artifact: `docs/stage-p/public-readiness-20260415T182700Z.json`).
   - **Exit criteria:** `https://bff.traders.app/health` returns `200` and auth-protected route contract still holds.
 
-- [!] `P06` ML Engine production deploy proof. (updated: 2026-04-15 21:55 IST) **BLOCKED.** `https://api.traders.app/health` not reachable because hostname does not resolve (artifact: `docs/stage-p/public-readiness-20260415T161834Z.json`).
+- [!] `P06` ML Engine production deploy proof. (updated: 2026-04-15 23:57 IST) **BLOCKED.** `https://api.traders.app/health` not reachable because hostname does not resolve (artifact: `docs/stage-p/public-readiness-20260415T182700Z.json`).
   - **Exit criteria:** `https://api.traders.app/health` returns `200` and core inference route responds within SLO budget.
 
-- [!] `P07` End-to-end public flow proof through production URLs. (updated: 2026-04-15 21:55 IST) **BLOCKED.** Dependent on P04/P05/P06; public chain cannot be tested until all three service endpoints are live.
+- [!] `P07` End-to-end public flow proof through production URLs. (updated: 2026-04-15 23:57 IST) **BLOCKED.** Dependent on P04/P05/P06; public chain cannot be tested until all three service endpoints are live.
   - **Exit criteria:** Public `consensus` and `regime` flows succeed end-to-end with traceable request IDs.
 
-- [!] `P08` Infisical -> runtime secret sync hardening. (updated: 2026-04-15 22:40 IST) **BLOCKED.** Live contract probe `docs/stage-p/ci-contract-live-20260415T173800Z.json` shows GitHub Actions secrets are currently empty (`0`), including missing `INFISICAL_TOKEN` required for sync workflows.
+- [!] `P08` Infisical -> runtime secret sync hardening. (updated: 2026-04-15 23:57 IST) **BLOCKED.** Live contract probe `docs/stage-p/ci-contract-live-20260415T182500Z.json` shows GitHub Actions secrets are currently empty (`0`) and only `7/13` required variables are populated; `INFISICAL_TOKEN` remains missing for sync workflows.
   - **Exit criteria:** Secret completeness checklist passes and no placeholder/default secret values are active in production.
 
-- [!] `P09` GitHub Actions production deploy prerequisites closure. (updated: 2026-04-15 22:40 IST) **BLOCKED.** Live probe `docs/stage-p/ci-contract-live-20260415T173800Z.json` confirms repo still has `0` Actions secrets and only `7/13` required variables populated (missing 8 explicit secrets + 6 variables); latest CI run `24467254349` shows `Deploy Production` job `skipped`.
+- [!] `P09` GitHub Actions production deploy prerequisites closure. (updated: 2026-04-15 23:57 IST) **BLOCKED.** Live probe `docs/stage-p/ci-contract-live-20260415T182500Z.json` confirms repo still has `0` Actions secrets and only `7/13` required variables populated (missing 8 explicit secrets + 6 variables); latest completed CI run `24470830346` ended `failure` and its `Deploy Production` job is `skipped` (newer runs `24470963590` and `24471142413` are currently in progress).
   - **Exit criteria:** `deploy-production` job runs green on `main` without manual secret injection.
 
-- [!] `P10` Public health and uptime monitoring (24/7) with alerting. (updated: 2026-04-15 22:40 IST) **BLOCKED.** Monitoring workflow exists, but alert-routing inputs are absent in live repo contract (`SLACK_WEBHOOK_URL`, `DISCORD_WEBHOOK_URL`, `PAGERDUTY_ROUTING_KEY` missing in `docs/stage-p/ci-contract-live-20260415T173800Z.json`).
+- [!] `P10` Public health and uptime monitoring (24/7) with alerting. (updated: 2026-04-15 23:57 IST) **BLOCKED.** Monitoring workflow exists, but alert-routing inputs are absent in live repo contract (`SLACK_WEBHOOK_URL`, `DISCORD_WEBHOOK_URL`, `PAGERDUTY_ROUTING_KEY` missing in `docs/stage-p/ci-contract-live-20260415T182500Z.json`).
   - **Exit criteria:** 5-minute checks active, alert routing tested, and acknowledgement path documented.
 
-- [!] `P11` Production observability endpoint validation. (updated: 2026-04-15 21:55 IST) **BLOCKED.** Requires live production traffic plus telemetry backend/dashboard access; unavailable in current local context.
+- [!] `P11` Production observability endpoint validation. (updated: 2026-04-15 23:57 IST) **BLOCKED.** Requires live production traffic plus telemetry backend/dashboard access; unavailable in current local context.
   - **Exit criteria:** Live dashboards show request rate/error rate/latency and on-call can diagnose from runbooks.
 
 - [ ] `P12` Backup + restore drill on production-like data. (updated: 2026-04-16 IST) Execute Redis/SQLite/Postgres restore drills using scripted backup tooling.
