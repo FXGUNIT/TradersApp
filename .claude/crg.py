@@ -59,13 +59,13 @@ def fmt_communities(r, limit=15):
     total = r.get("summary","")
     lines = [f"Communities ({total}):"]
     for c in r.get("communities", [])[:limit]:
-        lines.append(f"  [{c['size']:5d}] {c['name']} ({c['dominant_language']})")
+        lines.append(f"  [{str(c['size']):5s}] {c['name']} ({c['dominant_language']})")
     return "\n".join(lines)
 
 def fmt_arch(r):
     lines = [f"Architecture ({r.get('total_communities','?')} communities):"]
     for c in r.get("communities", []):
-        lines.append(f"  [{c['size']:5d}] {c['name']} — {c.get('description','')}")
+        lines.append(f"  [{str(c['size']):5s}] {c['name']} — {c.get('description','')}")
     if r.get("warnings"):
         lines.append("WARNINGS: " + "; ".join(r["warnings"]))
     return "\n".join(lines)
@@ -91,7 +91,7 @@ def fmt_large(r):
         return f"No oversized functions found (min={r.get('min_lines','?')})"
     lines = [f"Large functions ({len(fns)} found):"]
     for f in fns[:20]:
-        lines.append(f"  [{f.get('lines','?'):4d}] {f.get('qualified_name','?')} @ {f.get('file','')}:{f.get('line_start','')}")
+        lines.append(f"  [{str(f.get('lines','?')):4s}] {f.get('qualified_name','?')} @ {f.get('file','')}:{f.get('line_start','')}")
     return "\n".join(lines)
 
 def fmt_query(r, label=""):
