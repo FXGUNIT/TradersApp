@@ -1,101 +1,158 @@
 # TradersApp Production Setup Script
-# Run this AFTER completing the browser steps in docs/SETUP.md
-# This script sets GitHub Variables and Railway tokens so CI/CD auto-deploys.
+# Run this AFTER completing browser setup in docs/SETUP.md.
+# This script configures GitHub Actions secrets/variables for production deploy jobs.
 #
 # Prerequisites:
 #   - Railway account created + services deployed
 #   - Vercel project imported
-#   - GitHub CLI authenticated: gh auth login
+#   - GitHub CLI installed and authenticated (`gh auth login`)
 #
 # Usage:
 #   .\scripts\setup-production.ps1 -RailwayToken "railway_..." -VercelToken "..." -VercelOrgId "team_..." -VercelProjectId "prj_..."
+#   .\scripts\setup-production.ps1 -Repo "FXGUNIT/TradersApp" -RailwayToken "..." -VercelToken "..." -VercelOrgId "..." -VercelProjectId "..." \
+#       -RailwayProdEnvId "..." -RailwayProdMlServiceId "..." -RailwayProdBffServiceId "..."
 
 param(
-    [Parameter(Mandatory=$true)]
+    [Parameter(Mandatory = $true)]
     [string]$RailwayToken,
 
-    [Parameter(Mandatory=$true)]
+    [Parameter(Mandatory = $true)]
     [string]$VercelToken,
 
-    [Parameter(Mandatory=$true)]
+    [Parameter(Mandatory = $true)]
     [string]$VercelOrgId,
 
-    [Parameter(Mandatory=$true)]
+    [Parameter(Mandatory = $true)]
     [string]$VercelProjectId,
 
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory = $false)]
     [string]$SlackWebhook = "",
 
-    [Parameter(Mandatory=$false)]
-    [string]$DiscordWebhook = ""
+    [Parameter(Mandatory = $false)]
+    [string]$DiscordWebhook = "",
+
+    [Parameter(Mandatory = $false)]
+    [string]$Repo = "",
+
+    [Parameter(Mandatory = $false)]
+    [string]$RailwayProdEnvId = "",
+
+    [Parameter(Mandatory = $false)]
+    [string]$RailwayProdMlServiceId = "",
+
+    [Parameter(Mandatory = $false)]
+    [string]$RailwayProdBffServiceId = ""
 )
 
 $ErrorActionPreference = "Stop"
-$Repo = "gunitsingh1994/TradersApp"
+
+function Ensure-Command {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Name,
+        [Parameter(Mandatory = $true)]
+        [string]$InstallHint
+    )
+
+    if (-not (Get-Command $Name -ErrorAction SilentlyContinue)) {
+        throw "Required command '$Name' not found. Install first. $InstallHint"
+    }
+}
+
+function Resolve-GitHubRepo {
+    param(
+        [Parameter(Mandatory = $false)]
+        [string]$ExplicitRepo = ""
+    )
+
+    if ($ExplicitRepo) {
+        return $ExplicitRepo
+    }
+
+    $originUrl = git config --get remote.origin.url 2>$null
+    if (-not $originUrl) {
+        throw "Could not detect remote.origin.url. Pass -Repo <owner/name> explicitly."
+    }
+
+    if ($originUrl -match 'github\.com[:/](?<owner>[^/]+)/(?<name>[^/.]+)(\.git)?$') {
+        return "$($Matches.owner)/$($Matches.name)"
+    }
+
+    throw "remote.origin.url is not a parseable GitHub URL: $originUrl. Pass -Repo <owner/name>."
+}
+
+Ensure-Command -Name "gh" -InstallHint "Install GitHub CLI: https://cli.github.com/"
+$Repo = Resolve-GitHubRepo -ExplicitRepo $Repo
 
 Write-Host "============================================" -ForegroundColor Cyan
 Write-Host "TradersApp Production Setup" -ForegroundColor Cyan
+Write-Host "Repository: $Repo" -ForegroundColor Cyan
 Write-Host "============================================" -ForegroundColor Cyan
 
-# ── Step 1: Check gh auth ─────────────────────────────────────────────────
-Write-Host "`n[1/5] Checking GitHub CLI authentication..." -ForegroundColor Yellow
+Write-Host "`n[1/6] Checking GitHub CLI authentication..." -ForegroundColor Yellow
 $ghStatus = gh auth status 2>&1
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "NOT authenticated with GitHub. Running: gh auth login" -ForegroundColor Red
+    Write-Host "Not authenticated with GitHub. Running: gh auth login" -ForegroundColor Red
     gh auth login --hostname github.com
 } else {
     Write-Host "Already authenticated with GitHub" -ForegroundColor Green
 }
 
-# ── Step 2: Railway Token → GitHub Secret ──────────────────────────────────
-Write-Host "`n[2/5] Setting Railway token in GitHub Secrets..." -ForegroundColor Yellow
+Write-Host "`n[2/6] Setting Railway token in GitHub Secrets..." -ForegroundColor Yellow
 gh secret set RAILWAY_TOKEN --body $RailwayToken --repo $Repo
 Write-Host "RAILWAY_TOKEN set in GitHub Secrets" -ForegroundColor Green
 
-# ── Step 3: Railway Service IDs → GitHub Variables ─────────────────────────
-Write-Host "`n[3/5] Railway Service IDs (from Railway Dashboard):" -ForegroundColor Yellow
-Write-Host "  Go to Railway Dashboard → Project Settings → Copy:" -ForegroundColor White
-Write-Host "  - Environment ID (Project Settings)" -ForegroundColor White
-Write-Host "  - ML Engine Service ID (ML Engine service)" -ForegroundColor White
-Write-Host "  - BFF Service ID (BFF service)" -ForegroundColor White
+Write-Host "`n[3/6] Setting Railway production IDs in GitHub Variables..." -ForegroundColor Yellow
+Write-Host "  Go to Railway Dashboard -> Project Settings and copy:" -ForegroundColor White
+Write-Host "  - Environment ID" -ForegroundColor White
+Write-Host "  - ML Engine Service ID" -ForegroundColor White
+Write-Host "  - BFF Service ID" -ForegroundColor White
 
-$envId = Read-Host "Railway Production Environment ID"
-$mlSvcId = Read-Host "Railway ML Engine Service ID"
-$bffSvcId = Read-Host "Railway BFF Service ID"
+$envId = $RailwayProdEnvId
+if (-not $envId) {
+    $envId = Read-Host "Railway Production Environment ID"
+}
+$mlSvcId = $RailwayProdMlServiceId
+if (-not $mlSvcId) {
+    $mlSvcId = Read-Host "Railway ML Engine Service ID"
+}
+$bffSvcId = $RailwayProdBffServiceId
+if (-not $bffSvcId) {
+    $bffSvcId = Read-Host "Railway BFF Service ID"
+}
 
 gh variable set RAILWAY_PROD_ENV_ID --body $envId --repo $Repo
 gh variable set RAILWAY_PROD_ML_SERVICE_ID --body $mlSvcId --repo $Repo
 gh variable set RAILWAY_PROD_BFF_SERVICE_ID --body $bffSvcId --repo $Repo
-Write-Host "Railway variables set" -ForegroundColor Green
+Write-Host "Railway production variables set" -ForegroundColor Green
 
-# ── Step 4: Vercel → GitHub Secrets + Variables ───────────────────────────
-Write-Host "`n[4/5] Setting Vercel credentials in GitHub..." -ForegroundColor Yellow
+Write-Host "`n[4/6] Setting Vercel credentials in GitHub Secrets..." -ForegroundColor Yellow
 gh secret set VERCEL_TOKEN --body $VercelToken --repo $Repo
 gh secret set VERCEL_ORG_ID --body $VercelOrgId --repo $Repo
 gh secret set VERCEL_PROJECT_ID --body $VercelProjectId --repo $Repo
-Write-Host "Vercel variables set (as secrets for CI)" -ForegroundColor Green
+Write-Host "Vercel credentials set" -ForegroundColor Green
 
-# ── Step 5: Alert Webhooks ──────────────────────────────────────────────────
+Write-Host "`n[5/6] Optional webhook setup..." -ForegroundColor Yellow
 if ($SlackWebhook) {
-    Write-Host "`n[5/5] Setting Slack webhook..." -ForegroundColor Yellow
     gh secret set SLACK_WEBHOOK_URL --body $SlackWebhook --repo $Repo
     Write-Host "SLACK_WEBHOOK_URL set" -ForegroundColor Green
+} else {
+    Write-Host "Slack webhook not provided (skipped)" -ForegroundColor DarkYellow
 }
 
 if ($DiscordWebhook) {
-    Write-Host "`n[5/5] Setting Discord webhook..." -ForegroundColor Yellow
     gh secret set DISCORD_WEBHOOK_URL --body $DiscordWebhook --repo $Repo
     gh secret set ROLLBACK_WEBHOOK_URL --body $DiscordWebhook --repo $Repo
     Write-Host "DISCORD_WEBHOOK_URL + ROLLBACK_WEBHOOK_URL set" -ForegroundColor Green
+} else {
+    Write-Host "Discord webhook not provided (skipped)" -ForegroundColor DarkYellow
 }
 
-# ── Step 6: Verify all ──────────────────────────────────────────────────────
-Write-Host "`n[6/6] Verifying GitHub Variables..." -ForegroundColor Yellow
-$vars = gh variable list --repo $Repo
-Write-Host $vars
+Write-Host "`n[6/6] Verifying configured production variables..." -ForegroundColor Yellow
+gh variable list --repo $Repo
 
 Write-Host "`n============================================" -ForegroundColor Cyan
-Write-Host "SETUP COMPLETE!" -ForegroundColor Green
+Write-Host "SETUP COMPLETE" -ForegroundColor Green
 Write-Host "============================================" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Next steps:" -ForegroundColor White

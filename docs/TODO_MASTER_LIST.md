@@ -63,77 +63,20 @@ Run `python scripts/update_todo_progress.py --once` to regenerate.
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-15 21:42`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-15 21:56`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Active Backlog   64.3%  [###############---------]
+Active Backlog   69.0%  [#################-------]
 Stage Progress  01/02 complete
-Task Counts     done 027 | in progress 000 | blocked 000 | todo 015 | total 042
+Task Counts     done 028 | in progress 002 | blocked 008 | todo 004 | total 042
 ```
 
 | Section | Tasks | Progress | Status |
 |---|---|---:|---|
 | Stage R | [27/27] | 100.0% | COMPLETE |
-| Stage P | [0/15] |   0.0% | PENDING |
+| Stage P | [1/15] |   6.7% | IN PROGRESS |
 
 <!-- live-status:end -->
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -185,6 +128,7 @@ Task Counts     done 027 | in progress 000 | blocked 000 | todo 015 | total 042
 2026-04-15 16:25 | CODEX       | RC02-07   | Added Playwright RC02/RC03 suites, upload/OCR harness scenario, ML numerical fixtures, BFF route-contract tests, and closed RC02 RC03 RC05 RC06 RC07 in Stage R checklist
 2026-04-15 22:30 | CODEX       | RC01/04/08/09/10 | Closed remaining Stage R checklist items with docker-compose sibling proof artifacts, privilege + ML stability contract suites, optional-provider integration proof, and a dedicated UI quality CI gate
 2026-04-16 00:10 | CODEX       | STAGE-P   | Added 24/7 Always-On Production Activation Gate (P01-P15) with concrete DNS, TLS, hosting, secrets, monitoring, rollback, DR, and go-live proof requirements
+2026-04-15 21:55 | CODEX       | STAGE-P EXEC | Ran Stage P public probe (`scripts/stage_p_public_probe.py`), added CI contract probe (`scripts/stage_p_ci_contract_probe.py`), froze topology in `docs/P01_TOPOLOGY_FREEZE.md`, and updated Stage P states with evidence-backed blockers/progress in `docs/STAGE_P_PRODUCTION_ACTIVATION_PROOF.md`
 ```
 
 ## Stage R: Flawless Proof Gate
@@ -418,42 +362,43 @@ R13: Extended with measurable UI quality budgets via RS06, RS08.
 > **Trigger (2026-04-16):** User asked for the permanent public address where the app runs 24/7 without a local laptop.
 > **Definition:** This stage converts "code-ready" into "internet-live and operationally durable."
 > **Rule of interpretation:** Stage P is done only when public endpoints are reachable, monitored, recoverable, and owned.
+> **Latest proof artifact:** `docs/STAGE_P_PRODUCTION_ACTIVATION_PROOF.md`
 
-- [ ] `P01` Freeze the production topology decision and owner of record. (updated: 2026-04-16 IST) Decide one final runtime path (A: Vercel + Railway, B: Oracle Always Free + Docker Compose OCI, C: k3s/Longhorn) and record owner + fallback owner in docs.
+- [x] `P01` Freeze the production topology decision and owner of record. (updated: 2026-04-15 21:55 IST) **RESOLVED.** Topology frozen to Option A (Vercel + Railway + Infisical + GitHub Actions) with owner-of-record and rollback target in `docs/P01_TOPOLOGY_FREEZE.md`.
   - **Why this exists:** Without a frozen topology, DNS/secrets/monitoring work drifts and breaks repeatedly.
   - **Exit criteria:** One signed-off topology, one primary owner, one backup owner, one rollback target.
 
-- [ ] `P02` Complete public DNS records for all required hostnames. (updated: 2026-04-16 IST)
+- [!] `P02` Complete public DNS records for all required hostnames. (updated: 2026-04-15 21:55 IST) **BLOCKED.** Probe artifact `docs/stage-p/public-readiness-20260415T161834Z.json` confirms `bff.traders.app`, `api.traders.app`, and `staging.traders.app` unresolved (NXDOMAIN).
   - Required hostnames: `traders.app`, `bff.traders.app`, `api.traders.app`, `staging.traders.app`.
-  - **Current observed gap:** `bff.traders.app` and `api.traders.app` were NXDOMAIN in local checks.
+  - **Current observed gap:** only apex `traders.app` resolves; subdomains required for backend/staging do not exist in DNS yet.
   - **Exit criteria:** Global DNS resolution verified from at least two independent networks/regions.
 
-- [ ] `P03` Fix TLS/SSL for all public hostnames and verify handshake integrity. (updated: 2026-04-16 IST)
-  - **Current observed gap:** TLS handshake failure observed for `https://traders.app` in local check.
+- [!] `P03` Fix TLS/SSL for all public hostnames and verify handshake integrity. (updated: 2026-04-15 21:55 IST) **BLOCKED.** TLS probe currently succeeds only for `traders.app`; subdomain TLS checks are blocked by DNS absence (`P02` blocker).
+  - **Current observed gap:** no TLS validation possible for `bff.traders.app`, `api.traders.app`, `staging.traders.app` until DNS exists.
   - **Exit criteria:** Valid cert chain and successful HTTPS handshake for all Stage P hostnames.
 
-- [ ] `P04` Frontend production deploy proof. (updated: 2026-04-16 IST) Vercel production build serves the current release at `https://traders.app` with health route and static asset integrity.
+- [!] `P04` Frontend production deploy proof. (updated: 2026-04-15 21:55 IST) **BLOCKED.** Probe shows `https://traders.app/` redirects to `https://stocks.news/` and `https://traders.app/health` returns `404` (artifact: `docs/stage-p/public-readiness-20260415T161834Z.json`).
   - **Exit criteria:** `https://traders.app/health` returns expected success payload and homepage loads fully.
 
-- [ ] `P05` BFF production deploy proof. (updated: 2026-04-16 IST) Chosen backend runtime serves BFF at `https://bff.traders.app` with correct origin/CORS and auth behavior.
+- [!] `P05` BFF production deploy proof. (updated: 2026-04-15 21:55 IST) **BLOCKED.** `https://bff.traders.app/health` not reachable because hostname does not resolve (artifact: `docs/stage-p/public-readiness-20260415T161834Z.json`).
   - **Exit criteria:** `https://bff.traders.app/health` returns `200` and auth-protected route contract still holds.
 
-- [ ] `P06` ML Engine production deploy proof. (updated: 2026-04-16 IST) Chosen runtime serves ML Engine at `https://api.traders.app`.
+- [!] `P06` ML Engine production deploy proof. (updated: 2026-04-15 21:55 IST) **BLOCKED.** `https://api.traders.app/health` not reachable because hostname does not resolve (artifact: `docs/stage-p/public-readiness-20260415T161834Z.json`).
   - **Exit criteria:** `https://api.traders.app/health` returns `200` and core inference route responds within SLO budget.
 
-- [ ] `P07` End-to-end public flow proof through production URLs. (updated: 2026-04-16 IST) Validate browser -> frontend -> BFF -> ML route chain using real public domains (not localhost).
+- [!] `P07` End-to-end public flow proof through production URLs. (updated: 2026-04-15 21:55 IST) **BLOCKED.** Dependent on P04/P05/P06; public chain cannot be tested until all three service endpoints are live.
   - **Exit criteria:** Public `consensus` and `regime` flows succeed end-to-end with traceable request IDs.
 
-- [ ] `P08` Infisical -> runtime secret sync hardening. (updated: 2026-04-16 IST) Verify production and staging secret sync jobs populate all required keys for frontend/BFF/ML.
+- [-] `P08` Infisical -> runtime secret sync hardening. (updated: 2026-04-15 21:55 IST) **IN PROGRESS.** Workflow path confirmed in `.github/workflows/infisical-sync.yml`; live production verification pending repository/operator credentials.
   - **Exit criteria:** Secret completeness checklist passes and no placeholder/default secret values are active in production.
 
-- [ ] `P09` GitHub Actions production deploy prerequisites closure. (updated: 2026-04-16 IST) Verify all required repository/env secrets and vars for deploy jobs are present and valid.
+- [!] `P09` GitHub Actions production deploy prerequisites closure. (updated: 2026-04-15 21:55 IST) **BLOCKED.** Required contract extracted in `docs/stage-p/ci-contract-20260415T162029Z.json`; local `gh` CLI is missing, so live `secret/variable` inventory cannot be verified from this environment.
   - **Exit criteria:** `deploy-production` job runs green on `main` without manual secret injection.
 
-- [ ] `P10` Public health and uptime monitoring (24/7) with alerting. (updated: 2026-04-16 IST) Configure external monitors for all prod endpoints with pager/Slack/Discord routing.
+- [-] `P10` Public health and uptime monitoring (24/7) with alerting. (updated: 2026-04-15 21:55 IST) **IN PROGRESS.** 5-minute monitor workflow exists in `.github/workflows/monitor.yml`; live alert routing test still pending because public BFF/ML domains are not yet resolvable.
   - **Exit criteria:** 5-minute checks active, alert routing tested, and acknowledgement path documented.
 
-- [ ] `P11` Production observability endpoint validation. (updated: 2026-04-16 IST) Confirm logs, metrics, and traces are visible for frontend, BFF, and ML production traffic.
+- [!] `P11` Production observability endpoint validation. (updated: 2026-04-15 21:55 IST) **BLOCKED.** Requires live production traffic plus telemetry backend/dashboard access; unavailable in current local context.
   - **Exit criteria:** Live dashboards show request rate/error rate/latency and on-call can diagnose from runbooks.
 
 - [ ] `P12` Backup + restore drill on production-like data. (updated: 2026-04-16 IST) Execute Redis/SQLite/Postgres restore drills using scripted backup tooling.

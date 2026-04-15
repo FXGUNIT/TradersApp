@@ -1,0 +1,110 @@
+{
+  "generated_at_utc": "2026-04-15T16:20:29+00:00",
+  "workflows": {
+    ".github\\workflows\\ci.yml": {
+      "secrets": [
+        "GITHUB_TOKEN",
+        "INFISICAL_TOKEN",
+        "RAILWAY_TOKEN",
+        "VERCEL_ORG_ID",
+        "VERCEL_PROJECT_ID",
+        "VERCEL_TOKEN"
+      ],
+      "variables": [
+        "K6_BASE_URL",
+        "RAILWAY_PROD_BFF_SERVICE_ID",
+        "RAILWAY_PROD_ENV_ID",
+        "RAILWAY_PROD_ML_SERVICE_ID",
+        "RAILWAY_STAGING_BFF_SERVICE_ID",
+        "RAILWAY_STAGING_ENV_ID",
+        "RAILWAY_STAGING_ML_SERVICE_ID"
+      ]
+    },
+    ".github\\workflows\\infisical-sync.yml": {
+      "secrets": [
+        "INFISICAL_TOKEN",
+        "RAILWAY_TOKEN",
+        "VERCEL_TOKEN"
+      ],
+      "variables": [
+        "RAILWAY_PROD_ENV_ID"
+      ]
+    },
+    ".github\\workflows\\monitor.yml": {
+      "secrets": [
+        "DISCORD_WEBHOOK_URL",
+        "GITHUB_TOKEN",
+        "PAGERDUTY_ROUTING_KEY",
+        "RAILWAY_TOKEN",
+        "SLACK_WEBHOOK_URL"
+      ],
+      "variables": [
+        "BFF_URL",
+        "FRONTEND_URL",
+        "MLFLOW_TRACKING_URI",
+        "ML_ENGINE_URL",
+        "MODEL_FRESHNESS_MAX_DAYS",
+        "PROMETHEUS_URL"
+      ]
+    }
+  },
+  "required_contract": {
+    "secrets": [
+      "DISCORD_WEBHOOK_URL",
+      "GITHUB_TOKEN",
+      "INFISICAL_TOKEN",
+      "PAGERDUTY_ROUTING_KEY",
+      "RAILWAY_TOKEN",
+      "SLACK_WEBHOOK_URL",
+      "VERCEL_ORG_ID",
+      "VERCEL_PROJECT_ID",
+      "VERCEL_TOKEN"
+    ],
+    "variables": [
+      "BFF_URL",
+      "FRONTEND_URL",
+      "K6_BASE_URL",
+      "MLFLOW_TRACKING_URI",
+      "ML_ENGINE_URL",
+      "MODEL_FRESHNESS_MAX_DAYS",
+      "PROMETHEUS_URL",
+      "RAILWAY_PROD_BFF_SERVICE_ID",
+      "RAILWAY_PROD_ENV_ID",
+      "RAILWAY_PROD_ML_SERVICE_ID",
+      "RAILWAY_STAGING_BFF_SERVICE_ID",
+      "RAILWAY_STAGING_ENV_ID",
+      "RAILWAY_STAGING_ML_SERVICE_ID"
+    ]
+  },
+  "local_cli_status": {
+    "gh": {
+      "available": false,
+      "path": null,
+      "version": null
+    },
+    "vercel": {
+      "available": false,
+      "path": null,
+      "version": null
+    },
+    "railway": {
+      "available": false,
+      "path": null,
+      "version": null
+    },
+    "infisical": {
+      "available": true,
+      "path": "C:\\Users\\Asus\\AppData\\Roaming\\npm\\infisical.CMD",
+      "version": null
+    }
+  },
+  "summary": {
+    "required_secrets_count": 9,
+    "required_variables_count": 13,
+    "missing_local_cli_tools": [
+      "gh",
+      "railway",
+      "vercel"
+    ]
+  }
+}
