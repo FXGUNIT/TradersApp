@@ -1,8 +1,31 @@
 # R09 Proof Artifact: Cross-Service Integration Under Real Orchestration
 
 **Task:** R09 — Prove cross-service integration works under real orchestration, not just isolated tests.  
-**Claimed by:** codex | **Date:** 2026-04-14  
-**Status:** IN PROGRESS — core local process-stack path verified, wider dependency matrix still pending
+**Claimed by:** codex | **Date:** 2026-04-15  
+**Status:** RESOLVED — process-stack + docker-compose + optional-provider success path verified
+
+---
+
+## Closure Update (2026-04-15)
+
+R09 residual gaps were closed with three additional proofs:
+
+1. Redis-present docker-compose orchestration proof
+   - `.tmp_codex/r01-docker-20260415-163702/pass1-final-dev-up.log`
+   - `.tmp_codex/r01-docker-20260415-163702/pass1-final-dev-smoke-1.log`
+   - `.tmp_codex/r01-docker-20260415-163702/pass2-dev-up.log`
+   - `.tmp_codex/r01-docker-20260415-163702/pass2-dev-smoke.log`
+   - Both compose runs reached healthy `redis`, `bff`, `ml-engine`, and `frontend`.
+
+2. Optional upstream news-provider success-path proof
+   - Test: `bff/tests/breaking-news-service.test.mjs`
+   - Verification: `node --test bff/tests/breaking-news-service.test.mjs` -> `1 passed`
+   - Asserts both Yahoo RSS and GDELT providers are included when upstream calls succeed.
+
+3. Docker-compose end-to-end rerun proof
+   - Both clean sibling passes executed full up -> smoke -> down lifecycle with health checks returning `200`.
+
+Historical in-progress notes below are retained for traceability but are superseded by this closure update.
 
 ---
 

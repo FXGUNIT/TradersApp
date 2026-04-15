@@ -1,8 +1,30 @@
 # R08 Proof Artifact: ML Engine Routes, Models & Contracts
 
 **Task:** R08 — Prove ML Engine routes, models, and contracts meet the flawless gate.
-**Claimed by:** codex | **Date:** 2026-04-14
-**Status:** GAP FIXED — error leakage patched across all route files, evidence documented
+**Claimed by:** codex | **Date:** 2026-04-15
+**Status:** RESOLVED — stability gaps closed and contract-tested
+
+---
+
+## Closure Update (2026-04-15)
+
+The remaining R08 gaps are now closed with dedicated contract tests:
+
+- Incompatible `schema_version` rejection coverage.
+- Oversized payload rejection coverage.
+- Serialized artifact compatibility across restart-like registry re-instantiation.
+
+New suite:
+
+- `ml-engine/tests/test_r08_stability_contracts.py`
+
+Verification:
+
+- `python -m pytest ml-engine/tests/test_r08_stability_contracts.py -q` -> `3 passed`
+
+This closes RC08 (large payload, incompatible schema version, and artifact-compatibility restart proof).
+
+Historical sections below are retained for traceability.
 
 ---
 
