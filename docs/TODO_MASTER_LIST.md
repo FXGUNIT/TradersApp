@@ -63,19 +63,20 @@ Run `python scripts/update_todo_progress.py --once` to regenerate.
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-15 09:32`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-15 11:01`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Active Backlog   54.5%  [#############-----------]
+Active Backlog   28.6%  [#######-----------------]
 Stage Progress  00/01 complete
-Task Counts     done 002 | in progress 008 | blocked 001 | todo 000 | total 011
+Task Counts     done 002 | in progress 008 | blocked 001 | todo 010 | total 021
 ```
 
 | Section | Tasks | Progress | Status |
 |---|---|---:|---|
-| Stage R | [2/11] |  18.2% | IN PROGRESS |
+| Stage R | [2/21] |   9.5% | IN PROGRESS |
 
 <!-- live-status:end -->
+
 
 
 
@@ -368,3 +369,16 @@ R11: Extended with failure-recovery interaction and motion-resilience checks via
 R13: Extended with measurable UI quality budgets via RS06, RS08.
 
 - [x] `R20` Define and satisfy a final release gate before using the word "flawless." -- **[x] CLAIM ALLOWED** (2026-04-15) — all 3 blocking conditions resolved: R12-A IDOR guard in _dispatchRoutes.mjs + identityRoutes.mjs, R12-B SSRF guard in security.mjs/newsService.mjs/breakingNewsService.mjs, R19-A integration test fail-gate in ci.yml
+
+## Stage R Closure Checklist (Added 2026-04-15 by Codex)
+
+- [ ] `RC01` Resolve local Docker/WSL blocker and complete `R01` evidence with two clean-environment docker-compose smoke passes. (updated: 2026-04-15 IST)
+- [ ] `RC02` Complete `R02` frontend flow proof for navigation lattice, floating support chat, terminal premarket/reset/T&C flows, and admin shell utilities. (updated: 2026-04-15 IST)
+- [ ] `RC03` Close `R03` auth lifecycle gaps: identity role mapping, token refresh boundary, forgot-password token expiry, and multi-tab session consistency. (updated: 2026-04-15 IST)
+- [ ] `RC04` Close `R04` residual privileged-access risk and document explicit final decision with verification artifact. (updated: 2026-04-15 IST)
+- [ ] `RC05` Finalize `R05` upload/OCR robustness proof rerun and attach deterministic pass artifacts. (updated: 2026-04-15 IST)
+- [ ] `RC06` Finalize `R06` numeric correctness proof with fixture-backed validation for all user-visible trading metrics. (updated: 2026-04-15 IST)
+- [ ] `RC07` Close `R07` route-contract gaps: malformed input validation, session idempotency, and core domain route-level tests. (updated: 2026-04-15 IST)
+- [ ] `RC08` Close `R08` ML stability gaps: large payload proof, incompatible schema-version proof, and artifact-compatibility restart proof. (updated: 2026-04-15 IST)
+- [ ] `RC09` Close `R09` orchestration gaps: Redis-present integration proof, optional news-provider success-path proof, and docker-compose end-to-end rerun. (updated: 2026-04-15 IST)
+- [ ] `RC10` Execute RS01–RS08 UI/UX precision matrix and enforce CI quality gates (visual, a11y, interaction, responsive, cross-browser, flake control). (updated: 2026-04-15 IST)
