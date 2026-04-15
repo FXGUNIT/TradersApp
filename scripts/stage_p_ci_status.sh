@@ -199,8 +199,8 @@ main() {
       while [[ "$status" == "in_progress" || "$status" == "queued" ]]; do
         sleep "$POLL_INTERVAL"
         info=$(latest_run_status)
-        status=$(echo "$info" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status',''))")
-        conclusion=$(echo "$info" | python3 -c "import sys,json; print(json.load(sys.stdin).get('conclusion',''))")
+        status=$(echo "$info" | python3 -c "import sys,json; d=json.load(sys.stdin); d=d[0] if isinstance(d,list) else d; print(d.get('status',''))")
+        conclusion=$(echo "$info" | python3 -c "import sys,json; d=json.load(sys.stdin); d=d[0] if isinstance(d,list) else d; print(d.get('conclusion','') or '')")
       done
       show_status "$run_id" "$status" "$conclusion"
       exit_code=$?
