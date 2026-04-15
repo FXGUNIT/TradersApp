@@ -33,12 +33,20 @@ Write-Step "Stopping Docker Desktop processes"
 Get-Process "Docker Desktop", "com.docker.backend", "com.docker.proxy" -ErrorAction SilentlyContinue |
   Stop-Process -Force -ErrorAction SilentlyContinue
 
-Write-Step "Ensuring Docker Desktop HKLM registration key exists"
-$ddKey = "HKLM:\SOFTWARE\Docker Inc\Docker Desktop"
-New-Item -Path $ddKey -Force | Out-Null
-New-ItemProperty -Path $ddKey -Name "InstallPath" -Value "$dockerRoot\" -PropertyType String -Force | Out-Null
-New-ItemProperty -Path $ddKey -Name "Version" -Value "4.68.0" -PropertyType String -Force | Out-Null
-New-ItemProperty -Path $ddKey -Name "Channel" -Value "main" -PropertyType String -Force | Out-Null
+Write-Step "Ensuring Docker Desktop HKLM registration keys exist (64-bit + WOW6432Node)"
+$ddKeys = @(
+  "HKLM:\SOFTWARE\Docker Inc.\Docker Desktop",
+  "HKLM:\SOFTWARE\Docker Inc\Docker Desktop",
+  "HKLM:\SOFTWARE\WOW6432Node\Docker Inc.\Docker Desktop",
+  "HKLM:\SOFTWARE\WOW6432Node\Docker Inc\Docker Desktop"
+)
+foreach ($ddKey in $ddKeys) {
+  New-Item -Path $ddKey -Force | Out-Null
+  New-ItemProperty -Path $ddKey -Name "AppPath" -Value "$dockerRoot\" -PropertyType String -Force | Out-Null
+  New-ItemProperty -Path $ddKey -Name "InstallPath" -Value "$dockerRoot\" -PropertyType String -Force | Out-Null
+  New-ItemProperty -Path $ddKey -Name "Version" -Value "4.68.0" -PropertyType String -Force | Out-Null
+  New-ItemProperty -Path $ddKey -Name "Channel" -Value "main" -PropertyType String -Force | Out-Null
+}
 
 Write-Step "Registering Docker service if missing"
 $svc = Get-Service "com.docker.service" -ErrorAction SilentlyContinue
@@ -74,6 +82,14 @@ if ([string]::IsNullOrWhiteSpace($userPath)) {
   [Environment]::SetEnvironmentVariable("Path", $dockerCliDir, "User")
 } elseif ($userPath -notlike "*$dockerCliDir*") {
   [Environment]::SetEnvironmentVariable("Path", "$userPath;$dockerCliDir", "User")
+}
+
+Write-Step "Adding Docker CLI path to machine environment"
+$machinePath = [Environment]::GetEnvironmentVariable("Path", "Machine")
+if ([string]::IsNullOrWhiteSpace($machinePath)) {
+  [Environment]::SetEnvironmentVariable("Path", $dockerCliDir, "Machine")
+} elseif ($machinePath -notlike "*$dockerCliDir*") {
+  [Environment]::SetEnvironmentVariable("Path", "$machinePath;$dockerCliDir", "Machine")
 }
 
 Write-Step "Checking docker engine connectivity"
