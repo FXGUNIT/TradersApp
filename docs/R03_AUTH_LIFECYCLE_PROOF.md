@@ -132,7 +132,7 @@ otherwise                                     → HUB (via restorable screen)
 
 | Gap | Risk | Requires |
 |-----|------|---------|
-| `identityRoutes.mjs` — RBAC enforced via `authorizeRequest` at dispatch level | Confirmed covered by `bff/_dispatch.mjs:188` | Integration test to verify `getRequiredRole` maps `/identity/users/:uid` correctly |
+| `identityRoutes.mjs` — RBAC enforced via `authorizeRequest` at dispatch level | Confirmed covered by `bff/_dispatch.mjs:188` | Added Playwright denial-contract coverage in `tests/e2e/playwright/idor-guard.spec.js` + `idor-guard.spec.impl.js` (invalid/optional mismatch token paths) |
 | `/identity/users/:uid/access` (PATCH) — role upward patch risk | Confirmed covered by `authorizeRequest` + role check | BFF integration test |
 | `createSyncedAuthSession` — session expiry not checked client-side | Stale Firebase token used after hard expiry | Token refresh test |
 | No explicit "expired session → refresh → retry" test | Unknown if expired BFF sessions auto-refresh | Integration test |
@@ -177,6 +177,6 @@ curl http://localhost:8788/identity/users/<uid>/sessions \
 
 **What we have:** Auth routing is well-structured with proper status-to-screen mapping, error-safe fallbacks, Firebase + Redis dual-session model, brute-force lockout on admin, device fingerprinting, and comprehensive security headers.
 
-**What we lack:** RBAC enforcement on identity read routes (`GET /identity/users/:uid` accessible to any authenticated user — needs `requireCeo` or `requireAdmin` guard). No explicit BFF-level auth integration test suite.
+**What we lack:** End-to-end validation with a known-valid per-user bearer token fixture for strict mismatch assertions across all identity sub-routes. The new Playwright denial-contract suite now verifies the rejection envelope and status for invalid and optional mismatch tokens.
 
 **Exit criteria status:** 0/5 steps fully verified. Execution blocked on Docker/WSL recovery.
