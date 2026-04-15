@@ -1,5 +1,4 @@
 import "./idor-guard.spec.impl.js";
-/*
 /**
  * idor-guard.spec.js — R03 gap fix: BFF IDOR guard integration test
  *
@@ -11,6 +10,7 @@ import "./idor-guard.spec.impl.js";
  * CI: runs in browser-tests job alongside browser-compatibility.spec.js
  */
 import { test, expect } from '@playwright/test';
+test.skip(true, "Legacy IDOR draft tests disabled; use idor-guard.spec.impl.js.");
 
 test.describe.configure({ timeout: 90_000 });
 

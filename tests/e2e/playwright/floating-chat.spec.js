@@ -1,5 +1,4 @@
 import "./floating-chat.spec.impl.js";
-/*
 /**
  * floating-chat.spec.js — R02 gap fix: floating support chat widget E2E test
  *
@@ -15,6 +14,7 @@ import "./floating-chat.spec.impl.js";
  * CI: runs in browser-tests job
  */
 import { test, expect } from '@playwright/test';
+test.skip(true, "Legacy floating chat draft tests disabled; use floating-chat.spec.impl.js.");
 
 test.describe.configure({ timeout: 90_000 });
 
@@ -199,4 +199,3 @@ test('send message adds message to thread', async ({ page }) => {
   const newCount = await page.locator('.message-item, .chat-message').count();
   expect(newCount).toBeGreaterThan(initialCount);
 });
-*/
