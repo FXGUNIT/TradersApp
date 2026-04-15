@@ -12,6 +12,7 @@ Usage:
 import argparse
 import datetime
 import os
+import shutil
 import subprocess
 import sys
 
@@ -21,9 +22,17 @@ PG_DB = os.environ.get("POSTGRES_DB", "mlflow")
 BACKUP_DIR = os.environ.get("BACKUP_DIR", "/backups/postgres")
 
 
-def pg_cmd(cmd_args, capture=True):
+def pg_dump_cmd(cmd_args, capture=True):
     result = subprocess.run(
         ["docker", "exec", PG_CONTAINER, "pg_dump", *cmd_args],
+        capture_output=capture,
+    )
+    return result
+
+
+def pg_restore_cmd(cmd_args, capture=True):
+    result = subprocess.run(
+        ["docker", "exec", PG_CONTAINER, "pg_restore", *cmd_args],
         capture_output=capture,
     )
     return result
@@ -40,7 +49,7 @@ def run_backup(backup_dir):
 
     print(f"[backup_postgres] Dumping {PG_DB}@{PG_CONTAINER} -> {archive_path}")
 
-    result = pg_cmd([
+    result = pg_dump_cmd([
         "--username", PG_USER,
         "--dbname", PG_DB,
         "--format=c",        # custom (compressed)
@@ -72,7 +81,10 @@ def run_backup(backup_dir):
     latest = os.path.join(backup_dir, "mlflow_latest.dump")
     if os.path.lexists(latest):
         os.unlink(latest)
-    os.symlink(os.path.basename(archive_path), latest)
+    try:
+        os.symlink(os.path.basename(archive_path), latest)
+    except OSError:
+        shutil.copy2(archive_path, latest)
 
     # Retention: last 14 backups
     backups = sorted(
@@ -91,22 +103,22 @@ def run_restore(backup_path):
         print(f"[backup_postgres] Backup not found: {backup_path}", file=sys.stderr)
         sys.exit(1)
 
-    print("[backup_postgres] Stopping MLflow and PostgreSQL...")
+    print("[backup_postgres] Stopping MLflow writers before restore...")
     subprocess.run(["docker", "compose", "-f", "docker-compose.yml",
                     "stop", "mlflow"], capture_output=True)
-    subprocess.run(["docker", "stop", PG_CONTAINER], capture_output=True)
+    subprocess.run(["docker", "start", PG_CONTAINER], capture_output=True)
 
     # Restore
     tmp_restore = f"/tmp/mlflow_restore_{now_tag()}.dump"
     subprocess.run(["docker", "cp", backup_path, f"{PG_CONTAINER}:{tmp_restore}"], check=True)
 
     print(f"[backup_postgres] Restoring {tmp_restore} into {PG_DB}...")
-    result = pg_cmd([
+    result = pg_restore_cmd([
         "--username", PG_USER,
         "--dbname", PG_DB,
         "--clean",    # drop existing objects
         "--if-exists",
-        "-Fc",        # custom format (must match backup)
+        "--format=custom",        # custom format (must match backup)
         tmp_restore,
     ])
 
@@ -116,8 +128,7 @@ def run_restore(backup_path):
               file=sys.stderr)
 
     subprocess.run(["docker", "exec", PG_CONTAINER, "rm", tmp_restore], capture_output=True)
-    subprocess.run(["docker", "start", PG_CONTAINER], capture_output=True)
-    print("[backup_postgres] PostgreSQL restarted. Restore complete.")
+    print("[backup_postgres] Restore complete.")
 
 
 def run_verify(backup_path):
@@ -129,7 +140,7 @@ def run_verify(backup_path):
     # Basic integrity: check it's a valid pg_dump custom format
     with open(backup_path, "rb") as f:
         magic = f.read(6)
-    if magic[:5] == b"PGCOPY":
+    if magic[:5] == b"PGDMP":
         print(f"[backup_postgres] Valid pg_dump format. Size: {size_mb:.1f} MB")
     else:
         print(f"[backup_postgres] WARNING: unexpected magic bytes: {magic!r}", file=sys.stderr)

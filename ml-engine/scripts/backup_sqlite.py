@@ -21,7 +21,7 @@ BACKUP_DIR = os.environ.get("BACKUP_DIR", "/backups/sqlite")
 
 
 def now_tag():
-    return datetime.datetime.now().strftime("%Y%m%d_%H%M%SS")
+    return datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
 
 def backup_sqlite(db_path, dest_path):
@@ -60,7 +60,10 @@ def run_backup(backup_dir):
     latest = os.path.join(backup_dir, "trading_data_latest.db")
     if os.path.lexists(latest):
         os.unlink(latest)
-    os.symlink(os.path.basename(archive_path), latest)
+    try:
+        os.symlink(os.path.basename(archive_path), latest)
+    except OSError:
+        shutil.copy2(archive_path, latest)
 
     # Retention: last 30 backups
     backups = sorted(
