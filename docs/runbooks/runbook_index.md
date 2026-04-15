@@ -25,6 +25,7 @@ Operational playbooks for diagnosing and resolving TradersApp incidents.
 |---------|---------|
 | [Operations Runbook](operations-runbook.md) | Any P0-P3 production incident lifecycle |
 | [Backup and Restore](backup-and-restore-runbook.md) | Scheduled backups, restore drills, data recovery validation |
+| [DB Migrations (Alembic)](db-migrations.md) | Schema upgrades/downgrades and baseline stamping |
 | [ML Engine Down](ml-engine-down.md) | ML Engine `/health` returns non-200 or k6 SLO breach |
 | [BFF Down](bff-down.md) | Railway health check fails, `/ready` returns non-200 |
 | [Redis Unavailable](redis-unavailable.md) | Redis ping fails, circuit breaker OPEN |

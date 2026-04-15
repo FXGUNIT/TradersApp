@@ -9,9 +9,9 @@
 
 | Data Store | Backup Location | Recovery |
 |-----------|----------------|---------|
-| Redis session data | `docker exec traders-redis redis-cli SAVE` | Auto-restored on restart |
+| Redis session data | `scripts/backup_redis.py` / `scripts/cron/redis_backup_cron.sh` | `scripts/backup_redis.py --restore ...` |
 | ML Engine SQLite | `ml-engine/scripts/backup_sqlite.py` | Restore from backup |
-| PostgreSQL (MLflow) | `scripts/backup_postgres.py` | Restore from backup |
+| PostgreSQL (MLflow) | `scripts/backup_postgres.py` / `scripts/cron/postgres_backup_cron.sh` | `scripts/backup_postgres.py --restore ...` |
 | BFF JSON domain files | Git (committed state) | Restore from git history |
 | ML Models | GitHub Releases | See model-rollback.md |
 
@@ -55,10 +55,11 @@ python ml-engine/scripts/backup_sqlite.py --verify /backups/trading_data_latest.
 # Run backup
 python scripts/backup_postgres.py --backup-dir /backups
 
-# Restore (requires downtime)
-docker compose -f docker-compose.yml stop postgres
-pg_restore --dbname=mlflow --clean /backups/mlflow_latest.dump
-docker compose -f docker-compose.yml up -d postgres
+# Verify backup before restore
+python scripts/backup_postgres.py --verify /backups/mlflow_latest.dump
+
+# Restore (script handles pg_restore inside container)
+python scripts/backup_postgres.py --restore /backups/mlflow_latest.dump
 ```
 
 ---
