@@ -27,6 +27,7 @@ WORKFLOW_PATHS = [
 ]
 SECRET_PATTERN = re.compile(r"secrets\.([A-Z0-9_]+)")
 VAR_PATTERN = re.compile(r"vars\.([A-Z0-9_]+)")
+IMPLICIT_GITHUB_SECRETS = {"GITHUB_TOKEN"}
 
 
 def now_utc_iso() -> str:
@@ -112,8 +113,8 @@ def resolve_repo(explicit_repo: str | None = None) -> str | None:
     return f"{m.group('owner')}/{m.group('name')}"
 
 
-def gh_api_json(gh_path: str, endpoint: str, repo: str, timeout: int = 20) -> dict[str, Any] | None:
-    code, out, _err = run_cmd([gh_path, "api", endpoint, "--repo", repo], timeout=timeout)
+def gh_api_json(gh_path: str, endpoint: str, timeout: int = 20) -> dict[str, Any] | None:
+    code, out, _err = run_cmd([gh_path, "api", endpoint], timeout=timeout)
     if code != 0:
         return None
     out = out.strip()
@@ -227,8 +228,8 @@ def main() -> int:
         live["repo"] = repo
         live["gh_path"] = gh_path
 
-        secrets_payload = gh_api_json(gh_path, f"repos/{repo}/actions/secrets", repo=repo)
-        vars_payload = gh_api_json(gh_path, f"repos/{repo}/actions/variables", repo=repo)
+        secrets_payload = gh_api_json(gh_path, f"repos/{repo}/actions/secrets")
+        vars_payload = gh_api_json(gh_path, f"repos/{repo}/actions/variables")
 
         repo_secrets = sorted(
             {
@@ -251,7 +252,9 @@ def main() -> int:
             "variables": repo_vars,
         }
 
-        missing_repo_secrets = sorted(s for s in all_secrets if s not in set(repo_secrets))
+        missing_repo_secrets = sorted(
+            s for s in all_secrets if (s not in IMPLICIT_GITHUB_SECRETS and s not in set(repo_secrets))
+        )
         missing_repo_vars = sorted(v for v in all_vars if v not in set(repo_vars))
         live["contract_gap"] = {
             "missing_secrets": missing_repo_secrets,
@@ -259,8 +262,11 @@ def main() -> int:
         }
         live["latest_ci"] = gh_latest_ci(gh_path, repo)
 
+    explicit_required_secrets = sorted(s for s in all_secrets if s not in IMPLICIT_GITHUB_SECRETS)
+
     summary = {
         "required_secrets_count": len(all_secrets),
+        "required_explicit_secrets_count": len(explicit_required_secrets),
         "required_variables_count": len(all_vars),
         "missing_local_cli_tools": sorted(
             [name for name, state in cli_status.items() if not state["available"]]
@@ -274,6 +280,7 @@ def main() -> int:
         "workflows": workflow_refs,
         "required_contract": {
             "secrets": sorted(all_secrets),
+            "explicit_secrets": explicit_required_secrets,
             "variables": sorted(all_vars),
         },
         "local_cli_status": cli_status,

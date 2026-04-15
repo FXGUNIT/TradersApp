@@ -63,7 +63,7 @@ Run `python scripts/update_todo_progress.py --once` to regenerate.
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-15 22:38`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-15 22:41`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Active Backlog   66.7%  [################--------]
@@ -77,6 +77,7 @@ Task Counts     done 028 | in progress 000 | blocked 010 | todo 004 | total 042
 | Stage P | [1/15] |   6.7% | IN PROGRESS |
 
 <!-- live-status:end -->
+
 
 
 
@@ -132,6 +133,7 @@ Task Counts     done 028 | in progress 000 | blocked 010 | todo 004 | total 042
 2026-04-16 00:10 | CODEX       | STAGE-P   | Added 24/7 Always-On Production Activation Gate (P01-P15) with concrete DNS, TLS, hosting, secrets, monitoring, rollback, DR, and go-live proof requirements
 2026-04-15 21:55 | CODEX       | STAGE-P EXEC | Ran Stage P public probe (`scripts/stage_p_public_probe.py`), added CI contract probe (`scripts/stage_p_ci_contract_probe.py`), froze topology in `docs/P01_TOPOLOGY_FREEZE.md`, and updated Stage P states with evidence-backed blockers/progress in `docs/STAGE_P_PRODUCTION_ACTIVATION_PROOF.md`
 2026-04-15 22:37 | CODEX       | STAGE-P EXEC2 | Installed deploy CLIs (`vercel`, `railway`, portable `gh`), added live GitHub contract checks in `scripts/stage_p_ci_contract_probe.py`, captured zero-secret/zero-variable repo evidence, and hardened CI workflow action dependencies for deploy-path continuity
+2026-04-15 22:40 | CODEX       | STAGE-P EXEC3 | Seeded 7 deterministic GitHub Actions repository variables (`FRONTEND_URL`, `BFF_URL`, `ML_ENGINE_URL`, `K6_BASE_URL`, `MLFLOW_TRACKING_URI`, `PROMETHEUS_URL`, `MODEL_FRESHNESS_MAX_DAYS`) and refreshed live contract gap evidence to 8 missing explicit secrets + 6 missing variables
 ```
 
 ## Stage R: Flawless Proof Gate
@@ -392,13 +394,13 @@ R13: Extended with measurable UI quality budgets via RS06, RS08.
 - [!] `P07` End-to-end public flow proof through production URLs. (updated: 2026-04-15 21:55 IST) **BLOCKED.** Dependent on P04/P05/P06; public chain cannot be tested until all three service endpoints are live.
   - **Exit criteria:** Public `consensus` and `regime` flows succeed end-to-end with traceable request IDs.
 
-- [!] `P08` Infisical -> runtime secret sync hardening. (updated: 2026-04-15 22:37 IST) **BLOCKED.** Live contract probe `docs/stage-p/ci-contract-live-20260415T171500Z.json` shows GitHub Actions secrets are currently empty (`0`), including missing `INFISICAL_TOKEN` required for sync workflows.
+- [!] `P08` Infisical -> runtime secret sync hardening. (updated: 2026-04-15 22:40 IST) **BLOCKED.** Live contract probe `docs/stage-p/ci-contract-live-20260415T173800Z.json` shows GitHub Actions secrets are currently empty (`0`), including missing `INFISICAL_TOKEN` required for sync workflows.
   - **Exit criteria:** Secret completeness checklist passes and no placeholder/default secret values are active in production.
 
-- [!] `P09` GitHub Actions production deploy prerequisites closure. (updated: 2026-04-15 22:37 IST) **BLOCKED.** Live probe `docs/stage-p/ci-contract-live-20260415T171500Z.json` confirms repo has `0` Actions secrets and `0` Actions variables (missing all required 9 secrets + 13 vars); latest CI run `24467254349` shows `Deploy Production` job `skipped`.
+- [!] `P09` GitHub Actions production deploy prerequisites closure. (updated: 2026-04-15 22:40 IST) **BLOCKED.** Live probe `docs/stage-p/ci-contract-live-20260415T173800Z.json` confirms repo still has `0` Actions secrets and only `7/13` required variables populated (missing 8 explicit secrets + 6 variables); latest CI run `24467254349` shows `Deploy Production` job `skipped`.
   - **Exit criteria:** `deploy-production` job runs green on `main` without manual secret injection.
 
-- [!] `P10` Public health and uptime monitoring (24/7) with alerting. (updated: 2026-04-15 22:37 IST) **BLOCKED.** Monitoring workflow exists, but alert-routing inputs are absent in live repo contract (`SLACK_WEBHOOK_URL`, `DISCORD_WEBHOOK_URL`, `PAGERDUTY_ROUTING_KEY` missing in `docs/stage-p/ci-contract-live-20260415T171500Z.json`).
+- [!] `P10` Public health and uptime monitoring (24/7) with alerting. (updated: 2026-04-15 22:40 IST) **BLOCKED.** Monitoring workflow exists, but alert-routing inputs are absent in live repo contract (`SLACK_WEBHOOK_URL`, `DISCORD_WEBHOOK_URL`, `PAGERDUTY_ROUTING_KEY` missing in `docs/stage-p/ci-contract-live-20260415T173800Z.json`).
   - **Exit criteria:** 5-minute checks active, alert routing tested, and acknowledgement path documented.
 
 - [!] `P11` Production observability endpoint validation. (updated: 2026-04-15 21:55 IST) **BLOCKED.** Requires live production traffic plus telemetry backend/dashboard access; unavailable in current local context.

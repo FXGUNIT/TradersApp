@@ -7,7 +7,7 @@
 
 - Public DNS/TLS/endpoint probe (latest): `docs/stage-p/public-readiness-20260415T170500Z.json`
 - Public DNS/TLS/endpoint probe (baseline): `docs/stage-p/public-readiness-20260415T161834Z.json`
-- CI contract + live GitHub contract gap (latest): `docs/stage-p/ci-contract-live-20260415T171500Z.json`
+- CI contract + live GitHub contract gap (latest): `docs/stage-p/ci-contract-live-20260415T173800Z.json`
 - CI contract baseline: `docs/stage-p/ci-contract-20260415T162029Z.json`
 - Topology freeze decision: `docs/P01_TOPOLOGY_FREEZE.md`
 
@@ -23,7 +23,7 @@
 | P06 ML public deploy proof | BLOCKED | `https://api.traders.app/health` cannot resolve (NXDOMAIN) |
 | P07 end-to-end public flow | BLOCKED | P04-P06 all failing |
 | P08 Infisical sync hardening | BLOCKED | Repo Actions contract currently has 0 secrets/0 variables; required sync token/config missing |
-| P09 deploy prereq closure | BLOCKED | Live GitHub check shows missing 9/9 required secrets and 13/13 required variables; latest CI run has Deploy Production job skipped |
+| P09 deploy prereq closure | BLOCKED | Live GitHub check shows missing 8/8 explicit required secrets and 6/13 required variables; latest CI run has Deploy Production job skipped |
 | P10 public uptime monitoring | BLOCKED | Monitor workflow exists, but required alert-routing secrets/URL vars absent in live repo contract |
 | P11 observability validation | BLOCKED | Live public BFF/ML endpoints unavailable; no production telemetry validation path yet |
 
@@ -31,7 +31,7 @@
 
 1. **Domain ownership is active but app binding is incorrect:** `traders.app` resolves and serves HTTPS, but points to `stocks.news` and does not expose app health route.
 2. **Critical subdomains are missing from DNS:** `bff`, `api`, and `staging` are NXDOMAIN, blocking backend public verification.
-3. **Deploy control plane is unseeded in GitHub repo:** live API check reports **0 Actions secrets** and **0 Actions variables**.
+3. **Deploy control plane is only partially seeded in GitHub repo:** live API check reports **0 Actions secrets** and **7 repository variables**.
 4. **Latest CI run cannot reach production deploy:** latest `ci.yml` run (`24467254349`) finished `failure`; `Deploy Production` job conclusion is `skipped`.
 
 ## CI Hardening Applied In This Execution
