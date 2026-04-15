@@ -3,22 +3,24 @@ ML Engine — Pydantic Request/Response Models
 Extracted from main.py (Rule #3 hard limit: Python ≤600 lines)
 """
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, Literal
 
 
 class TrainRequest(BaseModel):
+    schema_version: Literal["1.0"] = "1.0"
     mode: str = Field(default="full", pattern="^(full|incremental)$")
     symbol: str = Field(default="MNQ")
     min_trades: int = Field(default=100, ge=50, le=10000)
 
 
 class PredictRequest(BaseModel):
+    schema_version: Literal["1.0"] = "1.0"
     symbol: str = Field(default="MNQ")
     session_id: int = Field(default=1, ge=0, le=2)
     math_engine_snapshot: Optional[dict] = Field(default=None)
     key_levels: Optional[dict] = Field(default=None)
-    candles: list[dict] = Field(default_factory=list)
-    trades: list[dict] = Field(default_factory=list)
+    candles: list[dict] = Field(default_factory=list, max_length=5000)
+    trades: list[dict] = Field(default_factory=list, max_length=5000)
 
 
 class CandleInput(BaseModel):
@@ -45,13 +47,15 @@ class TradeInput(BaseModel):
 
 
 class UploadCandlesRequest(BaseModel):
+    schema_version: Literal["1.0"] = "1.0"
     symbol: str = Field(default="MNQ")
-    candles: list[CandleInput]
+    candles: list[CandleInput] = Field(max_length=10000)
 
 
 class UploadTradesRequest(BaseModel):
+    schema_version: Literal["1.0"] = "1.0"
     symbol: str = Field(default="MNQ")
-    trades: list[TradeInput]
+    trades: list[TradeInput] = Field(max_length=10000)
     source_uid: Optional[str] = Field(default=None)
     source_role: Optional[str] = Field(default=None)
     days_used: Optional[int] = Field(default=None, ge=0)
@@ -62,11 +66,12 @@ class UploadTradesRequest(BaseModel):
 # ── Backtest / PBO ────────────────────────────────────────────────────────────
 
 class PBOBacktestRequest(BaseModel):
+    schema_version: Literal["1.0"] = "1.0"
     strategy_name: str = Field(default="momentum")
     symbol: str = Field(default="MNQ")
     strategy_type: str = Field(default="momentum", pattern="^(momentum|mean_reversion|regime_switching)$")
-    lookback: list[int] = Field(default_factory=lambda: [5, 10, 20, 30, 50])
-    threshold: list[float] = Field(default_factory=lambda: [0.005, 0.01, 0.015, 0.02])
+    lookback: list[int] = Field(default_factory=lambda: [5, 10, 20, 30, 50], max_length=50)
+    threshold: list[float] = Field(default_factory=lambda: [0.005, 0.01, 0.015, 0.02], max_length=50)
     n_trials: int = Field(default=100, ge=20, le=500)
     n_permutations: int = Field(default=100, ge=20, le=500)
     n_train_splits: int = Field(default=5, ge=2, le=10)
@@ -77,6 +82,7 @@ class PBOBacktestRequest(BaseModel):
 
 
 class MCBacktestRequest(BaseModel):
+    schema_version: Literal["1.0"] = "1.0"
     strategy_name: str = Field(default="momentum")
     symbol: str = Field(default="MNQ")
     strategy_type: str = Field(default="momentum", pattern="^(momentum|mean_reversion|regime_switching)$")
@@ -87,17 +93,19 @@ class MCBacktestRequest(BaseModel):
 
 
 class FullPBOBacktestRequest(BaseModel):
+    schema_version: Literal["1.0"] = "1.0"
     strategy_name: str = Field(default="momentum")
     symbol: str = Field(default="MNQ")
     strategy_type: str = Field(default="momentum", pattern="^(momentum|mean_reversion|regime_switching)$")
-    lookback: list[int] = Field(default_factory=lambda: [5, 10, 20, 30, 50])
-    threshold: list[float] = Field(default_factory=lambda: [0.005, 0.01, 0.015, 0.02])
+    lookback: list[int] = Field(default_factory=lambda: [5, 10, 20, 30, 50], max_length=50)
+    threshold: list[float] = Field(default_factory=lambda: [0.005, 0.01, 0.015, 0.02], max_length=50)
     n_trials: int = Field(default=100, ge=20, le=500)
     n_simulations: int = Field(default=1000, ge=100, le=5000)
     min_trades: int = Field(default=100, ge=20)
 
 
 class AutotuneRequest(BaseModel):
+    schema_version: Literal["1.0"] = "1.0"
     strategy_name: str = Field(default="momentum")
     symbol: str = Field(default="MNQ")
     strategy_type: str = Field(default="momentum", pattern="^(momentum|mean_reversion|regime_switching)$")
