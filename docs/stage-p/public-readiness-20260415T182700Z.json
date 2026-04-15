@@ -1,0 +1,195 @@
+{
+  "generated_at_utc": "2026-04-15T18:25:30+00:00",
+  "required_hosts": [
+    "traders.app",
+    "bff.traders.app",
+    "api.traders.app",
+    "staging.traders.app"
+  ],
+  "hosts": {
+    "traders.app": {
+      "dns": {
+        "ok": true,
+        "detail": "Resolved 2 address(es)",
+        "data": {
+          "addresses": [
+            "15.197.225.128",
+            "3.33.251.168"
+          ]
+        }
+      },
+      "tls": {
+        "ok": true,
+        "detail": "TLS handshake succeeded",
+        "data": {
+          "cipher": [
+            "TLS_AES_128_GCM_SHA256",
+            "TLSv1.3",
+            128
+          ],
+          "certificate": {
+            "subject": [
+              [
+                [
+                  "commonName",
+                  "traders.app"
+                ]
+              ]
+            ],
+            "issuer": [
+              [
+                [
+                  "countryName",
+                  "US"
+                ]
+              ],
+              [
+                [
+                  "stateOrProvinceName",
+                  "Arizona"
+                ]
+              ],
+              [
+                [
+                  "localityName",
+                  "Scottsdale"
+                ]
+              ],
+              [
+                [
+                  "organizationName",
+                  "GoDaddy.com, Inc."
+                ]
+              ],
+              [
+                [
+                  "organizationalUnitName",
+                  "http://certs.godaddy.com/repository/"
+                ]
+              ],
+              [
+                [
+                  "commonName",
+                  "Go Daddy Secure Certificate Authority - G2"
+                ]
+              ]
+            ],
+            "not_before": "Oct 16 02:00:43 2025 GMT",
+            "not_after": "Oct 16 02:00:43 2026 GMT",
+            "subject_alt_name": [
+              [
+                "DNS",
+                "traders.app"
+              ]
+            ],
+            "version": 3,
+            "serial_number": "2E76692FEF07BF6C"
+          }
+        }
+      }
+    },
+    "bff.traders.app": {
+      "dns": {
+        "ok": false,
+        "detail": "DNS resolution failed: [Errno 11001] getaddrinfo failed",
+        "data": {}
+      },
+      "tls": {
+        "ok": false,
+        "detail": "Skipped: DNS failed",
+        "data": {}
+      }
+    },
+    "api.traders.app": {
+      "dns": {
+        "ok": false,
+        "detail": "DNS resolution failed: [Errno 11001] getaddrinfo failed",
+        "data": {}
+      },
+      "tls": {
+        "ok": false,
+        "detail": "Skipped: DNS failed",
+        "data": {}
+      }
+    },
+    "staging.traders.app": {
+      "dns": {
+        "ok": false,
+        "detail": "DNS resolution failed: [Errno 11001] getaddrinfo failed",
+        "data": {}
+      },
+      "tls": {
+        "ok": false,
+        "detail": "Skipped: DNS failed",
+        "data": {}
+      }
+    }
+  },
+  "endpoints": {
+    "frontend_home": {
+      "ok": true,
+      "detail": "HTTP status 200 (redirected to https://stocks.news/)",
+      "data": {
+        "status": 200,
+        "final_url": "https://stocks.news/"
+      }
+    },
+    "frontend_health": {
+      "ok": false,
+      "detail": "HTTP error 404: Not Found",
+      "data": {
+        "status": 404,
+        "reason": "Not Found"
+      }
+    },
+    "bff_health": {
+      "ok": false,
+      "detail": "URL error: [Errno 11001] getaddrinfo failed",
+      "data": {
+        "reason": "[Errno 11001] getaddrinfo failed"
+      }
+    },
+    "ml_health": {
+      "ok": false,
+      "detail": "URL error: [Errno 11001] getaddrinfo failed",
+      "data": {
+        "reason": "[Errno 11001] getaddrinfo failed"
+      }
+    },
+    "staging_home": {
+      "ok": false,
+      "detail": "URL error: [Errno 11001] getaddrinfo failed",
+      "data": {
+        "reason": "[Errno 11001] getaddrinfo failed"
+      }
+    }
+  },
+  "task_status": {
+    "P02_dns_complete": {
+      "ok": false
+    },
+    "P03_tls_integrity": {
+      "ok": false
+    },
+    "P04_frontend_public_deploy": {
+      "ok": false
+    },
+    "P05_bff_public_deploy": {
+      "ok": false
+    },
+    "P06_ml_public_deploy": {
+      "ok": false
+    },
+    "P07_end_to_end_public_chain": {
+      "ok": false
+    },
+    "P10_24x7_monitoring_ready": {
+      "ok": false,
+      "note": "Requires validated alert routing credentials"
+    },
+    "P11_observability_runtime_validation": {
+      "ok": false,
+      "note": "Requires live dashboard and telemetry backend access"
+    }
+  }
+}
