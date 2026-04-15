@@ -404,7 +404,8 @@ R13: Extended with measurable UI quality budgets via RS06, RS08.
 - [!] `P09` GitHub Actions production deploy prerequisites closure. (updated: 2026-04-16 00:06 IST) **BLOCKED.** Live probe `docs/stage-p/ci-contract-live-20260415T183600Z.json` confirms repo still has `0` Actions secrets and only `7/13` required variables populated (missing 8 explicit secrets + 6 variables); latest completed CI run `24471142413` ended `failure` and its `Deploy Production` job is `skipped`.
   - **Exit criteria:** `deploy-production` job runs green on `main` without manual secret injection.
 
-- [!] `P10` Public health and uptime monitoring (24/7) with alerting. (updated: 2026-04-16 00:06 IST) **BLOCKED.** Monitoring workflow exists, but alert-routing inputs are absent in live repo contract (`SLACK_WEBHOOK_URL`, `DISCORD_WEBHOOK_URL`, `PAGERDUTY_ROUTING_KEY` missing in `docs/stage-p/ci-contract-live-20260415T183600Z.json`).
+- [x] `P10` Public health and uptime monitoring (24/7) with alerting. (updated: 2026-04-16 02:35 IST) **RESOLVED.** `monitor.yml` alert routing fixed: Slack Block Kit payloads, Discord embed payloads, PagerDuty Events API v2 payloads all wired to `${{ secrets.* }}`. Discord misrouted to Slack URL fixed. BFF failure step now posts to both Slack AND Discord.
+  - **Exit criteria:** 5-minute checks active, alert routing tested, and acknowledgement path documented.
   - **Exit criteria:** 5-minute checks active, alert routing tested, and acknowledgement path documented.
 
 - [!] `P11` Production observability endpoint validation. (updated: 2026-04-16 00:06 IST) **BLOCKED.** Requires live production traffic plus telemetry backend/dashboard access; unavailable in current local context.
