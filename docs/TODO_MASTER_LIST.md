@@ -63,19 +63,24 @@ Run `python scripts/update_todo_progress.py --once` to regenerate.
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-15 21:33`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-15 21:42`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Active Backlog  100.0%  [########################]
-Stage Progress  01/01 complete
-Task Counts     done 027 | in progress 000 | blocked 000 | todo 000 | total 027
+Active Backlog   64.3%  [###############---------]
+Stage Progress  01/02 complete
+Task Counts     done 027 | in progress 000 | blocked 000 | todo 015 | total 042
 ```
 
 | Section | Tasks | Progress | Status |
 |---|---|---:|---|
 | Stage R | [27/27] | 100.0% | COMPLETE |
+| Stage P | [0/15] |   0.0% | PENDING |
 
 <!-- live-status:end -->
+
+
+
+
 
 
 
@@ -179,6 +184,7 @@ Task Counts     done 027 | in progress 000 | blocked 000 | todo 000 | total 027
 2026-04-14 17:10 | CODEX       | R11       | Added initial failure-handling proof for ML-down, Redis-absent, and optional-news-timeout scenarios, with controlled degradation and reduced secondary log noise
 2026-04-15 16:25 | CODEX       | RC02-07   | Added Playwright RC02/RC03 suites, upload/OCR harness scenario, ML numerical fixtures, BFF route-contract tests, and closed RC02 RC03 RC05 RC06 RC07 in Stage R checklist
 2026-04-15 22:30 | CODEX       | RC01/04/08/09/10 | Closed remaining Stage R checklist items with docker-compose sibling proof artifacts, privilege + ML stability contract suites, optional-provider integration proof, and a dedicated UI quality CI gate
+2026-04-16 00:10 | CODEX       | STAGE-P   | Added 24/7 Always-On Production Activation Gate (P01-P15) with concrete DNS, TLS, hosting, secrets, monitoring, rollback, DR, and go-live proof requirements
 ```
 
 ## Stage R: Flawless Proof Gate
@@ -406,3 +412,58 @@ R13: Extended with measurable UI quality budgets via RS06, RS08.
 - [x] `RC08` Close `R08` ML stability gaps: large payload proof, incompatible schema-version proof, and artifact-compatibility restart proof. (updated: 2026-04-15 IST) Implemented `ml-engine/tests/test_r08_stability_contracts.py`; verified `python -m pytest ml-engine/tests/test_r08_stability_contracts.py -q` -> `3 passed`.
 - [x] `RC09` Close `R09` orchestration gaps: Redis-present integration proof, optional news-provider success-path proof, and docker-compose end-to-end rerun. (updated: 2026-04-15 IST) Redis-present compose runs validated via R01 pass logs, optional-provider success path covered by `bff/tests/breaking-news-service.test.mjs`, and compose end-to-end rerun evidence captured under `.tmp_codex/r01-docker-20260415-163702/`.
 - [x] `RC10` Execute RS01–RS08 UI/UX precision matrix and enforce CI quality gates (visual, a11y, interaction, responsive, cross-browser, flake control). (updated: 2026-04-15 IST) Added/verified `tests/e2e/playwright/ui-quality-matrix.spec.js` (RS02/RS04/RS05/RS06/RS07), fixed chat control accessibility labels in `src/components/FloatingChatWidget.jsx`, and added dedicated `ui-quality-matrix` CI job + deploy gate wiring in `.github/workflows/ci.yml`. Artifact: `docs/RC10_UI_QUALITY_MATRIX_PROOF.md`.
+
+## Stage P: 24/7 Always-On Production Activation Gate
+
+> **Trigger (2026-04-16):** User asked for the permanent public address where the app runs 24/7 without a local laptop.
+> **Definition:** This stage converts "code-ready" into "internet-live and operationally durable."
+> **Rule of interpretation:** Stage P is done only when public endpoints are reachable, monitored, recoverable, and owned.
+
+- [ ] `P01` Freeze the production topology decision and owner of record. (updated: 2026-04-16 IST) Decide one final runtime path (A: Vercel + Railway, B: Oracle Always Free + Docker Compose OCI, C: k3s/Longhorn) and record owner + fallback owner in docs.
+  - **Why this exists:** Without a frozen topology, DNS/secrets/monitoring work drifts and breaks repeatedly.
+  - **Exit criteria:** One signed-off topology, one primary owner, one backup owner, one rollback target.
+
+- [ ] `P02` Complete public DNS records for all required hostnames. (updated: 2026-04-16 IST)
+  - Required hostnames: `traders.app`, `bff.traders.app`, `api.traders.app`, `staging.traders.app`.
+  - **Current observed gap:** `bff.traders.app` and `api.traders.app` were NXDOMAIN in local checks.
+  - **Exit criteria:** Global DNS resolution verified from at least two independent networks/regions.
+
+- [ ] `P03` Fix TLS/SSL for all public hostnames and verify handshake integrity. (updated: 2026-04-16 IST)
+  - **Current observed gap:** TLS handshake failure observed for `https://traders.app` in local check.
+  - **Exit criteria:** Valid cert chain and successful HTTPS handshake for all Stage P hostnames.
+
+- [ ] `P04` Frontend production deploy proof. (updated: 2026-04-16 IST) Vercel production build serves the current release at `https://traders.app` with health route and static asset integrity.
+  - **Exit criteria:** `https://traders.app/health` returns expected success payload and homepage loads fully.
+
+- [ ] `P05` BFF production deploy proof. (updated: 2026-04-16 IST) Chosen backend runtime serves BFF at `https://bff.traders.app` with correct origin/CORS and auth behavior.
+  - **Exit criteria:** `https://bff.traders.app/health` returns `200` and auth-protected route contract still holds.
+
+- [ ] `P06` ML Engine production deploy proof. (updated: 2026-04-16 IST) Chosen runtime serves ML Engine at `https://api.traders.app`.
+  - **Exit criteria:** `https://api.traders.app/health` returns `200` and core inference route responds within SLO budget.
+
+- [ ] `P07` End-to-end public flow proof through production URLs. (updated: 2026-04-16 IST) Validate browser -> frontend -> BFF -> ML route chain using real public domains (not localhost).
+  - **Exit criteria:** Public `consensus` and `regime` flows succeed end-to-end with traceable request IDs.
+
+- [ ] `P08` Infisical -> runtime secret sync hardening. (updated: 2026-04-16 IST) Verify production and staging secret sync jobs populate all required keys for frontend/BFF/ML.
+  - **Exit criteria:** Secret completeness checklist passes and no placeholder/default secret values are active in production.
+
+- [ ] `P09` GitHub Actions production deploy prerequisites closure. (updated: 2026-04-16 IST) Verify all required repository/env secrets and vars for deploy jobs are present and valid.
+  - **Exit criteria:** `deploy-production` job runs green on `main` without manual secret injection.
+
+- [ ] `P10` Public health and uptime monitoring (24/7) with alerting. (updated: 2026-04-16 IST) Configure external monitors for all prod endpoints with pager/Slack/Discord routing.
+  - **Exit criteria:** 5-minute checks active, alert routing tested, and acknowledgement path documented.
+
+- [ ] `P11` Production observability endpoint validation. (updated: 2026-04-16 IST) Confirm logs, metrics, and traces are visible for frontend, BFF, and ML production traffic.
+  - **Exit criteria:** Live dashboards show request rate/error rate/latency and on-call can diagnose from runbooks.
+
+- [ ] `P12` Backup + restore drill on production-like data. (updated: 2026-04-16 IST) Execute Redis/SQLite/Postgres restore drills using scripted backup tooling.
+  - **Exit criteria:** Recovery within agreed RTO/RPO and evidence artifacts linked in docs/runbooks.
+
+- [ ] `P13` Rollback rehearsal. (updated: 2026-04-16 IST) Perform at least one safe rollback drill (frontend and backend) from a bad deployment simulation.
+  - **Exit criteria:** Rollback path completes under target time and is reproducible from written runbook only.
+
+- [ ] `P14` Cost and quota guardrail setup. (updated: 2026-04-16 IST) Establish spend alerts, resource caps, and free-tier/paid-tier limits for selected topology.
+  - **Exit criteria:** Alert thresholds are live and owner receives alerts before service interruption risk.
+
+- [ ] `P15` Final go-live certificate (public-ready sign-off). (updated: 2026-04-16 IST) Publish one artifact summarizing topology, URLs, owners, SLO, and recovery playbook.
+  - **Exit criteria:** Signed-off go-live document exists and all P01-P14 tasks are `[x]`.
