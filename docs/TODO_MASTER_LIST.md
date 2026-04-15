@@ -390,6 +390,160 @@ All Stages S1–S6, ML1–ML8, RESEARCH, FX, OPTS are BACKGROUND tasks. Implemen
   - Measure: shortfall percentiles, not just mean PnL
   - Compare: Deep Hedging vs static delta hedge vs no hedge
 
+### Phase ML9 — World-Class Self-Learning Engine
+*Converts partial batch-retrain system into true per-prediction feedback loop with exponential compounding. Every guess and result trains the model immediately.*
+
+#### ML9-A: Real Fisher Matrix Computation
+- [ ] ML9-A01 — Audit `ml-engine/models/mamba/mamba_sequence_model.py`
+  - Locate `save_fisher_matrix()` stub
+  - Confirm it currently saves only `{hash, timestamp}` dict
+- [ ] ML9-A02 — Implement real empirical Fisher diagonal in `ml-engine/models/mamba/mamba_sequence_model.py`
+  - Forward-pass 256 training samples, accumulate `grad²` per parameter
+  - Store as `.npz` (NumPy compressed) per training round
+  - Fisher used in EWC loss: `λ × Σ F_ii × (θ_i − θ*_i)²`
+  - Diagonal only — full N×N matrix is intractable
+- [ ] ML9-A03 — Create `ml-engine/infrastructure/fisher_utils.py`
+  - `load_fisher_for_round(round_id) → np.load()` dict
+  - `save_fisher_matrix(model, round_id)` → .npz path
+  - `compute_ewc_penalty(params, fisher_dict, theta_star)` → scalar loss term
+  - Backward compat: if no Fisher file found, skip EWC penalty gracefully
+
+#### ML9-B: Online Learning Layer (Per-Trade Weight Update)
+- [ ] ML9-B01 — Create `ml-engine/infrastructure/online_learner_config.py`
+  - `OnlineLearningConfig` dataclass:
+    - `min_trades_before_online: int = 10` — gate online updates
+    - `confidence_boost_correct: float = 0.02`
+    - `confidence_penalty_wrong: float = 0.05`
+    - `max_confidence_delta_per_trade: float = 0.10`
+    - `lightgbm_partial_fit_min_samples: int = 20`
+    - `mamba_nudge_threshold: int = 5`
+    - `ewc_lambda_online: float = 50.0`
+- [ ] ML9-B02 — Create `ml-engine/infrastructure/pattern_confidence_tracker.py`
+  - Pattern key: `"{setup}|{regime}|{session}"` (e.g. `"FAILED_BREAKOUT|NEUTRAL|nifty_morning"`)
+  - Log-odds compounding: `new_odds = old_odds × multiplier`
+  - Correct: multiplier = 1.05; Wrong: multiplier = 0.90
+  - Capped at [0.05, 0.95]; Persisted to `ml-engine/data/continual_learning/pattern_confidence.json`
+  - `_load()`: init all known pattern combos at 0.5 (neutral)
+  - `record_trade(setup, regime, session, correct, confidence) → float` — returns updated confidence
+  - `get_confidence(setup, regime, session) → float`
+  - Thread-safe via `threading.Lock`
+- [ ] ML9-B03 — Create `ml-engine/inference/online_learner.py`
+  - `OnlineLearner` class: `process_outcome(signal_id, trade_id, setup, regime, session, correct, confidence, pnl) → dict`
+  - **Layer 1** (instant, no model change): call `PatternConfidenceTracker.record_trade()`
+  - **Layer 2** (every 20 trades): `LightGBM.partial_fit()` on new trades only, `init_model=current_model`
+  - **Layer 3** (every 5 trades): Mamba EWC online nudge — 1 epoch, LR×0.1, load Fisher from last batch round
+  - `_log_online_update()` → append to `ml-engine/data/continual_learning/online_learning_log.jsonl`
+  - `get_learning_stats() → dict`: pattern counts, avg confidence, update count
+- [ ] ML9-B04 — Create `ml-engine/infrastructure/fisher_utils.py`
+  - `load_fisher_for_round(round_id) -> dict[str, np.ndarray]`
+  - `save_fisher_matrix(model, round_id) -> Path`
+  - Graceful fallback: return empty dict if no Fisher files exist yet
+
+#### ML9-C: Setup Classifier (Universal Self-Learning Model)
+- [ ] ML9-C01 — Create `ml-engine/models/setup/setup_classifier.py`
+  - `SetupClassifier` class: 4-class LightGBM (`NO_SETUP`, `RANGE_DAY`, `FAILED_BREAKOUT`, `TREND_PULLBACK`)
+  - `predict(features: dict) -> dict`: returns `{setup, confidence, probabilities, entry_ready}`
+  - `predict_setup_from_candles(candles_df, ib_high, ib_low, vah, val, poc, regime, session) -> dict`
+  - `train(X, y, mode)` — full or incremental (`partial_fit`)
+  - `set_pattern_tracker(tracker)` — inject PatternConfidenceTracker for bias blending
+  - Pattern bias blending: 70% model / 30% learned pattern confidence (configurable)
+  - `_fallback_predict()` — rule-based fallback when model not yet trained (Day 1)
+  - `_features_to_array()` — encode features dict to numpy array for LGB
+- [ ] ML9-C02 — Create `ml-engine/features/setup_features.py`
+  - `extract_setup_features(candles_df, ib_high, ib_low, vah, val, poc) -> dict`
+  - Features: IB geometry, wick/body ratios, ATR regime, volume profile, cyclical time, regime
+  - `detect_dead_chop(atr_5m, atr_20m) -> bool`
+  - `detect_rejection_strength(candle) -> float` (body/range ratio)
+- [ ] ML9-C03 — Update `ml-engine/data/schema.sql`
+  - `ALTER TABLE trade_log ADD COLUMN setup_type TEXT;`
+  - `ALTER TABLE trade_log ADD COLUMN setup_confidence REAL;`
+  - `ALTER TABLE trade_log ADD COLUMN entry_confirmed INTEGER;` — 1 if second candle confirmed
+  - `ALTER TABLE trade_log ADD COLUMN board_veto_active INTEGER;`
+  - `ALTER TABLE trade_log ADD COLUMN board_veto_member TEXT;`
+  - `ALTER TABLE trade_log ADD COLUMN pattern_confidence REAL;` — from PatternConfidenceTracker
+- [ ] ML9-C04 — Update `ml-engine/feedback/feedback_logger.py`
+  - Add `setup_type`, `setup_confidence`, `entry_confirmed` to `log_signal()` INSERT
+  - Add `pattern_confidence` to `record_outcome()` — join from pattern tracker
+- [ ] ML9-C05 — Update `ml-engine/feedback/trade_log_processor.py`
+  - Auto-label setup from IB behavior + candle close confirmation:
+    ```
+    if price_broke_IB AND returned AND candle2_CLOSED_confirming → "FAILED_BREAKOUT"
+    elif price_inside_IB AND near_POC AND volume_active → "RANGE_DAY"
+    elif confirmed_trend AND small_pullback_candles → "TREND_PULLBACK"
+    else → "NO_SETUP"
+    ```
+  - Auto-label `entry_confirmed`: second candle CLOSE confirms = 1, wick-only = 0
+  - Persist auto-labels to `trade_log.setup_type` after trade closes
+
+#### ML9-D: Deliberative Board Room
+- [ ] ML9-D01 — Create `ml-engine/infrastructure/board_room_deliberation.py`
+  - `BoardMember` dataclass: name, specialty, confidence (0.5→0.95), total_votes, correct_votes, veto_power, veto_conditions
+  - `DeliberationResult` dataclass: consensus, votes dict, confidence, veto_active, veto_member, reasoning, majority_count
+  - `DeliberativeBoardRoom` class — 5 board members:
+
+    | Member | Specialty | Veto? | Veto Conditions |
+    |---|---|---|---|
+    | Tech_IB | IB/VA geometry | No | dead_chop, atr_low |
+    | Tech_Candle | Candle patterns | No | wick_noise, no_confirm |
+    | RegimeWatcher | Market regime | **Yes** | CRISIS, CONTAGION |
+    | OptionsDesk | IV / premium | **Yes** | expiry_day, LOW_IV |
+    | RiskOfficer | Risk management | **Yes** | 2 losses today, position_open |
+
+  - `deliberate(ml_signal, ml_confidence, setup, regime, iv_regime, atr_5m, atr_20m, is_expiry_day, losses_today, positions_open) -> DeliberationResult`
+  - Consensus: 3/5 agree → proceed; any veto → NEUTRAL (no trade)
+  - `record_outcome(result, pnl)`: update each agent's accuracy + confidence
+  - `get_board_status() -> dict`: per-agent accuracy + confidence, deliberation count
+  - Persist state to `ml-engine/data/continual_learning/board_state.json`
+- [ ] ML9-D02 — Create `ml-engine/infrastructure/board_room_telemetry.py`
+  - `BoardRoomTelemetry`: replaces current passive heartbeat-only client
+  - `post_deliberation(result)` — POST to BFF after each deliberation
+  - `post_outcome(outcome)` — POST after each trade result
+  - `ensure_deliberation_loop()` — daemon thread, triggers on each consensus call
+  - Keep existing heartbeat: `post_heartbeat()` at 90-min intervals
+  - `report_board_error()` — separate error channel with 5-min cooldown
+
+#### ML9-E: Integration Into Consensus Pipeline
+- [ ] ML9-E01 — Update `ml-engine/inference/predictor.py`
+  - Instantiate `SetupClassifier` on startup
+  - Call `setup_classifier.predict_setup_from_candles()` before consensus
+  - Inject `PatternConfidenceTracker.get_confidence()` into setup features
+  - Include `{setup, setup_confidence, entry_ready}` in consensus response
+- [ ] ML9-E02 — Update `ml-engine/inference/consensus_aggregator.py`
+  - Accept `setup_confidence` from setup classifier
+  - Include board deliberation result in consensus output:
+    ```python
+    board_result = board_room.deliberate(
+        ml_signal=direction,
+        ml_confidence=consensus_confidence,
+        setup=setup_result["setup"],
+        regime=regime,
+        ...
+    )
+    final_signal = board_result.consensus if not board_result.veto_active else "NEUTRAL"
+    ```
+  - Append board votes + reasoning to consensus response payload
+- [ ] ML9-E03 — Update `ml-engine/_routes_pso.py` (feedback routes section)
+  - Wire `OnlineLearner.process_outcome()` into `record_outcome` endpoint
+  - Call `PatternConfidenceTracker.record_trade()` after every matched trade
+  - Call `BoardRoom.record_outcome()` after trade closes
+  - Log all online learning updates to `online_learning_log.jsonl`
+- [ ] ML9-E04 — Update `ml-engine/inference/predictor.py` — MLflow integration
+  - After every batch retrain (RetrainPipeline): log to MLflow with tags `{setup, regime, session}`
+  - Champion-challenger: if challenger accuracy ≥ baseline: promote to Production
+  - Log DVC commit hash as `dvc_commit` tag on every MLflow run
+- [ ] ML9-E05 — Create `ml-engine/tests/test_online_learner.py`
+  - Test PatternConfidenceTracker: log-odds compounding, bounds [0.05, 0.95]
+  - Test OnlineLearner: layer gating (10-trade gate, 20-trade LGB, 5-trade Mamba)
+  - Test BoardRoom: veto conditions, majority voting, outcome recording
+  - Test SetupClassifier: rule-based fallback on Day 1, pattern bias blending
+  - Test FisherUtils: round-trip save/load, graceful missing file handling
+- [ ] ML9-E06 — Create `ml-engine/tests/test_setup_classifier.py`
+  - Test: NO_SETUP when dead chop
+  - Test: FAILED_BREAKOUT when IB broken + returned
+  - Test: RANGE_DAY when inside IB + near POC
+  - Test: fallback returns valid structure when model=None
+  - Test: pattern confidence bias is applied to probabilities
+
 ---
 
 ## STAGE RESEARCH — Research Foundation & Reading
@@ -490,3 +644,11 @@ All Stages S1–S6, ML1–ML8, RESEARCH, FX, OPTS are BACKGROUND tasks. Implemen
 - [x] Calendar urgency UI: red corner design confirmed
 - [x] US evening: all 3 instruments in 1 view confirmed
 - [x] 3 setups universal across all asset classes confirmed
+- [x] Phase ML9 design: World-Class Self-Learning Engine (Phase 7 in plan)
+  - 4 critical gaps identified: Fisher stubs, batch-only learning, no setup classifier, passive Board Room
+  - 3-layer online learning architecture: PatternConfidenceTracker + LGB partial_fit + Mamba EWC nudge
+  - Log-odds compounding for pattern confidence (exponential growth)
+  - 5-agent Deliberative Board Room: Tech_IB, Tech_Candle, RegimeWatcher, OptionsDesk, RiskOfficer
+  - Universal Setup Classifier: RANGE_DAY / FAILED_BREAKOUT / TREND_PULLBACK / NO_SETUP
+  - Auto-labeling from IB behavior + candle close confirmation
+  - Real Fisher diagonal computation replacing torch stub
