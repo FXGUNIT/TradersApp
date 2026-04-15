@@ -1,11 +1,32 @@
 # R01 Fresh-Clone Repro Log
 
-Status: blocked on host Docker Desktop / WSL repair
-Last updated: 2026-04-14
+Status: RESOLVED (two clean docker-compose smoke passes completed)
+Last updated: 2026-04-15
 
 ## Goal
 
 Prove the documented local bootstrap path works from a genuinely clean environment twice, without hidden machine state, nested dependency inheritance, or manual repo surgery.
+
+## Closure Update (2026-04-15)
+
+The previous Docker/WSL blocker was resolved for proof execution. Two isolated sibling workspaces completed full compose-up/smoke/down cycles.
+
+Proof artifacts:
+
+- `.tmp_codex/r01-docker-20260415-163702/pass1-final-dev-up.log`
+- `.tmp_codex/r01-docker-20260415-163702/pass1-final-dev-smoke-1.log`
+- `.tmp_codex/r01-docker-20260415-163702/pass1-final-dev-down.log`
+- `.tmp_codex/r01-docker-20260415-163702/pass2-dev-up.log`
+- `.tmp_codex/r01-docker-20260415-163702/pass2-dev-smoke.log`
+- `.tmp_codex/r01-docker-20260415-163702/pass2-dev-down.log`
+
+Observed from both passes:
+
+- `scripts/dev-up.ps1` brought up `frontend`, `bff`, `ml-engine`, `analysis`, and `redis`.
+- `scripts/dev-smoke.ps1` returned `200/200/200` for frontend, BFF, and ML health checks.
+- `scripts/dev-up.ps1 -Down` cleaned containers and network.
+
+Historical blocked notes below are retained for traceability but superseded by this closure update.
 
 ## Baseline Environment
 
