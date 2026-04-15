@@ -4,6 +4,23 @@
 
 ---
 
+## ⚠️ EXECUTION PRIORITY — READ FIRST
+
+### TIER 1 — DO NOW: Get App Live 24x7
+**Stage P only.** Push DNS, secrets, CI pipeline. Get traders.app deployed and working from any device. Everything else waits.
+
+### TIER 2 — AFTER LIVE: Backend ML Improvements
+All Stages S1–S6, ML1–ML8, RESEARCH, FX, OPTS are BACKGROUND tasks. Implement carefully in the backend, update the live app when ready. No rush, no deadline.
+
+### Why?
+- A live app with current ML = earning NOW
+- A perfect app that doesn't deploy = zero value
+- Backend improvements happen WHILE the app earns
+
+---
+
+---
+
 ## STAGE P — Production Deployment (Stage P: P01–P15)
 *See: `docs/STAGE_P_ROADMAP.md` for full detail*
 
