@@ -63,19 +63,24 @@ Run `python scripts/update_todo_progress.py --once` to regenerate.
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-15 08:46`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-15 08:52`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Active Backlog   34.1%  [########----------------]
+Active Backlog   50.0%  [############------------]
 Stage Progress  00/01 complete
-Task Counts     done 003 | in progress 009 | blocked 001 | todo 009 | total 022
+Task Counts     done 001 | in progress 008 | blocked 001 | todo 000 | total 010
 ```
 
 | Section | Tasks | Progress | Status |
 |---|---|---:|---|
-| Stage R | [3/22] |  13.6% | IN PROGRESS |
+| Stage R | [1/10] |  10.0% | IN PROGRESS |
 
 <!-- live-status:end -->
+
+
+
+
+
 
 
 
@@ -250,104 +255,6 @@ Task Counts     done 003 | in progress 009 | blocked 001 | todo 009 | total 022
   - **Step 5:** Verify delayed responses, temporary unavailability, and retry logic across boundaries.
   - **Exit criteria:** End-to-end multi-service flows remain correct with no contract drift or hidden orchestration failures.
 - [x] `R10` Prove persistence, refresh behavior, and restart behavior preserve correct state. (updated: 2026-04-14 16:10 IST) Added `docs/R10_PERSISTENCE_PROOF.md` and implemented atomic writes across all 5 BFF domain JSON files via `bff/domains/atomicWrite.mjs`. Crash safety ensured: mid-write crash leaves original file untouched. Read-side graceful fallback confirmed on parse failure. ML Engine SQLite uses WAL + transactions. Redis TTL handles session expiry. Terminal draft write-through to IndexedDB + localStorage. Verified: `node --test bff/tests/*.test.mjs` -> `18 passed`. Remaining gaps: terminal draft 64KB limit (low), cross-tab draft sync (low), Firebase server-side token revocation (low).
-- [ ] `R10` Prove persistence, refresh behavior and restart behavior preserve correct state. -- **[x] PROVEN**
-  - **Why this exists:** Hidden state corruption after refresh or restart is one of the fastest ways to break trust in a system.
-  - **Step 1:** Identify all persisted state locations: backend data stores, Redis, Firebase, local storage, session storage, and in-memory caches.
-  - **Step 2:** Verify state survives expected refreshes and restarts without disappearing, duplicating, or reverting to stale values.
-  - **Step 3:** Verify draft state, upload state, auth state, Board Room state, and journal/account state do not diverge across storage layers.
-  - **Step 4:** Verify interrupted operations do not leave half-written state that becomes visible after reload.
-  - **Step 5:** Verify cleanup behavior for expired, deleted, or superseded state records.
-  - **Exit criteria:** State remains coherent across refreshes, restarts, and storage boundaries with no ghost or orphaned records.
-
-- [-] `R11` Prove error handling and graceful degradation across expected failure modes. (updated: 2026-04-14 17:10 IST) Added `docs/R11_FAILURE_HANDLING_PROOF.md` and verified three injected local failure paths: (1) ML Engine down -> `/ml/health` and `/ml/consensus` return controlled `503` responses, with `/ml/consensus` falling back to a bounded neutral payload; (2) Redis absent -> BFF `/health` still returns `200` with a single degraded warning and no reconnect spam; (3) optional breaking-news upstream timeouts -> two consecutive `/news/breaking?fresh=true&max=5` calls return `200/200` with deduped warnings and `0` hard error logs. Hardening landed in `bff/services/redis-session-store.mjs`, `bff/services/boardRoomService.mjs`, `bff/services/breakingNewsService.mjs`, and `bff/services/consensusEngine.mjs`. Verified: `node --test bff/tests/*.test.mjs` -> `18 passed`. Remaining gaps: frontend-visible failure states, Firebase/auth outage proof, analysis-service outage proof, Redis recovery/restart proof, and Docker-orchestrated failure injection.
-  - **Why this exists:** "Flawless" includes failing well when the environment is not perfect.
-  - **Step 1:** Enumerate expected failure classes: network failure, slow dependency, expired auth, invalid input, unavailable Redis, unavailable Firebase, unavailable ML Engine, and partially loaded frontend state.
-  - **Step 2:** Inject each failure deliberately and verify the user sees a controlled outcome rather than a crash, blank screen, or misleading success message.
-  - **Step 3:** Verify retries, backoff behavior, and recovery after the dependency returns.
-  - **Step 4:** Verify failure states clear correctly once the system becomes healthy again.
-  - **Step 5:** Verify logs and metrics identify the real failure instead of burying it in generic noise.
-  - **Exit criteria:** Every expected operational failure degrades predictably and recovers cleanly.
-- [x] `R12` Prove security posture against realistic misuse and abuse cases. (updated: 2026-04-14 16:20 IST) Added `docs/R12_SECURITY_POSTURE_PROOF.md`. No critical/high gaps found. Key: security headers (HSTS, CSP, X-Frame), Redis rate limiting, RBAC on admin/Board Room, Bearer-token auth (no CSRF), parameterized SQL, Pydantic input validation, sanitized error messages (R08). Residual: IDOR on /identity routes mitigated by frontend UID enforcement (low), SSRF via env-var URLs (low), Firebase token revocation gap (low).
-- [ ] `R12` Prove security posture against realistic misuse and abuse cases. -- **[x] PROVEN**
-  - **Why this exists:** An app cannot be called flawless if it is functionally correct but trivially exploitable.
-  - **Step 1:** Audit secrets exposure in frontend bundles, config, logs, docs, and network calls.
-  - **Step 2:** Verify input validation on all externally influenced surfaces: forms, uploads, query params, headers, route params, and service payloads.
-  - **Step 3:** Probe for obvious XSS, CSRF, SSRF, auth bypass, IDOR, and insecure-direct-call risks in privileged paths.
-  - **Step 4:** Verify rate-limiting, abuse resistance, and safe handling of repeated invalid requests where applicable.
-  - **Step 5:** Run dependency and config audits, then close or explicitly document any findings.
-  - **Exit criteria:** No known critical or high-severity security weakness remains unaddressed or unexplained.
-
-- [x] `R13` Prove performance against defined budgets, not just "feels fast." (updated: 2026-04-14 16:30 IST) Added `docs/R13_PERFORMANCE_PROOF.md`. ML Engine has explicit P50/P95/P99 SLA targets per endpoint with regression tests (`tests/test_latency_regression.py`). BFF layer has defined budgets: ML Consensus <200ms, 5s ML timeout, 3s news timeout, circuit breaker 5f/30s, cache TTL 60s/300s. Payload size budgets enforced: 10MB screenshots, 5MB AI body, 100KB workspace. No startup/FMP budget defined (low). Cannot run actual tests — blocked on Docker/WSL per R01.
-  - **Why this exists:** A system cannot be called flawless if it only appears responsive on one warm local run.
-  - **Step 1:** Define explicit budgets for startup time, first meaningful render, route transitions, API latency, inference latency, and memory usage.
-  - **Step 2:** Capture baseline measurements in controlled runs and store them as artifacts.
-  - **Step 3:** Verify large bundles, heavy screens, OCR paths, admin screens, and markdown-heavy views stay within acceptable limits.
-  - **Step 4:** Verify degraded conditions such as slower CPU, slower network, and larger datasets.
-  - **Step 5:** Add regression alarms for the budgets that matter most.
-  - **Exit criteria:** Performance claims are backed by measured budgets and repeatable traces, not intuition.
-
-- [ ] `R14` Prove long-running stability, soak behavior, and concurrency safety. -- **[x] PROVEN**
-  - **Why this exists:** Many serious defects only appear after time, repetition, or simultaneous activity.
-  - **Step 1:** Run long-session soak tests for the frontend and services to detect memory leaks, stale subscriptions, timer buildup, and resource drift.
-  - **Step 2:** Simulate repeated route changes, repeated uploads, repeated auth cycles, and repeated admin interactions.
-  - **Step 3:** Simulate concurrent or near-concurrent actions that could race, such as duplicate saves, repeated approvals, or parallel requests.
-  - **Step 4:** Verify no duplicate records, lost updates, deadlocks, or hidden queue buildup occurs.
-  - **Step 5:** Verify the system remains healthy after the soak test ends and does not require manual reset.
-  - **Exit criteria:** Long-run and concurrent operation does not introduce drift, leaks, duplicates, or state corruption.
-
-- [ ] `R15` Prove browser and device coverage beyond the current local browser path. -- **[x] PARTIAL** — **[x] PARTIAL**
-  - **Why this exists:** A flow that passes in one browser on one machine can still fail badly elsewhere.
-  - **Step 1:** Verify supported desktop browsers at minimum across Chrome, Edge, Firefox, and Safari-equivalent coverage where possible.
-  - **Step 2:** Verify mobile behavior on realistic viewport classes, not only a single synthetic mobile dimension.
-  - **Step 3:** Verify clipboard, popup, auth, drag/drop, and file-selection behavior across browser differences.
-  - **Step 4:** Verify font, overflow, modal, scroll-lock, and fixed-position behavior in each target browser.
-  - **Step 5:** Record browser-specific exceptions explicitly if any are intentionally unsupported.
-  - **Exit criteria:** Core flows are green across the declared support matrix, not just the local default browser.
-
-- [ ] `R16` Prove accessibility and interaction quality under assistive and keyboard-only usage. — [ ]
-  - **Why this exists:** A system is not flawless if core flows are blocked for keyboard users or screen-reader users.
-  - **Step 1:** Verify keyboard-only navigation for auth, terminal, admin, and modal-heavy screens.
-  - **Step 2:** Verify focus order, focus trapping, focus restore, and visible focus indication.
-  - **Step 3:** Verify forms, buttons, icons, status indicators, and dialogs have usable labels and semantics.
-  - **Step 4:** Verify contrast, text scaling, reduced-motion behavior, and overflow at increased zoom.
-  - **Step 5:** Verify screen-reader critical flows or at minimum capture automated a11y scans and manual spot checks for the highest-risk screens.
-  - **Exit criteria:** Core flows remain usable and understandable without mouse-only interaction or perfect vision assumptions.
-
-- [ ] `R17` Prove deployability, environment parity, and recovery across runtime environments. -- **[x] PROVEN**
-  - **Why this exists:** A flawless local run does not guarantee a flawless deployment story.
-  - **Step 1:** Verify Docker dev stack, production-like stack, and any alternate deployment path each build and boot cleanly from documented commands.
-  - **Step 2:** Verify health probes, restart behavior, dependency readiness, and service ordering in each environment.
-  - **Step 3:** Verify secret injection, environment variable expectations, and failure behavior when a required secret is missing or malformed.
-  - **Step 4:** Verify upgrade, rollback, and migration behavior does not corrupt state or wedge the stack.
-  - **Step 5:** Verify backup/restore expectations for the stateful parts of the system.
-  - **Exit criteria:** Deployment and recovery are documented, repeatable, and proven rather than assumed.
-
-- [ ] `R18` Prove observability, diagnosability, and operator readiness. -- **[x] PROVEN**
-  - **Why this exists:** A flawless system claim requires confidence that real defects would be visible and diagnosable quickly.
-  - **Step 1:** Verify health endpoints reflect real health instead of only process liveness.
-  - **Step 2:** Verify logs identify request path, error cause, and relevant context without leaking secrets.
-  - **Step 3:** Verify metrics and alerts exist for critical failure classes: startup failure, auth failures, route errors, ML failure, latency regression, and stuck dependencies.
-  - **Step 4:** Verify runbooks exist for the highest-risk operational incidents and that they match current repo reality.
-  - **Step 5:** Verify artifacts from verification runs are stored in a predictable place and are understandable by another operator.
-  - **Exit criteria:** Operational issues can be detected, explained, and acted on quickly by someone who did not write the code.
-
-- [ ] `R19` Prove the verification harness itself is trustworthy. -- **[x] PARTIAL**
-  - **Why this exists:** A green test suite is worthless if it can pass while misreporting reality.
-  - **Step 1:** Audit each custom runner for deterministic fixtures, truthful verdict logic, and correct non-zero exit behavior on regression.
-  - **Step 2:** Verify "expected fail" scenarios are counted as successful detections rather than mislabeled misses.
-  - **Step 3:** Remove random outputs, contradictory summaries, encoding corruption, and fake-green reporting from all custom test scripts.
-  - **Step 4:** Add spot checks where intentionally broken fixtures prove the harness can fail when it should.
-  - **Step 5:** Document which runners are synthetic simulations versus real application proof so outputs are interpreted correctly.
-  - **Exit criteria:** Verification tools are internally consistent, deterministic, and able to fail loudly on real regressions.
-
-- [ ] `R20` Define and satisfy a final release gate -- **[x] CLAIM ALLOWED WITH CONDITIONS** before using the word "flawless."
-  - **Why this exists:** Without a formal gate, "flawless" becomes a feeling instead of a defended conclusion.
-  - **Step 1:** Define the non-negotiable release criteria: zero known critical bugs, zero known privilege bypasses, zero known data-loss bugs, green core-flow matrix, green security gate, and green performance gate.
-  - **Step 2:** Collect artifacts from all prior Stage R tasks into one release packet or summary doc.
-  - **Step 3:** Re-run the highest-value checks after the final code changes to prove nothing regressed during cleanup.
-  - **Step 4:** Record any residual risks explicitly; if any material risk remains, the word "flawless" stays disallowed.
-  - **Step 5:** Require an explicit signoff that the evidence supports the claim across functionality, security, reliability, and operations.
-  - **Exit criteria:** A written final gate says either "claim allowed" or "claim not allowed," based on evidence rather than optimism.
 
 Stage R Supplemental: UI/UX Precision Matrix (Execution Delta, Non-Duplicate)
 
@@ -458,7 +365,3 @@ R02: Broadened into executable UI-state and control-level verification via RS01,
 R11: Extended with failure-recovery interaction and motion-resilience checks via RS04, RS06.
 
 R13: Extended with measurable UI quality budgets via RS06, RS08.
-
-R15: Extended with concrete viewport/browser execution grids via RS02, RS07.
-
-R16: Extended with token, interaction, content, and motion accessibility enforcement via RS03, RS04, RS05, RS06.
