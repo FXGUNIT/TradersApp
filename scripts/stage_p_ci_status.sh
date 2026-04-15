@@ -189,8 +189,8 @@ main() {
   local status conclusion
   local info
   info=$(latest_run_status)
-  status=$(echo "$info" | jq -r '.status')
-  conclusion=$(echo "$info" | jq -r '.conclusion')
+  status=$(echo "$info" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status',''))")
+  conclusion=$(echo "$info" | python3 -c "import sys,json; print(json.load(sys.stdin).get('conclusion',''))")
 
   if [[ "$status" == "in_progress" || "$status" == "queued" ]]; then
     show_status "$run_id" "$status" "$conclusion"
@@ -202,8 +202,8 @@ main() {
       while [[ "$status" == "in_progress" || "$status" == "queued" ]]; do
         sleep "$POLL_INTERVAL"
         info=$(latest_run_status)
-        status=$(echo "$info" | jq -r '.status')
-        conclusion=$(echo "$info" | jq -r '.conclusion')
+        status=$(echo "$info" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status',''))")
+        conclusion=$(echo "$info" | python3 -c "import sys,json; print(json.load(sys.stdin).get('conclusion',''))")
       done
       show_status "$run_id" "$status" "$conclusion"
       exit_code=$?
