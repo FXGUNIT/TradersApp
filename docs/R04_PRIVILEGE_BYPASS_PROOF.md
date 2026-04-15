@@ -1,8 +1,8 @@
 # R04 Proof Artifact: Admin/CEO Permission Bypass Gate
 
 **Task:** R04 — Prove admin-only and CEO-only permissions cannot be bypassed.
-**Claimed by:** claude-sonnet | **Date:** 2026-04-14
-**Status:** EVIDENCE GATHERED — gaps identified, evidence documented
+**Claimed by:** codex | **Date:** 2026-04-15
+**Status:** RESOLVED — privileged-access gaps closed and contract-tested
 
 ---
 
@@ -16,6 +16,26 @@ Five proof steps:
 3. Verify server-side rejection for unauthorized requests
 4. Verify role downgrade / change mid-session / expired-admin-session behavior
 5. Verify all denial paths are safe: correct status code, no data leak, no partial side effects
+
+---
+
+## Closure Update (2026-04-15)
+
+All previously identified critical gaps are now fixed:
+
+1. Removed hardcoded email-based admin bypass in Collective Consciousness.
+   - File: `bff/domains/identityState.mjs`
+   - New rule: admin bypass is role-based only (`role === "admin"`).
+2. Enforced `/board-room/*` ADMIN gating before handler execution.
+   - Files: `bff/_dispatchRoutes.mjs`, `bff/services/security.mjs`
+3. Added explicit regression coverage for privileged route denial and policy behavior.
+
+Verification:
+
+- `python -m pytest bff/tests/test_r04_privilege_contracts.py -q` -> `1 passed`
+- `node --test bff/tests/collective-consciousness-policy.test.mjs` -> `5 passed`
+
+Historical findings below are retained for traceability; superseded where they conflict with this closure update.
 
 ---
 
