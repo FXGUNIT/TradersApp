@@ -2,7 +2,7 @@
 
 **Task:** R16 -- Prove accessibility and interaction quality under assistive and keyboard-only usage.
 **Claimed by:** claude-sonnet | **Date:** 2026-04-14
-**Status:** PARTIAL -- keyboard nav present in key flows, automated a11y scan not in CI
+**Status:** PARTIAL — R16-A (focus-visible) and R16-B (prefers-reduced-motion) fixed 2026-04-15; automated a11y scan and remaining ARIA gaps still open
 
 ---
 
@@ -102,19 +102,26 @@ rem typography: YES -- CSS uses rem for scaling
 
 ## Gaps Found
 
-GAP1 (Medium): No global :focus-visible CSS rule
-GAP2 (Medium): No automated a11y scan in CI (no axe-core or playwright accessibility test)
-GAP3 (Medium): No prefers-reduced-motion support in CSS
-GAP4 (Low): No focus restore on modal close
-GAP5 (Low): aria-modal missing on AdminUnlockModal
-GAP6 (Low): No WCAG contrast audit in CI
+| Gap | Level | Status |
+|-----|-------|--------|
+| GAP1 (Medium): No global :focus-visible CSS rule → **RESOLVED (2026-04-15)** | Medium | `src/index.css` + `src/styles/global.css` now include `*:focus-visible { outline: 2px solid var(--color-focus, #3b82f6); outline-offset: 2px; }` + `*:focus:not(:focus-visible) { outline: none; }`. Playwright test `focused interactive elements have visible focus indicator` validates runtime behavior. |
+| GAP2 (Medium): No automated a11y scan in CI | Medium | Not yet addressed — axe-core Playwright integration pending |
+| GAP3 (Medium): No prefers-reduced-motion support in CSS → **RESOLVED (2026-04-15)** | Medium | Both CSS files now include `@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; } }` — suppresses all animations for users with vestibular sensitivity. |
+| GAP4 (Low): No focus restore on modal close | Low | Not yet addressed |
+| GAP5 (Low): aria-modal missing on AdminUnlockModal | Low | Not yet addressed |
+| GAP6 (Low): No WCAG contrast audit in CI | Low | Not yet addressed |
 
 ---
 
 ## Interim Verdict
 
-PARTIAL. Keyboard navigation exists in all major flows (auth, terminal, admin). ARIA live regions present for dynamic content. Form labels properly associated. However: no global focus indicator CSS, no prefers-reduced-motion support, no aria-modal on one modal, no automated a11y scan in CI. Real gaps for accessibility compliance but not blocking for basic keyboard operability.
+**MATERIALLY IMPROVED.** Global focus-visible CSS and prefers-reduced-motion support now implemented — two of the three medium-severity accessibility gaps are closed. Keyboard navigation is present in all major flows. Remaining gaps (GAP2, GAP4, GAP5, GAP6) are lower priority and documented.
 
-Recommended: Add global focus CSS, add prefers-reduced-motion, add Playwright + axe-core to CI.
+**Resolved 2026-04-15:**
+- R16-A: `:focus-visible` global CSS rule in `src/index.css` + `src/styles/global.css`
+- R16-B: `prefers-reduced-motion` media query suppressing all animations
 
-Proof artifact: docs/R16_ACCESSIBILITY_PROOF.md
+**Files changed:** `src/index.css`, `src/styles/global.css`
+
+**Proof artifact:** `docs/R16_ACCESSIBILITY_PROOF.md`
+**Updated:** 2026-04-15 — R16-A and R16-B resolved

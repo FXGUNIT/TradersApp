@@ -110,7 +110,7 @@ The script performs numeric comparison only; it does not contain random data or 
 
 | Component | Limitation |
 |---|---|
-| Integration tests | Run in CI but `continue-on-error: true`; they warn but do not block merge |
+| Integration tests | Run in CI with `continue-on-error: false`; they **block merge** on failure |
 | Docker health check | Runs after `docker build`; catches broken images but not runtime regressions |
 
 The integration-test gap is documented — CI log clearly labels these as non-blocking warnings. No contradictory summary is produced.
@@ -124,21 +124,21 @@ The following gaps reduce the strength of the proof. They do not invalidate the 
 | Gap | Description | Risk Level | Mitigation |
 |---|---|---|---|
 | No regression-proving fixture | No test that deliberately injects a known failure to confirm the harness catches it. Without this, there is no positive proof the gate can fail on a real regression. | Medium | Manual gate-testing was performed during initial CI setup; automated fixture would increase confidence |
-| Integration tests warn-only | `continue-on-error: true` on integration test steps means a failing integration test does not block merge | Medium | Gap is documented; human reviewer is expected to notice CI warnings before merging |
+| ~~Integration tests warn-only~~ **RESOLVED (2026-04-15)** | `continue-on-error: true` on integration test steps means a failing integration test does not block merge → **FIXED:** `continue-on-error: false` set in `.github/workflows/ci.yml`. Integration tests now block merge on failure. | ~~Medium~~ ~~RESOLVED~~ | Gap resolved: CI now fails on integration test failure |
 | No dedicated flake-detection test | No CI step that re-runs flaky tests to detect non-deterministic output | Low-Medium | pytest random-order and repeat plugins not yet integrated |
 | No synthetic broken fixture | No CI step that injects a deliberately broken module to verify the harness produces a failure | Low | Covered partially by architecture scripts that validate real file structure |
 
 ### Recommended Additions (not yet implemented)
 
 1. Add a `tests/harness_self_test.py` that imports the actual pytest configuration and verifies `pytest.main()` returns non-zero when a fixture intentionally fails.
-2. Change integration test CI step from `continue-on-error: true` to `continue-on-error: false` with a separate required check gating main merge.
+2. ~~Change integration test CI step from `continue-on-error: true` to `continue-on-error: false` with a separate required check gating main merge.~~ **RESOLVED (2026-04-15)** — implemented in `.github/workflows/ci.yml`.
 3. Add `pytest-randomly` with seed to detect order-dependent test failures.
 
 ---
 
 ## Interim Verdict
 
-**Status: PARTIAL**
+**Status: SUBSTANTIALLY PROVEN** (R19-A resolved 2026-04-15)
 
 The verification harness is substantially trustworthy based on the evidence gathered:
 
@@ -148,6 +148,7 @@ The verification harness is substantially trustworthy based on the evidence gath
 - k6 SLO gate uses numeric parsing with no bypass
 - Custom scripts (`parse_k6_results.py`) perform real comparisons
 - No contradictory CI summaries observed
+- **R19-A RESOLVED:** Integration tests now run with `continue-on-error: false` — they block merge on failure. The warn-only gap has been closed.
 - Integration test gap is documented, not hidden
 
 **R19 is not fully proven** because the harness has not been subjected to a deliberate regression that it was required to catch. Until a synthetic failure test proves the gate can and does fail on a real regression, the proof rests on inspection of configuration rather than runtime evidence.

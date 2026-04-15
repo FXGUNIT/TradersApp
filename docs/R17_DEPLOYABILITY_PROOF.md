@@ -2,7 +2,7 @@
 
 **Task:** R17 — Prove deployability, environment parity, and recovery across runtime environments.
 **Claimed by:** claude-sonnet | **Date:** 2026-04-14
-**Status:** PROVEN — Docker stacks documented, health probes in place, rollback workflow exists
+**Status:** RESOLVED — all 4 backup/migration gaps resolved 2026-04-15
 
 ---
 
@@ -115,22 +115,22 @@ PostgreSQL (mlflow metadata) — no migration tool found. **Gap for production D
 
 ## Backup / Restore
 
-### Redis Data
+### Redis Data → **FIXED (2026-04-15)**
 Volume: `redis-data:/data`. Backed by Docker named volume.
-No documented backup script for Redis in repo. **Gap.**
+`scripts/backup_redis.py` — Docker RDB snapshot → tar.gz archive. Cron wrapper: `scripts/cron/redis_backup_cron.sh`. 30-backup retention. `python scripts/backup_redis.py --backup-dir /backups` / `--restore /backups/redis_YYYYMMDD.tar.gz` / `--verify /backups/redis_latest.tar.gz`.
 
 ### ML Models
 `version_models.py` script handles model backup/restore.
 GitHub Release assets: `models_backup_YYYYMMDD_HHMMSS.tar.gz`.
 `rollback.yml` workflow uses this.
 
-### ML Engine SQLite
+### ML Engine SQLite → **FIXED (2026-04-15)**
 Named volume: `ml-data:/data`. Contains `trading_data.db`.
-No documented backup script. **Gap.**
+`ml-engine/scripts/backup_sqlite.py` — SQLite online backup API (`conn.backup()`) for consistent live backup. Cron wrapper: `scripts/cron/ml_engine_sqlite_backup_cron.sh`. 30-backup retention. Integrity check via `PRAGMA integrity_check` on restore. `python ml-engine/scripts/backup_sqlite.py --backup-dir /backups` / `--restore /backups/trading_data_YYYYMMDD.db` / `--verify /backups/trading_data_latest.db`.
 
-### PostgreSQL
+### PostgreSQL → **FIXED (2026-04-15)**
 Volume: `postgres-data:/var/lib/postgresql/data`.
-No documented backup script. **Gap.**
+`scripts/backup_postgres.py` — `pg_dump --format=c` (custom/compressed). Cron wrapper: `scripts/cron/postgres_backup_cron.sh`. 14-backup retention. Magic-bytes verification on restore. `python scripts/backup_postgres.py --backup-dir /backups` / `--restore /backups/mlflow_YYYYMMDD_HHMMSS.dump` / `--verify /backups/mlflow_latest.dump`.
 
 ---
 
@@ -151,26 +151,29 @@ Frontend served from Vercel CDN (same build as staging).
 
 ## Gaps Found
 
-**GAP 1 (Medium)** — No database migration tool (Flyway/Liquibase)
-PostgreSQL schema evolution requires manual SQL. No migration script tracked in repo.
-Fix: Add Flyway or Alembic for PostgreSQL migrations.
+**GAP 1 (Medium)** — No database migration tool → **RESOLVED (2026-04-15)**
+Alembic tool added: `ml-engine/alembic.ini` + `ml-engine/alembic/env.py` + baseline migration `ml-engine/alembic/versions/20260415_000001_baseline.py`. Usage: `alembic upgrade head`, `alembic revision -m "description"`, `alembic history`.
 
-**GAP 2 (Medium)** — No Redis backup script
-Stateful Redis volume has no documented backup procedure.
-Fix: Add `redis-cli bgrewriteaof` + RDB backup to cron job.
+**GAP 2 (Medium)** — No Redis backup script → **RESOLVED (2026-04-15)**
+`scripts/backup_redis.py` + `scripts/cron/redis_backup_cron.sh` implemented. RDB → tar.gz, 30-backup retention, OS symlink fallback for Windows.
 
-**GAP 3 (Medium)** — No ML Engine SQLite backup script
-`trading_data.db` has no automated backup to persistent storage.
-Fix: Add cron job to dump SQLite to Railway persistent disk.
+**GAP 3 (Medium)** — No ML Engine SQLite backup script → **RESOLVED (2026-04-15)**
+`ml-engine/scripts/backup_sqlite.py` + `scripts/cron/ml_engine_sqlite_backup_cron.sh` implemented. Online SQLite backup API, integrity check, 30-backup retention.
 
-**GAP 4 (Low)** — No PostgreSQL backup script
-`postgres-data` volume has no documented backup.
-Fix: `pg_dump` cron job to object storage.
+**GAP 4 (Low)** — No PostgreSQL backup script → **RESOLVED (2026-04-15)**
+`scripts/backup_postgres.py` + `scripts/cron/postgres_backup_cron.sh` implemented. pg_dump custom format, 14-backup retention, magic-bytes verification.
 
 ---
 
 ## Interim Verdict
 
-**PROVEN with gaps.** Docker stacks build and boot from documented commands. Health probes on all services. Secrets injected at runtime via Infisical, not baked into images. Rollback via Railway dashboard + rollback.yml workflow. Environment parity: dev/staging/prod use same Docker images. Gaps in database backup are real but operational — not blocking for the deployment claim.
+**RESOLVED — all gaps addressed as of 2026-04-15.** Docker stacks build and boot from documented commands. Health probes on all services. Secrets injected at runtime via Infisical, not baked into images. Rollback via Railway dashboard + rollback.yml workflow. Environment parity: dev/staging/prod use same Docker images. Alembic DB migration tool added. All 3 backup scripts (Redis, SQLite, PostgreSQL) implemented with cron wrappers and retention policies.
+
+**Files added:**
+- `ml-engine/alembic.ini` + `ml-engine/alembic/env.py` + `ml-engine/alembic/versions/20260415_000001_baseline.py`
+- `scripts/backup_redis.py` + `scripts/cron/redis_backup_cron.sh`
+- `ml-engine/scripts/backup_sqlite.py` + `scripts/cron/ml_engine_sqlite_backup_cron.sh`
+- `scripts/backup_postgres.py` + `scripts/cron/postgres_backup_cron.sh`
 
 **Proof artifact:** `docs/R17_DEPLOYABILITY_PROOF.md`
+**Updated:** 2026-04-15 — all 4 gaps resolved
