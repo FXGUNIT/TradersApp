@@ -11,18 +11,15 @@ WATCH=false
 POLL_INTERVAL=30
 
 # ── jq replacement via Python ─────────────────────────────────────────────────
-jq_() {
+py_get() {
   python3 -c "
 import sys, json
 data = json.load(sys.stdin)
-keys = '$*'.split()
-if not keys or keys == ['']:
-    print(json.dumps(data))
-else:
-    for k in keys:
-        data = data[0] if isinstance(data, list) else data.get(k, {})
-    print(json.dumps(data))
-" 2>/dev/null
+key = sys.argv[1]
+if isinstance(data, list): data = data[0]
+val = data.get(key, '') if isinstance(data, dict) else ''
+print(val)
+" "$1"
 }
 
 # ── Parse flags ────────────────────────────────────────────────────────────────
@@ -43,11 +40,11 @@ run_url() {
 }
 
 latest_run_id() {
-  gh run list --workflow="${WORKFLOW}" --limit 1 --json databaseId 2>/dev/null | jq_ databaseId
+  gh run list --workflow="${WORKFLOW}" --limit 1 --json databaseId 2>/dev/null | py_get databaseId
 }
 
 latest_run_status() {
-  gh run list --workflow="${WORKFLOW}" --limit 1 --json status,conclusion 2>/dev/null | jq_ status conclusion
+  gh run list --workflow="${WORKFLOW}" --limit 1 --json status,conclusion 2>/dev/null
 }
 
 run_jobs() {
