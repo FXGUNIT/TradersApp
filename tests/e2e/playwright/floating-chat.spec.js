@@ -1,3 +1,5 @@
+import "./floating-chat.spec.impl.js";
+/*
 /**
  * floating-chat.spec.js — R02 gap fix: floating support chat widget E2E test
  *
