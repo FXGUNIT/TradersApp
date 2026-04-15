@@ -808,3 +808,31 @@ svg[class*="icon"],
     will-change: opacity, transform;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   ACCESSIBILITY + MOTION SAFETY (R16 gaps fixed 2026-04-15)
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* R16-A: Global :focus-visible — keyboard focus always visible */
+*:focus-visible {
+  outline: 2px solid var(--color-focus, #3b82f6);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Remove default outline for mouse users (keep for keyboard) */
+*:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* R16-B: Respect prefers-reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
