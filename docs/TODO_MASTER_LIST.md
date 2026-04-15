@@ -395,3 +395,4 @@ R13: Extended with measurable UI quality budgets via RS06, RS08.
 - [ ] `RC08` Close `R08` ML stability gaps: large payload proof, incompatible schema-version proof, and artifact-compatibility restart proof. (updated: 2026-04-15 IST)
 - [ ] `RC09` Close `R09` orchestration gaps: Redis-present integration proof, optional news-provider success-path proof, and docker-compose end-to-end rerun. (updated: 2026-04-15 IST)
 - [ ] `RC10` Execute RS01–RS08 UI/UX precision matrix and enforce CI quality gates (visual, a11y, interaction, responsive, cross-browser, flake control). (updated: 2026-04-15 IST)
+
