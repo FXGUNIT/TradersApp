@@ -1,0 +1,40 @@
+326:     "crash",
+327:     "plunge",
+328:     "sell",
+329:     "loss",
+330:     "crisis",
+331:     "war",
+332:     "tension",
+333:     "slowdown",
+334:   ];
+335:   const bullCount = bullish.filter((w) => text.includes(w)).length;
+336:   const bearCount = bearish.filter((w) => text.includes(w)).length;
+337:   if (bullCount > bearCount) return "bullish";
+338:   if (bearCount > bullCount) return "bearish";
+339:   return "neutral";
+340: }
+341: 
+342: /**
+343:  * Main entry: get upcoming high-impact events.
+344:  * Returns all 3★+ events from FF (primary) + FF fallback if NewsData available.
+345:  */
+346: export async function getUpcomingEvents(daysAhead = 7) {
+347:   refreshAgentHeartbeat({
+348:     agent: NEWS_AGENT,
+349:     status: "active",
+350:     focus: `Building ${daysAhead}-day news outlook.`,
+351:   });
+352:   const ffEvents = await scrapeForexFactory();
+353: 
+354:   // Filter to future events within window
+355:   const now = new Date();
+356:   const cutoff = new Date(now.getTime() + daysAhead * 24 * 60 * 60 * 1000);
+357: 
+358:   const upcoming = ffEvents
+359:     .filter((e) => {
+360:       const dt = new Date(e.datetime);
+361:       return dt >= now && dt <= cutoff;
+362:     })
+363:     .sort((a, b) => a.time_until_min - b.time_until_min);
+364: 
+365:   // Next event

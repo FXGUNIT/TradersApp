@@ -129,6 +129,16 @@ export function registerDispatchRoutes({
     if (contentHandler(req, res, url, origin)) return true;
     if (await terminalHandler(req, res, url, origin)) return true;
     if (await terminalAnalyticsHandler(req, res, url, origin)) return true;
+    // ── Identity IDOR guard: verify request UID matches authenticated UID ─
+    if (pathname.startsWith("/identity/users")) {
+      const auth = await authorizeRequest(req);
+      if (!auth.authorized) {
+        json(res, 403, { ok: false, error: "Not authorized." }, origin);
+        return true;
+      }
+      // Attach authenticated UID to request for handler to compare
+      req._authUid = auth.uid;
+    }
     if (await identityHandler(req, res, url, origin)) return true;
     if (await onboardingHandler(req, res, url, origin)) return true;
     if (await supportHandler(req, res, url, origin)) return true;

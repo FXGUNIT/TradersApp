@@ -496,3 +496,43 @@ export function requireCeo(req, res) {
   }
   return true;
 }
+
+// R12-B: SSRF guard — validate all outbound URLs before fetch
+export const ALLOWED_OUTBOUND_HOSTS = new Set([
+  "newsdata.io",
+  "finnhub.io",
+  "gdeltproject.org",
+  "forexfactory.com",
+  // ML Engine: allow configured internal/external URLs
+]);
+
+const PRIVATE_PATTERNS = [
+  /^10\./,           // 10.0.0.0/8
+  /^172\.(1[6-9]|2\d|3[01])\./,  // 172.16.0.0/12
+  /^192\.168\./,    // 192.168.0.0/16
+  /^127\./,          // localhost
+  /^169\.254\./,    // link-local
+  /^0\./,            // 0.0.0.0/8
+  /^localhost$/i,
+  /^::1$/i,
+  /^(fc00|fe80):/i,  // IPv6 private
+];
+
+export function isOutboundUrlAllowed(url) {
+  if (!url) return false;
+  let hostname;
+  try {
+    hostname = new URL(url).hostname;
+  } catch {
+    return false; // malformed URL — reject
+  }
+  // Block private / reserved hosts
+  if (PRIVATE_PATTERNS.some((p) => p.test(hostname))) {
+    return false;
+  }
+  // Block direct IP addresses (numeric)
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(hostname)) {
+    return false;
+  }
+  return true;
+}

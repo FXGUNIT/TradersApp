@@ -15,6 +15,19 @@ export function createIdentityRouteHandler({
   readJsonBody,
 }) {
   return async function handleIdentityRoute(req, res, url, origin) {
+    // R12-A: IDOR guard — compare URL uid against authenticated uid
+    if (url.pathname.startsWith("/identity/users")) {
+      const urlUidMatch = url.pathname.match(/^\/identity\/users\/([^/]+)/);
+      if (urlUidMatch) {
+        const requestedUid = decodeURIComponent(urlUidMatch[1]);
+        const authenticatedUid = req._authUid;
+        if (authenticatedUid && requestedUid && authenticatedUid !== requestedUid) {
+          json(res, 403, { ok: false, error: "Access denied." }, origin);
+          return true;
+        }
+      }
+    }
+
     const userMatch = url.pathname.match(/^\/identity\/users\/([^/]+)$/);
     const statusMatch = url.pathname.match(
       /^\/identity\/users\/([^/]+)\/status$/,
