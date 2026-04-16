@@ -123,13 +123,11 @@ jobs:
         with:
           ref: ${{ needs.gate.outputs.sha }}
 
-      - name: Set deployment status — pending
-        uses: antonbabenko/deploy-status@v1
-        with:
-          status: pending
-          description: "Helm upgrade in progress…"
-          environment: ${{ needs.gate.outputs.environment }}
-          environment_url: ${{ env.DEPLOYMENT_URL }}
+      - name: Mark deploy pending (summary)
+        run: |
+          echo "Deployment status: pending" >> "$GITHUB_STEP_SUMMARY"
+          echo "Environment: ${{ needs.gate.outputs.environment }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Commit SHA: ${{ needs.gate.outputs.sha }}" >> "$GITHUB_STEP_SUMMARY"
 
       # ── Docker meta: SHA-tagged images from CI ────────────────────────────
       - name: Extract metadata for all services
@@ -378,13 +376,11 @@ jobs:
           echo "Cluster ingress reachable — external DNS + TLS pending cert-manager"
 
       # ── Success ─────────────────────────────────────────────────────────
-      - name: Set deployment status — success
-        uses: antonbabenko/deploy-status@v1
-        with:
-          status: success
-          description: "All smoke tests passed"
-          environment: ${{ needs.gate.outputs.environment }}
-          environment_url: ${{ env.DEPLOYMENT_URL }}
+      - name: Mark deploy success (summary)
+        run: |
+          echo "Deployment status: success" >> "$GITHUB_STEP_SUMMARY"
+          echo "Environment: ${{ needs.gate.outputs.environment }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Smoke tests: passed" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Deployment summary
         run: |
@@ -420,12 +416,11 @@ jobs:
           echo "${{ secrets.KUBECONFIG_B64 }}" | base64 -d > ~/.kube/config
           chmod 600 ~/.kube/config
 
-      - name: Set deployment status — failure
-        uses: antonbabenko/deploy-status@v1
-        with:
-          status: failure
-          description: "Smoke tests failed — rolling back"
-          environment: ${{ needs.deploy.outputs.environment || 'staging' }}
+      - name: Mark deploy failure (summary)
+        run: |
+          echo "Deployment status: failure" >> "$GITHUB_STEP_SUMMARY"
+          echo "Environment: ${{ needs.deploy.outputs.environment || 'staging' }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Reason: smoke tests failed, starting rollback" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Helm rollback
         run: |
