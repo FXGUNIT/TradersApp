@@ -155,13 +155,25 @@ jobs:
       - name: Configure kubeconfig
         run: |
           mkdir -p ~/.kube
-          echo "${{ secrets.KUBECONFIG_B64 }}" | base64 -d > ~/.kube/config
+          if [ -z "${{ secrets.KUBECONFIG_B64 }}" ]; then
+            echo "::error::KUBECONFIG_B64 is not set. Add it in repository or environment secrets."
+            exit 1
+          fi
+          echo "${{ secrets.KUBECONFIG_B64 }}" | base64 -d > ~/.kube/config || {
+            echo "::error::Failed to decode KUBECONFIG_B64. Ensure it is valid base64 kubeconfig content."
+            exit 1
+          }
+          if ! grep -q "server:" ~/.kube/config; then
+            echo "::error::Decoded kubeconfig does not contain a cluster server endpoint."
+            exit 1
+          fi
           chmod 600 ~/.kube/config
           echo "kubeconfig written"
 
       - name: Verify cluster connectivity
         run: |
           kubectl version --client
+          kubectl config current-context
           kubectl cluster-info
           echo "--- current namespace: ${{ vars.K8S_NAMESPACE || 'tradersapp' }}"
           kubectl get nodes
@@ -413,7 +425,14 @@ jobs:
       - name: Configure kubeconfig
         run: |
           mkdir -p ~/.kube
-          echo "${{ secrets.KUBECONFIG_B64 }}" | base64 -d > ~/.kube/config
+          if [ -z "${{ secrets.KUBECONFIG_B64 }}" ]; then
+            echo "::error::KUBECONFIG_B64 is not set for rollback job."
+            exit 1
+          fi
+          echo "${{ secrets.KUBECONFIG_B64 }}" | base64 -d > ~/.kube/config || {
+            echo "::error::Failed to decode KUBECONFIG_B64 for rollback."
+            exit 1
+          }
           chmod 600 ~/.kube/config
 
       - name: Mark deploy failure (summary)
@@ -435,4 +454,5 @@ jobs:
           NS="${{ vars.K8S_NAMESPACE || 'tradersapp' }}"
           echo "✗ Deployment failed — TradersApp rolled back to previous release."
           echo "Previous release history:"
-          helm history tradersapp -n "$NS"
+          helm history tradersapp -n "$NS" || true
+        continue-on-error: true
