@@ -335,6 +335,8 @@ TradersApp/
 
 ## ML Engine Architecture Rules
 
+**Board Room compliance:** All signal/output code must respect `.claude/rules/board-room.md`. Never output a LONG/SHORT signal without going through `DeliberativeBoardRoom.deliberate()`. RiskOfficer veto = final.
+
 ### Models Follow Strict Patterns
 
 Every ML model follows one of these patterns:
@@ -590,6 +592,7 @@ None → Staging → Production → Archived
 - [ ] Never catch `Exception` broadly — catch specific exceptions
 - [ ] Never use `eval()` or `new Function()` — use `JSON.parse` for JSON
 - [ ] Never make the ML engine depend on the BFF — BFF calls ML, never reverse
+- [ ] Never output a trading signal without Board Room deliberation
 
 ---
 
@@ -651,7 +654,7 @@ When a bug appears, follow this order. Human does steps 1-3 first:
 - ML predictions: cache with Redis (TTL per endpoint type)
 - Heavy ML operations: thread pool or worker process, never block main thread
 - React renders: use `React.memo` + `useMemo` + `useCallback` aggressively
-- No inline styles � CSS classes only
+- No inline styles � CSS classes only
 - Images and heavy assets lazy-loaded with `React.lazy()`
 - Candle data loading: max 10k rows per request, paginate larger queries
 - Model inference: lazy-load models, unload after 5 min inactivity
@@ -741,6 +744,7 @@ Every session starts with access to these (do not work without them):
 | DOMAIN-RULES.md    | Trading rules           | Signal/risk code         |
 | LEGACY-PATTERNS.md | Existing patterns       | ML/integration code      |
 | PROMPT-TEMPLATE.md | Session starter         | Every new session        |
+| `.claude/rules/board-room.md` | Board Room governance | All trading/signal code  |
 
 **Anti-pattern:** Starting a session without reviewing relevant sections of these files.
 
