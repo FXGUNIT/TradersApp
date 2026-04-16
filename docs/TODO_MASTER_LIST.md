@@ -41,13 +41,13 @@ All Stages S1–S6, ML1–ML8, RESEARCH, FX, OPTS are BACKGROUND tasks. Implemen
 - [ ] P06 — Verify BFF health endpoint returns HTTP 200
 - [ ] P07 — Verify CI pipeline `deploy-production` job succeeds
 
-> **CI Pipeline Status (Updated 2026-04-16 12:24 IST)**
+> **CI Pipeline — Latest Run: #944 (id: 24517846294) — 2026-04-16 evening**
 >
 > | Job | Status | Notes |
 > |---|---|---|
-> | Unit Tests | ✅ success | sklearn force_all_finite → lightgbm 4.6.0 |
-> | BFF Server | ✅ success | `ghcr.io/fxgunit` lowercase + docker context `bff/` |
-> | ML Engine Docker Build | ✅ success | docker context `ml-engine/` |
+> | Unit Tests | ✅ success | — |
+> | BFF Server | ✅ success | — |
+> | ML Engine Docker Build | ✅ success | — |
 > | Frontend Build | ✅ success | — |
 > | Security Scan — Bandit | ✅ success | — |
 > | Type Check — MyPy | ✅ success | — |
@@ -56,13 +56,25 @@ All Stages S1–S6, ML1–ML8, RESEARCH, FX, OPTS are BACKGROUND tasks. Implemen
 > | Dockerfile Lint — Hadolint | ✅ success | — |
 > | Helm Chart Lint | ✅ success | — |
 > | Validate ADRs | ✅ success | — |
-> | Browser Compatibility — Playwright | ✅ success | playwright install webkit added |
+> | Browser Compatibility — Playwright | ✅ success | — |
 > | UI Quality Matrix — Playwright | ✅ success | — |
-> | **Integration Tests** | ✅ success | `docker run` directly (not compose), dynamic network, bridge fallback |
-> | **Load Tests — Locust** | 🔄 in_progress | bridge fallback applied, verifying now |
-> | Container Security Scan | 🔴 independent | runs on separate trigger, not blocking |
-> | **Deploy Production** | ⏳ blocked | waiting on: P01 DNS + P04 secrets + P05 Railway IDs |
-> | **Deploy Staging** | ⏳ blocked | same as Deploy Production |
+> | Integration Tests | ✅ success | `docker run` directly, bridge network fallback |
+> | **Load Tests — Locust** | ✅ **success** | `docker exec curl` health check confirmed working |
+> | Container Security Scan | 🔴 independent | separate trigger, not blocking |
+> | **Deploy Production** | 🔴 **failure** | `Validate production deploy contract` step failed — missing 7 secrets/variables |
+> | Deploy Staging | ⏳ blocked | same missing secrets |
+>
+> **Deploy Production blocker:** Missing 7 items from `setup_stage_p.py`:
+> 1. `secrets.RAILWAY_TOKEN`
+> 2. `secrets.VERCEL_TOKEN`
+> 3. `secrets.VERCEL_ORG_ID`
+> 4. `secrets.VERCEL_PROJECT_ID`
+> 5. `secrets.INFISICAL_TOKEN` (may already be set)
+> 6. `vars.RAILWAY_PROD_ENV_ID`
+> 7. `vars.RAILWAY_PROD_ML_SERVICE_ID`
+> 8. `vars.RAILWAY_PROD_BFF_SERVICE_ID`
+>
+> **Action:** Run `python scripts/setup_stage_p.py --init` → fill `scripts/STAGE_P_VALUES.json` → `python scripts/setup_stage_p.py`
 
 - [ ] P08 — Verify frontend loads at public URL
 - [ ] P09 — Configure Infisical secret sync pipeline
