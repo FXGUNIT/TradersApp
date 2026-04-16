@@ -46,13 +46,13 @@ All Stages S1–S6, ML1–ML8, RESEARCH, FX, OPTS are BACKGROUND tasks. Implemen
 > | ML Engine Docker Build | ✅ Fixed | Removed `defaults.run.working-directory: ml-engine`; use `docker build --file ml-engine/Dockerfile .` |
 > | Integration Tests | ✅ Fixed | Build images locally, `docker run` directly (bypasses compose), dynamic network discovery |
 > | Load Tests | ✅ Fixed | Same as Integration Tests — builds images locally before `docker run` |
-> | Unit Tests | ✅ |
-> | Frontend Build | ✅ |
-> | Security Bandit | ✅ |
-> | Type Check | ✅ |
-> | File Size Gate | ✅ |
-> | Container Security Scan | 🔴 Independent — runs separately, not blocking |
-> | **deploy-production** | ⏳ Waiting on: P04 secrets + P05 Railway IDs + P01/P02 DNS |
+> | Unit Tests | ✅ | — |
+> | Frontend Build | ✅ | — |
+> | Security Bandit | ✅ | — |
+> | Type Check | ✅ | — |
+> | File Size Gate | ✅ | — |
+> | Container Security Scan | 🔴 Independent | Runs separately — not blocking |
+> | **deploy-production** | ⏳ Waiting | P04 secrets + P05 Railway IDs + P01/P02 DNS |
 - [ ] P08 — Verify frontend loads at public URL
 - [ ] P09 — Configure Infisical secret sync pipeline
 - [ ] P10 — DNS propagation verified (48h)
