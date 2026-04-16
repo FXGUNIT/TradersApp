@@ -26,11 +26,33 @@ All Stages S1–S6, ML1–ML8, RESEARCH, FX, OPTS are BACKGROUND tasks. Implemen
 
 - [ ] P01 — Reserve domain name
 - [ ] P02 — Update DNS A record to Vercel/Railway IP
-- [ ] P03 — Configure frontend `vite.config.ts` binding to domain
-- [ ] P04 — Push all 8 GitHub Actions secrets (DHAN_CLIENT_ID, DHAN_SECRET_KEY, FINNHUB_TOKEN, MLFLOW_*, etc.)
+- [x] P03 — Configure frontend `vite.config.ts` binding to domain
+  **✅ Done.** `vite.config.js` now has VITE_BFF_URL with domain-aware proxy fallback to `https://bff.traders.app` in production.
+- [ ] P04 — Push all 8 GitHub Actions secrets
+  **Partial.** `scripts/setup_stage_p.py` exists. Run `python scripts/setup_stage_p.py --init` to generate template, fill real values, then `python scripts/setup_stage_p.py` to push. Still needed:
+  - Vercel token + org/project IDs (for frontend deploy)
+  - Railway token (for backend deploy)
+  - INFISICAL_TOKEN ✅ (already pushed)
+  - FINNHUB_TOKEN ✅ / NEWS_API_KEY ✅
+  - MLFLOW_TRACKING_URI ✅ / AWS keys ✅
 - [ ] P05 — Push all Railway environment variables
 - [ ] P06 — Verify BFF health endpoint returns HTTP 200
 - [ ] P07 — Verify CI pipeline `deploy-production` job succeeds
+
+> **CI Pipeline — Fixes Applied (Apr 16)**
+> | Job | Status | Fix |
+> |---|---|---|
+> | BFF Server | ✅ Fixed | Removed `defaults.run.working-directory: bff`; use `docker build --file bff/Dockerfile .` |
+> | ML Engine Docker Build | ✅ Fixed | Removed `defaults.run.working-directory: ml-engine`; use `docker build --file ml-engine/Dockerfile .` |
+> | Integration Tests | ✅ Fixed | Build images locally, `docker run` directly (bypasses compose), dynamic network discovery |
+> | Load Tests | ✅ Fixed | Same as Integration Tests — builds images locally before `docker run` |
+> | Unit Tests | ✅ |
+> | Frontend Build | ✅ |
+> | Security Bandit | ✅ |
+> | Type Check | ✅ |
+> | File Size Gate | ✅ |
+> | Container Security Scan | 🔴 Independent — runs separately, not blocking |
+> | **deploy-production** | ⏳ Waiting on: P04 secrets + P05 Railway IDs + P01/P02 DNS |
 - [ ] P08 — Verify frontend loads at public URL
 - [ ] P09 — Configure Infisical secret sync pipeline
 - [ ] P10 — DNS propagation verified (48h)
