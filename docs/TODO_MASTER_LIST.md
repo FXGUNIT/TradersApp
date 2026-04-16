@@ -24,40 +24,49 @@ All Stages S1–S6, ML1–ML8, RESEARCH, FX, OPTS are BACKGROUND tasks. Implemen
 ## STAGE P — Production Deployment (Stage P: P01–P15)
 *See: `docs/STAGE_P_ROADMAP.md` for full detail*
 
-- [ ] P01 — Reserve domain name
-- [ ] P02 — Update DNS A record to Vercel/Railway IP
-- [x] P03 — Configure frontend `vite.config.ts` binding to domain
-  **✅ Done.** `vite.config.js` now has VITE_BFF_URL with domain-aware proxy fallback to `https://bff.traders.app` in production.
+- [ ] P01 — Reserve domain name (traders.app)
+- [ ] P02 — Create DNS A/CNAME records at domain registrar
+  **Needed:** bff.traders.app → Railway BFF IP, api.traders.app → Railway ML IP, staging.traders.app → Railway staging
+- [x] P03 — Configure frontend `vite.config.ts` binding to domain ✅
 - [ ] P04 — Push all 8 GitHub Actions secrets
-  **Partial.** `scripts/setup_stage_p.py` exists. Run `python scripts/setup_stage_p.py --init` to generate template, fill real values, then `python scripts/setup_stage_p.py` to push. Still needed:
-  - Vercel token + org/project IDs (for frontend deploy)
+  **Partial.** Run `python scripts/setup_stage_p.py --init` to generate template, fill real values in `scripts/STAGE_P_VALUES.json`, then `python scripts/setup_stage_p.py` to push.
+  Still needed:
+  - Vercel token + org ID + project ID (for frontend deploy)
   - Railway token (for backend deploy)
-  - INFISICAL_TOKEN ✅ (already pushed)
-  - FINNHUB_TOKEN ✅ / NEWS_API_KEY ✅
-  - MLFLOW_TRACKING_URI ✅ / AWS keys ✅
+  - Discord/Slack/PagerDuty webhook URLs
+  Already pushed: INFISICAL_TOKEN, FINNHUB_TOKEN, NEWS_API_KEY, MLFLOW_TRACKING_URI, AWS keys
 - [ ] P05 — Push all Railway environment variables
+  **Needed:** 6 Railway IDs (prod/staging env + service IDs for ML Engine + BFF)
+  Run `python scripts/setup_stage_p.py --init` → fill `scripts/STAGE_P_VALUES.json` → `python scripts/setup_stage_p.py`
 - [ ] P06 — Verify BFF health endpoint returns HTTP 200
 - [ ] P07 — Verify CI pipeline `deploy-production` job succeeds
 
-**CI Pipeline — Fixes Applied (Apr 16)**
-
-| Job | Status | Fix |
-|---|---|---|
-| BFF Server | ✅ Fixed | Removed `defaults.run.working-directory: bff`; use `docker build --file bff/Dockerfile .` |
-| ML Engine Docker Build | ✅ Fixed | Removed `defaults.run.working-directory: ml-engine`; use `docker build --file ml-engine/Dockerfile .` |
-| Integration Tests | ✅ Fixed | Build images locally, `docker run` directly (bypasses compose), dynamic network discovery |
-| Load Tests | ✅ Fixed | Same as Integration Tests — builds images locally before `docker run` |
-| Unit Tests | ✅ | — |
-| Frontend Build | ✅ | — |
-| Security Bandit | ✅ | — |
-| Type Check | ✅ | — |
-| File Size Gate | ✅ | — |
-| Container Security Scan | 🔴 Independent | Runs separately — not blocking |
-| **deploy-production** | ⏳ Waiting | P04 secrets + P05 Railway IDs + P01/P02 DNS |
+> **CI Pipeline Status (Updated 2026-04-16 12:24 IST)**
+>
+> | Job | Status | Notes |
+> |---|---|---|
+> | Unit Tests | ✅ success | sklearn force_all_finite → lightgbm 4.6.0 |
+> | BFF Server | ✅ success | `ghcr.io/fxgunit` lowercase + docker context `bff/` |
+> | ML Engine Docker Build | ✅ success | docker context `ml-engine/` |
+> | Frontend Build | ✅ success | — |
+> | Security Scan — Bandit | ✅ success | — |
+> | Type Check — MyPy | ✅ success | — |
+> | File Size Gate | ✅ success | — |
+> | Architecture Contracts | ✅ success | — |
+> | Dockerfile Lint — Hadolint | ✅ success | — |
+> | Helm Chart Lint | ✅ success | — |
+> | Validate ADRs | ✅ success | — |
+> | Browser Compatibility — Playwright | ✅ success | playwright install webkit added |
+> | UI Quality Matrix — Playwright | ✅ success | — |
+> | **Integration Tests** | ✅ success | `docker run` directly (not compose), dynamic network, bridge fallback |
+> | **Load Tests — Locust** | 🔄 in_progress | bridge fallback applied, verifying now |
+> | Container Security Scan | 🔴 independent | runs on separate trigger, not blocking |
+> | **Deploy Production** | ⏳ blocked | waiting on: P01 DNS + P04 secrets + P05 Railway IDs |
+> | **Deploy Staging** | ⏳ blocked | same as Deploy Production |
 
 - [ ] P08 — Verify frontend loads at public URL
 - [ ] P09 — Configure Infisical secret sync pipeline
-- [ ] P10 — DNS propagation verified (48h)
+- [ ] P10 — DNS propagation verified (48h after P01/P02)
 - [ ] P11 — Observability validated (Prometheus + Grafana + Slack alerts)
 - [ ] P12 — Backup drill completed
 - [ ] P13 — Rollback rehearsal completed
