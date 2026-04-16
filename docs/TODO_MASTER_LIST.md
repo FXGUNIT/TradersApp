@@ -697,3 +697,20 @@ All Stages S1–S6, ML1–ML8, RESEARCH, FX, OPTS are BACKGROUND tasks. Implemen
   - Universal Setup Classifier: RANGE_DAY / FAILED_BREAKOUT / TREND_PULLBACK / NO_SETUP
   - Auto-labeling from IB behavior + candle close confirmation
   - Real Fisher diagonal computation replacing torch stub
+
+
+<!-- live-status:start -->
+## Live Status
+Generated: `2026-04-17 00:37`  ·  Run `python scripts/update_todo_progress.py --once` to update
+
+```text
+Active Backlog    0.0%  [------------------------]
+Stage Progress  00/00 complete
+Task Counts     done 000 | in progress 000 | blocked 000 | todo 000 | total 000
+```
+
+| Section | Tasks | Progress | Status |
+|---|---|---:|---|
+
+
+<!-- live-status:end -->
