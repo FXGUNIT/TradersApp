@@ -417,7 +417,7 @@ jobs:
   rollback:
     name: Rollback on Failure
     runs-on: ubuntu-latest
-    if: ${{ failure() && github.event_name != 'workflow_dispatch' }}
+    if: ${{ failure() && needs.deploy.result == 'failure' && github.event_name != 'workflow_dispatch' }}
     needs: [deploy]
     environment:
       name: ${{ needs.deploy.outputs.environment || 'staging' }}
