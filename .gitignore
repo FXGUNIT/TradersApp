@@ -68,3 +68,4 @@ bandit-report.txt
 # Special Windows files
 nul
 airflow/reports/*.json
+.gstack/
