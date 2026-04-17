@@ -164,7 +164,7 @@ EOF
         name="$(printf '%s\n' "$line" | awk '{print $7}')"
         message="$(printf '%s\n' "$line" | cut -d' ' -f8-)"
 
-        if [ -n "$cutoff" ] && [ -n "$last_seen" ] && [ "$last_seen" \< "$cutoff" ]; then
+        if [ -n "$cutoff" ] && [ -n "$last_seen" ] && [ "$last_seen" < "$cutoff" ]; then
           continue
         fi
 
