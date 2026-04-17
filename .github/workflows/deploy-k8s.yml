@@ -307,6 +307,7 @@ jobs:
             ./k8s/helm/tradersapp \
             --namespace "$NS" \
             --create-namespace \
+            --install \
             --set global.imageTag="${TAG}" \
             -f ./k8s/helm/tradersapp/values.prod.yaml \
             --wait \
