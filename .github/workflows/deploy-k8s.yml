@@ -178,6 +178,33 @@ jobs:
           echo "--- current namespace: ${{ vars.K8S_NAMESPACE || 'tradersapp' }}"
           kubectl get nodes
 
+      # ── Stale workload cleanup ─────────────────────────────────────────────
+      # Wipes crash-looped pods + leftover jobs from failed deploys BEFORE
+      # the new helm upgrade runs. Prevents atomic-rollback poisoning where
+      # a misconfigured image poisons the next deploy's rollout.
+      - name: Clean stale workloads before deploy
+        run: |
+          NS="${{ vars.K8S_NAMESPACE || 'tradersapp' }}"
+          echo "--- Pruning failed/tracking pods from previous deploy ---"
+          # Remove pods that are CrashLoopBackOff, ImagePullBackOff, or ErrImagePull
+          for POD in $(kubectl get pods -n "$NS" --no-headers -o custom-columns=POD:.metadata.name,RS:.metadata.ownerReferences[0].name,ST:.status.phase,RC:.status.containerStatuses[0].state.waiting.reason 2>/dev/null | awk '$3!="Running" || $4~/BackOff|Error/ {print $1}'); do
+            echo "  Deleting stale pod: $POD"
+            kubectl delete pod "$POD" -n "$NS" --grace-period=0 --wait=false 2>/dev/null || true
+          done
+
+          # Remove orphaned migration Jobs from previous runs (safe to retry)
+          kubectl delete job ml-engine-migration -n "$NS" --ignore-not-found=true 2>/dev/null || true
+
+          # Prune all Helm releases with status failed or pending-install/upgrade
+          for RELEASE in $(helm list -n "$NS" -q 2>/dev/null); do
+            STATUS=$(helm status "$RELEASE" -n "$NS" -o json 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('info','{}'))" 2>/dev/null || echo "unknown")
+            helm uninstall "$RELEASE" -n "$NS" --wait=false 2>/dev/null || true
+          done
+
+          echo "--- Waiting 15s for evicted pods to disappear ---"
+          sleep 15
+          kubectl get pods -n "$NS" --no-headers
+
       # ── Helm setup ───────────────────────────────────────────────────────
       - name: Install Helm + helm-diff plugin
         run: |

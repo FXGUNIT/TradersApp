@@ -40,7 +40,7 @@ bff:
   image:
     pullPolicy: IfNotPresent
     repository: ghcr.io/fxgunit/tradersapp/bff
-    tag: v1.0.0
+    tag: ''
   replicaCount: 3
   resources:
     limits:
@@ -69,7 +69,7 @@ frontend:
   image:
     pullPolicy: IfNotPresent
     repository: ghcr.io/fxgunit/tradersapp/frontend
-    tag: v1.0.0
+    tag: ''
   ingress:
     enabled: false
   replicaCount: 2
@@ -176,7 +176,7 @@ mlEngine:
   image:
     pullPolicy: IfNotPresent
     repository: ghcr.io/fxgunit/tradersapp/ml-engine
-    tag: v1.0.0
+    tag: ''
   modelRegistrySidecar:
     maxCachedInstances: 4
     port: 8010
