@@ -39,7 +39,7 @@ bff:
       name: bff-secrets
   image:
     pullPolicy: IfNotPresent
-    repository: tradersapp/bff
+    repository: ghcr.io/fxgunit/tradersapp/bff
     tag: v1.0.0
   replicaCount: 3
   resources:
@@ -68,7 +68,7 @@ frontend:
   enabled: true
   image:
     pullPolicy: IfNotPresent
-    repository: tradersapp/frontend
+    repository: ghcr.io/fxgunit/tradersapp/frontend
     tag: v1.0.0
   ingress:
     enabled: false
@@ -175,7 +175,7 @@ mlEngine:
     slackWebhookSecretRef: observability-secrets/SLACK_HPA_WEBHOOK_URL
   image:
     pullPolicy: IfNotPresent
-    repository: tradersapp/ml-engine
+    repository: ghcr.io/fxgunit/tradersapp/ml-engine
     tag: v1.0.0
   modelRegistrySidecar:
     maxCachedInstances: 4
