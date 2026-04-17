@@ -169,7 +169,7 @@ mlEngine:
   - secretRef:
       name: ml-engine-secrets
   hpaWatcher:
-    enabled: true
+    enabled: false
     lookbackSeconds: 300
     pollIntervalSeconds: 30
     slackWebhookSecretRef: observability-secrets/SLACK_HPA_WEBHOOK_URL
