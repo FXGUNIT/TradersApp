@@ -69,3 +69,4 @@ bandit-report.txt
 nul
 airflow/reports/*.json
 .gstack/
+.venv-research/
