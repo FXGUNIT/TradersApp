@@ -287,7 +287,7 @@ mlflow:
     type: ClusterIP
   trackingUri: http://mlflow:5000
 monitoringStack:
-  enabled: true
+  enabled: false
   grafana:
     persistence:
       storageClassName: longhorn
