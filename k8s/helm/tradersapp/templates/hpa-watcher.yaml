@@ -78,7 +78,7 @@ data:
           colour="#ECB22E"
           ;;
       esac
-
+      
       escaped_reason="$(json_escape "$event_reason")"
       escaped_hpa="$(json_escape "$hpa_name")"
       escaped_namespace="$(json_escape "$namespace")"
