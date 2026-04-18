@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_TODO_PATH = ROOT / "docs" / "TODO_MASTER_LIST.md"
 PROGRESS_START = "<!-- live-status:start -->"
 PROGRESS_END = "<!-- live-status:end -->"
-LAST_UPDATED_RE = re.compile(r"^\*\*Last updated:\*\* .+$", re.MULTILINE)
+LAST_UPDATED_RE = re.compile(r"^\*\*Last Updated:\*\* .+$", re.MULTILINE | re.IGNORECASE)
 STATUS_SCORE = {
     "Done": 1.0,
     "Partial": 0.5,
@@ -300,7 +300,7 @@ def build_updated_markdown(todo_path: Path) -> str:
 
     # ---- 3. Touch timestamp on Last updated line ----
     updated = LAST_UPDATED_RE.sub(
-        f"**Last updated:** {datetime.now().astimezone().strftime('%Y-%m-%d')}",
+        f"**Last Updated:** {datetime.now().astimezone().strftime('%Y-%m-%d')}",
         updated,
         count=1,
     )
@@ -319,8 +319,104 @@ def _sync_coordination_block(markdown: str) -> str:
 
 
 def _build_live_status_table(markdown: str) -> str:
-    """Build the Live Status markdown table by scanning Stage/Phase task lines."""
-    stage_tasks: dict[str, list[dict]] = {}  # stage_name -> [{id, status, title}]
+    """Build the Live Status markdown table from the current Stage P checklist layout."""
+    section_start = re.search(r"^## STAGE P\b.*$", markdown, re.MULTILINE)
+    if not section_start:
+        return _build_legacy_live_status_table(markdown)
+
+    tail = markdown[section_start.start() :]
+    next_section = re.search(r"^## (?!STAGE P\b)", tail, re.MULTILINE)
+    stage_block = tail[: next_section.start()] if next_section else tail
+
+    sections: list[dict[str, object]] = []
+    current: dict[str, object] | None = None
+    heading_re = re.compile(r"^###\s+(P\d{2})\b.*$")
+    checkbox_re = re.compile(r"^-\s+\[(?P<mark>[ x])\]\s+(?P<title>.+)$")
+
+    for line in stage_block.splitlines():
+        heading_match = heading_re.match(line.strip())
+        if heading_match:
+            if current is not None:
+                sections.append(current)
+            current = {
+                "id": heading_match.group(1),
+                "heading": line.strip()[4:].strip(),
+                "done": 0,
+                "todo": 0,
+            }
+            continue
+
+        if current is None:
+            continue
+
+        checkbox_match = checkbox_re.match(line)
+        if checkbox_match:
+            if checkbox_match.group("mark") == "x":
+                current["done"] += 1
+            else:
+                current["todo"] += 1
+
+    if current is not None:
+        sections.append(current)
+
+    if not sections:
+        return _build_legacy_live_status_table(markdown)
+
+    done_sections = 0
+    active_sections = 0
+    blocked_sections = 0
+    pending_sections = 0
+    done_tasks = 0
+    open_tasks = 0
+    rows: list[str] = []
+
+    for section in sections:
+        section_id = str(section["id"])
+        heading = str(section["heading"])
+        done = int(section["done"])
+        todo = int(section["todo"])
+        total = done + todo
+        pct = (done / total * 100.0) if total else 0.0
+        status_label = _infer_stage_p_status(heading, done, total)
+
+        if status_label == "DONE":
+            done_sections += 1
+        elif status_label in {"IN PROGRESS", "CURRENT BLOCKER"}:
+            active_sections += 1
+        elif status_label.startswith("BLOCKED"):
+            blocked_sections += 1
+        else:
+            pending_sections += 1
+
+        done_tasks += done
+        open_tasks += todo
+
+        label = re.sub(r"^P\d{2}\s*[-:—]*\s*", "", heading).strip()
+        rows.append(f"| {section_id} - {label} | [{done}/{total}] | {pct:5.1f}% | {status_label} |")
+
+    timestamp = datetime.now().astimezone().strftime("%Y-%m-%d %H:%M")
+    section_total = len(sections)
+    task_total = done_tasks + open_tasks
+    backlog_pct = (done_tasks / task_total * 100.0) if task_total else 0.0
+
+    header = (
+        f"{PROGRESS_START}\n"
+        "## Live Status\n"
+        f"Generated: `{timestamp}`  -  Run `python scripts/update_todo_progress.py --once` to update\n\n"
+        "```text\n"
+        f"Stage P Backlog {backlog_pct:5.1f}%  {make_bar(backlog_pct, width=24)}\n"
+        f"Sections        done {format_count(done_sections)} | active {format_count(active_sections)} | blocked {format_count(blocked_sections)} | pending {format_count(pending_sections)} | total {format_count(section_total)}\n"
+        f"Checklist       done {format_count(done_tasks)} | open {format_count(open_tasks)} | total {format_count(task_total)}\n"
+        "```\n\n"
+        "| Section | Tasks | Progress | Status |\n"
+        "|---|---|---:|---|\n"
+    )
+    return header + "\n".join(rows) + f"\n\n{PROGRESS_END}\n"
+
+
+def _build_legacy_live_status_table(markdown: str) -> str:
+    """Fallback for older TODO layouts that used Stage/Phase task IDs."""
+    stage_tasks: dict[str, list[dict]] = {}
     current_section = "Unknown"
 
     lines = markdown.splitlines()
@@ -337,13 +433,14 @@ def _build_live_status_table(markdown: str) -> str:
         if tm:
             marker, tid, title = tm.group(1), tm.group(2), tm.group(3).strip()
             status = _marker_to_status(marker)
-            stage_tasks.setdefault(current_section, []).append({
-                "id": tid,
-                "status": status,
-                "title": title,
-            })
+            stage_tasks.setdefault(current_section, []).append(
+                {
+                    "id": tid,
+                    "status": status,
+                    "title": title,
+                }
+            )
 
-    # Build table and aggregate status bar data.
     rows = []
     total_tasks = 0
     done_tasks = 0
@@ -389,7 +486,7 @@ def _build_live_status_table(markdown: str) -> str:
     header = (
         f"{PROGRESS_START}\n"
         "## Live Status\n"
-        f"Generated: `{timestamp}`  ·  Run `python scripts/update_todo_progress.py --once` to update\n\n"
+        f"Generated: `{timestamp}`  ?  Run `python scripts/update_todo_progress.py --once` to update\n\n"
         "```text\n"
         f"Active Backlog  {backlog_pct:5.1f}%  {make_bar(backlog_pct, width=24)}\n"
         f"Stage Progress  {completed_sections:02d}/{section_total:02d} complete\n"
@@ -399,6 +496,23 @@ def _build_live_status_table(markdown: str) -> str:
         "|---|---|---:|---|\n"
     )
     return header + "\n".join(rows) + f"\n\n{PROGRESS_END}\n"
+
+
+def _infer_stage_p_status(heading: str, done: int, total: int) -> str:
+    normalized = heading.lower()
+    if done == total and total > 0:
+        return "DONE"
+    if "current blocker" in normalized:
+        return "CURRENT BLOCKER"
+    if "blocked by" in normalized:
+        return "BLOCKED"
+    if "in progress" in normalized:
+        return "IN PROGRESS"
+    if "known issue" in normalized:
+        return "KNOWN ISSUE"
+    if "required" in normalized or "pending" in normalized:
+        return "PENDING"
+    return "PENDING"
 
 
 def _marker_to_status(marker: str) -> str:
