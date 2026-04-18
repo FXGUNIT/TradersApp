@@ -67,7 +67,8 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [x] Service enabled and running: `systemctl status k3s` shows `active (running)`
 - [x] k3s survives containerd restarts via systemd watchdog (Restart=always, RestartSec=10)
 - [x] kubeconfig auto-generated at `/tmp/k3s-server.yaml` on boot
-- [ ] kubeconfig refreshed after each k3s restart (token changes) — update KUBECONFIG_B64 secret
+- [x] systemd MemoryMax=750M and --kube-apiserver-arg toleration flags added to prevent cascade OOM
+- [x] kubeconfig refreshed after k3s restart: `sed 's|127.0.0.1|144.24.112.249|g' /tmp/k3s-server.yaml > /tmp/k3s_external.yaml`
 
 ### P04 — OCI Security Configuration ✅ DONE
 - [x] TCP 6443 ingress rule in security list `ocid1.securitylist.oc1.ap-mumbai-1.aaaaaaaa2z34lytlitagp454gasqyh4sahcyhwxj27vt4ybe6gditysjtrjq` (0.0.0.0/0)
@@ -90,29 +91,34 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [x] nginx.conf bff resolver fix (resolver 10.43.0.10 + variable-based proxy_pass)
 - [x] k3s systemd service installed (auto-restart on boot) ✅ P03
 - [x] Ingress-nginx installed via SSH on OCI; CI step has intermittent API failures
+- [x] CI/CD deploy-k8s.yml updated to use `values.minimal.yaml` for core-4-only deploys
 - [ ] External access: Ingress-nginx needs NodePort or LoadBalancer service for port 80/443
 
-### P07 — k3s Namespace + Secrets Bootstrap 🔴 READY TO RUN
-- [ ] Run `scripts/admin/k3s-dev-bootstrap.ps1` via WSL to create tradersapp namespace + secrets
-- [ ] Required secrets: `ml-engine-secrets`, `tradersapp-secrets`, `bff-secrets`, `mlflow-runtime-secret`
-- [ ] Current state: namespace `tradersapp` exists, no secrets deployed yet
-- [ ] Next: run bootstrap script → helm install tradersapp → smoke test
+### P07 — k3s Namespace + Secrets Bootstrap ✅ DONE
+- [x] Run `scripts/admin/k3s-dev-bootstrap.ps1` via WSL — created all 4 secrets
+- [x] Created: `ml-engine-secrets` (16 keys), `tradersapp-secrets` (9 keys), `bff-secrets` (17 keys), `mlflow-runtime-secret` (5 keys)
+- [x] All key presence checks passed (JWT_SECRET, BFF_API_KEY, DATABASE_URL, etc.)
 
 ### P08 — Helm Chart Values ✅ DONE
 - [x] `values.prod.yaml` exists in `k8s/helm/tradersapp/`
 - [x] `values.dev.yaml` exists with dev overrides
+- [x] `values.minimal.yaml` created — core 4 only (bff, frontend, ml-engine, redis) with pinned SHA tags
 - [x] All Docker images tagged with GitHub SHA from CI pipeline
 
 ### P09 — Helm Deployment 🔴 IN PROGRESS
-- Root cause of failures: k3s API server OOMs under pod scheduling load on E2.1.Micro (945MB RAM)
-  - k3s API becomes unresponsive (503 ServiceUnavailable) until containerd is HUP'd
-  - Fix: k3s systemd service (P03 ✅) prevents death between sessions but doesn't prevent runtime OOM
-- [x] Bootstrapped ingress-nginx via SSH on OCI
-- [ ] Current state: namespace `tradersapp` exists, no helm release installed, no secrets deployed
-- [ ] Run bootstrap script → helm install tradersapp → wait for pod ready → smoke test
-- [ ] Reduce values.prod.yaml to core only: bff, ml-engine, frontend, redis
-- [ ] Disable kafka, mlflow, minio, postgresql (PVC not available, no local-storage)
-- [ ] Smoke tests: `bff` health, `ml-engine` health, frontend ingress, end-to-end consensus request
+- Root cause of all failures: E2.1.Micro (945MB RAM) is below the minimum for a standard k3s + multi-pod cluster
+  - k3s API server OOMs under pod scheduling load → 503 ServiceUnavailable → context deadline exceeded
+  - etcd also crashes on 21MB WAL replay under memory pressure
+  - Fix in progress: `values.minimal.yaml` with explicit SHA tags and all non-core services disabled
+  - Fix applied: systemd MemoryMax=750M + kube-apiserver toleration args to prevent cascade OOM
+  - k3s cold-restart pattern: clear etcd data dir → `systemctl restart k3s` when API won't stabilize
+  - kubectl API calls from Windows fail after etcd compaction: use local kubeconfig + wait for stabilization
+- [ ] values.minimal.yaml deployed cleanly: get all pods Running/Ready
+- [ ] Confirm bff, ml-engine, redis pull and start from GHCR with pinned SHA `aaba273`
+- [ ] Frontend CrashLoopBackOff fix: nginx `proxy_pass $bff_backend` needs resolver directive (already fixed in nginx.conf)
+- [ ] Verify images exist on GHCR for all 4 services at SHA aaba273 (trigger rebuild if missing)
+- [ ] Smoke tests: bff /health, ml-engine /health, frontend http://frontend:80, redis-cli ping
+- [ ] KUBECONFIG_B64 secret in GitHub updated after each k3s cold restart
 
 ### P10 — Stateful Services Inside Free Limits 🔴 KNOWN ISSUE
 - k3s is running with `--disable local-storage`, so standard PVC-backed workloads will not work as-is
@@ -288,7 +294,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-18 15:20`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-18 20:35`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Active Backlog    0.0%  [------------------------]
