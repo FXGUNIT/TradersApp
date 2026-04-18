@@ -5,7 +5,13 @@ on:
     branches: [main, staging]
   pull_request:
     branches: [main, staging]
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      bootstrap_edge:
+        description: "Attempt ingress-nginx + cert-manager bootstrap after the core deploy"
+        required: false
+        default: false
+        type: boolean
 
 env:
   NODE_VERSION: '24'
@@ -1083,13 +1089,19 @@ jobs:
             kubectl_retry 24 kubectl --kubeconfig /tmp/kubeconfig apply --validate=false -f "/tmp/${secret_name}.yaml"
           done
 
-      - name: Bootstrap ingress-nginx + cert-manager (production)
-        env:
-          CERT_MANAGER_EMAIL: ${{ vars.CERT_MANAGER_EMAIL || 'admin@traders.app' }}
+      - name: Resolve OCI edge bootstrap mode (production)
+        id: edge_mode
         run: |
-          bash ./scripts/k8s/bootstrap-oci-edge.sh \
-            --kubeconfig /tmp/kubeconfig \
-            --cert-email "${CERT_MANAGER_EMAIL}"
+          ENABLE_EDGE_BOOTSTRAP="false"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.bootstrap_edge }}" = "true" ]; then
+            ENABLE_EDGE_BOOTSTRAP="true"
+          fi
+          echo "enabled=${ENABLE_EDGE_BOOTSTRAP}" >> "$GITHUB_OUTPUT"
+          if [ "${ENABLE_EDGE_BOOTSTRAP}" = "true" ]; then
+            echo "OCI edge bootstrap enabled for this run."
+          else
+            echo "::notice::Skipping OCI edge bootstrap in the automatic deploy path so the free-tier node can stabilize the core runtime first."
+          fi
 
       # ── Deploy ML Engine + BFF via Helm on Oracle Cloud k3s ────────────
       - name: Deploy to Oracle Cloud k3s (production)
@@ -1308,7 +1320,28 @@ jobs:
 
           echo "Deployment complete."
 
+      - name: Bootstrap ingress-nginx + cert-manager (post-core, manual opt-in)
+        if: steps.edge_mode.outputs.enabled == 'true'
+        env:
+          CERT_MANAGER_EMAIL: ${{ vars.CERT_MANAGER_EMAIL || 'admin@traders.app' }}
+        run: |
+          bash ./scripts/k8s/bootstrap-oci-edge.sh \
+            --kubeconfig /tmp/kubeconfig \
+            --cert-email "${CERT_MANAGER_EMAIL}"
+
+      - name: Summarize deferred OCI edge bootstrap
+        if: steps.edge_mode.outputs.enabled != 'true'
+        run: |
+          {
+            echo "### Production Deploy Summary"
+            echo "- Core runtime: deployed via direct kubectl apply"
+            echo "- OCI edge bootstrap: deferred"
+            echo "- Reason: on the OCI E2.1.Micro free node, ingress-nginx + cert-manager cause k3s API flaps before the core pods settle"
+            echo "- Next step: rerun this workflow manually with \`bootstrap_edge=true\` after redis, ml-engine, bff, and frontend stay Ready"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Verify OCI production ingress resources
+        if: steps.edge_mode.outputs.enabled == 'true'
         run: |
           kubectl --kubeconfig /tmp/kubeconfig -n tradersapp get ingress,service,pod -o wide || true
           kubectl --kubeconfig /tmp/kubeconfig -n ingress-nginx get daemonset,pod -o wide || true
