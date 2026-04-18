@@ -17,7 +17,7 @@ bff:
   image:
     pullPolicy: IfNotPresent
     repository: ghcr.io/fxgunit/tradersapp/bff
-    tag: ''
+    tag: 'aaba273'
   resources:
     limits:
       cpu: 500m
@@ -38,7 +38,7 @@ frontend:
   image:
     pullPolicy: IfNotPresent
     repository: ghcr.io/fxgunit/tradersapp/frontend
-    tag: ''
+    tag: 'aaba273'
   ingress:
     enabled: false
   replicaCount: 1
@@ -85,7 +85,7 @@ mlEngine:
   image:
     pullPolicy: IfNotPresent
     repository: ghcr.io/fxgunit/tradersapp/ml-engine
-    tag: ''
+    tag: 'aaba273'
   modelRegistrySidecar:
     enabled: false
   persistence:
