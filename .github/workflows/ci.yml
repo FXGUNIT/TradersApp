@@ -939,6 +939,105 @@ jobs:
         with:
           version: '3.16.3'
 
+      - name: Wait for Kubernetes API (pre-secret sync)
+        run: |
+          set -euo pipefail
+
+          wait_for_kube_api() {
+            local max_tries="${1:-30}"
+            local sleep_seconds="${2:-10}"
+            local attempt=1
+            while [ "${attempt}" -le "${max_tries}" ]; do
+              if kubectl --kubeconfig /tmp/kubeconfig --request-timeout=10s get --raw='/version' >/dev/null 2>&1; then
+                echo "Kubernetes API reachable (attempt ${attempt}/${max_tries})."
+                return 0
+              fi
+              echo "Waiting for Kubernetes API (attempt ${attempt}/${max_tries})..."
+              sleep "${sleep_seconds}"
+              attempt=$((attempt + 1))
+            done
+            echo "::error::Kubernetes API remained unreachable after ${max_tries} attempts."
+            return 1
+          }
+
+          wait_for_kube_api 30 10
+
+      - name: Sync runtime secrets to k8s (pre-deploy)
+        run: |
+          set -euo pipefail
+          NS="tradersapp"
+          RUNTIME_ENV="/tmp/runtime-secrets.env"
+          INFISICAL_ENV="/tmp/infisical-runtime.env"
+
+          wait_for_kube_api() {
+            local max_tries="${1:-24}"
+            local sleep_seconds="${2:-10}"
+            local attempt=1
+            while [ "${attempt}" -le "${max_tries}" ]; do
+              if kubectl --kubeconfig /tmp/kubeconfig --request-timeout=10s get --raw='/version' >/dev/null 2>&1; then
+                return 0
+              fi
+              echo "Waiting for Kubernetes API (attempt ${attempt}/${max_tries})..."
+              sleep "${sleep_seconds}"
+              attempt=$((attempt + 1))
+            done
+            echo "::error::Kubernetes API remained unreachable after ${max_tries} attempts."
+            return 1
+          }
+
+          kubectl_retry() {
+            local max_tries="${1:-18}"
+            shift
+            local attempt=1
+            while [ "${attempt}" -le "${max_tries}" ]; do
+              if "$@"; then
+                return 0
+              fi
+              echo "kubectl command failed (attempt ${attempt}/${max_tries}), retrying..."
+              wait_for_kube_api 6 5 || true
+              sleep 5
+              attempt=$((attempt + 1))
+            done
+            echo "::error::kubectl command failed after ${max_tries} attempts: $*"
+            return 1
+          }
+
+          wait_for_kube_api 24 10
+
+          kubectl --kubeconfig /tmp/kubeconfig create namespace "${NS}" --dry-run=client -o yaml > /tmp/tradersapp-namespace.yaml
+          kubectl_retry 24 kubectl --kubeconfig /tmp/kubeconfig apply --validate=false -f /tmp/tradersapp-namespace.yaml
+
+          : > "${RUNTIME_ENV}"
+          if [ -n "${{ secrets.INFISICAL_TOKEN }}" ]; then
+            curl -fsSL https://raw.githubusercontent.com/Infisical/infisical/main/install-cli-deb.sh | bash
+            export INFISICAL_TOKEN=${{ secrets.INFISICAL_TOKEN }}
+            infisical secrets pull \
+              --env=production \
+              --projectId=0e4f9b8b-846e-4e66-a4aa-97c8fa9863ab \
+              --format=env > "${INFISICAL_ENV}" 2>/dev/null || true
+
+            if [ -s "${INFISICAL_ENV}" ]; then
+              sed -E 's/^export[[:space:]]+//' "${INFISICAL_ENV}" | \
+                awk '/^[A-Za-z_][A-Za-z0-9_]*=.*/ {print $0}' > "${RUNTIME_ENV}"
+            fi
+          else
+            echo "::warning::INFISICAL_TOKEN not set - using fallback runtime secrets for bootability"
+          fi
+
+          if ! grep -q '^DATABASE_URL=' "${RUNTIME_ENV}" 2>/dev/null; then
+            echo "DATABASE_URL=sqlite:////tmp/trading_data.db" >> "${RUNTIME_ENV}"
+          fi
+          if ! grep -q '^NODE_ENV=' "${RUNTIME_ENV}" 2>/dev/null; then
+            echo "NODE_ENV=production" >> "${RUNTIME_ENV}"
+          fi
+
+          for secret_name in ml-engine-secrets bff-secrets tradersapp-secrets; do
+            kubectl --kubeconfig /tmp/kubeconfig -n "${NS}" create secret generic "${secret_name}" \
+              --from-env-file="${RUNTIME_ENV}" \
+              --dry-run=client -o yaml > "/tmp/${secret_name}.yaml"
+            kubectl_retry 24 kubectl --kubeconfig /tmp/kubeconfig apply --validate=false -f "/tmp/${secret_name}.yaml"
+          done
+
       # ── Deploy ML Engine + BFF via Helm on Oracle Cloud k3s ────────────
       - name: Deploy to Oracle Cloud k3s (production)
         run: |
@@ -963,6 +1062,21 @@ jobs:
             return 1
           }
 
+          force_purge_helm_metadata() {
+            echo "Force-purging stale Helm metadata for tradersapp."
+            kubectl --kubeconfig /tmp/kubeconfig -n tradersapp delete secret \
+              -l owner=helm,name=tradersapp --ignore-not-found=true || true
+            kubectl --kubeconfig /tmp/kubeconfig -n tradersapp delete configmap \
+              -l OWNER=TILLER,NAME=tradersapp --ignore-not-found=true || true
+          }
+
+          cleanup_stale_release_workloads() {
+            echo "Cleaning stale workloads for tradersapp release."
+            kubectl --kubeconfig /tmp/kubeconfig -n tradersapp delete \
+              deployment,statefulset,daemonset,replicaset,pod,job,cronjob,ingress,service,configmap \
+              -l app.kubernetes.io/instance=tradersapp --ignore-not-found=true || true
+          }
+
           recover_helm_release_state() {
             local release_status=""
             local last_deployed_rev=""
@@ -974,7 +1088,7 @@ jobs:
               --namespace tradersapp \
               --kubeconfig /tmp/kubeconfig 2>/dev/null | awk '/^STATUS:/{print $2}' || true)"
 
-            if [[ "${release_status}" == pending-* ]]; then
+            if [[ "${release_status}" == pending-* ]] || [[ "${release_status}" == uninstalling ]]; then
               echo "Detected locked Helm release state: ${release_status}. Attempting recovery."
               last_deployed_rev="$(helm history tradersapp \
                 --namespace tradersapp \
@@ -989,9 +1103,13 @@ jobs:
                   --kubeconfig /tmp/kubeconfig || true
               else
                 echo "No previously deployed revision found. Uninstalling locked release before reinstall."
-                helm uninstall tradersapp \
+                if ! helm uninstall tradersapp \
                   --namespace tradersapp \
-                  --kubeconfig /tmp/kubeconfig || true
+                  --kubeconfig /tmp/kubeconfig; then
+                  echo "Helm uninstall failed, forcing metadata purge."
+                  force_purge_helm_metadata
+                fi
+                cleanup_stale_release_workloads
               fi
             fi
 
@@ -1005,9 +1123,14 @@ jobs:
               read -r total_count deployed_count <<< "$(printf '%s' "${history_json}" | python3 -c "import sys,json; h=json.load(sys.stdin); print(len(h), sum(1 for x in h if str(x.get('status','')).lower()=='deployed'))" 2>/dev/null || echo '0 0')"
               if [ "${total_count}" -gt 0 ] && [ "${deployed_count}" -eq 0 ]; then
                 echo "Release history has no deployed revisions. Uninstalling stale release metadata before fresh install."
-                helm uninstall tradersapp \
+                if ! helm uninstall tradersapp \
                   --namespace tradersapp \
-                  --kubeconfig /tmp/kubeconfig || true
+                  --kubeconfig /tmp/kubeconfig; then
+                  echo "Helm uninstall failed, forcing metadata purge."
+                  force_purge_helm_metadata
+                fi
+                force_purge_helm_metadata
+                cleanup_stale_release_workloads
               fi
             fi
           }
@@ -1024,10 +1147,10 @@ jobs:
               --namespace tradersapp \
               --create-namespace \
               --timeout 10m \
-              --atomic \
               --wait \
               --wait-for-jobs \
               -f ./k8s/helm/tradersapp/values.prod.yaml \
+              -f ./k8s/helm/tradersapp/values.prod.micro.yaml \
               --set mlEngine.image.repository="${IMAGE_REPO}/ml-engine" \
               --set mlEngine.image.tag="latest" \
               --set bff.image.repository="${IMAGE_REPO}/bff" \
@@ -1043,7 +1166,7 @@ jobs:
               break
             fi
 
-            if printf '%s' "${HELM_OUTPUT}" | grep -qiE "cluster unreachable|connect: connection refused|i/o timeout|another operation \\(install/upgrade/rollback\\) is in progress|has no deployed releases" && [ "${ATTEMPT}" -lt "${MAX_ATTEMPTS}" ]; then
+            if printf '%s' "${HELM_OUTPUT}" | grep -qiE "cluster unreachable|connect: connection refused|i/o timeout|unexpected EOF|another operation \\(install/upgrade/rollback\\) is in progress|has no deployed releases|failed to delete release" && [ "${ATTEMPT}" -lt "${MAX_ATTEMPTS}" ]; then
               ATTEMPT=$((ATTEMPT + 1))
               echo "Transient cluster/deploy lock failure detected. Running recovery and retrying Helm (attempt ${ATTEMPT}/${MAX_ATTEMPTS})..."
               wait_for_kube_api 12 10 || true
