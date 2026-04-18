@@ -7,7 +7,7 @@ Usage:
   scripts/k8s/deploy-core-minimal.sh \
     --kubeconfig /path/to/kubeconfig \
     --namespace tradersapp \
-    --image-repo ghcr.io/<owner>/tradersapp \
+    --image-repo ghcr.io/<owner> \
     --image-tag <sha>
 
 Purpose:
@@ -148,7 +148,25 @@ render_manifest() {
 wait_for_rollout() {
   local deployment="$1"
   local timeout="${2:-180s}"
-  kubectl_retry 6 kubectl --kubeconfig "${KUBECONFIG_PATH}" -n "${NAMESPACE}" rollout status "deployment/${deployment}" --timeout="${timeout}"
+  echo "Waiting for rollout of deployment/${deployment} (timeout ${timeout})..."
+  if kubectl --kubeconfig "${KUBECONFIG_PATH}" --request-timeout=15s -n "${NAMESPACE}" rollout status "deployment/${deployment}" --timeout="${timeout}"; then
+    return 0
+  fi
+
+  echo "::error::Rollout failed for deployment/${deployment}."
+  wait_for_kube_api 6 5 || true
+  kubectl --kubeconfig "${KUBECONFIG_PATH}" -n "${NAMESPACE}" get deployment,replicaset,pod -l "app=${deployment}" -o wide || true
+  kubectl --kubeconfig "${KUBECONFIG_PATH}" -n "${NAMESPACE}" describe "deployment/${deployment}" || true
+  for pod in $(kubectl --kubeconfig "${KUBECONFIG_PATH}" -n "${NAMESPACE}" get pods -l "app=${deployment}" -o name 2>/dev/null); do
+    pod_name="${pod#pod/}"
+    echo "--- logs ${pod}"
+    kubectl --kubeconfig "${KUBECONFIG_PATH}" -n "${NAMESPACE}" logs "${pod_name}" --all-containers=true --tail=200 || true
+    echo "--- previous logs ${pod}"
+    kubectl --kubeconfig "${KUBECONFIG_PATH}" -n "${NAMESPACE}" logs "${pod_name}" --all-containers=true --tail=200 --previous || true
+    echo "--- describe ${pod}"
+    kubectl --kubeconfig "${KUBECONFIG_PATH}" -n "${NAMESPACE}" describe "${pod}" || true
+  done
+  return 1
 }
 
 cleanup() {
