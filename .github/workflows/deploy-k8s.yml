@@ -1,4 +1,4 @@
-# ─────────────────────────────────────────────────────────────────────────────
+﻿# ─────────────────────────────────────────────────────────────────────────────
 # TradersApp — Kubernetes Deploy Workflow
 #
 # Triggered manually via workflow_dispatch. Builds no images — those are built
