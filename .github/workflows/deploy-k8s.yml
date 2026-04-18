@@ -340,7 +340,7 @@ jobs:
             --wait \
             --timeout "${{ env.HELM_TIMEOUT }}" \
             --history-max 5 \
-            --atomic
+            # --atomic  # removed: fails first-deploy with no prior release
 
       # ── Rollout status ──────────────────────────────────────────────────
       - name: Wait for rollout — bff
