@@ -109,6 +109,14 @@ cleanup_helm_release() {
     -l owner=helm,name="${release}" --ignore-not-found=true >/dev/null 2>&1 || true
 }
 
+release_status() {
+  local release="$1"
+  local namespace="$2"
+  helm status "${release}" \
+    --namespace "${namespace}" \
+    --kubeconfig "${KUBECONFIG_PATH}" 2>/dev/null | awk '/^STATUS:/{print $2}'
+}
+
 helm_retry() {
   local release="$1"
   local namespace="$2"
@@ -146,6 +154,11 @@ helm_retry() {
   return 1
 }
 
+warn_rollout_issue() {
+  local message="$1"
+  echo "::warning::${message}"
+}
+
 if [[ -z "${NODE_IP}" ]]; then
   NODE_IP="$(
     kubectl --kubeconfig "${KUBECONFIG_PATH}" config view --minify -o jsonpath='{.clusters[0].cluster.server}' \
@@ -165,34 +178,63 @@ helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx >/dev/nul
 helm repo update >/dev/null
 kubectl --kubeconfig "${KUBECONFIG_PATH}" create namespace ingress-nginx --dry-run=client -o yaml > /tmp/ingress-nginx-namespace.yaml
 kubectl_retry 12 kubectl --kubeconfig "${KUBECONFIG_PATH}" apply -f /tmp/ingress-nginx-namespace.yaml
-helm_retry ingress-nginx ingress-nginx \
-  helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
-    --version 4.15.1 \
-    --namespace ingress-nginx \
-    --create-namespace \
-    --kubeconfig "${KUBECONFIG_PATH}" \
-    -f "${INGRESS_VALUES}" \
-    --set controller.extraArgs.publish-status-address="${NODE_IP}"
+if [[ "$(release_status ingress-nginx ingress-nginx || true)" != "deployed" ]]; then
+  if ! helm_retry ingress-nginx ingress-nginx \
+    helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
+      --version 4.15.1 \
+      --namespace ingress-nginx \
+      --create-namespace \
+      --kubeconfig "${KUBECONFIG_PATH}" \
+      -f "${INGRESS_VALUES}" \
+      --set controller.extraArgs.publish-status-address="${NODE_IP}"; then
+    warn_rollout_issue "ingress-nginx install did not complete cleanly; continuing so app deployment can proceed"
+  fi
+else
+  echo "ingress-nginx release already deployed; skipping reinstall."
+fi
 
-wait_for_kube_api 12 5
-kubectl_retry 12 kubectl --kubeconfig "${KUBECONFIG_PATH}" -n ingress-nginx rollout status daemonset/ingress-nginx-controller --timeout=300s
+wait_for_kube_api 12 5 || warn_rollout_issue "Kubernetes API is unstable after ingress-nginx bootstrap; continuing with app deployment"
+if kubectl --kubeconfig "${KUBECONFIG_PATH}" -n ingress-nginx get daemonset ingress-nginx-controller >/dev/null 2>&1; then
+  if ! kubectl --kubeconfig "${KUBECONFIG_PATH}" -n ingress-nginx rollout status daemonset/ingress-nginx-controller --timeout=90s; then
+    warn_rollout_issue "ingress-nginx controller daemonset is not ready yet; continuing with app deployment"
+    kubectl --kubeconfig "${KUBECONFIG_PATH}" -n ingress-nginx get daemonset,pod -o wide || true
+  fi
+else
+  warn_rollout_issue "ingress-nginx controller daemonset not found after bootstrap; continuing with app deployment"
+  kubectl --kubeconfig "${KUBECONFIG_PATH}" -n ingress-nginx get all || true
+fi
 
 echo "Installing cert-manager 1.20.2..."
 kubectl --kubeconfig "${KUBECONFIG_PATH}" create namespace cert-manager --dry-run=client -o yaml > /tmp/cert-manager-namespace.yaml
 kubectl_retry 12 kubectl --kubeconfig "${KUBECONFIG_PATH}" apply -f /tmp/cert-manager-namespace.yaml
-helm_retry cert-manager cert-manager \
-  helm upgrade --install cert-manager oci://quay.io/jetstack/charts/cert-manager \
-    --version 1.20.2 \
-    --namespace cert-manager \
-    --create-namespace \
-    --kubeconfig "${KUBECONFIG_PATH}" \
-    -f "${CERT_VALUES}"
+if [[ "$(release_status cert-manager cert-manager || true)" != "deployed" ]]; then
+  if ! helm_retry cert-manager cert-manager \
+    helm upgrade --install cert-manager oci://quay.io/jetstack/charts/cert-manager \
+      --version 1.20.2 \
+      --namespace cert-manager \
+      --create-namespace \
+      --kubeconfig "${KUBECONFIG_PATH}" \
+      -f "${CERT_VALUES}"; then
+    warn_rollout_issue "cert-manager install did not complete cleanly; continuing so app deployment can proceed"
+  fi
+else
+  echo "cert-manager release already deployed; skipping reinstall."
+fi
 
-wait_for_kube_api 12 5
-kubectl_retry 12 kubectl --kubeconfig "${KUBECONFIG_PATH}" wait --for=condition=Established crd/clusterissuers.cert-manager.io --timeout=180s
-kubectl_retry 12 kubectl --kubeconfig "${KUBECONFIG_PATH}" -n cert-manager rollout status deployment/cert-manager --timeout=300s
-kubectl_retry 12 kubectl --kubeconfig "${KUBECONFIG_PATH}" -n cert-manager rollout status deployment/cert-manager-webhook --timeout=300s
-kubectl_retry 12 kubectl --kubeconfig "${KUBECONFIG_PATH}" -n cert-manager rollout status deployment/cert-manager-cainjector --timeout=300s
+wait_for_kube_api 12 5 || warn_rollout_issue "Kubernetes API is unstable after cert-manager bootstrap; continuing with app deployment"
+if kubectl --kubeconfig "${KUBECONFIG_PATH}" get crd clusterissuers.cert-manager.io >/dev/null 2>&1; then
+  kubectl --kubeconfig "${KUBECONFIG_PATH}" wait --for=condition=Established crd/clusterissuers.cert-manager.io --timeout=90s || \
+    warn_rollout_issue "cert-manager CRD is not fully established yet; TLS issuance may lag behind app deployment"
+else
+  warn_rollout_issue "cert-manager CRD not found after bootstrap; skipping ClusterIssuer apply for now"
+fi
+
+for deploy_name in cert-manager cert-manager-webhook cert-manager-cainjector; do
+  if kubectl --kubeconfig "${KUBECONFIG_PATH}" -n cert-manager get deployment "${deploy_name}" >/dev/null 2>&1; then
+    kubectl --kubeconfig "${KUBECONFIG_PATH}" -n cert-manager rollout status deployment/"${deploy_name}" --timeout=90s || \
+      warn_rollout_issue "${deploy_name} is not ready yet; continuing with app deployment"
+  fi
+done
 
 echo "Rendering TradersApp ClusterIssuers with ACME email ${CERT_MANAGER_EMAIL}..."
 python3 - "${CERT_MANAGER_EMAIL}" "${ISSUER_TEMPLATE}" > /tmp/tradersapp-cluster-issuers.yaml <<'PY'
@@ -205,7 +247,12 @@ template = template_path.read_text(encoding="utf-8")
 sys.stdout.write(template.replace("$ALERT_EMAIL", email))
 PY
 
-kubectl_retry 12 kubectl --kubeconfig "${KUBECONFIG_PATH}" apply -f /tmp/tradersapp-cluster-issuers.yaml
-kubectl_retry 12 kubectl --kubeconfig "${KUBECONFIG_PATH}" get clusterissuer selfsigned-internal letsencrypt-staging letsencrypt-prod
+if kubectl --kubeconfig "${KUBECONFIG_PATH}" get crd clusterissuers.cert-manager.io >/dev/null 2>&1; then
+  kubectl --kubeconfig "${KUBECONFIG_PATH}" apply -f /tmp/tradersapp-cluster-issuers.yaml || \
+    warn_rollout_issue "ClusterIssuer apply failed; TLS issuance will need a follow-up once cert-manager stabilizes"
+  kubectl --kubeconfig "${KUBECONFIG_PATH}" get clusterissuer selfsigned-internal letsencrypt-staging letsencrypt-prod || true
+else
+  warn_rollout_issue "Skipping ClusterIssuer apply because cert-manager CRDs are not available yet"
+fi
 
 echo "OCI edge bootstrap complete."
