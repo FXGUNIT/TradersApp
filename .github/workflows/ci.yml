@@ -1156,8 +1156,14 @@ jobs:
           dump_cluster_diagnostics() {
             echo "Collecting tradersapp cluster diagnostics."
             wait_for_kube_api 6 5 || true
+            kubectl --kubeconfig /tmp/kubeconfig get nodes -o wide || true
+            kubectl --kubeconfig /tmp/kubeconfig get --raw='/readyz?verbose' || true
             kubectl --kubeconfig /tmp/kubeconfig -n tradersapp get deployment,pod,service,ingress,pvc -o wide || true
             kubectl --kubeconfig /tmp/kubeconfig -n tradersapp get events --sort-by=.metadata.creationTimestamp || true
+            for node in $(kubectl --kubeconfig /tmp/kubeconfig get nodes -o name 2>/dev/null); do
+              echo "--- describe ${node}"
+              kubectl --kubeconfig /tmp/kubeconfig describe "${node}" || true
+            done
             for pod in $(kubectl --kubeconfig /tmp/kubeconfig -n tradersapp get pods -o name 2>/dev/null); do
               pod_name="${pod#pod/}"
               echo "--- logs ${pod}"
@@ -1227,6 +1233,25 @@ jobs:
             fi
           }
 
+          collect_progress_snapshots() {
+            local interval_seconds="${1:-60}"
+            while true; do
+              echo "===== tradersapp progress snapshot $(date -u +"%Y-%m-%dT%H:%M:%SZ") ====="
+              kubectl --kubeconfig /tmp/kubeconfig get nodes -o wide || true
+              kubectl --kubeconfig /tmp/kubeconfig get --raw='/readyz?verbose' 2>/dev/null | tail -n 20 || true
+              kubectl --kubeconfig /tmp/kubeconfig -n tradersapp get deployment,replicaset,pod,service,pvc -o wide || true
+              kubectl --kubeconfig /tmp/kubeconfig -n tradersapp get events --sort-by=.metadata.creationTimestamp 2>/dev/null | tail -n 60 || true
+              for pod in $(kubectl --kubeconfig /tmp/kubeconfig -n tradersapp get pods -o name 2>/dev/null); do
+                pod_name="${pod#pod/}"
+                echo "--- live logs ${pod}"
+                kubectl --kubeconfig /tmp/kubeconfig -n tradersapp logs "${pod_name}" --all-containers=true --tail=80 || true
+                echo "--- previous logs ${pod}"
+                kubectl --kubeconfig /tmp/kubeconfig -n tradersapp logs "${pod_name}" --all-containers=true --tail=80 --previous || true
+              done
+              sleep "${interval_seconds}"
+            done
+          }
+
           wait_for_kube_api 24 10
           recover_helm_release_state
           cleanup_legacy_disabled_stack
@@ -1234,8 +1259,12 @@ jobs:
           ATTEMPT=1
           MAX_ATTEMPTS=3
           while true; do
+            HELM_LOG="$(mktemp)"
+            PROGRESS_LOG="$(mktemp)"
+            collect_progress_snapshots 60 >"${PROGRESS_LOG}" 2>&1 &
+            COLLECTOR_PID=$!
             set +e
-            HELM_OUTPUT="$(helm upgrade --install tradersapp \
+            helm upgrade --install tradersapp \
               ./k8s/helm/tradersapp \
               --namespace tradersapp \
               --create-namespace \
@@ -1250,10 +1279,18 @@ jobs:
               --set bff.image.tag="latest" \
               --set frontend.image.repository="${IMAGE_REPO}/frontend" \
               --set frontend.image.tag="latest" \
-              --kubeconfig /tmp/kubeconfig 2>&1)"
+              --kubeconfig /tmp/kubeconfig >"${HELM_LOG}" 2>&1
             HELM_RC=$?
             set -e
+            kill "${COLLECTOR_PID}" 2>/dev/null || true
+            wait "${COLLECTOR_PID}" 2>/dev/null || true
+            HELM_OUTPUT="$(cat "${HELM_LOG}")"
+            if [ "${HELM_RC}" -ne 0 ] && [ -s "${PROGRESS_LOG}" ]; then
+              echo "===== deployment progress snapshots ====="
+              cat "${PROGRESS_LOG}"
+            fi
             printf '%s\n' "${HELM_OUTPUT}"
+            rm -f "${HELM_LOG}" "${PROGRESS_LOG}"
 
             if [ "${HELM_RC}" -eq 0 ]; then
               break
