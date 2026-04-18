@@ -36,7 +36,8 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 
 ### Current Checkpoint - 2026-04-19
 - Latest completed failed deploy: GitHub Actions run `24613991349`
-- Current active deploy while this TODO is being updated: run `24614292140`
+- Active pipeline runs while this TODO is being updated: `24614292140` is at `Deploy Production`, and `24614650418` is still in pre-deploy CI jobs
+- Production deploy concurrency is already serialized in CI with `group: deploy-production-main`; upstream test/build jobs can overlap, but the production deploy job is not supposed to run in parallel
 - GHCR images are present; `ghcr.io/fxgunit/bff:latest`, `ghcr.io/fxgunit/frontend:latest`, and `ghcr.io/fxgunit/ml-engine:latest` all exist
 - The current hard blocker is not missing images; it is node pressure on the OCI free-tier k3s node during the core rollout
 - Exact latest failure: the node hit `DiskPressure`, evicted `bff`, `frontend`, `ml-engine`, and `redis`, then applied `node.kubernetes.io/disk-pressure:NoSchedule`, which left replacement pods Pending with `FailedScheduling`
@@ -315,16 +316,32 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-19 03:21`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-19 03:23`  -  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Active Backlog    0.0%  [------------------------]
-Stage Progress  00/00 complete
-Task Counts     done 000 | in progress 000 | blocked 000 | todo 000 | total 000
+Stage P Backlog  51.2%  [############------------]
+Sections        done 008 | active 001 | blocked 005 | pending 003 | total 017
+Checklist       done 042 | open 040 | total 082
 ```
 
 | Section | Tasks | Progress | Status |
 |---|---|---:|---|
-
+| P01 - OCI Compute Instance ✅ DONE | [4/4] | 100.0% | DONE |
+| P02 - k3s Installation & Configuration ✅ DONE | [6/6] | 100.0% | DONE |
+| P03 - k3s Auto-Restart on Boot ✅ DONE | [6/6] | 100.0% | DONE |
+| P04 - OCI Security Configuration ✅ DONE | [3/3] | 100.0% | DONE |
+| P05 - kubeconfig Secret (KUBECONFIG_B64) ✅ DONE | [4/4] | 100.0% | DONE |
+| P06 - CI/CD Pipeline (`deploy-k8s.yml`) DONE - minimal direct-apply path | [12/12] | 100.0% | DONE |
+| P07 - k3s Namespace + Secrets Bootstrap ✅ DONE | [3/3] | 100.0% | DONE |
+| P08 - Helm Chart Values ✅ DONE | [4/4] | 100.0% | DONE |
+| P09 - Core Deployment CURRENT BLOCKER | [0/7] |   0.0% | CURRENT BLOCKER |
+| P10 - Stateful Services Inside Free Limits 🔴 KNOWN ISSUE | [0/5] |   0.0% | KNOWN ISSUE |
+| P11 - Ingress / External Access BLOCKED BY P09 | [0/6] |   0.0% | BLOCKED |
+| P12 - DNS + TLS on Current Registrar ⏳ BLOCKED BY P11 | [0/5] |   0.0% | BLOCKED |
+| P13 - Frontend on OCI k3s BLOCKED BY P11 | [0/4] |   0.0% | BLOCKED |
+| P14 - Observability 🔴 KNOWN ISSUE | [0/3] |   0.0% | KNOWN ISSUE |
+| P15 - Backup & Rollback ⏳ BLOCKED BY P09 | [0/3] |   0.0% | BLOCKED |
+| P16 - Go-Live Sign-Off 🔴 BLOCKED BY P09 | [0/4] |   0.0% | BLOCKED |
+| P17 - Documentation Alignment ⏳ PENDING | [0/3] |   0.0% | PENDING |
 
 <!-- live-status:end -->
