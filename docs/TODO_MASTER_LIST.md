@@ -41,6 +41,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - GHCR images are present; `ghcr.io/fxgunit/bff:latest`, `ghcr.io/fxgunit/frontend:latest`, and `ghcr.io/fxgunit/ml-engine:latest` all exist
 - The current hard blocker is not missing images; it is node pressure on the OCI free-tier k3s node during the core rollout
 - Exact latest failure: the node hit `DiskPressure`, evicted `bff`, `frontend`, `ml-engine`, and `redis`, then applied `node.kubernetes.io/disk-pressure:NoSchedule`, which left replacement pods Pending with `FailedScheduling`
+- New mitigation now added in the deploy path: pre-deploy node-pressure recovery deletes failed/evicted pods and, when `DiskPressure` is active, runs a privileged host cleanup job to prune unused k3s/containerd artifacts before retrying
 - Windows-to-OCI `kubectl` TLS timeout / handshake problems still exist, but GitHub Actions is reaching the cluster far enough to start real deploys; the cluster is then destabilizing during rollout
 
 
@@ -130,6 +131,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
   - Fix already applied: production CI builds and pushes current commit SHA images before deploy
   - Fix already applied: production CI deploys the rendered minimal manifest via direct `kubectl apply`
   - Fix already applied: automatic production CI defers `ingress-nginx` + `cert-manager` until after the core runtime stabilizes
+  - Fix already applied: `scripts/k8s/recover-node-pressure.sh` now runs before the minimal apply and again on `DiskPressure` retry paths to delete failed pods, prune unused k3s/containerd artifacts, and wait for the node taint to clear
   - Operational note: when the API will not stabilize, the existing cold-restart pattern is still `systemctl restart k3s` and, only if required, clearing the etcd data dir before recreating kubeconfig
 - [ ] Inspect and reduce disk usage on the OCI node (`containerd` images, dead sandboxes, evicted pod artifacts, logs, temp files)
 - [ ] Clear `node.kubernetes.io/disk-pressure:NoSchedule` and keep it clear through a full minimal rollout
@@ -316,7 +318,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-19 03:23`  -  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-19 03:32`  -  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Stage P Backlog  51.2%  [############------------]

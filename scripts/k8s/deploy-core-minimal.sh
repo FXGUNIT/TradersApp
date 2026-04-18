@@ -67,6 +67,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 VALUES_FILE="${REPO_ROOT}/k8s/helm/tradersapp/values.minimal.yaml"
 MANIFEST_PATH="$(mktemp)"
+NODE_RECOVERY_SCRIPT="${SCRIPT_DIR}/recover-node-pressure.sh"
 
 wait_for_kube_api() {
   local max_tries="${1:-24}"
@@ -182,6 +183,16 @@ render_manifest
 force_purge_helm_metadata
 cleanup_disabled_stack
 cleanup_core_runtime
+
+if [[ -f "${NODE_RECOVERY_SCRIPT}" ]]; then
+  echo "Running node pressure recovery before applying the core manifest."
+  bash "${NODE_RECOVERY_SCRIPT}" \
+    --kubeconfig "${KUBECONFIG_PATH}" \
+    --namespace "${NAMESPACE}" \
+    --wait-seconds 180
+else
+  echo "::warning::Node recovery script is missing or not executable: ${NODE_RECOVERY_SCRIPT}"
+fi
 
 kubectl_retry 6 kubectl --kubeconfig "${KUBECONFIG_PATH}" apply -f "${MANIFEST_PATH}"
 wait_for_rollout redis 180s

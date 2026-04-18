@@ -1306,6 +1306,18 @@ jobs:
               break
             fi
 
+            if printf '%s' "${DEPLOY_OUTPUT}" | grep -qiE "diskpressure|node\.kubernetes\.io/disk-pressure|untolerated taint|failedscheduling|The node had condition: \[DiskPressure\]" && [ "${ATTEMPT}" -lt "${MAX_ATTEMPTS}" ]; then
+              ATTEMPT=$((ATTEMPT + 1))
+              echo "Node pressure detected during rollout. Running OCI node recovery before retry (attempt ${ATTEMPT}/${MAX_ATTEMPTS})..."
+              bash ./scripts/k8s/recover-node-pressure.sh \
+                --kubeconfig /tmp/kubeconfig \
+                --namespace tradersapp \
+                --wait-seconds 180 || true
+              wait_for_kube_api 12 10 || true
+              sleep 20
+              continue
+            fi
+
             if printf '%s' "${DEPLOY_OUTPUT}" | grep -qiE "cluster unreachable|connect: connection refused|i/o timeout|unexpected EOF|context deadline exceeded|apiserver not ready" && [ "${ATTEMPT}" -lt "${MAX_ATTEMPTS}" ]; then
               ATTEMPT=$((ATTEMPT + 1))
               echo "Transient cluster/runtime failure detected. Retrying minimal deploy (attempt ${ATTEMPT}/${MAX_ATTEMPTS})..."
