@@ -8,12 +8,15 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_TODO_PATH = ROOT / "docs" / "TODO_MASTER_LIST.md"
+MASTER_PROGRESS_START = "<!-- master-progress:start -->"
+MASTER_PROGRESS_END = "<!-- master-progress:end -->"
 PROGRESS_START = "<!-- live-status:start -->"
 PROGRESS_END = "<!-- live-status:end -->"
 LAST_UPDATED_RE = re.compile(r"^\*\*Last Updated:\*\* .+$", re.MULTILINE | re.IGNORECASE)
 STATUS_SCORE = {
     "Done": 1.0,
     "Partial": 0.5,
+    "Blocked": 0.0,
     "Todo": 0.0,
 }
 
@@ -34,6 +37,15 @@ class ExecutionStep:
     stage: str
     status: str
     title: str
+
+
+@dataclass
+class ChecklistItem:
+    area: str
+    phase_id: str
+    phase_title: str
+    status: str
+    raw_title: str
 
 
 def parse_estimate_days(value: str) -> tuple[float, float]:
