@@ -13,7 +13,7 @@ metadata:
 data:
   MODEL_STORE: "/models/store"
   MODEL_STORE_READ_ONLY: "true"
-  MODEL_REGISTRY_MODE: "sidecar"
+  MODEL_REGISTRY_MODE: {{ ternary "sidecar" "direct" .Values.mlEngine.modelRegistrySidecar.enabled | quote }}
   MODEL_REGISTRY_URL: "http://127.0.0.1:{{ .Values.mlEngine.modelRegistrySidecar.port }}"
   MODEL_REGISTRY_PORT: {{ .Values.mlEngine.modelRegistrySidecar.port | quote }}
   MODEL_REGISTRY_MAX_CACHED_INSTANCES: {{ .Values.mlEngine.modelRegistrySidecar.maxCachedInstances | quote }}

@@ -130,7 +130,7 @@ spec:
             - name: MODEL_STORE_READ_ONLY
               value: "true"
             - name: MODEL_REGISTRY_MODE
-              value: "sidecar"
+              value: {{ ternary "sidecar" "direct" .Values.mlEngine.modelRegistrySidecar.enabled | quote }}
             - name: MODEL_REGISTRY_URL
               value: "http://127.0.0.1:{{ .Values.mlEngine.modelRegistrySidecar.port }}"
             - name: MODEL_REGISTRY_PORT
@@ -238,6 +238,7 @@ spec:
               readOnly: true
             - name: tmp
               mountPath: /tmp
+        {{- if .Values.mlEngine.modelRegistrySidecar.enabled }}
         - name: model-registry
           image: "{{ .Values.mlEngine.image.repository }}:{{ .Values.mlEngine.image.tag }}"
           imagePullPolicy: {{ include "tradersapp.imagePullPolicy" .Values.mlEngine.image }}
@@ -306,6 +307,7 @@ spec:
               readOnly: true
             - name: tmp
               mountPath: /tmp
+        {{- end }}
       volumes:
         - name: data
           {{- if .Values.mlEngine.runtimeState.enabled }}

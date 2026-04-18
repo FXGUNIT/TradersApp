@@ -47,6 +47,7 @@ mlEngine:
   runtimeState:
     enabled: false
   modelRegistrySidecar:
+    enabled: false
     warmup: false
     maxCachedInstances: 1
     resources:

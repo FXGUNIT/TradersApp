@@ -178,6 +178,7 @@ mlEngine:
     repository: ghcr.io/fxgunit/tradersapp/ml-engine
     tag: ''
   modelRegistrySidecar:
+    enabled: true
     maxCachedInstances: 4
     port: 8010
     resources:

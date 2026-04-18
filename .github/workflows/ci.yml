@@ -1084,6 +1084,17 @@ jobs:
               --ignore-not-found=true || true
           }
 
+          dump_cluster_diagnostics() {
+            echo "Collecting tradersapp cluster diagnostics."
+            wait_for_kube_api 6 5 || true
+            kubectl --kubeconfig /tmp/kubeconfig -n tradersapp get deployment,pod,service,ingress,pvc -o wide || true
+            kubectl --kubeconfig /tmp/kubeconfig -n tradersapp get events --sort-by=.metadata.creationTimestamp || true
+            for pod in $(kubectl --kubeconfig /tmp/kubeconfig -n tradersapp get pods -o name 2>/dev/null); do
+              echo "--- describe ${pod}"
+              kubectl --kubeconfig /tmp/kubeconfig -n tradersapp describe "${pod}" || true
+            done
+          }
+
           recover_helm_release_state() {
             local release_status=""
             local last_deployed_rev=""
@@ -1182,6 +1193,7 @@ jobs:
               continue
             fi
 
+            dump_cluster_diagnostics
             exit "${HELM_RC}"
           done
 

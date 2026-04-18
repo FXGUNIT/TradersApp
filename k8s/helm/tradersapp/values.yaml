@@ -130,6 +130,7 @@ mlEngine:
     accessModes: ["ReadWriteOnce"]
     storageClass: local-path # Use longhorn in self-hosted production
   modelRegistrySidecar:
+    enabled: true
     port: 8010
     warmup: true
     maxCachedInstances: 4
