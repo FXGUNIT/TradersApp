@@ -1312,7 +1312,7 @@ jobs:
               bash ./scripts/k8s/recover-node-pressure.sh \
                 --kubeconfig /tmp/kubeconfig \
                 --namespace tradersapp \
-                --wait-seconds 180 || true
+                --wait-seconds 300 || true
               wait_for_kube_api 12 10 || true
               sleep 20
               continue

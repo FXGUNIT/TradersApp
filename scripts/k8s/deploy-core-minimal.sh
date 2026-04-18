@@ -189,7 +189,7 @@ if [[ -f "${NODE_RECOVERY_SCRIPT}" ]]; then
   bash "${NODE_RECOVERY_SCRIPT}" \
     --kubeconfig "${KUBECONFIG_PATH}" \
     --namespace "${NAMESPACE}" \
-    --wait-seconds 180
+    --wait-seconds 300
 else
   echo "::warning::Node recovery script is missing or not executable: ${NODE_RECOVERY_SCRIPT}"
 fi
