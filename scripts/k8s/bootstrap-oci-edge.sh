@@ -192,6 +192,18 @@ warn_rollout_issue() {
   echo "::warning::${message}"
 }
 
+cleanup_ingress_admission_artifacts() {
+  echo "Removing stale ingress-nginx admission artifacts for OCI free-tier mode..."
+  kubectl --kubeconfig "${KUBECONFIG_PATH}" delete validatingwebhookconfiguration ingress-nginx-admission \
+    --ignore-not-found=true >/dev/null 2>&1 || true
+  kubectl --kubeconfig "${KUBECONFIG_PATH}" -n ingress-nginx delete service ingress-nginx-controller-admission \
+    --ignore-not-found=true >/dev/null 2>&1 || true
+  kubectl --kubeconfig "${KUBECONFIG_PATH}" -n ingress-nginx delete secret ingress-nginx-admission \
+    --ignore-not-found=true >/dev/null 2>&1 || true
+  kubectl --kubeconfig "${KUBECONFIG_PATH}" -n ingress-nginx delete job ingress-nginx-admission-create ingress-nginx-admission-patch \
+    --ignore-not-found=true >/dev/null 2>&1 || true
+}
+
 if [[ -z "${NODE_IP}" ]]; then
   NODE_IP="$(
     kubectl --kubeconfig "${KUBECONFIG_PATH}" config view --minify -o jsonpath='{.clusters[0].cluster.server}' \
@@ -212,20 +224,18 @@ fi
 echo "Installing ingress-nginx 4.15.1 for bare-metal OCI access on ${NODE_IP}..."
 helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx >/dev/null 2>&1 || true
 helm repo update >/dev/null
-if [[ "$(release_status ingress-nginx ingress-nginx || true)" != "deployed" ]]; then
-  if ! helm_retry ingress-nginx ingress-nginx \
-    helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
-      --version 4.15.1 \
-      --namespace ingress-nginx \
-      --create-namespace \
-      --kubeconfig "${KUBECONFIG_PATH}" \
-      -f "${INGRESS_VALUES}" \
-      --set controller.extraArgs.publish-status-address="${NODE_IP}"; then
-    warn_rollout_issue "ingress-nginx install did not complete cleanly; continuing so app deployment can proceed"
-  fi
-else
-  echo "ingress-nginx release already deployed; skipping reinstall."
+if ! helm_retry ingress-nginx ingress-nginx \
+  helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
+    --version 4.15.1 \
+    --namespace ingress-nginx \
+    --create-namespace \
+    --kubeconfig "${KUBECONFIG_PATH}" \
+    -f "${INGRESS_VALUES}" \
+    --set controller.extraArgs.publish-status-address="${NODE_IP}"; then
+  warn_rollout_issue "ingress-nginx install did not complete cleanly; continuing so app deployment can proceed"
 fi
+
+cleanup_ingress_admission_artifacts
 
 wait_for_kube_api "${POST_INSTALL_API_WAIT_TRIES}" "${POST_INSTALL_API_WAIT_SLEEP}" || warn_rollout_issue "Kubernetes API is unstable after ingress-nginx bootstrap; continuing with app deployment"
 if kubectl --kubeconfig "${KUBECONFIG_PATH}" -n ingress-nginx get daemonset ingress-nginx-controller >/dev/null 2>&1; then
