@@ -194,6 +194,11 @@ jobs:
 
           # Remove orphaned migration Jobs from previous runs (safe to retry)
           kubectl delete job ml-engine-migration -n "$NS" --ignore-not-found=true 2>/dev/null || true
+          kubectl delete horizontalpodautoscaler,poddisruptionbudget -n "$NS" \
+            -l app.kubernetes.io/instance=tradersapp --ignore-not-found=true 2>/dev/null || true
+          kubectl delete persistentvolumeclaim -n "$NS" \
+            redis-pvc ml-models-pvc ml-state-pvc mlflow-postgres-pvc minio-pvc tradersapp-feast-features data-kafka-0 \
+            --ignore-not-found=true 2>/dev/null || true
 
           # Note: Do NOT uninstall helm releases here -- that removes the namespace
           # and causes subsequent steps to fail. Helm upgrades handle cleanup.
@@ -261,11 +266,16 @@ jobs:
       - name: Helm diff (preview changes)
         run: |
           TAG="${{ steps.image_tag.outputs.tag }}"
+          ENV_NAME="${{ needs.gate.outputs.environment }}"
+          VALUES_ARGS=(-f ./k8s/helm/tradersapp/values.prod.yaml)
+          if [ "$ENV_NAME" = "production" ]; then
+            VALUES_ARGS+=(-f ./k8s/helm/tradersapp/values.prod.micro.yaml)
+          fi
           helm diff upgrade tradersapp \
             ./k8s/helm/tradersapp \
             --namespace "${{ vars.K8S_NAMESPACE || 'tradersapp' }}" \
             --set global.imageTag="${TAG}" \
-            -f ./k8s/helm/tradersapp/values.prod.yaml \
+            "${VALUES_ARGS[@]}" \
             --detailed-exitcode \
             --no-color || DIFF_EXIT=$?
           if [ "${DIFF_EXIT:-0}" -eq 2 ]; then
@@ -326,6 +336,12 @@ jobs:
         run: |
           TAG="${{ steps.image_tag.outputs.tag }}"
           NS="${{ vars.K8S_NAMESPACE || 'tradersapp' }}"
+          ENV_NAME="${{ needs.gate.outputs.environment }}"
+          VALUES_ARGS=(-f ./k8s/helm/tradersapp/values.prod.yaml)
+          if [ "$ENV_NAME" = "production" ]; then
+            VALUES_ARGS+=(-f ./k8s/helm/tradersapp/values.prod.micro.yaml)
+          fi
+
 
           helm upgrade tradersapp \
             ./k8s/helm/tradersapp \
@@ -333,7 +349,7 @@ jobs:
             --create-namespace \
             --install \
             --set global.imageTag="${TAG}" \
-            -f ./k8s/helm/tradersapp/values.prod.yaml \
+            "${VALUES_ARGS[@]}" \
             --wait \
             --timeout "${{ env.HELM_TIMEOUT }}" \
             --history-max 5 \
