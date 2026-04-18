@@ -86,44 +86,43 @@ data:
       escaped_object="$(json_escape "$involved_object")"
       now_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || printf '%s' 'unknown')"
 
-      cat <<EOF
-{
-  "attachments": [
-    {
-      "color": "$colour",
-      "blocks": [
-        {
-          "type": "header",
-          "text": {
-            "type": "plain_text",
-            "text": "$emoji HPA Scaling Event: $escaped_hpa",
-            "emoji": true
+    payload="$(cat <<END
+      {
+        "attachments": [
+          {
+            "color": "$colour",
+            "blocks": [
+              {
+                "type": "header",
+                "text": {
+                  "type": "plain_text",
+                  "text": "$emoji HPA Scaling Event: $escaped_hpa",
+                  "emoji": true
+                }
+              },
+              {
+                "type": "section",
+                "fields": [
+                  {"type": "mrkdwn", "text": "*Reason:*\n\`$escaped_reason\`"},
+                  {"type": "mrkdwn", "text": "*Namespace:*\n\`$escaped_namespace\`"},
+                  {"type": "mrkdwn", "text": "*Involved Object:*\n\`$escaped_object\`"},
+                  {"type": "mrkdwn", "text": "*First Seen:*\n\`$escaped_first_seen\`"},
+                  {"type": "mrkdwn", "text": "*Event Count:*\n$count"},
+                  {"type": "mrkdwn", "text": "*Message:*\n\`\`\`$escaped_message\`\`\`"}
+                ]
+              },
+              {
+                "type": "context",
+                "elements": [
+                  {"type": "mrkdwn", "text": "TradersApp HPA watcher | namespace=$escaped_namespace | observed_at=$now_utc"}
+                ]
+              }
+            ]
           }
-        },
-        {
-          "type": "section",
-          "fields": [
-            {"type": "mrkdwn", "text": "*Reason:*\n\`$escaped_reason\`"},
-            {"type": "mrkdwn", "text": "*Namespace:*\n\`$escaped_namespace\`"},
-            {"type": "mrkdwn", "text": "*Involved Object:*\n\`$escaped_object\`"},
-            {"type": "mrkdwn", "text": "*First Seen:*\n\`$escaped_first_seen\`"},
-            {"type": "mrkdwn", "text": "*Event Count:*\n$count"},
-            {"type": "mrkdwn", "text": "*Message:*\n\`\`\`$escaped_message\`\`\`"}
-          ]
-        },
-        {
-          "type": "context",
-          "elements": [
-            {"type": "mrkdwn", "text": "TradersApp HPA watcher | namespace=$escaped_namespace | observed_at=$now_utc"}
-          ]
-        }
-      ]
-    }
-  ]
-}
-EOF
-    }
-
+        ]
+      }
+    END
+    )"
     event_already_seen() {
       event_key="$1"
       grep -Fxq "$event_key" "$SEEN_EVENTS_FILE"
