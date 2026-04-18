@@ -586,7 +586,8 @@ jobs:
             echo "⚠ INFISICAL_TOKEN not set; skipping Infisical secret pull for frontend build."
             exit 0
           fi
-          curl -fsSL https://raw.githubusercontent.com/Infisical/infisical/main/install-cli-deb.sh | bash
+          curl -1sLf 'https://artifacts-cli.infisical.com/setup.deb.sh' | sudo -E bash
+          sudo apt-get update && sudo apt-get install -y infisical
           export INFISICAL_TOKEN=${{ secrets.INFISICAL_TOKEN }}
           infisical secrets pull \
             --env=${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }} \
@@ -676,7 +677,8 @@ jobs:
             echo "⚠ INFISICAL_TOKEN not set; skipping Infisical secret pull for BFF build."
             exit 0
           fi
-          curl -fsSL https://raw.githubusercontent.com/Infisical/infisical/main/install-cli-deb.sh | bash
+          curl -1sLf 'https://artifacts-cli.infisical.com/setup.deb.sh' | sudo -E bash
+          sudo apt-get update && sudo apt-get install -y infisical
           export INFISICAL_TOKEN=${{ secrets.INFISICAL_TOKEN }}
           infisical secrets pull \
             --env=${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }} \
@@ -786,7 +788,8 @@ jobs:
             echo "⚠ Skipping Railway secret sync — INFISICAL_TOKEN or RAILWAY_TOKEN not set in GitHub Secrets"
             exit 0
           fi
-          curl -fsSL https://raw.githubusercontent.com/Infisical/infisical/main/install-cli-deb.sh | bash
+          curl -1sLf 'https://artifacts-cli.infisical.com/setup.deb.sh' | sudo -E bash
+          sudo apt-get update && sudo apt-get install -y infisical
           export INFISICAL_TOKEN=${{ secrets.INFISICAL_TOKEN }}
           infisical secrets pull \
             --env=staging \
@@ -1009,7 +1012,8 @@ jobs:
 
           : > "${RUNTIME_ENV}"
           if [ -n "${{ secrets.INFISICAL_TOKEN }}" ]; then
-            curl -fsSL https://raw.githubusercontent.com/Infisical/infisical/main/install-cli-deb.sh | bash
+            curl -1sLf 'https://artifacts-cli.infisical.com/setup.deb.sh' | sudo -E bash
+            sudo apt-get update && sudo apt-get install -y infisical
             export INFISICAL_TOKEN=${{ secrets.INFISICAL_TOKEN }}
             infisical secrets pull \
               --env=production \
@@ -1200,7 +1204,8 @@ jobs:
             echo "⚠ INFISICAL_TOKEN not set — skipping k8s secret sync"
             exit 0
           fi
-          curl -fsSL https://raw.githubusercontent.com/Infisical/infisical/main/install-cli-deb.sh | bash
+          curl -1sLf 'https://artifacts-cli.infisical.com/setup.deb.sh' | sudo -E bash
+          sudo apt-get update && sudo apt-get install -y infisical
           export INFISICAL_TOKEN=${{ secrets.INFISICAL_TOKEN }}
           # Create/update k8s secret directly via kubectl
           infisical secrets pull \
