@@ -195,15 +195,12 @@ jobs:
           # Remove orphaned migration Jobs from previous runs (safe to retry)
           kubectl delete job ml-engine-migration -n "$NS" --ignore-not-found=true 2>/dev/null || true
 
-          # Prune all Helm releases with status failed or pending-install/upgrade
-          for RELEASE in $(helm list -n "$NS" -q 2>/dev/null); do
-            STATUS=$(helm status "$RELEASE" -n "$NS" -o json 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('info','{}'))" 2>/dev/null || echo "unknown")
-            helm uninstall "$RELEASE" -n "$NS" --wait=false 2>/dev/null || true
-          done
+          # Note: Do NOT uninstall helm releases here -- that removes the namespace
+          # and causes subsequent steps to fail. Helm upgrades handle cleanup.
 
-          echo "--- Waiting 15s for evicted pods to disappear ---"
-          sleep 15
-          kubectl get pods -n "$NS" --no-headers
+          echo "--- Waiting 5s for any evicted pods to clear ---"
+          sleep 5
+          kubectl get pods -n "$NS" --no-headers 2>/dev/null || echo "(namespace may not exist yet)"
 
       # ── Helm setup ───────────────────────────────────────────────────────
       - name: Install Helm + helm-diff plugin
@@ -283,7 +280,7 @@ jobs:
           TAG="${{ steps.image_tag.outputs.tag }}"
           NS="${{ vars.K8S_NAMESPACE || 'tradersapp' }}"
 
-          cat << 'MIGRATION_YAML' | kubectl apply -f -
+          cat << MIGRATION_YAML | kubectl apply -f -
           apiVersion: batch/v1
           kind: Job
           metadata:
