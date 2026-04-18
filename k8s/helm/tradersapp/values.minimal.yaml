@@ -1,37 +1,14 @@
-analysisService:
-  enabled: false
-  replicaCount: 2
-  resources:
-    limits:
-      cpu: 500m
-      memory: 512Mi
-    requests:
-      cpu: 100m
-      memory: 128Mi
-  securityContext:
-    runAsNonRoot: true
-    runAsUser: 1002
-  service:
-    healthPort: 8082
-    port: 50051
-    type: ClusterIP
+# Minimal production — core 4 services only for E2.1.Micro (945MB RAM)
+# All non-core services disabled to prevent k3s API OOM during helm install
+
+global:
+  imageTag: aaba273
+
 bff:
-  analysisTransport:
-    grpcAddress: analysis-service:50051
-    grpcStrict: false
-    mode: grpc
-  autoscaling:
-    enabled: true
-    maxReplicas: 10
-    minReplicas: 2
-    targetCPUUtilizationPercentage: 60
-    targetMemoryUtilizationPercentage: 80
-  canary:
-    enabled: false
-    image:
-      tag: ''
-    replicaCount: 1
   enabled: true
+  replicaCount: 1
+  autoscaling:
+    enabled: false
   envFrom:
   - configMapRef:
       name: bff-config
@@ -41,11 +18,10 @@ bff:
     pullPolicy: IfNotPresent
     repository: ghcr.io/fxgunit/tradersapp/bff
     tag: ''
-  replicaCount: 3
   resources:
     limits:
       cpu: 500m
-      memory: 512Mi
+      memory: 256Mi
     requests:
       cpu: 100m
       memory: 128Mi
@@ -55,16 +31,7 @@ bff:
   service:
     port: 8788
     type: ClusterIP
-certificates:
-  autoRotation: true
-  caCertRef: mtls-certificates/CA_CERT
-  certSecretRef: mtls-certificates
-  enabled: false
-  rotationPeriodDays: 90
-feast:
-  featureStorage:
-    storageClass: longhorn
-  enabled: false
+
 frontend:
   enabled: true
   containerPort: 8080
@@ -74,7 +41,7 @@ frontend:
     tag: ''
   ingress:
     enabled: false
-  replicaCount: 2
+  replicaCount: 1
   resources:
     limits:
       cpu: 200m
@@ -85,83 +52,27 @@ frontend:
   service:
     port: 80
     type: ClusterIP
-grafana:
-  enabled: false
-ingress:
-  annotations: {}
-  apiIngress:
-    allowedOrigin: https://tradersapp.io
-    annotations: {}
-    className: nginx
-    enabled: true
-    hosts:
-    - host: api.tradersapp.io
-      paths:
-      - path: /
-        port: 8788
-        service: bff
-    rateLimit:
-      burst: '50'
-      rpm: '2000'
-      rps: '200'
-    tls:
-      clusterIssuer: letsencrypt-prod
-      hosts:
-      - api.tradersapp.io
-  className: nginx
+
+redis:
   enabled: true
-  hosts:
-  - host: tradersapp.io
-    paths:
-    - path: /
-      port: 80
-      service: frontend
-    - path: /api
-      port: 8788
-      service: bff
-  rateLimit:
-    burst: '20'
-    connections: '100'
-    limitBy: $remote_addr
-    rpm: '500'
-    rps: '50'
-  tls:
-    clusterIssuer: letsencrypt-prod
-    enabled: true
-    hosts:
-    - tradersapp.io
-    secretName: tradersapp-tls
-kafka:
+  image:
+    repository: redis
+    tag: 7-alpine
   persistence:
-    storageClass: longhorn
-keycloak:
-  enabled: false
-  replicaCount: 3
+    enabled: false
   resources:
     limits:
-      cpu: 2000m
-      memory: 4Gi
+      cpu: 200m
+      memory: 128Mi
     requests:
-      cpu: 500m
-      memory: 1Gi
-  secretRef:
-    adminPassword: keycloak-admin-secret/KEYCLOAK_ADMIN_PASSWORD
+      cpu: 50m
+      memory: 64Mi
+
 mlEngine:
-  autoscaling:
-    enabled: true
-    maxReplicas: 10
-    minReplicas: 1
-    targetCPUUtilizationPercentage: 80
-    targetLatencyMs: '200'
-    targetMemoryUtilizationPercentage: 80
-  dataQuality:
-    alertWebhook: ''
-    blockOnCritical: true
-    lookbackDays: 90
-    quarantineDir: /data/dq_quarantine
-    requireGreatExpectations: true
-    validateBeforeTrain: true
   enabled: true
+  replicaCount: 1
+  autoscaling:
+    enabled: false
   envFrom:
   - configMapRef:
       name: ml-engine-config
@@ -171,47 +82,23 @@ mlEngine:
       name: ml-engine-secrets
   hpaWatcher:
     enabled: false
-    lookbackSeconds: 300
-    pollIntervalSeconds: 30
-    slackWebhookSecretRef: observability-secrets/SLACK_HPA_WEBHOOK_URL
   image:
     pullPolicy: IfNotPresent
     repository: ghcr.io/fxgunit/tradersapp/ml-engine
     tag: ''
   modelRegistrySidecar:
-    enabled: true
-    maxCachedInstances: 4
-    port: 8010
-    resources:
-      limits:
-        cpu: 500m
-        memory: 1Gi
-      requests:
-        cpu: 100m
-        memory: 256Mi
-    warmup: true
+    enabled: false
   persistence:
-    accessModes:
-    - ReadWriteMany
-    enabled: true
-    size: 5Gi
-    storageClass: longhorn
-  replicaCount: 1
+    enabled: false
   resources:
     limits:
-      cpu: 2000m
-      memory: 2Gi
+      cpu: 1000m
+      memory: 512Mi
     requests:
       cpu: 250m
-      memory: 512Mi
+      memory: 256Mi
   runtimeState:
-    accessModes:
-    - ReadWriteMany
-    continualLearningDir: /data/continual_learning
-    enabled: true
-    mambaCacheDir: /data/mamba_cache
-    size: 10Gi
-    storageClass: longhorn
+    enabled: false
   securityContext:
     fsGroup: 1000
     runAsNonRoot: true
@@ -219,139 +106,47 @@ mlEngine:
   service:
     port: 8001
     type: ClusterIP
+
+# --- disabled services ---
+
+analysisService:
+  enabled: false
+
+certificates:
+  enabled: false
+
+featureStorage:
+  enabled: false
+
+feast:
+  enabled: false
+
+grafana:
+  enabled: false
+
+ingress:
+  enabled: false
+
+keycloak:
+  enabled: false
+
+minio:
+  enabled: false
+
 mlflow:
   enabled: false
-  gunicornOptions: --workers 2 --timeout=300
-  image:
-    pullPolicy: IfNotPresent
-    repository: registry.example.com/example/mlflow
-    tag: v2.21.3
-  minio:
-    clientImage:
-      pullPolicy: IfNotPresent
-      repository: minio/mc
-      tag: RELEASE.2025-08-13T08-35-41Z
-    image:
-      pullPolicy: IfNotPresent
-      repository: minio/minio
-      tag: RELEASE.2025-09-07T16-13-09Z
-    password: ''
-    persistence:
-      enabled: true
-      size: 50Gi
-      storageClass: longhorn
-    resources:
-      limits:
-        cpu: 500m
-        memory: 1Gi
-      requests:
-        cpu: 100m
-        memory: 256Mi
-    user: ''
-  postgres:
-    database: mlflow
-    image:
-      pullPolicy: IfNotPresent
-      repository: postgres
-      tag: 16-alpine
-    password: ''
-    persistence:
-      enabled: true
-      size: 10Gi
-      storageClass: longhorn
-    resources:
-      limits:
-        cpu: 500m
-        memory: 1Gi
-      requests:
-        cpu: 100m
-        memory: 256Mi
-    user: mlflow
-  replicaCount: 1
-  resources:
-    limits:
-      cpu: 1000m
-      memory: 2Gi
-    requests:
-      cpu: 250m
-      memory: 512Mi
-  s3:
-    bucket: mlflow-artifacts
-    endpointUrl: http://minio:9000
-    region: us-east-1
-  secretRef:
-    existingSecret: mlflow-runtime-secret
-    postgresDbKey: POSTGRES_DB
-    postgresPasswordKey: POSTGRES_PASSWORD
-    postgresUserKey: POSTGRES_USER
-  service:
-    port: 5000
-    type: ClusterIP
-  trackingUri: http://mlflow:5000
+
 monitoringStack:
   enabled: false
-  grafana:
-    persistence:
-      storageClassName: longhorn
-  prometheus:
-    prometheusSpec:
-      storageSpec:
-        volumeClaimTemplate:
-          spec:
-            storageClassName: longhorn
-namespace: tradersapp
-observability:
-  grafana: true
-  jaeger: true
-  loki: true
-  prometheus: true
-  secretsRef:
-    alertmanagerWebhook: observability-secrets/ALERTMANAGER_WEBHOOK_URL
-    grafanaAdminPassword: observability-secrets/GRAFANA_ADMIN_PASSWORD
-    slackHpaWebhook: observability-secrets/SLACK_HPA_WEBHOOK_URL
-    slackWebhook: observability-secrets/SLACK_WEBHOOK_URL
-redis:
-  enabled: true
-  image:
-    repository: redis
-    tag: 7-alpine
-  persistence:
-    enabled: true
-    size: 1Gi
-    storageClass: longhorn
-  resources:
-    limits:
-      cpu: 200m
-      memory: 256Mi
-    requests:
-      cpu: 50m
-      memory: 128Mi
-security:
-  externalSecrets: true
-  falco: true
-  networkPolicies: true
-  opaPolicies: true
-  podDisruptionBudgets: true
-  readOnlyRootFilesystem: true
-  runAsNonRoot: true
-  trivyOperator: true
-triton:
-  cudaVisibleDevices: '0'
+
+postgres:
   enabled: false
-  inferenceLatencyTargetMs: 100
-  modelStorage:
-    storageClass: longhorn
-  nodeSelector:
-    nvidia.com/gpu: 'true'
-  replicaCount: 1
-  securityContext:
-    runAsNonRoot: true
-    runAsUser: 1000
-  tolerations:
-  - effect: NoSchedule
-    key: nvidia.com/gpu
-    operator: Exists
+
+security:
+  enabled: false
+
+triton:
+  enabled: false
+
 vllm:
-  modelStorage:
-    storageClass: longhorn
   enabled: false
