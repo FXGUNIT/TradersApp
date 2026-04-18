@@ -840,16 +840,6 @@ jobs:
           fi
           # Infisical for secrets sync to k8s
           [ -n "${{ secrets.INFISICAL_TOKEN }}" ] || { echo "::error::Missing secret: INFISICAL_TOKEN"; MISSING=1; }
-          # Vercel for frontend (optional — set to skip and deploy frontend via k8s instead)
-          if [ -z "${{ secrets.VERCEL_TOKEN }}" ]; then
-            echo "::warning::VERCEL_TOKEN not set — frontend will NOT be deployed to Vercel"
-          fi
-          if [ -z "${{ secrets.VERCEL_ORG_ID }}" ]; then
-            echo "::warning::VERCEL_ORG_ID not set"
-          fi
-          if [ -z "${{ secrets.VERCEL_PROJECT_ID }}" ]; then
-            echo "::warning::VERCEL_PROJECT_ID not set"
-          fi
 
           if [ "$MISSING" -ne 0 ]; then
             echo "Production deploy contract validation failed."
@@ -1074,21 +1064,50 @@ jobs:
             return 1
           }
 
+          kubectl_retry() {
+            local max_tries="${1:-6}"
+            shift
+            local attempt=1
+            while [ "${attempt}" -le "${max_tries}" ]; do
+              if "$@"; then
+                return 0
+              fi
+              echo "kubectl command failed (attempt ${attempt}/${max_tries}), retrying..."
+              wait_for_kube_api 4 5 || true
+              sleep 5
+              attempt=$((attempt + 1))
+            done
+            echo "::error::kubectl command failed after ${max_tries} attempts: $*"
+            return 1
+          }
+
           force_purge_helm_metadata() {
             echo "Force-purging stale Helm metadata for tradersapp."
-            kubectl --kubeconfig /tmp/kubeconfig -n tradersapp delete secret \
+            kubectl_retry 6 kubectl --kubeconfig /tmp/kubeconfig -n tradersapp delete secret \
               -l owner=helm,name=tradersapp --ignore-not-found=true || true
-            kubectl --kubeconfig /tmp/kubeconfig -n tradersapp delete configmap \
+            kubectl_retry 6 kubectl --kubeconfig /tmp/kubeconfig -n tradersapp delete configmap \
               -l OWNER=TILLER,NAME=tradersapp --ignore-not-found=true || true
           }
 
           cleanup_stale_release_workloads() {
             echo "Cleaning stale workloads for tradersapp release."
-            kubectl --kubeconfig /tmp/kubeconfig -n tradersapp delete \
+            kubectl_retry 6 kubectl --kubeconfig /tmp/kubeconfig -n tradersapp delete \
               deployment,statefulset,daemonset,replicaset,pod,job,cronjob,ingress,service,configmap,horizontalpodautoscaler,poddisruptionbudget \
               -l app.kubernetes.io/instance=tradersapp --ignore-not-found=true || true
-            kubectl --kubeconfig /tmp/kubeconfig -n tradersapp delete persistentvolumeclaim \
+            kubectl_retry 6 kubectl --kubeconfig /tmp/kubeconfig -n tradersapp delete persistentvolumeclaim \
               redis-pvc ml-models-pvc ml-state-pvc mlflow-postgres-pvc minio-pvc tradersapp-feast-features data-kafka-0 \
+              --ignore-not-found=true || true
+          }
+
+          cleanup_legacy_disabled_stack() {
+            echo "Cleaning stale legacy workloads disabled by the micro profile."
+            kubectl_retry 6 kubectl --kubeconfig /tmp/kubeconfig -n tradersapp delete \
+              deployment,statefulset,daemonset,replicaset,pod,job,cronjob,service,persistentvolumeclaim,poddisruptionbudget \
+              -l 'app in (analysis-service,mlflow,mlflow-postgres,minio,feast,triton)' --ignore-not-found=true || true
+            kubectl_retry 6 kubectl --kubeconfig /tmp/kubeconfig -n tradersapp delete job minio-setup \
+              --ignore-not-found=true || true
+            kubectl_retry 6 kubectl --kubeconfig /tmp/kubeconfig -n tradersapp delete persistentvolumeclaim \
+              redis-pvc ml-models-pvc ml-state-pvc mlflow-postgres-pvc minio-pvc tradersapp-feast-features tradersapp-tradersapp-feast-features tradersapp-tradersapp-triton-models data-kafka-0 \
               --ignore-not-found=true || true
           }
 
@@ -1163,6 +1182,7 @@ jobs:
 
           wait_for_kube_api 24 10
           recover_helm_release_state
+          cleanup_legacy_disabled_stack
 
           ATTEMPT=1
           MAX_ATTEMPTS=3
