@@ -14,7 +14,13 @@ spec:
     matchLabels:
       app: frontend
   strategy:
-    {{- toYaml .Values.frontend.strategy | nindent 4 }}
+    type: {{ default "RollingUpdate" .Values.frontend.strategy.type }}
+    {{- if eq (default "RollingUpdate" .Values.frontend.strategy.type) "RollingUpdate" }}
+    {{- with .Values.frontend.strategy.rollingUpdate }}
+    rollingUpdate:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- end }}
   template:
     metadata:
       labels:

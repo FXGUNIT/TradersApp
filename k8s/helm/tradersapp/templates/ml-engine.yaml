@@ -14,7 +14,13 @@ spec:
     matchLabels:
       app: ml-engine
   strategy:
-    {{- toYaml .Values.mlEngine.strategy | nindent 4 }}
+    type: {{ default "RollingUpdate" .Values.mlEngine.strategy.type }}
+    {{- if eq (default "RollingUpdate" .Values.mlEngine.strategy.type) "RollingUpdate" }}
+    {{- with .Values.mlEngine.strategy.rollingUpdate }}
+    rollingUpdate:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- end }}
   template:
     metadata:
       labels:

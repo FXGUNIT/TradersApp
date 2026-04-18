@@ -238,7 +238,13 @@ spec:
     matchLabels:
       app: redis
   strategy:
-    {{- toYaml .Values.redis.strategy | nindent 4 }}
+    type: {{ default "RollingUpdate" .Values.redis.strategy.type }}
+    {{- if eq (default "RollingUpdate" .Values.redis.strategy.type) "RollingUpdate" }}
+    {{- with .Values.redis.strategy.rollingUpdate }}
+    rollingUpdate:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- end }}
   template:
     metadata:
       labels:

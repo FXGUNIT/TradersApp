@@ -14,7 +14,13 @@ spec:
     matchLabels:
       app: bff
   strategy:
-    {{- toYaml .Values.bff.strategy | nindent 4 }}
+    type: {{ default "RollingUpdate" .Values.bff.strategy.type }}
+    {{- if eq (default "RollingUpdate" .Values.bff.strategy.type) "RollingUpdate" }}
+    {{- with .Values.bff.strategy.rollingUpdate }}
+    rollingUpdate:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- end }}
   template:
     metadata:
       labels:
