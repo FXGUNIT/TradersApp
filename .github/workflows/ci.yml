@@ -858,11 +858,14 @@ jobs:
       - name: Build and push ML Engine image
         run: |
           OWNER_LC="${GITHUB_REPOSITORY_OWNER,,}"
-          IMAGE="ghcr.io/${OWNER_LC}/ml-engine:latest"
+          IMAGE_SHA="ghcr.io/${OWNER_LC}/ml-engine:${GITHUB_SHA}"
+          IMAGE_LATEST="ghcr.io/${OWNER_LC}/ml-engine:latest"
           ATTEMPT=1
           MAX_ATTEMPTS=3
           while [ "${ATTEMPT}" -le "${MAX_ATTEMPTS}" ]; do
-            if docker build -t "${IMAGE}" --file ml-engine/Dockerfile ml-engine/ && docker push "${IMAGE}"; then
+            if docker build -t "${IMAGE_SHA}" -t "${IMAGE_LATEST}" --file ml-engine/Dockerfile ml-engine/ \
+              && docker push "${IMAGE_SHA}" \
+              && docker push "${IMAGE_LATEST}"; then
               exit 0
             fi
             if [ "${ATTEMPT}" -eq "${MAX_ATTEMPTS}" ]; then
@@ -870,7 +873,7 @@ jobs:
               exit 1
             fi
             echo "ML Engine image build/push failed. Retrying (attempt $((ATTEMPT + 1))/${MAX_ATTEMPTS})..."
-            docker image rm "${IMAGE}" >/dev/null 2>&1 || true
+            docker image rm "${IMAGE_SHA}" "${IMAGE_LATEST}" >/dev/null 2>&1 || true
             sleep 20
             ATTEMPT=$((ATTEMPT + 1))
           done
@@ -879,11 +882,14 @@ jobs:
       - name: Build and push BFF image
         run: |
           OWNER_LC="${GITHUB_REPOSITORY_OWNER,,}"
-          IMAGE="ghcr.io/${OWNER_LC}/bff:latest"
+          IMAGE_SHA="ghcr.io/${OWNER_LC}/bff:${GITHUB_SHA}"
+          IMAGE_LATEST="ghcr.io/${OWNER_LC}/bff:latest"
           ATTEMPT=1
           MAX_ATTEMPTS=3
           while [ "${ATTEMPT}" -le "${MAX_ATTEMPTS}" ]; do
-            if docker build -t "${IMAGE}" --file bff/Dockerfile bff/ && docker push "${IMAGE}"; then
+            if docker build -t "${IMAGE_SHA}" -t "${IMAGE_LATEST}" --file bff/Dockerfile bff/ \
+              && docker push "${IMAGE_SHA}" \
+              && docker push "${IMAGE_LATEST}"; then
               exit 0
             fi
             if [ "${ATTEMPT}" -eq "${MAX_ATTEMPTS}" ]; then
@@ -891,7 +897,7 @@ jobs:
               exit 1
             fi
             echo "BFF image build/push failed. Retrying (attempt $((ATTEMPT + 1))/${MAX_ATTEMPTS})..."
-            docker image rm "${IMAGE}" >/dev/null 2>&1 || true
+            docker image rm "${IMAGE_SHA}" "${IMAGE_LATEST}" >/dev/null 2>&1 || true
             sleep 20
             ATTEMPT=$((ATTEMPT + 1))
           done
@@ -900,12 +906,15 @@ jobs:
       - name: Build and push Frontend image
         run: |
           OWNER_LC="${GITHUB_REPOSITORY_OWNER,,}"
-          IMAGE="ghcr.io/${OWNER_LC}/frontend:latest"
+          IMAGE_SHA="ghcr.io/${OWNER_LC}/frontend:${GITHUB_SHA}"
+          IMAGE_LATEST="ghcr.io/${OWNER_LC}/frontend:latest"
           ATTEMPT=1
           MAX_ATTEMPTS=3
           while [ "${ATTEMPT}" -le "${MAX_ATTEMPTS}" ]; do
-            if docker build -t "${IMAGE}" \
-              --file Dockerfile.frontend . && docker push "${IMAGE}"; then
+            if docker build -t "${IMAGE_SHA}" -t "${IMAGE_LATEST}" \
+              --file Dockerfile.frontend . \
+              && docker push "${IMAGE_SHA}" \
+              && docker push "${IMAGE_LATEST}"; then
               exit 0
             fi
             if [ "${ATTEMPT}" -eq "${MAX_ATTEMPTS}" ]; then
@@ -913,7 +922,7 @@ jobs:
               exit 1
             fi
             echo "Frontend image build/push failed. Retrying (attempt $((ATTEMPT + 1))/${MAX_ATTEMPTS})..."
-            docker image rm "${IMAGE}" >/dev/null 2>&1 || true
+            docker image rm "${IMAGE_SHA}" "${IMAGE_LATEST}" >/dev/null 2>&1 || true
             sleep 20
             ATTEMPT=$((ATTEMPT + 1))
           done
@@ -1253,60 +1262,48 @@ jobs:
           }
 
           wait_for_kube_api 24 10
-          recover_helm_release_state
-          cleanup_legacy_disabled_stack
+          DEPLOY_TAG="${GITHUB_SHA}"
+          echo "Deploying minimal core runtime with image tag ${DEPLOY_TAG}."
 
           ATTEMPT=1
           MAX_ATTEMPTS=3
           while true; do
-            HELM_LOG="$(mktemp)"
+            DEPLOY_LOG="$(mktemp)"
             PROGRESS_LOG="$(mktemp)"
-            collect_progress_snapshots 60 >"${PROGRESS_LOG}" 2>&1 &
+            collect_progress_snapshots 45 >"${PROGRESS_LOG}" 2>&1 &
             COLLECTOR_PID=$!
             set +e
-            helm upgrade --install tradersapp \
-              ./k8s/helm/tradersapp \
+            bash ./scripts/k8s/deploy-core-minimal.sh \
+              --kubeconfig /tmp/kubeconfig \
               --namespace tradersapp \
-              --create-namespace \
-              --timeout 10m \
-              --wait \
-              --wait-for-jobs \
-              -f ./k8s/helm/tradersapp/values.prod.yaml \
-              -f ./k8s/helm/tradersapp/values.prod.micro.yaml \
-              --set mlEngine.image.repository="${IMAGE_REPO}/ml-engine" \
-              --set mlEngine.image.tag="latest" \
-              --set bff.image.repository="${IMAGE_REPO}/bff" \
-              --set bff.image.tag="latest" \
-              --set frontend.image.repository="${IMAGE_REPO}/frontend" \
-              --set frontend.image.tag="latest" \
-              --kubeconfig /tmp/kubeconfig >"${HELM_LOG}" 2>&1
-            HELM_RC=$?
+              --image-repo "${IMAGE_REPO}" \
+              --image-tag "${DEPLOY_TAG}" >"${DEPLOY_LOG}" 2>&1
+            DEPLOY_RC=$?
             set -e
             kill "${COLLECTOR_PID}" 2>/dev/null || true
             wait "${COLLECTOR_PID}" 2>/dev/null || true
-            HELM_OUTPUT="$(cat "${HELM_LOG}")"
-            if [ "${HELM_RC}" -ne 0 ] && [ -s "${PROGRESS_LOG}" ]; then
+            DEPLOY_OUTPUT="$(cat "${DEPLOY_LOG}")"
+            if [ "${DEPLOY_RC}" -ne 0 ] && [ -s "${PROGRESS_LOG}" ]; then
               echo "===== deployment progress snapshots ====="
               cat "${PROGRESS_LOG}"
             fi
-            printf '%s\n' "${HELM_OUTPUT}"
-            rm -f "${HELM_LOG}" "${PROGRESS_LOG}"
+            printf '%s\n' "${DEPLOY_OUTPUT}"
+            rm -f "${DEPLOY_LOG}" "${PROGRESS_LOG}"
 
-            if [ "${HELM_RC}" -eq 0 ]; then
+            if [ "${DEPLOY_RC}" -eq 0 ]; then
               break
             fi
 
-            if printf '%s' "${HELM_OUTPUT}" | grep -qiE "cluster unreachable|connect: connection refused|i/o timeout|unexpected EOF|another operation \\(install/upgrade/rollback\\) is in progress|has no deployed releases|failed to delete release" && [ "${ATTEMPT}" -lt "${MAX_ATTEMPTS}" ]; then
+            if printf '%s' "${DEPLOY_OUTPUT}" | grep -qiE "cluster unreachable|connect: connection refused|i/o timeout|unexpected EOF|context deadline exceeded|apiserver not ready" && [ "${ATTEMPT}" -lt "${MAX_ATTEMPTS}" ]; then
               ATTEMPT=$((ATTEMPT + 1))
-              echo "Transient cluster/deploy lock failure detected. Running recovery and retrying Helm (attempt ${ATTEMPT}/${MAX_ATTEMPTS})..."
+              echo "Transient cluster/runtime failure detected. Retrying minimal deploy (attempt ${ATTEMPT}/${MAX_ATTEMPTS})..."
               wait_for_kube_api 12 10 || true
-              recover_helm_release_state || true
               sleep 30
               continue
             fi
 
             dump_cluster_diagnostics
-            exit "${HELM_RC}"
+            exit "${DEPLOY_RC}"
           done
 
           echo "Deployment complete."
