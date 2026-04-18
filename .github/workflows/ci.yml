@@ -858,23 +858,65 @@ jobs:
       - name: Build and push ML Engine image
         run: |
           OWNER_LC="${GITHUB_REPOSITORY_OWNER,,}"
-          docker build -t ghcr.io/${OWNER_LC}/ml-engine:latest --file ml-engine/Dockerfile ml-engine/
-          docker push ghcr.io/${OWNER_LC}/ml-engine:latest
+          IMAGE="ghcr.io/${OWNER_LC}/ml-engine:latest"
+          ATTEMPT=1
+          MAX_ATTEMPTS=3
+          while [ "${ATTEMPT}" -le "${MAX_ATTEMPTS}" ]; do
+            if docker build -t "${IMAGE}" --file ml-engine/Dockerfile ml-engine/ && docker push "${IMAGE}"; then
+              exit 0
+            fi
+            if [ "${ATTEMPT}" -eq "${MAX_ATTEMPTS}" ]; then
+              echo "::error::ML Engine image build/push failed after ${MAX_ATTEMPTS} attempts."
+              exit 1
+            fi
+            echo "ML Engine image build/push failed. Retrying (attempt $((ATTEMPT + 1))/${MAX_ATTEMPTS})..."
+            docker image rm "${IMAGE}" >/dev/null 2>&1 || true
+            sleep 20
+            ATTEMPT=$((ATTEMPT + 1))
+          done
         continue-on-error: false
 
       - name: Build and push BFF image
         run: |
           OWNER_LC="${GITHUB_REPOSITORY_OWNER,,}"
-          docker build -t ghcr.io/${OWNER_LC}/bff:latest --file bff/Dockerfile bff/
-          docker push ghcr.io/${OWNER_LC}/bff:latest
+          IMAGE="ghcr.io/${OWNER_LC}/bff:latest"
+          ATTEMPT=1
+          MAX_ATTEMPTS=3
+          while [ "${ATTEMPT}" -le "${MAX_ATTEMPTS}" ]; do
+            if docker build -t "${IMAGE}" --file bff/Dockerfile bff/ && docker push "${IMAGE}"; then
+              exit 0
+            fi
+            if [ "${ATTEMPT}" -eq "${MAX_ATTEMPTS}" ]; then
+              echo "::error::BFF image build/push failed after ${MAX_ATTEMPTS} attempts."
+              exit 1
+            fi
+            echo "BFF image build/push failed. Retrying (attempt $((ATTEMPT + 1))/${MAX_ATTEMPTS})..."
+            docker image rm "${IMAGE}" >/dev/null 2>&1 || true
+            sleep 20
+            ATTEMPT=$((ATTEMPT + 1))
+          done
         continue-on-error: false
 
       - name: Build and push Frontend image
         run: |
           OWNER_LC="${GITHUB_REPOSITORY_OWNER,,}"
-          docker build -t ghcr.io/${OWNER_LC}/frontend:latest \
-            --file Dockerfile.frontend .
-          docker push ghcr.io/${OWNER_LC}/frontend:latest
+          IMAGE="ghcr.io/${OWNER_LC}/frontend:latest"
+          ATTEMPT=1
+          MAX_ATTEMPTS=3
+          while [ "${ATTEMPT}" -le "${MAX_ATTEMPTS}" ]; do
+            if docker build -t "${IMAGE}" \
+              --file Dockerfile.frontend . && docker push "${IMAGE}"; then
+              exit 0
+            fi
+            if [ "${ATTEMPT}" -eq "${MAX_ATTEMPTS}" ]; then
+              echo "::error::Frontend image build/push failed after ${MAX_ATTEMPTS} attempts."
+              exit 1
+            fi
+            echo "Frontend image build/push failed. Retrying (attempt $((ATTEMPT + 1))/${MAX_ATTEMPTS})..."
+            docker image rm "${IMAGE}" >/dev/null 2>&1 || true
+            sleep 20
+            ATTEMPT=$((ATTEMPT + 1))
+          done
         continue-on-error: false
 
       # ── Setup kubectl for Oracle Cloud k3s ───────────────────────────────
