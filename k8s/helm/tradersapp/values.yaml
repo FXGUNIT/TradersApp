@@ -253,6 +253,7 @@ frontend:
     repository: tradersapp/frontend
     tag: latest
     pullPolicy: IfNotPresent
+  containerPort: 8080
   service:
     port: 80
     type: ClusterIP

@@ -66,6 +66,7 @@ feast:
     storageClass: longhorn
 frontend:
   enabled: true
+  containerPort: 8080
   image:
     pullPolicy: IfNotPresent
     repository: ghcr.io/fxgunit/tradersapp/frontend

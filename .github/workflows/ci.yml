@@ -1159,6 +1159,11 @@ jobs:
             kubectl --kubeconfig /tmp/kubeconfig -n tradersapp get deployment,pod,service,ingress,pvc -o wide || true
             kubectl --kubeconfig /tmp/kubeconfig -n tradersapp get events --sort-by=.metadata.creationTimestamp || true
             for pod in $(kubectl --kubeconfig /tmp/kubeconfig -n tradersapp get pods -o name 2>/dev/null); do
+              pod_name="${pod#pod/}"
+              echo "--- logs ${pod}"
+              kubectl --kubeconfig /tmp/kubeconfig -n tradersapp logs "${pod_name}" --all-containers=true --tail=200 || true
+              echo "--- previous logs ${pod}"
+              kubectl --kubeconfig /tmp/kubeconfig -n tradersapp logs "${pod_name}" --all-containers=true --tail=200 --previous || true
               echo "--- describe ${pod}"
               kubectl --kubeconfig /tmp/kubeconfig -n tradersapp describe "${pod}" || true
             done
