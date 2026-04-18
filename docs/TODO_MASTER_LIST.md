@@ -2,6 +2,76 @@
 **Last Updated:** 2026-04-19
 **Based on:** Stage P production deployment + Session Redesign + ML Research Foundation
 
+
+
+<!-- master-progress:start -->
+## Progress Dashboard
+Generated: `2026-04-19 04:03`  ·  Run `python scripts/update_todo_progress.py --once` to update
+
+```text
+Master Backlog  30.7%  [#######-----------------]
+Tasks          done 042 | in progress 000 | blocked 000 | todo 095 | total 137
+```
+
+How to read this:
+- `Master Backlog` counts every checkbox task across Stage P, Stage S, and ML research.
+- Tier bars are strategic buckets and can overlap; phase bars are the exact checklist counts.
+
+### By Area
+
+| Area | Tasks | Progress | Status |
+|---|---|---:|---|
+| Stage P | [42/82] |  51.2% | CURRENT BLOCKER |
+| Stage S | [0/47] |   0.0% | PENDING |
+| ML Research | [0/8] |   0.0% | PENDING |
+
+### By Tier
+
+| Tier | Scope | Progress | Status |
+|---|---|---:|---|
+| TIER 1 | Stage P rollout path |  51.2% | CURRENT BLOCKER |
+| TIER 2 | Bootstrap + minimal core |  50.0% | CURRENT BLOCKER |
+| TIER 3 | OCI ingress + DNS cutover |   0.0% | BLOCKED |
+| TIER 4 | Stage S + ML backlog |   0.0% | PENDING |
+
+### By Phase
+
+| Phase | Tasks | Progress | Status |
+|---|---|---:|---|
+| P01 - OCI Compute Instance ✅ DONE | [4/4] | 100.0% | DONE |
+| P02 - k3s Installation & Configuration ✅ DONE | [6/6] | 100.0% | DONE |
+| P03 - k3s Auto-Restart on Boot ✅ DONE | [6/6] | 100.0% | DONE |
+| P04 - OCI Security Configuration ✅ DONE | [3/3] | 100.0% | DONE |
+| P05 - kubeconfig Secret (KUBECONFIG_B64) ✅ DONE | [4/4] | 100.0% | DONE |
+| P06 - CI/CD Pipeline (`deploy-k8s.yml`) DONE - minimal direct-apply path | [12/12] | 100.0% | DONE |
+| P07 - k3s Namespace + Secrets Bootstrap ✅ DONE | [3/3] | 100.0% | DONE |
+| P08 - Helm Chart Values ✅ DONE | [4/4] | 100.0% | DONE |
+| P09 - Core Deployment CURRENT BLOCKER | [0/7] |   0.0% | CURRENT BLOCKER |
+| P10 - Stateful Services Inside Free Limits 🔴 KNOWN ISSUE | [0/5] |   0.0% | KNOWN ISSUE |
+| P11 - Ingress / External Access BLOCKED BY P09 | [0/6] |   0.0% | BLOCKED |
+| P12 - DNS + TLS on Current Registrar ⏳ BLOCKED BY P11 | [0/5] |   0.0% | BLOCKED |
+| P13 - Frontend on OCI k3s BLOCKED BY P11 | [0/4] |   0.0% | BLOCKED |
+| P14 - Observability 🔴 KNOWN ISSUE | [0/3] |   0.0% | KNOWN ISSUE |
+| P15 - Backup & Rollback ⏳ BLOCKED BY P09 | [0/3] |   0.0% | BLOCKED |
+| P16 - Go-Live Sign-Off 🔴 BLOCKED BY P09 | [0/4] |   0.0% | BLOCKED |
+| P17 - Documentation Alignment ⏳ PENDING | [0/3] |   0.0% | PENDING |
+| S1 - Trading Session Config Foundation | [0/11] |   0.0% | PENDING |
+| S2 - BFF Multi-Instrument Routing | [0/7] |   0.0% | PENDING |
+| S3 - Frontend Dashboard Redesign | [0/13] |   0.0% | PENDING |
+| S4 - Options Module (Greenfield) | [0/7] |   0.0% | PENDING |
+| S5 - Economic Calendar & Expiry Calendar | [0/5] |   0.0% | PENDING |
+| S6 - Database + Trade Logging | [0/4] |   0.0% | PENDING |
+| ML1 - Volatility Surface建模 (Bergomi-like) | [0/1] |   0.0% | PENDING |
+| ML2 - HMM Regime Detection (upgrade from FP-FK) | [0/1] |   0.0% | PENDING |
+| ML3 - Anomalous Diffusion (Lévy processes) | [0/1] |   0.0% | PENDING |
+| ML4 - Mamba Sequence Model | [0/1] |   0.0% | PENDING |
+| ML5 - PFHedge for Greeks-aware hedging | [0/1] |   0.0% | PENDING |
+| ML6 - Alpha Signal Ensemble | [0/1] |   0.0% | PENDING |
+| ML7 - Continual Learning (EWC + replay buffer) | [0/1] |   0.0% | PENDING |
+| ML8 - Backtesting rig (kernc-backtesting) | [0/1] |   0.0% | PENDING |
+
+<!-- master-progress:end -->
+
 ---
 
 ## EXECUTION PRIORITY
@@ -318,32 +388,16 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-19 03:32`  -  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-19 04:03`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Stage P Backlog  51.2%  [############------------]
-Sections        done 008 | active 001 | blocked 005 | pending 003 | total 017
-Checklist       done 042 | open 040 | total 082
+Active Backlog    0.0%  [------------------------]
+Stage Progress  00/00 complete
+Task Counts     done 000 | in progress 000 | blocked 000 | todo 000 | total 000
 ```
 
 | Section | Tasks | Progress | Status |
 |---|---|---:|---|
-| P01 - OCI Compute Instance ✅ DONE | [4/4] | 100.0% | DONE |
-| P02 - k3s Installation & Configuration ✅ DONE | [6/6] | 100.0% | DONE |
-| P03 - k3s Auto-Restart on Boot ✅ DONE | [6/6] | 100.0% | DONE |
-| P04 - OCI Security Configuration ✅ DONE | [3/3] | 100.0% | DONE |
-| P05 - kubeconfig Secret (KUBECONFIG_B64) ✅ DONE | [4/4] | 100.0% | DONE |
-| P06 - CI/CD Pipeline (`deploy-k8s.yml`) DONE - minimal direct-apply path | [12/12] | 100.0% | DONE |
-| P07 - k3s Namespace + Secrets Bootstrap ✅ DONE | [3/3] | 100.0% | DONE |
-| P08 - Helm Chart Values ✅ DONE | [4/4] | 100.0% | DONE |
-| P09 - Core Deployment CURRENT BLOCKER | [0/7] |   0.0% | CURRENT BLOCKER |
-| P10 - Stateful Services Inside Free Limits 🔴 KNOWN ISSUE | [0/5] |   0.0% | KNOWN ISSUE |
-| P11 - Ingress / External Access BLOCKED BY P09 | [0/6] |   0.0% | BLOCKED |
-| P12 - DNS + TLS on Current Registrar ⏳ BLOCKED BY P11 | [0/5] |   0.0% | BLOCKED |
-| P13 - Frontend on OCI k3s BLOCKED BY P11 | [0/4] |   0.0% | BLOCKED |
-| P14 - Observability 🔴 KNOWN ISSUE | [0/3] |   0.0% | KNOWN ISSUE |
-| P15 - Backup & Rollback ⏳ BLOCKED BY P09 | [0/3] |   0.0% | BLOCKED |
-| P16 - Go-Live Sign-Off 🔴 BLOCKED BY P09 | [0/4] |   0.0% | BLOCKED |
-| P17 - Documentation Alignment ⏳ PENDING | [0/3] |   0.0% | PENDING |
+
 
 <!-- live-status:end -->

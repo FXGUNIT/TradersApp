@@ -245,7 +245,7 @@ def classify_checklist_item(
     if normalized_section.startswith("STAGES ML"):
         phase_match = re.match(r"^(ML\d+)\b", task_title)
         phase_id = phase_match.group(1) if phase_match else "ML"
-        phase_title = phase_id if phase_match else "ML Research"
+        phase_title = task_title if phase_match else "ML Research"
         return ChecklistItem(
             area="ML Research",
             phase_id=phase_id,
@@ -316,6 +316,14 @@ def phase_sort_key(phase_id: str) -> tuple[int, int | str]:
     if phase_id.startswith("ML") and phase_id[2:].isdigit():
         return (2, int(phase_id[2:]))
     return (3, phase_id)
+
+
+def clean_phase_title(phase_id: str, phase_title: str) -> str:
+    cleaned = phase_title.strip()
+    cleaned = re.sub(rf"^{re.escape(phase_id)}\s*[-:â€”]*\s*", "", cleaned).strip()
+    cleaned = re.sub(rf"^Phase\s+{re.escape(phase_id)}\s*[-:â€”]*\s*", "", cleaned).strip()
+    cleaned = cleaned.lstrip("-–—:â€” ").strip()
+    return cleaned or phase_title
 
 
 def build_master_progress_block(markdown: str) -> str:
@@ -424,8 +432,9 @@ def build_master_progress_block(markdown: str) -> str:
         bucket_items: list[ChecklistItem] = bucket["items"]  # type: ignore[assignment]
         bucket_summary = summarize_checklist_items(bucket_items)
         status_label = infer_heading_status(str(bucket["title"]), int(bucket_summary["done"]), int(bucket_summary["total"]))
+        display_title = clean_phase_title(phase_id, str(bucket["title"]))
         lines.append(
-            f"| {phase_id} - {bucket['title']} | [{int(bucket_summary['done'])}/{int(bucket_summary['total'])}] | {bucket_summary['completion_pct']:5.1f}% | {status_label} |"
+            f"| {phase_id} - {display_title} | [{int(bucket_summary['done'])}/{int(bucket_summary['total'])}] | {bucket_summary['completion_pct']:5.1f}% | {status_label} |"
         )
 
     lines.extend(["", MASTER_PROGRESS_END])
@@ -550,44 +559,56 @@ def build_progress_block(markdown: str) -> str:
 
 
 def build_updated_markdown(todo_path: Path) -> str:
-    """Write live status into the TODO_MASTER_LIST.md file.
-
-    The coordination JSON + LiveStatus block are updated in-place.
-    Everything else in the file stays untouched.
-    """
+    """Write generated progress blocks into docs/TODO_MASTER_LIST.md."""
     markdown = todo_path.read_text(encoding="utf-8")
 
     # ---- 1. Coordination block: update claimed_by / claimed_at ----
     markdown = _sync_coordination_block(markdown)
 
-    # ---- 2. Live Status table: rebuild from current task state ----
-    block = _build_live_status_table(markdown)
-    pattern = re.compile(
+    # ---- 2. Top dashboard: full master progress near the top of the file ----
+    updated = markdown
+    master_block = build_master_progress_block(updated)
+    master_pattern = re.compile(
+        rf"{re.escape(MASTER_PROGRESS_START)}.*?{re.escape(MASTER_PROGRESS_END)}",
+        re.DOTALL,
+    )
+    if master_pattern.search(updated):
+        updated = master_pattern.sub(master_block, updated, count=1)
+    else:
+        marker = re.search(r"^---\s*$", updated, re.MULTILINE)
+        if marker:
+            pos = marker.start()
+            updated = updated[:pos] + "\n\n" + master_block + "\n\n" + updated[pos:]
+        else:
+            updated = master_block + "\n\n" + updated
+
+    # ---- 3. Lower block: Stage P detailed live status ----
+    live_block = _build_live_status_table(updated)
+    live_pattern = re.compile(
         rf"{re.escape(PROGRESS_START)}.*?{re.escape(PROGRESS_END)}",
         re.DOTALL,
     )
-    if pattern.search(markdown):
-        updated = pattern.sub(block, markdown, count=1)
+    if live_pattern.search(updated):
+        updated = live_pattern.sub(live_block, updated, count=1)
     else:
-        # No existing block — append before the first ## Stage or ## Phase
-        marker = re.search(r"(?=^## (?:Stage|Phase))", markdown, re.MULTILINE)
+        marker = re.search(r"(?=^## (?:Stage|Phase))", updated, re.MULTILINE)
         if marker:
             pos = marker.start()
-            updated = markdown[:pos] + block + "\n\n" + markdown[pos:]
+            updated = updated[:pos] + live_block + "\n\n" + updated[pos:]
         else:
-            updated = markdown + "\n\n" + block
+            updated = updated + "\n\n" + live_block
 
-    # ---- 3. Touch timestamp on Last updated line ----
+    # ---- 4. Touch timestamp on Last updated line ----
     updated = LAST_UPDATED_RE.sub(
         f"**Last Updated:** {datetime.now().astimezone().strftime('%Y-%m-%d')}",
         updated,
         count=1,
     )
-    # ensure trailing newline
     return updated.rstrip("\n") + "\n"
 
 
 def _sync_coordination_block(markdown: str) -> str:
+
     """Parse the coordination JSON block and update claimed_at timestamps
     for any task whose status has changed since the last sync.
 
