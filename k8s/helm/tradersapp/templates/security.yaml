@@ -237,6 +237,8 @@ spec:
   selector:
     matchLabels:
       app: redis
+  strategy:
+    {{- toYaml .Values.redis.strategy | nindent 4 }}
   template:
     metadata:
       labels:

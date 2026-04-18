@@ -14,10 +14,7 @@ spec:
     matchLabels:
       app: bff
   strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxSurge: 2
-      maxUnavailable: 0
+    {{- toYaml .Values.bff.strategy | nindent 4 }}
   template:
     metadata:
       labels:

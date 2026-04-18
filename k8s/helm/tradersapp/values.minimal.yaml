@@ -7,8 +7,13 @@ global:
 bff:
   enabled: true
   replicaCount: 1
+  strategy:
+    type: Recreate
   autoscaling:
     enabled: false
+  analysisTransport:
+    mode: http
+    grpcStrict: false
   envFrom:
   - configMapRef:
       name: bff-config
@@ -35,6 +40,8 @@ bff:
 frontend:
   enabled: true
   containerPort: 8080
+  strategy:
+    type: Recreate
   image:
     pullPolicy: IfNotPresent
     repository: ghcr.io/fxgunit/tradersapp/frontend
@@ -55,6 +62,8 @@ frontend:
 
 redis:
   enabled: true
+  strategy:
+    type: Recreate
   image:
     repository: redis
     tag: 7-alpine
@@ -71,6 +80,10 @@ redis:
 mlEngine:
   enabled: true
   replicaCount: 1
+  strategy:
+    type: Recreate
+  kafkaEnabled: false
+  requireDatabaseUrl: false
   autoscaling:
     enabled: false
   envFrom:
@@ -138,6 +151,7 @@ minio:
 
 mlflow:
   enabled: false
+  trackingUri: ""
 
 monitoringStack:
   enabled: false
@@ -146,7 +160,8 @@ postgres:
   enabled: false
 
 security:
-  enabled: false
+  networkPolicies: false
+  podDisruptionBudgets: false
 
 triton:
   enabled: false

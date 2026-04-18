@@ -64,6 +64,11 @@ mlEngine:
   replicaCount: 1
   kafkaEnabled: true
   requireDatabaseUrl: true
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
   image:
     repository: tradersapp/ml-engine
     tag: latest
@@ -181,6 +186,11 @@ postgresql:
 bff:
   enabled: true
   replicaCount: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 2
+      maxUnavailable: 0
   image:
     repository: tradersapp/bff
     tag: latest
@@ -249,6 +259,11 @@ analysisService:
 frontend:
   enabled: true
   replicaCount: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 2
+      maxUnavailable: 0
   image:
     repository: tradersapp/frontend
     tag: latest
@@ -413,6 +428,11 @@ vllm:
 # Redis (in-cluster) — shared between Feast online store and ML Engine cache
 redis:
   enabled: true
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
   image:
     repository: redis
     tag: 7-alpine

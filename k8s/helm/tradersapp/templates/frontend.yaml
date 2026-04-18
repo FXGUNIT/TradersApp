@@ -14,10 +14,7 @@ spec:
     matchLabels:
       app: frontend
   strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxSurge: 2
-      maxUnavailable: 0
+    {{- toYaml .Values.frontend.strategy | nindent 4 }}
   template:
     metadata:
       labels:
