@@ -65,6 +65,39 @@ INGRESS_VALUES="${REPO_ROOT}/k8s/ingress-nginx/values.oci-free.yaml"
 CERT_VALUES="${REPO_ROOT}/k8s/cert-manager/values.oci-free.yaml"
 ISSUER_TEMPLATE="${REPO_ROOT}/k8s/cert-manager/cluster-issuers.yaml"
 
+CI_BEST_EFFORT="${CI_BEST_EFFORT:-${CI:-}}"
+if [[ "${CI_BEST_EFFORT}" == "true" || "${CI_BEST_EFFORT}" == "1" ]]; then
+  : "${API_WAIT_TRIES:=4}"
+  : "${API_WAIT_SLEEP:=5}"
+  : "${KUBECTL_RETRIES:=3}"
+  : "${KUBECTL_WAIT_TRIES:=2}"
+  : "${KUBECTL_WAIT_SLEEP:=3}"
+  : "${KUBECTL_RETRY_SLEEP:=2}"
+  : "${HELM_RETRIES:=2}"
+  : "${HELM_RETRY_API_WAIT_TRIES:=4}"
+  : "${HELM_RETRY_API_WAIT_SLEEP:=5}"
+  : "${HELM_RETRY_COOLDOWN:=5}"
+  : "${POST_INSTALL_API_WAIT_TRIES:=2}"
+  : "${POST_INSTALL_API_WAIT_SLEEP:=3}"
+  : "${ROLLOUT_TIMEOUT:=20s}"
+  : "${CERT_ROLLOUT_TIMEOUT:=20s}"
+else
+  : "${API_WAIT_TRIES:=24}"
+  : "${API_WAIT_SLEEP:=10}"
+  : "${KUBECTL_RETRIES:=12}"
+  : "${KUBECTL_WAIT_TRIES:=6}"
+  : "${KUBECTL_WAIT_SLEEP:=5}"
+  : "${KUBECTL_RETRY_SLEEP:=5}"
+  : "${HELM_RETRIES:=3}"
+  : "${HELM_RETRY_API_WAIT_TRIES:=12}"
+  : "${HELM_RETRY_API_WAIT_SLEEP:=10}"
+  : "${HELM_RETRY_COOLDOWN:=20}"
+  : "${POST_INSTALL_API_WAIT_TRIES:=12}"
+  : "${POST_INSTALL_API_WAIT_SLEEP:=5}"
+  : "${ROLLOUT_TIMEOUT:=90s}"
+  : "${CERT_ROLLOUT_TIMEOUT:=90s}"
+fi
+
 wait_for_kube_api() {
   local max_tries="${1:-24}"
   local sleep_seconds="${2:-10}"
@@ -82,7 +115,7 @@ wait_for_kube_api() {
 }
 
 kubectl_retry() {
-  local max_tries="${1:-12}"
+  local max_tries="${1:-${KUBECTL_RETRIES}}"
   shift
   local attempt=1
   while [[ "${attempt}" -le "${max_tries}" ]]; do
@@ -90,8 +123,8 @@ kubectl_retry() {
       return 0
     fi
     echo "kubectl command failed (attempt ${attempt}/${max_tries}), retrying..."
-    wait_for_kube_api 6 5 || true
-    sleep 5
+    wait_for_kube_api "${KUBECTL_WAIT_TRIES}" "${KUBECTL_WAIT_SLEEP}" || true
+    sleep "${KUBECTL_RETRY_SLEEP}"
     attempt=$((attempt + 1))
   done
   echo "::error::kubectl command failed after ${max_tries} attempts: $*" >&2
@@ -122,7 +155,7 @@ helm_retry() {
   local namespace="$2"
   shift 2
   local attempt=1
-  local max_attempts=3
+  local max_attempts="${HELM_RETRIES}"
   local output=""
   local rc=0
 
@@ -140,9 +173,9 @@ helm_retry() {
     if printf '%s' "${output}" | grep -qiE "unexpected EOF|cluster unreachable|connection refused|i/o timeout|context deadline exceeded|another operation .* in progress|failed to create"; then
       if [[ "${attempt}" -lt "${max_attempts}" ]]; then
         echo "Transient Helm/bootstrap failure detected for ${release}; retrying (attempt $((attempt + 1))/${max_attempts})..."
-        wait_for_kube_api 12 10 || true
+        wait_for_kube_api "${HELM_RETRY_API_WAIT_TRIES}" "${HELM_RETRY_API_WAIT_SLEEP}" || true
         cleanup_helm_release "${release}" "${namespace}"
-        sleep 20
+        sleep "${HELM_RETRY_COOLDOWN}"
         attempt=$((attempt + 1))
         continue
       fi
@@ -171,13 +204,14 @@ if [[ -z "${NODE_IP}" ]]; then
   exit 1
 fi
 
-wait_for_kube_api 24 10
+if ! wait_for_kube_api "${API_WAIT_TRIES}" "${API_WAIT_SLEEP}"; then
+  warn_rollout_issue "Kubernetes API is unstable before edge bootstrap; skipping ingress-nginx/cert-manager for this run"
+  exit 0
+fi
 
 echo "Installing ingress-nginx 4.15.1 for bare-metal OCI access on ${NODE_IP}..."
 helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx >/dev/null 2>&1 || true
 helm repo update >/dev/null
-kubectl --kubeconfig "${KUBECONFIG_PATH}" create namespace ingress-nginx --dry-run=client -o yaml > /tmp/ingress-nginx-namespace.yaml
-kubectl_retry 12 kubectl --kubeconfig "${KUBECONFIG_PATH}" apply -f /tmp/ingress-nginx-namespace.yaml
 if [[ "$(release_status ingress-nginx ingress-nginx || true)" != "deployed" ]]; then
   if ! helm_retry ingress-nginx ingress-nginx \
     helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
@@ -193,9 +227,9 @@ else
   echo "ingress-nginx release already deployed; skipping reinstall."
 fi
 
-wait_for_kube_api 12 5 || warn_rollout_issue "Kubernetes API is unstable after ingress-nginx bootstrap; continuing with app deployment"
+wait_for_kube_api "${POST_INSTALL_API_WAIT_TRIES}" "${POST_INSTALL_API_WAIT_SLEEP}" || warn_rollout_issue "Kubernetes API is unstable after ingress-nginx bootstrap; continuing with app deployment"
 if kubectl --kubeconfig "${KUBECONFIG_PATH}" -n ingress-nginx get daemonset ingress-nginx-controller >/dev/null 2>&1; then
-  if ! kubectl --kubeconfig "${KUBECONFIG_PATH}" -n ingress-nginx rollout status daemonset/ingress-nginx-controller --timeout=90s; then
+  if ! kubectl --kubeconfig "${KUBECONFIG_PATH}" -n ingress-nginx rollout status daemonset/ingress-nginx-controller --timeout="${ROLLOUT_TIMEOUT}"; then
     warn_rollout_issue "ingress-nginx controller daemonset is not ready yet; continuing with app deployment"
     kubectl --kubeconfig "${KUBECONFIG_PATH}" -n ingress-nginx get daemonset,pod -o wide || true
   fi
@@ -205,8 +239,6 @@ else
 fi
 
 echo "Installing cert-manager 1.20.2..."
-kubectl --kubeconfig "${KUBECONFIG_PATH}" create namespace cert-manager --dry-run=client -o yaml > /tmp/cert-manager-namespace.yaml
-kubectl_retry 12 kubectl --kubeconfig "${KUBECONFIG_PATH}" apply -f /tmp/cert-manager-namespace.yaml
 if [[ "$(release_status cert-manager cert-manager || true)" != "deployed" ]]; then
   if ! helm_retry cert-manager cert-manager \
     helm upgrade --install cert-manager oci://quay.io/jetstack/charts/cert-manager \
@@ -221,9 +253,9 @@ else
   echo "cert-manager release already deployed; skipping reinstall."
 fi
 
-wait_for_kube_api 12 5 || warn_rollout_issue "Kubernetes API is unstable after cert-manager bootstrap; continuing with app deployment"
+wait_for_kube_api "${POST_INSTALL_API_WAIT_TRIES}" "${POST_INSTALL_API_WAIT_SLEEP}" || warn_rollout_issue "Kubernetes API is unstable after cert-manager bootstrap; continuing with app deployment"
 if kubectl --kubeconfig "${KUBECONFIG_PATH}" get crd clusterissuers.cert-manager.io >/dev/null 2>&1; then
-  kubectl --kubeconfig "${KUBECONFIG_PATH}" wait --for=condition=Established crd/clusterissuers.cert-manager.io --timeout=90s || \
+  kubectl --kubeconfig "${KUBECONFIG_PATH}" wait --for=condition=Established crd/clusterissuers.cert-manager.io --timeout="${CERT_ROLLOUT_TIMEOUT}" || \
     warn_rollout_issue "cert-manager CRD is not fully established yet; TLS issuance may lag behind app deployment"
 else
   warn_rollout_issue "cert-manager CRD not found after bootstrap; skipping ClusterIssuer apply for now"
@@ -231,7 +263,7 @@ fi
 
 for deploy_name in cert-manager cert-manager-webhook cert-manager-cainjector; do
   if kubectl --kubeconfig "${KUBECONFIG_PATH}" -n cert-manager get deployment "${deploy_name}" >/dev/null 2>&1; then
-    kubectl --kubeconfig "${KUBECONFIG_PATH}" -n cert-manager rollout status deployment/"${deploy_name}" --timeout=90s || \
+    kubectl --kubeconfig "${KUBECONFIG_PATH}" -n cert-manager rollout status deployment/"${deploy_name}" --timeout="${CERT_ROLLOUT_TIMEOUT}" || \
       warn_rollout_issue "${deploy_name} is not ready yet; continuing with app deployment"
   fi
 done

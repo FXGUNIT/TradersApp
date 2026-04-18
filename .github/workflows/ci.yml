@@ -1207,18 +1207,11 @@ jobs:
 
           echo "Deployment complete."
 
-      # ── Vercel: deploy frontend (optional — only if credentials set) ───
-      - name: Deploy Frontend to Vercel (production)
+      - name: Verify OCI production ingress resources
         run: |
-          if [ -z "${{ secrets.VERCEL_TOKEN }}" ]; then
-            echo "⚠ VERCEL_TOKEN not set — skipping Vercel frontend deploy"
-            exit 0
-          fi
-          npx vercel --prod --yes --token ${{ secrets.VERCEL_TOKEN }}
+          kubectl --kubeconfig /tmp/kubeconfig -n tradersapp get ingress,service,pod -o wide || true
+          kubectl --kubeconfig /tmp/kubeconfig -n ingress-nginx get daemonset,pod -o wide || true
         continue-on-error: false
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
       # ── Sync secrets from Infisical to k8s via External Secrets Operator ─
       - name: Sync Infisical secrets to k8s (production)
