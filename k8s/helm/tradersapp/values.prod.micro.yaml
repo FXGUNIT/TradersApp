@@ -46,13 +46,23 @@ mlEngine:
     enabled: false
   runtimeState:
     enabled: false
+  modelRegistrySidecar:
+    warmup: false
+    maxCachedInstances: 1
+    resources:
+      requests:
+        cpu: 25m
+        memory: 64Mi
+      limits:
+        cpu: 150m
+        memory: 256Mi
   resources:
     requests:
-      cpu: 100m
-      memory: 256Mi
+      cpu: 75m
+      memory: 192Mi
     limits:
-      cpu: 700m
-      memory: 1024Mi
+      cpu: 500m
+      memory: 768Mi
 
 redis:
   enabled: true

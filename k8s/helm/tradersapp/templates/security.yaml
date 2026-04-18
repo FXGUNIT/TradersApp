@@ -249,7 +249,7 @@ spec:
             - containerPort: 6379
           {{- with .Values.redis.resources }}
           resources:
-            {{- toYaml . | nindent 10 }}
+            {{- toYaml . | nindent 12 }}
           {{- end }}
           volumeMounts:
             - name: redis-data

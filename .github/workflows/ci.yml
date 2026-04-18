@@ -1077,8 +1077,11 @@ jobs:
           cleanup_stale_release_workloads() {
             echo "Cleaning stale workloads for tradersapp release."
             kubectl --kubeconfig /tmp/kubeconfig -n tradersapp delete \
-              deployment,statefulset,daemonset,replicaset,pod,job,cronjob,ingress,service,configmap \
+              deployment,statefulset,daemonset,replicaset,pod,job,cronjob,ingress,service,configmap,horizontalpodautoscaler,poddisruptionbudget \
               -l app.kubernetes.io/instance=tradersapp --ignore-not-found=true || true
+            kubectl --kubeconfig /tmp/kubeconfig -n tradersapp delete persistentvolumeclaim \
+              redis-pvc ml-models-pvc ml-state-pvc mlflow-postgres-pvc minio-pvc tradersapp-feast-features data-kafka-0 \
+              --ignore-not-found=true || true
           }
 
           recover_helm_release_state() {
