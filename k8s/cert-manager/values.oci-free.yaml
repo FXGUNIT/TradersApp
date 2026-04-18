@@ -1,0 +1,43 @@
+crds:
+  enabled: true
+
+prometheus:
+  enabled: false
+
+resources:
+  requests:
+    cpu: 25m
+    memory: 64Mi
+  limits:
+    cpu: 150m
+    memory: 192Mi
+
+webhook:
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 15m
+      memory: 48Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+cainjector:
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 15m
+      memory: 48Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+startupapicheck:
+  timeout: 2m
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 50m
+      memory: 64Mi

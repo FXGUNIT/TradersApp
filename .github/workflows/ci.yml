@@ -1042,6 +1042,14 @@ jobs:
             kubectl_retry 24 kubectl --kubeconfig /tmp/kubeconfig apply --validate=false -f "/tmp/${secret_name}.yaml"
           done
 
+      - name: Bootstrap ingress-nginx + cert-manager (production)
+        env:
+          CERT_MANAGER_EMAIL: ${{ vars.CERT_MANAGER_EMAIL || 'admin@traders.app' }}
+        run: |
+          bash ./scripts/k8s/bootstrap-oci-edge.sh \
+            --kubeconfig /tmp/kubeconfig \
+            --cert-email "${CERT_MANAGER_EMAIL}"
+
       # ── Deploy ML Engine + BFF via Helm on Oracle Cloud k3s ────────────
       - name: Deploy to Oracle Cloud k3s (production)
         run: |

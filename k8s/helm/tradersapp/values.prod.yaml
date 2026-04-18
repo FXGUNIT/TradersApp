@@ -128,7 +128,6 @@ ingress:
     enabled: true
     hosts:
     - tradersapp.io
-    - api.tradersapp.io
     secretName: tradersapp-tls
 kafka:
   persistence:

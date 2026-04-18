@@ -213,6 +213,14 @@ jobs:
           curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
           helm plugin install https://github.com/databus23/helm-diff --version v0.1.0 || true
 
+      - name: Bootstrap ingress-nginx + cert-manager
+        env:
+          CERT_MANAGER_EMAIL: ${{ vars.CERT_MANAGER_EMAIL || 'admin@traders.app' }}
+        run: |
+          bash ./scripts/k8s/bootstrap-oci-edge.sh \
+            --kubeconfig ~/.kube/config \
+            --cert-email "${CERT_MANAGER_EMAIL}"
+
       # ── Determine image tag ──────────────────────────────────────────────
       - name: Resolve image tag
         id: image_tag

@@ -122,7 +122,6 @@ ingress:
     clusterIssuer: letsencrypt-prod
     hosts:
       - traders.app
-      - api.traders.app
     secretName: tradersapp-tls
   apiIngress:
     enabled: true
