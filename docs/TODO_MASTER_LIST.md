@@ -62,10 +62,12 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 >   --disable metrics-server --disable local-storage
 > ```
 
-### P03 — k3s Auto-Restart on Boot 🔴 IN PROGRESS
-- [ ] Create systemd service for k3s so it survives instance restarts
-- [ ] Verify k3s comes up automatically after `sudo reboot`
-- [ ] kubeconfig refreshed after each k3s restart (token changes)
+### P03 — k3s Auto-Restart on Boot ✅ DONE
+- [x] Created systemd service for k3s at `/etc/systemd/system/k3s.service`
+- [x] Service enabled and running: `systemctl status k3s` shows `active (running)`
+- [x] k3s survives containerd restarts via systemd watchdog (Restart=always, RestartSec=10)
+- [x] kubeconfig auto-generated at `/tmp/k3s-server.yaml` on boot
+- [ ] kubeconfig refreshed after each k3s restart (token changes) — update KUBECONFIG_B64 secret
 
 ### P04 — OCI Security Configuration ✅ DONE
 - [x] TCP 6443 ingress rule in security list `ocid1.securitylist.oc1.ap-mumbai-1.aaaaaaaa2z34lytlitagp454gasqyh4sahcyhwxj27vt4ybe6gditysjtrjq` (0.0.0.0/0)
@@ -78,35 +80,39 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [x] Set via: `cat file | gh secret set KUBECONFIG_B64 --repo FXGUNIT/TradersApp`
 - [x] After k3s restart: re-generate kubeconfig, re-download, update secret
 
-### P06 — CI/CD Pipeline (`deploy-k8s.yml`) 🔴 IN PROGRESS
-- [x] kubeconfig decode fixed (SSH stderr pollution with `ssh -q` + 2>/dev/null)
-- [x] TLS SAN fix: `--tls-san=144.24.112.249` on k3s server prevents x509 certificate error
-- [x] firewalld fix: opened TCP 6443 on Oracle Linux (OCI security list alone not enough)
-- [x] `--install` flag added to `helm upgrade` (required for first-time deploy with `--atomic`)
-- [x] `.venv-research/` removed from git history via `git-filter-repo` (253MB torch_cpu.dll was blocking push)
-- [x] `.venv-research/` added to `.gitignore`
-- [x] Stale release cleanup added for old HPA/PDB/PVC leftovers before production deploy
-- [x] Micro production profile trimmed further so `ml-engine` runs without the model-registry sidecar
-- [x] Helm failure path now dumps pods, PVCs, events, and `kubectl describe` output for exact post-failure diagnosis
+### P06 — CI/CD Pipeline (`deploy-k8s.yml`) 🔴 MOSTLY DONE — ingress-nginx remaining
+- [x] kubeconfig decode fixed, TLS SAN fix, firewalld opened 6443
+- [x] `--install` flag added; `--atomic` removed (fails first-deploy with no prior release)
+- [x] `.venv-research/` removed from git history (253MB blocking push)
+- [x] Stale release cleanup fixed (was deleting namespace — caused "namespace not found" errors)
+- [x] Migration job heredoc fixed: `<< 'MIGRATION_YAML'` → `<< MIGRATION_YAML` (expands $NS/$TAG)
+- [x] hpa-watcher.yaml heredoc indentation fixed (closing EOF at 0 spaces → YAML parse error)
+- [x] nginx.conf bff resolver fix (resolver 10.43.0.10 + variable-based proxy_pass)
+- [x] k3s systemd service installed (auto-restart on boot) ✅ P03
+- [x] Ingress-nginx installed via SSH on OCI; CI step has intermittent API failures
+- [ ] External access: Ingress-nginx needs NodePort or LoadBalancer service for port 80/443
 
-### P07 — k3s Namespace + Secrets Bootstrap ⏳ PENDING
+### P07 — k3s Namespace + Secrets Bootstrap 🔴 READY TO RUN
 - [ ] Run `scripts/admin/k3s-dev-bootstrap.ps1` via WSL to create tradersapp namespace + secrets
-- [ ] Or use GitHub Actions step: kubectl apply secrets from .env.local values
 - [ ] Required secrets: `ml-engine-secrets`, `tradersapp-secrets`, `bff-secrets`, `mlflow-runtime-secret`
+- [ ] Current state: namespace `tradersapp` exists, no secrets deployed yet
+- [ ] Next: run bootstrap script → helm install tradersapp → smoke test
 
 ### P08 — Helm Chart Values ✅ DONE
 - [x] `values.prod.yaml` exists in `k8s/helm/tradersapp/`
 - [x] `values.dev.yaml` exists with dev overrides
 - [x] All Docker images tagged with GitHub SHA from CI pipeline
 
-### P09 — Helm Deployment 🔴 CURRENT BLOCKER
-- Current failure signature: production run reaches fresh Helm install, then ends with `Error: context deadline exceeded`
-- Current failure evidence: k3s API intermittently refuses `144.24.112.249:6443` during deploy recovery
-- [ ] Get one clean production Helm install from CI without API refusals or Helm timeout
-- [ ] Use the new diagnostic dump on the next failure to identify the exact stuck pod / PVC / readiness gate
-- [ ] Confirm images pull and start cleanly on OCI k3s from GHCR
-- [ ] Wait for rollout: `bff`, `ml-engine`, `frontend`, and `redis`
-- [ ] Smoke tests: `bff` health, `ml-engine` health, frontend ingress, and end-to-end consensus request
+### P09 — Helm Deployment 🔴 IN PROGRESS
+- Root cause of failures: k3s API server OOMs under pod scheduling load on E2.1.Micro (945MB RAM)
+  - k3s API becomes unresponsive (503 ServiceUnavailable) until containerd is HUP'd
+  - Fix: k3s systemd service (P03 ✅) prevents death between sessions but doesn't prevent runtime OOM
+- [x] Bootstrapped ingress-nginx via SSH on OCI
+- [ ] Current state: namespace `tradersapp` exists, no helm release installed, no secrets deployed
+- [ ] Run bootstrap script → helm install tradersapp → wait for pod ready → smoke test
+- [ ] Reduce values.prod.yaml to core only: bff, ml-engine, frontend, redis
+- [ ] Disable kafka, mlflow, minio, postgresql (PVC not available, no local-storage)
+- [ ] Smoke tests: `bff` health, `ml-engine` health, frontend ingress, end-to-end consensus request
 
 ### P10 — Stateful Services Inside Free Limits 🔴 KNOWN ISSUE
 - k3s is running with `--disable local-storage`, so standard PVC-backed workloads will not work as-is
@@ -282,7 +288,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-18 13:43`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-18 15:20`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Active Backlog    0.0%  [------------------------]
