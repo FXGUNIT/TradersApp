@@ -1,5 +1,5 @@
 # TODO Master List
-**Last Updated:** 2026-04-17
+**Last Updated:** 2026-04-18
 **Based on:** Stage P production deployment + Session Redesign + ML Research Foundation
 
 ---
@@ -13,16 +13,26 @@ Everything below is blocked by this completing successfully.
 ### TIER 2 — STAGING: k3s bootstrap + secrets injection
 Once CI/CD works, bootstrap namespace + secrets on k3s cluster, then Helm deploy.
 
-### TIER 3 — DNS + Frontend binding
-Point traders.app → OCI public IP via DNS A record once k3s ingress works.
+### TIER 3 — DNS + OCI ingress binding
+Point `traders.app`, `bff.traders.app`, and `api.traders.app` at the OCI public edge once ingress is stable.
 
 ### TIER 4 — Backend ML Improvements
 All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live app when ready.
 
 ---
 
+## PRODUCTION CONSTRAINTS
+
+- Production topology is OCI Always Free k3s only. Do not depend on Railway, Vercel, or any other paid-hosting path.
+- Keep the existing domain, but use the current registrar/DNS provider already attached to `traders.app` instead of adding a new paid platform.
+- Do not cut app features to fit the server. Reduce infrastructure overhead first; keep trading logic, accuracy checks, and robustness requirements intact.
+- Robustness on free infrastructure means deterministic boot, repeatable deploys, working health checks, and recovery procedures. It does not imply multi-node HA on a single Always Free node.
+- Public production hosts must terminate on the OCI/k3s edge: `traders.app`, `bff.traders.app`, and `api.traders.app`.
+
+---
+
 ## STAGE P — Production Deployment (Live 24x7 on OCI k3s)
-*Target: GitHub Actions → k3s (OCI E2.1.Micro) → traders.app*
+*Target: GitHub Actions → single-node k3s on OCI Always Free → `traders.app` + `bff.traders.app` + `api.traders.app`*
 
 ### P01 — OCI Compute Instance ✅ DONE
 - [x] OCI E2.1.Micro at 144.24.112.249 (ap-mumbai-1, Always Free)
@@ -75,6 +85,9 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [x] `--install` flag added to `helm upgrade` (required for first-time deploy with `--atomic`)
 - [x] `.venv-research/` removed from git history via `git-filter-repo` (253MB torch_cpu.dll was blocking push)
 - [x] `.venv-research/` added to `.gitignore`
+- [x] Stale release cleanup added for old HPA/PDB/PVC leftovers before production deploy
+- [x] Micro production profile trimmed further so `ml-engine` runs without the model-registry sidecar
+- [x] Helm failure path now dumps pods, PVCs, events, and `kubectl describe` output for exact post-failure diagnosis
 
 ### P07 — k3s Namespace + Secrets Bootstrap ⏳ PENDING
 - [ ] Run `scripts/admin/k3s-dev-bootstrap.ps1` via WSL to create tradersapp namespace + secrets
@@ -86,41 +99,47 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [x] `values.dev.yaml` exists with dev overrides
 - [x] All Docker images tagged with GitHub SHA from CI pipeline
 
-### P09 — Helm Deployment ⏳ BLOCKED BY P06
-- [ ] Helm upgrade runs in CI: `helm upgrade tradersapp ./k8s/helm/tradersapp --install --atomic --wait`
-- [ ] Images loaded into k3s containerd from GHCR
-- [ ] Wait for rollout: bff, ml-engine, frontend deployments
-- [ ] Smoke tests: bff health, ml-engine health, frontend ingress
+### P09 — Helm Deployment 🔴 CURRENT BLOCKER
+- Current failure signature: production run reaches fresh Helm install, then ends with `Error: context deadline exceeded`
+- Current failure evidence: k3s API intermittently refuses `144.24.112.249:6443` during deploy recovery
+- [ ] Get one clean production Helm install from CI without API refusals or Helm timeout
+- [ ] Use the new diagnostic dump on the next failure to identify the exact stuck pod / PVC / readiness gate
+- [ ] Confirm images pull and start cleanly on OCI k3s from GHCR
+- [ ] Wait for rollout: `bff`, `ml-engine`, `frontend`, and `redis`
+- [ ] Smoke tests: `bff` health, `ml-engine` health, frontend ingress, and end-to-end consensus request
 
-### P10 — Persistent Storage 🔴 KNOWN ISSUE
-- k3s with `--disable local-storage` means no PersistentVolumeClaims work
-- PostgreSQL, Redis, MinIO pods will fail if they need PVCs
-- **Workaround:** Use `emptyDir` volumes or HostPath for dev; for prod consider NFS backend
-- [ ] Assess which services actually need persistent storage
-- [ ] Implement `emptyDir` fallback for ml-engine PostgreSQL (data in container, non-persistent)
-- [ ] Redis: `emptyDir` for cache only (no persistence needed for dev)
-- [ ] MinIO/MLflow: requires persistent storage — deploy NFS provisioner or skip for now
+### P10 — Stateful Services Inside Free Limits 🔴 KNOWN ISSUE
+- k3s is running with `--disable local-storage`, so standard PVC-backed workloads will not work as-is
+- Free-only production cannot assume a paid managed database, object store, or storage provisioner
+- [ ] Audit each stateful component and classify it as required-for-production or removable-from-runtime
+- [ ] Keep Redis explicitly ephemeral (`emptyDir`) because it is cache, not source-of-truth
+- [ ] Remove stale PVC baggage from old experiments (`data-kafka-0`, abandoned Longhorn references, other dead claims)
+- [ ] Decide whether PostgreSQL is truly required in the live request path; if yes, fit it into the single-node free design with a documented recovery method
+- [ ] Defer any non-essential MLflow/MinIO persistence until a genuinely free durable path is proven
 
-### P11 — Ingress / External Access 🔴 KNOWN ISSUE
-- k3s running with `--disable traefik --disable servicelb` — no built-in ingress controller
-- [ ] Deploy k8s nginx-ingress or use NodePort service
-- [ ] Frontend served at `http://144.24.112.249:30080` (NodePort)
-- [ ] BFF served at `http://144.24.112.249:30081` (NodePort)
-- [ ] Or deploy MetalLB for LoadBalancer (if supported on E2.1.Micro)
-- [ ] Point DNS `traders.app` → `144.24.112.249` once ingress works
+### P11 — Ingress / External Access 🔴 CURRENT BLOCKER
+- k3s runs with `--disable traefik --disable servicelb`, so external traffic must be handled explicitly
+- [ ] Standardize on one free edge path: `ingress-nginx` on OCI k3s, not Vercel, Railway, or another proxy dependency
+- [ ] Route `traders.app`, `bff.traders.app`, and `api.traders.app` through the same OCI public IP and ingress controller
+- [ ] Keep NodePort only as a temporary debugging fallback, not the final public architecture
+- [ ] Prove frontend, BFF, and ML engine all answer through ingress before touching final DNS
+- [ ] Ensure the ingress path is compatible with Let's Encrypt / cert-manager challenge flow
 
-### P12 — DNS Configuration ⏳ BLOCKED BY P11
-- [ ] Register/manage `traders.app` domain (Cloudflare or Porkbun)
-- [ ] A record: `traders.app` → `144.24.112.249`
-- [ ] CNAME: `bff.traders.app` → `traders.app`
-- [ ] CNAME: `api.traders.app` → `traders.app`
-- [ ] TLS: Let's Encrypt cert-manager or Cloudflare origin cert
+### P12 — DNS + TLS on Current Registrar ⏳ BLOCKED BY P11
+- Current live mismatch: `traders.app` resolves to the wrong edge, HTTPS is broken, and `api.traders.app` is still NXDOMAIN
+- Current authoritative DNS is on the existing registrar nameservers; keep that path instead of introducing another paid DNS layer
+- [ ] Fix the apex A record so `traders.app` points to the OCI ingress IP instead of the current wrong edge
+- [ ] Create `bff.traders.app` and `api.traders.app` DNS records against the same OCI edge
+- [ ] Remove or replace legacy DNS entries that still send traffic to the wrong AWS / old frontend path
+- [ ] Issue and validate Let's Encrypt certificates for apex + API/BFF hosts through cert-manager on k3s
+- [ ] Verify `https://traders.app`, `https://bff.traders.app/health`, and `https://api.traders.app/health`
 
-### P13 — Frontend Vercel Deployment 🔴 REDIRECT NEEDED
-- Vercel deploys from `vercel.json` — currently targets Vercel infrastructure
-- [ ] Either: Keep Vercel for frontend static hosting + proxy via Cloudflare to OCI k3s
-- [ ] Or: Move frontend to k3s alongside backend (NodePort)
-- [ ] Update `vercel.json` CSP headers for new domain once live
+### P13 — Frontend on OCI k3s 🔴 REQUIRED
+- Production frontend must be served from OCI/k3s, not Vercel
+- [ ] Remove Vercel from the production go-live path and treat `vercel.json` as non-production only unless explicitly needed for previews
+- [ ] Serve the built frontend from the cluster alongside the backend stack
+- [ ] Confirm `traders.app` no longer redirects to `stocks.news` or any legacy deployment
+- [ ] Re-check CSP, API base URLs, and frontend environment wiring for the OCI-hosted domains
 
 ### P14 — Observability 🔴 KNOWN ISSUE
 - Prometheus + Grafana stack too heavy for E2.1.Micro (1GB RAM)
@@ -135,8 +154,14 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 
 ### P16 — Go-Live Sign-Off 🔴 BLOCKED BY P09
 - [ ] Manual smoke test: load traders.app, check consensus signal renders
+- [ ] Manual smoke test: `bff.traders.app/health` and `api.traders.app/health` both return healthy over HTTPS
 - [ ] Paper trade for 1 week before any real money
 - [ ] Board Room deliberation rule applies to all signals
+
+### P17 — Documentation Alignment ⏳ PENDING
+- [ ] Rewrite or archive any Stage P docs that still reference Railway/Vercel as the production path
+- [ ] Make this master TODO the source of truth for the free-only production architecture
+- [ ] Update DNS/TLS runbooks to match the current registrar + OCI ingress plan
 
 ---
 
@@ -257,7 +282,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-18 08:20`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-18 13:43`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Active Backlog    0.0%  [------------------------]
