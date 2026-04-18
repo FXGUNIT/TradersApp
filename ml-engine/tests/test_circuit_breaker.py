@@ -87,7 +87,10 @@ class TestCircuitBreakerStateTransitions:
         with pytest.raises(RuntimeError):
             with cb.call(fallback=None):
                 raise RuntimeError("probe failure")
-        assert cb.state == "OPEN"
+        # `state` is side-effecting and can immediately re-enter HALF_OPEN once
+        # the short recovery timeout has elapsed again. Snapshot the raw state
+        # instead so this assertion remains deterministic under CI parallelism.
+        assert cb.get_state()["state"] == "OPEN"
 
     def test_half_open_max_calls_respected(self):
         from infrastructure.performance import CircuitBreaker
