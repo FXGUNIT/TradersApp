@@ -117,6 +117,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
   - Fix applied: `values.minimal.yaml` now forces coherent core-only runtime settings (`bff` HTTP transport, `ml-engine` Kafka/required-DB off, security extras off)
   - Fix applied: core runtime Deployments now use `Recreate` in the minimal profile so the node does not schedule two generations at once
   - Fix applied: production CI now builds/pushes current commit SHA images and deploys the rendered minimal manifest via direct `kubectl apply`
+  - Fix applied: automatic production CI now defers `ingress-nginx` + `cert-manager` until after the core runtime stabilizes; edge bootstrap is manual opt-in post-core because pre-core bootstrap was flapping the 945Mi node
   - k3s cold-restart pattern: clear etcd data dir -> `systemctl restart k3s` when API won't stabilize
   - kubectl API calls from Windows fail after etcd compaction: use local kubeconfig + wait for stabilization
 - [ ] values.minimal.yaml direct-apply deploy completes with exactly one Running/Ready pod each for `redis`, `ml-engine`, `bff`, and `frontend`
@@ -136,6 +137,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 
 ### P11 — Ingress / External Access 🔴 CURRENT BLOCKER
 - k3s runs with `--disable traefik --disable servicelb`, so external traffic must be handled explicitly
+- Automatic CI no longer bootstraps `ingress-nginx` / `cert-manager` before the core deploy on the free OCI node; edge bootstrap is now a separate post-core action to avoid destabilizing P09
 - [ ] Standardize on one free edge path: `ingress-nginx` on OCI k3s, not Vercel, Railway, or another proxy dependency
 - [ ] Route `traders.app`, `bff.traders.app`, and `api.traders.app` through the same OCI public IP and ingress controller
 - [ ] Keep NodePort only as a temporary debugging fallback, not the final public architecture
@@ -299,7 +301,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-18 22:03`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-18 22:58`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Active Backlog    0.0%  [------------------------]

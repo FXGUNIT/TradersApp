@@ -39,9 +39,13 @@ on:
         required: false
         default: "false"
         type: boolean
+      bootstrap_edge:
+        description: "Attempt ingress-nginx + cert-manager bootstrap after the core deploy"
+        required: false
+        default: false
+        type: boolean
 
 env:
-  REGISTRY: ghcr.io/${{ github.repository_owner }}/tradersapp
   HELM_TIMEOUT: 10m
   SMOKE_TIMEOUT: 120
 
@@ -55,6 +59,7 @@ jobs:
       environment: ${{ steps.env.outputs.environment }}
       image_tag: ${{ steps.env.outputs.image_tag }}
       skip_migration: ${{ steps.env.outputs.skip_migration }}
+      bootstrap_edge: ${{ steps.env.outputs.bootstrap_edge }}
     steps:
       - name: Determine trigger context
         id: env
@@ -63,6 +68,7 @@ jobs:
             echo "environment=${{ inputs.environment }}" >> $GITHUB_OUTPUT
             echo "image_tag=${{ inputs.image_tag }}" >> $GITHUB_OUTPUT
             echo "skip_migration=${{ inputs.skip_migration }}" >> $GITHUB_OUTPUT
+            echo "bootstrap_edge=${{ inputs.bootstrap_edge }}" >> $GITHUB_OUTPUT
           else
             CONCLUSION="${{ github.event.workflow_run.conclusion }}"
             if [ "$CONCLUSION" != "success" ]; then
@@ -73,6 +79,7 @@ jobs:
             echo "environment=production" >> $GITHUB_OUTPUT
             echo "image_tag=" >> $GITHUB_OUTPUT
             echo "skip_migration=false" >> $GITHUB_OUTPUT
+            echo "bootstrap_edge=false" >> $GITHUB_OUTPUT
           fi
 
       # Get SHA of the commit that triggered the parent CI workflow.
@@ -124,19 +131,6 @@ jobs:
           echo "Commit SHA: ${{ needs.gate.outputs.sha }}" >> "$GITHUB_STEP_SUMMARY"
 
       # ── Docker meta: SHA-tagged images from CI ────────────────────────────
-      - name: Extract metadata for all services
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: |
-            ${{ env.REGISTRY }}/ml-engine
-            ${{ env.REGISTRY }}/bff
-            ${{ env.REGISTRY }}/frontend
-            ${{ env.REGISTRY }}/analysis-service
-          tags: |
-            type=sha,prefix=,suffix=,format=short
-            type=raw,value=latest
-
       # Log in to GHCR so we can pull the SHA-tagged images CI built.
       - name: Login to GHCR
         uses: docker/login-action@v3
@@ -207,13 +201,6 @@ jobs:
           curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
           helm plugin install https://github.com/databus23/helm-diff --version v0.1.0 || true
 
-      - name: Bootstrap ingress-nginx + cert-manager
-        env:
-          CERT_MANAGER_EMAIL: ${{ vars.CERT_MANAGER_EMAIL || 'admin@traders.app' }}
-        run: |
-          bash ./scripts/k8s/bootstrap-oci-edge.sh \
-            --kubeconfig ~/.kube/config \
-            --cert-email "${CERT_MANAGER_EMAIL}"
 
       # ── Determine image tag ──────────────────────────────────────────────
       - name: Resolve image tag
@@ -230,9 +217,10 @@ jobs:
       - name: Pull SHA-tagged images from GHCR
         run: |
           TAG="${{ steps.image_tag.outputs.tag }}"
+          IMAGE_REPO="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}"
           for SVC in ml-engine bff frontend analysis-service; do
-            echo "Pulling ${{ env.REGISTRY }}/${SVC}:${TAG}"
-            docker pull ${{ env.REGISTRY }}/${SVC}:${TAG} || {
+            echo "Pulling ${IMAGE_REPO}/${SVC}:${TAG}"
+            docker pull "${IMAGE_REPO}/${SVC}:${TAG}" || {
               echo "⚠ Could not pull $SVC:${TAG} — cluster may not have network access to GHCR"
               echo "  Ensure the k3s nodes have GHCR auth configured:"
               echo "  kubectl create secret docker-registry ghcr-secret \\"
@@ -247,9 +235,10 @@ jobs:
       - name: Tag images as tradersapp/*:sha
         run: |
           TAG="${{ steps.image_tag.outputs.tag }}"
+          IMAGE_REPO="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}"
           for SVC in ml-engine bff frontend analysis-service; do
             docker tag \
-              ${{ env.REGISTRY }}/${SVC}:${TAG} \
+              "${IMAGE_REPO}/${SVC}:${TAG}" \
               tradersapp/${SVC}:sha || true
           done
 
@@ -258,8 +247,9 @@ jobs:
         if: vars.K8S_CLUSTER_NAME != ''
         run: |
           TAG="${{ steps.image_tag.outputs.tag }}"
+          IMAGE_REPO="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}"
           for SVC in ml-engine bff frontend analysis-service; do
-            docker save ${{ env.REGISTRY }}/${SVC}:${TAG} \
+            docker save "${IMAGE_REPO}/${SVC}:${TAG}" \
               | ssh ${{ vars.K8S_SSH_USER }}@${{ vars.K8S_NODE_HOST }} \
                 "ctr -n k8s.io images import -" || true
           done
@@ -291,6 +281,7 @@ jobs:
         run: |
           TAG="${{ steps.image_tag.outputs.tag }}"
           NS="${{ vars.K8S_NAMESPACE || 'tradersapp' }}"
+          IMAGE_REPO="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}"
 
           cat << MIGRATION_YAML | kubectl apply -f -
           apiVersion: batch/v1
@@ -313,7 +304,7 @@ jobs:
                 restartPolicy: OnFailure
                 containers:
                   - name: migration
-                    image: ${{ env.REGISTRY }}/ml-engine:${TAG}
+                    image: ${IMAGE_REPO}/ml-engine:${TAG}
                     command: ["python", "scripts/migrate_to_postgres.py"]
                     env:
                       - name: DATABASE_URL
@@ -334,28 +325,31 @@ jobs:
         continue-on-error: true  # Non-fatal — schema may already be up to date
 
       # ── Helm upgrade ─────────────────────────────────────────────────────
-      - name: Helm upgrade (install or upgrade)
+      - name: Deploy core runtime
         run: |
           TAG="${{ steps.image_tag.outputs.tag }}"
           NS="${{ vars.K8S_NAMESPACE || 'tradersapp' }}"
           ENV_NAME="${{ needs.gate.outputs.environment }}"
-          VALUES_ARGS=(-f ./k8s/helm/tradersapp/values.prod.yaml)
+          IMAGE_REPO="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}"
           if [ "$ENV_NAME" = "production" ]; then
-            VALUES_ARGS+=(-f ./k8s/helm/tradersapp/values.prod.micro.yaml)
+            bash ./scripts/k8s/deploy-core-minimal.sh \
+              --kubeconfig ~/.kube/config \
+              --namespace "$NS" \
+              --image-repo "${IMAGE_REPO}" \
+              --image-tag "${TAG}"
+          else
+            VALUES_ARGS=(-f ./k8s/helm/tradersapp/values.prod.yaml)
+            helm upgrade tradersapp \
+              ./k8s/helm/tradersapp \
+              --namespace "$NS" \
+              --create-namespace \
+              --install \
+              --set global.imageTag="${TAG}" \
+              "${VALUES_ARGS[@]}" \
+              --wait \
+              --timeout "${{ env.HELM_TIMEOUT }}" \
+              --history-max 5
           fi
-
-
-          helm upgrade tradersapp \
-            ./k8s/helm/tradersapp \
-            --namespace "$NS" \
-            --create-namespace \
-            --install \
-            --set global.imageTag="${TAG}" \
-            "${VALUES_ARGS[@]}" \
-            --wait \
-            --timeout "${{ env.HELM_TIMEOUT }}" \
-            --history-max 5 \
-            # --atomic  # removed: fails first-deploy with no prior release
 
       # ── Rollout status ──────────────────────────────────────────────────
       - name: Wait for rollout — bff
