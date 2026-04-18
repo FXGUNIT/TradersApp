@@ -1,5 +1,5 @@
 # TODO Master List
-**Last Updated:** 2026-04-18
+**Last Updated:** 2026-04-19
 **Based on:** Stage P production deployment + Session Redesign + ML Research Foundation
 
 ---
@@ -33,6 +33,15 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 
 ## STAGE P — Production Deployment (Live 24x7 on OCI k3s)
 *Target: GitHub Actions → single-node k3s on OCI Always Free → `traders.app` + `bff.traders.app` + `api.traders.app`*
+
+### Current Checkpoint - 2026-04-19
+- Latest completed failed deploy: GitHub Actions run `24613991349`
+- Current active deploy while this TODO is being updated: run `24614292140`
+- GHCR images are present; `ghcr.io/fxgunit/bff:latest`, `ghcr.io/fxgunit/frontend:latest`, and `ghcr.io/fxgunit/ml-engine:latest` all exist
+- The current hard blocker is not missing images; it is node pressure on the OCI free-tier k3s node during the core rollout
+- Exact latest failure: the node hit `DiskPressure`, evicted `bff`, `frontend`, `ml-engine`, and `redis`, then applied `node.kubernetes.io/disk-pressure:NoSchedule`, which left replacement pods Pending with `FailedScheduling`
+- Windows-to-OCI `kubectl` TLS timeout / handshake problems still exist, but GitHub Actions is reaching the cluster far enough to start real deploys; the cluster is then destabilizing during rollout
+
 
 ### P01 — OCI Compute Instance ✅ DONE
 - [x] OCI E2.1.Micro at 144.24.112.249 (ap-mumbai-1, Always Free)
@@ -81,7 +90,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [x] Set via: `cat file | gh secret set KUBECONFIG_B64 --repo FXGUNIT/TradersApp`
 - [x] After k3s restart: re-generate kubeconfig, re-download, update secret
 
-### P06 - CI/CD Pipeline (`deploy-k8s.yml`) IN PROGRESS - minimal direct-apply path
+### P06 - CI/CD Pipeline (`deploy-k8s.yml`) DONE - minimal direct-apply path
 - [x] kubeconfig decode fixed, TLS SAN fix, firewalld opened 6443
 - [x] `--install` flag added; `--atomic` removed (fails first-deploy with no prior release)
 - [x] `.venv-research/` removed from git history (253MB blocking push)
@@ -94,7 +103,6 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [x] `values.minimal.yaml` created for core-4-only deploys
 - [x] Production CI now pushes both `latest` and current commit SHA image tags before deploy
 - [x] Production CI now deploys the rendered minimal manifest via direct `kubectl apply`
-- [ ] External access: Ingress-nginx needs NodePort or LoadBalancer service for port 80/443
 
 ### P07 — k3s Namespace + Secrets Bootstrap ✅ DONE
 - [x] Run `scripts/admin/k3s-dev-bootstrap.ps1` via WSL — created all 4 secrets
@@ -107,23 +115,27 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [x] `values.minimal.yaml` created — core 4 only (bff, frontend, ml-engine, redis) with pinned SHA tags
 - [x] All Docker images tagged with GitHub SHA from CI pipeline
 
-### P09 - Helm Deployment IN PROGRESS
-- Root cause of all failures: E2.1.Micro (945MB RAM) is below the minimum for a standard k3s + multi-pod cluster
-  - k3s API server OOMs under pod scheduling load -> 503 ServiceUnavailable -> context deadline exceeded
-  - etcd also crashes on 21MB WAL replay under memory pressure
-  - Run `24607446277` proved node allocatable memory is only `968676Ki`, and the failed rollout hit `934Mi` requested memory because duplicate rolling-update pods remained alive
-  - Stale ReplicaSets also left invalid-image frontend pods behind from earlier failed rollouts
-  - Fix applied: systemd MemoryMax=750M + kube-apiserver toleration args to prevent cascade OOM
-  - Fix applied: `values.minimal.yaml` now forces coherent core-only runtime settings (`bff` HTTP transport, `ml-engine` Kafka/required-DB off, security extras off)
-  - Fix applied: core runtime Deployments now use `Recreate` in the minimal profile so the node does not schedule two generations at once
-  - Fix applied: production CI now builds/pushes current commit SHA images and deploys the rendered minimal manifest via direct `kubectl apply`
-  - Fix applied: automatic production CI now defers `ingress-nginx` + `cert-manager` until after the core runtime stabilizes; edge bootstrap is manual opt-in post-core because pre-core bootstrap was flapping the 945Mi node
-  - k3s cold-restart pattern: clear etcd data dir -> `systemctl restart k3s` when API won't stabilize
-  - kubectl API calls from Windows fail after etcd compaction: use local kubeconfig + wait for stabilization
+### P09 - Core Deployment CURRENT BLOCKER
+- Current hard failure mode on the OCI free node is rollout-time node pressure, not missing GHCR images
+  - Run `24613991349` already built and pushed current commit images, then failed during the real production deploy
+  - Verified from GHCR: `ghcr.io/fxgunit/bff:latest`, `ghcr.io/fxgunit/frontend:latest`, and `ghcr.io/fxgunit/ml-engine:latest` exist
+  - Exact node taint from the failed deploy diagnostics: `node.kubernetes.io/disk-pressure:NoSchedule`
+  - Exact node condition from the failed deploy diagnostics: `DiskPressure=True`, `MemoryPressure=False`
+  - Exact pod outcome from the failed deploy diagnostics: `bff`, `frontend`, `ml-engine`, and `redis` were evicted with `The node had condition: [DiskPressure]`
+  - Exact scheduler outcome from the failed deploy diagnostics: replacement pods stayed Pending with `0/1 nodes are available: 1 node(s) had untolerated taint(s)`
+  - Windows-to-OCI `kubectl` TLS / handshake instability is still real, but it is a secondary symptom right now; GitHub Actions is reaching the cluster, and the cluster is collapsing during rollout
+  - Fix already applied: `values.minimal.yaml` forces coherent core-only runtime settings (`bff` HTTP transport, `ml-engine` Kafka off, required DB off, security extras off)
+  - Fix already applied: core runtime Deployments use `Recreate` in the minimal profile so the node does not schedule two generations at once
+  - Fix already applied: production CI builds and pushes current commit SHA images before deploy
+  - Fix already applied: production CI deploys the rendered minimal manifest via direct `kubectl apply`
+  - Fix already applied: automatic production CI defers `ingress-nginx` + `cert-manager` until after the core runtime stabilizes
+  - Operational note: when the API will not stabilize, the existing cold-restart pattern is still `systemctl restart k3s` and, only if required, clearing the etcd data dir before recreating kubeconfig
+- [ ] Inspect and reduce disk usage on the OCI node (`containerd` images, dead sandboxes, evicted pod artifacts, logs, temp files)
+- [ ] Clear `node.kubernetes.io/disk-pressure:NoSchedule` and keep it clear through a full minimal rollout
 - [ ] values.minimal.yaml direct-apply deploy completes with exactly one Running/Ready pod each for `redis`, `ml-engine`, `bff`, and `frontend`
 - [ ] Confirm the cluster is running the current CI commit SHA images for `bff`, `frontend`, and `ml-engine`
 - [ ] Verify stale ReplicaSets / invalid-image pods are fully gone after the new cleanup path
-- [ ] Smoke tests: bff /health, ml-engine /health, frontend http://frontend:80, redis-cli ping
+- [ ] Smoke tests: `bff /health`, `ml-engine /health`, frontend `http://frontend:80`, `redis-cli ping`
 - [ ] KUBECONFIG_B64 secret in GitHub updated after each k3s cold restart
 
 ### P10 — Stateful Services Inside Free Limits 🔴 KNOWN ISSUE
@@ -135,10 +147,12 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [ ] Decide whether PostgreSQL is truly required in the live request path; if yes, fit it into the single-node free design with a documented recovery method
 - [ ] Defer any non-essential MLflow/MinIO persistence until a genuinely free durable path is proven
 
-### P11 — Ingress / External Access 🔴 CURRENT BLOCKER
+### P11 - Ingress / External Access BLOCKED BY P09
 - k3s runs with `--disable traefik --disable servicelb`, so external traffic must be handled explicitly
 - Automatic CI no longer bootstraps `ingress-nginx` / `cert-manager` before the core deploy on the free OCI node; edge bootstrap is now a separate post-core action to avoid destabilizing P09
+- External access is intentionally downstream of core runtime stability; do not treat ingress as the primary blocker while P09 is still failing on node pressure
 - [ ] Standardize on one free edge path: `ingress-nginx` on OCI k3s, not Vercel, Railway, or another proxy dependency
+- [ ] Expose `ingress-nginx` on the OCI node with a free-compatible service path once P09 is stable (NodePort is acceptable for debugging; final production path must remain OCI-only)
 - [ ] Route `traders.app`, `bff.traders.app`, and `api.traders.app` through the same OCI public IP and ingress controller
 - [ ] Keep NodePort only as a temporary debugging fallback, not the final public architecture
 - [ ] Prove frontend, BFF, and ML engine all answer through ingress before touching final DNS
@@ -153,7 +167,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [ ] Issue and validate Let's Encrypt certificates for apex + API/BFF hosts through cert-manager on k3s
 - [ ] Verify `https://traders.app`, `https://bff.traders.app/health`, and `https://api.traders.app/health`
 
-### P13 — Frontend on OCI k3s 🔴 REQUIRED
+### P13 - Frontend on OCI k3s BLOCKED BY P11
 - Production frontend must be served from OCI/k3s, not Vercel
 - [ ] Remove Vercel from the production go-live path and treat `vercel.json` as non-production only unless explicitly needed for previews
 - [ ] Serve the built frontend from the cluster alongside the backend stack
@@ -301,7 +315,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-19 02:40`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-19 03:18`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Active Backlog    0.0%  [------------------------]
