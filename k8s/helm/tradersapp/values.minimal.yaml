@@ -127,6 +127,9 @@ grafana:
 ingress:
   enabled: false
 
+kafka:
+  enabled: false
+
 keycloak:
   enabled: false
 
