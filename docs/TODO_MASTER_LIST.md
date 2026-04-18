@@ -11,7 +11,7 @@ Push TradersApp from GitHub Actions → k3s on OCI → live at traders.app.
 Everything below is blocked by this completing successfully.
 
 ### TIER 2 — STAGING: k3s bootstrap + secrets injection
-Once CI/CD works, bootstrap namespace + secrets on k3s cluster, then Helm deploy.
+Once CI/CD works, bootstrap namespace + secrets on k3s cluster, then minimal core deploy.
 
 ### TIER 3 — DNS + OCI ingress binding
 Point `traders.app`, `bff.traders.app`, and `api.traders.app` at the OCI public edge once ingress is stable.
@@ -81,17 +81,19 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [x] Set via: `cat file | gh secret set KUBECONFIG_B64 --repo FXGUNIT/TradersApp`
 - [x] After k3s restart: re-generate kubeconfig, re-download, update secret
 
-### P06 — CI/CD Pipeline (`deploy-k8s.yml`) 🔴 MOSTLY DONE — ingress-nginx remaining
+### P06 - CI/CD Pipeline (`deploy-k8s.yml`) IN PROGRESS - minimal direct-apply path
 - [x] kubeconfig decode fixed, TLS SAN fix, firewalld opened 6443
 - [x] `--install` flag added; `--atomic` removed (fails first-deploy with no prior release)
 - [x] `.venv-research/` removed from git history (253MB blocking push)
-- [x] Stale release cleanup fixed (was deleting namespace — caused "namespace not found" errors)
-- [x] Migration job heredoc fixed: `<< 'MIGRATION_YAML'` → `<< MIGRATION_YAML` (expands $NS/$TAG)
-- [x] hpa-watcher.yaml heredoc indentation fixed (closing EOF at 0 spaces → YAML parse error)
+- [x] Stale release cleanup fixed (was deleting namespace - caused "namespace not found" errors)
+- [x] Migration job heredoc fixed: `<< 'MIGRATION_YAML'` -> `<< MIGRATION_YAML` (expands $NS/$TAG)
+- [x] hpa-watcher.yaml heredoc indentation fixed (closing EOF at 0 spaces -> YAML parse error)
 - [x] nginx.conf bff resolver fix (resolver 10.43.0.10 + variable-based proxy_pass)
-- [x] k3s systemd service installed (auto-restart on boot) ✅ P03
+- [x] k3s systemd service installed (auto-restart on boot) - see P03
 - [x] Ingress-nginx installed via SSH on OCI; CI step has intermittent API failures
-- [x] CI/CD deploy-k8s.yml updated to use `values.minimal.yaml` for core-4-only deploys
+- [x] `values.minimal.yaml` created for core-4-only deploys
+- [x] Production CI now pushes both `latest` and current commit SHA image tags before deploy
+- [x] Production CI now deploys the rendered minimal manifest via direct `kubectl apply`
 - [ ] External access: Ingress-nginx needs NodePort or LoadBalancer service for port 80/443
 
 ### P07 — k3s Namespace + Secrets Bootstrap ✅ DONE
@@ -105,18 +107,21 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [x] `values.minimal.yaml` created — core 4 only (bff, frontend, ml-engine, redis) with pinned SHA tags
 - [x] All Docker images tagged with GitHub SHA from CI pipeline
 
-### P09 — Helm Deployment 🔴 IN PROGRESS
+### P09 - Helm Deployment IN PROGRESS
 - Root cause of all failures: E2.1.Micro (945MB RAM) is below the minimum for a standard k3s + multi-pod cluster
-  - k3s API server OOMs under pod scheduling load → 503 ServiceUnavailable → context deadline exceeded
+  - k3s API server OOMs under pod scheduling load -> 503 ServiceUnavailable -> context deadline exceeded
   - etcd also crashes on 21MB WAL replay under memory pressure
-  - Fix in progress: `values.minimal.yaml` with explicit SHA tags and all non-core services disabled
+  - Run `24607446277` proved node allocatable memory is only `968676Ki`, and the failed rollout hit `934Mi` requested memory because duplicate rolling-update pods remained alive
+  - Stale ReplicaSets also left invalid-image frontend pods behind from earlier failed rollouts
   - Fix applied: systemd MemoryMax=750M + kube-apiserver toleration args to prevent cascade OOM
-  - k3s cold-restart pattern: clear etcd data dir → `systemctl restart k3s` when API won't stabilize
+  - Fix applied: `values.minimal.yaml` now forces coherent core-only runtime settings (`bff` HTTP transport, `ml-engine` Kafka/required-DB off, security extras off)
+  - Fix applied: core runtime Deployments now use `Recreate` in the minimal profile so the node does not schedule two generations at once
+  - Fix applied: production CI now builds/pushes current commit SHA images and deploys the rendered minimal manifest via direct `kubectl apply`
+  - k3s cold-restart pattern: clear etcd data dir -> `systemctl restart k3s` when API won't stabilize
   - kubectl API calls from Windows fail after etcd compaction: use local kubeconfig + wait for stabilization
-- [ ] values.minimal.yaml deployed cleanly: get all pods Running/Ready
-- [ ] Confirm bff, ml-engine, redis pull and start from GHCR with pinned SHA `aaba273`
-- [ ] Frontend CrashLoopBackOff fix: nginx `proxy_pass $bff_backend` needs resolver directive (already fixed in nginx.conf)
-- [ ] Verify images exist on GHCR for all 4 services at SHA aaba273 (trigger rebuild if missing)
+- [ ] values.minimal.yaml direct-apply deploy completes with exactly one Running/Ready pod each for `redis`, `ml-engine`, `bff`, and `frontend`
+- [ ] Confirm the cluster is running the current CI commit SHA images for `bff`, `frontend`, and `ml-engine`
+- [ ] Verify stale ReplicaSets / invalid-image pods are fully gone after the new cleanup path
 - [ ] Smoke tests: bff /health, ml-engine /health, frontend http://frontend:80, redis-cli ping
 - [ ] KUBECONFIG_B64 secret in GitHub updated after each k3s cold restart
 
@@ -294,7 +299,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-18 20:35`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-18 22:03`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Active Backlog    0.0%  [------------------------]

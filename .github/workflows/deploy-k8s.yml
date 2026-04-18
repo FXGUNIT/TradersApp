@@ -1,9 +1,10 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # TradersApp — Kubernetes Deploy Workflow
 #
-# Triggered automatically after ci.yml passes on `main`, OR manually via
-# workflow_dispatch. Builds no images — those are built and pushed by ci.yml
-# to GHCR with SHA-tagged references. This workflow pulls them and drives Helm.
+# Triggered manually via workflow_dispatch. Builds no images — those are built
+# and pushed by ci.yml to GHCR with SHA-tagged references. This workflow is kept
+# as a manual deployment path so the main CI production deploy remains the only
+# automatic rollout on the free-tier cluster.
 #
 # Required GitHub Secrets:
 #   KUBECONFIG_B64   — base64-encoded kubeconfig for the target k3s/API server
@@ -17,13 +18,6 @@
 name: Deploy to Kubernetes
 
 on:
-  # Auto-deploy when ci.yml completes successfully on main.
-  # workflow_run gives us access to the triggering workflow's artifacts + conclusion.
-  workflow_run:
-    workflows: ["CI/CD Pipeline"]
-    types: [completed]
-    branches: [main]
-
   # Manual trigger: allows deploy of any SHA to staging/production without
   # waiting for the full CI pipeline. Useful for hotfixes.
   workflow_dispatch:
