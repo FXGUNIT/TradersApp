@@ -165,6 +165,273 @@ def format_count(value: float) -> str:
     return f"{int(value):03d}"
 
 
+def strip_generated_blocks(markdown: str) -> str:
+    cleaned = markdown
+    for start_marker, end_marker in (
+        (MASTER_PROGRESS_START, MASTER_PROGRESS_END),
+        (PROGRESS_START, PROGRESS_END),
+    ):
+        cleaned = re.sub(
+            rf"{re.escape(start_marker)}.*?{re.escape(end_marker)}\s*",
+            "",
+            cleaned,
+            flags=re.DOTALL,
+        )
+    return cleaned
+
+
+def parse_master_checklist(markdown: str) -> list[ChecklistItem]:
+    items: list[ChecklistItem] = []
+    current_section = ""
+    current_subsection = ""
+
+    for line in strip_generated_blocks(markdown).splitlines():
+        section_match = re.match(r"^##\s+(.+)$", line.strip())
+        if section_match:
+            current_section = section_match.group(1).strip()
+            current_subsection = ""
+            continue
+
+        subsection_match = re.match(r"^###\s+(.+)$", line.strip())
+        if subsection_match:
+            current_subsection = subsection_match.group(1).strip()
+            continue
+
+        task_match = re.match(r"^-\s+\[(?P<mark>[ x!\-])\]\s+(?P<title>.+)$", line)
+        if not task_match:
+            continue
+
+        status = _marker_to_status(task_match.group("mark"))
+        task_title = task_match.group("title").strip()
+        item = classify_checklist_item(current_section, current_subsection, task_title, status)
+        if item is not None:
+            items.append(item)
+
+    return items
+
+
+def classify_checklist_item(
+    current_section: str,
+    current_subsection: str,
+    task_title: str,
+    status: str,
+) -> ChecklistItem | None:
+    normalized_section = current_section.upper()
+
+    if normalized_section.startswith("STAGE P"):
+        phase_match = re.match(r"^(P\d{2})\b", current_subsection)
+        phase_id = phase_match.group(1) if phase_match else "P00"
+        phase_title = current_subsection or phase_id
+        return ChecklistItem(
+            area="Stage P",
+            phase_id=phase_id,
+            phase_title=phase_title,
+            status=status,
+            raw_title=task_title,
+        )
+
+    if normalized_section.startswith("STAGE S"):
+        phase_match = re.match(r"^Phase\s+(S\d+)\b", current_subsection)
+        phase_id = phase_match.group(1) if phase_match else "S0"
+        phase_title = current_subsection or phase_id
+        return ChecklistItem(
+            area="Stage S",
+            phase_id=phase_id,
+            phase_title=phase_title,
+            status=status,
+            raw_title=task_title,
+        )
+
+    if normalized_section.startswith("STAGES ML"):
+        phase_match = re.match(r"^(ML\d+)\b", task_title)
+        phase_id = phase_match.group(1) if phase_match else "ML"
+        phase_title = phase_id if phase_match else "ML Research"
+        return ChecklistItem(
+            area="ML Research",
+            phase_id=phase_id,
+            phase_title=phase_title,
+            status=status,
+            raw_title=task_title,
+        )
+
+    return None
+
+
+def summarize_checklist_items(items: list[ChecklistItem]) -> dict[str, float]:
+    total = len(items)
+    done = sum(1 for item in items if item.status == "Done")
+    partial = sum(1 for item in items if item.status == "Partial")
+    blocked = sum(1 for item in items if item.status == "Blocked")
+    todo = sum(1 for item in items if item.status == "Todo")
+    weighted_done = sum(STATUS_SCORE.get(item.status, 0.0) for item in items)
+    completion_pct = (weighted_done / total * 100.0) if total else 0.0
+    return {
+        "total": total,
+        "done": done,
+        "partial": partial,
+        "blocked": blocked,
+        "todo": todo,
+        "completion_pct": completion_pct,
+    }
+
+
+def infer_heading_status(heading: str, done: int, total: int) -> str:
+    normalized = heading.lower()
+    if total > 0 and done == total:
+        return "DONE"
+    if "current blocker" in normalized:
+        return "CURRENT BLOCKER"
+    if "blocked by" in normalized or normalized.endswith("blocked"):
+        return "BLOCKED"
+    if "known issue" in normalized:
+        return "KNOWN ISSUE"
+    if "in progress" in normalized:
+        return "IN PROGRESS"
+    if "pending" in normalized or "required" in normalized:
+        return "PENDING"
+    if done > 0:
+        return "IN PROGRESS"
+    return "PENDING"
+
+
+def infer_aggregate_status(statuses: list[str], done: int, total: int) -> str:
+    if total > 0 and done == total:
+        return "DONE"
+    if "CURRENT BLOCKER" in statuses:
+        return "CURRENT BLOCKER"
+    if "BLOCKED" in statuses:
+        return "BLOCKED"
+    if "KNOWN ISSUE" in statuses:
+        return "KNOWN ISSUE"
+    if "IN PROGRESS" in statuses:
+        return "IN PROGRESS"
+    return "PENDING"
+
+
+def phase_sort_key(phase_id: str) -> tuple[int, int | str]:
+    if phase_id.startswith("P") and phase_id[1:].isdigit():
+        return (0, int(phase_id[1:]))
+    if phase_id.startswith("S") and phase_id[1:].isdigit():
+        return (1, int(phase_id[1:]))
+    if phase_id.startswith("ML") and phase_id[2:].isdigit():
+        return (2, int(phase_id[2:]))
+    return (3, phase_id)
+
+
+def build_master_progress_block(markdown: str) -> str:
+    items = parse_master_checklist(markdown)
+    summary = summarize_checklist_items(items)
+
+    phase_buckets: dict[str, dict[str, object]] = {}
+    area_buckets: dict[str, list[ChecklistItem]] = {
+        "Stage P": [],
+        "Stage S": [],
+        "ML Research": [],
+    }
+
+    for item in items:
+        area_buckets.setdefault(item.area, []).append(item)
+        bucket = phase_buckets.setdefault(
+            item.phase_id,
+            {
+                "title": item.phase_title,
+                "items": [],
+            },
+        )
+        bucket["items"].append(item)
+
+    tier_defs = [
+        ("TIER 1", "Stage P rollout path", lambda item: item.area == "Stage P"),
+        ("TIER 2", "Bootstrap + minimal core", lambda item: item.phase_id in {"P07", "P08", "P09"}),
+        ("TIER 3", "OCI ingress + DNS cutover", lambda item: item.phase_id in {"P11", "P12", "P13"}),
+        ("TIER 4", "Stage S + ML backlog", lambda item: item.area in {"Stage S", "ML Research"}),
+    ]
+
+    timestamp = datetime.now().astimezone().strftime("%Y-%m-%d %H:%M")
+    lines = [
+        MASTER_PROGRESS_START,
+        "## Progress Dashboard",
+        f"Generated: `{timestamp}`  ·  Run `python scripts/update_todo_progress.py --once` to update",
+        "",
+        "```text",
+        f"Master Backlog {summary['completion_pct']:5.1f}%  {make_bar(summary['completion_pct'], width=24)}",
+        f"Tasks          done {format_count(summary['done'])} | in progress {format_count(summary['partial'])} | blocked {format_count(summary['blocked'])} | todo {format_count(summary['todo'])} | total {format_count(summary['total'])}",
+        "```",
+        "",
+        "How to read this:",
+        "- `Master Backlog` counts every checkbox task across Stage P, Stage S, and ML research.",
+        "- Tier bars are strategic buckets and can overlap; phase bars are the exact checklist counts.",
+        "",
+        "### By Area",
+        "",
+        "| Area | Tasks | Progress | Status |",
+        "|---|---|---:|---|",
+    ]
+
+    for area_name in ("Stage P", "Stage S", "ML Research"):
+        area_items = area_buckets.get(area_name, [])
+        area_summary = summarize_checklist_items(area_items)
+        phase_statuses: list[str] = []
+        for phase_id, bucket in phase_buckets.items():
+            bucket_items = bucket["items"]
+            if bucket_items and bucket_items[0].area == area_name:
+                done = sum(1 for item in bucket_items if item.status == "Done")
+                phase_statuses.append(infer_heading_status(str(bucket["title"]), done, len(bucket_items)))
+        status_label = infer_aggregate_status(phase_statuses, int(area_summary["done"]), int(area_summary["total"]))
+        lines.append(
+            f"| {area_name} | [{int(area_summary['done'])}/{int(area_summary['total'])}] | {area_summary['completion_pct']:5.1f}% | {status_label} |"
+        )
+
+    lines.extend(
+        [
+            "",
+            "### By Tier",
+            "",
+            "| Tier | Scope | Progress | Status |",
+            "|---|---|---:|---|",
+        ]
+    )
+
+    for tier_name, scope_label, matcher in tier_defs:
+        tier_items = [item for item in items if matcher(item)]
+        tier_summary = summarize_checklist_items(tier_items)
+        phase_statuses = []
+        seen_phase_ids = {item.phase_id for item in tier_items}
+        for phase_id in seen_phase_ids:
+            bucket = phase_buckets.get(phase_id)
+            if bucket is None:
+                continue
+            bucket_items = bucket["items"]
+            done = sum(1 for item in bucket_items if item.status == "Done")
+            phase_statuses.append(infer_heading_status(str(bucket["title"]), done, len(bucket_items)))
+        status_label = infer_aggregate_status(phase_statuses, int(tier_summary["done"]), int(tier_summary["total"]))
+        lines.append(
+            f"| {tier_name} | {scope_label} | {tier_summary['completion_pct']:5.1f}% | {status_label} |"
+        )
+
+    lines.extend(
+        [
+            "",
+            "### By Phase",
+            "",
+            "| Phase | Tasks | Progress | Status |",
+            "|---|---|---:|---|",
+        ]
+    )
+
+    for phase_id in sorted(phase_buckets.keys(), key=phase_sort_key):
+        bucket = phase_buckets[phase_id]
+        bucket_items: list[ChecklistItem] = bucket["items"]  # type: ignore[assignment]
+        bucket_summary = summarize_checklist_items(bucket_items)
+        status_label = infer_heading_status(str(bucket["title"]), int(bucket_summary["done"]), int(bucket_summary["total"]))
+        lines.append(
+            f"| {phase_id} - {bucket['title']} | [{int(bucket_summary['done'])}/{int(bucket_summary['total'])}] | {bucket_summary['completion_pct']:5.1f}% | {status_label} |"
+        )
+
+    lines.extend(["", MASTER_PROGRESS_END])
+    return "\n".join(lines)
+
+
 def summarize(tasks: list[Task]) -> tuple[str, dict[str, dict[str, float]]]:
     total = len(tasks)
     done = sum(1 for task in tasks if task.status == "Done")
