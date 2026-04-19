@@ -278,7 +278,10 @@ spec:
           persistentVolumeClaim:
             claimName: redis-pvc
           {{- else }}
-          emptyDir: {}
+          emptyDir:
+            {{- with .Values.redis.runtimeData.sizeLimit }}
+            sizeLimit: {{ . }}
+            {{- end }}
           {{- end }}
 ---
 apiVersion: v1

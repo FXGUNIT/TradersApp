@@ -135,6 +135,22 @@ spec:
             readOnlyRootFilesystem: true
             capabilities:
               drop: ["ALL"]
+          {{- with .Values.bff.runtimeTmp }}
+          volumeMounts:
+            - name: bff-tmp
+              mountPath: /tmp
+          {{- end }}
+      {{- with .Values.bff.runtimeTmp }}
+      volumes:
+        - name: bff-tmp
+          emptyDir:
+            {{- if .medium }}
+            medium: {{ .medium }}
+            {{- end }}
+            {{- if .sizeLimit }}
+            sizeLimit: {{ .sizeLimit }}
+            {{- end }}
+      {{- end }}
       terminationGracePeriodSeconds: 30
 ---
 apiVersion: v1

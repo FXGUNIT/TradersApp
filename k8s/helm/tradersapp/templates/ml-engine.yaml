@@ -317,19 +317,25 @@ spec:
           persistentVolumeClaim:
             claimName: ml-state-pvc
           {{- else }}
-          emptyDir: {}
+          emptyDir:
+            {{- with .Values.mlEngine.runtimeState.sizeLimit }}
+            sizeLimit: {{ . }}
+            {{- end }}
           {{- end }}
         - name: models
           {{- if .Values.mlEngine.persistence.enabled }}
           persistentVolumeClaim:
             claimName: ml-models-pvc
           {{- else }}
-          emptyDir: {}
+          emptyDir:
+            {{- with .Values.mlEngine.modelStore.sizeLimit }}
+            sizeLimit: {{ . }}
+            {{- end }}
           {{- end }}
         - name: tmp
           emptyDir:
-            medium: Memory
-            sizeLimit: 256Mi
+            medium: {{ .Values.mlEngine.tmp.medium | default "Memory" }}
+            sizeLimit: {{ .Values.mlEngine.tmp.sizeLimit | default "256Mi" }}
       terminationGracePeriodSeconds: 60
       {{- with .Values.tolerations }}
       tolerations:

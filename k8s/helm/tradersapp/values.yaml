@@ -129,6 +129,12 @@ mlEngine:
     storageClass: local-path # Use longhorn in self-hosted production
     continualLearningDir: "/data/continual_learning"
     mambaCacheDir: "/data/mamba_cache"
+    sizeLimit: ""
+  modelStore:
+    sizeLimit: ""
+  tmp:
+    medium: Memory
+    sizeLimit: 256Mi
   persistence:
     enabled: true
     size: 5Gi
@@ -239,6 +245,9 @@ bff:
         name: bff-config
     - secretRef:
         name: bff-secrets
+  runtimeTmp:
+    sizeLimit: ""
+    medium: ""
 
 analysisService:
   enabled: true
@@ -281,6 +290,9 @@ frontend:
       memory: 128Mi
   ingress:
     enabled: false # Replaced by k8s/helm/tradersapp/templates/ingress.yaml — set ingress.enabled=true in values.prod.yaml
+  runtimeTmp:
+    sizeLimit: ""
+    medium: ""
 
 # Triton Inference Server — GPU-accelerated ONNX model serving
 # Set enabled=true and configure nodeSelector + tolerations for GPU nodes
@@ -440,6 +452,8 @@ redis:
     enabled: true
     size: 5Gi
     storageClass: longhorn
+  runtimeData:
+    sizeLimit: ""
   # Redis runtime configuration — maxmemory 256 MiB, LRU eviction when full
   configuration: |
     maxmemory 256mb

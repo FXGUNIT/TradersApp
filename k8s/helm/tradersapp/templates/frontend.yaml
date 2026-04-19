@@ -91,7 +91,13 @@ spec:
               mountPath: /tmp
       volumes:
         - name: frontend-tmp
-          emptyDir: {}
+          emptyDir:
+            {{- with .Values.frontend.runtimeTmp.medium }}
+            medium: {{ . }}
+            {{- end }}
+            {{- with .Values.frontend.runtimeTmp.sizeLimit }}
+            sizeLimit: {{ . }}
+            {{- end }}
       terminationGracePeriodSeconds: 15
 ---
 apiVersion: v1
