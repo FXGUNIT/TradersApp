@@ -1,6 +1,6 @@
 # TODO Master List
 **Last Updated:** 2026-04-20
-**Status:** P09 SUPERSEDED by P25 — Ampere A1 migration is the path forward
+**Status:** P26 ACTIVE — OVH VPS + Docker Compose is the production path
 **Based on:** Stage P production deployment + Session Redesign + ML Research Foundation
 
 
@@ -22,7 +22,7 @@ How to read this:
 
 | Area | Tasks | Progress | Status |
 |---|---|---:|---|
-| Stage P | [105/169] |  62.1% | P25 ACTIVE |
+| Stage P | [105/169] |  62.1% | P25 OVHcloud ACTIVE |
 | Stage S | [0/47] |   0.0% | PENDING |
 | ML Research | [0/8] |   0.0% | PENDING |
 
@@ -84,15 +84,15 @@ How to read this:
 
 ## EXECUTION PRIORITY
 
-### TIER 1 — ACTIVE NOW: Complete k3s CI/CD Pipeline
-Push TradersApp from GitHub Actions → k3s on OCI → live at traders.app.
-Everything below is blocked by this completing successfully.
+### TIER 1 — ACTIVE NOW: OVH VPS bootstrap + automated deploy
+Push TradersApp from GitHub Actions → OVH VPS → Docker Compose → live at `traders.app`.
+Everything below is blocked by the first successful OVH cutover.
 
-### TIER 2 — STAGING: k3s bootstrap + secrets injection
-Once CI/CD works, bootstrap namespace + secrets on k3s cluster, then minimal core deploy.
+### TIER 2 — STAGING: runtime secrets + DNS cutover
+Once the OVH deploy automation is ready, load runtime secrets, point DNS, and verify the public hosts.
 
-### TIER 3 — DNS + OCI ingress binding
-Point `traders.app`, `bff.traders.app`, and `api.traders.app` at the OCI public edge once ingress is stable.
+### TIER 3 — historical OCI archive / rollback path
+Keep the OCI k3s work as reference only until OVH is fully stable. Do not treat OCI as the active production route.
 
 ### TIER 4 — Backend ML Improvements
 All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live app when ready.
@@ -101,28 +101,23 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 
 ## PRODUCTION CONSTRAINTS
 
-- Production topology is OCI Always Free k3s only. Do not depend on Railway, Vercel, or any other paid-hosting path.
+- Production topology is OVH VPS-3 single-host Docker Compose. OCI k3s is archival evidence and fallback only.
 - Keep the existing domain, but use the current registrar/DNS provider already attached to `traders.app` instead of adding a new paid platform.
 - Do not cut app features to fit the server. Reduce infrastructure overhead first; keep trading logic, accuracy checks, and robustness requirements intact.
-- Robustness on free infrastructure means deterministic boot, repeatable deploys, working health checks, and recovery procedures. It does not imply multi-node HA on a single Always Free node.
-- Public production hosts must terminate on the OCI/k3s edge: `traders.app`, `bff.traders.app`, and `api.traders.app`.
+- Robustness on a single VPS means deterministic boot, repeatable deploys, working health checks, backups, and recovery procedures. It does not imply multi-node HA.
+- Public production hosts must terminate on the OVH edge: `traders.app`, `bff.traders.app`, and `api.traders.app`.
 
 ---
 
-## STAGE P — Production Deployment (Live 24x7 on OCI k3s)
-*Target: GitHub Actions → single-node k3s on OCI Always Free → `traders.app` + `bff.traders.app` + `api.traders.app`*
+## STAGE P — Production Deployment (Live 24x7 on OVH VPS + Docker Compose)
+*Target: GitHub Actions → single OVH VPS-3 → Docker Compose → `traders.app` + `bff.traders.app` + `api.traders.app`*
 
-### Current Checkpoint - 2026-04-19
-- Latest completed failed deploy: GitHub Actions run `24618145954`
-- New repo-side mitigation prepared after that failure: stronger node-pressure recovery now deletes terminal pods, avoids projected API-token mounts in the cleanup job, removes stale kubelet/pod log directories by active pod UID, prunes dangling container log symlinks, truncates oversized pod logs, and gives kubelet a longer 300-second window to clear `DiskPressure`
-- Production deploy concurrency is already serialized in CI with `group: deploy-production-main`; upstream test/build jobs can overlap, but the production deploy job is not supposed to run in parallel
-- GHCR images are present; `ghcr.io/fxgunit/bff:latest`, `ghcr.io/fxgunit/frontend:latest`, and `ghcr.io/fxgunit/ml-engine:latest` all exist
-- The current hard blocker is not missing images; it is OCI node runtime instability during the core rollout
-- Exact latest failure: pod sandbox creation failed repeatedly with `failed to stat parent: stat /var/lib/rancher/k3s/agent/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1/fs: no such file or directory`
-- Highest-confidence interpretation: the node moved from plain `DiskPressure` into broken containerd overlayfs snapshot state after aggressive cleanup on the single free-tier node
-- New mitigation now added in the deploy path: pre-deploy recovery no longer prunes container images; it now detects overlayfs snapshot corruption separately and schedules a host-side `k3s-killall.sh` + `k3s` restart repair before retrying
-- New mitigation prepared for the next production cycle: the minimal profile now caps pod ephemeral storage and `emptyDir` usage for `bff`, `frontend`, `ml-engine`, and `redis` so a single pod cannot silently consume enough local disk to re-trigger node-wide `DiskPressure`
-- Windows-to-OCI `kubectl` TLS timeout / handshake problems still exist, but GitHub Actions is reaching the cluster far enough to start real deploys; the cluster is then destabilizing during rollout
+### Current Checkpoint - 2026-04-20
+- Production target is now OVH VPS-3, not OCI k3s
+- Repo-side OVH deployment assets are the active workstream: Compose bundle, reverse proxy, bootstrap scripts, runtime env builder, and GitHub Actions deploy workflow
+- OCI P09 and P25 remain in this file only as historical evidence and fallback, not as the current production plan
+- The current hard blocker is no longer OCI memory pressure; it is the first real OVH cutover with live VPS credentials, DNS, and runtime secrets
+- Success now means: `git push main` builds/pushes images, SSHes to OVH, runs Docker Compose, and leaves the public hosts healthy without laptop involvement
 
 
 ### P01 — OCI Compute Instance ✅ DONE
@@ -198,79 +193,21 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [x] All Docker images tagged with GitHub SHA from CI pipeline
 
 ### P09 - Core Deployment — SUPERSEDED by P25 ✅
-- P09 is fully deprecated. E2.1.Micro 1GB RAM cannot run k3s control plane + 4 pods without memory collapse. See P25 for the definitive migration path using Ampere A1.
+- P09 is fully deprecated. E2.1.Micro 1GB RAM cannot run k3s control plane + 4 pods without memory collapse. Ampere A1 Mumbai is capacity-exhausted. See P25 for the OVHcloud VPS-3 deployment path.
 
-### P25 — Ampere A1 Migration (Definitive Production Path) 🔴 ACTIVE
-*Supersedes P09. Ampere A1 (4 OCPU / 24GB) is the only free-tier OCI shape that can run k3s reliably.*
+### P25 — OVHcloud VPS-3 Deployment 🔴 ACTIVE
+*Supersedes P09 and Ampere A1 path. OVHcloud VPS-3 is the confirmed deployment target.*
 
-**Why P09 failed:** E2.1.Micro (1GB RAM) — k3s control plane uses 400MB before any pod runs. Remaining ~545MB must host etcd + kubelet + containerd + 4 pods simultaneously. Memory pressure causes k3s crash loops on every deploy attempt. No amount of tuning or staging fixes a fundamental resource gap.
+**Full plan:** See `docs/P25_OVHcloud_Deployment_Plan.md`
 
-**Why Ampere A1 works:** 24GB RAM. k3s overhead stays at ~400MB (2% of available). All 4 services run with 20GB+ headroom. No crash loops. Future upgrades (bigger ML models, more services) already fit.
+**Why this path:**
+- OVHcloud VPS-3: 8 vCore / 24GB RAM / 200GB NVMe — **$19.97/month**
+- 3x the RAM, 8x the cores of Oracle E2.1 for the same price
+- No capacity exhaustion risk (unlike Ampere A1 Mumbai)
+- GitHub Actions handles all deployment — no laptop dependency
 
-**Oracle Ampere A1 Always Free facts:**
-- Type: Always Free — "life of the account" (not trial, not credit)
-- OCPUs: up to 4 (flexible allocation)
-- RAM: up to 24GB
-- Monthly limit: 3,000 OCPU hours + 18,000 GB-hours (ampere VMs only)
-- Idle policy: Oracle reclaims instances with < 20% CPU + < 20% RAM + < 20% network for 7 consecutive days. A live app with 1k visitors/day always stays above these thresholds. Mitigation: GitHub Actions hourly heartbeat curl keeps idle policy happy.
+**Monthly cost:** ~$20/month (OVHcloud VPS-3)
 
-#### P25 — Instance Creation (YOU: ~5 min)
-- [ ] Open OCI Console → Compute → Instances → Create Instance
-- [ ] Shape: VM.Standard.A1.Flex | OCPUs: 4 | Memory: 24GB
-- [ ] OS: Ubuntu 22.04 LTS (ARM64)
-- [ ] Subnet: same availability domain as current instance (ap-mumbai-1)
-- [ ] Public IP: Assign (note this IP — will replace 144.24.112.249)
-- [ ] SSH key: use existing `C:\Users\Asus\.ssh\id_ed25519` or create new
-- [ ] Name: `tradersapp-a1`
-- [ ] Once created, give me the new public IP — I handle everything from there
-
-#### P25 — Bootstrap (ME: ~20 min after IP received)
-- [ ] SSH to new Ampere A1 node with provided key
-- [ ] Install k3s: `curl -sfL https://get.k3s.io | sh -`
-- [ ] Verify: `sudo k3s kubectl get nodes` → Node Ready
-- [ ] Add swap: `sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile && echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab`
-- [ ] Create tradersapp namespace: `sudo k3s kubectl create namespace tradersapp`
-- [ ] Apply ingress-nginx + cert-manager
-- [ ] Apply tradersapp-deployments.yaml (all 4 services: redis, bff, ml-engine, frontend)
-
-#### P25 — Verify (ME: ~10 min)
-- [ ] `sudo k3s kubectl get pods -n tradersapp` → all 4 Running
-- [ ] `curl https://bff.traders.app/health` → HTTP 200
-- [ ] `curl https://api.traders.app/health` → HTTP 200
-- [ ] `curl https://traders.app/` → TradersApp frontend
-
-#### P25 — DNS Update (YOU: ~1 min)
-- [ ] OCI Console → Networking or Cloudflare → Update A records from `144.24.112.249` to new Ampere A1 IP
-
-#### P25 — GitHub Actions (ME: ~10 min)
-- [ ] Extract kubeconfig from new node: `sudo cat /etc/rancher/k3s/k3s.yaml | sed 's|127.0.0.1|NEW_IP|g' | base64 -w0`
-- [ ] Update `KUBECONFIG_B64` GitHub secret: `gh secret set KUBECONFIG_B64 --body "<b64>" --repo FXGUNIT/TradersApp`
-- [ ] Future deploys: `git push main` → GitHub Actions builds → deploys automatically. Laptop never involved again.
-
-#### P25 — Keep-Alive Heartbeat (ME: ~5 min)
-- [ ] Add GitHub Actions cron job: `curl -s -o /dev/null https://traders.app/health` every hour
-- [ ] Prevents Oracle idle policy reclamation. Even 1 request/hour is enough.
-
-#### P25 — Deprecate Old Node
-- [ ] Stop E2.1.Micro instance from OCI Console (saves nothing but removes confusion)
-- [ ] Keep E2.1.Micro stopped, not terminated, until new node is fully verified
-
-#### P25 — Success Criteria
-- `https://traders.app` → TradersApp frontend served
-- `https://bff.traders.app/health` → HTTP 200
-- `https://api.traders.app/health` → HTTP 200
-- All 4 pods Running in `tradersapp` namespace
-- `git push main` triggers automatic deploy via GitHub Actions
-- Ampere A1 idle policy never triggers (hourly heartbeat active)
-- Current hard failure mode on the OCI free node is containerd / overlayfs runtime corruption after earlier node-pressure cleanup, not missing GHCR images
-  - Run `24618145954` passed the upstream unit/build gates, then failed during the real production deploy
-  - Verified from GHCR: `ghcr.io/fxgunit/bff:latest`, `ghcr.io/fxgunit/frontend:latest`, and `ghcr.io/fxgunit/ml-engine:latest` exist
-  - Earlier runs did confirm rollout-time `DiskPressure=True` and taint `node.kubernetes.io/disk-pressure:NoSchedule`
-  - Exact latest runtime outcome from the failed deploy diagnostics: kubelet raised repeated `FailedCreatePodSandBox` events with `failed to stat parent ... overlayfs/snapshots/1/fs: no such file or directory`
-  - Exact workload impact from the failed deploy diagnostics: `redis` and `ml-engine` pods remained stuck in `ContainerCreating` / `Pending` because the runtime could not create pod sandboxes
-  - Exact control-plane outcome from the failed deploy diagnostics: the API was still reachable long enough to dump pod describes, but the node runtime itself could not start new sandboxes reliably
-  - Windows-to-OCI `kubectl` TLS / handshake instability is still real, but it is a secondary symptom right now; GitHub Actions is reaching the cluster, and the cluster is collapsing during rollout
-  - Fix already applied: `values.minimal.yaml` forces coherent core-only runtime settings (`bff` HTTP transport, `ml-engine` Kafka off, required DB off, security extras off)
   - Fix already applied: core runtime Deployments use `Recreate` in the minimal profile so the node does not schedule two generations at once
   - Fix already applied: production CI builds and pushes current commit SHA images before deploy
   - Fix already applied: production CI now renders deterministic staged core manifests from the minimal Helm values, validates each slice, and applies them in the order `redis -> ml-engine -> bff -> frontend`
@@ -290,6 +227,36 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [ ] Verify stale ReplicaSets / invalid-image pods are fully gone after the new cleanup path
 - [ ] Smoke tests: `bff /health`, `ml-engine /health`, frontend `http://frontend:80`, `redis-cli ping`
 - [ ] KUBECONFIG_B64 secret in GitHub updated after each k3s cold restart
+
+### P26 — OVH VPS Docker Compose Production Path 🔴 ACTIVE
+*Supersedes P25 as the real production route. Single-host OVH VPS-3 with GitHub Actions deployment is now the target architecture.*
+
+#### P26 — Architecture Freeze
+- [x] Freeze production target as `OVH VPS-3` with `Docker Compose`, not OCI k3s
+- [x] Freeze production delivery model as `GitHub Actions -> GHCR -> OVH SSH deploy`
+- [x] Freeze public host layout as `traders.app`, `bff.traders.app`, and `api.traders.app`
+- [x] Keep OCI k3s artifacts in the repo as rollback/reference only, not as the default path
+
+#### P26 — Repo-Side OVH Execution
+- [x] Create a dedicated OVH runtime bundle with Compose, reverse proxy, and server-local configs
+- [x] Create an idempotent OVH bootstrap script for a fresh Ubuntu/Debian VPS
+- [x] Create an idempotent OVH deploy script that updates the runtime bundle, pulls GHCR images, and restarts the stack safely
+- [x] Create a runtime env builder that turns Infisical or direct env secrets into a server-ready `.env`
+- [x] Create a dedicated GitHub Actions OVH deployment workflow
+- [x] Guard the old auto-production k3s path so OVH can become the active deploy target without deleting the legacy workflow
+- [x] Document the OVH production runbook, secrets contract, and cutover steps
+
+#### P26 — Live Cutover (Pending Real Credentials)
+- [ ] Buy or provision the OVH VPS-3 instance
+- [ ] Add GitHub repository variable `PRODUCTION_DEPLOY_PLATFORM=ovh`
+- [ ] Add GitHub secrets for `OVH_SSH_HOST`, `OVH_SSH_USER`, and `OVH_SSH_PRIVATE_KEY`
+- [ ] Add either `OVH_APP_ENV` or keep `INFISICAL_TOKEN` available for runtime secret generation
+- [ ] Point `traders.app`, `bff.traders.app`, and `api.traders.app` DNS to the OVH VPS public IP
+- [ ] Run the first GitHub Actions OVH deploy and capture the bootstrap/deploy logs
+- [ ] Confirm local health on the VPS for `frontend`, `bff`, `ml-engine`, `analysis-service`, and `redis`
+- [ ] Confirm public health for `https://traders.app`, `https://bff.traders.app/health`, and `https://api.traders.app/health`
+- [ ] Run the existing load-test suite against the OVH public edge and record the first real concurrency envelope
+- [ ] Archive the final OCI node details only after OVH is stable for at least one clean redeploy cycle
 
 #### P09-C - `kubectl apply tradersapp-deployments.yaml` on OCI E2.1.Micro
 - Root cause to treat as authoritative until disproven: OCI E2.1.Micro `1 GB RAM` is too small for `k3s + etcd + kubelet + containerd + the TradersApp core-4 pods` when applied as one rollout step
@@ -583,7 +550,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-20 00:38`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-20 04:56`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Active Backlog    0.0%  [------------------------]
