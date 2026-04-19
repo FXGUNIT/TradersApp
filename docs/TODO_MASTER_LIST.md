@@ -105,13 +105,14 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 *Target: GitHub Actions → single-node k3s on OCI Always Free → `traders.app` + `bff.traders.app` + `api.traders.app`*
 
 ### Current Checkpoint - 2026-04-19
-- Latest completed failed deploy: GitHub Actions run `24615531759`
+- Latest completed failed deploy: GitHub Actions run `24618145954`
 - New repo-side mitigation prepared after that failure: stronger node-pressure recovery now deletes terminal pods, avoids projected API-token mounts in the cleanup job, removes stale kubelet/pod log directories by active pod UID, prunes dangling container log symlinks, truncates oversized pod logs, and gives kubelet a longer 300-second window to clear `DiskPressure`
 - Production deploy concurrency is already serialized in CI with `group: deploy-production-main`; upstream test/build jobs can overlap, but the production deploy job is not supposed to run in parallel
 - GHCR images are present; `ghcr.io/fxgunit/bff:latest`, `ghcr.io/fxgunit/frontend:latest`, and `ghcr.io/fxgunit/ml-engine:latest` all exist
-- The current hard blocker is not missing images; it is node pressure on the OCI free-tier k3s node during the core rollout
-- Exact latest failure: the node stayed at `DiskPressure=True` even after the first cleanup job completed, then the control plane degraded (`etcd-readiness failed`, followed by external API connection resets/refusals on `144.24.112.249:6443`)
-- New mitigation now added in the deploy path: pre-deploy node-pressure recovery deletes failed/evicted pods and, when `DiskPressure` is active, runs a privileged host cleanup job to prune unused k3s/containerd artifacts before retrying
+- The current hard blocker is not missing images; it is OCI node runtime instability during the core rollout
+- Exact latest failure: pod sandbox creation failed repeatedly with `failed to stat parent: stat /var/lib/rancher/k3s/agent/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1/fs: no such file or directory`
+- Highest-confidence interpretation: the node moved from plain `DiskPressure` into broken containerd overlayfs snapshot state after aggressive cleanup on the single free-tier node
+- New mitigation now added in the deploy path: pre-deploy recovery no longer prunes container images; it now detects overlayfs snapshot corruption separately and schedules a host-side `k3s-killall.sh` + `k3s` restart repair before retrying
 - New mitigation prepared for the next production cycle: the minimal profile now caps pod ephemeral storage and `emptyDir` usage for `bff`, `frontend`, `ml-engine`, and `redis` so a single pod cannot silently consume enough local disk to re-trigger node-wide `DiskPressure`
 - Windows-to-OCI `kubectl` TLS timeout / handshake problems still exist, but GitHub Actions is reaching the cluster far enough to start real deploys; the cluster is then destabilizing during rollout
 
@@ -189,24 +190,25 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [x] All Docker images tagged with GitHub SHA from CI pipeline
 
 ### P09 - Core Deployment CURRENT BLOCKER
-- Current hard failure mode on the OCI free node is rollout-time node pressure, not missing GHCR images
-  - Run `24615531759` passed the upstream unit/build gates, then failed during the real production deploy
+- Current hard failure mode on the OCI free node is containerd / overlayfs runtime corruption after earlier node-pressure cleanup, not missing GHCR images
+  - Run `24618145954` passed the upstream unit/build gates, then failed during the real production deploy
   - Verified from GHCR: `ghcr.io/fxgunit/bff:latest`, `ghcr.io/fxgunit/frontend:latest`, and `ghcr.io/fxgunit/ml-engine:latest` exist
-  - Exact node taint from the failed deploy diagnostics: `node.kubernetes.io/disk-pressure:NoSchedule`
-  - Exact node condition from the failed deploy diagnostics: `DiskPressure=True`, `MemoryPressure=False`
-  - Exact cleanup outcome from the failed deploy diagnostics: the recovery job completed, but `DiskPressure` still did not clear within the first 180-second wait window
-  - Exact control-plane outcome from the failed deploy diagnostics: `/readyz` reported `etcd-readiness failed`, then external API calls to `144.24.112.249:6443` started returning connection resets/refusals
+  - Earlier runs did confirm rollout-time `DiskPressure=True` and taint `node.kubernetes.io/disk-pressure:NoSchedule`
+  - Exact latest runtime outcome from the failed deploy diagnostics: kubelet raised repeated `FailedCreatePodSandBox` events with `failed to stat parent ... overlayfs/snapshots/1/fs: no such file or directory`
+  - Exact workload impact from the failed deploy diagnostics: `redis` and `ml-engine` pods remained stuck in `ContainerCreating` / `Pending` because the runtime could not create pod sandboxes
+  - Exact control-plane outcome from the failed deploy diagnostics: the API was still reachable long enough to dump pod describes, but the node runtime itself could not start new sandboxes reliably
   - Windows-to-OCI `kubectl` TLS / handshake instability is still real, but it is a secondary symptom right now; GitHub Actions is reaching the cluster, and the cluster is collapsing during rollout
   - Fix already applied: `values.minimal.yaml` forces coherent core-only runtime settings (`bff` HTTP transport, `ml-engine` Kafka off, required DB off, security extras off)
   - Fix already applied: core runtime Deployments use `Recreate` in the minimal profile so the node does not schedule two generations at once
   - Fix already applied: production CI builds and pushes current commit SHA images before deploy
   - Fix already applied: production CI deploys the rendered minimal manifest via direct `kubectl apply`
   - Fix already applied: automatic production CI defers `ingress-nginx` + `cert-manager` until after the core runtime stabilizes
-  - Fix already applied: `scripts/k8s/recover-node-pressure.sh` now runs before the minimal apply and again on `DiskPressure` retry paths; it deletes terminal pods, prunes unused k3s/containerd artifacts, removes stale kubelet/pod log directories by active pod UID, truncates oversized pod logs, avoids projected service-account mounts, and waits up to 300 seconds for the node taint to clear
+  - Fix already applied: `scripts/k8s/recover-node-pressure.sh` now runs before the minimal apply and again on retry paths; it deletes terminal pods, removes stale kubelet/pod log directories by active pod UID, truncates oversized pod logs, avoids projected service-account mounts, and waits up to 300 seconds for the node taint to clear
   - Fix already applied: the minimal runtime now sets explicit `ephemeral-storage` requests/limits and `emptyDir` size limits for core services to reduce the chance of another uncontrolled disk-pressure cascade
+  - Fix now added: when deploy diagnostics show overlayfs snapshot corruption, recovery switches from image pruning to a safer host-side runtime reset using the K3s `k3s-killall.sh` reset path plus `k3s` restart
   - Operational note: when the API will not stabilize, the existing cold-restart pattern is still `systemctl restart k3s` and, only if required, clearing the etcd data dir before recreating kubeconfig
-- [ ] Inspect and reduce disk usage on the OCI node (`containerd` images, dead sandboxes, evicted pod artifacts, logs, temp files)
-- [ ] Clear `node.kubernetes.io/disk-pressure:NoSchedule` and keep it clear through a full minimal rollout
+- [ ] Clear both failure modes on the OCI node: `DiskPressure` and broken containerd overlayfs snapshot state
+- [ ] Prove the safer runtime repair path restores sandbox creation after the overlayfs `failed to stat parent` failure
 - [ ] values.minimal.yaml direct-apply deploy completes with exactly one Running/Ready pod each for `redis`, `ml-engine`, `bff`, and `frontend`
 - [ ] Confirm the cluster is running the current CI commit SHA images for `bff`, `frontend`, and `ml-engine`
 - [ ] Verify stale ReplicaSets / invalid-image pods are fully gone after the new cleanup path
@@ -390,7 +392,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-19 06:01`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-19 09:09`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Active Backlog    0.0%  [------------------------]
