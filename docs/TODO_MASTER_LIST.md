@@ -112,6 +112,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - The current hard blocker is not missing images; it is node pressure on the OCI free-tier k3s node during the core rollout
 - Exact latest failure: the node stayed at `DiskPressure=True` even after the first cleanup job completed, then the control plane degraded (`etcd-readiness failed`, followed by external API connection resets/refusals on `144.24.112.249:6443`)
 - New mitigation now added in the deploy path: pre-deploy node-pressure recovery deletes failed/evicted pods and, when `DiskPressure` is active, runs a privileged host cleanup job to prune unused k3s/containerd artifacts before retrying
+- New mitigation prepared for the next production cycle: the minimal profile now caps pod ephemeral storage and `emptyDir` usage for `bff`, `frontend`, `ml-engine`, and `redis` so a single pod cannot silently consume enough local disk to re-trigger node-wide `DiskPressure`
 - Windows-to-OCI `kubectl` TLS timeout / handshake problems still exist, but GitHub Actions is reaching the cluster far enough to start real deploys; the cluster is then destabilizing during rollout
 
 
@@ -202,6 +203,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
   - Fix already applied: production CI deploys the rendered minimal manifest via direct `kubectl apply`
   - Fix already applied: automatic production CI defers `ingress-nginx` + `cert-manager` until after the core runtime stabilizes
   - Fix already applied: `scripts/k8s/recover-node-pressure.sh` now runs before the minimal apply and again on `DiskPressure` retry paths; it deletes terminal pods, prunes unused k3s/containerd artifacts, removes stale kubelet/pod log directories by active pod UID, truncates oversized pod logs, avoids projected service-account mounts, and waits up to 300 seconds for the node taint to clear
+  - Fix already applied: the minimal runtime now sets explicit `ephemeral-storage` requests/limits and `emptyDir` size limits for core services to reduce the chance of another uncontrolled disk-pressure cascade
   - Operational note: when the API will not stabilize, the existing cold-restart pattern is still `systemctl restart k3s` and, only if required, clearing the etcd data dir before recreating kubeconfig
 - [ ] Inspect and reduce disk usage on the OCI node (`containerd` images, dead sandboxes, evicted pod artifacts, logs, temp files)
 - [ ] Clear `node.kubernetes.io/disk-pressure:NoSchedule` and keep it clear through a full minimal rollout
@@ -388,7 +390,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-19 05:21`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-19 06:01`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Active Backlog    0.0%  [------------------------]
