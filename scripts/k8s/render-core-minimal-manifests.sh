@@ -31,12 +31,18 @@ IMAGE_REPO=""
 IMAGE_TAG=""
 KUBECONFIG_PATH=""
 VALIDATE_CLIENT="false"
+PYTHON_BIN=""
+NODE_RAM_MIB="${NODE_RAM_MIB:-1024}"
+NODE_SWAP_MIB="${NODE_SWAP_MIB:-2048}"
+MIN_MEM_AVAILABLE_MIB="${MIN_NODE_MEM_AVAILABLE_MIB:-350}"
+MIN_SWAP_FREE_MIB="${MIN_NODE_SWAP_FREE_MIB:-768}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 VALUES_FILE="${REPO_ROOT}/k8s/helm/tradersapp/values.minimal.yaml"
 OUTPUT_DIR="${REPO_ROOT}/artifacts/k8s/core-minimal"
 TEMP_SPLIT_DIR=""
+BUDGET_SCRIPT="${SCRIPT_DIR}/generate-core-memory-budget.py"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -231,12 +237,36 @@ validate_client_manifests() {
   done
 }
 
+generate_budget_report() {
+  if [[ ! -f "${BUDGET_SCRIPT}" ]]; then
+    echo "::error::Budget generator script is missing: ${BUDGET_SCRIPT}" >&2
+    exit 1
+  fi
+
+  if command -v python3 >/dev/null 2>&1; then
+    PYTHON_BIN="$(command -v python3)"
+  elif command -v python >/dev/null 2>&1; then
+    PYTHON_BIN="$(command -v python)"
+  else
+    echo "::error::python3 or python is required to generate the core budget report" >&2
+    exit 1
+  fi
+
+  "${PYTHON_BIN}" "${BUDGET_SCRIPT}" \
+    --manifest-dir "${OUTPUT_DIR}" \
+    --node-ram-mib "${NODE_RAM_MIB}" \
+    --node-swap-mib "${NODE_SWAP_MIB}" \
+    --min-mem-available-mib "${MIN_MEM_AVAILABLE_MIB}" \
+    --min-swap-free-mib "${MIN_SWAP_FREE_MIB}"
+}
+
 write_apply_order
 render_full_manifest
 split_into_documents
 classify_documents
 assert_expected_outputs
 validate_client_manifests
+generate_budget_report
 
 echo "Rendered full manifest: ${FULL_MANIFEST_PATH}"
 echo "Staged apply order file: ${APPLY_ORDER_PATH}"
