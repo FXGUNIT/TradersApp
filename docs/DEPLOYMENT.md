@@ -71,10 +71,9 @@ After OCI ingress is live (P11/P12), add these records in Cloudflare DNS:
    - Enable **Automatic HTTPS Rewrites**
    - TLS version: **1.3** (Cloudflare handles downgrades)
 3. **SSL/TLS → Origin Server:**
-   - Generate origin certificate (free, 15-year)
-   - Download and upload to Railway environment variables:
-     - `SSL_CERT` (full certificate chain)
-     - `SSL_KEY` (private key)
+   - Generate origin certificate (free, 15-year) for OCI k3s edge
+   - After cert-manager is deployed (P11/P12), TLS certs are managed automatically via Let's Encrypt
+   - Until then, terminate TLS at Cloudflare edge only
 4. **DDoS → L7 DDoS Mitigation:** Set to **ON**
 5. **Security → WAF:**
    - Enable **OWASP ModSecurity Core Rule Set**
@@ -239,17 +238,7 @@ In GitHub repo → Settings → Secrets and variables → Actions:
 
 | Secret | Where Used | How to Get |
 |---|---|---|
-| `VERCEL_TOKEN` | CI/CD | Vercel → Settings → Tokens |
-| `VERCEL_ORG_ID` | CI/CD | `vercel org ls` |
-| `VERCEL_PROJECT_ID` | CI/CD | `vercel project ls` |
-| `RAILWAY_TOKEN` | CI/CD | Railway → Account Settings → Tokens |
-| `RAILWAY_STAGING_ENV_ID` | Deploy | Railway staging env ID |
-| `RAILWAY_STAGING_BFF_SERVICE_ID` | Deploy | Railway staging BFF service ID |
-| `RAILWAY_STAGING_ML_SERVICE_ID` | Deploy | Railway staging ML service ID |
-| `RAILWAY_PROD_ENV_ID` | Deploy | Railway production env ID |
-| `RAILWAY_PROD_BFF_SERVICE_ID` | Deploy | Railway production BFF service ID |
-| `RAILWAY_PROD_ML_SERVICE_ID` | Deploy | Railway production ML service ID |
-| `SLACK_WEBHOOK_URL` | Monitor | Slack → Workspace → Apps → Incoming Webhooks |
+| `KUBECONFIG_B64` | CI/CD | `sed 's\|127.0.0.1\|144.24.112.249\|g' /tmp/k3s-server.yaml \| base64 -w0` on OCI node |
 | `DISCORD_WEBHOOK_URL` | Monitor | Discord → Server Settings → Integrations → Webhooks |
 | `INFISICAL_PROJECT_ID` | Secrets | Infisical project settings |
 
@@ -279,27 +268,27 @@ python ml-engine/scripts/version_models.py --restore ./backups/models_backup_202
 gh workflow run rollback.yml -f version=2026-04-01
 ```
 
-### Railway Deployments
+### OCI k3s Rollback (Primary)
 
-**Via Railway Dashboard:**
-1. Railway → ML Engine → Deployments
-2. Find the working deployment → click "Revert to this deployment"
-
-**Via Railway CLI:**
 ```bash
-railway login
-railway status
-railway rollback --service ml-engine
-railway rollback --service bff
+# Via kubectl on OCI node
+ssh opc@144.24.112.249
+kubectl --kubeconfig /tmp/k3s_external.yaml rollout undo deployment/<name> -n tradersapp
+kubectl --kubeconfig /tmp/k3s_external.yaml rollout status deployment/<name> -n tradersapp
 ```
 
-### Vercel Frontend
-```bash
-# List deployments
-vercel list
+**Via GitHub Actions:** Re-run the `deploy-k8s.yml` workflow — it will rebuild and redeploy from the current commit.
 
-# Rollback to previous deployment
-vercel rollback [deployment-url]
+### ML Models
+```bash
+# List available backups
+python ml-engine/scripts/version_models.py --status
+
+# Restore from specific backup
+python ml-engine/scripts/version_models.py --restore ./backups/models_backup_20260401_020000.tar.gz
+
+# GitHub Actions: trigger rollback
+gh workflow run rollback.yml -f version=2026-04-01
 ```
 
 ### Database Rollback (if using Neon PostgreSQL)
@@ -332,4 +321,4 @@ After every deployment, verify:
 - [ ] No CORS errors in browser
 - [ ] Rate limit headers present (`X-RateLimit-Remaining`)
 - [ ] Security headers present (CSP, X-Frame-Options, etc.)
-- [ ] No 5xx errors in Railway logs
+- [ ] No 5xx errors in k3s pod logs (`kubectl get pods -n tradersapp`)

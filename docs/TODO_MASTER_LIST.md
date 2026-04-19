@@ -6,11 +6,11 @@
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-19 16:12`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-19 16:16`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Master Backlog  45.1%  [###########-------------]
-Tasks          done 078 | in progress 000 | blocked 000 | todo 095 | total 173
+Master Backlog  45.4%  [###########-------------]
+Tasks          done 079 | in progress 000 | blocked 000 | todo 095 | total 174
 ```
 
 How to read this:
@@ -21,7 +21,7 @@ How to read this:
 
 | Area | Tasks | Progress | Status |
 |---|---|---:|---|
-| Stage P | [78/118] |  66.1% | CURRENT BLOCKER |
+| Stage P | [79/119] |  66.4% | CURRENT BLOCKER |
 | Stage S | [0/47] |   0.0% | PENDING |
 | ML Research | [0/8] |   0.0% | PENDING |
 
@@ -29,7 +29,7 @@ How to read this:
 
 | Tier | Scope | Progress | Status |
 |---|---|---:|---|
-| TIER 1 | Stage P rollout path |  66.1% | CURRENT BLOCKER |
+| TIER 1 | Stage P rollout path |  66.4% | CURRENT BLOCKER |
 | TIER 2 | Bootstrap + minimal core |  50.0% | CURRENT BLOCKER |
 | TIER 3 | OCI ingress + DNS cutover |   0.0% | BLOCKED |
 | TIER 4 | Stage S + ML backlog |   0.0% | PENDING |
@@ -54,7 +54,7 @@ How to read this:
 | P14 - Observability 🔴 KNOWN ISSUE | [0/3] |   0.0% | KNOWN ISSUE |
 | P15 - Backup & Rollback ⏳ BLOCKED BY P09 | [0/3] |   0.0% | BLOCKED |
 | P16 - Go-Live Sign-Off 🔴 BLOCKED BY P09 | [0/4] |   0.0% | BLOCKED |
-| P17 - Documentation Alignment 🔄 IN PROGRESS | [1/4] |  25.0% | IN PROGRESS |
+| P17 - Documentation Alignment 🔄 IN PROGRESS | [2/5] |  40.0% | IN PROGRESS |
 | P18 - Windows Desktop Architecture Freeze | [5/5] | 100.0% | DONE |
 | P19 - Windows Installer Wizard | [5/5] | 100.0% | DONE |
 | P20 - Desktop Auth, Access Control, and Admin Kill Switch | [5/5] | 100.0% | DONE |
@@ -455,7 +455,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-19 16:12`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-19 16:16`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Active Backlog    0.0%  [------------------------]
