@@ -21,6 +21,16 @@ KUBECONFIG_PATH=""
 NAMESPACE="tradersapp"
 IMAGE_REPO=""
 IMAGE_TAG=""
+OCI_NODE_NAME="${OCI_NODE_NAME:-tradersapp-oci}"
+OCI_NODE_SSH_HOST="${OCI_NODE_SSH_HOST:-}"
+OCI_NODE_SSH_USER="${OCI_NODE_SSH_USER:-opc}"
+OCI_NODE_SSH_KEY="${OCI_NODE_SSH_KEY:-}"
+OCI_NODE_SSH_PORT="${OCI_NODE_SSH_PORT:-22}"
+MIN_NODE_MEM_AVAILABLE_MIB="${MIN_NODE_MEM_AVAILABLE_MIB:-350}"
+MIN_NODE_SWAP_FREE_MIB="${MIN_NODE_SWAP_FREE_MIB:-768}"
+MAX_ROOT_USAGE_PERCENT="${MAX_ROOT_USAGE_PERCENT:-90}"
+MAX_K3S_USAGE_PERCENT="${MAX_K3S_USAGE_PERCENT:-90}"
+MAX_KUBELET_USAGE_PERCENT="${MAX_KUBELET_USAGE_PERCENT:-90}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -70,6 +80,7 @@ APPLY_ORDER_PATH="${MANIFEST_DIR}/00-apply-order.txt"
 FULL_MANIFEST_PATH="${MANIFEST_DIR}/tradersapp-deployments.yaml"
 NODE_RECOVERY_SCRIPT="${SCRIPT_DIR}/recover-node-pressure.sh"
 RENDER_SCRIPT="${SCRIPT_DIR}/render-core-minimal-manifests.sh"
+PREFLIGHT_SCRIPT="${SCRIPT_DIR}/check-oci-core-preflight.sh"
 
 wait_for_kube_api() {
   local max_tries="${1:-24}"
@@ -199,6 +210,38 @@ apply_staged_manifests() {
   done < "${APPLY_ORDER_PATH}"
 }
 
+run_deploy_preflight() {
+  if [[ ! -f "${PREFLIGHT_SCRIPT}" ]]; then
+    echo "::error::Preflight script is missing: ${PREFLIGHT_SCRIPT}" >&2
+    exit 1
+  fi
+
+  local preflight_cmd=(
+    bash "${PREFLIGHT_SCRIPT}"
+    --kubeconfig "${KUBECONFIG_PATH}"
+    --namespace "${NAMESPACE}"
+    --node-name "${OCI_NODE_NAME}"
+    --min-mem-available-mib "${MIN_NODE_MEM_AVAILABLE_MIB}"
+    --min-swap-free-mib "${MIN_NODE_SWAP_FREE_MIB}"
+    --max-root-usage-pct "${MAX_ROOT_USAGE_PERCENT}"
+    --max-k3s-usage-pct "${MAX_K3S_USAGE_PERCENT}"
+    --max-kubelet-usage-pct "${MAX_KUBELET_USAGE_PERCENT}"
+  )
+
+  if [[ -n "${OCI_NODE_SSH_HOST}" ]]; then
+    preflight_cmd+=(
+      --host "${OCI_NODE_SSH_HOST}"
+      --ssh-user "${OCI_NODE_SSH_USER}"
+      --ssh-port "${OCI_NODE_SSH_PORT}"
+    )
+    if [[ -n "${OCI_NODE_SSH_KEY}" ]]; then
+      preflight_cmd+=(--ssh-key "${OCI_NODE_SSH_KEY}")
+    fi
+  fi
+
+  "${preflight_cmd[@]}"
+}
+
 wait_for_rollout() {
   local deployment="$1"
   local timeout="${2:-180s}"
@@ -249,6 +292,8 @@ else
   echo "::warning::Node recovery script is missing or not executable: ${NODE_RECOVERY_SCRIPT}"
 fi
 
+echo "Running OCI core deploy preflight gate."
+run_deploy_preflight
 apply_staged_manifests
 
 echo "Minimal core deploy complete."

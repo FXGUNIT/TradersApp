@@ -6,11 +6,11 @@
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-19 20:29`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-19 20:35`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Master Backlog  40.4%  [##########--------------]
-Tasks          done 090 | in progress 000 | blocked 000 | todo 133 | total 223
+Master Backlog  41.3%  [##########--------------]
+Tasks          done 092 | in progress 000 | blocked 000 | todo 131 | total 223
 ```
 
 How to read this:
@@ -21,7 +21,7 @@ How to read this:
 
 | Area | Tasks | Progress | Status |
 |---|---|---:|---|
-| Stage P | [90/168] |  53.6% | CURRENT BLOCKER |
+| Stage P | [92/168] |  54.8% | CURRENT BLOCKER |
 | Stage S | [0/47] |   0.0% | PENDING |
 | ML Research | [0/8] |   0.0% | PENDING |
 
@@ -29,8 +29,8 @@ How to read this:
 
 | Tier | Scope | Progress | Status |
 |---|---|---:|---|
-| TIER 1 | Stage P rollout path |  53.6% | CURRENT BLOCKER |
-| TIER 2 | Bootstrap + minimal core |  25.0% | CURRENT BLOCKER |
+| TIER 1 | Stage P rollout path |  54.8% | CURRENT BLOCKER |
+| TIER 2 | Bootstrap + minimal core |  28.1% | CURRENT BLOCKER |
 | TIER 3 | OCI ingress + DNS cutover |   0.0% | BLOCKED |
 | TIER 4 | Stage S + ML backlog |   0.0% | PENDING |
 
@@ -46,7 +46,7 @@ How to read this:
 | P06 - CI/CD Pipeline (`deploy-k8s.yml`) DONE - minimal direct-apply path | [12/12] | 100.0% | DONE |
 | P07 - k3s Namespace + Secrets Bootstrap ✅ DONE | [3/3] | 100.0% | DONE |
 | P08 - Helm Chart Values ✅ DONE | [4/4] | 100.0% | DONE |
-| P09 - Core Deployment CURRENT BLOCKER | [9/57] |  15.8% | CURRENT BLOCKER |
+| P09 - Core Deployment CURRENT BLOCKER | [11/57] |  19.3% | CURRENT BLOCKER |
 | P10 - Stateful Services Inside Free Limits ✅ DONE | [5/5] | 100.0% | DONE |
 | P11 - Ingress / External Access BLOCKED BY P09 | [0/6] |   0.0% | BLOCKED |
 | P12 - DNS + TLS on Current Registrar ⏳ BLOCKED BY P11 | [0/5] |   0.0% | BLOCKED |
@@ -213,6 +213,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
   - Fix already applied: `scripts/k8s/recover-node-pressure.sh` now runs before the minimal apply and again on retry paths; it deletes terminal pods, removes stale kubelet/pod log directories by active pod UID, truncates oversized pod logs, avoids projected service-account mounts, and waits up to 300 seconds for the node taint to clear
   - Fix already applied: the minimal runtime now sets explicit `ephemeral-storage` requests/limits and `emptyDir` size limits for core services to reduce the chance of another uncontrolled disk-pressure cascade
   - Fix now added: when deploy diagnostics show overlayfs snapshot corruption, recovery switches from image pruning to a safer host-side runtime reset using the K3s `k3s-killall.sh` reset path plus `k3s` restart
+  - Fix now added: `scripts/k8s/check-oci-core-preflight.sh` blocks the staged deploy if the node still shows pressure conditions or, when SSH metrics are configured, if remote memory, swap, or filesystem thresholds are below the provisional safety floor
   - Operational note: when the API will not stabilize, the existing cold-restart pattern is still `systemctl restart k3s` and, only if required, clearing the etcd data dir before recreating kubeconfig
 - [ ] Clear both failure modes on the OCI node: `DiskPressure` and broken containerd overlayfs snapshot state
 - [ ] Prove the safer runtime repair path restores sandbox creation after the overlayfs `failed to stat parent` failure
@@ -262,8 +263,8 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [ ] P09-C35 - Re-check that `frontend` serves static assets only and does not trigger unnecessary sidecars or extra processes
 - [ ] P09-C36 - Re-check that `redis` remains ephemeral and does not request storage classes or PVC-related init work
 - [ ] P09-C37 - Harden the runtime repair script so overlayfs corruption recovery runs before any new pod scheduling attempt
-- [ ] P09-C38 - Add a preflight gate that aborts deployment immediately if free memory is below the minimum safe floor from P09-C16
-- [ ] P09-C39 - Add a preflight gate that aborts deployment immediately if `DiskPressure=True` or inode pressure is already present
+- [x] P09-C38 - Add a preflight gate that aborts deployment immediately if free memory is below the minimum safe floor from P09-C16
+- [x] P09-C39 - Add a preflight gate that aborts deployment immediately if `DiskPressure=True` or inode pressure is already present
 - [x] P09-C40 - Apply the split manifests one service at a time in the exact order `redis -> ml-engine -> bff -> frontend`
 - [ ] P09-C41 - After each service apply, wait for either `Ready` or a failure event and record memory, events, and pod logs before moving on
 - [ ] P09-C42 - Identify the first exact service and lifecycle stage that re-triggers memory collapse or overlayfs corruption
@@ -508,7 +509,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-19 20:29`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-19 20:35`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Active Backlog    0.0%  [------------------------]

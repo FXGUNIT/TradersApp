@@ -103,6 +103,13 @@ log() {
   printf '[%s] %s\n' "$(date +%H:%M:%S)" "$*"
 }
 
+require_cmd() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    echo "::error::Required command not found: $1" >&2
+    exit 1
+  fi
+}
+
 run_remote_capture() {
   local label="$1"
   local command="$2"
@@ -155,6 +162,14 @@ Cluster captures:
   cluster/deployments.txt
 EOF
 }
+
+if [[ -n "${HOST}" ]]; then
+  require_cmd ssh
+fi
+
+if [[ -n "${KUBECONFIG_PATH}" ]]; then
+  require_cmd kubectl
+fi
 
 if [[ -n "${HOST}" ]]; then
   run_remote_capture "identity" "hostnamectl 2>/dev/null || uname -a; echo; date -Is; echo; uptime"
