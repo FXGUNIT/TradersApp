@@ -6,11 +6,11 @@
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-19 17:16`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-19 19:24`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Master Backlog  46.8%  [###########-------------]
-Tasks          done 081 | in progress 000 | blocked 000 | todo 092 | total 173
+Master Backlog  36.3%  [#########---------------]
+Tasks          done 081 | in progress 000 | blocked 000 | todo 142 | total 223
 ```
 
 How to read this:
@@ -21,7 +21,7 @@ How to read this:
 
 | Area | Tasks | Progress | Status |
 |---|---|---:|---|
-| Stage P | [81/118] |  68.6% | CURRENT BLOCKER |
+| Stage P | [81/168] |  48.2% | CURRENT BLOCKER |
 | Stage S | [0/47] |   0.0% | PENDING |
 | ML Research | [0/8] |   0.0% | PENDING |
 
@@ -29,8 +29,8 @@ How to read this:
 
 | Tier | Scope | Progress | Status |
 |---|---|---:|---|
-| TIER 1 | Stage P rollout path |  68.6% | CURRENT BLOCKER |
-| TIER 2 | Bootstrap + minimal core |  50.0% | CURRENT BLOCKER |
+| TIER 1 | Stage P rollout path |  48.2% | CURRENT BLOCKER |
+| TIER 2 | Bootstrap + minimal core |  10.9% | CURRENT BLOCKER |
 | TIER 3 | OCI ingress + DNS cutover |   0.0% | BLOCKED |
 | TIER 4 | Stage S + ML backlog |   0.0% | PENDING |
 
@@ -46,7 +46,7 @@ How to read this:
 | P06 - CI/CD Pipeline (`deploy-k8s.yml`) DONE - minimal direct-apply path | [12/12] | 100.0% | DONE |
 | P07 - k3s Namespace + Secrets Bootstrap ✅ DONE | [3/3] | 100.0% | DONE |
 | P08 - Helm Chart Values ✅ DONE | [4/4] | 100.0% | DONE |
-| P09 - Core Deployment CURRENT BLOCKER | [0/7] |   0.0% | CURRENT BLOCKER |
+| P09 - Core Deployment CURRENT BLOCKER | [0/57] |   0.0% | CURRENT BLOCKER |
 | P10 - Stateful Services Inside Free Limits ✅ DONE | [5/5] | 100.0% | DONE |
 | P11 - Ingress / External Access BLOCKED BY P09 | [0/6] |   0.0% | BLOCKED |
 | P12 - DNS + TLS on Current Registrar ⏳ BLOCKED BY P11 | [0/5] |   0.0% | BLOCKED |
@@ -221,6 +221,60 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [ ] Verify stale ReplicaSets / invalid-image pods are fully gone after the new cleanup path
 - [ ] Smoke tests: `bff /health`, `ml-engine /health`, frontend `http://frontend:80`, `redis-cli ping`
 - [ ] KUBECONFIG_B64 secret in GitHub updated after each k3s cold restart
+
+#### P09-C - `kubectl apply tradersapp-deployments.yaml` on OCI E2.1.Micro
+- Root cause to treat as authoritative until disproven: OCI E2.1.Micro `1 GB RAM` is too small for `k3s + etcd + kubelet + containerd + the TradersApp core-4 pods` when applied as one rollout step
+- Goal: break the remaining P09 blocker into 50 atomic steps so memory pressure, runtime corruption, and rollout ordering can be debugged without another blind full-manifest retry
+- [ ] P09-C01 - Capture fresh baseline memory on the node before any repair: `free -m`, `vmstat 1 5`, and `/proc/meminfo`
+- [ ] P09-C02 - Capture current control-plane memory by process: `ps aux --sort=-%mem | head -20`
+- [ ] P09-C03 - Record `systemctl status k3s` and `journalctl -u k3s -n 300 --no-pager` from the failing node
+- [ ] P09-C04 - Record `kubectl get nodes -o wide` and `kubectl describe node tradersapp-oci` after a failed apply
+- [ ] P09-C05 - Record `kubectl get pods -A -o wide` with restart counts and current node placement
+- [ ] P09-C06 - Record `kubectl get events -A --sort-by=.lastTimestamp | tail -200` to preserve the exact failure sequence
+- [ ] P09-C07 - Capture current ephemeral storage usage with `df -h`, `df -i`, and `du -sh /var/lib/rancher/k3s/*`
+- [ ] P09-C08 - Save one full failure bundle under a dated runbook artifact path so later retries compare against the same evidence format
+- [ ] P09-C09 - Quantify resident memory used by `etcd`, `kubelet`, `containerd`, and `k3s server` separately
+- [ ] P09-C10 - Decide whether embedded `etcd` must remain or whether the node should switch to a lighter single-node k3s datastore path
+- [ ] P09-C11 - If embedded `etcd` remains, document the exact minimum safe free-memory floor required before any application pods start
+- [ ] P09-C12 - Audit current k3s server flags and remove any non-essential control-plane add-ons still consuming memory
+- [ ] P09-C13 - Audit kubelet eviction thresholds and image-garbage-collection thresholds for better low-memory behavior on 1 GB RAM
+- [ ] P09-C14 - Audit whether swap is actually active and helping under pressure instead of causing unusable thrash
+- [ ] P09-C15 - Audit `systemd` service limits for k3s and confirm they are not making reclaim behavior worse
+- [ ] P09-C16 - Define a hard node-memory budget table for control-plane, OS, and each core TradersApp pod before another deploy attempt
+- [ ] P09-C17 - Extract the direct-apply CI manifest into per-service logical chunks instead of one all-at-once apply unit
+- [ ] P09-C18 - Create a dedicated `redis-only` manifest slice for isolated bring-up testing
+- [ ] P09-C19 - Create a dedicated `ml-engine-only` manifest slice for isolated bring-up testing
+- [ ] P09-C20 - Create a dedicated `bff-only` manifest slice for isolated bring-up testing
+- [ ] P09-C21 - Create a dedicated `frontend-only` manifest slice for isolated bring-up testing
+- [ ] P09-C22 - Add a reproducible manifest-generation command that emits the split apply order from the same source values as CI
+- [ ] P09-C23 - Make the split manifests deterministic so line diffs show only intentional resource changes between retries
+- [ ] P09-C24 - Add a dry-run validation step for every split manifest before the node sees a real apply
+- [ ] P09-C25 - Measure real startup RSS and steady-state RSS for `redis` when deployed alone on the node
+- [ ] P09-C26 - Measure real startup RSS and steady-state RSS for `ml-engine` when deployed alone on the node
+- [ ] P09-C27 - Measure real startup RSS and steady-state RSS for `bff` when deployed alone on the node
+- [ ] P09-C28 - Measure real startup RSS and steady-state RSS for `frontend` when deployed alone on the node
+- [ ] P09-C29 - Lower `redis` requests and limits to the smallest stable envelope proven by isolated testing
+- [ ] P09-C30 - Lower `ml-engine` requests and limits to the smallest stable envelope proven by isolated testing
+- [ ] P09-C31 - Lower `bff` requests and limits to the smallest stable envelope proven by isolated testing
+- [ ] P09-C32 - Lower `frontend` requests and limits to the smallest stable envelope proven by isolated testing
+- [ ] P09-C33 - Re-check that `ml-engine` is not still pulling in hidden heavy dependencies at runtime such as Kafka, Triton, or model warm-load paths
+- [ ] P09-C34 - Re-check that `bff` is not still depending on disabled services through startup probes, env wiring, or transport fallbacks
+- [ ] P09-C35 - Re-check that `frontend` serves static assets only and does not trigger unnecessary sidecars or extra processes
+- [ ] P09-C36 - Re-check that `redis` remains ephemeral and does not request storage classes or PVC-related init work
+- [ ] P09-C37 - Harden the runtime repair script so overlayfs corruption recovery runs before any new pod scheduling attempt
+- [ ] P09-C38 - Add a preflight gate that aborts deployment immediately if free memory is below the minimum safe floor from P09-C16
+- [ ] P09-C39 - Add a preflight gate that aborts deployment immediately if `DiskPressure=True` or inode pressure is already present
+- [ ] P09-C40 - Apply the split manifests one service at a time in the exact order `redis -> ml-engine -> bff -> frontend`
+- [ ] P09-C41 - After each service apply, wait for either `Ready` or a failure event and record memory, events, and pod logs before moving on
+- [ ] P09-C42 - Identify the first exact service and lifecycle stage that re-triggers memory collapse or overlayfs corruption
+- [ ] P09-C43 - If a single service alone breaks the node, stop full-stack testing and reduce that service further before any combined retry
+- [ ] P09-C44 - If all four services run individually, test the minimal combined pairings `redis+bff`, `redis+ml-engine`, and `redis+frontend`
+- [ ] P09-C45 - If pairings hold, test the three-service stack `redis + ml-engine + bff` before adding the frontend
+- [ ] P09-C46 - Only after staged pair/triple validation, retry full `kubectl apply tradersapp-deployments.yaml`
+- [ ] P09-C47 - Confirm the successful full-stack run keeps exactly one Ready pod each for `redis`, `ml-engine`, `bff`, and `frontend`
+- [ ] P09-C48 - Confirm the successful full-stack run still leaves enough free memory headroom to survive one pod restart without node collapse
+- [ ] P09-C49 - Update the production deploy workflow so CI uses the proven staged-apply order instead of a blind one-shot core rollout
+- [ ] P09-C50 - Rewrite the P09 checkpoint note with the final proven memory envelope, staged rollout order, and recovery procedure for future cold starts
 
 ### P10 — Stateful Services Inside Free Limits ✅ DONE
 - [x] Audit each stateful component and classify it as required-for-production or removable-from-runtime
@@ -454,7 +508,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-19 17:16`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-19 19:24`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Active Backlog    0.0%  [------------------------]
