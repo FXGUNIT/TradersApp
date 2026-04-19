@@ -49,6 +49,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--node-ram-mib", type=int, default=1024, help="Physical RAM budget for the OCI node.")
     parser.add_argument("--node-swap-mib", type=int, default=2048, help="Configured swap budget on the OCI node.")
     parser.add_argument(
+        "--os-reserve-mib",
+        type=int,
+        default=160,
+        help="Reserved RAM budget for the base operating system on the OCI node.",
+    )
+    parser.add_argument(
+        "--control-plane-reserve-mib",
+        type=int,
+        default=190,
+        help="Reserved RAM budget for k3s, kubelet, containerd, and other control-plane work.",
+    )
+    parser.add_argument(
         "--min-mem-available-mib",
         type=int,
         default=350,
@@ -206,9 +218,50 @@ def build_report(services: list[ServiceBudget], args: argparse.Namespace) -> dic
         totals.ephemeral_request_mib += service.resources.ephemeral_request_mib
         totals.ephemeral_limit_mib += service.resources.ephemeral_limit_mib
 
+    system_reserve_mib = args.os_reserve_mib + args.control_plane_reserve_mib
+    unallocated_system_buffer_mib = args.min_mem_available_mib - system_reserve_mib
+    if unallocated_system_buffer_mib < 0:
+        raise ValueError(
+            "OS reserve plus control-plane reserve exceeds the pre-deploy MemAvailable floor"
+        )
+
     safe_resident_budget_mib = args.node_ram_mib - args.min_mem_available_mib
     residual_headroom_above_requests_mib = safe_resident_budget_mib - totals.memory_request_mib
     overcommit_against_safe_resident_budget_mib = totals.memory_limit_mib - safe_resident_budget_mib
+
+    hard_budget_table = [
+        {
+            "category": "operating-system",
+            "description": "Base host OS reserve",
+            "memoryBudgetMiB": args.os_reserve_mib,
+        },
+        {
+            "category": "control-plane",
+            "description": "k3s + kubelet + containerd + ancillary control-plane reserve",
+            "memoryBudgetMiB": args.control_plane_reserve_mib,
+        },
+        {
+            "category": "system-buffer",
+            "description": "Unallocated safety margin inside the pre-deploy MemAvailable floor",
+            "memoryBudgetMiB": unallocated_system_buffer_mib,
+        },
+    ]
+    for service in services:
+        hard_budget_table.append(
+            {
+                "category": service.service,
+                "description": f"{service.service} pod resource envelope",
+                "memoryRequestMiB": service.resources.memory_request_mib,
+                "memoryLimitMiB": service.resources.memory_limit_mib,
+            }
+        )
+    hard_budget_table.append(
+        {
+            "category": "app-headroom",
+            "description": "Remaining RAM headroom above summed pod requests inside the safe resident budget",
+            "memoryBudgetMiB": residual_headroom_above_requests_mib,
+        }
+    )
 
     return {
         "generatedAt": datetime.now(timezone.utc).isoformat(),
@@ -217,10 +270,14 @@ def build_report(services: list[ServiceBudget], args: argparse.Namespace) -> dic
         "nodeProfile": {
             "physicalRamMiB": args.node_ram_mib,
             "configuredSwapMiB": args.node_swap_mib,
+            "osReserveMiB": args.os_reserve_mib,
+            "controlPlaneReserveMiB": args.control_plane_reserve_mib,
             "preDeployMemAvailableFloorMiB": args.min_mem_available_mib,
             "preDeploySwapFreeFloorMiB": args.min_swap_free_mib,
+            "unallocatedSystemBufferMiB": unallocated_system_buffer_mib,
             "safeResidentBudgetMiB": safe_resident_budget_mib,
         },
+        "hardBudgetTable": hard_budget_table,
         "services": [
             {
                 "order": service.order,
@@ -266,15 +323,36 @@ def render_markdown(report: dict) -> str:
         "|---|---:|",
         f"| Physical RAM | {format_mib(node['physicalRamMiB'])} |",
         f"| Configured swap | {format_mib(node['configuredSwapMiB'])} |",
+        f"| Base OS reserve | {format_mib(node['osReserveMiB'])} |",
+        f"| k3s control-plane reserve | {format_mib(node['controlPlaneReserveMiB'])} |",
         f"| Pre-deploy MemAvailable floor | {format_mib(node['preDeployMemAvailableFloorMiB'])} |",
         f"| Pre-deploy SwapFree floor | {format_mib(node['preDeploySwapFreeFloorMiB'])} |",
+        f"| Unallocated system buffer inside floor | {format_mib(node['unallocatedSystemBufferMiB'])} |",
         f"| Safe resident budget after floor | {format_mib(node['safeResidentBudgetMiB'])} |",
         "",
+        "## Hard Node Budget Table",
+        "",
+        "| Category | Description | Memory Budget | Memory Request | Memory Limit |",
+        "|---|---|---:|---:|---:|",
+    ]
+
+    for entry in report["hardBudgetTable"]:
+        lines.append(
+            f"| `{entry['category']}` | {entry['description']} | "
+            f"{format_mib(entry.get('memoryBudgetMiB', 0))} | "
+            f"{format_mib(entry.get('memoryRequestMiB', 0))} | "
+            f"{format_mib(entry.get('memoryLimitMiB', 0))} |"
+        )
+
+    lines.extend(
+        [
+            "",
         "## Service Envelopes",
         "",
         "| Order | Service | Request CPU | Limit CPU | Request Memory | Limit Memory | Request Ephemeral | Limit Ephemeral |",
         "|---|---|---:|---:|---:|---:|---:|---:|",
-    ]
+        ]
+    )
 
     for service in report["services"]:
         resources = service["resources"]
@@ -306,6 +384,7 @@ def render_markdown(report: dict) -> str:
             "",
             "## Interpretation",
             "",
+            f"- The hard system reserve before application pods is `{format_mib(node['preDeployMemAvailableFloorMiB'])}`, split into base OS `{format_mib(node['osReserveMiB'])}`, control-plane `{format_mib(node['controlPlaneReserveMiB'])}`, and extra safety buffer `{format_mib(node['unallocatedSystemBufferMiB'])}`.",
             f"- The current staged core manifests request `{format_mib(totals['memoryRequestMiB'])}` of RAM across the four runtime pods.",
             f"- With a pre-deploy MemAvailable floor of `{format_mib(node['preDeployMemAvailableFloorMiB'])}`, only `{format_mib(node['safeResidentBudgetMiB'])}` of node RAM is treated as safe for application working set during rollout.",
             f"- That leaves `{format_mib(totals['residualHeadroomAboveRequestsMiB'])}` of physical RAM above the summed pod requests before swap becomes part of the survival story.",
@@ -322,6 +401,12 @@ def main() -> None:
     apply_order_path = manifest_dir / APPLY_ORDER_FILE
     if not apply_order_path.is_file():
         raise SystemExit(f"Apply order file not found: {apply_order_path}")
+    if args.os_reserve_mib < 0 or args.control_plane_reserve_mib < 0:
+        raise SystemExit("OS reserve and control-plane reserve must be non-negative")
+    if args.min_mem_available_mib < 0 or args.min_swap_free_mib < 0:
+        raise SystemExit("MemAvailable and SwapFree floors must be non-negative")
+    if args.node_ram_mib <= 0 or args.node_swap_mib < 0:
+        raise SystemExit("Node RAM must be positive and node swap must be non-negative")
 
     manifest_names = [
         line.strip()

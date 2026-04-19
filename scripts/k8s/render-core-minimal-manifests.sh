@@ -34,6 +34,8 @@ VALIDATE_CLIENT="false"
 PYTHON_BIN=""
 NODE_RAM_MIB="${NODE_RAM_MIB:-1024}"
 NODE_SWAP_MIB="${NODE_SWAP_MIB:-2048}"
+NODE_OS_RESERVE_MIB="${NODE_OS_RESERVE_MIB:-160}"
+NODE_CONTROL_PLANE_RESERVE_MIB="${NODE_CONTROL_PLANE_RESERVE_MIB:-190}"
 MIN_MEM_AVAILABLE_MIB="${MIN_NODE_MEM_AVAILABLE_MIB:-350}"
 MIN_SWAP_FREE_MIB="${MIN_NODE_SWAP_FREE_MIB:-768}"
 
@@ -256,6 +258,8 @@ generate_budget_report() {
     --manifest-dir "${OUTPUT_DIR}" \
     --node-ram-mib "${NODE_RAM_MIB}" \
     --node-swap-mib "${NODE_SWAP_MIB}" \
+    --os-reserve-mib "${NODE_OS_RESERVE_MIB}" \
+    --control-plane-reserve-mib "${NODE_CONTROL_PLANE_RESERVE_MIB}" \
     --min-mem-available-mib "${MIN_MEM_AVAILABLE_MIB}" \
     --min-swap-free-mib "${MIN_SWAP_FREE_MIB}"
 }
