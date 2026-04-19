@@ -1,0 +1,380 @@
+name: Windows Desktop Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: "Desktop version (3-part or 4-part; defaults to the pushed tag)."
+        required: false
+        type: string
+      include_webview2_offline:
+        description: "Download the Evergreen offline runtime installer and attach it to the release artifact set."
+        required: false
+        default: false
+        type: boolean
+
+env:
+  NODE_VERSION: "24"
+  DOTNET_VERSION: "8.0.x"
+  DESKTOP_PROJECT: "desktop/windows/TradersApp.Desktop/TradersApp.Desktop.csproj"
+  PACKAGE_PROJECT: "desktop/windows/installer/TradersApp.Package/TradersApp.Package.wixproj"
+  BUNDLE_PROJECT: "desktop/windows/installer/TradersApp.Bundle/TradersApp.Bundle.wixproj"
+  BUNDLE_PACKAGES_DIR: "desktop/windows/installer/TradersApp.Bundle/Packages"
+
+jobs:
+  build-windows:
+    name: Build Windows desktop release
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    outputs:
+      desktop_version: ${{ steps.version.outputs.desktop_version }}
+      release_tag: ${{ steps.version.outputs.release_tag }}
+      appcast_url: ${{ steps.urls.outputs.appcast_url }}
+      updates_base_url: ${{ steps.urls.outputs.updates_base_url }}
+      release_notes_base_url: ${{ steps.urls.outputs.release_notes_base_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Resolve release version
+        id: version
+        shell: pwsh
+        run: |
+          $rawVersion = "${{ github.event.inputs.release_version }}"
+          if ([string]::IsNullOrWhiteSpace($rawVersion) -and "${{ github.ref_type }}" -eq "tag") {
+            $rawVersion = "${{ github.ref_name }}"
+          }
+
+          if ([string]::IsNullOrWhiteSpace($rawVersion)) {
+            throw "A release version is required for workflow_dispatch runs."
+          }
+
+          $normalized = $rawVersion.Trim()
+          if ($normalized.StartsWith("v", [System.StringComparison]::OrdinalIgnoreCase)) {
+            $normalized = $normalized.Substring(1)
+          }
+
+          $parts = $normalized.Split(".")
+          if ($parts.Count -eq 3) {
+            $desktopVersion = "$normalized.0"
+          }
+          elseif ($parts.Count -eq 4) {
+            $desktopVersion = $normalized
+          }
+          else {
+            throw "Version '$rawVersion' must be in 3-part or 4-part dotted form."
+          }
+
+          $releaseTag = if ("${{ github.ref_type }}" -eq "tag") {
+            "${{ github.ref_name }}"
+          }
+          else {
+            "v$desktopVersion"
+          }
+
+          "desktop_version=$desktopVersion" >> $env:GITHUB_OUTPUT
+          "release_tag=$releaseTag" >> $env:GITHUB_OUTPUT
+
+      - name: Resolve update URLs
+        id: urls
+        shell: pwsh
+        run: |
+          $repository = "${{ github.repository }}"
+          $releaseTag = "${{ steps.version.outputs.release_tag }}"
+          $defaultAppCastUrl = "https://github.com/$repository/releases/latest/download/appcast.xml"
+          $defaultUpdatesBaseUrl = "https://github.com/$repository/releases/download/$releaseTag"
+
+          $appCastUrl = "${{ vars.WINDOWS_APPCAST_URL }}"
+          if ([string]::IsNullOrWhiteSpace($appCastUrl)) {
+            $appCastUrl = $defaultAppCastUrl
+          }
+
+          $updatesBaseUrl = "${{ vars.WINDOWS_UPDATES_BASE_URL }}"
+          if ([string]::IsNullOrWhiteSpace($updatesBaseUrl)) {
+            $updatesBaseUrl = $defaultUpdatesBaseUrl
+          }
+
+          $releaseNotesBaseUrl = "${{ vars.WINDOWS_RELEASE_NOTES_BASE_URL }}"
+          if ([string]::IsNullOrWhiteSpace($releaseNotesBaseUrl)) {
+            $releaseNotesBaseUrl = $updatesBaseUrl
+          }
+
+          "appcast_url=$appCastUrl" >> $env:GITHUB_OUTPUT
+          "updates_base_url=$updatesBaseUrl" >> $env:GITHUB_OUTPUT
+          "release_notes_base_url=$releaseNotesBaseUrl" >> $env:GITHUB_OUTPUT
+
+      - name: Validate signing and update secrets
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrWhiteSpace("${{ secrets.SIGN_CERTIFICATE_BASE64 }}")) {
+            throw "SIGN_CERTIFICATE_BASE64 is required for Windows release builds."
+          }
+
+          if ([string]::IsNullOrWhiteSpace("${{ secrets.SIGN_CERTIFICATE_PASSWORD }}")) {
+            throw "SIGN_CERTIFICATE_PASSWORD is required for Windows release builds."
+          }
+
+          if ([string]::IsNullOrWhiteSpace("${{ secrets.SPARKLE_PRIVATE_KEY }}")) {
+            throw "SPARKLE_PRIVATE_KEY is required for NetSparkle appcast generation."
+          }
+
+          if ([string]::IsNullOrWhiteSpace("${{ secrets.SPARKLE_PUBLIC_KEY }}")) {
+            throw "SPARKLE_PUBLIC_KEY is required to embed the update verification key."
+          }
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Generate desktop runtime settings
+        shell: pwsh
+        run: |
+          ./scripts/windows/write-desktop-settings.ps1 `
+            -OutputPath "desktop/windows/TradersApp.Desktop/desktop-settings.json" `
+            -AppCastUrl "${{ steps.urls.outputs.appcast_url }}" `
+            -AppCastPublicKey "${{ secrets.SPARKLE_PUBLIC_KEY }}"
+
+      - name: Download WebView2 runtime packages
+        shell: pwsh
+        env:
+          WEBVIEW2_BOOTSTRAPPER_URL: ${{ vars.WEBVIEW2_BOOTSTRAPPER_URL }}
+          WEBVIEW2_OFFLINE_INSTALLER_URL: ${{ vars.WEBVIEW2_OFFLINE_INSTALLER_URL }}
+        run: |
+          ./scripts/windows/fetch-webview2-runtime.ps1 `
+            -BundlePackagesDir "${{ env.BUNDLE_PACKAGES_DIR }}" `
+            -DownloadOfflineInstaller:${{ inputs.include_webview2_offline || false }}
+
+      - name: Build desktop web bundle
+        shell: pwsh
+        env:
+          DESKTOP_BFF_URL: https://bff.traders.app
+          DESKTOP_APP_VERSION: ${{ steps.version.outputs.desktop_version }}
+        run: npm run build:desktop:web
+
+      - name: Build desktop shell
+        shell: pwsh
+        run: |
+          dotnet build "${{ env.DESKTOP_PROJECT }}" `
+            -c Release `
+            -p:DesktopVersion=${{ steps.version.outputs.desktop_version }}
+
+      - name: Sign desktop executable
+        shell: pwsh
+        env:
+          SIGN_CERTIFICATE_BASE64: ${{ secrets.SIGN_CERTIFICATE_BASE64 }}
+          SIGN_CERTIFICATE_PASSWORD: ${{ secrets.SIGN_CERTIFICATE_PASSWORD }}
+          SIGN_TIMESTAMP_URL: ${{ vars.SIGN_TIMESTAMP_URL }}
+        run: |
+          ./scripts/windows/sign-release.ps1 `
+            -Paths "desktop/windows/TradersApp.Desktop/bin/Release/net8.0-windows/TradersApp.Desktop.exe" `
+            -RequireSigning
+
+      - name: Build MSI package
+        shell: pwsh
+        run: |
+          dotnet build "${{ env.PACKAGE_PROJECT }}" `
+            -c Release `
+            -p:DesktopVersion=${{ steps.version.outputs.desktop_version }}
+
+      - name: Build bootstrapper bundle
+        shell: pwsh
+        run: |
+          dotnet build "${{ env.BUNDLE_PROJECT }}" `
+            -c Release `
+            -p:DesktopVersion=${{ steps.version.outputs.desktop_version }}
+
+      - name: Sign installer artifacts
+        shell: pwsh
+        env:
+          SIGN_CERTIFICATE_BASE64: ${{ secrets.SIGN_CERTIFICATE_BASE64 }}
+          SIGN_CERTIFICATE_PASSWORD: ${{ secrets.SIGN_CERTIFICATE_PASSWORD }}
+          SIGN_TIMESTAMP_URL: ${{ vars.SIGN_TIMESTAMP_URL }}
+        run: |
+          ./scripts/windows/sign-release.ps1 `
+            -Paths @(
+              "desktop/windows/installer/TradersApp.Package/bin/Release/TradersApp.Package.msi",
+              "desktop/windows/installer/TradersApp.Bundle/bin/Release/TradersApp.Desktop.Setup.exe"
+            ) `
+            -RequireSigning
+
+      - name: Stage release payload
+        shell: pwsh
+        run: |
+          $artifactsDir = "artifacts/windows-release"
+          $changesDir = Join-Path $artifactsDir "changelogs"
+          New-Item -ItemType Directory -Path $artifactsDir -Force | Out-Null
+          New-Item -ItemType Directory -Path $changesDir -Force | Out-Null
+
+          Copy-Item "desktop/windows/installer/TradersApp.Package/bin/Release/TradersApp.Package.msi" $artifactsDir -Force
+          Copy-Item "desktop/windows/installer/TradersApp.Bundle/bin/Release/TradersApp.Desktop.Setup.exe" $artifactsDir -Force
+
+          Get-ChildItem -Path "${{ env.BUNDLE_PACKAGES_DIR }}" -Filter "MicrosoftEdgeWebView2RuntimeInstaller*.exe" -ErrorAction SilentlyContinue |
+            ForEach-Object { Copy-Item $_.FullName $artifactsDir -Force }
+
+          $recentCommits = git log --pretty=format:"- %s (%h)" -n 20
+          if ([string]::IsNullOrWhiteSpace($recentCommits)) {
+            $recentCommits = "- Windows desktop thin-client release packaging."
+          }
+
+          $releaseNotes = @"
+# TradersApp Desktop ${{ steps.version.outputs.desktop_version }}
+
+Built from commit $env:GITHUB_SHA on $(Get-Date -Format "yyyy-MM-dd").
+
+## Changes
+$recentCommits
+"@
+
+          Set-Content `
+            -LiteralPath (Join-Path $changesDir "${{ steps.version.outputs.desktop_version }}.md") `
+            -Value $releaseNotes
+
+      - name: Write SHA-256 sidecars
+        shell: pwsh
+        run: |
+          ./scripts/windows/write-sha256.ps1 `
+            -Paths @(
+              "artifacts/windows-release/TradersApp.Package.msi",
+              "artifacts/windows-release/TradersApp.Desktop.Setup.exe"
+            )
+
+      - name: Install NetSparkle AppCast generator
+        shell: pwsh
+        run: |
+          dotnet tool update --global NetSparkleUpdater.Tools.AppCastGenerator
+          if ($LASTEXITCODE -ne 0) {
+            dotnet tool install --global NetSparkleUpdater.Tools.AppCastGenerator
+          }
+          "$env:USERPROFILE\.dotnet\tools" >> $env:GITHUB_PATH
+
+      - name: Generate signed appcast
+        shell: pwsh
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+          SPARKLE_PUBLIC_KEY: ${{ secrets.SPARKLE_PUBLIC_KEY }}
+        run: |
+          ./scripts/windows/generate-appcast.ps1 `
+            -PackagePath "artifacts/windows-release/TradersApp.Desktop.Setup.exe" `
+            -AppCastOutputDirectory "artifacts/windows-release" `
+            -ChangesDirectory "artifacts/windows-release/changelogs" `
+            -ReleaseVersion "${{ steps.version.outputs.desktop_version }}" `
+            -UpdatesBaseUrl "${{ steps.urls.outputs.updates_base_url }}" `
+            -ReleaseNotesBaseUrl "${{ steps.urls.outputs.release_notes_base_url }}" `
+            -AppCastUrl "${{ steps.urls.outputs.appcast_url }}"
+
+      - name: Hash appcast outputs
+        shell: pwsh
+        run: |
+          ./scripts/windows/write-sha256.ps1 `
+            -Paths @(
+              "artifacts/windows-release/appcast.xml",
+              "artifacts/windows-release/appcast.xml.signature"
+            )
+
+      - name: Upload Windows release payload
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-release-payload
+          path: artifacts/windows-release/
+          retention-days: 14
+
+  security-and-sbom:
+    name: Scan Windows release payload
+    runs-on: ubuntu-latest
+    needs: [build-windows]
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Download Windows release payload
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-release-payload
+          path: windows-release
+
+      - name: Scan release payload with Trivy
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: windows-release
+          format: sarif
+          output: trivy-windows-release.sarif
+          severity: HIGH,CRITICAL
+          exit-code: 1
+
+      - name: Generate SBOM for release payload
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: windows-release
+          format: cyclonedx
+          output: tradersapp-windows-desktop.sbom.cdx.json
+          exit-code: 0
+
+      - name: Upload Trivy results to GitHub Security
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-windows-release.sarif
+
+      - name: Upload security artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-release-security
+          path: |
+            trivy-windows-release.sarif
+            tradersapp-windows-desktop.sbom.cdx.json
+          retention-days: 14
+
+  publish-release:
+    name: Publish GitHub release
+    runs-on: ubuntu-latest
+    needs: [build-windows, security-and-sbom]
+    if: github.ref_type == 'tag'
+    permissions:
+      contents: write
+    steps:
+      - name: Download release payload
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-release-payload
+          path: release-assets
+
+      - name: Download security artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-release-security
+          path: release-assets
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.build-windows.outputs.release_tag }}
+          generate_release_notes: true
+          files: |
+            release-assets/TradersApp.Desktop.Setup.exe
+            release-assets/TradersApp.Desktop.Setup.exe.sha256
+            release-assets/TradersApp.Package.msi
+            release-assets/TradersApp.Package.msi.sha256
+            release-assets/appcast.xml
+            release-assets/appcast.xml.sha256
+            release-assets/appcast.xml.signature
+            release-assets/appcast.xml.signature.sha256
+            release-assets/changelogs/${{ needs.build-windows.outputs.desktop_version }}.md
+            release-assets/tradersapp-windows-desktop.sbom.cdx.json
+            release-assets/trivy-windows-release.sarif

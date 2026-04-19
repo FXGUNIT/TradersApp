@@ -70,3 +70,9 @@ nul
 airflow/reports/*.json
 .gstack/
 .venv-research/
+
+# Windows desktop release outputs
+desktop/windows/**/bin/
+desktop/windows/**/obj/
+desktop/windows/TradersApp.Desktop/desktop-settings.json
+desktop/windows/installer/TradersApp.Bundle/Packages/*.exe
