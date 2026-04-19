@@ -29,6 +29,10 @@
     <DesktopWebAsset Include="$(DesktopWebSourceDir)**\*.*" />
   </ItemGroup>
 
+  <ItemGroup Condition="Exists('$(MSBuildThisFileDirectory)desktop-settings.json')">
+    <Content Include="desktop-settings.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
   <Target Name="CopyDesktopWebAssets" AfterTargets="Build">
     <MakeDir Directories="$(DesktopWebOutputDir)" />
     <Copy
