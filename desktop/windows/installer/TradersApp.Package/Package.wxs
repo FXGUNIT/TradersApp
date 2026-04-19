@@ -4,7 +4,7 @@
       Id="TradersApp.Desktop.Package"
       Name="TradersApp Desktop"
       Manufacturer="TradersApp"
-      Version="1.0.0.0"
+      Version="$(DesktopVersion)"
       UpgradeCode="{0557D930-7954-45A2-92C9-16A473515B37}"
       Scope="perUserOrMachine">
 

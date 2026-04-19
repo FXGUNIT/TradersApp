@@ -4,7 +4,7 @@
   <Bundle
       Name="TradersApp Desktop Setup"
       Manufacturer="TradersApp"
-      Version="1.0.0.0"
+      Version="$(DesktopVersion)"
       UpgradeCode="{0FBF4C0A-BB81-4613-B717-273978E6A4A0}"
       AboutUrl="https://traders.app"
       Compressed="yes">

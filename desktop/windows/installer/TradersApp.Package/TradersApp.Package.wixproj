@@ -1,8 +1,9 @@
 <Project Sdk="WixToolset.Sdk/6.0.2">
 
   <PropertyGroup>
+    <DesktopVersion Condition="'$(DesktopVersion)' == ''">1.0.0.0</DesktopVersion>
     <DesktopBuildDir>$(MSBuildThisFileDirectory)..\..\TradersApp.Desktop\bin\$(Configuration)\net8.0-windows\</DesktopBuildDir>
-    <DefineConstants>$(DefineConstants);DesktopBuildDir=$(DesktopBuildDir)</DefineConstants>
+    <DefineConstants>$(DefineConstants);DesktopBuildDir=$(DesktopBuildDir);DesktopVersion=$(DesktopVersion)</DefineConstants>
     <OutputName>TradersApp.Package</OutputName>
   </PropertyGroup>
 

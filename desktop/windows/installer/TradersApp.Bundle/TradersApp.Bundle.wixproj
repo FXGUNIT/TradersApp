@@ -2,9 +2,10 @@
 
   <PropertyGroup>
     <OutputType>Bundle</OutputType>
+    <DesktopVersion Condition="'$(DesktopVersion)' == ''">1.0.0.0</DesktopVersion>
     <WebView2BootstrapperPath>$(MSBuildThisFileDirectory)Packages\MicrosoftEdgeWebview2Setup.exe</WebView2BootstrapperPath>
     <HasWebView2Bootstrapper>$([System.IO.File]::Exists('$(WebView2BootstrapperPath)'))</HasWebView2Bootstrapper>
-    <DefineConstants>$(DefineConstants);WebView2BootstrapperPath=$(WebView2BootstrapperPath);HasWebView2Bootstrapper=$(HasWebView2Bootstrapper)</DefineConstants>
+    <DefineConstants>$(DefineConstants);DesktopVersion=$(DesktopVersion);WebView2BootstrapperPath=$(WebView2BootstrapperPath);HasWebView2Bootstrapper=$(HasWebView2Bootstrapper)</DefineConstants>
     <OutputName>TradersApp.Desktop.Setup</OutputName>
   </PropertyGroup>
 
