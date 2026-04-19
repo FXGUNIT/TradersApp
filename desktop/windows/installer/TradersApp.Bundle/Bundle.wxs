@@ -10,7 +10,10 @@
       Compressed="yes">
 
     <BootstrapperApplication>
-      <bal:WixStandardBootstrapperApplication Theme="standard" />
+      <bal:WixStandardBootstrapperApplication
+          LicenseFile="..\Assets\License.rtf"
+          Theme="rtfLicense"
+          ShowVersion="yes" />
     </BootstrapperApplication>
 
     <util:RegistrySearch
@@ -47,7 +50,6 @@
       <MsiPackage
           Id="TradersAppDesktopMsi"
           SourceFile="TradersApp.Package.msi"
-          DisplayInternalUI="yes"
           Visible="no" />
     </Chain>
   </Bundle>

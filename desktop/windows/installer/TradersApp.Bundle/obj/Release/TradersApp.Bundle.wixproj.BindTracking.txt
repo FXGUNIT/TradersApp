@@ -1,0 +1,13 @@
+BuiltPdbOutput	E:\TradersApp\desktop\windows\installer\TradersApp.Bundle\obj\Release\TradersApp.Desktop.Setup.wixpdb
+BuiltTargetOutput	E:\TradersApp\desktop\windows\installer\TradersApp.Bundle\obj\Release\TradersApp.Desktop.Setup.exe
+Input	..\Assets\License.rtf
+Input	C:\Users\Asus\.nuget\packages\wixtoolset.bootstrapperapplications.wixext\6.0.2\wixext6\WixToolset.BootstrapperApplications.wixext.dll
+Input	E:\TradersApp\desktop\windows\installer\TradersApp.Bundle\obj\Release\WixToolset.BootstrapperApplications.wixext_G-NHR8ZADDbU0Luzr2uifITawG0\wix-ir\logo.png
+Input	E:\TradersApp\desktop\windows\installer\TradersApp.Bundle\obj\Release\WixToolset.BootstrapperApplications.wixext_G-NHR8ZADDbU0Luzr2uifITawG0\wix-ir\RtfTheme.wxl
+Input	E:\TradersApp\desktop\windows\installer\TradersApp.Bundle\obj\Release\WixToolset.BootstrapperApplications.wixext_G-NHR8ZADDbU0Luzr2uifITawG0\wix-ir\RtfTheme.xml
+Input	E:\TradersApp\desktop\windows\installer\TradersApp.Bundle\obj\Release\WixToolset.BootstrapperApplications.wixext_G-NHR8ZADDbU0Luzr2uifITawG0\wix-ir\wixstdba.exe-2
+Input	E:\TradersApp\desktop\windows\installer\TradersApp.Package\bin\Release\TradersApp.Package.msi
+Intermediate	E:\TradersApp\desktop\windows\installer\TradersApp.Bundle\obj\Release\WixToolset.BootstrapperApplications.wixext_G-NHR8ZADDbU0Luzr2uifITawG0\wix-ir\logo.png
+Intermediate	E:\TradersApp\desktop\windows\installer\TradersApp.Bundle\obj\Release\WixToolset.BootstrapperApplications.wixext_G-NHR8ZADDbU0Luzr2uifITawG0\wix-ir\RtfTheme.wxl
+Intermediate	E:\TradersApp\desktop\windows\installer\TradersApp.Bundle\obj\Release\WixToolset.BootstrapperApplications.wixext_G-NHR8ZADDbU0Luzr2uifITawG0\wix-ir\RtfTheme.xml
+Intermediate	E:\TradersApp\desktop\windows\installer\TradersApp.Bundle\obj\Release\WixToolset.BootstrapperApplications.wixext_G-NHR8ZADDbU0Luzr2uifITawG0\wix-ir\wixstdba.exe-2

@@ -2,10 +2,10 @@
   "version": 3,
   "targets": {
     "native,Version=v0.0": {
-      "WixToolset.Bal.wixext/6.0.2": {
+      "WixToolset.BootstrapperApplications.wixext/6.0.2": {
         "type": "package",
         "build": {
-          "build/WixToolset.Bal.wixext.targets": {}
+          "build/WixToolset.BootstrapperApplications.wixext.targets": {}
         }
       },
       "WixToolset.Util.wixext/6.0.2": {
@@ -17,20 +17,20 @@
     }
   },
   "libraries": {
-    "WixToolset.Bal.wixext/6.0.2": {
-      "sha512": "WeO0Qo28apmrEKQ+fEmWBEwnsez+4/B/NP5WnCnK2ZzKNcBr9xiRx01XHPBr08VqibDZGgXraDqFJ7Flws2QDw==",
+    "WixToolset.BootstrapperApplications.wixext/6.0.2": {
+      "sha512": "/XYG3naW7A9Gpo9VUp7/oG1OmuaLys/Wm1kaBUXuhjd6tYWsBZYi5ymQKjfICfyNTcu3Q0AEuS0zFEvyNh2V5Q==",
       "type": "package",
-      "path": "wixtoolset.bal.wixext/6.0.2",
+      "path": "wixtoolset.bootstrapperapplications.wixext/6.0.2",
       "files": [
         ".nupkg.metadata",
         ".signature.p7s",
         "OSMFEULA.txt",
         "README.md",
-        "build/WixToolset.Bal.wixext.targets",
+        "build/WixToolset.BootstrapperApplications.wixext.targets",
         "icon.png",
         "wixext6/WixToolset.BootstrapperApplications.wixext.dll",
-        "wixtoolset.bal.wixext.6.0.2.nupkg.sha512",
-        "wixtoolset.bal.wixext.nuspec"
+        "wixtoolset.bootstrapperapplications.wixext.6.0.2.nupkg.sha512",
+        "wixtoolset.bootstrapperapplications.wixext.nuspec"
       ]
     },
     "WixToolset.Util.wixext/6.0.2": {
@@ -52,7 +52,7 @@
   },
   "projectFileDependencyGroups": {
     "native,Version=v0.0": [
-      "WixToolset.Bal.wixext >= 6.0.2",
+      "WixToolset.BootstrapperApplications.wixext >= 6.0.2",
       "WixToolset.Util.wixext >= 6.0.2"
     ]
   },
@@ -94,7 +94,7 @@
       "native": {
         "targetAlias": "native",
         "dependencies": {
-          "WixToolset.Bal.wixext": {
+          "WixToolset.BootstrapperApplications.wixext": {
             "target": "Package",
             "version": "[6.0.2, )"
           },

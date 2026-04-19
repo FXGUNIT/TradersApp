@@ -1,10 +1,10 @@
 {
   "version": 2,
-  "dgSpecHash": "9FSdj3qrObM=",
+  "dgSpecHash": "1dFa+PCbc0E=",
   "success": true,
   "projectFilePath": "E:\\TradersApp\\desktop\\windows\\installer\\TradersApp.Bundle\\TradersApp.Bundle.wixproj",
   "expectedPackageFiles": [
-    "C:\\Users\\Asus\\.nuget\\packages\\wixtoolset.bal.wixext\\6.0.2\\wixtoolset.bal.wixext.6.0.2.nupkg.sha512",
+    "C:\\Users\\Asus\\.nuget\\packages\\wixtoolset.bootstrapperapplications.wixext\\6.0.2\\wixtoolset.bootstrapperapplications.wixext.6.0.2.nupkg.sha512",
     "C:\\Users\\Asus\\.nuget\\packages\\wixtoolset.util.wixext\\6.0.2\\wixtoolset.util.wixext.6.0.2.nupkg.sha512"
   ],
   "logs": []

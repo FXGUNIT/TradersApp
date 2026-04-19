@@ -1,6 +1,7 @@
 <Project Sdk="WixToolset.Sdk/6.0.2">
 
   <PropertyGroup>
+    <OutputType>Bundle</OutputType>
     <WebView2BootstrapperPath>$(MSBuildThisFileDirectory)Packages\MicrosoftEdgeWebview2Setup.exe</WebView2BootstrapperPath>
     <HasWebView2Bootstrapper>$([System.IO.File]::Exists('$(WebView2BootstrapperPath)'))</HasWebView2Bootstrapper>
     <DefineConstants>$(DefineConstants);WebView2BootstrapperPath=$(WebView2BootstrapperPath);HasWebView2Bootstrapper=$(HasWebView2Bootstrapper)</DefineConstants>
@@ -8,7 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="WixToolset.Bal.wixext" Version="6.0.2" />
+    <PackageReference Include="WixToolset.BootstrapperApplications.wixext" Version="6.0.2" />
     <PackageReference Include="WixToolset.Util.wixext" Version="6.0.2" />
   </ItemGroup>
 

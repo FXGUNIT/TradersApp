@@ -1,1 +1,6 @@
 E:\TradersApp\desktop\windows\installer\TradersApp.Bundle\obj\Release\TradersApp.Bundle.wixproj.CoreCompileInputs.cache
+E:\TradersApp\desktop\windows\installer\TradersApp.Bundle\obj\Release\TradersApp.Desktop.Setup.wixpdb
+E:\TradersApp\desktop\windows\installer\TradersApp.Bundle\bin\Release\TradersApp.Desktop.Setup.exe
+E:\TradersApp\desktop\windows\installer\TradersApp.Bundle\bin\Release\TradersApp.Desktop.Setup.wixpdb
+E:\TradersApp\desktop\windows\installer\TradersApp.Bundle\obj\Release\TradersApp.Desktop.Setup.exe
+E:\TradersApp\desktop\windows\installer\TradersApp.Bundle\obj\Release\TradersApp.Bundle.wixproj.BindTracking.txt

@@ -39,7 +39,7 @@
         "native": {
           "targetAlias": "native",
           "dependencies": {
-            "WixToolset.Bal.wixext": {
+            "WixToolset.BootstrapperApplications.wixext": {
               "target": "Package",
               "version": "[6.0.2, )"
             },

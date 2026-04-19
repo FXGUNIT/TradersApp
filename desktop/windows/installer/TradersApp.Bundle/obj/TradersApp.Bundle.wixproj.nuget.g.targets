@@ -2,6 +2,6 @@
 <Project ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ImportGroup Condition=" '$(ExcludeRestorePackageImports)' != 'true' ">
     <Import Project="$(NuGetPackageRoot)wixtoolset.util.wixext\6.0.2\build\WixToolset.Util.wixext.targets" Condition="Exists('$(NuGetPackageRoot)wixtoolset.util.wixext\6.0.2\build\WixToolset.Util.wixext.targets')" />
-    <Import Project="$(NuGetPackageRoot)wixtoolset.bal.wixext\6.0.2\build\WixToolset.Bal.wixext.targets" Condition="Exists('$(NuGetPackageRoot)wixtoolset.bal.wixext\6.0.2\build\WixToolset.Bal.wixext.targets')" />
+    <Import Project="$(NuGetPackageRoot)wixtoolset.bootstrapperapplications.wixext\6.0.2\build\WixToolset.BootstrapperApplications.wixext.targets" Condition="Exists('$(NuGetPackageRoot)wixtoolset.bootstrapperapplications.wixext\6.0.2\build\WixToolset.BootstrapperApplications.wixext.targets')" />
   </ImportGroup>
 </Project>
