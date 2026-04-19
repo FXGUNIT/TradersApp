@@ -6,7 +6,7 @@
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-19 17:03`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-19 17:13`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Master Backlog  45.4%  [###########-------------]
@@ -279,13 +279,13 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [ ] Rewrite or archive any Stage P docs that still reference Railway/Vercel as the production path
 - [ ] Make this master TODO the source of truth for the free-only production architecture
 - [ ] Update DNS/TLS runbooks to match the current registrar + OCI ingress plan
-- [x] **Docs updated this session:**
+- [x] **Docs updated this session (3/5):**
   - `docs/GO_LIVE_CERTIFICATE.md` — topology table, SLO, alert channels, rollback sections fully rewritten for OCI k3s
-- [x] **Files remaining to update:**
-  - `docs/DEPLOYMENT.md` — Railway/Vercel setup sections (lines 30–31, 97, 128, 190–192, 266–267, 313–325)
-  - `docs/STAGE_P_DNS_SETUP.md` — Railway/Vercel DNS targets (lines 48, 70, 82–84, 136–157, 200, 203, 246, 298–307, 323–324, 348)
-  - `docs/SETUP.md` — Railway/Vercel setup steps (lines 11–12, 55, 65–67, 84, 107, 157–160)
-  - `docs/STAGE_P_24X7_EXECUTION_CHECKLIST.md` — Vercel CNAME at line 134, Vercel deploy at line 160
+  - `docs/DEPLOYMENT.md` — infrastructure overview, OCI k3s setup, CI/CD, secrets, rollback sections rewritten
+  - `docs/STAGE_P_DNS_SETUP.md` — DNS targets changed from Railway/Vercel to OCI k3s node IP (144.24.112.249), staging.traders.app deprecated
+- [x] **Files remaining (2/5):**
+  - `docs/SETUP.md` — Railway/Vercel setup steps need OCI bootstrap procedures
+  - `docs/STAGE_P_24X7_EXECUTION_CHECKLIST.md` — Vercel CNAME at line 134, Vercel deploy at line 160; needs OCI kubectl commands
 
 ### P18 - Windows Desktop Architecture Freeze
 - [x] Freeze TradersApp end-user delivery as a Windows-only thin desktop client
@@ -455,7 +455,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-19 17:03`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-19 17:13`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Active Backlog    0.0%  [------------------------]
