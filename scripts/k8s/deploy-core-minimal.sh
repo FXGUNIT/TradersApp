@@ -65,9 +65,11 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-VALUES_FILE="${REPO_ROOT}/k8s/helm/tradersapp/values.minimal.yaml"
-MANIFEST_PATH="$(mktemp)"
+MANIFEST_DIR="$(mktemp -d)"
+APPLY_ORDER_PATH="${MANIFEST_DIR}/00-apply-order.txt"
+FULL_MANIFEST_PATH="${MANIFEST_DIR}/tradersapp-deployments.yaml"
 NODE_RECOVERY_SCRIPT="${SCRIPT_DIR}/recover-node-pressure.sh"
+RENDER_SCRIPT="${SCRIPT_DIR}/render-core-minimal-manifests.sh"
 
 wait_for_kube_api() {
   local max_tries="${1:-24}"
@@ -134,16 +136,40 @@ cleanup_core_runtime() {
     -l 'app in (bff,frontend,ml-engine,redis)' --ignore-not-found=true || true
 }
 
-render_manifest() {
-  helm template tradersapp "${REPO_ROOT}/k8s/helm/tradersapp" \
+render_manifests() {
+  if [[ ! -f "${RENDER_SCRIPT}" ]]; then
+    echo "::error::Render script is missing: ${RENDER_SCRIPT}" >&2
+    exit 1
+  fi
+
+  bash "${RENDER_SCRIPT}" \
     --namespace "${NAMESPACE}" \
-    -f "${VALUES_FILE}" \
-    --set "bff.image.repository=${IMAGE_REPO}/bff" \
-    --set "bff.image.tag=${IMAGE_TAG}" \
-    --set "frontend.image.repository=${IMAGE_REPO}/frontend" \
-    --set "frontend.image.tag=${IMAGE_TAG}" \
-    --set "mlEngine.image.repository=${IMAGE_REPO}/ml-engine" \
-    --set "mlEngine.image.tag=${IMAGE_TAG}" > "${MANIFEST_PATH}"
+    --image-repo "${IMAGE_REPO}" \
+    --image-tag "${IMAGE_TAG}" \
+    --output-dir "${MANIFEST_DIR}" \
+    --kubeconfig "${KUBECONFIG_PATH}" \
+    --validate-client
+}
+
+apply_staged_manifests() {
+  if [[ ! -s "${APPLY_ORDER_PATH}" ]]; then
+    echo "::error::Apply order file is missing or empty: ${APPLY_ORDER_PATH}" >&2
+    exit 1
+  fi
+
+  local manifest_name=""
+  local manifest_path=""
+  while IFS= read -r manifest_name; do
+    [[ -n "${manifest_name}" ]] || continue
+    manifest_path="${MANIFEST_DIR}/${manifest_name}"
+    if [[ ! -s "${manifest_path}" ]]; then
+      echo "::error::Expected staged manifest is missing: ${manifest_path}" >&2
+      exit 1
+    fi
+
+    echo "Applying staged manifest ${manifest_name}"
+    kubectl_retry 6 kubectl --kubeconfig "${KUBECONFIG_PATH}" apply -f "${manifest_path}"
+  done < "${APPLY_ORDER_PATH}"
 }
 
 wait_for_rollout() {
@@ -171,7 +197,7 @@ wait_for_rollout() {
 }
 
 cleanup() {
-  rm -f "${MANIFEST_PATH}"
+  rm -rf "${MANIFEST_DIR}"
 }
 trap cleanup EXIT
 
@@ -179,7 +205,9 @@ wait_for_kube_api 24 10
 kubectl --kubeconfig "${KUBECONFIG_PATH}" create namespace "${NAMESPACE}" --dry-run=client -o yaml | \
   kubectl --kubeconfig "${KUBECONFIG_PATH}" apply -f -
 
-render_manifest
+render_manifests
+echo "Rendered staged manifests under ${MANIFEST_DIR}"
+echo "Full manifest snapshot: ${FULL_MANIFEST_PATH}"
 force_purge_helm_metadata
 cleanup_disabled_stack
 cleanup_core_runtime
@@ -194,7 +222,7 @@ else
   echo "::warning::Node recovery script is missing or not executable: ${NODE_RECOVERY_SCRIPT}"
 fi
 
-kubectl_retry 6 kubectl --kubeconfig "${KUBECONFIG_PATH}" apply -f "${MANIFEST_PATH}"
+apply_staged_manifests
 wait_for_rollout redis 180s
 wait_for_rollout ml-engine 240s
 wait_for_rollout bff 180s
