@@ -6,11 +6,11 @@
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-19 19:24`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-19 20:29`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Master Backlog  36.3%  [#########---------------]
-Tasks          done 081 | in progress 000 | blocked 000 | todo 142 | total 223
+Master Backlog  40.4%  [##########--------------]
+Tasks          done 090 | in progress 000 | blocked 000 | todo 133 | total 223
 ```
 
 How to read this:
@@ -21,7 +21,7 @@ How to read this:
 
 | Area | Tasks | Progress | Status |
 |---|---|---:|---|
-| Stage P | [81/168] |  48.2% | CURRENT BLOCKER |
+| Stage P | [90/168] |  53.6% | CURRENT BLOCKER |
 | Stage S | [0/47] |   0.0% | PENDING |
 | ML Research | [0/8] |   0.0% | PENDING |
 
@@ -29,8 +29,8 @@ How to read this:
 
 | Tier | Scope | Progress | Status |
 |---|---|---:|---|
-| TIER 1 | Stage P rollout path |  48.2% | CURRENT BLOCKER |
-| TIER 2 | Bootstrap + minimal core |  10.9% | CURRENT BLOCKER |
+| TIER 1 | Stage P rollout path |  53.6% | CURRENT BLOCKER |
+| TIER 2 | Bootstrap + minimal core |  25.0% | CURRENT BLOCKER |
 | TIER 3 | OCI ingress + DNS cutover |   0.0% | BLOCKED |
 | TIER 4 | Stage S + ML backlog |   0.0% | PENDING |
 
@@ -46,7 +46,7 @@ How to read this:
 | P06 - CI/CD Pipeline (`deploy-k8s.yml`) DONE - minimal direct-apply path | [12/12] | 100.0% | DONE |
 | P07 - k3s Namespace + Secrets Bootstrap ✅ DONE | [3/3] | 100.0% | DONE |
 | P08 - Helm Chart Values ✅ DONE | [4/4] | 100.0% | DONE |
-| P09 - Core Deployment CURRENT BLOCKER | [0/57] |   0.0% | CURRENT BLOCKER |
+| P09 - Core Deployment CURRENT BLOCKER | [9/57] |  15.8% | CURRENT BLOCKER |
 | P10 - Stateful Services Inside Free Limits ✅ DONE | [5/5] | 100.0% | DONE |
 | P11 - Ingress / External Access BLOCKED BY P09 | [0/6] |   0.0% | BLOCKED |
 | P12 - DNS + TLS on Current Registrar ⏳ BLOCKED BY P11 | [0/5] |   0.0% | BLOCKED |
@@ -208,7 +208,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
   - Fix already applied: `values.minimal.yaml` forces coherent core-only runtime settings (`bff` HTTP transport, `ml-engine` Kafka off, required DB off, security extras off)
   - Fix already applied: core runtime Deployments use `Recreate` in the minimal profile so the node does not schedule two generations at once
   - Fix already applied: production CI builds and pushes current commit SHA images before deploy
-  - Fix already applied: production CI deploys the rendered minimal manifest via direct `kubectl apply`
+  - Fix already applied: production CI now renders deterministic staged core manifests from the minimal Helm values, validates each slice, and applies them in the order `redis -> ml-engine -> bff -> frontend`
   - Fix already applied: automatic production CI defers `ingress-nginx` + `cert-manager` until after the core runtime stabilizes
   - Fix already applied: `scripts/k8s/recover-node-pressure.sh` now runs before the minimal apply and again on retry paths; it deletes terminal pods, removes stale kubelet/pod log directories by active pod UID, truncates oversized pod logs, avoids projected service-account mounts, and waits up to 300 seconds for the node taint to clear
   - Fix already applied: the minimal runtime now sets explicit `ephemeral-storage` requests/limits and `emptyDir` size limits for core services to reduce the chance of another uncontrolled disk-pressure cascade
@@ -241,14 +241,14 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [ ] P09-C14 - Audit whether swap is actually active and helping under pressure instead of causing unusable thrash
 - [ ] P09-C15 - Audit `systemd` service limits for k3s and confirm they are not making reclaim behavior worse
 - [ ] P09-C16 - Define a hard node-memory budget table for control-plane, OS, and each core TradersApp pod before another deploy attempt
-- [ ] P09-C17 - Extract the direct-apply CI manifest into per-service logical chunks instead of one all-at-once apply unit
-- [ ] P09-C18 - Create a dedicated `redis-only` manifest slice for isolated bring-up testing
-- [ ] P09-C19 - Create a dedicated `ml-engine-only` manifest slice for isolated bring-up testing
-- [ ] P09-C20 - Create a dedicated `bff-only` manifest slice for isolated bring-up testing
-- [ ] P09-C21 - Create a dedicated `frontend-only` manifest slice for isolated bring-up testing
-- [ ] P09-C22 - Add a reproducible manifest-generation command that emits the split apply order from the same source values as CI
-- [ ] P09-C23 - Make the split manifests deterministic so line diffs show only intentional resource changes between retries
-- [ ] P09-C24 - Add a dry-run validation step for every split manifest before the node sees a real apply
+- [x] P09-C17 - Extract the direct-apply CI manifest into per-service logical chunks instead of one all-at-once apply unit
+- [x] P09-C18 - Create a dedicated `redis-only` manifest slice for isolated bring-up testing
+- [x] P09-C19 - Create a dedicated `ml-engine-only` manifest slice for isolated bring-up testing
+- [x] P09-C20 - Create a dedicated `bff-only` manifest slice for isolated bring-up testing
+- [x] P09-C21 - Create a dedicated `frontend-only` manifest slice for isolated bring-up testing
+- [x] P09-C22 - Add a reproducible manifest-generation command that emits the split apply order from the same source values as CI
+- [x] P09-C23 - Make the split manifests deterministic so line diffs show only intentional resource changes between retries
+- [x] P09-C24 - Add a dry-run validation step for every split manifest before the node sees a real apply
 - [ ] P09-C25 - Measure real startup RSS and steady-state RSS for `redis` when deployed alone on the node
 - [ ] P09-C26 - Measure real startup RSS and steady-state RSS for `ml-engine` when deployed alone on the node
 - [ ] P09-C27 - Measure real startup RSS and steady-state RSS for `bff` when deployed alone on the node
@@ -264,7 +264,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [ ] P09-C37 - Harden the runtime repair script so overlayfs corruption recovery runs before any new pod scheduling attempt
 - [ ] P09-C38 - Add a preflight gate that aborts deployment immediately if free memory is below the minimum safe floor from P09-C16
 - [ ] P09-C39 - Add a preflight gate that aborts deployment immediately if `DiskPressure=True` or inode pressure is already present
-- [ ] P09-C40 - Apply the split manifests one service at a time in the exact order `redis -> ml-engine -> bff -> frontend`
+- [x] P09-C40 - Apply the split manifests one service at a time in the exact order `redis -> ml-engine -> bff -> frontend`
 - [ ] P09-C41 - After each service apply, wait for either `Ready` or a failure event and record memory, events, and pod logs before moving on
 - [ ] P09-C42 - Identify the first exact service and lifecycle stage that re-triggers memory collapse or overlayfs corruption
 - [ ] P09-C43 - If a single service alone breaks the node, stop full-stack testing and reduce that service further before any combined retry
@@ -508,7 +508,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-19 19:24`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-19 20:29`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Active Backlog    0.0%  [------------------------]
