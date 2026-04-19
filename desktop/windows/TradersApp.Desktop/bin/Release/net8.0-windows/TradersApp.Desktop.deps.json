@@ -6,7 +6,7 @@
   "compilationOptions": {},
   "targets": {
     ".NETCoreApp,Version=v8.0": {
-      "TradersApp.Desktop/1.0.0": {
+      "TradersApp.Desktop/1.2.3.4": {
         "dependencies": {
           "Microsoft.Web.WebView2": "1.0.3912.50",
           "NetSparkleUpdater.SparkleUpdater": "3.0.4",
@@ -127,7 +127,7 @@
     }
   },
   "libraries": {
-    "TradersApp.Desktop/1.0.0": {
+    "TradersApp.Desktop/1.2.3.4": {
       "type": "project",
       "serviceable": false,
       "sha512": ""

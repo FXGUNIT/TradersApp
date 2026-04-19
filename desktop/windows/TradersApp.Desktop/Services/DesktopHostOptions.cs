@@ -79,7 +79,7 @@ internal static class DesktopHostOptions
         }
     }
 
-    private static string ResolveSetting(string environmentKey, string configuredValue, string fallback)
+    private static string ResolveSetting(string environmentKey, string? configuredValue, string fallback)
     {
         var value = Environment.GetEnvironmentVariable(environmentKey);
         if (!string.IsNullOrWhiteSpace(value))

@@ -1,0 +1,1 @@
+var e=Object.freeze({LOADING:`loading`,LOGIN:`login`,SIGNUP:`signup`,WAITING:`waiting`,FORCE_PASSWORD_RESET:`forcePasswordReset`,SESSIONS:`sessions`,HUB:`hub`,CONSCIOUSNESS:`consciousness`,ADMIN:`admin`,APP:`app`,SPLASH:`splash`});Object.freeze(Object.values(e));export{e as t};
