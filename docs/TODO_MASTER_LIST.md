@@ -6,11 +6,11 @@
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-19 20:35`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-19 20:58`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Master Backlog  41.3%  [##########--------------]
-Tasks          done 092 | in progress 000 | blocked 000 | todo 131 | total 223
+Master Backlog  41.7%  [##########--------------]
+Tasks          done 093 | in progress 000 | blocked 000 | todo 130 | total 223
 ```
 
 How to read this:
@@ -21,7 +21,7 @@ How to read this:
 
 | Area | Tasks | Progress | Status |
 |---|---|---:|---|
-| Stage P | [92/168] |  54.8% | CURRENT BLOCKER |
+| Stage P | [93/168] |  55.4% | CURRENT BLOCKER |
 | Stage S | [0/47] |   0.0% | PENDING |
 | ML Research | [0/8] |   0.0% | PENDING |
 
@@ -29,8 +29,8 @@ How to read this:
 
 | Tier | Scope | Progress | Status |
 |---|---|---:|---|
-| TIER 1 | Stage P rollout path |  54.8% | CURRENT BLOCKER |
-| TIER 2 | Bootstrap + minimal core |  28.1% | CURRENT BLOCKER |
+| TIER 1 | Stage P rollout path |  55.4% | CURRENT BLOCKER |
+| TIER 2 | Bootstrap + minimal core |  29.7% | CURRENT BLOCKER |
 | TIER 3 | OCI ingress + DNS cutover |   0.0% | BLOCKED |
 | TIER 4 | Stage S + ML backlog |   0.0% | PENDING |
 
@@ -46,7 +46,7 @@ How to read this:
 | P06 - CI/CD Pipeline (`deploy-k8s.yml`) DONE - minimal direct-apply path | [12/12] | 100.0% | DONE |
 | P07 - k3s Namespace + Secrets Bootstrap ✅ DONE | [3/3] | 100.0% | DONE |
 | P08 - Helm Chart Values ✅ DONE | [4/4] | 100.0% | DONE |
-| P09 - Core Deployment CURRENT BLOCKER | [11/57] |  19.3% | CURRENT BLOCKER |
+| P09 - Core Deployment CURRENT BLOCKER | [12/57] |  21.1% | CURRENT BLOCKER |
 | P10 - Stateful Services Inside Free Limits ✅ DONE | [5/5] | 100.0% | DONE |
 | P11 - Ingress / External Access BLOCKED BY P09 | [0/6] |   0.0% | BLOCKED |
 | P12 - DNS + TLS on Current Registrar ⏳ BLOCKED BY P11 | [0/5] |   0.0% | BLOCKED |
@@ -214,6 +214,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
   - Fix already applied: the minimal runtime now sets explicit `ephemeral-storage` requests/limits and `emptyDir` size limits for core services to reduce the chance of another uncontrolled disk-pressure cascade
   - Fix now added: when deploy diagnostics show overlayfs snapshot corruption, recovery switches from image pruning to a safer host-side runtime reset using the K3s `k3s-killall.sh` reset path plus `k3s` restart
   - Fix now added: `scripts/k8s/check-oci-core-preflight.sh` blocks the staged deploy if the node still shows pressure conditions or, when SSH metrics are configured, if remote memory, swap, or filesystem thresholds are below the provisional safety floor
+  - Fix now added: `scripts/k8s/render-core-minimal-manifests.sh` now emits `05-core-budget.md` and `05-core-budget.json`, defining the current 1 GB node budget split as OS `160 MiB`, control-plane `190 MiB`, safe resident app budget `674 MiB`, summed core pod requests `512 MiB`, and residual headroom `162 MiB`
   - Operational note: when the API will not stabilize, the existing cold-restart pattern is still `systemctl restart k3s` and, only if required, clearing the etcd data dir before recreating kubeconfig
 - [ ] Clear both failure modes on the OCI node: `DiskPressure` and broken containerd overlayfs snapshot state
 - [ ] Prove the safer runtime repair path restores sandbox creation after the overlayfs `failed to stat parent` failure
@@ -241,7 +242,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [ ] P09-C13 - Audit kubelet eviction thresholds and image-garbage-collection thresholds for better low-memory behavior on 1 GB RAM
 - [ ] P09-C14 - Audit whether swap is actually active and helping under pressure instead of causing unusable thrash
 - [ ] P09-C15 - Audit `systemd` service limits for k3s and confirm they are not making reclaim behavior worse
-- [ ] P09-C16 - Define a hard node-memory budget table for control-plane, OS, and each core TradersApp pod before another deploy attempt
+- [x] P09-C16 - Define a hard node-memory budget table for control-plane, OS, and each core TradersApp pod before another deploy attempt
 - [x] P09-C17 - Extract the direct-apply CI manifest into per-service logical chunks instead of one all-at-once apply unit
 - [x] P09-C18 - Create a dedicated `redis-only` manifest slice for isolated bring-up testing
 - [x] P09-C19 - Create a dedicated `ml-engine-only` manifest slice for isolated bring-up testing
@@ -509,7 +510,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-19 20:35`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-19 20:58`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Active Backlog    0.0%  [------------------------]

@@ -163,8 +163,18 @@ Deployments are driven by `.github/workflows/deploy-k8s.yml`.
 1. Build and push `ghcr.io/fxgunit/<service>:latest` + SHA-tagged images
 2. Run node-pressure recovery script (`scripts/k8s/recover-node-pressure.sh`)
 3. Run OCI core preflight gates (`scripts/k8s/check-oci-core-preflight.sh`) against node pressure and optional SSH-based memory/disk thresholds
-4. Render deterministic staged core manifests, dry-run validate each slice, then apply in order `redis -> ml-engine -> bff -> frontend`
+4. Render deterministic staged core manifests, emit `05-core-budget.md` / `05-core-budget.json`, dry-run validate each slice, then apply in order `redis -> ml-engine -> bff -> frontend`
 5. Smoke test health endpoints
+
+**Current provisional 1 GB node budget used by the staged render:**
+- Base OS reserve: `160 MiB`
+- k3s control-plane reserve: `190 MiB`
+- Pre-deploy `MemAvailable` floor: `350 MiB`
+- Safe resident application budget after that floor: `674 MiB`
+- Core pod summed memory requests: `512 MiB`
+- Residual RAM headroom above summed requests: `162 MiB`
+
+> These values are the current hard deploy budget for P09-C16. Replace them only after the live OCI evidence capture tasks (`P09-C01` through `P09-C15`) prove a tighter or safer floor.
 
 **Triggering a deploy:**
 Push to `main` branch → GitHub Actions runs `deploy-k8s.yml` automatically.
