@@ -6,11 +6,11 @@
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-19 05:21`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-19 15:53`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Master Backlog  30.7%  [#######-----------------]
-Tasks          done 042 | in progress 000 | blocked 000 | todo 095 | total 137
+Master Backlog  41.3%  [##########--------------]
+Tasks          done 071 | in progress 000 | blocked 000 | todo 101 | total 172
 ```
 
 How to read this:
@@ -21,7 +21,7 @@ How to read this:
 
 | Area | Tasks | Progress | Status |
 |---|---|---:|---|
-| Stage P | [42/82] |  51.2% | CURRENT BLOCKER |
+| Stage P | [71/117] |  60.7% | CURRENT BLOCKER |
 | Stage S | [0/47] |   0.0% | PENDING |
 | ML Research | [0/8] |   0.0% | PENDING |
 
@@ -29,7 +29,7 @@ How to read this:
 
 | Tier | Scope | Progress | Status |
 |---|---|---:|---|
-| TIER 1 | Stage P rollout path |  51.2% | CURRENT BLOCKER |
+| TIER 1 | Stage P rollout path |  60.7% | CURRENT BLOCKER |
 | TIER 2 | Bootstrap + minimal core |  50.0% | CURRENT BLOCKER |
 | TIER 3 | OCI ingress + DNS cutover |   0.0% | BLOCKED |
 | TIER 4 | Stage S + ML backlog |   0.0% | PENDING |
@@ -55,6 +55,13 @@ How to read this:
 | P15 - Backup & Rollback ⏳ BLOCKED BY P09 | [0/3] |   0.0% | BLOCKED |
 | P16 - Go-Live Sign-Off 🔴 BLOCKED BY P09 | [0/4] |   0.0% | BLOCKED |
 | P17 - Documentation Alignment ⏳ PENDING | [0/3] |   0.0% | PENDING |
+| P18 - Windows Desktop Architecture Freeze | [5/5] | 100.0% | DONE |
+| P19 - Windows Installer Wizard | [5/5] | 100.0% | DONE |
+| P20 - Desktop Auth, Access Control, and Admin Kill Switch | [5/5] | 100.0% | DONE |
+| P21 - Self-Update System | [5/5] | 100.0% | DONE |
+| P22 - Desktop Security and IP Hardening | [5/5] | 100.0% | DONE |
+| P23 - 4 GB Performance and Compatibility Certification | [0/5] |   0.0% | PENDING |
+| P24 - Windows Release Readiness and Docs Alignment | [4/5] |  80.0% | IN PROGRESS |
 | S1 - Trading Session Config Foundation | [0/11] |   0.0% | PENDING |
 | S2 - BFF Multi-Instrument Routing | [0/7] |   0.0% | PENDING |
 | S3 - Frontend Dashboard Redesign | [0/13] |   0.0% | PENDING |
@@ -274,39 +281,39 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [ ] Update DNS/TLS runbooks to match the current registrar + OCI ingress plan
 
 ### P18 - Windows Desktop Architecture Freeze
-- [ ] Freeze TradersApp end-user delivery as a Windows-only thin desktop client
-- [ ] Lock minimum supported end-user hardware to Windows 10/11 x64, 4 GB RAM, no discrete GPU, internet required
-- [ ] Keep BFF, ML inference, secrets, and admin enforcement server-side only
-- [ ] Lock desktop transport to packaged frontend assets talking to `bff.traders.app` and `api.traders.app` over HTTPS
-- [ ] Preserve the existing React UI/UX inside the Windows desktop shell instead of rewriting the experience natively
+- [x] Freeze TradersApp end-user delivery as a Windows-only thin desktop client
+- [x] Lock minimum supported end-user hardware to Windows 10/11 x64, 4 GB RAM, no discrete GPU, internet required
+- [x] Keep BFF, ML inference, secrets, and admin enforcement server-side only
+- [x] Lock desktop transport to packaged frontend assets talking to `bff.traders.app` and `api.traders.app` over HTTPS
+- [x] Preserve the existing React UI/UX inside the Windows desktop shell instead of rewriting the experience natively
 
 ### P19 - Windows Installer Wizard
-- [ ] Add `desktop/windows/TradersApp.Desktop` as the Windows shell built on .NET 8 WPF + WebView2
-- [ ] Package the frontend into desktop app-local assets using the dedicated desktop web build
-- [ ] Add `desktop/windows/installer` WiX installer scaffolding for install, repair, uninstall, and shortcuts
-- [ ] Include WebView2 prerequisite detection plus Evergreen bootstrapper/offline runtime support
-- [ ] Support silent install and upgrade-friendly install paths for Windows deployments
+- [x] Add `desktop/windows/TradersApp.Desktop` as the Windows shell built on .NET 8 WPF + WebView2
+- [x] Package the frontend into desktop app-local assets using the dedicated desktop web build
+- [x] Add `desktop/windows/installer` WiX installer scaffolding for install, repair, uninstall, and shortcuts
+- [x] Include WebView2 prerequisite detection plus Evergreen bootstrapper/offline runtime support
+- [x] Support silent install and upgrade-friendly install paths for Windows deployments
 
 ### P20 - Desktop Auth, Access Control, and Admin Kill Switch
-- [ ] Extend identity session records with desktop metadata: `platform`, `appVersion`, `installId`, `deviceId`, `lastPolicyCheckAt`
-- [ ] Extend identity status responses with `clientPolicy.minimumDesktopVersion`, `clientPolicy.maintenanceActive`, `clientPolicy.forceLogout`, and `clientPolicy.reason`
-- [ ] Reuse the existing identity/session model instead of creating a parallel desktop auth backend
-- [ ] Revoke all active user sessions when an admin blocks that user
-- [ ] Force the desktop shell to sign out blocked, locked, maintenance-disabled, or minimum-version-rejected clients
+- [x] Extend identity session records with desktop metadata: `platform`, `appVersion`, `installId`, `deviceId`, `lastPolicyCheckAt`
+- [x] Extend identity status responses with `clientPolicy.minimumDesktopVersion`, `clientPolicy.maintenanceActive`, `clientPolicy.forceLogout`, and `clientPolicy.reason`
+- [x] Reuse the existing identity/session model instead of creating a parallel desktop auth backend
+- [x] Revoke all active user sessions when an admin blocks that user
+- [x] Force the desktop shell to sign out blocked, locked, maintenance-disabled, or minimum-version-rejected clients
 
 ### P21 - Self-Update System
-- [ ] Integrate NetSparkle signed appcast updates into the Windows shell
-- [ ] Support both automatic signed-feed checks and manual signed package import
-- [ ] Reject unsigned, corrupted, or downgraded update packages
-- [ ] Support restart-safe update handoff after download and install
-- [ ] Publish signed update metadata and release artifacts through GitHub Releases
+- [x] Integrate NetSparkle signed appcast updates into the Windows shell
+- [x] Support both automatic signed-feed checks and manual signed package import
+- [x] Reject unsigned, corrupted, or downgraded update packages
+- [x] Support restart-safe update handoff after download and install
+- [x] Publish signed update metadata and release artifacts through GitHub Releases
 
 ### P22 - Desktop Security and IP Hardening
-- [ ] Strip source maps and release debug surfaces from the desktop web bundle
-- [ ] Store remembered desktop session material using DPAPI-backed secure storage in the shell
-- [ ] Block arbitrary top-level external navigation from the desktop WebView2 host
-- [ ] Keep secrets, model weights, and admin authority out of shipped desktop assets
-- [ ] Publish SHA-256 hashes, SBOM outputs, and malware/dependency scan results for desktop releases
+- [x] Strip source maps and release debug surfaces from the desktop web bundle
+- [x] Store remembered desktop session material using DPAPI-backed secure storage in the shell
+- [x] Block arbitrary top-level external navigation from the desktop WebView2 host
+- [x] Keep secrets, model weights, and admin authority out of shipped desktop assets
+- [x] Publish SHA-256 hashes, SBOM outputs, and malware/dependency scan results for desktop releases
 
 ### P23 - 4 GB Performance and Compatibility Certification
 - [ ] Validate cold start to login screen at `<= 8s` on Windows 10/11 x64 4 GB reference machines
@@ -316,11 +323,11 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [ ] Confirm the desktop release never starts local BFF or ML sidecar services
 
 ### P24 - Windows Release Readiness and Docs Alignment
-- [ ] Add a Windows release workflow for building, signing, hashing, and publishing desktop artifacts
-- [ ] Add install, update, rollback, and uninstall runbooks for the Windows desktop client
-- [ ] Add QA/UAT checks for install, login, admin block, forced logout, self-update, repair, and uninstall
+- [x] Add a Windows release workflow for building, signing, hashing, and publishing desktop artifacts
+- [x] Add install, update, rollback, and uninstall runbooks for the Windows desktop client
+- [x] Add QA/UAT checks for install, login, admin block, forced logout, self-update, repair, and uninstall
 - [ ] Keep desktop rollout blocked on both backend 24x7 readiness and signed desktop release readiness
-- [ ] Keep Stage P as the only section updated for the Windows desktop rollout
+- [x] Keep Stage P as the only section updated for the Windows desktop rollout
 
 ---
 
@@ -441,7 +448,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-19 15:03`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-19 15:53`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Active Backlog    0.0%  [------------------------]
