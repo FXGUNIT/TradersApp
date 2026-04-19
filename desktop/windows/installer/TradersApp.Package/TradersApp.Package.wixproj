@@ -1,0 +1,17 @@
+<Project Sdk="WixToolset.Sdk/6.0.2">
+
+  <PropertyGroup>
+    <DesktopBuildDir>$(MSBuildThisFileDirectory)..\..\TradersApp.Desktop\bin\$(Configuration)\net8.0-windows\</DesktopBuildDir>
+    <DefineConstants>$(DefineConstants);DesktopBuildDir=$(DesktopBuildDir)</DefineConstants>
+    <OutputName>TradersApp.Package</OutputName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WixToolset.UI.wixext" Version="6.0.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\TradersApp.Desktop\TradersApp.Desktop.csproj" />
+  </ItemGroup>
+
+</Project>

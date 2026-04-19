@@ -1,0 +1,6 @@
+E:\TradersApp\desktop\windows\installer\TradersApp.Package\bin\Release\TradersApp.Package.msi
+E:\TradersApp\desktop\windows\installer\TradersApp.Package\bin\Release\TradersApp.Package.wixpdb
+E:\TradersApp\desktop\windows\installer\TradersApp.Package\obj\Release\TradersApp.Package.wixproj.CoreCompileInputs.cache
+E:\TradersApp\desktop\windows\installer\TradersApp.Package\obj\Release\TradersApp.Package.msi
+E:\TradersApp\desktop\windows\installer\TradersApp.Package\obj\Release\TradersApp.Package.wixpdb
+E:\TradersApp\desktop\windows\installer\TradersApp.Package\obj\Release\TradersApp.Package.wixproj.BindTracking-neutral.txt

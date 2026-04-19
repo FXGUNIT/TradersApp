@@ -1,0 +1,109 @@
+{
+  "version": 3,
+  "targets": {
+    "native,Version=v0.0": {
+      "WixToolset.Bal.wixext/6.0.2": {
+        "type": "package",
+        "build": {
+          "build/WixToolset.Bal.wixext.targets": {}
+        }
+      },
+      "WixToolset.Util.wixext/6.0.2": {
+        "type": "package",
+        "build": {
+          "build/WixToolset.Util.wixext.targets": {}
+        }
+      }
+    }
+  },
+  "libraries": {
+    "WixToolset.Bal.wixext/6.0.2": {
+      "sha512": "WeO0Qo28apmrEKQ+fEmWBEwnsez+4/B/NP5WnCnK2ZzKNcBr9xiRx01XHPBr08VqibDZGgXraDqFJ7Flws2QDw==",
+      "type": "package",
+      "path": "wixtoolset.bal.wixext/6.0.2",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "OSMFEULA.txt",
+        "README.md",
+        "build/WixToolset.Bal.wixext.targets",
+        "icon.png",
+        "wixext6/WixToolset.BootstrapperApplications.wixext.dll",
+        "wixtoolset.bal.wixext.6.0.2.nupkg.sha512",
+        "wixtoolset.bal.wixext.nuspec"
+      ]
+    },
+    "WixToolset.Util.wixext/6.0.2": {
+      "sha512": "plP64ub/0KjNbtLeaeiibVCPkKfr439WTKZmTwVSoQ4fznLHBZLsE0+wcyk6dA5cQuQsD5hlmnVGTKgPioiusQ==",
+      "type": "package",
+      "path": "wixtoolset.util.wixext/6.0.2",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "OSMFEULA.txt",
+        "README.md",
+        "build/WixToolset.Util.wixext.targets",
+        "icon.png",
+        "wixext6/WixToolset.Util.wixext.dll",
+        "wixtoolset.util.wixext.6.0.2.nupkg.sha512",
+        "wixtoolset.util.wixext.nuspec"
+      ]
+    }
+  },
+  "projectFileDependencyGroups": {
+    "native,Version=v0.0": [
+      "WixToolset.Bal.wixext >= 6.0.2",
+      "WixToolset.Util.wixext >= 6.0.2"
+    ]
+  },
+  "packageFolders": {
+    "C:\\Users\\Asus\\.nuget\\packages\\": {}
+  },
+  "project": {
+    "version": "1.0.0",
+    "restore": {
+      "projectUniqueName": "E:\\TradersApp\\desktop\\windows\\installer\\TradersApp.Bundle\\TradersApp.Bundle.wixproj",
+      "projectName": "TradersApp.Desktop.Setup",
+      "projectPath": "E:\\TradersApp\\desktop\\windows\\installer\\TradersApp.Bundle\\TradersApp.Bundle.wixproj",
+      "packagesPath": "C:\\Users\\Asus\\.nuget\\packages\\",
+      "outputPath": "E:\\TradersApp\\desktop\\windows\\installer\\TradersApp.Bundle\\obj\\",
+      "projectStyle": "PackageReference",
+      "UsingMicrosoftNETSdk": false,
+      "configFilePaths": [
+        "C:\\Users\\Asus\\AppData\\Roaming\\NuGet\\NuGet.Config"
+      ],
+      "originalTargetFrameworks": [
+        "native"
+      ],
+      "sources": {
+        "https://api.nuget.org/v3/index.json": {}
+      },
+      "frameworks": {
+        "native": {
+          "targetAlias": "native",
+          "projectReferences": {}
+        }
+      },
+      "restoreAuditProperties": {
+        "enableAudit": "true",
+        "auditLevel": "low",
+        "auditMode": "direct"
+      }
+    },
+    "frameworks": {
+      "native": {
+        "targetAlias": "native",
+        "dependencies": {
+          "WixToolset.Bal.wixext": {
+            "target": "Package",
+            "version": "[6.0.2, )"
+          },
+          "WixToolset.Util.wixext": {
+            "target": "Package",
+            "version": "[6.0.2, )"
+          }
+        }
+      }
+    }
+  }
+}
