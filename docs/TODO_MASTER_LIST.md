@@ -279,12 +279,13 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [ ] Rewrite or archive any Stage P docs that still reference Railway/Vercel as the production path
 - [ ] Make this master TODO the source of truth for the free-only production architecture
 - [ ] Update DNS/TLS runbooks to match the current registrar + OCI ingress plan
-- [x] **Files requiring updates:**
-  - `docs/GO_LIVE_CERTIFICATE.md` — topology table still lists Vercel/Railway hosting (lines 15–20, 51, 184); entire hosting column needs OCI k3s rewrite
-  - `docs/DEPLOYMENT.md` — Railway/Vercel setup sections (lines 30–31, 97, 128, 190–192, 266–267, 313–325); needs OCI k3s direct-apply CI/CD section
-  - `docs/STAGE_P_DNS_SETUP.md` — Railway/Vercel DNS targets (lines 48, 70, 82–84, 136–157, 200, 203, 246, 298–307, 323–324, 348); needs OCI ingress-only DNS plan
-  - `docs/SETUP.md` — Railway/Vercel setup steps (lines 11–12, 55, 65–67, 84, 107, 157–160); needs OCI bootstrap procedures
-  - `docs/STAGE_P_24X7_EXECUTION_CHECKLIST.md` — Vercel CNAME at line 134 and Vercel deploy command at line 160; needs OCI kubectl commands
+- [x] **Docs updated this session:**
+  - `docs/GO_LIVE_CERTIFICATE.md` — topology table, SLO, alert channels, rollback sections fully rewritten for OCI k3s
+- [x] **Files remaining to update:**
+  - `docs/DEPLOYMENT.md` — Railway/Vercel setup sections (lines 30–31, 97, 128, 190–192, 266–267, 313–325)
+  - `docs/STAGE_P_DNS_SETUP.md` — Railway/Vercel DNS targets (lines 48, 70, 82–84, 136–157, 200, 203, 246, 298–307, 323–324, 348)
+  - `docs/SETUP.md` — Railway/Vercel setup steps (lines 11–12, 55, 65–67, 84, 107, 157–160)
+  - `docs/STAGE_P_24X7_EXECUTION_CHECKLIST.md` — Vercel CNAME at line 134, Vercel deploy at line 160
 
 ### P18 - Windows Desktop Architecture Freeze
 - [x] Freeze TradersApp end-user delivery as a Windows-only thin desktop client

@@ -1,6 +1,7 @@
 # Deployment Guide — TradersApp
 
-**Last updated:** 2026-04-02
+**Last updated:** 2026-04-19
+**Status:** OCI k3s — Railway/Vercel deprecated as production path. See `docs/TODO_MASTER_LIST.md`
 
 ---
 
@@ -11,15 +12,24 @@
 │                        Cloudflare WAF                              │
 │  (DDoS protection, SSL/TLS 1.3, CDN, OWASP rules, bot management)│
 │  Proxy mode: Full (strict) SSL for all traffic                     │
-└──────────────┬──────────────────┬───────────────────┬──────────────┘
-               │                  │                   │
-        ┌──────▼──────┐   ┌──────▼──────┐    ┌──────▼──────┐
-        │   Vercel    │   │   Railway   │    │   Railway   │
-        │  (Frontend) │   │  (BFF :8788)│    │(ML :8001)   │
-        │   Port 443  │   │  Port 8788  │    │  Port 8001  │
-        │   CDN edge  │   │  Persistent │    │  Persistent  │
-        └─────────────┘   └─────────────┘    └─────────────┘
+└───────────────────────────────┬────────────────────────────────────┘
+                                │
+                    ┌───────────▼────────────┐
+                    │   OCI Always Free      │
+                    │   k3s on E2.1.Micro    │
+                    │   (144.24.112.249)     │
+                    │                        │
+                    │  ┌────────────────┐    │
+                    │  │ tradersapp NS  │    │
+                    │  │  bff           │    │
+                    │  │  frontend      │    │
+                    │  │  ml-engine     │    │
+                    │  │  redis         │    │
+                    │  └────────────────┘    │
+                    └───────────────────────┘
 ```
+
+> **Production topology:** OCI Always Free k3s only. Railway and Vercel are no longer used for production hosting. `docs/TODO_MASTER_LIST.md` is the authoritative source.
 
 ---
 
@@ -27,11 +37,10 @@
 
 ### Accounts Required
 - [ ] GitHub account (already have)
-- [ ] Vercel account (https://vercel.com) — connect GitHub repo
-- [ ] Railway account (https://railway.app) — connect GitHub repo
+- [ ] Oracle Cloud Infrastructure account (https://cloud.oracle.com) — OCI Always Free tier
 - [ ] Cloudflare account (https://cloudflare.com) — add domain
 - [ ] Infisical account (https://infisical.com) — secrets management
-- [ ] Neon account (https://neon.tech) — PostgreSQL (optional, dev uses SQLite)
+- [ ] Neon account (https://neon.tech) — PostgreSQL *(optional — not in core runtime)*
 
 ### Domain
 - [ ] Purchase domain or use existing (e.g., `traders.app`)
@@ -43,15 +52,16 @@
 
 ### DNS Configuration
 
-Add these records in Cloudflare DNS:
+After OCI ingress is live (P11/P12), add these records in Cloudflare DNS:
 
 | Type | Name | Content | Proxy | SSL |
 |---|---|---|---|---|
-| A | traders.app | [Vercel IP] | Proxied | Strict |
-| A | www | [Vercel IP] | Proxied | Strict |
-| CNAME | api | [Railway ML Engine URL] | Proxied | Strict |
-| CNAME | bff | [Railway BFF URL] | Proxied | Strict |
-| A | ml-engine | [Railway ML IP] | Proxied | Strict |
+| A | traders.app | `144.24.112.249` | Proxied | Strict |
+| A | www | `144.24.112.249` | Proxied | Strict |
+| CNAME | api | `144.24.112.249` | Proxied | Strict |
+| CNAME | bff | `144.24.112.249` | Proxied | Strict |
+
+> **Before P12 completes:** These records may still point to old Vercel/Railway edges. Update only after OCI ingress is confirmed healthy.
 
 ### SSL/TLS Configuration (Cloudflare Dashboard)
 
@@ -91,106 +101,73 @@ Then:
 
 ---
 
-## 3. Vercel (Frontend)
+## 3. OCI k3s Node Setup
 
-### Connect Repository
-1. Go to https://vercel.com → New Project
-2. Import `traders-app` GitHub repo
-3. Framework: **Vite** (detected automatically)
-4. Root directory: `/`
-5. Build command: `npm run build`
-6. Output directory: `dist`
+> Full details in `docs/TODO_MASTER_LIST.md` — P01 through P09.
 
-### Environment Variables (Vercel Dashboard → Settings → Environment Variables)
+### One-time node setup
+```bash
+# SSH to OCI node as opc user
+ssh opc@144.24.112.249
 
-| Name | Value |
+# Add 2 GB swap (required for k3s on 1GB RAM)
+sudo swapon /swapfile
+
+# Install k3s binary directly (RPM OOMs on E2.1.Micro)
+curl -sfL https://github.com/k3s-io/k3s/releases/download/v1.34.6%2Bk3s1/k3s -o /usr/local/bin/k3s
+chmod +x /usr/local/bin/k3s
+
+# Run k3s server (do NOT set KUBECONFIG env var for the server process)
+sudo /usr/local/bin/k3s server \
+  --cluster-init \
+  --tls-san=144.24.112.249 \
+  --write-kubeconfig /tmp/k3s-server.yaml \
+  --write-kubeconfig-mode 644 \
+  --disable traefik --disable servicelb \
+  --disable-helm-controller --disable-kube-proxy \
+  --disable-cloud-controller \
+  --disable metrics-server --disable local-storage
+
+# Open firewall for k3s API server port
+sudo firewall-cmd --add-port=6443/tcp --permanent
+sudo firewall-cmd --reload
+
+# Generate external kubeconfig
+sed 's|127.0.0.1|144.24.112.249|g' /tmp/k3s-server.yaml > /tmp/k3s_external.yaml
+
+# Install systemd service for auto-restart on boot
+# (see P03 in TODO_MASTER_LIST.md for full systemd unit file)
+```
+
+### Updating KUBECONFIG_B64 secret after k3s restart
+```bash
+# On OCI node — re-generate kubeconfig after restart
+sed 's|127.0.0.1|144.24.112.249|g' /tmp/k3s-server.yaml | base64 -w0
+
+# Set via GitHub Actions secret (or directly)
+# GitHub: Settings → Secrets → KUBECONFIG_B64
+```
+
+## 4. GitHub Actions CI/CD
+
+Deployments are driven by `.github/workflows/deploy-k8s.yml`.
+
+**Required GitHub Secrets:**
+
+| Secret | How to Get |
 |---|---|
-| `VITE_MASTER_SALT` | `<generate: openssl rand -hex 32>` |
-| `VITE_ADMIN_PASS_HASH` | `<hash from: npm run admin:hash>` |
-| `VITE_BFF_URL` | `https://bff.traders.app` |
-| `VITE_ML_ENGINE_URL` | `https://api.traders.app` |
-| `VITE_NEWS_API_KEY` | NewsData.io key (free tier) |
+| `KUBECONFIG_B64` | `base64 -w0 /tmp/k3s_external.yaml` on OCI node |
+| `INFISICAL_PROJECT_ID` | Infisical project settings |
+| `DISCORD_WEBHOOK_URL` | Discord → Server Settings → Webhooks |
 
-### Custom Domain
-1. Settings → Domains → Add `traders.app`
-2. Add CNAME from Vercel dashboard to Cloudflare
-3. Cloudflare: change CNAME proxy mode to **Proxied**
+**Pipeline flow:**
+1. Build and push `ghcr.io/fxgunit/<service>:latest` + SHA-tagged images
+2. Run node-pressure recovery script (`scripts/k8s/recover-node-pressure.sh`)
+3. Direct `kubectl apply` of `tradersapp-deployments.yaml` (core 4 services)
+4. Smoke test health endpoints
 
-### Deployment
-- Auto-deploy on push to `main` branch
-- Preview deployments for PRs
-
----
-
-## 4. Railway (BFF + ML Engine)
-
-### Create Project
-1. https://railway.app → New Project → Deploy from GitHub repo
-2. Add both services:
-   - `bff` — directory: `bff`
-   - `ml-engine` — directory: `ml-engine`
-
-### BFF Service (Railway)
-
-**Settings → Environment:**
-```
-NODE_ENV=production
-PORT=8788
-BFF_HOST=0.0.0.0
-BFF_PORT=8788
-ML_ENGINE_URL=https://api.traders.app
-BFF_ALLOWED_ORIGINS=https://traders.app,https://www.traders.app
-```
-
-**Settings → Health Check:**
-- Path: `/health`
-- Port: `8788`
-
-**Settings → Custom Domain:**
-- Add `bff.traders.app` → CNAME to Railway URL
-
-### ML Engine Service (Railway)
-
-**Settings → Environment:**
-```
-PYTHONUNBUFFERED=1
-PYTHONDONTWRITEBYTECODE=1
-PORT=8001
-```
-
-**Settings → Health Check:**
-- Path: `/health`
-- Port: `8001`
-
-**Settings → Custom Domain:**
-- Add `api.traders.app` → CNAME to Railway URL
-
-### Persistent Disk (ML Engine)
-1. Railway → ML Engine → Settings → Add Persistent Disk
-2. Mount at: `/app/data`
-3. This persists the SQLite database across deploys
-
-### Infisical Integration
-
-1. Install Infisical CLI: `npm install -g infisical`
-2. Connect Infisical to GitHub repo
-3. Create secrets:
-   - `FIREBASE_API_KEY`, `FIREBASE_PROJECT_ID`, etc.
-   - `NEWS_API_KEY`
-   - `NEWS_API_KEY` (backup)
-4. In Railway: Settings → Variables → Reference from Infisical
-   ```
-   ${{ infisical.FIREBASE_API_KEY }}
-   ```
-
-### Deploy
-- Railway auto-deploys on push to linked branch
-- Use Railway CLI for manual deploys:
-  ```bash
-  railway login
-  railway up --service ml-engine
-  railway up --service bff
-  ```
+**Triggering a deploy:**
+Push to `main` branch → GitHub Actions runs `deploy-k8s.yml` automatically.
 
 ---
 
