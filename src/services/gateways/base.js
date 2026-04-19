@@ -1,5 +1,7 @@
+import { getDesktopRequestHeaders } from "../desktopBridge.js";
+import { getAdminToken } from "../sessionStore.js";
+
 const BFF_BASE_URL = String(import.meta.env.VITE_BFF_URL || "").trim();
-const ADMIN_TOKEN_KEY = "TradersApp_AdminToken";
 const BFF_FAILURE_COOLDOWN_MS = 2 * 60 * 1000;
 
 let bffUnavailableUntil = 0;
@@ -46,14 +48,6 @@ export function createBffUnavailableResult(operation, extra = {}) {
   };
 }
 
-function getAdminToken() {
-  try {
-    return localStorage.getItem(ADMIN_TOKEN_KEY) || null;
-  } catch {
-    return null;
-  }
-}
-
 function buildUrl(path) {
   if (!BFF_BASE_URL) {
     return path;
@@ -71,8 +65,10 @@ export async function bffFetch(path, options = {}) {
     return null;
   }
 
-  const adminToken = getAdminToken();
+  const adminToken = await getAdminToken();
+  const desktopHeaders = await getDesktopRequestHeaders();
   const headers = {
+    ...desktopHeaders,
     ...(options.headers || {}),
   };
   if (adminToken) {

@@ -1,4 +1,9 @@
-const ADMIN_TOKEN_KEY = "TradersApp_AdminToken";
+import {
+  clearAdminToken as clearStoredAdminToken,
+  getAdminToken as getStoredAdminToken,
+  setAdminToken as setStoredAdminToken,
+} from "./sessionStore.js";
+
 const ADMIN_DEVICE_KEY = "TradersApp_AdminDeviceId";
 const ADMIN_REMEMBER_KEY = "TradersApp_AdminRemember";
 
@@ -69,8 +74,9 @@ export function parseUserAgent(ua) {
 /** List all active admin sessions from the BFF. */
 export async function listAdminSessions() {
   try {
+    const adminToken = await getAdminToken();
     const res = await fetch(`${resolveBffBaseUrl()}/admin/sessions`, {
-      headers: { Authorization: `Bearer ${getAdminToken()}` },
+      headers: { Authorization: `Bearer ${adminToken}` },
     });
     const data = await res.json().catch(() => ({}));
     return data;
@@ -82,11 +88,12 @@ export async function listAdminSessions() {
 /** Revoke a specific admin session by short session id (from list response). */
 export async function revokeAdminSessionRemote(sessionId) {
   try {
+    const adminToken = await getAdminToken();
     const res = await fetch(`${resolveBffBaseUrl()}/admin/sessions`, {
       method: "DELETE",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${getAdminToken()}`,
+        Authorization: `Bearer ${adminToken}`,
       },
       body: JSON.stringify({ id: sessionId }),
     });
@@ -97,23 +104,11 @@ export async function revokeAdminSessionRemote(sessionId) {
 }
 
 export function getAdminToken() {
-  try {
-    return localStorage.getItem(ADMIN_TOKEN_KEY) || null;
-  } catch {
-    return null;
-  }
+  return getStoredAdminToken();
 }
 
-export function setAdminToken(token) {
-  try {
-    if (token) {
-      localStorage.setItem(ADMIN_TOKEN_KEY, token);
-    } else {
-      localStorage.removeItem(ADMIN_TOKEN_KEY);
-    }
-  } catch {
-    // best-effort
-  }
+export async function setAdminToken(token) {
+  await setStoredAdminToken(token);
 }
 
 export async function verifyAdminPassword(password) {
@@ -121,7 +116,7 @@ export async function verifyAdminPassword(password) {
     typeof window !== "undefined" &&
     window.__TRADERS_AUDIT_DATA
   ) {
-    setAdminToken("audit-simulated-token");
+    await setAdminToken("audit-simulated-token");
     return { verified: true, simulated: true };
   }
 
@@ -199,14 +194,14 @@ export async function verifyAdminPassword(password) {
   }
 
   if (tokenPayload.ok && tokenPayload.token) {
-    setAdminToken(tokenPayload.token);
+    await setAdminToken(tokenPayload.token);
   }
 
   return payload;
 }
 
-export function clearAdminToken() {
-  setAdminToken(null);
+export async function clearAdminToken() {
+  await clearStoredAdminToken();
 }
 
 export default {

@@ -39,6 +39,7 @@ import { useConnectionStatusEffect } from "./features/shell/useConnectionStatusE
 import { useResizeOptimizationEffect } from "./features/shell/useResizeOptimizationEffect.js";
 import { useFirebaseHeartbeatEffect } from "./features/shell/useFirebaseHeartbeatEffect.js";
 import { useDevAuditHarnessEffect } from "./features/shell/useDevAuditHarnessEffect.js";
+import { useDesktopClientPolicy } from "./features/shell/useDesktopClientPolicy.js";
 import { useAuthBootstrap } from "./features/identity/useAuthBootstrap.js";
 import { useTerminalWorkspaceHydration } from "./features/shell/useTerminalWorkspaceHydration.js";
 import { useTerminalPersistenceHandlers } from "./features/terminal/useTerminalPersistenceHandlers.js";
@@ -256,6 +257,13 @@ function TradersRegimentInner() {
   });
 
   useAuthBootstrap({ checkUserStatus, isAdminAuthenticated, setAuth, setProfile, setGoogleUser, setScreen, setIsInitialLoading, authBootstrapCompleteRef });
+  useDesktopClientPolicy({
+    auth,
+    currentSessionId,
+    handleLogout,
+    setMaintenanceModeActive,
+    showToast,
+  });
   useTerminalWorkspaceHydration({ auth, profile, adminUid: ADMIN_UID, loadTerminalWorkspace, setProfile });
 
   // ── Admin access handlers ───────────────────────────────────────────────────

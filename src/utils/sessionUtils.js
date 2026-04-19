@@ -1,4 +1,5 @@
 import { dbW, dbR, dbDel } from "./firebaseDbUtils.js";
+import { getDesktopRuntimeContext } from "../services/desktopBridge.js";
 import { hasBff } from "../services/gateways/base.js";
 import {
   deleteIdentitySession,
@@ -6,6 +7,7 @@ import {
   revokeOtherIdentitySessions,
   upsertIdentitySession,
 } from "../services/gateways/identityGateway.js";
+import { setRememberedSession } from "../services/sessionStore.js";
 
 export const encryptSessionToken = (data) => {
   try {
@@ -139,6 +141,7 @@ export const createSession = async (uid, token, rememberMe) => {
     const sessionId = generateSessionId();
     const device = getDeviceInfo();
     const geo = await getSessionGeoData();
+    const desktopContext = await getDesktopRuntimeContext();
     const expiresAt = new Date(
       Date.now() +
         (rememberMe ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000),
@@ -149,9 +152,14 @@ export const createSession = async (uid, token, rememberMe) => {
       device,
       city: geo.city,
       country: geo.country,
+      platform: desktopContext.platform || "browser",
+      appVersion: desktopContext.appVersion || null,
+      installId: desktopContext.installId || null,
+      deviceId: desktopContext.deviceId || null,
       createdAt: new Date().toISOString(),
       expiresAt: expiresAt.toISOString(),
       lastActive: new Date().toISOString(),
+      lastPolicyCheckAt: new Date().toISOString(),
     };
 
     await upsertSession(uid, sessionId, sessionData, token);
@@ -163,7 +171,7 @@ export const createSession = async (uid, token, rememberMe) => {
         expiresAt: expiresAt.toISOString(),
         token: token,
       });
-      localStorage.setItem(`sess_${uid}`, encryptedSession);
+      await setRememberedSession(uid, encryptedSession);
     }
 
     return sessionId;

@@ -19,6 +19,10 @@ import {
   executeStructuredGoogleAuth,
 } from "./authCredentialHandlers.js";
 import { clearUserListCache } from "../../utils/userUtils.js";
+import {
+  clearAdminToken,
+  clearRememberedSession,
+} from "../../services/sessionStore.js";
 
 export function useAuthSessionHandlers({
   auth,
@@ -339,9 +343,11 @@ export function useAuthSessionHandlers({
     clearUserListCache();
     localStorage.removeItem("isAdminAuthenticated");
     localStorage.removeItem("admin_session");
+    await clearAdminToken();
     if (activeUid) {
       clearLastScreen(activeUid);
       clearConsciousnessReturnScreen(activeUid);
+      await clearRememberedSession(activeUid);
     }
     clearPendingGoogleSignup();
     setGoogleUser(null);

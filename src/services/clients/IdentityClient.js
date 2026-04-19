@@ -22,6 +22,8 @@ import {
   getSessionGeoData,
   normalizeSessionMap,
 } from "../../utils/sessionUtils.js";
+import { getDesktopRuntimeContext } from "../desktopBridge.js";
+import { setRememberedSession } from "../sessionStore.js";
 
 function normalizeUserPayload(response) {
   if (!response) {
@@ -108,6 +110,7 @@ function mergeProfileData(userData, authData = {}, fullData = {}) {
     trainingEligibilityMessage: userData?.trainingEligibilityMessage || "",
     plan: collectiveConsciousness.plan,
     collectiveConsciousness,
+    clientPolicy: userData?.clientPolicy || fullData?.clientPolicy || null,
     sessions,
   };
 
@@ -121,6 +124,7 @@ function mergeProfileData(userData, authData = {}, fullData = {}) {
 
 export function resolveScreenForUser(userData, authData = {}) {
   if (!userData) return SCREEN_IDS.LOGIN;
+  if (userData?.clientPolicy?.forceLogout) return SCREEN_IDS.LOGIN;
   if (userData.status === "BLOCKED") return SCREEN_IDS.LOGIN;
   if (userData.status === "PENDING") return SCREEN_IDS.WAITING;
   if (authData.uid === ADMIN_UID) return SCREEN_IDS.ADMIN;
@@ -264,6 +268,7 @@ export async function createUserSession(uid, token, rememberMe) {
     const sessionId = generateSessionId();
     const device = getDeviceInfo();
     const geo = await getSessionGeoData();
+    const desktopContext = await getDesktopRuntimeContext();
     const expiresAt = new Date(
       Date.now() +
         (rememberMe ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000),
@@ -274,9 +279,14 @@ export async function createUserSession(uid, token, rememberMe) {
       device,
       city: geo.city,
       country: geo.country,
+      platform: desktopContext.platform || "browser",
+      appVersion: desktopContext.appVersion || null,
+      installId: desktopContext.installId || null,
+      deviceId: desktopContext.deviceId || null,
       createdAt: new Date().toISOString(),
       expiresAt: expiresAt.toISOString(),
       lastActive: new Date().toISOString(),
+      lastPolicyCheckAt: new Date().toISOString(),
     };
 
     const response = await upsertIdentitySession(uid, sessionId, sessionData);
@@ -293,7 +303,7 @@ export async function createUserSession(uid, token, rememberMe) {
           token: token || "",
         }),
       );
-      localStorage.setItem(`sess_${uid}`, encryptedSession);
+      await setRememberedSession(uid, encryptedSession);
     }
 
     return sessionId;
@@ -331,13 +341,7 @@ export async function getUserStatusByUid(uid, _authDataOrToken = "") {
   }
 
   const response = await fetchIdentityUserStatus(uid);
-  const status =
-    typeof response?.status === "string"
-      ? response.status
-      : typeof response?.data?.status === "string"
-        ? response.data.status
-        : null;
-  return status;
+  return response || null;
 }
 
 export default {

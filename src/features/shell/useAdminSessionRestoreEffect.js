@@ -1,16 +1,10 @@
 import { useEffect, useRef } from "react";
 import { auth } from "../../services/firebase.js";
+import {
+  clearAdminToken,
+  getAdminToken as getStoredAdminToken,
+} from "../../services/sessionStore.js";
 import { sendTelegramAlert } from "../../utils/securityAlertUtils.js";
-
-const ADMIN_TOKEN_KEY = "TradersApp_AdminToken";
-
-function getStoredAdminToken() {
-  try {
-    return localStorage.getItem(ADMIN_TOKEN_KEY) || null;
-  } catch {
-    return null;
-  }
-}
 
 export function useAdminSessionRestoreEffect({
   setIsAdminAuthenticated,
@@ -28,7 +22,7 @@ export function useAdminSessionRestoreEffect({
     const attemptRestore = async () => {
       try {
         const savedAdminStatus = localStorage.getItem("isAdminAuthenticated");
-        const storedToken = getStoredAdminToken();
+        const storedToken = await getStoredAdminToken();
 
         if (savedAdminStatus === "true" && storedToken) {
           // Validate token against BFF before restoring
@@ -60,7 +54,7 @@ export function useAdminSessionRestoreEffect({
 
           // Token invalid — clear and go to login
           localStorage.removeItem("isAdminAuthenticated");
-          localStorage.removeItem(ADMIN_TOKEN_KEY);
+          await clearAdminToken();
         }
       } catch (error) {
         console.warn("Failed to restore admin session:", error);
