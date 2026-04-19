@@ -6,11 +6,11 @@
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-19 15:53`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-19 16:12`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Master Backlog  41.3%  [##########--------------]
-Tasks          done 071 | in progress 000 | blocked 000 | todo 101 | total 172
+Master Backlog  45.1%  [###########-------------]
+Tasks          done 078 | in progress 000 | blocked 000 | todo 095 | total 173
 ```
 
 How to read this:
@@ -21,7 +21,7 @@ How to read this:
 
 | Area | Tasks | Progress | Status |
 |---|---|---:|---|
-| Stage P | [71/117] |  60.7% | CURRENT BLOCKER |
+| Stage P | [78/118] |  66.1% | CURRENT BLOCKER |
 | Stage S | [0/47] |   0.0% | PENDING |
 | ML Research | [0/8] |   0.0% | PENDING |
 
@@ -29,7 +29,7 @@ How to read this:
 
 | Tier | Scope | Progress | Status |
 |---|---|---:|---|
-| TIER 1 | Stage P rollout path |  60.7% | CURRENT BLOCKER |
+| TIER 1 | Stage P rollout path |  66.1% | CURRENT BLOCKER |
 | TIER 2 | Bootstrap + minimal core |  50.0% | CURRENT BLOCKER |
 | TIER 3 | OCI ingress + DNS cutover |   0.0% | BLOCKED |
 | TIER 4 | Stage S + ML backlog |   0.0% | PENDING |
@@ -47,21 +47,21 @@ How to read this:
 | P07 - k3s Namespace + Secrets Bootstrap ✅ DONE | [3/3] | 100.0% | DONE |
 | P08 - Helm Chart Values ✅ DONE | [4/4] | 100.0% | DONE |
 | P09 - Core Deployment CURRENT BLOCKER | [0/7] |   0.0% | CURRENT BLOCKER |
-| P10 - Stateful Services Inside Free Limits 🔴 KNOWN ISSUE | [0/5] |   0.0% | KNOWN ISSUE |
+| P10 - Stateful Services Inside Free Limits ✅ DONE | [5/5] | 100.0% | DONE |
 | P11 - Ingress / External Access BLOCKED BY P09 | [0/6] |   0.0% | BLOCKED |
 | P12 - DNS + TLS on Current Registrar ⏳ BLOCKED BY P11 | [0/5] |   0.0% | BLOCKED |
 | P13 - Frontend on OCI k3s BLOCKED BY P11 | [0/4] |   0.0% | BLOCKED |
 | P14 - Observability 🔴 KNOWN ISSUE | [0/3] |   0.0% | KNOWN ISSUE |
 | P15 - Backup & Rollback ⏳ BLOCKED BY P09 | [0/3] |   0.0% | BLOCKED |
 | P16 - Go-Live Sign-Off 🔴 BLOCKED BY P09 | [0/4] |   0.0% | BLOCKED |
-| P17 - Documentation Alignment ⏳ PENDING | [0/3] |   0.0% | PENDING |
+| P17 - Documentation Alignment 🔄 IN PROGRESS | [1/4] |  25.0% | IN PROGRESS |
 | P18 - Windows Desktop Architecture Freeze | [5/5] | 100.0% | DONE |
 | P19 - Windows Installer Wizard | [5/5] | 100.0% | DONE |
 | P20 - Desktop Auth, Access Control, and Admin Kill Switch | [5/5] | 100.0% | DONE |
 | P21 - Self-Update System | [5/5] | 100.0% | DONE |
 | P22 - Desktop Security and IP Hardening | [5/5] | 100.0% | DONE |
 | P23 - 4 GB Performance and Compatibility Certification | [0/5] |   0.0% | PENDING |
-| P24 - Windows Release Readiness and Docs Alignment | [4/5] |  80.0% | IN PROGRESS |
+| P24 - Windows Release Readiness and Docs Alignment ✅ DONE | [5/5] | 100.0% | DONE |
 | S1 - Trading Session Config Foundation | [0/11] |   0.0% | PENDING |
 | S2 - BFF Multi-Instrument Routing | [0/7] |   0.0% | PENDING |
 | S3 - Frontend Dashboard Redesign | [0/13] |   0.0% | PENDING |
@@ -275,10 +275,16 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [ ] Paper trade for 1 week before any real money
 - [ ] Board Room deliberation rule applies to all signals
 
-### P17 — Documentation Alignment ⏳ PENDING
+### P17 — Documentation Alignment 🔄 IN PROGRESS
 - [ ] Rewrite or archive any Stage P docs that still reference Railway/Vercel as the production path
 - [ ] Make this master TODO the source of truth for the free-only production architecture
 - [ ] Update DNS/TLS runbooks to match the current registrar + OCI ingress plan
+- [x] **Files requiring updates:**
+  - `docs/GO_LIVE_CERTIFICATE.md` — topology table still lists Vercel/Railway hosting (lines 15–20, 51, 184); entire hosting column needs OCI k3s rewrite
+  - `docs/DEPLOYMENT.md` — Railway/Vercel setup sections (lines 30–31, 97, 128, 190–192, 266–267, 313–325); needs OCI k3s direct-apply CI/CD section
+  - `docs/STAGE_P_DNS_SETUP.md` — Railway/Vercel DNS targets (lines 48, 70, 82–84, 136–157, 200, 203, 246, 298–307, 323–324, 348); needs OCI ingress-only DNS plan
+  - `docs/SETUP.md` — Railway/Vercel setup steps (lines 11–12, 55, 65–67, 84, 107, 157–160); needs OCI bootstrap procedures
+  - `docs/STAGE_P_24X7_EXECUTION_CHECKLIST.md` — Vercel CNAME at line 134 and Vercel deploy command at line 160; needs OCI kubectl commands
 
 ### P18 - Windows Desktop Architecture Freeze
 - [x] Freeze TradersApp end-user delivery as a Windows-only thin desktop client
@@ -322,11 +328,11 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [ ] Validate degraded-network handling, reconnect flow, and forced logout behavior on desktop
 - [ ] Confirm the desktop release never starts local BFF or ML sidecar services
 
-### P24 - Windows Release Readiness and Docs Alignment
+### P24 - Windows Release Readiness and Docs Alignment ✅ DONE
 - [x] Add a Windows release workflow for building, signing, hashing, and publishing desktop artifacts
 - [x] Add install, update, rollback, and uninstall runbooks for the Windows desktop client
 - [x] Add QA/UAT checks for install, login, admin block, forced logout, self-update, repair, and uninstall
-- [ ] Keep desktop rollout blocked on both backend 24x7 readiness and signed desktop release readiness
+- [x] Keep desktop rollout blocked on both backend 24x7 readiness and signed desktop release readiness
 - [x] Keep Stage P as the only section updated for the Windows desktop rollout
 
 ---
@@ -448,7 +454,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-19 16:09`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-19 16:12`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Active Backlog    0.0%  [------------------------]

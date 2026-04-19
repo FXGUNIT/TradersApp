@@ -12,14 +12,14 @@
 
 | # | Service | Public URL | Tech Stack | Hosting | Purpose |
 |---|---------|-----------|------------|---------|---------|
-| 1 | React Frontend | `https://traders.app` | React 18, Vite, Zustand, React Query | **Vercel** | User-facing trading dashboard |
-| 2 | BFF (Backend-for-Frontend) | `https://bff.traders.app` | Node.js, Express, axios, Helmet | **Railway** | API gateway, orchestration, security |
-| 3 | ML Engine | `https://api.traders.app` | Python, FastAPI, LightGBM, scikit-learn | **Railway** | Consensus signals, regime detection, alpha scoring |
-| 4 | MLflow | `https://mlflow.traders.app` | MLflow, PostgreSQL, MinIO (S3-compatible) | **Railway** | Experiment tracking, model registry, artifact store |
-| 5 | Prometheus | `https://prometheus.traders.app` | Prometheus | **Railway** | Metrics collection, alerting rules |
-| 6 | Telegram Bridge | `@TradersAppBot` (Telegram only) | Node.js, Telegram Bot API | **Railway** | Human-in-the-loop alerts, signal notifications — no public HTTP URL |
+| 1 | React Frontend | `https://traders.app` | React 18, Vite, Zustand, React Query | **OCI k3s** | User-facing trading dashboard |
+| 2 | BFF (Backend-for-Frontend) | `https://bff.traders.app` | Node.js, Express, axios, Helmet | **OCI k3s** | API gateway, orchestration, security |
+| 3 | ML Engine | `https://api.traders.app` | Python, FastAPI, LightGBM, scikit-learn | **OCI k3s** | Consensus signals, regime detection, alpha scoring |
+| 4 | MLflow | `https://mlflow.traders.app` | MLflow, PostgreSQL, MinIO (S3-compatible) | **OCI k3s** *(future)* | Experiment tracking, model registry, artifact store |
+| 5 | Prometheus | `https://prometheus.traders.app` | Prometheus | **OCI k3s** *(future)* | Metrics collection, alerting rules |
+| 6 | Telegram Bridge | `@TradersAppBot` (Telegram only) | Node.js, Telegram Bot API | **OCI k3s** | Human-in-the-loop alerts, signal notifications |
 
-> **Note:** All public URLs are subject to DNS propagation. Ensure A/CNAME records are set per `docs/STAGE_P_DNS_SETUP.md` before declaring go-live complete.
+> **Note:** Production topology is OCI Always Free k3s only. MLflow and Prometheus are deferred to future Stage P iterations when RAM headroom allows. `docs/TODO_MASTER_LIST.md` is the authoritative source for current service status.
 
 ---
 
@@ -48,7 +48,7 @@
 | Circuit breaker threshold | **5 failures / 30s** | Per-service breaker in BFF | Opens circuit, returns stale data with warning |
 | Cache TTL (consensus) | **60s** | Redis or in-memory | Prevents hammering ML Engine |
 | Cache TTL (regime) | **300s** | Redis or in-memory | Longer TTL for stable regime signal |
-| Uptime target | **99.5%** | Vercel + Railway SLA | Excludes scheduled Railway maintenance windows |
+| Uptime target | **99.0%** | OCI Always Free single-node design | Excludes k3s node reboots; see `docs/STAGE_P_24X7_EXECUTION_CHECKLIST.md` |
 | Paper trade rule | **Mandatory** | Human enforcement | All signals paper-traded 1 full week before live use |
 
 ---
@@ -60,8 +60,8 @@
 | Frontend | `https://traders.app` | Pending DNS propagation |
 | BFF | `https://bff.traders.app` | Pending DNS propagation |
 | ML Engine | `https://api.traders.app` | Pending DNS propagation |
-| MLflow | `https://mlflow.traders.app` | Pending DNS propagation |
-| Prometheus | `https://prometheus.traders.app` | Pending DNS propagation |
+| MLflow | `https://mlflow.traders.app` | Pending — deferred to future Stage P |
+| Prometheus | `https://prometheus.traders.app` | Pending — deferred to future Stage P |
 | Telegram Bridge | `https://t.me/TradersAppBot` | Active |
 
 > **DNS Setup Reference:** `docs/STAGE_P_DNS_SETUP.md`
@@ -71,46 +71,66 @@
 
 ## 5. Recovery Playbook
 
-### 5.1 Roll Back a Bad Frontend Deploy (Vercel)
+### 5.1 Roll Back a Bad Core Deploy (OCI k3s via GitHub Actions)
 
-**Via Dashboard (preferred):**
-1. Log in to [vercel.com](https://vercel.com) → select `TradersApp` project.
-2. Navigate to **Deployments** → find the currently broken deployment.
-3. Click **"..."** menu → select **"Promote to Production"** on the previous known-good deployment.
-4. Vercel will immediately serve the promoted deployment.
+**Via GitHub Actions (preferred):**
+1. Go to `github.com/FXGUNIT/TradersApp/actions` → find the failing workflow run.
+2. Click the run → **"Re-run all jobs"** — CI will rebuild and redeploy.
+3. To force a known-good image: push a revert commit or tag, then trigger re-run.
 
-**Via CLI:**
+**Via kubectl on OCI node (emergency):**
 ```bash
-vercel rollback                  # Interactive — selects from recent deployments
-vercel rollback <deployment-id>  # Roll back to a specific deployment
+# SSH to OCI node
+ssh opc@144.24.112.249
+
+# Roll back to last known-good deployment
+kubectl --kubeconfig /tmp/k3s_external.yaml rollout undo deployment/<name> -n tradersapp
+
+# Check rollout status
+kubectl --kubeconfig /tmp/k3s_external.yaml rollout status deployment/<name> -n tradersapp
+
+# If cluster is unreachable, restart k3s first
+sudo systemctl restart k3s
+sleep 30
+kubectl --kubeconfig /tmp/k3s_external.yaml rollout undo deployment/<name> -n tradersapp
 ```
 
-**What gets rolled back:** Only the Vercel edge/SSR layer. Database, BFF, and ML Engine are unaffected.
+**What gets rolled back:** The named Deployment only. Other services in the tradersapp namespace are unaffected.
 
 ---
 
-### 5.2 Roll Back a Bad BFF or ML Engine Deploy (Railway)
+### 5.2 Roll Back via Git Auto-Backup (`scripts/auto_backup.py`)
 
-**Via Dashboard (preferred):**
-1. Log in to [railway.app](https://railway.app) → select `TradersApp` project.
-2. Navigate to the affected service (`bff` or `ml-engine`).
-3. Go to **Deployments** tab → find the broken deployment.
-4. Click **"Redeploy"** on the previous known-good deployment SHA, or:
-5. Click **"Rollback"** if Railway's built-in rollback button is visible.
-
-**Via CLI:**
 ```bash
-# Install railway CLI if not present
-npm install -g @railway/cli
-railway login
+# Step 1: List available backup tags
+git tag --list 'backup/*'
 
-# Roll back bff to previous deployment
-railway up --service bff --detach
-# Or specify a deployment ID:
-railway rollback bff <deployment-id>
+# Step 2: Identify the last known-good backup tag
+git log 'backup/<tag>' --oneline -5
+
+# Step 3: Create a restoration branch (do NOT work on main directly)
+git checkout -b restore/$(date +%Y%m%d) main
+
+# Step 4: Merge or reset to the backup tag
+git reset --hard 'backup/<last-good-tag>'
+
+# Step 5: Push the restored branch — CI will rebuild images and redeploy
+git push origin restore/$(date +%Y%m%d)
+
+# Step 6: Verify health checks pass
+# Reference: `.github/workflows/monitor.yml`
 ```
 
-**What gets rolled back:** The Railway container for the named service only. The other service and the frontend are unaffected.
+**Emergency full-repo rollback:**
+```bash
+# Safer — creates a new revert commit
+git revert HEAD
+# OR immediate hard reset (emergency only):
+git reset --hard 'backup/<last-good-tag>'
+git push --force origin main    # DANGEROUS — notifies all contributors
+```
+
+**What gets rolled back:** The entire application stack via rebuilt images. All services in `tradersapp` namespace are affected.
 
 ---
 
@@ -164,9 +184,8 @@ git push --force origin main    # DANGEROUS — notifies all contributors
 |---------|--------|---------|
 | GitHub Actions Monitor | `.github/workflows/monitor.yml` | 5-minute health check failures |
 | Discord webhook | `FXGUNIT` | Alert fan-out via monitor workflow |
-| Railway built-in alerts | `FXGUNIT` | Container restart, OOM, deploy failure |
-| Vercel built-in alerts | `FXGUNIT` | Build failure, cold start errors |
-| Telegram Bridge | `@TradersAppBot` | Human-in-the-loop signal alerts (FXGUNIT receives direct messages) |
+| GitHub Actions CI/CD | `.github/workflows/deploy-k8s.yml` | Deploy failure, container crash loops |
+| Telegram Bridge | `@TradersAppBot` | Human-in-the-loop signal alerts |
 
 > **Alert routing:** All alerts funnel through the `.github/workflows/monitor.yml` health-check workflow. If the monitor workflow fails 3 consecutive times, a GitHub Actions incident is raised and FXGUNIT is notified via Discord webhook.
 
@@ -181,7 +200,7 @@ git push --force origin main    # DANGEROUS — notifies all contributors
 This document certifies that **TradersApp** has completed Stage P deployment and is approved for production use as of **2026-04-16**.
 
 All gates have been cleared:
-- [x] Topology frozen (Option A: Vercel + Railway + Infisical + GitHub Actions) — `docs/P01_TOPOLOGY_FREEZE.md`
+- [x] Topology frozen (OCI k3s on E2.1.Micro — `docs/P01_TOPOLOGY_FREEZE.md`)
 - [x] DNS setup documented — `docs/STAGE_P_DNS_SETUP.md`
 - [x] Production activation proof submitted — `docs/STAGE_P_PRODUCTION_ACTIVATION_PROOF.md`
 - [x] Secrets provisioned via Infisical
