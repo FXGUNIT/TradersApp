@@ -133,6 +133,9 @@ split_into_documents() {
       next
     }
     {
+      if ($0 ~ /^[[:space:]]*$/ && current == "") {
+        next
+      }
       if (current == "") {
         next_file()
       }
