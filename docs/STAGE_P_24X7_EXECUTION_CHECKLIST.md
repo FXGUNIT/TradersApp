@@ -130,11 +130,11 @@ gh variable list --repo $repo
 
 Create or update these records exactly with your real provider targets:
 
-- `traders.app` -> Vercel apex target (`A 76.76.21.21` or provider ALIAS/ANAME to Vercel)
-- `www.traders.app` -> `cname.vercel-dns.com`
-- `bff.traders.app` -> Railway BFF domain target (usually CNAME)
-- `api.traders.app` -> Railway ML domain target (usually CNAME)
-- `staging.traders.app` -> Vercel staging deployment CNAME target
+- `traders.app` -> A `144.24.112.249` (OCI k3s node)
+- `www.traders.app` -> A `144.24.112.249`
+- `bff.traders.app` -> A `144.24.112.249`
+- `api.traders.app` -> A `144.24.112.249`
+- `staging.traders.app` -> remove if exists (Vercel staging deprecated)
 
 Then verify propagation:
 
@@ -145,19 +145,30 @@ nslookup api.traders.app
 nslookup staging.traders.app
 ```
 
-## 5) Vercel domain and redirect fix
+## 5) OCI k3s core deploy verification
 
-In Vercel project settings:
+After pushing to `main`, GitHub Actions runs `deploy-k8s.yml` automatically:
 
-1. Ensure `traders.app` is attached to this TradersApp project.
-2. Remove any redirect rule sending `traders.app` to `stocks.news`.
-3. Ensure production deployment serves this repo.
-4. Confirm `/health` is available in deployed output.
+1. Confirm all 4 pods running:
+   ```powershell
+   kubectl --kubeconfig $env:KUBECONFIG get pods -n tradersapp
+   ```
+2. Confirm health endpoints respond:
+   ```powershell
+   curl https://bff.traders.app/health
+   curl https://api.traders.app/health
+   ```
+3. If cluster was restarted, refresh kubeconfig and update `KUBECONFIG_B64` GitHub secret:
+   ```bash
+   sed 's|127.0.0.1|144.24.112.249|g' /tmp/k3s-server.yaml | base64 -w0
+   # Then update via: gh secret set KUBECONFIG_B64 --body "<b64>" --repo FXGUNIT/TradersApp
+   ```
 
-CLI re-deploy after domain fix:
+CLI re-deploy trigger:
 
 ```powershell
-npx vercel --prod --yes --token <VERCEL_TOKEN>
+# Trigger full pipeline (build + deploy to OCI k3s)
+gh workflow run deploy-k8s.yml --ref main
 ```
 
 ## 6) Trigger and verify full pipeline

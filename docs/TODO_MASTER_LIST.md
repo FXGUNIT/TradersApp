@@ -6,11 +6,11 @@
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-19 17:13`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-19 17:16`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Master Backlog  45.4%  [###########-------------]
-Tasks          done 079 | in progress 000 | blocked 000 | todo 095 | total 174
+Master Backlog  46.8%  [###########-------------]
+Tasks          done 081 | in progress 000 | blocked 000 | todo 092 | total 173
 ```
 
 How to read this:
@@ -21,7 +21,7 @@ How to read this:
 
 | Area | Tasks | Progress | Status |
 |---|---|---:|---|
-| Stage P | [79/119] |  66.4% | CURRENT BLOCKER |
+| Stage P | [81/118] |  68.6% | CURRENT BLOCKER |
 | Stage S | [0/47] |   0.0% | PENDING |
 | ML Research | [0/8] |   0.0% | PENDING |
 
@@ -29,7 +29,7 @@ How to read this:
 
 | Tier | Scope | Progress | Status |
 |---|---|---:|---|
-| TIER 1 | Stage P rollout path |  66.4% | CURRENT BLOCKER |
+| TIER 1 | Stage P rollout path |  68.6% | CURRENT BLOCKER |
 | TIER 2 | Bootstrap + minimal core |  50.0% | CURRENT BLOCKER |
 | TIER 3 | OCI ingress + DNS cutover |   0.0% | BLOCKED |
 | TIER 4 | Stage S + ML backlog |   0.0% | PENDING |
@@ -54,7 +54,7 @@ How to read this:
 | P14 - Observability 🔴 KNOWN ISSUE | [0/3] |   0.0% | KNOWN ISSUE |
 | P15 - Backup & Rollback ⏳ BLOCKED BY P09 | [0/3] |   0.0% | BLOCKED |
 | P16 - Go-Live Sign-Off 🔴 BLOCKED BY P09 | [0/4] |   0.0% | BLOCKED |
-| P17 - Documentation Alignment 🔄 IN PROGRESS | [2/5] |  40.0% | IN PROGRESS |
+| P17 - Documentation Alignment ✅ DONE | [4/4] | 100.0% | DONE |
 | P18 - Windows Desktop Architecture Freeze | [5/5] | 100.0% | DONE |
 | P19 - Windows Installer Wizard | [5/5] | 100.0% | DONE |
 | P20 - Desktop Auth, Access Control, and Admin Kill Switch | [5/5] | 100.0% | DONE |
@@ -275,17 +275,16 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [ ] Paper trade for 1 week before any real money
 - [ ] Board Room deliberation rule applies to all signals
 
-### P17 — Documentation Alignment 🔄 IN PROGRESS
-- [ ] Rewrite or archive any Stage P docs that still reference Railway/Vercel as the production path
-- [ ] Make this master TODO the source of truth for the free-only production architecture
-- [ ] Update DNS/TLS runbooks to match the current registrar + OCI ingress plan
-- [x] **Docs updated this session (3/5):**
+### P17 — Documentation Alignment ✅ DONE
+- [x] Rewrite or archive any Stage P docs that still reference Railway/Vercel as the production path
+- [x] Make this master TODO the source of truth for the free-only production architecture
+- [x] Update DNS/TLS runbooks to match the current registrar + OCI ingress plan
+- [x] **Docs updated this session (5/5):**
   - `docs/GO_LIVE_CERTIFICATE.md` — topology table, SLO, alert channels, rollback sections fully rewritten for OCI k3s
   - `docs/DEPLOYMENT.md` — infrastructure overview, OCI k3s setup, CI/CD, secrets, rollback sections rewritten
   - `docs/STAGE_P_DNS_SETUP.md` — DNS targets changed from Railway/Vercel to OCI k3s node IP (144.24.112.249), staging.traders.app deprecated
-- [x] **Files remaining (2/5):**
-  - `docs/SETUP.md` — Railway/Vercel setup steps need OCI bootstrap procedures
-  - `docs/STAGE_P_24X7_EXECUTION_CHECKLIST.md` — Vercel CNAME at line 134, Vercel deploy at line 160; needs OCI kubectl commands
+  - `docs/SETUP.md` — Railway/Vercel setup replaced with OCI k3s bootstrap and Cloudflare DNS steps
+  - `docs/STAGE_P_24X7_EXECUTION_CHECKLIST.md` — DNS targets and deploy trigger replaced with OCI kubectl commands
 
 ### P18 - Windows Desktop Architecture Freeze
 - [x] Freeze TradersApp end-user delivery as a Windows-only thin desktop client
@@ -455,7 +454,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-19 17:13`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-19 17:16`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Active Backlog    0.0%  [------------------------]
