@@ -172,6 +172,17 @@ export async function loadUserProfile(authData = {}) {
     activeDay: new Date().toISOString().slice(0, 10),
   }).catch(() => null);
   const userData = normalizeUserPayload(activityResponse) || fetchedUserData;
+  const statusPayload = await fetchIdentityUserStatus(authData.uid).catch(
+    () => null,
+  );
+  const resolvedUserData =
+    statusPayload && typeof statusPayload === "object"
+      ? {
+          ...userData,
+          ...statusPayload,
+          clientPolicy: statusPayload.clientPolicy || null,
+        }
+      : userData;
 
   const sessionsResponse = await fetchIdentitySessions(authData.uid);
   const sessions = normalizeSessionMap(
@@ -182,11 +193,11 @@ export async function loadUserProfile(authData = {}) {
       {},
   );
   const fullData = {
-    ...(userData || {}),
+    ...(resolvedUserData || {}),
     sessions,
   };
 
-  return mergeProfileData(userData, authData, fullData);
+  return mergeProfileData(resolvedUserData, authData, fullData);
 }
 
 export async function loadUserProfileByUid(authData = {}) {

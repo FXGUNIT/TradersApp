@@ -208,6 +208,123 @@ console.log(JSON.stringify({ first, second }));
     assert result["second"]["payload"]["revokedCount"] == 0
 
 
+def test_identity_status_includes_client_policy_contract():
+    result = _run_node(
+        """
+import { createIdentityRouteHandler } from "./bff/routes/identityRoutes.mjs";
+
+const json = (res, status, payload) => {
+  res.statusCode = status;
+  res.payload = payload;
+};
+
+const handler = createIdentityRouteHandler({
+  deleteSession: () => null,
+  findUserByEmail: () => null,
+  getUserByUid: () => ({ user: { uid: "user-a" }, sessions: {} }),
+  getUserStatus: () => ({
+    uid: "user-a",
+    status: "ACTIVE",
+    role: "user",
+    isLocked: false,
+  }),
+  getMaintenanceState: () => true,
+  listTrainingEligibilityUsers: () => [],
+  listSessions: () => ({}),
+  patchUserAccess: () => ({ uid: "user-a" }),
+  patchUserSecurity: () => ({ uid: "user-a" }),
+  provisionUser: () => null,
+  recordUserActiveDay: () => null,
+  resolveClientPolicy: ({ maintenanceActive, platform, currentVersion }) => ({
+    minimumDesktopVersion: "1.4.0",
+    maintenanceActive,
+    forceLogout: platform === "windows" && currentVersion === "1.0.0",
+    reason: "MAINTENANCE_MODE_ACTIVE",
+  }),
+  revokeOtherSessions: () => ({ success: true, revokedCount: 0, sessions: {} }),
+  upsertSession: () => null,
+  json,
+  readJsonBody: async (req) => req.__body || {},
+});
+
+const req = {
+  method: "GET",
+  headers: {
+    "x-tradersapp-platform": "windows",
+    "x-tradersapp-version": "1.0.0",
+  },
+};
+const res = {};
+
+await handler(
+  req,
+  res,
+  new URL("http://localhost/identity/users/user-a/status"),
+  "http://localhost",
+);
+
+console.log(JSON.stringify({ status: res.statusCode, payload: res.payload }));
+""".strip()
+    )
+
+    assert result["status"] == 200
+    assert result["payload"]["ok"] is True
+    assert result["payload"]["clientPolicy"] == {
+        "minimumDesktopVersion": "1.4.0",
+        "maintenanceActive": True,
+        "forceLogout": True,
+        "reason": "MAINTENANCE_MODE_ACTIVE",
+    }
+
+
+def test_admin_block_route_returns_revoked_count_contract():
+    result = _run_node(
+        """
+import { createAdminRouteHandler } from "./bff/routes/adminRoutes.mjs";
+
+const json = (res, status, payload) => {
+  res.statusCode = status;
+  res.payload = payload;
+};
+
+const handler = createAdminRouteHandler({
+  approveAdminUser: () => ({ success: false, error: "unused" }),
+  blockAdminUser: () => ({
+    success: true,
+    user: { uid: "user-a", status: "BLOCKED" },
+    revokedCount: 3,
+  }),
+  getMaintenanceState: () => false,
+  listAdminUsers: () => ({}),
+  lockAdminUser: () => ({ success: false, error: "unused" }),
+  recordAdminAuditEvent: () => null,
+  toggleMaintenanceState: () => false,
+  json,
+  readJsonBody: async (req) => req.__body || {},
+});
+
+const req = {
+  method: "POST",
+  __body: { adminUid: "admin-root" },
+};
+const res = {};
+
+await handler(
+  req,
+  res,
+  new URL("http://localhost/admin/users/user-a/block"),
+  "http://localhost",
+);
+
+console.log(JSON.stringify({ status: res.statusCode, payload: res.payload }));
+""".strip()
+    )
+
+    assert result["status"] == 200
+    assert result["payload"]["ok"] is True
+    assert result["payload"]["revokedCount"] == 3
+
+
 def test_support_message_route_contract_shape():
     result = _run_node(
         """

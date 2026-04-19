@@ -1,0 +1,347 @@
+{
+  "version": 3,
+  "targets": {
+    "net8.0-windows7.0": {
+      "Microsoft.Win32.SystemEvents/9.0.8": {
+        "type": "package",
+        "compile": {
+          "lib/net8.0/Microsoft.Win32.SystemEvents.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net8.0/Microsoft.Win32.SystemEvents.dll": {
+            "related": ".xml"
+          }
+        },
+        "build": {
+          "buildTransitive/net8.0/_._": {}
+        },
+        "runtimeTargets": {
+          "runtimes/win/lib/net8.0/Microsoft.Win32.SystemEvents.dll": {
+            "assetType": "runtime",
+            "rid": "win"
+          }
+        }
+      },
+      "NetSparkleUpdater.Chaos.NaCl/0.9.3": {
+        "type": "package",
+        "compile": {
+          "lib/net8.0/Chaos.NaCl.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net8.0/Chaos.NaCl.dll": {
+            "related": ".xml"
+          }
+        }
+      },
+      "NetSparkleUpdater.SparkleUpdater/3.0.4": {
+        "type": "package",
+        "dependencies": {
+          "NetSparkleUpdater.Chaos.NaCl": "0.9.3"
+        },
+        "compile": {
+          "lib/net8.0/NetSparkle.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net8.0/NetSparkle.dll": {
+            "related": ".xml"
+          }
+        }
+      },
+      "NetSparkleUpdater.UI.WPF/3.0.4": {
+        "type": "package",
+        "dependencies": {
+          "NetSparkleUpdater.SparkleUpdater": "3.0.4",
+          "System.Drawing.Common": "9.0.8"
+        },
+        "compile": {
+          "lib/net8.0-windows7.0/NetSparkle.UI.WPF.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net8.0-windows7.0/NetSparkle.UI.WPF.dll": {
+            "related": ".xml"
+          }
+        },
+        "frameworkReferences": [
+          "Microsoft.WindowsDesktop.App.WPF"
+        ]
+      },
+      "System.Drawing.Common/9.0.8": {
+        "type": "package",
+        "dependencies": {
+          "Microsoft.Win32.SystemEvents": "9.0.8"
+        },
+        "compile": {
+          "lib/net8.0/System.Drawing.Common.dll": {
+            "related": ".pdb;.xml"
+          },
+          "lib/net8.0/System.Private.Windows.Core.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net8.0/System.Drawing.Common.dll": {
+            "related": ".pdb;.xml"
+          },
+          "lib/net8.0/System.Private.Windows.Core.dll": {
+            "related": ".xml"
+          }
+        },
+        "build": {
+          "buildTransitive/net8.0/_._": {}
+        }
+      }
+    }
+  },
+  "libraries": {
+    "Microsoft.Win32.SystemEvents/9.0.8": {
+      "sha512": "64oQBN8I8EOcyHGNt6+rlcqm4tlcKfqOpswtBCJZnpzBQ15L6IFKqjnbjbOWBpG9wKq9A/aC2LFSmSqplbwTYA==",
+      "type": "package",
+      "path": "microsoft.win32.systemevents/9.0.8",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "Icon.png",
+        "LICENSE.TXT",
+        "PACKAGE.md",
+        "THIRD-PARTY-NOTICES.TXT",
+        "buildTransitive/net461/Microsoft.Win32.SystemEvents.targets",
+        "buildTransitive/net462/_._",
+        "buildTransitive/net8.0/_._",
+        "buildTransitive/netcoreapp2.0/Microsoft.Win32.SystemEvents.targets",
+        "lib/net462/Microsoft.Win32.SystemEvents.dll",
+        "lib/net462/Microsoft.Win32.SystemEvents.xml",
+        "lib/net8.0/Microsoft.Win32.SystemEvents.dll",
+        "lib/net8.0/Microsoft.Win32.SystemEvents.xml",
+        "lib/net9.0/Microsoft.Win32.SystemEvents.dll",
+        "lib/net9.0/Microsoft.Win32.SystemEvents.xml",
+        "lib/netstandard2.0/Microsoft.Win32.SystemEvents.dll",
+        "lib/netstandard2.0/Microsoft.Win32.SystemEvents.xml",
+        "microsoft.win32.systemevents.9.0.8.nupkg.sha512",
+        "microsoft.win32.systemevents.nuspec",
+        "runtimes/win/lib/net8.0/Microsoft.Win32.SystemEvents.dll",
+        "runtimes/win/lib/net8.0/Microsoft.Win32.SystemEvents.xml",
+        "runtimes/win/lib/net9.0/Microsoft.Win32.SystemEvents.dll",
+        "runtimes/win/lib/net9.0/Microsoft.Win32.SystemEvents.xml",
+        "useSharedDesignerContext.txt"
+      ]
+    },
+    "NetSparkleUpdater.Chaos.NaCl/0.9.3": {
+      "sha512": "Copo3+rYuRVOuc6fmzHwXwehDC8l8DQ3y2VRI/d0sQTwProL4QAjkxRPV0zr3XBz1A8ZODXATOXV0hJXc7YdKg==",
+      "type": "package",
+      "path": "netsparkleupdater.chaos.nacl/0.9.3",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "LICENSE.md",
+        "README.md",
+        "lib/net462/Chaos.NaCl.dll",
+        "lib/net462/Chaos.NaCl.xml",
+        "lib/net6.0/Chaos.NaCl.dll",
+        "lib/net6.0/Chaos.NaCl.xml",
+        "lib/net7.0/Chaos.NaCl.dll",
+        "lib/net7.0/Chaos.NaCl.xml",
+        "lib/net8.0/Chaos.NaCl.dll",
+        "lib/net8.0/Chaos.NaCl.xml",
+        "lib/net9.0/Chaos.NaCl.dll",
+        "lib/net9.0/Chaos.NaCl.xml",
+        "lib/netstandard2.0/Chaos.NaCl.dll",
+        "lib/netstandard2.0/Chaos.NaCl.xml",
+        "netsparkleupdater.chaos.nacl.0.9.3.nupkg.sha512",
+        "netsparkleupdater.chaos.nacl.nuspec"
+      ]
+    },
+    "NetSparkleUpdater.SparkleUpdater/3.0.4": {
+      "sha512": "oAxJnYWK2c/wZTQgKR4rLBVQC4PB2PaOB30V+quFi+m/gndPbPKCntBqToP12ssSV2MMxclkzlAhJc+jhXiZ0w==",
+      "type": "package",
+      "path": "netsparkleupdater.sparkleupdater/3.0.4",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "README.md",
+        "UPGRADING.md",
+        "lib/net462/NetSparkle.dll",
+        "lib/net462/NetSparkle.xml",
+        "lib/net6.0/NetSparkle.dll",
+        "lib/net6.0/NetSparkle.xml",
+        "lib/net7.0/NetSparkle.dll",
+        "lib/net7.0/NetSparkle.xml",
+        "lib/net8.0/NetSparkle.dll",
+        "lib/net8.0/NetSparkle.xml",
+        "lib/net9.0/NetSparkle.dll",
+        "lib/net9.0/NetSparkle.xml",
+        "lib/netstandard2.0/NetSparkle.dll",
+        "lib/netstandard2.0/NetSparkle.xml",
+        "netsparkleupdater.sparkleupdater.3.0.4.nupkg.sha512",
+        "netsparkleupdater.sparkleupdater.nuspec",
+        "software-update-available.png"
+      ]
+    },
+    "NetSparkleUpdater.UI.WPF/3.0.4": {
+      "sha512": "/X3f0vvNQfRl1to8GLD2+FrWDTk1D2bRjYU+JXntjWcoIwsNszRA4Qocpmq7wQrx8NNS7uo2uF498jjvQ5eP3Q==",
+      "type": "package",
+      "path": "netsparkleupdater.ui.wpf/3.0.4",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "README.md",
+        "lib/net462/NetSparkle.UI.WPF.dll",
+        "lib/net462/NetSparkle.UI.WPF.xml",
+        "lib/net6.0-windows7.0/NetSparkle.UI.WPF.dll",
+        "lib/net6.0-windows7.0/NetSparkle.UI.WPF.xml",
+        "lib/net7.0-windows7.0/NetSparkle.UI.WPF.dll",
+        "lib/net7.0-windows7.0/NetSparkle.UI.WPF.xml",
+        "lib/net8.0-windows7.0/NetSparkle.UI.WPF.dll",
+        "lib/net8.0-windows7.0/NetSparkle.UI.WPF.xml",
+        "lib/net9.0-windows7.0/NetSparkle.UI.WPF.dll",
+        "lib/net9.0-windows7.0/NetSparkle.UI.WPF.xml",
+        "netsparkleupdater.ui.wpf.3.0.4.nupkg.sha512",
+        "netsparkleupdater.ui.wpf.nuspec",
+        "software-update-available.png"
+      ]
+    },
+    "System.Drawing.Common/9.0.8": {
+      "sha512": "ineIJmF+yuBEHGft9R153J9kmBFaeEfFL5Put5nzENneRcGGPUb3MvM8zrZ5pERQ0jPPSE3Wqw/clXvOq2F/Kw==",
+      "type": "package",
+      "path": "system.drawing.common/9.0.8",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "Icon.png",
+        "LICENSE.TXT",
+        "PACKAGE.md",
+        "THIRD-PARTY-NOTICES.TXT",
+        "buildTransitive/net461/System.Drawing.Common.targets",
+        "buildTransitive/net462/_._",
+        "buildTransitive/net8.0/_._",
+        "buildTransitive/netcoreapp2.0/System.Drawing.Common.targets",
+        "lib/MonoAndroid10/_._",
+        "lib/MonoTouch10/_._",
+        "lib/net462/System.Drawing.Common.dll",
+        "lib/net462/System.Drawing.Common.pdb",
+        "lib/net462/System.Drawing.Common.xml",
+        "lib/net8.0/System.Drawing.Common.dll",
+        "lib/net8.0/System.Drawing.Common.pdb",
+        "lib/net8.0/System.Drawing.Common.xml",
+        "lib/net8.0/System.Private.Windows.Core.dll",
+        "lib/net8.0/System.Private.Windows.Core.xml",
+        "lib/net9.0/System.Drawing.Common.dll",
+        "lib/net9.0/System.Drawing.Common.pdb",
+        "lib/net9.0/System.Drawing.Common.xml",
+        "lib/net9.0/System.Private.Windows.Core.dll",
+        "lib/net9.0/System.Private.Windows.Core.xml",
+        "lib/netstandard2.0/System.Drawing.Common.dll",
+        "lib/netstandard2.0/System.Drawing.Common.pdb",
+        "lib/netstandard2.0/System.Drawing.Common.xml",
+        "lib/xamarinios10/_._",
+        "lib/xamarinmac20/_._",
+        "lib/xamarintvos10/_._",
+        "lib/xamarinwatchos10/_._",
+        "system.drawing.common.9.0.8.nupkg.sha512",
+        "system.drawing.common.nuspec",
+        "useSharedDesignerContext.txt"
+      ]
+    }
+  },
+  "projectFileDependencyGroups": {
+    "net8.0-windows7.0": [
+      "NetSparkleUpdater.UI.WPF >= 3.0.4"
+    ]
+  },
+  "packageFolders": {
+    "C:\\Users\\Asus\\.nuget\\packages\\": {}
+  },
+  "project": {
+    "version": "1.0.0",
+    "restore": {
+      "projectUniqueName": "E:\\TradersApp\\desktop\\windows\\TradersApp.Desktop\\TradersApp.Desktop.csproj",
+      "projectName": "TradersApp.Desktop",
+      "projectPath": "E:\\TradersApp\\desktop\\windows\\TradersApp.Desktop\\TradersApp.Desktop.csproj",
+      "packagesPath": "C:\\Users\\Asus\\.nuget\\packages\\",
+      "outputPath": "E:\\TradersApp\\desktop\\windows\\TradersApp.Desktop\\obj\\",
+      "projectStyle": "PackageReference",
+      "configFilePaths": [
+        "C:\\Users\\Asus\\AppData\\Roaming\\NuGet\\NuGet.Config"
+      ],
+      "originalTargetFrameworks": [
+        "net8.0-windows"
+      ],
+      "sources": {
+        "https://api.nuget.org/v3/index.json": {}
+      },
+      "frameworks": {
+        "net8.0-windows7.0": {
+          "targetAlias": "net8.0-windows",
+          "projectReferences": {}
+        }
+      },
+      "warningProperties": {
+        "warnAsError": [
+          "NU1605"
+        ]
+      },
+      "restoreAuditProperties": {
+        "enableAudit": "true",
+        "auditLevel": "low",
+        "auditMode": "direct"
+      },
+      "SdkAnalysisLevel": "10.0.200"
+    },
+    "frameworks": {
+      "net8.0-windows7.0": {
+        "targetAlias": "net8.0-windows",
+        "dependencies": {
+          "NetSparkleUpdater.UI.WPF": {
+            "target": "Package",
+            "version": "[3.0.4, )"
+          }
+        },
+        "imports": [
+          "net461",
+          "net462",
+          "net47",
+          "net471",
+          "net472",
+          "net48",
+          "net481"
+        ],
+        "assetTargetFallback": true,
+        "warn": true,
+        "downloadDependencies": [
+          {
+            "name": "Microsoft.AspNetCore.App.Ref",
+            "version": "[8.0.25, 8.0.25]"
+          },
+          {
+            "name": "Microsoft.NETCore.App.Host.win-x64",
+            "version": "[8.0.25, 8.0.25]"
+          },
+          {
+            "name": "Microsoft.NETCore.App.Ref",
+            "version": "[8.0.25, 8.0.25]"
+          },
+          {
+            "name": "Microsoft.WindowsDesktop.App.Ref",
+            "version": "[8.0.25, 8.0.25]"
+          }
+        ],
+        "frameworkReferences": {
+          "Microsoft.NETCore.App": {
+            "privateAssets": "all"
+          },
+          "Microsoft.WindowsDesktop.App.WPF": {
+            "privateAssets": "none"
+          }
+        },
+        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.201/PortableRuntimeIdentifierGraph.json"
+      }
+    }
+  }
+}

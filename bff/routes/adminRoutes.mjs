@@ -98,6 +98,7 @@ export function createAdminRouteHandler({
         {
           ok: true,
           user: result.user,
+          revokedCount: Number(result.revokedCount || 0),
         },
         origin,
       );

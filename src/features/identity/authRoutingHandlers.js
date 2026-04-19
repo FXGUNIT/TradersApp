@@ -1,5 +1,73 @@
 import { isPasswordExpired } from "../../utils/securityUtils.js";
 import { auth as firebaseAuth } from "../../services/firebase.js";
+import {
+  isDesktopRuntime,
+  notifyDesktopPolicy,
+  requestDesktopUpdateCheck,
+} from "../../services/desktopBridge.js";
+
+const CLIENT_POLICY_MESSAGES = {
+  ACCOUNT_BLOCKED: "Account access revoked. Contact support.",
+  ACCOUNT_LOCKED: "Account locked. Contact support.",
+  MAINTENANCE_MODE_ACTIVE: "Maintenance mode is active. Please try again later.",
+};
+
+async function handleClientPolicyExit({
+  nextProfile,
+  authData,
+  setProfile,
+  setScreen,
+  showToast,
+  SCREEN_IDS,
+}) {
+  const clientPolicy = nextProfile?.clientPolicy;
+  if (!clientPolicy?.forceLogout) {
+    return false;
+  }
+
+  const reason = clientPolicy.reason || "CLIENT_POLICY_EXIT";
+  const minimumDesktopVersion = clientPolicy.minimumDesktopVersion || null;
+
+  if (isDesktopRuntime()) {
+    await notifyDesktopPolicy({
+      reason,
+      maintenanceActive: Boolean(clientPolicy.maintenanceActive),
+      minimumDesktopVersion,
+    }).catch(() => null);
+  }
+
+  if (reason === "MINIMUM_DESKTOP_VERSION_REQUIRED") {
+    showToast(
+      `Desktop update required. Minimum supported version is ${minimumDesktopVersion}.`,
+      "warning",
+    );
+    if (isDesktopRuntime()) {
+      await requestDesktopUpdateCheck({
+        minimumDesktopVersion,
+      }).catch(() => null);
+    }
+  } else {
+    showToast(
+      CLIENT_POLICY_MESSAGES[reason] || "Desktop access is currently unavailable.",
+      reason === "ACCOUNT_BLOCKED" || reason === "ACCOUNT_LOCKED" ? "error" : "warning",
+    );
+  }
+
+  try {
+    if (firebaseAuth?.signOut) {
+      await firebaseAuth.signOut();
+    }
+  } catch {
+    // The caller still needs the route to collapse back to login.
+  }
+
+  setProfile({
+    ...nextProfile,
+    emailVerified: authData?.emailVerified,
+  });
+  setScreen(SCREEN_IDS.LOGIN);
+  return true;
+}
 
 export const executeCheckUserStatus = async ({
   authData,
@@ -162,6 +230,19 @@ export const executeCheckUserStatus = async ({
       ...nextProfile,
       emailVerified: authData.emailVerified,
     });
+
+    if (
+      await handleClientPolicyExit({
+        nextProfile,
+        authData,
+        setProfile,
+        setScreen,
+        showToast,
+        SCREEN_IDS,
+      })
+    ) {
+      return;
+    }
 
     if (userData.status === "BLOCKED") {
       setScreen(SCREEN_IDS.LOGIN);
