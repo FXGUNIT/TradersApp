@@ -159,6 +159,8 @@ apply_staged_manifests() {
 
   local manifest_name=""
   local manifest_path=""
+  local deployment_name=""
+  local rollout_timeout=""
   while IFS= read -r manifest_name; do
     [[ -n "${manifest_name}" ]] || continue
     manifest_path="${MANIFEST_DIR}/${manifest_name}"
@@ -169,6 +171,31 @@ apply_staged_manifests() {
 
     echo "Applying staged manifest ${manifest_name}"
     kubectl_retry 6 kubectl --kubeconfig "${KUBECONFIG_PATH}" apply -f "${manifest_path}"
+
+    deployment_name=""
+    rollout_timeout="180s"
+    case "${manifest_name}" in
+      01-redis.yaml)
+        deployment_name="redis"
+        rollout_timeout="180s"
+        ;;
+      02-ml-engine.yaml)
+        deployment_name="ml-engine"
+        rollout_timeout="240s"
+        ;;
+      03-bff.yaml)
+        deployment_name="bff"
+        rollout_timeout="180s"
+        ;;
+      04-frontend.yaml)
+        deployment_name="frontend"
+        rollout_timeout="180s"
+        ;;
+    esac
+
+    if [[ -n "${deployment_name}" ]]; then
+      wait_for_rollout "${deployment_name}" "${rollout_timeout}"
+    fi
   done < "${APPLY_ORDER_PATH}"
 }
 
@@ -223,9 +250,5 @@ else
 fi
 
 apply_staged_manifests
-wait_for_rollout redis 180s
-wait_for_rollout ml-engine 240s
-wait_for_rollout bff 180s
-wait_for_rollout frontend 180s
 
 echo "Minimal core deploy complete."

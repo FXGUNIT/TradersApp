@@ -162,7 +162,7 @@ Deployments are driven by `.github/workflows/deploy-k8s.yml`.
 **Pipeline flow:**
 1. Build and push `ghcr.io/fxgunit/<service>:latest` + SHA-tagged images
 2. Run node-pressure recovery script (`scripts/k8s/recover-node-pressure.sh`)
-3. Direct `kubectl apply` of `tradersapp-deployments.yaml` (core 4 services)
+3. Render deterministic staged core manifests, dry-run validate each slice, then apply in order `redis -> ml-engine -> bff -> frontend`
 4. Smoke test health endpoints
 
 **Triggering a deploy:**
