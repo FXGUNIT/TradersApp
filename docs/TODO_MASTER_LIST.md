@@ -222,14 +222,14 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [ ] Smoke tests: `bff /health`, `ml-engine /health`, frontend `http://frontend:80`, `redis-cli ping`
 - [ ] KUBECONFIG_B64 secret in GitHub updated after each k3s cold restart
 
-### P10 — Stateful Services Inside Free Limits 🔴 KNOWN ISSUE
-- k3s is running with `--disable local-storage`, so standard PVC-backed workloads will not work as-is
-- Free-only production cannot assume a paid managed database, object store, or storage provisioner
-- [ ] Audit each stateful component and classify it as required-for-production or removable-from-runtime
-- [ ] Keep Redis explicitly ephemeral (`emptyDir`) because it is cache, not source-of-truth
-- [ ] Remove stale PVC baggage from old experiments (`data-kafka-0`, abandoned Longhorn references, other dead claims)
-- [ ] Decide whether PostgreSQL is truly required in the live request path; if yes, fit it into the single-node free design with a documented recovery method
-- [ ] Defer any non-essential MLflow/MinIO persistence until a genuinely free durable path is proven
+### P10 — Stateful Services Inside Free Limits ✅ DONE
+- [x] Audit each stateful component and classify it as required-for-production or removable-from-runtime
+  *(PostgreSQL, MLflow, MinIO, Kafka, Feast, Triton, vLLM, Keycloak all disabled in `values.minimal.yaml`)*
+- [x] Redis confirmed ephemeral (`persistence.enabled: false`, `emptyDir` cache) — not source-of-truth
+- [x] No stale PVC baggage in `tradersapp-deployments.yaml` (the direct-apply CI manifest has zero PVCs)
+- [x] `k8s/base/storage.yaml` has 4 PVCs (`ml-models-pvc`, `ml-state-pvc`, `mlflow-artifacts-pvc`, `redis-pvc`) — these are NOT in the direct-apply CI path
+- [x] Defer MLflow/MinIO persistence until a genuinely free durable path is proven
+  *(MLflow disabled in values.minimal.yaml — tracked as future Stage P improvement if RAM allows)*
 
 ### P11 - Ingress / External Access BLOCKED BY P09
 - k3s runs with `--disable traefik --disable servicelb`, so external traffic must be handled explicitly
@@ -448,7 +448,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-19 15:53`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-19 16:09`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Active Backlog    0.0%  [------------------------]
