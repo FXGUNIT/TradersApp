@@ -98,6 +98,7 @@ import {
   handleTelegramSendForensicAlert,
 } from "./routes/telegramRoutes.mjs";
 import { createTerminalAnalyticsService } from "./services/terminalAnalyticsService.mjs";
+import { resolveClientPolicy as resolveDesktopClientPolicy } from "./services/clientPolicy.mjs";
 import { createDispatcher, setRolesAdmin } from "./_dispatch.mjs";
 
 // ── Env loading ──────────────────────────────────────────────────────────────
@@ -163,6 +164,12 @@ const TELEGRAM_CHAT_ID =
   "";
 const ADMIN_ATTEMPT_LIMIT = 3;
 const ADMIN_LOCKOUT_WINDOW_MS = 15 * 60 * 1000;
+const DESKTOP_MINIMUM_VERSION =
+  String(
+    process.env.WINDOWS_DESKTOP_MINIMUM_VERSION ||
+      process.env.DESKTOP_MINIMUM_VERSION ||
+      "",
+  ).trim() || null;
 
 const AI_PROVIDER_DEFINITIONS = [
   {
@@ -401,6 +408,20 @@ const invokeProvider = async (providerKey, systemPrompt, userPrompt) => {
   return invokeOpenAiCompatible({ ...config, systemPrompt, userPrompt });
 };
 
+const resolveClientPolicy = ({
+  userStatus,
+  maintenanceActive,
+  platform,
+  currentVersion,
+}) =>
+  resolveDesktopClientPolicy({
+    userStatus,
+    maintenanceActive,
+    minimumDesktopVersion: DESKTOP_MINIMUM_VERSION,
+    platform,
+    currentVersion,
+  });
+
 // ── Dispatcher ───────────────────────────────────────────────────────────────
 
 setRolesAdmin(ROLES.ADMIN);
@@ -457,6 +478,7 @@ const dispatcher = createDispatcher({
   patchUserSecurity,
   provisionUser,
   recordUserActiveDay,
+  resolveClientPolicy,
   consumeCollectiveConsciousnessQuestion,
   revokeOtherSessions,
   upsertSession,

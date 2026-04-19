@@ -273,6 +273,55 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [ ] Make this master TODO the source of truth for the free-only production architecture
 - [ ] Update DNS/TLS runbooks to match the current registrar + OCI ingress plan
 
+### P18 - Windows Desktop Architecture Freeze
+- [ ] Freeze TradersApp end-user delivery as a Windows-only thin desktop client
+- [ ] Lock minimum supported end-user hardware to Windows 10/11 x64, 4 GB RAM, no discrete GPU, internet required
+- [ ] Keep BFF, ML inference, secrets, and admin enforcement server-side only
+- [ ] Lock desktop transport to packaged frontend assets talking to `bff.traders.app` and `api.traders.app` over HTTPS
+- [ ] Preserve the existing React UI/UX inside the Windows desktop shell instead of rewriting the experience natively
+
+### P19 - Windows Installer Wizard
+- [ ] Add `desktop/windows/TradersApp.Desktop` as the Windows shell built on .NET 8 WPF + WebView2
+- [ ] Package the frontend into desktop app-local assets using the dedicated desktop web build
+- [ ] Add `desktop/windows/installer` WiX installer scaffolding for install, repair, uninstall, and shortcuts
+- [ ] Include WebView2 prerequisite detection plus Evergreen bootstrapper/offline runtime support
+- [ ] Support silent install and upgrade-friendly install paths for Windows deployments
+
+### P20 - Desktop Auth, Access Control, and Admin Kill Switch
+- [ ] Extend identity session records with desktop metadata: `platform`, `appVersion`, `installId`, `deviceId`, `lastPolicyCheckAt`
+- [ ] Extend identity status responses with `clientPolicy.minimumDesktopVersion`, `clientPolicy.maintenanceActive`, `clientPolicy.forceLogout`, and `clientPolicy.reason`
+- [ ] Reuse the existing identity/session model instead of creating a parallel desktop auth backend
+- [ ] Revoke all active user sessions when an admin blocks that user
+- [ ] Force the desktop shell to sign out blocked, locked, maintenance-disabled, or minimum-version-rejected clients
+
+### P21 - Self-Update System
+- [ ] Integrate NetSparkle signed appcast updates into the Windows shell
+- [ ] Support both automatic signed-feed checks and manual signed package import
+- [ ] Reject unsigned, corrupted, or downgraded update packages
+- [ ] Support restart-safe update handoff after download and install
+- [ ] Publish signed update metadata and release artifacts through GitHub Releases
+
+### P22 - Desktop Security and IP Hardening
+- [ ] Strip source maps and release debug surfaces from the desktop web bundle
+- [ ] Store remembered desktop session material using DPAPI-backed secure storage in the shell
+- [ ] Block arbitrary top-level external navigation from the desktop WebView2 host
+- [ ] Keep secrets, model weights, and admin authority out of shipped desktop assets
+- [ ] Publish SHA-256 hashes, SBOM outputs, and malware/dependency scan results for desktop releases
+
+### P23 - 4 GB Performance and Compatibility Certification
+- [ ] Validate cold start to login screen at `<= 8s` on Windows 10/11 x64 4 GB reference machines
+- [ ] Validate idle RAM at `<= 500 MB` after the shell and web UI fully load
+- [ ] Confirm OCR and heavy modules remain lazy-loaded and do not require a discrete GPU
+- [ ] Validate degraded-network handling, reconnect flow, and forced logout behavior on desktop
+- [ ] Confirm the desktop release never starts local BFF or ML sidecar services
+
+### P24 - Windows Release Readiness and Docs Alignment
+- [ ] Add a Windows release workflow for building, signing, hashing, and publishing desktop artifacts
+- [ ] Add install, update, rollback, and uninstall runbooks for the Windows desktop client
+- [ ] Add QA/UAT checks for install, login, admin block, forced logout, self-update, repair, and uninstall
+- [ ] Keep desktop rollout blocked on both backend 24x7 readiness and signed desktop release readiness
+- [ ] Keep Stage P as the only section updated for the Windows desktop rollout
+
 ---
 
 ## Git History Rewrite — COMPLETED 2026-04-17
@@ -392,7 +441,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-19 09:09`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-19 15:03`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Active Backlog    0.0%  [------------------------]

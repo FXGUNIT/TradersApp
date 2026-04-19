@@ -53,9 +53,14 @@ function normalizeSessionRecord(sessionId, session = {}) {
     device: session.device || "Unknown Device",
     city: session.city || "Unknown",
     country: session.country || "Unknown",
+    platform: String(session.platform || "browser").trim().toLowerCase() || "browser",
+    appVersion: normalizeSessionMetadataValue(session.appVersion),
+    installId: normalizeSessionMetadataValue(session.installId),
+    deviceId: normalizeSessionMetadataValue(session.deviceId),
     createdAt: session.createdAt || nowIso(),
     expiresAt: session.expiresAt || null,
     lastActive: session.lastActive || session.updatedAt || nowIso(),
+    lastPolicyCheckAt: normalizeIsoTimestamp(session.lastPolicyCheckAt),
     updatedAt: session.updatedAt || nowIso(),
   };
 }
@@ -423,6 +428,11 @@ export function getUserByUid(uid) {
   return record ? clone(record) : null;
 }
 
+function normalizeSessionMetadataValue(value) {
+  const normalized = String(value || "").trim();
+  return normalized || null;
+}
+
 export function getUserStatus(uid) {
   const state = readState();
   const user = state.users?.[uid];
@@ -614,6 +624,28 @@ export function revokeOtherSessions(uid, currentSessionId) {
   };
 }
 
+export function revokeAllSessions(uid) {
+  if (!uid) {
+    return { success: false, error: "UID is required." };
+  }
+
+  const state = readState();
+  const bucket = normalizeSessionBucket(state.sessions?.[uid] || {});
+  const revokedCount = Object.keys(bucket).length;
+
+  state.sessions = {
+    ...(state.sessions || {}),
+    [uid]: {},
+  };
+
+  writeState(state);
+  return {
+    success: true,
+    revokedCount,
+    sessions: {},
+  };
+}
+
 export function ensureUserRecord(uid, patch = {}) {
   if (!uid) {
     return null;
@@ -799,6 +831,7 @@ export default {
   patchUserSecurity,
   provisionUser,
   recordUserActiveDay,
+  revokeAllSessions,
   revokeOtherSessions,
   upsertSession,
 };

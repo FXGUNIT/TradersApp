@@ -3,12 +3,14 @@ export function createIdentityRouteHandler({
   findUserByEmail,
   getUserByUid,
   getUserStatus,
+  getMaintenanceState,
   listTrainingEligibilityUsers,
   listSessions,
   patchUserAccess,
   patchUserSecurity,
   provisionUser,
   recordUserActiveDay,
+  resolveClientPolicy,
   revokeOtherSessions,
   upsertSession,
   json,
@@ -104,12 +106,40 @@ export function createIdentityRouteHandler({
         return true;
       }
 
+      const clientPolicy =
+        typeof resolveClientPolicy === "function"
+          ? resolveClientPolicy({
+              userStatus: status,
+              maintenanceActive:
+                typeof getMaintenanceState === "function"
+                  ? getMaintenanceState()
+                  : false,
+              platform:
+                req.headers?.["x-tradersapp-platform"] ||
+                req.headers?.["X-TradersApp-Platform"] ||
+                "",
+              currentVersion:
+                req.headers?.["x-tradersapp-version"] ||
+                req.headers?.["X-TradersApp-Version"] ||
+                "",
+            })
+          : {
+              minimumDesktopVersion: null,
+              maintenanceActive:
+                typeof getMaintenanceState === "function"
+                  ? Boolean(getMaintenanceState())
+                  : false,
+              forceLogout: false,
+              reason: null,
+            };
+
       json(
         res,
         200,
         {
           ok: true,
           ...status,
+          clientPolicy,
         },
         origin,
       );

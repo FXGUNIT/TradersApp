@@ -7,6 +7,7 @@ import {
   listApplications,
   upsertApplication,
 } from "./onboardingState.mjs";
+import { revokeAllSessions } from "./identityState.mjs";
 
 const ADMIN_DATA_PATH = resolve(process.cwd(), "bff/data/admin-domain.json");
 const IDENTITY_DATA_PATH = resolve(process.cwd(), "bff/data/identity-domain.json");
@@ -337,6 +338,7 @@ export function blockAdminUser(uid, adminUid) {
       isLocked: Boolean(nextUser?.isLocked),
     });
   }
+  const revocation = revokeAllSessions(uid);
 
   appendAuditEvent({
     actorUid: adminUid,
@@ -346,12 +348,17 @@ export function blockAdminUser(uid, adminUid) {
     detail: {
       action: "block",
       status: "BLOCKED",
+      revokedSessions: Number(revocation?.revokedCount || 0),
     },
     createdAt: updatedAt,
     updatedAt,
   });
 
-  return { success: true, user: clone(nextUser) };
+  return {
+    success: true,
+    user: clone(nextUser),
+    revokedCount: Number(revocation?.revokedCount || 0),
+  };
 }
 
 export function lockAdminUser(uid, adminUid) {
