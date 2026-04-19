@@ -6,11 +6,38 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <AssemblyTitle>TradersApp Desktop</AssemblyTitle>
+    <Company>TradersApp</Company>
+    <Product>TradersApp Desktop</Product>
+    <Description>Windows thin-client shell for TradersApp.</Description>
+    <Version>1.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <DesktopWebSourceDir>$(MSBuildThisFileDirectory)..\..\..\dist\desktop-web\</DesktopWebSourceDir>
+    <DesktopWebOutputDir>$(OutDir)webapp\</DesktopWebOutputDir>
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3912.50" />
     <PackageReference Include="NetSparkleUpdater.SparkleUpdater" Version="3.0.4" />
     <PackageReference Include="NetSparkleUpdater.UI.WPF" Version="3.0.4" />
   </ItemGroup>
+
+  <ItemGroup Condition="Exists('$(DesktopWebSourceDir)')">
+    <DesktopWebAsset Include="$(DesktopWebSourceDir)**\*.*" />
+  </ItemGroup>
+
+  <Target Name="CopyDesktopWebAssets" AfterTargets="Build">
+    <MakeDir Directories="$(DesktopWebOutputDir)" />
+    <Copy
+      SourceFiles="@(DesktopWebAsset)"
+      DestinationFiles="@(DesktopWebAsset->'$(DesktopWebOutputDir)%(RecursiveDir)%(Filename)%(Extension)')"
+      SkipUnchangedFiles="true"
+      Condition="Exists('$(DesktopWebSourceDir)')" />
+    <Warning
+      Text="Desktop web assets were not found at $(DesktopWebSourceDir). Run npm run build:desktop:web before publishing the Windows shell."
+      Condition="!Exists('$(DesktopWebSourceDir)')" />
+  </Target>
 
 </Project>
