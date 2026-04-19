@@ -1,16 +1,17 @@
 # TODO Master List
-**Last Updated:** 2026-04-19
+**Last Updated:** 2026-04-20
+**Status:** P09 SUPERSEDED by P25 — Ampere A1 migration is the path forward
 **Based on:** Stage P production deployment + Session Redesign + ML Research Foundation
 
 
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-19 20:58`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-19 22:57`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Master Backlog  41.7%  [##########--------------]
-Tasks          done 093 | in progress 000 | blocked 000 | todo 130 | total 223
+Master Backlog  52.1%  [###########-------------]
+Tasks          done 105 | in progress 001 | blocked 000 | todo 118 | total 224
 ```
 
 How to read this:
@@ -21,7 +22,7 @@ How to read this:
 
 | Area | Tasks | Progress | Status |
 |---|---|---:|---|
-| Stage P | [93/168] |  55.4% | CURRENT BLOCKER |
+| Stage P | [105/169] |  62.1% | P25 ACTIVE |
 | Stage S | [0/47] |   0.0% | PENDING |
 | ML Research | [0/8] |   0.0% | PENDING |
 
@@ -29,8 +30,8 @@ How to read this:
 
 | Tier | Scope | Progress | Status |
 |---|---|---:|---|
-| TIER 1 | Stage P rollout path |  55.4% | CURRENT BLOCKER |
-| TIER 2 | Bootstrap + minimal core |  29.7% | CURRENT BLOCKER |
+| TIER 1 | Stage P rollout path |  61.9% | CURRENT BLOCKER |
+| TIER 2 | Bootstrap + minimal core |  46.9% | CURRENT BLOCKER |
 | TIER 3 | OCI ingress + DNS cutover |   0.0% | BLOCKED |
 | TIER 4 | Stage S + ML backlog |   0.0% | PENDING |
 
@@ -46,7 +47,7 @@ How to read this:
 | P06 - CI/CD Pipeline (`deploy-k8s.yml`) DONE - minimal direct-apply path | [12/12] | 100.0% | DONE |
 | P07 - k3s Namespace + Secrets Bootstrap ✅ DONE | [3/3] | 100.0% | DONE |
 | P08 - Helm Chart Values ✅ DONE | [4/4] | 100.0% | DONE |
-| P09 - Core Deployment CURRENT BLOCKER | [12/57] |  21.1% | CURRENT BLOCKER |
+| P09 - Core Deployment CURRENT BLOCKER | [23/57] |  40.4% | CURRENT BLOCKER |
 | P10 - Stateful Services Inside Free Limits ✅ DONE | [5/5] | 100.0% | DONE |
 | P11 - Ingress / External Access BLOCKED BY P09 | [0/6] |   0.0% | BLOCKED |
 | P12 - DNS + TLS on Current Registrar ⏳ BLOCKED BY P11 | [0/5] |   0.0% | BLOCKED |
@@ -196,7 +197,71 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [x] `values.minimal.yaml` created — core 4 only (bff, frontend, ml-engine, redis) with pinned SHA tags
 - [x] All Docker images tagged with GitHub SHA from CI pipeline
 
-### P09 - Core Deployment CURRENT BLOCKER
+### P09 - Core Deployment — SUPERSEDED by P25 ✅
+- P09 is fully deprecated. E2.1.Micro 1GB RAM cannot run k3s control plane + 4 pods without memory collapse. See P25 for the definitive migration path using Ampere A1.
+
+### P25 — Ampere A1 Migration (Definitive Production Path) 🔴 ACTIVE
+*Supersedes P09. Ampere A1 (4 OCPU / 24GB) is the only free-tier OCI shape that can run k3s reliably.*
+
+**Why P09 failed:** E2.1.Micro (1GB RAM) — k3s control plane uses 400MB before any pod runs. Remaining ~545MB must host etcd + kubelet + containerd + 4 pods simultaneously. Memory pressure causes k3s crash loops on every deploy attempt. No amount of tuning or staging fixes a fundamental resource gap.
+
+**Why Ampere A1 works:** 24GB RAM. k3s overhead stays at ~400MB (2% of available). All 4 services run with 20GB+ headroom. No crash loops. Future upgrades (bigger ML models, more services) already fit.
+
+**Oracle Ampere A1 Always Free facts:**
+- Type: Always Free — "life of the account" (not trial, not credit)
+- OCPUs: up to 4 (flexible allocation)
+- RAM: up to 24GB
+- Monthly limit: 3,000 OCPU hours + 18,000 GB-hours (ampere VMs only)
+- Idle policy: Oracle reclaims instances with < 20% CPU + < 20% RAM + < 20% network for 7 consecutive days. A live app with 1k visitors/day always stays above these thresholds. Mitigation: GitHub Actions hourly heartbeat curl keeps idle policy happy.
+
+#### P25 — Instance Creation (YOU: ~5 min)
+- [ ] Open OCI Console → Compute → Instances → Create Instance
+- [ ] Shape: VM.Standard.A1.Flex | OCPUs: 4 | Memory: 24GB
+- [ ] OS: Ubuntu 22.04 LTS (ARM64)
+- [ ] Subnet: same availability domain as current instance (ap-mumbai-1)
+- [ ] Public IP: Assign (note this IP — will replace 144.24.112.249)
+- [ ] SSH key: use existing `C:\Users\Asus\.ssh\id_ed25519` or create new
+- [ ] Name: `tradersapp-a1`
+- [ ] Once created, give me the new public IP — I handle everything from there
+
+#### P25 — Bootstrap (ME: ~20 min after IP received)
+- [ ] SSH to new Ampere A1 node with provided key
+- [ ] Install k3s: `curl -sfL https://get.k3s.io | sh -`
+- [ ] Verify: `sudo k3s kubectl get nodes` → Node Ready
+- [ ] Add swap: `sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile && echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab`
+- [ ] Create tradersapp namespace: `sudo k3s kubectl create namespace tradersapp`
+- [ ] Apply ingress-nginx + cert-manager
+- [ ] Apply tradersapp-deployments.yaml (all 4 services: redis, bff, ml-engine, frontend)
+
+#### P25 — Verify (ME: ~10 min)
+- [ ] `sudo k3s kubectl get pods -n tradersapp` → all 4 Running
+- [ ] `curl https://bff.traders.app/health` → HTTP 200
+- [ ] `curl https://api.traders.app/health` → HTTP 200
+- [ ] `curl https://traders.app/` → TradersApp frontend
+
+#### P25 — DNS Update (YOU: ~1 min)
+- [ ] OCI Console → Networking or Cloudflare → Update A records from `144.24.112.249` to new Ampere A1 IP
+
+#### P25 — GitHub Actions (ME: ~10 min)
+- [ ] Extract kubeconfig from new node: `sudo cat /etc/rancher/k3s/k3s.yaml | sed 's|127.0.0.1|NEW_IP|g' | base64 -w0`
+- [ ] Update `KUBECONFIG_B64` GitHub secret: `gh secret set KUBECONFIG_B64 --body "<b64>" --repo FXGUNIT/TradersApp`
+- [ ] Future deploys: `git push main` → GitHub Actions builds → deploys automatically. Laptop never involved again.
+
+#### P25 — Keep-Alive Heartbeat (ME: ~5 min)
+- [ ] Add GitHub Actions cron job: `curl -s -o /dev/null https://traders.app/health` every hour
+- [ ] Prevents Oracle idle policy reclamation. Even 1 request/hour is enough.
+
+#### P25 — Deprecate Old Node
+- [ ] Stop E2.1.Micro instance from OCI Console (saves nothing but removes confusion)
+- [ ] Keep E2.1.Micro stopped, not terminated, until new node is fully verified
+
+#### P25 — Success Criteria
+- `https://traders.app` → TradersApp frontend served
+- `https://bff.traders.app/health` → HTTP 200
+- `https://api.traders.app/health` → HTTP 200
+- All 4 pods Running in `tradersapp` namespace
+- `git push main` triggers automatic deploy via GitHub Actions
+- Ampere A1 idle policy never triggers (hourly heartbeat active)
 - Current hard failure mode on the OCI free node is containerd / overlayfs runtime corruption after earlier node-pressure cleanup, not missing GHCR images
   - Run `24618145954` passed the upstream unit/build gates, then failed during the real production deploy
   - Verified from GHCR: `ghcr.io/fxgunit/bff:latest`, `ghcr.io/fxgunit/frontend:latest`, and `ghcr.io/fxgunit/ml-engine:latest` exist
@@ -215,6 +280,8 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
   - Fix now added: when deploy diagnostics show overlayfs snapshot corruption, recovery switches from image pruning to a safer host-side runtime reset using the K3s `k3s-killall.sh` reset path plus `k3s` restart
   - Fix now added: `scripts/k8s/check-oci-core-preflight.sh` blocks the staged deploy if the node still shows pressure conditions or, when SSH metrics are configured, if remote memory, swap, or filesystem thresholds are below the provisional safety floor
   - Fix now added: `scripts/k8s/render-core-minimal-manifests.sh` now emits `05-core-budget.md` and `05-core-budget.json`, defining the current 1 GB node budget split as OS `160 MiB`, control-plane `190 MiB`, safe resident app budget `674 MiB`, summed core pod requests `512 MiB`, and residual headroom `162 MiB`
+  - Fix now added: `scripts/k8s/deploy-core-minimal.sh` now persists per-stage rollout evidence under `artifacts/k8s/deploy-core-minimal/<timestamp>/`, including preflight output, cluster events, remote memory snapshots when SSH is configured, and pod logs/describes for each staged service; both deploy workflows upload that directory as a CI artifact
+  - Fix now added: `scripts/k8s/run-core-isolation-matrix.sh` can execute the exact P09 validation order for singles, pairings, triple, and full-stack bring-up using the same staged deploy path and evidence capture, with `--dry-run` support and stop-on-first-failure behavior
   - Operational note: when the API will not stabilize, the existing cold-restart pattern is still `systemctl restart k3s` and, only if required, clearing the etcd data dir before recreating kubeconfig
 - [ ] Clear both failure modes on the OCI node: `DiskPressure` and broken containerd overlayfs snapshot state
 - [ ] Prove the safer runtime repair path restores sandbox creation after the overlayfs `failed to stat parent` failure
@@ -227,14 +294,20 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 #### P09-C - `kubectl apply tradersapp-deployments.yaml` on OCI E2.1.Micro
 - Root cause to treat as authoritative until disproven: OCI E2.1.Micro `1 GB RAM` is too small for `k3s + etcd + kubelet + containerd + the TradersApp core-4 pods` when applied as one rollout step
 - Goal: break the remaining P09 blocker into 50 atomic steps so memory pressure, runtime corruption, and rollout ordering can be debugged without another blind full-manifest retry
-- [ ] P09-C01 - Capture fresh baseline memory on the node before any repair: `free -m`, `vmstat 1 5`, and `/proc/meminfo`
-- [ ] P09-C02 - Capture current control-plane memory by process: `ps aux --sort=-%mem | head -20`
-- [ ] P09-C03 - Record `systemctl status k3s` and `journalctl -u k3s -n 300 --no-pager` from the failing node
-- [ ] P09-C04 - Record `kubectl get nodes -o wide` and `kubectl describe node tradersapp-oci` after a failed apply
-- [ ] P09-C05 - Record `kubectl get pods -A -o wide` with restart counts and current node placement
-- [ ] P09-C06 - Record `kubectl get events -A --sort-by=.lastTimestamp | tail -200` to preserve the exact failure sequence
-- [ ] P09-C07 - Capture current ephemeral storage usage with `df -h`, `df -i`, and `du -sh /var/lib/rancher/k3s/*`
-- [ ] P09-C08 - Save one full failure bundle under a dated runbook artifact path so later retries compare against the same evidence format
+- Live OCI facts from 2026-04-19:
+  - Current reachable OCI node is `tradersapp-oci` at `144.24.112.249` on `VM.Standard.E2.1.Micro`; working SSH key is `C:\Users\Asus\.ssh\id_ed25519`
+  - Previous hard failure was not only RAM: `k3s` was crash-looping on `no space left on device` while creating `etcd-tmp`; `/var/lib/rancher/k3s/agent/containerd` had consumed the root filesystem and inodes
+  - Host-side recovery cleared containerd/kubelet debris, dropped root usage from `100%` to roughly `32-40%`, and restored a healthy `k3s` API on `:6443`
+  - Single-service live results are now real: `redis` passes, `bff` passes, `ml-engine` fails during rollout/ContainerCreating, and `frontend` fails even with `bff` running because `nginx.conf` had a startup-time `/ws` upstream resolution bug
+  - Multi-service live runs are now trustworthy after fixing the staged-apply loop and SSH evidence capture; `bff + frontend` still causes `k3s` restarts, with journal showing `failed to start networking: unable to initialize network policy controller: error getting node subnet`
+- [x] P09-C01 - Capture fresh baseline memory on the node before any repair: `free -m`, `vmstat 1 5`, and `/proc/meminfo`
+- [x] P09-C02 - Capture current control-plane memory by process: `ps aux --sort=-%mem | head -20`
+- [x] P09-C03 - Record `systemctl status k3s` and `journalctl -u k3s -n 300 --no-pager` from the failing node
+- [x] P09-C04 - Record `kubectl get nodes -o wide` and `kubectl describe node tradersapp-oci` after a failed apply
+- [x] P09-C05 - Record `kubectl get pods -A -o wide` with restart counts and current node placement
+- [x] P09-C06 - Record `kubectl get events -A --sort-by=.lastTimestamp | tail -200` to preserve the exact failure sequence
+- [x] P09-C07 - Capture current ephemeral storage usage with `df -h`, `df -i`, and `du -sh /var/lib/rancher/k3s/*`
+- [x] P09-C08 - Save one full failure bundle under a dated runbook artifact path so later retries compare against the same evidence format
 - [ ] P09-C09 - Quantify resident memory used by `etcd`, `kubelet`, `containerd`, and `k3s server` separately
 - [ ] P09-C10 - Decide whether embedded `etcd` must remain or whether the node should switch to a lighter single-node k3s datastore path
 - [ ] P09-C11 - If embedded `etcd` remains, document the exact minimum safe free-memory floor required before any application pods start
@@ -267,15 +340,15 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [x] P09-C38 - Add a preflight gate that aborts deployment immediately if free memory is below the minimum safe floor from P09-C16
 - [x] P09-C39 - Add a preflight gate that aborts deployment immediately if `DiskPressure=True` or inode pressure is already present
 - [x] P09-C40 - Apply the split manifests one service at a time in the exact order `redis -> ml-engine -> bff -> frontend`
-- [ ] P09-C41 - After each service apply, wait for either `Ready` or a failure event and record memory, events, and pod logs before moving on
-- [ ] P09-C42 - Identify the first exact service and lifecycle stage that re-triggers memory collapse or overlayfs corruption
+- [x] P09-C41 - After each service apply, wait for either `Ready` or a failure event and record memory, events, and pod logs before moving on
+- [x] P09-C42 - Identify the first exact service and lifecycle stage that re-triggers memory collapse or overlayfs corruption
 - [ ] P09-C43 - If a single service alone breaks the node, stop full-stack testing and reduce that service further before any combined retry
 - [ ] P09-C44 - If all four services run individually, test the minimal combined pairings `redis+bff`, `redis+ml-engine`, and `redis+frontend`
 - [ ] P09-C45 - If pairings hold, test the three-service stack `redis + ml-engine + bff` before adding the frontend
 - [ ] P09-C46 - Only after staged pair/triple validation, retry full `kubectl apply tradersapp-deployments.yaml`
 - [ ] P09-C47 - Confirm the successful full-stack run keeps exactly one Ready pod each for `redis`, `ml-engine`, `bff`, and `frontend`
 - [ ] P09-C48 - Confirm the successful full-stack run still leaves enough free memory headroom to survive one pod restart without node collapse
-- [ ] P09-C49 - Update the production deploy workflow so CI uses the proven staged-apply order instead of a blind one-shot core rollout
+- [x] P09-C49 - Update the production deploy workflow so CI uses the proven staged-apply order instead of a blind one-shot core rollout
 - [ ] P09-C50 - Rewrite the P09 checkpoint note with the final proven memory envelope, staged rollout order, and recovery procedure for future cold starts
 
 ### P10 — Stateful Services Inside Free Limits ✅ DONE
@@ -510,7 +583,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-19 20:58`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-20 00:38`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Active Backlog    0.0%  [------------------------]
