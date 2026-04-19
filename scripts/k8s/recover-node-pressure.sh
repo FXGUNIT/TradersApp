@@ -15,6 +15,13 @@ Purpose:
     1. deleting failed / completed pods,
     2. inspecting node taints and conditions,
     3. running a small privileged host cleanup job when DiskPressure is active.
+
+  If the node instead shows containerd overlayfs snapshot corruption
+  (for example `failed to stat parent ... overlayfs/snapshots/.../fs`),
+  switch to a safer runtime repair path:
+    - reset the k3s/containerd runtime state using the host `k3s-killall.sh`
+    - restart k3s cleanly
+    - avoid destructive image pruning that can worsen broken snapshot graphs
 EOF
 }
 
@@ -164,6 +171,21 @@ if matches:
   return 1
 }
 
+node_has_overlay_snapshot_corruption() {
+  local output
+  output="$(
+    kubectl --kubeconfig "${KUBECONFIG_PATH}" get events -A \
+      -o jsonpath='{range .items[*]}{.metadata.namespace}{"\t"}{.involvedObject.name}{"\t"}{.reason}{"\t"}{.message}{"\n"}{end}' 2>/dev/null |
+      grep -Ei 'failed to stat parent: stat .*/io\.containerd\.snapshotter\.v1\.overlayfs/snapshots/.*/fs: no such file or directory|parent snapshot .* does not exist|failed to create prepare snapshot dir'
+  )" || true
+
+  if [[ -n "${output}" ]]; then
+    echo "${output}"
+    return 0
+  fi
+  return 1
+}
+
 run_node_cleanup_job() {
   local job_name="node-disk-recovery"
 
@@ -264,9 +286,10 @@ spec:
                 summarize_host_disk before
                 collect_active_uids
 
+                # Keep cleanup conservative. On this node class, aggressive image
+                # pruning has correlated with broken overlayfs parent snapshots.
                 k3s crictl pods --state Exited -q | xargs -r k3s crictl rmp -f || true
                 k3s crictl ps -a --state Exited -q | xargs -r k3s crictl rm -f || true
-                k3s crictl rmi --prune || true
 
                 cleanup_stale_uid_dirs /var/log/pods
                 cleanup_stale_uid_dirs /var/lib/kubelet/pods
@@ -307,6 +330,116 @@ EOF
   kubectl --kubeconfig "${KUBECONFIG_PATH}" -n "${NAMESPACE}" logs "job/${job_name}" --tail=300 || true
 }
 
+run_node_runtime_repair_job() {
+  local job_name="node-runtime-repair"
+
+  echo "Scheduling host-side k3s/containerd runtime repair using ${CLEANUP_IMAGE}."
+  kubectl_retry 6 kubectl --kubeconfig "${KUBECONFIG_PATH}" -n "${NAMESPACE}" delete job "${job_name}" \
+    --ignore-not-found=true --wait=true || true
+
+  cat <<EOF | kubectl_retry 6 kubectl --kubeconfig "${KUBECONFIG_PATH}" apply --validate=false -f -
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ${job_name}
+  namespace: ${NAMESPACE}
+spec:
+  ttlSecondsAfterFinished: 300
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app: node-runtime-repair
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      hostPID: true
+      tolerations:
+        - operator: Exists
+          effect: NoSchedule
+        - operator: Exists
+          effect: NoExecute
+      containers:
+        - name: repair
+          image: ${CLEANUP_IMAGE}
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            privileged: true
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          command:
+            - /bin/sh
+            - -ceu
+            - |
+              chroot /host /bin/sh -ceu '
+                mkdir -p /var/log
+                cat > /usr/local/bin/tradersapp-runtime-repair.sh <<'\''HOST_REPAIR'\''
+#!/bin/sh
+set -eu
+LOG_FILE=/var/log/tradersapp-runtime-repair.log
+exec >>"${LOG_FILE}" 2>&1
+echo "=== $(date -Is) tradersapp runtime repair start ==="
+df -h / /var/lib/rancher /var/lib/kubelet /var/log 2>/dev/null || true
+
+if command -v systemctl >/dev/null 2>&1; then
+  systemctl stop k3s || true
+elif command -v rc-service >/dev/null 2>&1; then
+  rc-service k3s stop || true
+fi
+
+if [ -x /usr/local/bin/k3s-killall.sh ]; then
+  /usr/local/bin/k3s-killall.sh || true
+fi
+
+rm -rf /run/k3s/containerd /run/containerd 2>/dev/null || true
+sync
+sleep 5
+
+if command -v systemctl >/dev/null 2>&1; then
+  systemctl start k3s
+  systemctl --no-pager --full status k3s || true
+elif command -v rc-service >/dev/null 2>&1; then
+  rc-service k3s start || true
+else
+  echo "No supported service manager found for k3s restart." >&2
+  exit 1
+fi
+
+echo "=== $(date -Is) tradersapp runtime repair end ==="
+HOST_REPAIR
+                chmod 700 /usr/local/bin/tradersapp-runtime-repair.sh
+                nohup /usr/local/bin/tradersapp-runtime-repair.sh >/dev/null 2>&1 </dev/null &
+              '
+          volumeMounts:
+            - name: host-root
+              mountPath: /host
+      volumes:
+        - name: host-root
+          hostPath:
+            path: /
+            type: Directory
+EOF
+
+  if ! kubectl_retry 6 kubectl --kubeconfig "${KUBECONFIG_PATH}" -n "${NAMESPACE}" wait \
+    --for=condition=complete "job/${job_name}" --timeout=90s; then
+    echo "::warning::Runtime repair launcher job did not report completion."
+    kubectl --kubeconfig "${KUBECONFIG_PATH}" -n "${NAMESPACE}" get pods -l app=node-runtime-repair -o wide || true
+    for pod in $(kubectl --kubeconfig "${KUBECONFIG_PATH}" -n "${NAMESPACE}" get pods -l app=node-runtime-repair -o name 2>/dev/null); do
+      kubectl --kubeconfig "${KUBECONFIG_PATH}" -n "${NAMESPACE}" logs "${pod#pod/}" --tail=200 || true
+      kubectl --kubeconfig "${KUBECONFIG_PATH}" -n "${NAMESPACE}" describe "${pod}" || true
+    done
+    return 1
+  fi
+
+  echo "Runtime repair launcher completed. Waiting for the k3s API to return."
+}
+
 wait_for_disk_pressure_clear() {
   local timeout_seconds="${1:-300}"
   local elapsed=0
@@ -331,6 +464,13 @@ kubectl --kubeconfig "${KUBECONFIG_PATH}" create namespace "${NAMESPACE}" --dry-
 
 delete_terminal_pods
 log_node_state
+
+if node_has_overlay_snapshot_corruption >/dev/null; then
+  echo "Overlayfs snapshot corruption detected; switching to runtime repair."
+  run_node_runtime_repair_job
+  wait_for_kube_api 60 5
+  log_node_state
+fi
 
 if node_has_disk_pressure >/dev/null; then
   echo "DiskPressure detected; starting host cleanup."

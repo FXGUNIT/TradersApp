@@ -1318,6 +1318,18 @@ jobs:
               continue
             fi
 
+            if printf '%s' "${DEPLOY_OUTPUT}" | grep -qiE "failed to stat parent: stat .*/io\.containerd\.snapshotter\.v1\.overlayfs/snapshots/.*/fs: no such file or directory|parent snapshot .* does not exist|failed to create prepare snapshot dir|FailedCreatePodSandBox" && [ "${ATTEMPT}" -lt "${MAX_ATTEMPTS}" ]; then
+              ATTEMPT=$((ATTEMPT + 1))
+              echo "Containerd overlayfs snapshot corruption detected during rollout. Running OCI runtime repair before retry (attempt ${ATTEMPT}/${MAX_ATTEMPTS})..."
+              bash ./scripts/k8s/recover-node-pressure.sh \
+                --kubeconfig /tmp/kubeconfig \
+                --namespace tradersapp \
+                --wait-seconds 300 || true
+              wait_for_kube_api 24 10 || true
+              sleep 30
+              continue
+            fi
+
             if printf '%s' "${DEPLOY_OUTPUT}" | grep -qiE "cluster unreachable|connect: connection refused|i/o timeout|unexpected EOF|context deadline exceeded|apiserver not ready" && [ "${ATTEMPT}" -lt "${MAX_ATTEMPTS}" ]; then
               ATTEMPT=$((ATTEMPT + 1))
               echo "Transient cluster/runtime failure detected. Retrying minimal deploy (attempt ${ATTEMPT}/${MAX_ATTEMPTS})..."
