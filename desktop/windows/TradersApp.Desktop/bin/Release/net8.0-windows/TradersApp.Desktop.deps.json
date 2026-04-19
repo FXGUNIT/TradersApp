@@ -1,0 +1,193 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v8.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v8.0": {
+      "TradersApp.Desktop/1.0.0": {
+        "dependencies": {
+          "Microsoft.Web.WebView2": "1.0.3912.50",
+          "NetSparkleUpdater.SparkleUpdater": "3.0.4",
+          "NetSparkleUpdater.UI.WPF": "3.0.4",
+          "Microsoft.Web.WebView2.Core": "1.0.3912.50",
+          "Microsoft.Web.WebView2.WinForms": "1.0.3912.50",
+          "Microsoft.Web.WebView2.Wpf": "1.0.3912.50"
+        },
+        "runtime": {
+          "TradersApp.Desktop.dll": {}
+        }
+      },
+      "Microsoft.Web.WebView2/1.0.3912.50": {
+        "runtimeTargets": {
+          "runtimes/win-arm64/native/WebView2Loader.dll": {
+            "rid": "win-arm64",
+            "assetType": "native",
+            "fileVersion": "1.0.3912.50"
+          },
+          "runtimes/win-x64/native/WebView2Loader.dll": {
+            "rid": "win-x64",
+            "assetType": "native",
+            "fileVersion": "1.0.3912.50"
+          },
+          "runtimes/win-x86/native/WebView2Loader.dll": {
+            "rid": "win-x86",
+            "assetType": "native",
+            "fileVersion": "1.0.3912.50"
+          }
+        }
+      },
+      "Microsoft.Win32.SystemEvents/9.0.8": {
+        "runtime": {
+          "lib/net8.0/Microsoft.Win32.SystemEvents.dll": {
+            "assemblyVersion": "9.0.0.0",
+            "fileVersion": "9.0.825.36511"
+          }
+        },
+        "runtimeTargets": {
+          "runtimes/win/lib/net8.0/Microsoft.Win32.SystemEvents.dll": {
+            "rid": "win",
+            "assetType": "runtime",
+            "assemblyVersion": "9.0.0.0",
+            "fileVersion": "9.0.825.36511"
+          }
+        }
+      },
+      "NetSparkleUpdater.Chaos.NaCl/0.9.3": {
+        "runtime": {
+          "lib/net8.0/Chaos.NaCl.dll": {
+            "assemblyVersion": "0.1.0.0",
+            "fileVersion": "0.1.0.0"
+          }
+        }
+      },
+      "NetSparkleUpdater.SparkleUpdater/3.0.4": {
+        "dependencies": {
+          "NetSparkleUpdater.Chaos.NaCl": "0.9.3"
+        },
+        "runtime": {
+          "lib/net8.0/NetSparkle.dll": {
+            "assemblyVersion": "3.0.4.0",
+            "fileVersion": "3.0.4.0"
+          }
+        }
+      },
+      "NetSparkleUpdater.UI.WPF/3.0.4": {
+        "dependencies": {
+          "NetSparkleUpdater.SparkleUpdater": "3.0.4",
+          "System.Drawing.Common": "9.0.8"
+        },
+        "runtime": {
+          "lib/net8.0-windows7.0/NetSparkle.UI.WPF.dll": {
+            "assemblyVersion": "3.0.4.0",
+            "fileVersion": "3.0.4.0"
+          }
+        }
+      },
+      "System.Drawing.Common/9.0.8": {
+        "dependencies": {
+          "Microsoft.Win32.SystemEvents": "9.0.8"
+        },
+        "runtime": {
+          "lib/net8.0/System.Drawing.Common.dll": {
+            "assemblyVersion": "9.0.0.0",
+            "fileVersion": "9.0.825.36801"
+          },
+          "lib/net8.0/System.Private.Windows.Core.dll": {
+            "assemblyVersion": "9.0.0.0",
+            "fileVersion": "9.0.825.36801"
+          }
+        }
+      },
+      "Microsoft.Web.WebView2.Core/1.0.3912.50": {
+        "runtime": {
+          "Microsoft.Web.WebView2.Core.dll": {
+            "assemblyVersion": "1.0.3912.50",
+            "fileVersion": "1.0.3912.50"
+          }
+        }
+      },
+      "Microsoft.Web.WebView2.WinForms/1.0.3912.50": {
+        "runtime": {
+          "Microsoft.Web.WebView2.WinForms.dll": {
+            "assemblyVersion": "1.0.3912.50",
+            "fileVersion": "1.0.3912.50"
+          }
+        }
+      },
+      "Microsoft.Web.WebView2.Wpf/1.0.3912.50": {
+        "runtime": {
+          "Microsoft.Web.WebView2.Wpf.dll": {
+            "assemblyVersion": "1.0.3912.50",
+            "fileVersion": "1.0.3912.50"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "TradersApp.Desktop/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Microsoft.Web.WebView2/1.0.3912.50": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-mEIKZDSmb6CxGWKoxaxTSJ0yi0DD2zp29TA7kJY2GdanuH3c5aYruwfqsm3OsYn/h2hUhybQZvfbxyZe4O+X4Q==",
+      "path": "microsoft.web.webview2/1.0.3912.50",
+      "hashPath": "microsoft.web.webview2.1.0.3912.50.nupkg.sha512"
+    },
+    "Microsoft.Win32.SystemEvents/9.0.8": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-64oQBN8I8EOcyHGNt6+rlcqm4tlcKfqOpswtBCJZnpzBQ15L6IFKqjnbjbOWBpG9wKq9A/aC2LFSmSqplbwTYA==",
+      "path": "microsoft.win32.systemevents/9.0.8",
+      "hashPath": "microsoft.win32.systemevents.9.0.8.nupkg.sha512"
+    },
+    "NetSparkleUpdater.Chaos.NaCl/0.9.3": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-Copo3+rYuRVOuc6fmzHwXwehDC8l8DQ3y2VRI/d0sQTwProL4QAjkxRPV0zr3XBz1A8ZODXATOXV0hJXc7YdKg==",
+      "path": "netsparkleupdater.chaos.nacl/0.9.3",
+      "hashPath": "netsparkleupdater.chaos.nacl.0.9.3.nupkg.sha512"
+    },
+    "NetSparkleUpdater.SparkleUpdater/3.0.4": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-oAxJnYWK2c/wZTQgKR4rLBVQC4PB2PaOB30V+quFi+m/gndPbPKCntBqToP12ssSV2MMxclkzlAhJc+jhXiZ0w==",
+      "path": "netsparkleupdater.sparkleupdater/3.0.4",
+      "hashPath": "netsparkleupdater.sparkleupdater.3.0.4.nupkg.sha512"
+    },
+    "NetSparkleUpdater.UI.WPF/3.0.4": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-/X3f0vvNQfRl1to8GLD2+FrWDTk1D2bRjYU+JXntjWcoIwsNszRA4Qocpmq7wQrx8NNS7uo2uF498jjvQ5eP3Q==",
+      "path": "netsparkleupdater.ui.wpf/3.0.4",
+      "hashPath": "netsparkleupdater.ui.wpf.3.0.4.nupkg.sha512"
+    },
+    "System.Drawing.Common/9.0.8": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-ineIJmF+yuBEHGft9R153J9kmBFaeEfFL5Put5nzENneRcGGPUb3MvM8zrZ5pERQ0jPPSE3Wqw/clXvOq2F/Kw==",
+      "path": "system.drawing.common/9.0.8",
+      "hashPath": "system.drawing.common.9.0.8.nupkg.sha512"
+    },
+    "Microsoft.Web.WebView2.Core/1.0.3912.50": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Microsoft.Web.WebView2.WinForms/1.0.3912.50": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Microsoft.Web.WebView2.Wpf/1.0.3912.50": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}

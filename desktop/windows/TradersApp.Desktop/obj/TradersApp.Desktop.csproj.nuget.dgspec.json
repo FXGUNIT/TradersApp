@@ -44,6 +44,14 @@
         "net8.0-windows7.0": {
           "targetAlias": "net8.0-windows",
           "dependencies": {
+            "Microsoft.Web.WebView2": {
+              "target": "Package",
+              "version": "[1.0.3912.50, )"
+            },
+            "NetSparkleUpdater.SparkleUpdater": {
+              "target": "Package",
+              "version": "[3.0.4, )"
+            },
             "NetSparkleUpdater.UI.WPF": {
               "target": "Package",
               "version": "[3.0.4, )"
