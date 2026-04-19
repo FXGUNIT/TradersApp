@@ -165,6 +165,9 @@ classify_documents() {
   for doc_path in "${TEMP_SPLIT_DIR}"/doc-*.yaml; do
     [[ -s "${doc_path}" ]] || continue
     resource_name="$(sed -n 's/^  name: //p' "${doc_path}" | head -n 1 | tr -d '\r')"
+    if [[ -z "${resource_name}" ]]; then
+      continue
+    fi
 
     case "${resource_name}" in
       redis)
