@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const REPO_ROOT = resolve(__dirname, "..", "..");
+const REPO_ROOT = __dirname; // /app in container
 
 const ANALYSIS_TRANSPORT = String(
   process.env.ML_ANALYSIS_TRANSPORT || "http",

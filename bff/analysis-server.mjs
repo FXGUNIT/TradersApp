@@ -16,7 +16,7 @@ import {
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const REPO_ROOT = resolve(__dirname, "..");
+const REPO_ROOT = __dirname; // /app in container
 
 // ─── gRPC Service Definition ───────────────────────────────────────────────────
 //
