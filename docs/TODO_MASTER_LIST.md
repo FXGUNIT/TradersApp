@@ -1,5 +1,5 @@
 # TODO Master List
-**Last Updated:** 2026-04-20
+**Last Updated:** 2026-04-21
 **Status:** P26 ACTIVE — Contabo VPS + Docker Compose is the production path
 **Based on:** Stage P production deployment + Session Redesign + ML Research Foundation
 
@@ -63,7 +63,7 @@ How to read this:
 | P23 - 4 GB Performance and Compatibility Certification | [0/5] |   0.0% | PENDING |
 | P24 - Windows Release Readiness and Docs Alignment ✅ DONE | [5/5] | 100.0% | DONE |
 | P25 - Ampere A1 Migration (Archived Fallback) 🟡 ON HOLD | [0/7] |   0.0% | PENDING |
-| P26 - Contabo VPS Docker Compose Production Path 🔴 ACTIVE | [38/74] |  51.4% | IN PROGRESS |
+| P26 - Contabo VPS Docker Compose Production Path 🔴 ACTIVE | [44/74] |  59.5% | IN PROGRESS |
 | S1 - Trading Session Config Foundation | [0/11] |   0.0% | PENDING |
 | S2 - BFF Multi-Instrument Routing | [0/7] |   0.0% | PENDING |
 | S3 - Frontend Dashboard Redesign | [0/13] |   0.0% | PENDING |
@@ -246,15 +246,21 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [x] Create a manual GitHub Actions verification workflow for off-box public proof capture
 - [x] Tighten the remote deploy smoke checks so localhost health explicitly covers `frontend`, `bff`, `ml-engine`, `analysis-service`, and `redis`
 
-#### P26 — Live Cutover (Pending Real Credentials)
-- [ ] Contabo VPS is bought and running — note the public IP address
-- [ ] Add GitHub secret: `CONTABO_SSH_KEY` (private SSH key content)
-- [ ] Add GitHub secret: `CONTABO_VPS_HOST` (VPS public IP address)
-- [ ] Add GitHub secret: `CONTABO_VPS_USER` (`root` or `deploy`)
-- [ ] Add GitHub variables: `PRODUCTION_DEPLOY_PLATFORM=contabo` and, if needed, `CONTABO_DOMAIN=traders.app`
-- [ ] Confirm local health on the VPS for `frontend`, `bff`, `ml-engine`, `analysis-service`, and `redis`
-- [ ] Confirm public health for `https://traders.app`, `https://bff.traders.app/health`, and `https://api.traders.app/health` via `python scripts/contabo/verify_public_deploy.py` or the `Verify Contabo Public Deploy` workflow
-- [ ] Run the Contabo public-edge k6 suite via `python scripts/contabo/verify_public_deploy.py --with-k6` or the `Verify Contabo Public Deploy` workflow and record the first real concurrency envelope
+#### P26 — Live Cutover ✅ IN PROGRESS
+- [x] Contabo VPS is bought and running — public IP `173.249.18.14`
+- [x] Add GitHub secret: `CONTABO_SSH_KEY` (private SSH key content)
+- [x] Add GitHub secret: `CONTABO_VPS_HOST` (VPS public IP address)
+- [x] Add GitHub secret: `CONTABO_VPS_USER` (`root`)
+- [x] Add GitHub variables: `PRODUCTION_DEPLOY_PLATFORM=contabo`, `CONTABO_DOMAIN=traders.app`, `CONTABO_APP_ROOT=/opt/tradersapp`, `INFISICAL_PROJECT_ID`
+- [x] VPS docker-compose fixed: analysis-service command path corrected (`bff/analysis-server.mjs` → `analysis-server.mjs`)
+- [x] REPO_ROOT fixed in `analysis-server.mjs` and `analysisTransport.mjs` — proto resolves to `/app/proto/` in container
+- [x] Contabo deploy-contabo workflow verified: SSH connects, compose up succeeds
+- [x] Local VPS health confirmed: `redis` healthy, `ml-engine` healthy
+- [x] CI pipeline green through BFF Server step — ML Engine build + Integration Tests in progress
+- [ ] Wait for new BFF image with proto fix to reach GHCR, then restart analysis-service on VPS
+- [ ] Confirm local health for `bff` and `analysis-service` on VPS
+- [ ] Confirm public health for `https://traders.app`, `https://bff.traders.app/health`, and `https://api.traders.app/health`
+- [ ] Run the Contabo public-edge k6 suite and record the first concurrency envelope
 - [ ] Archive the final OCI node details only after Contabo is stable for at least one clean redeploy cycle
 
 #### P09-C - `kubectl apply tradersapp-deployments.yaml` on OCI E2.1.Micro
@@ -551,7 +557,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-20 19:43`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-21 03:32`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Active Backlog    0.0%  [------------------------]
