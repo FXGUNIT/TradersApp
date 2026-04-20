@@ -1,200 +1,389 @@
-# ─────────────────────────────────────────────────────────────────────────────
-# TradersApp — Contabo VPS Deployment
-#
-# Builds and deploys TradersApp to Contabo VPS via GitHub Actions.
-# Triggered on: push to main (automatic) OR workflow_dispatch (manual)
-#
-# Required GitHub Secrets:
-#   CONTABO_VPS_HOST      — Contabo VPS public IP (e.g. 173.249.18.14)
-#   CONTABO_VPS_USER      — SSH user (e.g. root)
-#   CONTABO_SSH_KEY       — Private SSH key content
-#
-# Optional GitHub Variables (Settings → Variables):
-#   CONTABO_DEPLOY_PATH   — Path on VPS (default: /opt/tradersapp)
-#   CONTABO_DOMAIN        — Domain for SSL (e.g. traders.app)
-#   CONTABO_BFF_HOST      — BFF public host (e.g. bff.traders.app)
-#   CONTABO_API_HOST      — API public host (e.g. api.traders.app)
-#
-# GitHub token (GITHUB_TOKEN) and GHCR packages are auto-available.
-# ─────────────────────────────────────────────────────────────────────────────
-
 name: Deploy to Contabo VPS
+
+on:
+  workflow_run:
+    workflows: ["CI/CD Pipeline"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Git ref or SHA to deploy"
+        required: false
+        default: ""
+      image_tag:
+        description: "Docker image tag to publish and deploy (defaults to commit SHA)"
+        required: false
+        default: ""
+      compose_profiles:
+        description: "Optional compose profiles such as mlops,observability"
+        required: false
+        default: "core"
+      skip_bootstrap:
+        description: "Skip remote bootstrap and only run the deploy step"
+        required: false
+        default: false
+        type: boolean
+      skip_build:
+        description: "Skip Docker builds and deploy the selected image tag"
+        required: false
+        default: false
+        type: boolean
+      skip_public_verify:
+        description: "Skip public DNS/TLS/HTTP verification after deploy"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
   packages: write
 
-on:
-  push:
-    branches: [main]
-  workflow_dispatch:
-    inputs:
-      skip_build:
-        description: "Skip Docker build, pull latest GHCR images"
-        required: false
-        default: "false"
-        type: boolean
-
 env:
-  GHCR_OWNER: fxgunit
-  DEPLOY_PATH: /opt/tradersapp
-  COMPOSE_FILE: deploy/ovh/docker-compose.yml
-  RUNTIME_ENV: runtime/.env.ovh
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
   deploy:
-    name: Deploy to Contabo VPS
+    name: Deploy Contabo VPS
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    if: |
+      vars.PRODUCTION_DEPLOY_PLATFORM == 'contabo' &&
+      (
+        github.event_name == 'workflow_dispatch' ||
+        (
+          github.event_name == 'workflow_run' &&
+          github.event.workflow_run.conclusion == 'success' &&
+          github.event.workflow_run.head_branch == 'main'
+        )
+      )
+    environment:
+      name: production
+      url: https://traders.app
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Setup SSH
+      - name: Resolve deploy context
+        id: context
+        shell: bash
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.CONTABO_SSH_KEY }}" > ~/.ssh/contabo_key
-          chmod 600 ~/.ssh/contabo_key
-          ssh-keyscan -H ${{ secrets.CONTABO_VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+          set -euo pipefail
 
-      # ── Build Docker images ───────────────────────────────────────────────
-      - name: Log into GitHub Container Registry
-        if: inputs.skip_build != 'true'
-        run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | \
-            docker login ghcr.io -u "${{ github.actor }}" --password-stdin
-
-      - name: Extract commit SHA
-        id: sha
-        run: echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-
-      - name: Build BFF image
-        if: inputs.skip_build != 'true'
-        run: |
-          docker build \
-            --build-arg BFF_ADMIN_PASS_HASH=${{ secrets.BFF_ADMIN_PASS_HASH }} \
-            --build-arg MASTER_SALT=${{ secrets.MASTER_SALT }} \
-            --build-arg AI_GEMINI_PRO_KEY=${{ secrets.AI_GEMINI_PRO_KEY }} \
-            --build-arg AI_GROQ_TURBO_KEY=${{ secrets.AI_GROQ_TURBO_KEY }} \
-            --build-arg AI_OPENROUTER_MIND_ALPHA=${{ secrets.AI_OPENROUTER_MIND_ALPHA }} \
-            --build-arg AI_OPENROUTER_MIND_BETA=${{ secrets.AI_OPENROUTER_MIND_BETA }} \
-            --build-arg AI_CEREBRAS_KEY=${{ secrets.AI_CEREBRAS_KEY }} \
-            --build-arg AI_DEEPSEEK_KEY=${{ secrets.AI_DEEPSEEK_KEY }} \
-            --build-arg AI_SAMBANOVA_KEY=${{ secrets.AI_SAMBANOVA_KEY }} \
-            --build-arg FINNHUB_API_KEY=${{ secrets.FINNHUB_API_KEY }} \
-            --build-arg NEWS_API_KEY=${{ secrets.NEWS_API_KEY }} \
-            -t ghcr.io/${{ env.GHCR_OWNER }}/bff:${{ steps.sha.outputs.sha }} \
-            -t ghcr.io/${{ env.GHCR_OWNER }}/bff:latest \
-            -f bff/Dockerfile .
-
-      - name: Build ML Engine image
-        if: inputs.skip_build != 'true'
-        run: |
-          docker build \
-            --build-arg FINNHUB_API_KEY=${{ secrets.FINNHUB_API_KEY }} \
-            --build-arg AI_GEMINI_PRO_KEY=${{ secrets.AI_GEMINI_PRO_KEY }} \
-            --build-arg AI_GROQ_TURBO_KEY=${{ secrets.AI_GROQ_TURBO_KEY }} \
-            --build-arg AI_OPENROUTER_MIND_ALPHA=${{ secrets.AI_OPENROUTER_MIND_ALPHA }} \
-            --build-arg AI_OPENROUTER_MIND_BETA=${{ secrets.AI_OPENROUTER_MIND_BETA }} \
-            --build-arg AI_CEREBRAS_KEY=${{ secrets.AI_CEREBRAS_KEY }} \
-            --build-arg AI_DEEPSEEK_KEY=${{ secrets.AI_DEEPSEEK_KEY }} \
-            --build-arg AI_SAMBANOVA_KEY=${{ secrets.AI_SAMBANOVA_KEY }} \
-            -t ghcr.io/${{ env.GHCR_OWNER }}/ml-engine:${{ steps.sha.outputs.sha }} \
-            -t ghcr.io/${{ env.GHCR_OWNER }}/ml-engine:latest \
-            -f ml-engine/Dockerfile \
-            ml-engine/
-
-      - name: Build Frontend image
-        if: inputs.skip_build != 'true'
-        run: |
-          docker build \
-            --build-arg VITE_BFF_URL=${{ vars.CONTABO_BFF_HOST != '' && format('https://{0}', vars.CONTABO_BFF_HOST) || 'https://bff.traders.app' }} \
-            --build-arg VITE_API_URL=${{ vars.CONTABO_API_HOST != '' && format('https://{0}/api', vars.CONTABO_API_HOST) || 'https://api.traders.app/api' }} \
-            -t ghcr.io/${{ env.GHCR_OWNER }}/frontend:${{ steps.sha.outputs.sha }} \
-            -t ghcr.io/${{ env.GHCR_OWNER }}/frontend:latest \
-            -f Dockerfile.frontend .
-
-      - name: Push images to GHCR
-        if: inputs.skip_build != 'true'
-        run: |
-          docker push ghcr.io/${{ env.GHCR_OWNER }}/bff:${{ steps.sha.outputs.sha }}
-          docker push ghcr.io/${{ env.GHCR_OWNER }}/bff:latest
-          docker push ghcr.io/${{ env.GHCR_OWNER }}/ml-engine:${{ steps.sha.outputs.sha }}
-          docker push ghcr.io/${{ env.GHCR_OWNER }}/ml-engine:latest
-          docker push ghcr.io/${{ env.GHCR_OWNER }}/frontend:${{ steps.sha.outputs.sha }}
-          docker push ghcr.io/${{ env.GHCR_OWNER }}/frontend:latest
-
-      # ── Deploy to VPS ─────────────────────────────────────────────────
-      - name: Deploy to Contabo VPS
-        run: |
-          ssh -i ~/.ssh/contabo_key \
-              -o StrictHostKeyChecking=no \
-              -o ConnectTimeout=30 \
-              ${{ secrets.CONTABO_VPS_USER }}@${{ secrets.CONTABO_VPS_HOST }} \
-              << 'ENDSSH'
-          set -e
-          DEPLOY_PATH={{ env.DEPLOY_PATH }}
-          SHA={{ steps.sha.outputs.sha }}
-
-          echo "=== Pulling latest code ==="
-          cd $DEPLOY_PATH/deploy/ovh
-          sudo -u tradersapp git pull origin main || true
-
-          echo "=== Updating runtime .env ==="
-          # Update IMAGE_TAG in runtime .env
-          if [ -f "$DEPLOY_PATH/runtime/.env.ovh" ]; then
-            sed -i "s/^IMAGE_TAG=.*/IMAGE_TAG=$SHA/" "$DEPLOY_PATH/runtime/.env.ovh"
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            REF="${{ github.event.workflow_run.head_sha }}"
+            IMAGE_TAG="${{ github.event.workflow_run.head_sha }}"
+            COMPOSE_PROFILES="${{ vars.CONTABO_COMPOSE_PROFILES || 'core' }}"
+            SKIP_BOOTSTRAP="false"
+            SKIP_BUILD="false"
+            SKIP_PUBLIC_VERIFY="false"
+          else
+            REF="${{ inputs.ref }}"
+            IMAGE_TAG="${{ inputs.image_tag }}"
+            COMPOSE_PROFILES="${{ inputs.compose_profiles }}"
+            SKIP_BOOTSTRAP="${{ inputs.skip_bootstrap }}"
+            SKIP_BUILD="${{ inputs.skip_build }}"
+            SKIP_PUBLIC_VERIFY="${{ inputs.skip_public_verify }}"
           fi
 
-          echo "=== Pulling Docker images ==="
-          cd $DEPLOY_PATH/deploy/ovh
-          docker compose --env-file $DEPLOY_PATH/runtime/.env.ovh pull
+          if [ -z "${REF}" ]; then
+            REF="${GITHUB_SHA}"
+          fi
 
-          echo "=== Stopping old containers ==="
-          docker compose --env-file $DEPLOY_PATH/runtime/.env.ovh down
+          if [ -z "${IMAGE_TAG}" ]; then
+            IMAGE_TAG="${REF}"
+          fi
 
-          echo "=== Starting new stack ==="
-          docker compose --env-file $DEPLOY_PATH/runtime/.env.ovh up -d
+          if [ -z "${COMPOSE_PROFILES}" ]; then
+            COMPOSE_PROFILES="core"
+          fi
 
-          echo "=== Waiting for services ==="
-          sleep 15
+          OWNER_LC="${GITHUB_REPOSITORY_OWNER,,}"
 
-          echo "=== Container status ==="
-          docker compose --env-file $DEPLOY_PATH/runtime/.env.ovh ps
+          DOMAIN="${{ vars.CONTABO_DOMAIN }}"
+          if [ -z "${DOMAIN}" ]; then
+            DOMAIN="${{ vars.TRADERSAPP_DOMAIN }}"
+          fi
+          if [ -z "${DOMAIN}" ]; then
+            DOMAIN="traders.app"
+          fi
 
-          echo "=== Recent logs ==="
-          docker compose --env-file $DEPLOY_PATH/runtime/.env.ovh logs --tail=30
-          ENDSSH
+          BFF_HOST="${{ vars.BFF_PUBLIC_HOST }}"
+          if [ -z "${BFF_HOST}" ]; then
+            BFF_HOST="bff.${DOMAIN}"
+          fi
 
-      - name: Smoke test
+          API_HOST="${{ vars.API_PUBLIC_HOST }}"
+          if [ -z "${API_HOST}" ]; then
+            API_HOST="api.${DOMAIN}"
+          fi
+
+          APP_ROOT="${{ vars.CONTABO_APP_ROOT }}"
+          if [ -z "${APP_ROOT}" ]; then
+            APP_ROOT="/opt/tradersapp"
+          fi
+
+          {
+            echo "ref=${REF}"
+            echo "image_tag=${IMAGE_TAG}"
+            echo "compose_profiles=${COMPOSE_PROFILES}"
+            echo "owner=${OWNER_LC}"
+            echo "domain=${DOMAIN}"
+            echo "bff_host=${BFF_HOST}"
+            echo "api_host=${API_HOST}"
+            echo "app_root=${APP_ROOT}"
+            echo "skip_bootstrap=${SKIP_BOOTSTRAP}"
+            echo "skip_build=${SKIP_BUILD}"
+            echo "skip_public_verify=${SKIP_PUBLIC_VERIFY}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Validate production contract
+        shell: bash
         run: |
-          sleep 10
-          echo "=== Health checks ==="
-          curl -sf --max-time 10 \
-            "http://${{ secrets.CONTABO_VPS_HOST }}/edge-health" \
-            && echo "EDGE: OK" || echo "EDGE: FAIL"
-          curl -sf --max-time 15 \
-            "http://${{ secrets.CONTABO_VPS_HOST }}/api/health" \
-            -w "\nBFF: %{http_code}" \
-            && echo "" || echo "BFF: FAIL"
+          set -euo pipefail
+          missing=0
 
-      - name: Upload deploy evidence
-        if: always()
-        run: |
-          ssh -i ~/.ssh/contabo_key \
-              -o StrictHostKeyChecking=no \
-              -o ConnectTimeout=30 \
-              ${{ secrets.CONTABO_VPS_USER }}@${{ secrets.CONTABO_VPS_HOST }} \
-              "cd /opt/tradersapp/deploy/ovh && docker compose --env-file /opt/tradersapp/runtime/.env.ovh logs --tail=50" \
-              > artifacts/contabo-deploy-$(date +%Y%m%d-%H%M%S).log 2>&1 || true
+          for key in CONTABO_VPS_HOST CONTABO_VPS_USER CONTABO_SSH_KEY; do
+            if [ -z "${!key:-}" ]; then
+              echo "::error::Missing required secret: ${key}"
+              missing=1
+            fi
+          done
 
-      - name: Upload evidence
-        uses: actions/upload-artifact@v4
-        if: always()
+          if [ -z "${CONTABO_APP_ENV:-}" ] && { [ -z "${INFISICAL_TOKEN:-}" ] || [ -z "${INFISICAL_PROJECT_ID:-}" ]; }; then
+            echo "::error::Provide CONTABO_APP_ENV or both INFISICAL_TOKEN and INFISICAL_PROJECT_ID."
+            missing=1
+          fi
+
+          if [ "${missing}" -ne 0 ]; then
+            exit 1
+          fi
+        env:
+          CONTABO_VPS_HOST: ${{ secrets.CONTABO_VPS_HOST }}
+          CONTABO_VPS_USER: ${{ secrets.CONTABO_VPS_USER }}
+          CONTABO_SSH_KEY: ${{ secrets.CONTABO_SSH_KEY }}
+          CONTABO_APP_ENV: ${{ secrets.CONTABO_APP_ENV }}
+          INFISICAL_TOKEN: ${{ secrets.INFISICAL_TOKEN }}
+          INFISICAL_PROJECT_ID: ${{ secrets.INFISICAL_PROJECT_ID }}
+
+      - name: Checkout deploy commit
+        uses: actions/checkout@v4
         with:
-          name: contabo-deploy-logs
-          path: artifacts/*.log
-          retention-days: 7
+          ref: ${{ steps.context.outputs.ref }}
+
+      - name: Prepare runtime env
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .artifacts/contabo
+
+          if [ -n "${CONTABO_APP_ENV:-}" ]; then
+            printf '%s\n' "${CONTABO_APP_ENV}" > .artifacts/contabo/base.env
+          else
+            curl -1sLf 'https://artifacts-cli.infisical.com/setup.deb.sh' | sudo -E bash
+            sudo apt-get update
+            sudo apt-get install -y infisical
+            export INFISICAL_TOKEN
+            infisical secrets pull \
+              --env=production \
+              --projectId="${INFISICAL_PROJECT_ID}" \
+              --format=env > .artifacts/contabo/base.env
+          fi
+
+          bash scripts/contabo/build-runtime-env.sh \
+            --base-env .artifacts/contabo/base.env \
+            --output .artifacts/contabo/.env.contabo \
+            --ghcr-owner "${{ steps.context.outputs.owner }}" \
+            --image-tag "${{ steps.context.outputs.image_tag }}" \
+            --domain "${{ steps.context.outputs.domain }}" \
+            --bff-host "${{ steps.context.outputs.bff_host }}" \
+            --api-host "${{ steps.context.outputs.api_host }}" \
+            --compose-profiles "${{ steps.context.outputs.compose_profiles }}"
+        env:
+          CONTABO_APP_ENV: ${{ secrets.CONTABO_APP_ENV }}
+          INFISICAL_TOKEN: ${{ secrets.INFISICAL_TOKEN }}
+          INFISICAL_PROJECT_ID: ${{ secrets.INFISICAL_PROJECT_ID }}
+
+      - name: Login to GHCR
+        if: steps.context.outputs.skip_build != 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push ML Engine image
+        if: steps.context.outputs.skip_build != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          IMAGE_SHA="ghcr.io/${{ steps.context.outputs.owner }}/ml-engine:${{ steps.context.outputs.image_tag }}"
+          IMAGE_LATEST="ghcr.io/${{ steps.context.outputs.owner }}/ml-engine:latest"
+          docker build \
+            --build-arg FINNHUB_API_KEY="${{ secrets.FINNHUB_API_KEY }}" \
+            --build-arg NEWS_API_KEY="${{ secrets.NEWS_API_KEY }}" \
+            --build-arg AI_GEMINI_PRO_KEY="${{ secrets.AI_GEMINI_PRO_KEY }}" \
+            --build-arg AI_GROQ_TURBO_KEY="${{ secrets.AI_GROQ_TURBO_KEY }}" \
+            --build-arg AI_OPENROUTER_MIND_ALPHA="${{ secrets.AI_OPENROUTER_MIND_ALPHA }}" \
+            --build-arg AI_OPENROUTER_MIND_BETA="${{ secrets.AI_OPENROUTER_MIND_BETA }}" \
+            --build-arg AI_CEREBRAS_KEY="${{ secrets.AI_CEREBRAS_KEY }}" \
+            --build-arg AI_DEEPSEEK_KEY="${{ secrets.AI_DEEPSEEK_KEY }}" \
+            --build-arg AI_SAMBANOVA_KEY="${{ secrets.AI_SAMBANOVA_KEY }}" \
+            -t "${IMAGE_SHA}" \
+            -t "${IMAGE_LATEST}" \
+            --file ml-engine/Dockerfile \
+            ml-engine/
+          docker push "${IMAGE_SHA}"
+          docker push "${IMAGE_LATEST}"
+
+      - name: Build and push BFF image
+        if: steps.context.outputs.skip_build != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          IMAGE_SHA="ghcr.io/${{ steps.context.outputs.owner }}/bff:${{ steps.context.outputs.image_tag }}"
+          IMAGE_LATEST="ghcr.io/${{ steps.context.outputs.owner }}/bff:latest"
+          docker build \
+            --build-arg BFF_ADMIN_PASS_HASH="${{ secrets.BFF_ADMIN_PASS_HASH }}" \
+            --build-arg MASTER_SALT="${{ secrets.MASTER_SALT }}" \
+            --build-arg FINNHUB_API_KEY="${{ secrets.FINNHUB_API_KEY }}" \
+            --build-arg NEWS_API_KEY="${{ secrets.NEWS_API_KEY }}" \
+            --build-arg AI_GEMINI_PRO_KEY="${{ secrets.AI_GEMINI_PRO_KEY }}" \
+            --build-arg AI_GROQ_TURBO_KEY="${{ secrets.AI_GROQ_TURBO_KEY }}" \
+            --build-arg AI_OPENROUTER_MIND_ALPHA="${{ secrets.AI_OPENROUTER_MIND_ALPHA }}" \
+            --build-arg AI_OPENROUTER_MIND_BETA="${{ secrets.AI_OPENROUTER_MIND_BETA }}" \
+            --build-arg AI_CEREBRAS_KEY="${{ secrets.AI_CEREBRAS_KEY }}" \
+            --build-arg AI_DEEPSEEK_KEY="${{ secrets.AI_DEEPSEEK_KEY }}" \
+            --build-arg AI_SAMBANOVA_KEY="${{ secrets.AI_SAMBANOVA_KEY }}" \
+            -t "${IMAGE_SHA}" \
+            -t "${IMAGE_LATEST}" \
+            --file bff/Dockerfile \
+            bff/
+          docker push "${IMAGE_SHA}"
+          docker push "${IMAGE_LATEST}"
+
+      - name: Build and push Frontend image
+        if: steps.context.outputs.skip_build != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          IMAGE_SHA="ghcr.io/${{ steps.context.outputs.owner }}/frontend:${{ steps.context.outputs.image_tag }}"
+          IMAGE_LATEST="ghcr.io/${{ steps.context.outputs.owner }}/frontend:latest"
+          docker build \
+            --build-arg VITE_BFF_URL="https://${{ steps.context.outputs.bff_host }}" \
+            --build-arg VITE_API_URL="https://${{ steps.context.outputs.api_host }}" \
+            -t "${IMAGE_SHA}" \
+            -t "${IMAGE_LATEST}" \
+            --file deploy/contabo/Dockerfile.frontend \
+            .
+          docker push "${IMAGE_SHA}"
+          docker push "${IMAGE_LATEST}"
+
+      - name: Prepare SSH access
+        shell: bash
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${CONTABO_SSH_KEY}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "${CONTABO_VPS_HOST}" >> ~/.ssh/known_hosts
+        env:
+          CONTABO_VPS_HOST: ${{ secrets.CONTABO_VPS_HOST }}
+          CONTABO_SSH_KEY: ${{ secrets.CONTABO_SSH_KEY }}
+
+      - name: Upload Contabo release bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .artifacts/contabo
+          tar -czf .artifacts/contabo/contabo-bundle.tgz deploy/contabo scripts/contabo
+
+          ssh "${{ secrets.CONTABO_VPS_USER }}@${{ secrets.CONTABO_VPS_HOST }}" "rm -rf /tmp/tradersapp-contabo-release && mkdir -p /tmp/tradersapp-contabo-release"
+          scp .artifacts/contabo/contabo-bundle.tgz "${{ secrets.CONTABO_VPS_USER }}@${{ secrets.CONTABO_VPS_HOST }}:/tmp/tradersapp-contabo-release/contabo-bundle.tgz"
+          scp .artifacts/contabo/.env.contabo "${{ secrets.CONTABO_VPS_USER }}@${{ secrets.CONTABO_VPS_HOST }}:/tmp/tradersapp-contabo-release/.env.contabo"
+
+      - name: Bootstrap and deploy on Contabo
+        shell: bash
+        env:
+          GHCR_TOKEN_B64: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          GHCR_TOKEN_B64="$(printf '%s' "${GHCR_TOKEN_B64}" | base64 -w0)"
+
+          ssh "${{ secrets.CONTABO_VPS_USER }}@${{ secrets.CONTABO_VPS_HOST }}" "bash -s" <<EOF
+            set -euo pipefail
+            RELEASE_DIR="/tmp/tradersapp-contabo-release"
+            APP_ROOT="${{ steps.context.outputs.app_root }}"
+            SUDO=""
+            if [ "\$(id -u)" -ne 0 ]; then
+              SUDO="sudo"
+            fi
+
+            tar -xzf "\${RELEASE_DIR}/contabo-bundle.tgz" -C "\${RELEASE_DIR}"
+
+            if [ "${{ steps.context.outputs.skip_bootstrap }}" != "true" ]; then
+              \${SUDO} bash "\${RELEASE_DIR}/scripts/contabo/setup-vps.sh" --app-root "\${APP_ROOT}"
+            fi
+
+            printf '%s' '${GHCR_TOKEN_B64}' | base64 -d | \${SUDO} bash "\${RELEASE_DIR}/scripts/contabo/deploy.sh" \
+              --bundle-root "\${RELEASE_DIR}" \
+              --env-file "\${RELEASE_DIR}/.env.contabo" \
+              --app-root "\${APP_ROOT}" \
+              --ghcr-username '${{ github.actor }}' \
+              --ghcr-token-stdin
+          EOF
+
+      - name: Capture remote status
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .artifacts/contabo
+          ssh "${{ secrets.CONTABO_VPS_USER }}@${{ secrets.CONTABO_VPS_HOST }}" "bash -s" <<EOF > .artifacts/contabo/compose-ps.txt
+            set -euo pipefail
+            APP_ROOT="${{ steps.context.outputs.app_root }}"
+            SUDO=""
+            if [ "\$(id -u)" -ne 0 ]; then
+              SUDO="sudo"
+            fi
+            \${SUDO} docker compose --project-name tradersapp --project-directory "\${APP_ROOT}/deploy/contabo" --env-file "\${APP_ROOT}/runtime/.env.contabo" -f "\${APP_ROOT}/deploy/contabo/docker-compose.yml" ps
+          EOF
+          ssh "${{ secrets.CONTABO_VPS_USER }}@${{ secrets.CONTABO_VPS_HOST }}" "bash -s" <<EOF > .artifacts/contabo/compose-logs.txt
+            set -euo pipefail
+            APP_ROOT="${{ steps.context.outputs.app_root }}"
+            SUDO=""
+            if [ "\$(id -u)" -ne 0 ]; then
+              SUDO="sudo"
+            fi
+            \${SUDO} docker compose --project-name tradersapp --project-directory "\${APP_ROOT}/deploy/contabo" --env-file "\${APP_ROOT}/runtime/.env.contabo" -f "\${APP_ROOT}/deploy/contabo/docker-compose.yml" logs --tail 200
+          EOF
+
+      - name: Verify public deployment
+        if: steps.context.outputs.skip_public_verify != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/contabo/verify_public_deploy.py \
+            --frontend-host "${{ steps.context.outputs.domain }}" \
+            --bff-host "${{ steps.context.outputs.bff_host }}" \
+            --api-host "${{ steps.context.outputs.api_host }}" \
+            --output ".artifacts/contabo/public-readiness-${{ github.run_id }}.json"
+
+      - name: Upload Contabo deploy evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: contabo-deploy-evidence-${{ github.run_id }}
+          path: .artifacts/contabo/
+          retention-days: 14
+
+      - name: Publish summary
+        shell: bash
+        run: |
+          {
+            echo "## Contabo deploy complete"
+            echo ""
+            echo "- Commit: \`${{ steps.context.outputs.ref }}\`"
+            echo "- Image tag: \`${{ steps.context.outputs.image_tag }}\`"
+            echo "- Domain: \`https://${{ steps.context.outputs.domain }}\`"
+            echo "- BFF health: \`https://${{ steps.context.outputs.bff_host }}/health\`"
+            echo "- API health: \`https://${{ steps.context.outputs.api_host }}/health\`"
+            echo "- Compose profiles: \`${{ steps.context.outputs.compose_profiles }}\`"
+            echo "- Public verification skipped: \`${{ steps.context.outputs.skip_public_verify }}\`"
+          } >> "${GITHUB_STEP_SUMMARY}"

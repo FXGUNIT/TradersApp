@@ -1,6 +1,8 @@
 # TradersApp — Production Deployment Guide (OCI k3s)
 
-**Time to complete: ~30 minutes.** Production runs on OCI Always Free k3s only.
+> **Archived reference only.** The active production path is `Contabo VPS + Docker Compose`, not OCI k3s. Use [P26_Contabo_Deployment_Plan.md](/e:/TradersApp/docs/P26_Contabo_Deployment_Plan.md:1) and [TODO_MASTER_LIST.md](/e:/TradersApp/docs/TODO_MASTER_LIST.md:1) for the current deployment path.
+
+**Time to complete: ~30 minutes.** This document is retained only as historical OCI/k3s evidence.
 
 ---
 
@@ -165,7 +167,7 @@ curl https://api.traders.app/health
 
 | Service | Usage | Free Limit | Status |
 |---------|-------|-----------|--------|
-| OCI E2.1.Micro | k3s node | Always Free | ✅ Active |
+| OCI E2.1.Micro | k3s node | Always Free | Archived reference |
 | GitHub Actions | CI/CD | 2000 min/month | ✅ Under limit |
 | GHCR | Container registry | 500MB | ✅ Well under limit |
 | Cloudflare | DNS + WAF + SSL | Unlimited | ✅ Active |

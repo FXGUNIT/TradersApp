@@ -10,7 +10,9 @@ For project health snapshot, see `docs/PROJECT_STATUS.md`.
 | Document | Purpose |
 |----------|---------|
 | `LOCAL_DEV.md` | Local development quickstart |
-| `SETUP.md` | Production deployment (browser steps) |
+| `DEPLOYMENT.md` | Active production deployment overview |
+| `P26_Contabo_Deployment_Plan.md` | Active Contabo production cutover runbook |
+| `SETUP.md` | Archived OCI production setup reference |
 | `SECRETS_MANAGEMENT.md` | Secrets management guide |
 | `docs/TODO_MASTER_LIST.md` | Master task list and critical path |
 
@@ -18,21 +20,22 @@ For project health snapshot, see `docs/PROJECT_STATUS.md`.
 
 ## Current Runtime Truth
 
-- Delivery is described as mixed rather than purely self-hosted: the core app stack runs locally/in-cluster, while some external AI and messaging dependencies remain third-party.
+- Delivery is described as mixed rather than purely self-hosted: the active production path is `Contabo VPS + Docker Compose`, while some external AI and messaging dependencies remain third-party.
 - The active ML inference seam still includes HTTP `/predict` for runtime compatibility, even where gRPC analysis paths also exist.
-- The current SLA baseline for the local/runtime-facing prediction path is `<200ms P95`, not the older aggressive placeholder targets shown in some historical assets.
+- The current SLA baseline for the local/runtime-facing prediction path is `<200ms P95`, not older placeholder targets shown in some historical assets.
 
 ---
 
-## Deployment & Operations
+## Deployment and Operations
 
 ### Runbooks
 
 | Runbook | Scope | Status |
 |---------|-------|--------|
 | `DEPLOYMENT.md` | Full deployment procedures | Complete |
+| `P26_Contabo_Deployment_Plan.md` | Active Contabo production deployment | Complete |
 | `LOCAL_DEV.md` | Local dev setup | Complete |
-| `SETUP.md` | Production deployment | Complete |
+| `SETUP.md` | Archived OCI production deployment reference | Archived |
 | `CANARY_DEPLOYMENT_RUNBOOK.md` | Canary release procedure | Complete |
 | `K8S_LIVE_CLUSTER_VALIDATION.md` | Post-deploy cluster validation | Complete |
 | `K8S_COLD_WARM_CACHE_LOAD.md` | Redis cold/warm cache loading | Complete |
@@ -42,7 +45,6 @@ For project health snapshot, see `docs/PROJECT_STATUS.md`.
 | `HPA_SCALING_TEST_RUNBOOK.md` | HPA autoscaling validation | Stub |
 | `POSTGRES_PROD_CUTOVER_RUNBOOK.md` | SQLite to PostgreSQL cutover | Stub |
 | `MIGRATION-K3S-TO-DOCKER.md` | K3s to Docker Compose migration | Complete |
-| `OCI-DEPLOYMENT-RUNBOOK.md` | OCI/Railway deployment | Complete |
 
 ### Infrastructure
 
@@ -57,28 +59,28 @@ For project health snapshot, see `docs/PROJECT_STATUS.md`.
 
 ---
 
-## Architecture & Design
+## Architecture and Design
 
 | Document | Purpose |
 |----------|---------|
 | `ARCHITECTURE_REVIEW_CHECKLIST.md` | Architecture review checklist |
-| `ADR-REGISTER.md` | ADR index (supernote → see `adr/REGISTER.md`) |
+| `ADR-REGISTER.md` | ADR index (supernote -> see `adr/REGISTER.md`) |
 | `adr/REGISTER.md` | Full Architecture Decision Record index |
 | `DDD_MICROSERVICES.md` | Domain-driven design and microservice boundaries |
 | `BOUNDED_CONTEXTS.md` | Bounded context definitions |
 | `SCALABILITY.md` | Scalability design decisions |
 | `PROCESS.md` | Organizational and team process |
 
-### Architectural Assets (see `docs/assets/)
+### Architectural Assets (see `docs/assets/`)
 
-- `architecture-3d-overview.*` — Current runtime overview
-- `architecture-system-design-board.*` — Detailed topology with maturity labels
-- `architecture-5w1h-map.*` — Operating intent map
-- `architecture-birdview-roadmap.*` — Evolution roadmap
+- `architecture-3d-overview.*` - Current runtime overview
+- `architecture-system-design-board.*` - Detailed topology with maturity labels
+- `architecture-5w1h-map.*` - Operating intent map
+- `architecture-birdview-roadmap.*` - Evolution roadmap
 
 ---
 
-## ML Engine & Data
+## ML Engine and Data
 
 | Document | Purpose |
 |----------|---------|
@@ -99,7 +101,7 @@ For project health snapshot, see `docs/PROJECT_STATUS.md`.
 |----------|---------|
 | `docs/DOMAIN-RULES.md` | Trading domain rules |
 | `docs/EDGE-CASES.md` | Market scenario edge cases |
-| `docs/LEGACY-PATTERNS.md` | Existing ML/integration patterns |
+| `docs/LEGACY-PATTERNS.md` | Existing ML and integration patterns |
 | `docs/TRADING_STRATEGY_COMPILED.md` | Compiled trading strategy |
 | `docs/TRADING-MASTER-ANALYSIS.md` | Master trading analysis |
 | `docs/QUANTITATIVE_TRADING_STRATEGY.md` | Quant strategy details |
@@ -128,11 +130,11 @@ For project health snapshot, see `docs/PROJECT_STATUS.md`.
 
 ---
 
-## Agents & Automation
+## Agents and Automation
 
 | Document | Purpose |
 |----------|---------|
-| `CICD_GITEA_WOODPECKER.md` | Gitea + Woodpecker CI/CD guide |
+| `CICD_GITEA_WOODPECKER.md` | Gitea and Woodpecker CI/CD guide |
 | `TASK_ALIGNMENT_20_POINT_PLAN.md` | Agent task alignment guide |
 | `PROMPT-TEMPLATE.md` | Session starter prompt template |
 

@@ -1,24 +1,24 @@
 # Deployment Guide — TradersApp
 
 **Last updated:** 2026-04-20
-**Status:** OVH VPS + Docker Compose is the active production path. OCI k3s is archived fallback only. See `docs/OVH_PRODUCTION_RUNBOOK.md`.
+**Status:** Contabo VPS + Docker Compose is the active production path. OCI k3s is archived fallback only. See `docs/P26_Contabo_Deployment_Plan.md`.
 
 ---
 
 ## Active Production Path
 
-- Single `OVH VPS-3`
+- Single `Contabo VPS`
 - `GitHub Actions -> GHCR -> SSH -> Docker Compose`
 - Public hosts:
   - `traders.app`
   - `bff.traders.app`
   - `api.traders.app`
 - Runtime bundle:
-  - [deploy/ovh/docker-compose.yml](/e:/TradersApp/deploy/ovh/docker-compose.yml:1)
-  - [deploy/ovh/Caddyfile](/e:/TradersApp/deploy/ovh/Caddyfile:1)
-  - [scripts/ovh/bootstrap.sh](/e:/TradersApp/scripts/ovh/bootstrap.sh:1)
-  - [scripts/ovh/deploy.sh](/e:/TradersApp/scripts/ovh/deploy.sh:1)
-  - [docs/OVH_PRODUCTION_RUNBOOK.md](/e:/TradersApp/docs/OVH_PRODUCTION_RUNBOOK.md:1)
+  - [deploy/contabo/docker-compose.yml](/e:/TradersApp/deploy/contabo/docker-compose.yml:1)
+  - [deploy/contabo/Caddyfile](/e:/TradersApp/deploy/contabo/Caddyfile:1)
+  - [scripts/contabo/setup-vps.sh](/e:/TradersApp/scripts/contabo/setup-vps.sh:1)
+  - [scripts/contabo/deploy.sh](/e:/TradersApp/scripts/contabo/deploy.sh:1)
+  - [docs/P26_Contabo_Deployment_Plan.md](/e:/TradersApp/docs/P26_Contabo_Deployment_Plan.md:1)
 
 ## Archived OCI Reference
 
@@ -48,7 +48,7 @@ The rest of this document describes the old OCI k3s path kept for audit and roll
                     └───────────────────────┘
 ```
 
-> **Archived topology:** OCI Always Free k3s only. This is retained as historical context. The active production route is the OVH runbook above.
+> **Archived topology:** OCI Always Free k3s only. This is retained as historical context. The active production route is the Contabo runbook above.
 
 ---
 

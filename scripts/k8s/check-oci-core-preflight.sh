@@ -132,6 +132,8 @@ fi
 PASS_COUNT=0
 FAIL_COUNT=0
 PYTHON_BIN=""
+SSH_KEY_EFFECTIVE=""
+SSH_TEMP_KEY=""
 
 log() {
   printf '[%s] %s\n' "$(date +%H:%M:%S)" "$*"
@@ -152,9 +154,9 @@ kubectl_cmd() {
 }
 
 ssh_cmd() {
-  local cmd=(ssh -p "${SSH_PORT}" -o BatchMode=yes -o StrictHostKeyChecking=accept-new)
-  if [[ -n "${SSH_KEY}" ]]; then
-    cmd+=(-i "${SSH_KEY}")
+  local cmd=(ssh -p "${SSH_PORT}" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new)
+  if [[ -n "${SSH_KEY_EFFECTIVE}" ]]; then
+    cmd+=(-i "${SSH_KEY_EFFECTIVE}")
   fi
   cmd+=("${SSH_USER}@${HOST}" "$@")
   "${cmd[@]}"
@@ -182,11 +184,12 @@ check_node_conditions() {
     return
   }
 
-  if "${PYTHON_BIN}" - "${NODE_NAME}" <<'PY' <<<"${node_json}"
+  if NODE_JSON_PAYLOAD="${node_json}" "${PYTHON_BIN}" - "${NODE_NAME}" <<'PY'
 import json
+import os
 import sys
 
-doc = json.load(sys.stdin)
+doc = json.loads(os.environ["NODE_JSON_PAYLOAD"])
 conditions = {item.get("type"): item.get("status") for item in doc.get("status", {}).get("conditions", [])}
 taints = doc.get("spec", {}).get("taints", []) or []
 
@@ -212,6 +215,25 @@ PY
     fail "Node ${NODE_NAME} is not safe for rollout"
   fi
 }
+
+prepare_ssh_key() {
+  if [[ -z "${SSH_KEY}" ]]; then
+    SSH_KEY_EFFECTIVE=""
+    return 0
+  fi
+
+  SSH_TEMP_KEY="$(mktemp "${TMPDIR:-/tmp}/tradersapp-ssh-key-XXXXXX")"
+  cp "${SSH_KEY}" "${SSH_TEMP_KEY}"
+  chmod 600 "${SSH_TEMP_KEY}"
+  SSH_KEY_EFFECTIVE="${SSH_TEMP_KEY}"
+}
+
+cleanup() {
+  if [[ -n "${SSH_TEMP_KEY}" ]]; then
+    rm -f "${SSH_TEMP_KEY}" 2>/dev/null || true
+  fi
+}
+trap cleanup EXIT
 
 check_remote_thresholds() {
   if [[ -z "${HOST}" ]]; then
@@ -291,6 +313,10 @@ else
 fi
 if [[ -n "${HOST}" ]]; then
   require_cmd ssh
+  require_cmd cp
+  require_cmd chmod
+  require_cmd mktemp
+  prepare_ssh_key
 fi
 check_kube_api
 check_node_conditions

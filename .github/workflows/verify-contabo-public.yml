@@ -1,0 +1,104 @@
+name: Verify Contabo Public Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      frontend_host:
+        description: "Frontend public host"
+        required: false
+        default: "traders.app"
+      bff_host:
+        description: "BFF public host"
+        required: false
+        default: "bff.traders.app"
+      api_host:
+        description: "ML Engine public host"
+        required: false
+        default: "api.traders.app"
+      timeout_seconds:
+        description: "Probe timeout in seconds"
+        required: false
+        default: "15"
+      with_k6:
+        description: "Run the public-edge k6 suite after health checks"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify Public Edge
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install k6
+        if: ${{ inputs.with_k6 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo gdebi install -n k6 2>/dev/null || \
+            { curl -fsSL https://github.com/grafana/k6/releases/download/v0.55.0/k6-v0.55.0-linux-amd64.tar.gz \
+              | sudo tar -xz -C /usr/local/bin k6-v0.55.0-linux-amd64/k6 --strip-components=1; }
+
+      - name: Run public verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .artifacts/contabo
+          args=(
+            --frontend-host "${{ inputs.frontend_host }}"
+            --bff-host "${{ inputs.bff_host }}"
+            --api-host "${{ inputs.api_host }}"
+            --timeout "${{ inputs.timeout_seconds }}"
+            --output ".artifacts/contabo/public-readiness-${{ github.run_id }}.json"
+          )
+
+          if [ "${{ inputs.with_k6 }}" = "true" ]; then
+            args+=(--with-k6)
+          fi
+
+          python scripts/contabo/verify_public_deploy.py "${args[@]}"
+
+      - name: Parse k6 SLO results
+        if: ${{ always() && inputs.with_k6 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/ci/parse_k6_results.py
+
+      - name: Upload verification artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: contabo-public-verification-${{ github.run_id }}
+          path: |
+            .artifacts/contabo/
+            .artifacts/k6-slo-*/
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Publish summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Contabo public verification"
+            echo ""
+            echo "- Frontend: \`https://${{ inputs.frontend_host }}\`"
+            echo "- BFF health: \`https://${{ inputs.bff_host }}/health\`"
+            echo "- API health: \`https://${{ inputs.api_host }}/health\`"
+            echo "- k6 suite: \`${{ inputs.with_k6 }}\`"
+            echo "- Artifact: \`contabo-public-verification-${{ github.run_id }}\`"
+          } >> "${GITHUB_STEP_SUMMARY}"

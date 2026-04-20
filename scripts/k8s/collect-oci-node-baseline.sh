@@ -32,6 +32,8 @@ SSH_KEY=""
 SSH_PORT="22"
 KUBECONFIG_PATH=""
 NAMESPACE="tradersapp"
+SSH_KEY_EFFECTIVE=""
+SSH_TEMP_KEY=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -115,9 +117,9 @@ run_remote_capture() {
   local command="$2"
   local output_path="${OUTPUT_DIR}/host/${label}.txt"
 
-  local ssh_cmd=(ssh -p "${SSH_PORT}" -o BatchMode=yes -o StrictHostKeyChecking=accept-new)
-  if [[ -n "${SSH_KEY}" ]]; then
-    ssh_cmd+=(-i "${SSH_KEY}")
+  local ssh_cmd=(ssh -p "${SSH_PORT}" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new)
+  if [[ -n "${SSH_KEY_EFFECTIVE}" ]]; then
+    ssh_cmd+=(-i "${SSH_KEY_EFFECTIVE}")
   fi
   ssh_cmd+=("${SSH_USER}@${HOST}" "${command}")
 
@@ -163,8 +165,31 @@ Cluster captures:
 EOF
 }
 
+prepare_ssh_key() {
+  if [[ -z "${SSH_KEY}" ]]; then
+    SSH_KEY_EFFECTIVE=""
+    return 0
+  fi
+
+  SSH_TEMP_KEY="$(mktemp "${TMPDIR:-/tmp}/tradersapp-ssh-key-XXXXXX")"
+  cp "${SSH_KEY}" "${SSH_TEMP_KEY}"
+  chmod 600 "${SSH_TEMP_KEY}"
+  SSH_KEY_EFFECTIVE="${SSH_TEMP_KEY}"
+}
+
+cleanup() {
+  if [[ -n "${SSH_TEMP_KEY}" ]]; then
+    rm -f "${SSH_TEMP_KEY}" 2>/dev/null || true
+  fi
+}
+trap cleanup EXIT
+
 if [[ -n "${HOST}" ]]; then
   require_cmd ssh
+  require_cmd cp
+  require_cmd chmod
+  require_cmd mktemp
+  prepare_ssh_key
 fi
 
 if [[ -n "${KUBECONFIG_PATH}" ]]; then

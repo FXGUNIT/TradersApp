@@ -33,12 +33,66 @@ async function main() {
 
   const docChecks = [
     {
+      path: "README.md",
+      required: [
+        { label: "active Contabo runbook link", pattern: /Contabo Production Runbook/ },
+        { label: "active production runbook quick-start entry", pattern: /Active production runbook/ },
+        { label: "Contabo architecture wording", pattern: /GitHub Actions \+ Docker Compose \+ Contabo/ },
+      ],
+    },
+    {
       path: "docs/index.md",
       required: [
         { label: "Current Runtime Truth section", pattern: /## Current Runtime Truth/ },
         { label: "HTTP /predict runtime note", pattern: /HTTP `\/predict`/ },
         { label: "mixed delivery wording", pattern: /described as mixed/i },
         { label: "current SLA baseline", pattern: /<200ms P95/ },
+        { label: "active Contabo runbook entry", pattern: /P26_Contabo_Deployment_Plan\.md/ },
+        { label: "archived OCI setup entry", pattern: /Archived OCI production setup reference/ },
+        { label: "active Contabo path note", pattern: /active production path is `Contabo VPS \+ Docker Compose`/i },
+      ],
+      forbidden: [
+        { label: "obsolete OCI deployment runbook index entry", pattern: /OCI-DEPLOYMENT-RUNBOOK\.md/ },
+      ],
+    },
+    {
+      path: "docs/DEPLOYMENT.md",
+      required: [
+        { label: "active Contabo deployment status", pattern: /Contabo VPS \+ Docker Compose is the active production path/ },
+        { label: "Contabo runbook reference", pattern: /P26_Contabo_Deployment_Plan\.md/ },
+        { label: "archived OCI reference section", pattern: /## Archived OCI Reference/ },
+      ],
+    },
+    {
+      path: "docs/P26_Contabo_Deployment_Plan.md",
+      required: [
+        { label: "CI-to-Contabo pipeline wording", pattern: /`push main` -> `CI\/CD Pipeline` -> `Deploy to Contabo VPS`/ },
+        { label: "production platform variable contract", pattern: /PRODUCTION_DEPLOY_PLATFORM=contabo/ },
+        { label: "Contabo workflow reference", pattern: /deploy-contabo\.yml/ },
+        { label: "manual public verification workflow reference", pattern: /verify-contabo-public\.yml/ },
+        { label: "skip public verify contract", pattern: /skip_public_verify=true/ },
+      ],
+    },
+    {
+      path: "docs/SETUP.md",
+      required: [
+        { label: "archived OCI banner", pattern: /Archived reference only/ },
+        { label: "active Contabo redirect", pattern: /active production path is `Contabo VPS \+ Docker Compose`/i },
+      ],
+      forbidden: [
+        { label: "stale OCI-only active claim", pattern: /Production runs on OCI Always Free k3s only/ },
+        { label: "stale OCI active status table label", pattern: /\| OCI E2\.1\.Micro \| k3s node \| Always Free \| .*Active .* \|/ },
+      ],
+    },
+    {
+      path: "docs/GO_LIVE_CERTIFICATE.md",
+      required: [
+        { label: "archived certificate banner", pattern: /Archived topology certificate/ },
+        { label: "archived OCI status", pattern: /ARCHIVED .* HISTORICAL OCI BASELINE/ },
+        { label: "active Contabo redirect", pattern: /active production target is now `Contabo VPS \+ Docker Compose`/i },
+      ],
+      forbidden: [
+        { label: "stale production-ready certificate status", pattern: /APPROVED .* PRODUCTION READY/ },
       ],
     },
     {

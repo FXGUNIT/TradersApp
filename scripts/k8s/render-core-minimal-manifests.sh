@@ -10,6 +10,7 @@ Usage:
     --image-tag <sha> \
     [--output-dir /path/to/output] \
     [--kubeconfig /path/to/kubeconfig] \
+    [--services redis,ml-engine,bff,frontend] \
     [--validate-client]
 
 Purpose:
@@ -31,6 +32,8 @@ IMAGE_REPO=""
 IMAGE_TAG=""
 KUBECONFIG_PATH=""
 VALIDATE_CLIENT="false"
+SELECTED_SERVICES_ARG=""
+SELECTED_SERVICES=()
 PYTHON_BIN=""
 NODE_RAM_MIB="${NODE_RAM_MIB:-1024}"
 NODE_SWAP_MIB="${NODE_SWAP_MIB:-2048}"
@@ -45,6 +48,7 @@ VALUES_FILE="${REPO_ROOT}/k8s/helm/tradersapp/values.minimal.yaml"
 OUTPUT_DIR="${REPO_ROOT}/artifacts/k8s/core-minimal"
 TEMP_SPLIT_DIR=""
 BUDGET_SCRIPT="${SCRIPT_DIR}/generate-core-memory-budget.py"
+CORE_SERVICES=(redis ml-engine bff frontend)
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -66,6 +70,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --kubeconfig)
       KUBECONFIG_PATH="${2:-}"
+      shift 2
+      ;;
+    --services)
+      SELECTED_SERVICES_ARG="${2:-}"
       shift 2
       ;;
     --validate-client)
@@ -90,8 +98,47 @@ if [[ -z "${IMAGE_REPO}" || -z "${IMAGE_TAG}" ]]; then
   exit 1
 fi
 
+normalize_selected_services() {
+  local service=""
+
+  if [[ -z "${SELECTED_SERVICES_ARG}" ]]; then
+    SELECTED_SERVICES=("${CORE_SERVICES[@]}")
+    return 0
+  fi
+
+  local cleaned="${SELECTED_SERVICES_ARG// /}"
+  declare -A requested_lookup=()
+  local raw_services=()
+  IFS=',' read -r -a raw_services <<< "${cleaned}"
+
+  for service in "${raw_services[@]}"; do
+    [[ -n "${service}" ]] || continue
+    case "${service}" in
+      redis|ml-engine|bff|frontend)
+        requested_lookup["${service}"]=1
+        ;;
+      *)
+        echo "::error::Unsupported service in --services: ${service}" >&2
+        exit 1
+        ;;
+    esac
+  done
+
+  for service in "${CORE_SERVICES[@]}"; do
+    if [[ -n "${requested_lookup["${service}"]:-}" ]]; then
+      SELECTED_SERVICES+=("${service}")
+    fi
+  done
+
+  if [[ "${#SELECTED_SERVICES[@]}" -eq 0 ]]; then
+    echo "::error::--services resolved to an empty service set" >&2
+    exit 1
+  fi
+}
+
 mkdir -p "${OUTPUT_DIR}"
 TEMP_SPLIT_DIR="$(mktemp -d)"
+normalize_selected_services
 
 cleanup() {
   rm -rf "${TEMP_SPLIT_DIR}"
@@ -100,18 +147,68 @@ trap cleanup EXIT
 
 FULL_MANIFEST_PATH="${OUTPUT_DIR}/tradersapp-deployments.yaml"
 APPLY_ORDER_PATH="${OUTPUT_DIR}/00-apply-order.txt"
+SELECTED_SERVICES_PATH="${OUTPUT_DIR}/00-selected-services.txt"
 REDIS_MANIFEST_PATH="${OUTPUT_DIR}/01-redis.yaml"
 ML_ENGINE_MANIFEST_PATH="${OUTPUT_DIR}/02-ml-engine.yaml"
 BFF_MANIFEST_PATH="${OUTPUT_DIR}/03-bff.yaml"
 FRONTEND_MANIFEST_PATH="${OUTPUT_DIR}/04-frontend.yaml"
 
+service_manifest_filename() {
+  case "$1" in
+    redis)
+      printf '01-redis.yaml\n'
+      ;;
+    ml-engine)
+      printf '02-ml-engine.yaml\n'
+      ;;
+    bff)
+      printf '03-bff.yaml\n'
+      ;;
+    frontend)
+      printf '04-frontend.yaml\n'
+      ;;
+    *)
+      echo "::error::Unknown service for manifest filename: $1" >&2
+      exit 1
+      ;;
+  esac
+}
+
+service_manifest_path() {
+  case "$1" in
+    redis)
+      printf '%s\n' "${REDIS_MANIFEST_PATH}"
+      ;;
+    ml-engine)
+      printf '%s\n' "${ML_ENGINE_MANIFEST_PATH}"
+      ;;
+    bff)
+      printf '%s\n' "${BFF_MANIFEST_PATH}"
+      ;;
+    frontend)
+      printf '%s\n' "${FRONTEND_MANIFEST_PATH}"
+      ;;
+    *)
+      echo "::error::Unknown service for manifest path: $1" >&2
+      exit 1
+      ;;
+  esac
+}
+
 write_apply_order() {
-  cat > "${APPLY_ORDER_PATH}" <<'EOF'
-01-redis.yaml
-02-ml-engine.yaml
-03-bff.yaml
-04-frontend.yaml
-EOF
+  : > "${APPLY_ORDER_PATH}"
+  local service=""
+  for service in "${SELECTED_SERVICES[@]}"; do
+    service_manifest_filename "${service}" >> "${APPLY_ORDER_PATH}"
+  done
+}
+
+write_selected_services() {
+  : > "${SELECTED_SERVICES_PATH}"
+  local service=""
+  for service in "${SELECTED_SERVICES[@]}"; do
+    printf '%s\n' "${service}" >> "${SELECTED_SERVICES_PATH}"
+  done
 }
 
 render_full_manifest() {
@@ -225,15 +322,13 @@ validate_client_manifests() {
 
   local manifest_path
   local kubectl_base=(kubectl)
+  local service
   if [[ -n "${KUBECONFIG_PATH}" ]]; then
     kubectl_base+=(--kubeconfig "${KUBECONFIG_PATH}")
   fi
 
-  for manifest_path in \
-    "${REDIS_MANIFEST_PATH}" \
-    "${ML_ENGINE_MANIFEST_PATH}" \
-    "${BFF_MANIFEST_PATH}" \
-    "${FRONTEND_MANIFEST_PATH}"; do
+  for service in "${SELECTED_SERVICES[@]}"; do
+    manifest_path="$(service_manifest_path "${service}")"
     echo "Client dry-run validating $(basename "${manifest_path}")"
     "${kubectl_base[@]}" apply --dry-run=client --validate=false -f "${manifest_path}" >/dev/null
   done
@@ -265,6 +360,7 @@ generate_budget_report() {
 }
 
 write_apply_order
+write_selected_services
 render_full_manifest
 split_into_documents
 classify_documents
@@ -274,6 +370,7 @@ generate_budget_report
 
 echo "Rendered full manifest: ${FULL_MANIFEST_PATH}"
 echo "Staged apply order file: ${APPLY_ORDER_PATH}"
+echo "Selected service list: ${SELECTED_SERVICES_PATH}"
 echo "Split manifests:"
 echo "  ${REDIS_MANIFEST_PATH}"
 echo "  ${ML_ENGINE_MANIFEST_PATH}"

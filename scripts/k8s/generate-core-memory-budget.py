@@ -220,10 +220,6 @@ def build_report(services: list[ServiceBudget], args: argparse.Namespace) -> dic
 
     system_reserve_mib = args.os_reserve_mib + args.control_plane_reserve_mib
     unallocated_system_buffer_mib = args.min_mem_available_mib - system_reserve_mib
-    if unallocated_system_buffer_mib < 0:
-        raise ValueError(
-            "OS reserve plus control-plane reserve exceeds the pre-deploy MemAvailable floor"
-        )
 
     safe_resident_budget_mib = args.node_ram_mib - args.min_mem_available_mib
     residual_headroom_above_requests_mib = safe_resident_budget_mib - totals.memory_request_mib
@@ -310,6 +306,35 @@ def build_report(services: list[ServiceBudget], args: argparse.Namespace) -> dic
 def render_markdown(report: dict) -> str:
     node = report["nodeProfile"]
     totals = report["totals"]
+    service_count = len(report["services"])
+    service_noun = "runtime pod" if service_count == 1 else "runtime pods"
+    system_buffer_mib = node["unallocatedSystemBufferMiB"]
+    overcommit_mib = totals["overcommitAgainstSafeResidentBudgetMiB"]
+    if system_buffer_mib >= 0:
+        floor_interpretation = (
+            f"- The hard system reserve before application pods is `{format_mib(node['preDeployMemAvailableFloorMiB'])}`, "
+            f"split into base OS `{format_mib(node['osReserveMiB'])}`, control-plane `{format_mib(node['controlPlaneReserveMiB'])}`, "
+            f"and extra safety buffer `{format_mib(system_buffer_mib)}`."
+        )
+    else:
+        floor_interpretation = (
+            f"- The live pre-deploy MemAvailable floor `{format_mib(node['preDeployMemAvailableFloorMiB'])}` is currently "
+            f"`{format_mib(abs(system_buffer_mib))}` below the configured OS plus control-plane reserve "
+            f"(`{format_mib(node['osReserveMiB'] + node['controlPlaneReserveMiB'])}`). Treat that as a temporary override used for live isolation, not a final safe budget."
+        )
+    if overcommit_mib > 0:
+        limit_interpretation = (
+            f"- The summed pod memory limits still reach `{format_mib(totals['memoryLimitMiB'])}`, "
+            f"which exceeds the safe resident budget by `{format_mib(overcommit_mib)}`. "
+            "Treat that as a warning that simultaneous peak usage is not safe on a 1 GB node."
+        )
+    else:
+        limit_interpretation = (
+            f"- The summed pod memory limits reach `{format_mib(totals['memoryLimitMiB'])}`, "
+            f"which stays `{format_mib(abs(overcommit_mib))}` below the safe resident budget. "
+            "That subset should fit inside the current provisional resident-memory envelope if live OCI measurements agree."
+        )
+
     lines = [
         "# Core Minimal Memory Budget",
         "",
@@ -384,11 +409,11 @@ def render_markdown(report: dict) -> str:
             "",
             "## Interpretation",
             "",
-            f"- The hard system reserve before application pods is `{format_mib(node['preDeployMemAvailableFloorMiB'])}`, split into base OS `{format_mib(node['osReserveMiB'])}`, control-plane `{format_mib(node['controlPlaneReserveMiB'])}`, and extra safety buffer `{format_mib(node['unallocatedSystemBufferMiB'])}`.",
-            f"- The current staged core manifests request `{format_mib(totals['memoryRequestMiB'])}` of RAM across the four runtime pods.",
+            floor_interpretation,
+            f"- The current staged apply set requests `{format_mib(totals['memoryRequestMiB'])}` of RAM across `{service_count}` selected {service_noun}.",
             f"- With a pre-deploy MemAvailable floor of `{format_mib(node['preDeployMemAvailableFloorMiB'])}`, only `{format_mib(node['safeResidentBudgetMiB'])}` of node RAM is treated as safe for application working set during rollout.",
             f"- That leaves `{format_mib(totals['residualHeadroomAboveRequestsMiB'])}` of physical RAM above the summed pod requests before swap becomes part of the survival story.",
-            f"- The summed pod memory limits still reach `{format_mib(totals['memoryLimitMiB'])}`, which exceeds the safe resident budget by `{format_mib(totals['overcommitAgainstSafeResidentBudgetMiB'])}`. Treat that as a warning that simultaneous peak usage is not safe on a 1 GB node.",
+            limit_interpretation,
             f"- Until live OCI evidence replaces them, the deploy gate thresholds remain provisional defaults: MemAvailable `{format_mib(node['preDeployMemAvailableFloorMiB'])}`, SwapFree `{format_mib(node['preDeploySwapFreeFloorMiB'])}`.",
         ]
     )

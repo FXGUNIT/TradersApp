@@ -821,7 +821,7 @@ jobs:
     name: Deploy Production
     runs-on: ubuntu-latest
     needs: [frontend, browser-tests, ui-quality-matrix, ml-engine, bff, unit-tests, security-bandit, type-check, dockerfile-lint, helm-lint, file-size-gate, architecture-contracts, load-tests]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && vars.PRODUCTION_DEPLOY_PLATFORM != 'ovh'
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && vars.PRODUCTION_DEPLOY_PLATFORM != 'ovh' && vars.PRODUCTION_DEPLOY_PLATFORM != 'contabo'
     concurrency:
       group: deploy-production-main
       cancel-in-progress: false

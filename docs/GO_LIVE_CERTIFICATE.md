@@ -1,8 +1,10 @@
 # TradersApp — Stage P Go-Live Certificate
 
+> **Archived topology certificate.** This document reflects the older OCI k3s production plan. The active production target is now `Contabo VPS + Docker Compose`; see [P26_Contabo_Deployment_Plan.md](/e:/TradersApp/docs/P26_Contabo_Deployment_Plan.md:1) and [TODO_MASTER_LIST.md](/e:/TradersApp/docs/TODO_MASTER_LIST.md:1).
+
 **Document ID:** GO_LIVE_CERTIFICATE_STAGE_P
 **Issued:** 2026-04-16
-**Status:** APPROVED — PRODUCTION READY
+**Status:** ARCHIVED — HISTORICAL OCI BASELINE
 **Authority:** FXGUNIT
 **Topology Baseline:** P01_TOPOLOGY_FREEZE (accepted 2026-04-15)
 
@@ -19,7 +21,7 @@
 | 5 | Prometheus | `https://prometheus.traders.app` | Prometheus | **OCI k3s** *(future)* | Metrics collection, alerting rules |
 | 6 | Telegram Bridge | `@TradersAppBot` (Telegram only) | Node.js, Telegram Bot API | **OCI k3s** | Human-in-the-loop alerts, signal notifications |
 
-> **Note:** Production topology is OCI Always Free k3s only. MLflow and Prometheus are deferred to future Stage P iterations when RAM headroom allows. `docs/TODO_MASTER_LIST.md` is the authoritative source for current service status.
+> **Historical note:** This table reflects the archived OCI Always Free k3s plan. `docs/TODO_MASTER_LIST.md` and `docs/P26_Contabo_Deployment_Plan.md` are the authoritative sources for the active Contabo production path.
 
 ---
 

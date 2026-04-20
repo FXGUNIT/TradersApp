@@ -1,100 +1,184 @@
-#!/bin/bash
-# ─────────────────────────────────────────────────────────────────────────────
-# TradersApp — Contabo VPS One-Time Setup
-# Run once on a fresh Contabo VPS to prepare it for TradersApp deployment.
-# ─────────────────────────────────────────────────────────────────────────────
-# Usage: curl -fsSL https://raw.githubusercontent.com/fxgunit/TradersApp/main/scripts/contabo/setup-vps.sh | bash
-# Or:    bash setup-vps.sh <your-public-ssh-key>
-# ─────────────────────────────────────────────────────────────────────────────
+#!/usr/bin/env bash
+set -euo pipefail
 
-set -e
+APP_ROOT="/opt/tradersapp"
+APP_USER="tradersapp"
+SKIP_FIREWALL="0"
+AUTHORIZED_KEY=""
 
-SSH_KEY="${1:-}"
-DEPLOY_PATH="/opt/tradersapp"
+usage() {
+  cat <<'EOF'
+Usage: setup-vps.sh [--app-root /opt/tradersapp] [--user tradersapp] [--skip-firewall] [--authorized-key "ssh-ed25519 ..."]
 
-echo "=== TradersApp Contabo VPS Setup ==="
+Idempotent Contabo VPS bootstrap for TradersApp:
+  - installs Docker Engine + compose plugin
+  - installs curl, git, rsync, jq, fail2ban, ufw
+  - creates the tradersapp runtime directories
+  - optionally seeds the deploy user's SSH authorized_keys
+  - installs the tradersapp systemd unit for the Contabo compose stack
+EOF
+}
 
-# ── 1. Update system ──────────────────────────────────────────────────────────
-echo "[1/8] Updating system packages..."
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --app-root)
+      APP_ROOT="$2"
+      shift 2
+      ;;
+    --user)
+      APP_USER="$2"
+      shift 2
+      ;;
+    --skip-firewall)
+      SKIP_FIREWALL="1"
+      shift
+      ;;
+    --authorized-key)
+      AUTHORIZED_KEY="$2"
+      shift 2
+      ;;
+    --help|-h)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      usage >&2
+      exit 1
+      ;;
+  esac
+done
+
+if [ "$(id -u)" -ne 0 ]; then
+  echo "setup-vps.sh must run as root." >&2
+  exit 1
+fi
+
+export DEBIAN_FRONTEND=noninteractive
+
+if ! command -v apt-get >/dev/null 2>&1; then
+  echo "This bootstrap currently supports Debian/Ubuntu only." >&2
+  exit 1
+fi
+
+install_docker_repo() {
+  install -m 0755 -d /etc/apt/keyrings
+  if [ ! -f /etc/apt/keyrings/docker.asc ]; then
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+    chmod a+r /etc/apt/keyrings/docker.asc
+  fi
+
+  local arch codename distro
+  arch="$(dpkg --print-architecture)"
+  codename="$(. /etc/os-release && echo "${VERSION_CODENAME}")"
+  distro="$(. /etc/os-release && echo "${ID}")"
+
+  if [ "${distro}" != "ubuntu" ] && [ "${distro}" != "debian" ]; then
+    echo "Unsupported Linux distribution for Docker repo: ${distro}" >&2
+    exit 1
+  fi
+
+  cat > /etc/apt/sources.list.d/docker.list <<EOF
+deb [arch=${arch} signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/${distro} ${codename} stable
+EOF
+}
+
+ensure_user() {
+  if ! id "${APP_USER}" >/dev/null 2>&1; then
+    useradd --create-home --shell /bin/bash "${APP_USER}"
+  fi
+
+  usermod -aG docker "${APP_USER}"
+}
+
+configure_authorized_key() {
+  if [ -z "${AUTHORIZED_KEY}" ]; then
+    return 0
+  fi
+
+  local ssh_dir auth_keys
+  ssh_dir="/home/${APP_USER}/.ssh"
+  auth_keys="${ssh_dir}/authorized_keys"
+
+  install -d -m 0700 -o "${APP_USER}" -g "${APP_USER}" "${ssh_dir}"
+  touch "${auth_keys}"
+  chown "${APP_USER}:${APP_USER}" "${auth_keys}"
+  chmod 0600 "${auth_keys}"
+
+  if ! grep -Fqx "${AUTHORIZED_KEY}" "${auth_keys}"; then
+    printf '%s\n' "${AUTHORIZED_KEY}" >> "${auth_keys}"
+  fi
+}
+
+configure_firewall() {
+  if [ "${SKIP_FIREWALL}" = "1" ]; then
+    return 0
+  fi
+
+  if command -v ufw >/dev/null 2>&1; then
+    ufw allow OpenSSH >/dev/null 2>&1 || true
+    ufw allow 80/tcp >/dev/null 2>&1 || true
+    ufw allow 443/tcp >/dev/null 2>&1 || true
+    ufw --force enable >/dev/null 2>&1 || true
+  fi
+}
+
+install_systemd_unit() {
+  cat > /etc/systemd/system/tradersapp.service <<EOF
+[Unit]
+Description=TradersApp Contabo Docker Compose stack
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+ConditionPathExists=${APP_ROOT}/deploy/contabo/docker-compose.yml
+ConditionPathExists=${APP_ROOT}/runtime/.env.contabo
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=${APP_ROOT}/deploy/contabo
+User=${APP_USER}
+Group=docker
+ExecStart=/usr/bin/docker compose --project-name tradersapp --project-directory ${APP_ROOT}/deploy/contabo --env-file ${APP_ROOT}/runtime/.env.contabo -f ${APP_ROOT}/deploy/contabo/docker-compose.yml up -d --remove-orphans
+ExecStop=/usr/bin/docker compose --project-name tradersapp --project-directory ${APP_ROOT}/deploy/contabo --env-file ${APP_ROOT}/runtime/.env.contabo -f ${APP_ROOT}/deploy/contabo/docker-compose.yml down
+ExecReload=/usr/bin/docker compose --project-name tradersapp --project-directory ${APP_ROOT}/deploy/contabo --env-file ${APP_ROOT}/runtime/.env.contabo -f ${APP_ROOT}/deploy/contabo/docker-compose.yml up -d --remove-orphans
+TimeoutStartSec=900
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+  systemctl daemon-reload
+  systemctl enable tradersapp.service >/dev/null 2>&1 || true
+}
+
+echo "[bootstrap] Installing OS packages..."
 apt-get update -qq
-apt-get install -y -qq curl git ufw fail2ban > /dev/null 2>&1
+apt-get install -y -qq ca-certificates curl gnupg lsb-release git jq rsync fail2ban ufw sudo
 
-# ── 2. Firewall (SSH + HTTP + HTTPS only) ──────────────────────────────────
-echo "[2/8] Configuring firewall (SSH, HTTP, HTTPS)..."
-ufw default deny incoming
-ufw default allow outgoing
-ufw allow 22/tcp    # SSH
-ufw allow 80/tcp    # HTTP
-ufw allow 443/tcp   # HTTPS
-ufw --force enable
+echo "[bootstrap] Installing Docker..."
+install_docker_repo
+apt-get update -qq
+apt-get install -y -qq docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+systemctl enable docker >/dev/null 2>&1 || true
+systemctl restart docker
 
-# ── 3. Create deploy user ───────────────────────────────────────────────────
-echo "[3/8] Creating deploy user..."
-id -u tradersapp > /dev/null 2>&1 || useradd -m -s /bin/bash tradersapp
-echo "tradersapp ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
-mkdir -p /home/tradersapp/.ssh
-chmod 700 /home/tradersapp/.ssh
+echo "[bootstrap] Creating application user and directories..."
+ensure_user
+install -d -m 0755 -o "${APP_USER}" -g "${APP_USER}" \
+  "${APP_ROOT}" \
+  "${APP_ROOT}/deploy" \
+  "${APP_ROOT}/deploy/contabo" \
+  "${APP_ROOT}/runtime" \
+  "${APP_ROOT}/logs"
+configure_authorized_key
 
-# Add SSH key if provided
-if [ -n "$SSH_KEY" ]; then
-    echo "$SSH_KEY" >> /home/tradersapp/.ssh/authorized_keys
-    chown tradersapp:tradersapp /home/tradersapp/.ssh/authorized_keys
-    chmod 600 /home/tradersapp/.ssh/authorized_keys
-fi
+echo "[bootstrap] Enabling baseline host protection..."
+configure_firewall
+systemctl enable fail2ban >/dev/null 2>&1 || true
+systemctl restart fail2ban >/dev/null 2>&1 || true
 
-# ── 4. Ensure Docker is installed ─────────────────────────────────────────
-echo "[4/8] Checking Docker..."
-if ! command -v docker &> /dev/null; then
-    echo "Docker not found — installing..."
-    curl -fsSL https://get.docker.com | sh
-    usermod -aG docker tradersapp
-    systemctl enable docker
-else
-    echo "Docker already installed: $(docker --version)"
-fi
+echo "[bootstrap] Installing systemd service..."
+install_systemd_unit
 
-# ── 5. Ensure Docker Compose is installed ───────────────────────────────────
-echo "[5/8] Checking Docker Compose..."
-if ! docker compose version &> /dev/null; then
-    echo "Installing Docker Compose..."
-    curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" \
-        -o /usr/local/bin/docker-compose
-    chmod +x /usr/local/bin/docker-compose
-fi
-echo "Docker Compose: $(docker compose version)"
-
-# ── 6. Create app directories ───────────────────────────────────────────────
-echo "[6/8] Creating app directories..."
-mkdir -p "$DEPLOY_PATH/deploy/ovh"
-mkdir -p "$DEPLOY_PATH/runtime"
-mkdir -p "$DEPLOY_PATH/logs"
-chown -R tradersapp:tradersapp "$DEPLOY_PATH"
-
-# ── 7. Clone TradersApp repo (as tradersapp user) ───────────────────────────
-echo "[7/8] Cloning TradersApp repo..."
-if [ -d "$DEPLOY_PATH/deploy/ovh/.git" ]; then
-    echo "Repo already cloned — updating..."
-    cd "$DEPLOY_PATH/deploy/ovh"
-    sudo -u tradersapp git pull origin main || true
-else
-    sudo -u tradersapp git clone --depth=1 https://github.com/fxgunit/TradersApp.git "$DEPLOY_PATH/deploy/ovh"
-fi
-
-# ── 8. Create runtime .env from example ─────────────────────────────────────
-echo "[8/8] Creating runtime .env..."
-if [ ! -f "$DEPLOY_PATH/runtime/.env.ovh" ]; then
-    if [ -f "$DEPLOY_PATH/deploy/ovh/deploy/ovh/runtime.env.example" ]; then
-        cp "$DEPLOY_PATH/deploy/ovh/deploy/ovh/runtime.env.example" "$DEPLOY_PATH/runtime/.env.ovh"
-    fi
-fi
-
-echo ""
-echo "=== Setup Complete ==="
-echo "VPS is ready for TradersApp deployment."
-echo ""
-echo "Next step:"
-echo "  1. Add CONTABO_SSH_KEY, CONTABO_VPS_HOST, CONTABO_VPS_USER to GitHub Secrets"
-echo "  2. Trigger deploy-contabo.yml from GitHub Actions tab"
-echo "  3. Or run manually on VPS:"
-echo "     cd $DEPLOY_PATH/deploy/ovh"
-echo "     docker compose --env-file $DEPLOY_PATH/runtime/.env.ovh up -d"
+echo "[bootstrap] Complete. App root: ${APP_ROOT}"

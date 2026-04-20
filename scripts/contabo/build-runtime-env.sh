@@ -1,0 +1,152 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+BASE_ENV=""
+OUTPUT=""
+GHCR_OWNER="${GHCR_OWNER:-}"
+IMAGE_TAG="${IMAGE_TAG:-}"
+TRADERSAPP_DOMAIN="${TRADERSAPP_DOMAIN:-}"
+BFF_PUBLIC_HOST="${BFF_PUBLIC_HOST:-}"
+API_PUBLIC_HOST="${API_PUBLIC_HOST:-}"
+COMPOSE_PROFILES="${COMPOSE_PROFILES:-core}"
+
+usage() {
+  cat <<'EOF'
+Usage: build-runtime-env.sh --output /path/to/.env [options]
+
+Options:
+  --base-env FILE          Base env file from CONTABO_APP_ENV or Infisical output
+  --output FILE            Destination .env file
+  --ghcr-owner OWNER       GHCR owner/org (required if absent from base env)
+  --image-tag TAG          Image tag to deploy (default: latest)
+  --domain HOST            traders.app root domain
+  --bff-host HOST          bff.traders.app public hostname
+  --api-host HOST          api.traders.app public hostname
+  --compose-profiles LIST  Optional compose profiles, comma-separated
+EOF
+}
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --base-env)
+      BASE_ENV="$2"
+      shift 2
+      ;;
+    --output)
+      OUTPUT="$2"
+      shift 2
+      ;;
+    --ghcr-owner)
+      GHCR_OWNER="$2"
+      shift 2
+      ;;
+    --image-tag)
+      IMAGE_TAG="$2"
+      shift 2
+      ;;
+    --domain)
+      TRADERSAPP_DOMAIN="$2"
+      shift 2
+      ;;
+    --bff-host)
+      BFF_PUBLIC_HOST="$2"
+      shift 2
+      ;;
+    --api-host)
+      API_PUBLIC_HOST="$2"
+      shift 2
+      ;;
+    --compose-profiles)
+      COMPOSE_PROFILES="$2"
+      shift 2
+      ;;
+    --help|-h)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      usage >&2
+      exit 1
+      ;;
+  esac
+done
+
+if [ -z "${OUTPUT}" ]; then
+  echo "--output is required." >&2
+  exit 1
+fi
+
+if [ -z "${GHCR_OWNER}" ]; then
+  echo "GHCR owner is required." >&2
+  exit 1
+fi
+
+if [ -z "${IMAGE_TAG}" ]; then
+  IMAGE_TAG="latest"
+fi
+
+if [ -z "${TRADERSAPP_DOMAIN}" ]; then
+  TRADERSAPP_DOMAIN="traders.app"
+fi
+
+if [ -z "${BFF_PUBLIC_HOST}" ]; then
+  BFF_PUBLIC_HOST="bff.${TRADERSAPP_DOMAIN}"
+fi
+
+if [ -z "${API_PUBLIC_HOST}" ]; then
+  API_PUBLIC_HOST="api.${TRADERSAPP_DOMAIN}"
+fi
+
+install -d "$(dirname "${OUTPUT}")"
+tmp_file="$(mktemp)"
+
+if [ -n "${BASE_ENV}" ] && [ -f "${BASE_ENV}" ]; then
+  while IFS= read -r line; do
+    line="$(printf '%s' "${line}" | tr -d '\r' | sed -E 's/^export[[:space:]]+//')"
+    case "${line}" in
+      ""|\#*)
+        continue
+        ;;
+    esac
+
+    key="${line%%=*}"
+    case "${key}" in
+      COMPOSE_PROJECT_NAME|TRADERSAPP_ROOT|GHCR_OWNER|IMAGE_TAG|TRADERSAPP_DOMAIN|BFF_PUBLIC_HOST|API_PUBLIC_HOST|COMPOSE_PROFILES|NODE_ENV|BFF_HOST|BFF_PORT|BFF_ALLOWED_ORIGINS|REDIS_HOST|REDIS_PORT|ML_ENGINE_URL|ML_ANALYSIS_TRANSPORT|ML_ANALYSIS_GRPC_ADDR|ML_ANALYSIS_GRPC_STRICT|ANALYSIS_SERVICE_GRPC_PORT|ANALYSIS_SERVICE_HEALTH_PORT)
+        continue
+        ;;
+    esac
+
+    printf '%s\n' "${line}" >> "${tmp_file}"
+  done < "${BASE_ENV}"
+else
+  : > "${tmp_file}"
+fi
+
+cat >> "${tmp_file}" <<EOF
+COMPOSE_PROJECT_NAME=tradersapp
+TRADERSAPP_ROOT=/opt/tradersapp
+GHCR_OWNER=${GHCR_OWNER}
+IMAGE_TAG=${IMAGE_TAG}
+TRADERSAPP_DOMAIN=${TRADERSAPP_DOMAIN}
+BFF_PUBLIC_HOST=${BFF_PUBLIC_HOST}
+API_PUBLIC_HOST=${API_PUBLIC_HOST}
+COMPOSE_PROFILES=${COMPOSE_PROFILES}
+NODE_ENV=production
+BFF_HOST=0.0.0.0
+BFF_PORT=8788
+BFF_ALLOWED_ORIGINS=https://${TRADERSAPP_DOMAIN},https://${BFF_PUBLIC_HOST},https://${API_PUBLIC_HOST}
+REDIS_HOST=redis
+REDIS_PORT=6379
+ML_ENGINE_URL=http://ml-engine:8001
+ML_ANALYSIS_TRANSPORT=grpc
+ML_ANALYSIS_GRPC_ADDR=analysis-service:50051
+ML_ANALYSIS_GRPC_STRICT=false
+ANALYSIS_SERVICE_GRPC_PORT=50051
+ANALYSIS_SERVICE_HEALTH_PORT=8082
+EOF
+
+mv "${tmp_file}" "${OUTPUT}"
+chmod 600 "${OUTPUT}"
+
+echo "Wrote ${OUTPUT}"

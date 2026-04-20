@@ -11,6 +11,7 @@
 
 ## Desktop Runtime Behavior
 
+- [ ] Run `powershell -ExecutionPolicy Bypass -File .\scripts\windows\certify-desktop-performance.ps1 ...` on each 4 GB reference machine and archive the JSON/Markdown artifacts.
 - [ ] Confirm login screen loads within the startup budget on a 4 GB RAM laptop.
 - [ ] Confirm idle desktop memory stays within the budget after login and first navigation.
 - [ ] Confirm core screens match the web UI and no desktop-only regressions appear.
@@ -20,6 +21,7 @@
 ## Auth, Policy, And Admin Control
 
 - [ ] Log in as a valid user and confirm the desktop session registers version, install ID, and device ID.
+- [ ] Validate degraded-network handling and reconnect recovery on the desktop shell while the session remains open.
 - [ ] Block that user from the admin panel and confirm the desktop session is forced out on the next policy check or protected call.
 - [ ] Confirm a blocked user cannot sign in again while the status remains `BLOCKED`.
 - [ ] Confirm maintenance mode forces a shell-level exit path.
@@ -40,4 +42,5 @@
 - [ ] Verify `appcast.xml` and `appcast.xml.signature` are published together.
 - [ ] Verify every published installer has a matching `.sha256` sidecar.
 - [ ] Verify the workflow emitted a CycloneDX SBOM and Trivy SARIF.
+- [ ] Verify the desktop release payload contains no local `BFF`, `ML`, GPU-runtime, or source-map artifacts.
 - [ ] Verify no source maps, secrets, or model artifacts are present in the release payload.

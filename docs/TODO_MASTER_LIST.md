@@ -7,11 +7,11 @@
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-20 05:08`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-20 19:27`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Master Backlog  47.1%  [###########-------------]
-Tasks          done 115 | in progress 000 | blocked 000 | todo 129 | total 244
+Master Backlog  48.2%  [############------------]
+Tasks          done 119 | in progress 000 | blocked 000 | todo 128 | total 247
 ```
 
 How to read this:
@@ -22,7 +22,7 @@ How to read this:
 
 | Area | Tasks | Progress | Status |
 |---|---|---:|---|
-| Stage P | [115/189] |  60.8% | BLOCKED |
+| Stage P | [119/192] |  62.0% | BLOCKED |
 | Stage S | [0/47] |   0.0% | PENDING |
 | ML Research | [0/8] |   0.0% | PENDING |
 
@@ -30,7 +30,7 @@ How to read this:
 
 | Tier | Scope | Progress | Status |
 |---|---|---:|---|
-| TIER 1 | Stage P rollout path |  60.8% | BLOCKED |
+| TIER 1 | Stage P rollout path |  62.0% | BLOCKED |
 | TIER 2 | Bootstrap + minimal core | 100.0% | DONE |
 | TIER 3 | OCI ingress + DNS cutover |   0.0% | BLOCKED |
 | TIER 4 | Stage S + ML backlog |   0.0% | PENDING |
@@ -63,7 +63,7 @@ How to read this:
 | P23 - 4 GB Performance and Compatibility Certification | [0/5] |   0.0% | PENDING |
 | P24 - Windows Release Readiness and Docs Alignment ✅ DONE | [5/5] | 100.0% | DONE |
 | P25 - Ampere A1 Migration (Archived Fallback) 🟡 ON HOLD | [0/7] |   0.0% | PENDING |
-| P26 - Contabo VPS Docker Compose Production Path 🔴 ACTIVE | [34/71] |  47.9% | IN PROGRESS |
+| P26 - Contabo VPS Docker Compose Production Path 🔴 ACTIVE | [38/74] |  51.4% | IN PROGRESS |
 | S1 - Trading Session Config Foundation | [0/11] |   0.0% | PENDING |
 | S2 - BFF Multi-Instrument Routing | [0/7] |   0.0% | PENDING |
 | S3 - Frontend Dashboard Redesign | [0/13] |   0.0% | PENDING |
@@ -116,6 +116,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 ### Current Checkpoint - 2026-04-20
 - Production target is now Contabo VPS, not OCI k3s
 - Repo-side Contabo deployment assets are the active workstream: Compose bundle, reverse proxy, bootstrap scripts, runtime env builder, and GitHub Actions deploy workflow
+- Repo-side public verification is now wired three ways: local script, dedicated public-edge k6 suite, and GitHub Actions verification workflow
 - OCI P09 and P25 remain in this file only as historical evidence and fallback, not as the current production plan
 - The current hard blocker is no longer OCI memory pressure; it is the first real Contabo cutover with live Contabo VPS credentials, DNS, and runtime secrets
 - Success now means: `git push main` builds/pushes images, SSHes to Contabo, runs Docker Compose, and leaves the public hosts healthy without laptop involvement
@@ -240,16 +241,20 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [x] Create a dedicated GitHub Actions Contabo deployment workflow
 - [x] Guard the old auto-production k3s path so Contabo can become the active deploy target without deleting the legacy workflow
 - [x] Document the Contabo production runbook, secrets contract, and cutover steps
+- [x] Create a dedicated Contabo public verification harness for DNS, TLS, and public health evidence
+- [x] Create a Contabo public-edge k6 suite for first real concurrency-envelope capture
+- [x] Create a manual GitHub Actions verification workflow for off-box public proof capture
+- [x] Tighten the remote deploy smoke checks so localhost health explicitly covers `frontend`, `bff`, `ml-engine`, `analysis-service`, and `redis`
 
 #### P26 — Live Cutover (Pending Real Credentials)
 - [ ] Contabo VPS is bought and running — note the public IP address
 - [ ] Add GitHub secret: `CONTABO_SSH_KEY` (private SSH key content)
 - [ ] Add GitHub secret: `CONTABO_VPS_HOST` (VPS public IP address)
 - [ ] Add GitHub secret: `CONTABO_VPS_USER` (`root` or `deploy`)
-- [ ] Add GitHub secret: `CONTABO_DOMAIN` (`api.tradersapp.<yourdomain>`)
+- [ ] Add GitHub variables: `PRODUCTION_DEPLOY_PLATFORM=contabo` and, if needed, `CONTABO_DOMAIN=traders.app`
 - [ ] Confirm local health on the VPS for `frontend`, `bff`, `ml-engine`, `analysis-service`, and `redis`
-- [ ] Confirm public health for `https://traders.app`, `https://bff.traders.app/health`, and `https://api.traders.app/health`
-- [ ] Run the existing load-test suite against the Contabo public edge and record the first real concurrency envelope
+- [ ] Confirm public health for `https://traders.app`, `https://bff.traders.app/health`, and `https://api.traders.app/health` via `python scripts/contabo/verify_public_deploy.py` or the `Verify Contabo Public Deploy` workflow
+- [ ] Run the Contabo public-edge k6 suite via `python scripts/contabo/verify_public_deploy.py --with-k6` or the `Verify Contabo Public Deploy` workflow and record the first real concurrency envelope
 - [ ] Archive the final OCI node details only after Contabo is stable for at least one clean redeploy cycle
 
 #### P09-C - `kubectl apply tradersapp-deployments.yaml` on OCI E2.1.Micro
@@ -412,6 +417,8 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [x] Publish SHA-256 hashes, SBOM outputs, and malware/dependency scan results for desktop releases
 
 ### P23 - 4 GB Performance and Compatibility Certification
+- Repo-side certification harness is now `scripts/windows/certify-desktop-performance.ps1`; it emits JSON/Markdown evidence for shell startup, idle RAM, OCR lazy-loading, GPU-free payload, and child-process checks
+- Full `P23` sign-off still requires manual runs on Windows 10 x64 and Windows 11 x64 `4 GB RAM` reference machines plus degraded-network and forced-logout proof
 - [ ] Validate cold start to login screen at `<= 8s` on Windows 10/11 x64 4 GB reference machines
 - [ ] Validate idle RAM at `<= 500 MB` after the shell and web UI fully load
 - [ ] Confirm OCR and heavy modules remain lazy-loaded and do not require a discrete GPU
@@ -544,7 +551,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-20 16:47`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-20 19:43`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Active Backlog    0.0%  [------------------------]
