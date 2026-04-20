@@ -304,7 +304,7 @@ jobs:
       - name: Build BFF image
         run: |
           OWNER_LC="${GITHUB_REPOSITORY_OWNER,,}"
-          docker build -t ghcr.io/${OWNER_LC}/bff:latest --file bff/Dockerfile bff/
+          docker build -t ghcr.io/${OWNER_LC}/bff:latest --file bff/Dockerfile .
 
       - name: Start services
         run: |
@@ -382,7 +382,7 @@ jobs:
       - name: Build BFF image
         run: |
           OWNER_LC="${GITHUB_REPOSITORY_OWNER,,}"
-          docker build -t ghcr.io/${OWNER_LC}/bff:latest --file bff/Dockerfile bff/
+          docker build -t ghcr.io/${OWNER_LC}/bff:latest --file bff/Dockerfile .
 
       - name: Start services
         run: |
@@ -713,7 +713,7 @@ jobs:
             --tag ghcr.io/${OWNER_LC}/bff:${{ github.sha }} \
             --tag ghcr.io/${OWNER_LC}/bff:latest \
             --file bff/Dockerfile \
-            bff/
+            .
         continue-on-error: false
 
   # -------------------------------------------------------------------------
@@ -893,7 +893,7 @@ jobs:
           ATTEMPT=1
           MAX_ATTEMPTS=3
           while [ "${ATTEMPT}" -le "${MAX_ATTEMPTS}" ]; do
-            if docker build -t "${IMAGE_SHA}" -t "${IMAGE_LATEST}" --file bff/Dockerfile bff/ \
+            if docker build -t "${IMAGE_SHA}" -t "${IMAGE_LATEST}" --file bff/Dockerfile . \
               && docker push "${IMAGE_SHA}" \
               && docker push "${IMAGE_LATEST}"; then
               exit 0

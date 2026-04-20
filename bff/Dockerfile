@@ -7,7 +7,7 @@ COPY package.json ./
 RUN npm install --omit=dev --prefer-offline 2>/dev/null || true
 
 # Copy bff source
-COPY bff/ ./
+COPY ./ ./
 
 # Build args (secrets injected at Docker build time from GitHub Actions)
 ARG AI_GEMINI_PRO_KEY
