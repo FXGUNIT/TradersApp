@@ -94,13 +94,14 @@ jobs:
             --build-arg AI_GEMINI_PRO_KEY=${{ secrets.AI_GEMINI_PRO_KEY }} \
             --build-arg AI_GROQ_TURBO_KEY=${{ secrets.AI_GROQ_TURBO_KEY }} \
             --build-arg AI_OPENROUTER_MIND_ALPHA=${{ secrets.AI_OPENROUTER_MIND_ALPHA }} \
-            --build-arg AI_OPENROUTER_MIND_BETA=${{ secrets.AI_OPENROUTOR_MIND_BETA }} \
+            --build-arg AI_OPENROUTER_MIND_BETA=${{ secrets.AI_OPENROUTER_MIND_BETA }} \
             --build-arg AI_CEREBRAS_KEY=${{ secrets.AI_CEREBRAS_KEY }} \
             --build-arg AI_DEEPSEEK_KEY=${{ secrets.AI_DEEPSEEK_KEY }} \
             --build-arg AI_SAMBANOVA_KEY=${{ secrets.AI_SAMBANOVA_KEY }} \
             -t ghcr.io/${{ env.GHCR_OWNER }}/ml-engine:${{ steps.sha.outputs.sha }} \
             -t ghcr.io/${{ env.GHCR_OWNER }}/ml-engine:latest \
-            -f ml-engine/Dockerfile .
+            -f ml-engine/Dockerfile \
+            ml-engine/
 
       - name: Build Frontend image
         if: inputs.skip_build != 'true'
