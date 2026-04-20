@@ -351,6 +351,14 @@ jobs:
               --history-max 5
           fi
 
+      - name: Upload staged deploy evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k8s-core-deploy-evidence-${{ github.run_id }}
+          path: artifacts/k8s/deploy-core-minimal/
+          if-no-files-found: ignore
+
       # ── Rollout status ──────────────────────────────────────────────────
       - name: Wait for rollout — bff
         run: |
