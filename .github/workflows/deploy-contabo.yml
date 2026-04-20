@@ -20,6 +20,10 @@
 
 name: Deploy to Contabo VPS
 
+permissions:
+  contents: read
+  packages: write
+
 on:
   push:
     branches: [main]
