@@ -1,0 +1,321 @@
+name: Deploy OVH Production
+
+on:
+  workflow_run:
+    workflows: ["CI/CD Pipeline"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Git ref or SHA to deploy"
+        required: false
+        default: ""
+      image_tag:
+        description: "Docker image tag to publish and deploy (defaults to commit SHA)"
+        required: false
+        default: ""
+      compose_profiles:
+        description: "Optional compose profiles such as mlops,observability"
+        required: false
+        default: "core"
+      skip_bootstrap:
+        description: "Skip remote bootstrap and only run the deploy step"
+        required: false
+        default: false
+        type: boolean
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  deploy:
+    name: Deploy OVH VPS
+    runs-on: ubuntu-latest
+    if: |
+      vars.PRODUCTION_DEPLOY_PLATFORM == 'ovh' &&
+      (
+        github.event_name == 'workflow_dispatch' ||
+        (
+          github.event_name == 'workflow_run' &&
+          github.event.workflow_run.conclusion == 'success' &&
+          github.event.workflow_run.head_branch == 'main'
+        )
+      )
+    environment:
+      name: production
+      url: https://traders.app
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Resolve deploy context
+        id: context
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            REF="${{ github.event.workflow_run.head_sha }}"
+            IMAGE_TAG="${{ github.event.workflow_run.head_sha }}"
+            COMPOSE_PROFILES="${{ vars.OVH_COMPOSE_PROFILES || 'core' }}"
+            SKIP_BOOTSTRAP="false"
+          else
+            REF="${{ inputs.ref }}"
+            IMAGE_TAG="${{ inputs.image_tag }}"
+            COMPOSE_PROFILES="${{ inputs.compose_profiles }}"
+            SKIP_BOOTSTRAP="${{ inputs.skip_bootstrap }}"
+          fi
+
+          if [ -z "${REF}" ]; then
+            REF="${GITHUB_SHA}"
+          fi
+
+          if [ -z "${IMAGE_TAG}" ]; then
+            IMAGE_TAG="${REF}"
+          fi
+
+          if [ -z "${COMPOSE_PROFILES}" ]; then
+            COMPOSE_PROFILES="core"
+          fi
+
+          OWNER_LC="${GITHUB_REPOSITORY_OWNER,,}"
+          DOMAIN="${{ vars.TRADERSAPP_DOMAIN }}"
+          if [ -z "${DOMAIN}" ]; then
+            DOMAIN="traders.app"
+          fi
+
+          BFF_HOST="${{ vars.BFF_PUBLIC_HOST }}"
+          if [ -z "${BFF_HOST}" ]; then
+            BFF_HOST="bff.${DOMAIN}"
+          fi
+
+          API_HOST="${{ vars.API_PUBLIC_HOST }}"
+          if [ -z "${API_HOST}" ]; then
+            API_HOST="api.${DOMAIN}"
+          fi
+
+          APP_ROOT="${{ vars.OVH_APP_ROOT }}"
+          if [ -z "${APP_ROOT}" ]; then
+            APP_ROOT="/opt/tradersapp"
+          fi
+
+          {
+            echo "ref=${REF}"
+            echo "image_tag=${IMAGE_TAG}"
+            echo "compose_profiles=${COMPOSE_PROFILES}"
+            echo "owner=${OWNER_LC}"
+            echo "domain=${DOMAIN}"
+            echo "bff_host=${BFF_HOST}"
+            echo "api_host=${API_HOST}"
+            echo "app_root=${APP_ROOT}"
+            echo "skip_bootstrap=${SKIP_BOOTSTRAP}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Validate production contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=0
+
+          for key in OVH_SSH_HOST OVH_SSH_USER OVH_SSH_PRIVATE_KEY; do
+            if [ -z "${!key:-}" ]; then
+              echo "::error::Missing required secret: ${key}"
+              missing=1
+            fi
+          done
+
+          if [ -z "${OVH_APP_ENV:-}" ] && { [ -z "${INFISICAL_TOKEN:-}" ] || [ -z "${INFISICAL_PROJECT_ID:-}" ]; }; then
+            echo "::error::Provide OVH_APP_ENV or both INFISICAL_TOKEN and INFISICAL_PROJECT_ID."
+            missing=1
+          fi
+
+          if [ "${missing}" -ne 0 ]; then
+            exit 1
+          fi
+        env:
+          OVH_SSH_HOST: ${{ secrets.OVH_SSH_HOST }}
+          OVH_SSH_USER: ${{ secrets.OVH_SSH_USER }}
+          OVH_SSH_PRIVATE_KEY: ${{ secrets.OVH_SSH_PRIVATE_KEY }}
+          OVH_APP_ENV: ${{ secrets.OVH_APP_ENV }}
+          INFISICAL_TOKEN: ${{ secrets.INFISICAL_TOKEN }}
+          INFISICAL_PROJECT_ID: ${{ secrets.INFISICAL_PROJECT_ID }}
+
+      - name: Checkout deploy commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.context.outputs.ref }}
+
+      - name: Prepare runtime env
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .artifacts/ovh
+
+          if [ -n "${OVH_APP_ENV:-}" ]; then
+            printf '%s\n' "${OVH_APP_ENV}" > .artifacts/ovh/base.env
+          else
+            curl -1sLf 'https://artifacts-cli.infisical.com/setup.deb.sh' | sudo -E bash
+            sudo apt-get update
+            sudo apt-get install -y infisical
+            export INFISICAL_TOKEN
+            infisical secrets pull \
+              --env=production \
+              --projectId="${INFISICAL_PROJECT_ID}" \
+              --format=env > .artifacts/ovh/base.env
+          fi
+
+          bash scripts/ovh/build-runtime-env.sh \
+            --base-env .artifacts/ovh/base.env \
+            --output .artifacts/ovh/.env.ovh \
+            --ghcr-owner "${{ steps.context.outputs.owner }}" \
+            --image-tag "${{ steps.context.outputs.image_tag }}" \
+            --domain "${{ steps.context.outputs.domain }}" \
+            --bff-host "${{ steps.context.outputs.bff_host }}" \
+            --api-host "${{ steps.context.outputs.api_host }}" \
+            --compose-profiles "${{ steps.context.outputs.compose_profiles }}"
+        env:
+          OVH_APP_ENV: ${{ secrets.OVH_APP_ENV }}
+          INFISICAL_TOKEN: ${{ secrets.INFISICAL_TOKEN }}
+          INFISICAL_PROJECT_ID: ${{ secrets.INFISICAL_PROJECT_ID }}
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push ML Engine image
+        shell: bash
+        run: |
+          set -euo pipefail
+          IMAGE_SHA="ghcr.io/${{ steps.context.outputs.owner }}/ml-engine:${{ steps.context.outputs.image_tag }}"
+          IMAGE_LATEST="ghcr.io/${{ steps.context.outputs.owner }}/ml-engine:latest"
+          docker build -t "${IMAGE_SHA}" -t "${IMAGE_LATEST}" --file ml-engine/Dockerfile ml-engine/
+          docker push "${IMAGE_SHA}"
+          docker push "${IMAGE_LATEST}"
+
+      - name: Build and push BFF image
+        shell: bash
+        run: |
+          set -euo pipefail
+          IMAGE_SHA="ghcr.io/${{ steps.context.outputs.owner }}/bff:${{ steps.context.outputs.image_tag }}"
+          IMAGE_LATEST="ghcr.io/${{ steps.context.outputs.owner }}/bff:latest"
+          docker build -t "${IMAGE_SHA}" -t "${IMAGE_LATEST}" --file bff/Dockerfile bff/
+          docker push "${IMAGE_SHA}"
+          docker push "${IMAGE_LATEST}"
+
+      - name: Build and push Frontend image
+        shell: bash
+        run: |
+          set -euo pipefail
+          IMAGE_SHA="ghcr.io/${{ steps.context.outputs.owner }}/frontend:${{ steps.context.outputs.image_tag }}"
+          IMAGE_LATEST="ghcr.io/${{ steps.context.outputs.owner }}/frontend:latest"
+          docker build \
+            -t "${IMAGE_SHA}" \
+            -t "${IMAGE_LATEST}" \
+            --build-arg VITE_BFF_URL="https://${{ steps.context.outputs.bff_host }}" \
+            --build-arg VITE_API_URL="https://${{ steps.context.outputs.api_host }}" \
+            --file deploy/ovh/Dockerfile.frontend \
+            .
+          docker push "${IMAGE_SHA}"
+          docker push "${IMAGE_LATEST}"
+
+      - name: Prepare SSH access
+        shell: bash
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${OVH_SSH_PRIVATE_KEY}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "${OVH_SSH_HOST}" >> ~/.ssh/known_hosts
+        env:
+          OVH_SSH_HOST: ${{ secrets.OVH_SSH_HOST }}
+          OVH_SSH_PRIVATE_KEY: ${{ secrets.OVH_SSH_PRIVATE_KEY }}
+
+      - name: Upload OVH release bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .artifacts/ovh
+          tar -czf .artifacts/ovh/ovh-bundle.tgz deploy/ovh scripts/ovh
+
+          ssh "${{ secrets.OVH_SSH_USER }}@${{ secrets.OVH_SSH_HOST }}" "rm -rf /tmp/tradersapp-ovh-release && mkdir -p /tmp/tradersapp-ovh-release"
+          scp .artifacts/ovh/ovh-bundle.tgz "${{ secrets.OVH_SSH_USER }}@${{ secrets.OVH_SSH_HOST }}:/tmp/tradersapp-ovh-release/ovh-bundle.tgz"
+          scp .artifacts/ovh/.env.ovh "${{ secrets.OVH_SSH_USER }}@${{ secrets.OVH_SSH_HOST }}:/tmp/tradersapp-ovh-release/.env.ovh"
+
+      - name: Bootstrap and deploy on OVH
+        shell: bash
+        env:
+          GHCR_TOKEN_B64: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          GHCR_TOKEN_B64="$(printf '%s' "${GHCR_TOKEN_B64}" | base64 -w0)"
+
+          ssh "${{ secrets.OVH_SSH_USER }}@${{ secrets.OVH_SSH_HOST }}" "bash -s" <<EOF
+            set -euo pipefail
+            RELEASE_DIR="/tmp/tradersapp-ovh-release"
+            APP_ROOT="${{ steps.context.outputs.app_root }}"
+            SUDO=""
+            if [ "\$(id -u)" -ne 0 ]; then
+              SUDO="sudo"
+            fi
+
+            tar -xzf "\${RELEASE_DIR}/ovh-bundle.tgz" -C "\${RELEASE_DIR}"
+
+            if [ "${{ steps.context.outputs.skip_bootstrap }}" != "true" ]; then
+              \${SUDO} bash "\${RELEASE_DIR}/scripts/ovh/bootstrap.sh" --app-root "\${APP_ROOT}"
+            fi
+
+            printf '%s' '${GHCR_TOKEN_B64}' | base64 -d | \${SUDO} bash "\${RELEASE_DIR}/scripts/ovh/deploy.sh" \
+              --bundle-root "\${RELEASE_DIR}" \
+              --env-file "\${RELEASE_DIR}/.env.ovh" \
+              --app-root "\${APP_ROOT}" \
+              --ghcr-username '${{ github.actor }}' \
+              --ghcr-token-stdin
+          EOF
+
+      - name: Capture remote status
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .artifacts/ovh
+          ssh "${{ secrets.OVH_SSH_USER }}@${{ secrets.OVH_SSH_HOST }}" "bash -s" <<EOF > .artifacts/ovh/compose-ps.txt
+            set -euo pipefail
+            APP_ROOT="${{ steps.context.outputs.app_root }}"
+            SUDO=""
+            if [ "\$(id -u)" -ne 0 ]; then
+              SUDO="sudo"
+            fi
+            \${SUDO} docker compose --project-name tradersapp --env-file "\${APP_ROOT}/runtime/.env.ovh" -f "\${APP_ROOT}/deploy/ovh/docker-compose.yml" ps
+          EOF
+          ssh "${{ secrets.OVH_SSH_USER }}@${{ secrets.OVH_SSH_HOST }}" "bash -s" <<EOF > .artifacts/ovh/compose-logs.txt
+            set -euo pipefail
+            APP_ROOT="${{ steps.context.outputs.app_root }}"
+            SUDO=""
+            if [ "\$(id -u)" -ne 0 ]; then
+              SUDO="sudo"
+            fi
+            \${SUDO} docker compose --project-name tradersapp --env-file "\${APP_ROOT}/runtime/.env.ovh" -f "\${APP_ROOT}/deploy/ovh/docker-compose.yml" logs --tail 200
+          EOF
+
+      - name: Upload OVH deploy evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: ovh-deploy-evidence-${{ github.run_id }}
+          path: .artifacts/ovh/
+          retention-days: 14
+
+      - name: Publish summary
+        shell: bash
+        run: |
+          {
+            echo "## OVH deploy complete"
+            echo ""
+            echo "- Commit: \`${{ steps.context.outputs.ref }}\`"
+            echo "- Image tag: \`${{ steps.context.outputs.image_tag }}\`"
+            echo "- Domain: \`https://${{ steps.context.outputs.domain }}\`"
+            echo "- BFF health: \`https://${{ steps.context.outputs.bff_host }}/health\`"
+            echo "- API health: \`https://${{ steps.context.outputs.api_host }}/health\`"
+            echo "- Compose profiles: \`${{ steps.context.outputs.compose_profiles }}\`"
+          } >> "${GITHUB_STEP_SUMMARY}"

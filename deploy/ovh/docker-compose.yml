@@ -1,0 +1,274 @@
+services:
+  edge:
+    image: caddy:2.9.1-alpine
+    container_name: traders-edge
+    restart: unless-stopped
+    pull_policy: always
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      TRADERSAPP_DOMAIN: ${TRADERSAPP_DOMAIN}
+      BFF_PUBLIC_HOST: ${BFF_PUBLIC_HOST}
+      API_PUBLIC_HOST: ${API_PUBLIC_HOST}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      frontend:
+        condition: service_healthy
+      bff:
+        condition: service_healthy
+      ml-engine:
+        condition: service_healthy
+    logging: &default-logging
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  redis:
+    image: redis:7-alpine
+    container_name: traders-redis
+    restart: unless-stopped
+    command: redis-server --save 60 1000 --appendonly yes --loglevel warning
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis_data:/data
+    mem_limit: 768m
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    logging: *default-logging
+
+  ml-engine:
+    image: ghcr.io/${GHCR_OWNER}/ml-engine:${IMAGE_TAG}
+    container_name: traders-ml-engine
+    restart: unless-stopped
+    pull_policy: always
+    init: true
+    ports:
+      - "127.0.0.1:8001:8001"
+    environment:
+      DB_PATH: /data/trading_data.db
+      MODEL_STORE: /models/store
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT}
+      MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI:-}
+      NODE_ENV: production
+    volumes:
+      - ml_data:/data
+      - ml_models:/models
+    depends_on:
+      redis:
+        condition: service_healthy
+    mem_limit: 4g
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8001/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 6
+      start_period: 60s
+    logging: *default-logging
+
+  analysis-service:
+    image: ghcr.io/${GHCR_OWNER}/bff:${IMAGE_TAG}
+    container_name: traders-analysis-service
+    restart: unless-stopped
+    pull_policy: always
+    init: true
+    command: ["node", "analysis-server.mjs"]
+    ports:
+      - "127.0.0.1:50051:50051"
+      - "127.0.0.1:8082:8082"
+    environment:
+      ML_ENGINE_URL: ${ML_ENGINE_URL}
+      ANALYSIS_SERVICE_GRPC_PORT: ${ANALYSIS_SERVICE_GRPC_PORT}
+      ANALYSIS_SERVICE_HEALTH_PORT: ${ANALYSIS_SERVICE_HEALTH_PORT}
+      NODE_ENV: production
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      ml-engine:
+        condition: service_healthy
+    mem_limit: 1g
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8082/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 6
+      start_period: 20s
+    logging: *default-logging
+
+  bff:
+    image: ghcr.io/${GHCR_OWNER}/bff:${IMAGE_TAG}
+    container_name: traders-bff
+    restart: unless-stopped
+    pull_policy: always
+    init: true
+    ports:
+      - "127.0.0.1:8788:8788"
+    environment:
+      NODE_ENV: ${NODE_ENV}
+      PORT: ${BFF_PORT}
+      BFF_HOST: ${BFF_HOST}
+      BFF_PORT: ${BFF_PORT}
+      BFF_ALLOWED_ORIGINS: ${BFF_ALLOWED_ORIGINS}
+      ML_ENGINE_URL: ${ML_ENGINE_URL}
+      ML_ANALYSIS_TRANSPORT: ${ML_ANALYSIS_TRANSPORT}
+      ML_ANALYSIS_GRPC_ADDR: ${ML_ANALYSIS_GRPC_ADDR}
+      ML_ANALYSIS_GRPC_STRICT: ${ML_ANALYSIS_GRPC_STRICT}
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      NODE_OPTIONS: ${NODE_OPTIONS:---max-old-space-size=1024}
+    depends_on:
+      redis:
+        condition: service_healthy
+      ml-engine:
+        condition: service_healthy
+      analysis-service:
+        condition: service_healthy
+    mem_limit: 2g
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8788/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 6
+      start_period: 20s
+    logging: *default-logging
+
+  frontend:
+    image: ghcr.io/${GHCR_OWNER}/frontend:${IMAGE_TAG}
+    container_name: traders-frontend
+    restart: unless-stopped
+    pull_policy: always
+    ports:
+      - "127.0.0.1:8080:8080"
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 6
+      start_period: 10s
+    logging: *default-logging
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: traders-postgres
+    restart: unless-stopped
+    profiles: ["mlops"]
+    ports:
+      - "127.0.0.1:5432:5432"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-tradersapp}
+      POSTGRES_USER: ${POSTGRES_USER:-tradersapp}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    mem_limit: 2g
+    logging: *default-logging
+
+  minio:
+    image: minio/minio:RELEASE.2026-03-27T14-03-41Z
+    container_name: traders-minio
+    restart: unless-stopped
+    profiles: ["mlops"]
+    command: server /data --console-address ":9001"
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-tradersapp}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-changeme123}
+    volumes:
+      - minio_data:/data
+    mem_limit: 2g
+    logging: *default-logging
+
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.21.3
+    container_name: traders-mlflow
+    restart: unless-stopped
+    profiles: ["mlops"]
+    ports:
+      - "127.0.0.1:5000:5000"
+    command: >
+      mlflow server
+      --host 0.0.0.0
+      --port 5000
+      --backend-store-uri ${MLFLOW_BACKEND_STORE_URI:-sqlite:///mlflow/mlflow.db}
+      --default-artifact-root ${MLFLOW_ARTIFACT_ROOT:-/mlflow/artifacts}
+    volumes:
+      - mlflow_data:/mlflow
+    depends_on:
+      minio:
+        condition: service_started
+    mem_limit: 2g
+    logging: *default-logging
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: traders-prometheus
+    restart: unless-stopped
+    profiles: ["observability"]
+    ports:
+      - "127.0.0.1:9090:9090"
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=15d"
+      - "--web.enable-lifecycle"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    mem_limit: 2g
+    logging: *default-logging
+
+  grafana:
+    image: grafana/grafana:11.5.2
+    container_name: traders-grafana
+    restart: unless-stopped
+    profiles: ["observability"]
+    ports:
+      - "127.0.0.1:3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-changeme}
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      prometheus:
+        condition: service_started
+    mem_limit: 1g
+    logging: *default-logging
+
+  watchtower:
+    image: containrrr/watchtower:1.7.1
+    container_name: traders-watchtower
+    restart: unless-stopped
+    profiles: ["observability"]
+    command:
+      - "--cleanup"
+      - "--interval"
+      - "3600"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    mem_limit: 256m
+    logging: *default-logging
+
+volumes:
+  caddy_data:
+  caddy_config:
+  redis_data:
+  ml_data:
+  ml_models:
+  postgres_data:
+  minio_data:
+  mlflow_data:
+  prometheus_data:
+  grafana_data:

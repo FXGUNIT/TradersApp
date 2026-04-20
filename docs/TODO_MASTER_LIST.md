@@ -7,11 +7,11 @@
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-19 22:57`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-20 05:08`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Master Backlog  52.1%  [###########-------------]
-Tasks          done 105 | in progress 001 | blocked 000 | todo 118 | total 224
+Master Backlog  47.1%  [###########-------------]
+Tasks          done 115 | in progress 000 | blocked 000 | todo 129 | total 244
 ```
 
 How to read this:
@@ -22,7 +22,7 @@ How to read this:
 
 | Area | Tasks | Progress | Status |
 |---|---|---:|---|
-| Stage P | [105/169] |  62.1% | P25 OVHcloud ACTIVE |
+| Stage P | [115/189] |  60.8% | BLOCKED |
 | Stage S | [0/47] |   0.0% | PENDING |
 | ML Research | [0/8] |   0.0% | PENDING |
 
@@ -30,8 +30,8 @@ How to read this:
 
 | Tier | Scope | Progress | Status |
 |---|---|---:|---|
-| TIER 1 | Stage P rollout path |  61.9% | CURRENT BLOCKER |
-| TIER 2 | Bootstrap + minimal core |  46.9% | CURRENT BLOCKER |
+| TIER 1 | Stage P rollout path |  60.8% | BLOCKED |
+| TIER 2 | Bootstrap + minimal core | 100.0% | DONE |
 | TIER 3 | OCI ingress + DNS cutover |   0.0% | BLOCKED |
 | TIER 4 | Stage S + ML backlog |   0.0% | PENDING |
 
@@ -47,7 +47,6 @@ How to read this:
 | P06 - CI/CD Pipeline (`deploy-k8s.yml`) DONE - minimal direct-apply path | [12/12] | 100.0% | DONE |
 | P07 - k3s Namespace + Secrets Bootstrap ✅ DONE | [3/3] | 100.0% | DONE |
 | P08 - Helm Chart Values ✅ DONE | [4/4] | 100.0% | DONE |
-| P09 - Core Deployment CURRENT BLOCKER | [23/57] |  40.4% | CURRENT BLOCKER |
 | P10 - Stateful Services Inside Free Limits ✅ DONE | [5/5] | 100.0% | DONE |
 | P11 - Ingress / External Access BLOCKED BY P09 | [0/6] |   0.0% | BLOCKED |
 | P12 - DNS + TLS on Current Registrar ⏳ BLOCKED BY P11 | [0/5] |   0.0% | BLOCKED |
@@ -63,6 +62,8 @@ How to read this:
 | P22 - Desktop Security and IP Hardening | [5/5] | 100.0% | DONE |
 | P23 - 4 GB Performance and Compatibility Certification | [0/5] |   0.0% | PENDING |
 | P24 - Windows Release Readiness and Docs Alignment ✅ DONE | [5/5] | 100.0% | DONE |
+| P25 - Ampere A1 Migration (Archived Fallback) 🟡 ON HOLD | [0/7] |   0.0% | PENDING |
+| P26 - OVH VPS Docker Compose Production Path 🔴 ACTIVE | [34/71] |  47.9% | IN PROGRESS |
 | S1 - Trading Session Config Foundation | [0/11] |   0.0% | PENDING |
 | S2 - BFF Multi-Instrument Routing | [0/7] |   0.0% | PENDING |
 | S3 - Frontend Dashboard Redesign | [0/13] |   0.0% | PENDING |
@@ -193,20 +194,12 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [x] All Docker images tagged with GitHub SHA from CI pipeline
 
 ### P09 - Core Deployment — SUPERSEDED by P25 ✅
-- P09 is fully deprecated. E2.1.Micro 1GB RAM cannot run k3s control plane + 4 pods without memory collapse. Ampere A1 Mumbai is capacity-exhausted. See P25 for the OVHcloud VPS-3 deployment path.
+- P09 is fully deprecated. E2.1.Micro 1GB RAM cannot run k3s control plane + 4 pods without memory collapse. Ampere A1 Mumbai is capacity-exhausted. See P26 for the active OVH VPS-3 deployment path.
 
-### P25 — OVHcloud VPS-3 Deployment 🔴 ACTIVE
-*Supersedes P09 and Ampere A1 path. OVHcloud VPS-3 is the confirmed deployment target.*
+### P25 — Ampere A1 Migration (Archived Fallback) 🟡 ON HOLD
+*Historical fallback only. Do not treat this as the active production route.*
 
-**Full plan:** See `docs/P25_OVHcloud_Deployment_Plan.md`
-
-**Why this path:**
-- OVHcloud VPS-3: 8 vCore / 24GB RAM / 200GB NVMe — **$19.97/month**
-- 3x the RAM, 8x the cores of Oracle E2.1 for the same price
-- No capacity exhaustion risk (unlike Ampere A1 Mumbai)
-- GitHub Actions handles all deployment — no laptop dependency
-
-**Monthly cost:** ~$20/month (OVHcloud VPS-3)
+**Archived note:** the cloud selection work ended with OVH as the active deployment target because A1 capacity remained unavailable and OCI k3s on E2.1.Micro stayed unstable. Keep the OCI/A1 notes below only as evidence and rollback context.
 
   - Fix already applied: core runtime Deployments use `Recreate` in the minimal profile so the node does not schedule two generations at once
   - Fix already applied: production CI builds and pushes current commit SHA images before deploy
@@ -230,6 +223,8 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 
 ### P26 — OVH VPS Docker Compose Production Path 🔴 ACTIVE
 *Supersedes P25 as the real production route. Single-host OVH VPS-3 with GitHub Actions deployment is now the target architecture.*
+
+**Runbook:** See `docs/OVH_PRODUCTION_RUNBOOK.md`
 
 #### P26 — Architecture Freeze
 - [x] Freeze production target as `OVH VPS-3` with `Docker Compose`, not OCI k3s
@@ -550,7 +545,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-20 04:56`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-20 05:08`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Active Backlog    0.0%  [------------------------]

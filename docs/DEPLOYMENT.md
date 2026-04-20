@@ -1,9 +1,28 @@
 # Deployment Guide — TradersApp
 
-**Last updated:** 2026-04-19
-**Status:** OCI k3s — Railway/Vercel deprecated as production path. See `docs/TODO_MASTER_LIST.md`
+**Last updated:** 2026-04-20
+**Status:** OVH VPS + Docker Compose is the active production path. OCI k3s is archived fallback only. See `docs/OVH_PRODUCTION_RUNBOOK.md`.
 
 ---
+
+## Active Production Path
+
+- Single `OVH VPS-3`
+- `GitHub Actions -> GHCR -> SSH -> Docker Compose`
+- Public hosts:
+  - `traders.app`
+  - `bff.traders.app`
+  - `api.traders.app`
+- Runtime bundle:
+  - [deploy/ovh/docker-compose.yml](/e:/TradersApp/deploy/ovh/docker-compose.yml:1)
+  - [deploy/ovh/Caddyfile](/e:/TradersApp/deploy/ovh/Caddyfile:1)
+  - [scripts/ovh/bootstrap.sh](/e:/TradersApp/scripts/ovh/bootstrap.sh:1)
+  - [scripts/ovh/deploy.sh](/e:/TradersApp/scripts/ovh/deploy.sh:1)
+  - [docs/OVH_PRODUCTION_RUNBOOK.md](/e:/TradersApp/docs/OVH_PRODUCTION_RUNBOOK.md:1)
+
+## Archived OCI Reference
+
+The rest of this document describes the old OCI k3s path kept for audit and rollback context. It is no longer the active production route.
 
 ## Infrastructure Overview
 
@@ -29,7 +48,7 @@
                     └───────────────────────┘
 ```
 
-> **Production topology:** OCI Always Free k3s only. Railway and Vercel are no longer used for production hosting. `docs/TODO_MASTER_LIST.md` is the authoritative source.
+> **Archived topology:** OCI Always Free k3s only. This is retained as historical context. The active production route is the OVH runbook above.
 
 ---
 
@@ -175,6 +194,15 @@ Deployments are driven by `.github/workflows/deploy-k8s.yml`.
 - Residual RAM headroom above summed requests: `162 MiB`
 
 > These values are the current hard deploy budget for P09-C16. Replace them only after the live OCI evidence capture tasks (`P09-C01` through `P09-C15`) prove a tighter or safer floor.
+
+**Per-stage rollout evidence path:**
+- Local/scripted runs save staged manifests, preflight output, and per-service rollout snapshots under `artifacts/k8s/deploy-core-minimal/<timestamp>/`
+- CI uploads that directory as the `k8s-core-deploy-evidence-<run_id>` artifact so failed OCI retries preserve memory, events, and pod-log evidence
+
+**Isolation matrix runner for P09-C42 to P09-C46:**
+- `scripts/k8s/run-core-isolation-matrix.sh` runs the staged validation sequence `singles -> pairs -> triple -> full`
+- It uses the same `deploy-core-minimal.sh` path as CI, preserves per-profile logs under `artifacts/k8s/core-isolation-matrix/<timestamp>/`, and stops on the first failing profile unless `--continue-on-failure` is set
+- Use `--dry-run` to preview the exact profile order without touching the cluster
 
 **Triggering a deploy:**
 Push to `main` branch → GitHub Actions runs `deploy-k8s.yml` automatically.
