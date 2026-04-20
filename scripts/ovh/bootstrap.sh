@@ -113,9 +113,9 @@ RemainAfterExit=yes
 WorkingDirectory=${APP_ROOT}/deploy/ovh
 User=${APP_USER}
 Group=docker
-ExecStart=/usr/bin/docker compose --project-name tradersapp --env-file ${APP_ROOT}/runtime/.env.ovh -f ${APP_ROOT}/deploy/ovh/docker-compose.yml up -d --remove-orphans
-ExecStop=/usr/bin/docker compose --project-name tradersapp --env-file ${APP_ROOT}/runtime/.env.ovh -f ${APP_ROOT}/deploy/ovh/docker-compose.yml down
-ExecReload=/usr/bin/docker compose --project-name tradersapp --env-file ${APP_ROOT}/runtime/.env.ovh -f ${APP_ROOT}/deploy/ovh/docker-compose.yml up -d --remove-orphans
+ExecStart=/usr/bin/docker compose --project-name tradersapp --project-directory ${APP_ROOT}/deploy/ovh --env-file ${APP_ROOT}/runtime/.env.ovh -f ${APP_ROOT}/deploy/ovh/docker-compose.yml up -d --remove-orphans
+ExecStop=/usr/bin/docker compose --project-name tradersapp --project-directory ${APP_ROOT}/deploy/ovh --env-file ${APP_ROOT}/runtime/.env.ovh -f ${APP_ROOT}/deploy/ovh/docker-compose.yml down
+ExecReload=/usr/bin/docker compose --project-name tradersapp --project-directory ${APP_ROOT}/deploy/ovh --env-file ${APP_ROOT}/runtime/.env.ovh -f ${APP_ROOT}/deploy/ovh/docker-compose.yml up -d --remove-orphans
 TimeoutStartSec=900
 
 [Install]

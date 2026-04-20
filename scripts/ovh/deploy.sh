@@ -111,7 +111,7 @@ if [ -n "${GHCR_USERNAME}" ] && [ -n "${GHCR_TOKEN}" ]; then
   printf '%s' "${GHCR_TOKEN}" | run_as_app "docker login ghcr.io -u '${GHCR_USERNAME}' --password-stdin"
 fi
 
-COMPOSE_CMD="docker compose --project-name tradersapp --env-file '${RUNTIME_ENV}' -f '${DEPLOY_ROOT}/docker-compose.yml'"
+COMPOSE_CMD="docker compose --project-name tradersapp --project-directory '${DEPLOY_ROOT}' --env-file '${RUNTIME_ENV}' -f '${DEPLOY_ROOT}/docker-compose.yml'"
 
 echo "[deploy] Pulling images..."
 run_as_app "${COMPOSE_CMD} pull"
