@@ -1,6 +1,6 @@
 # TODO Master List
 **Last Updated:** 2026-04-20
-**Status:** P26 ACTIVE — OVH VPS + Docker Compose is the production path
+**Status:** P26 ACTIVE — Contabo VPS + Docker Compose is the production path
 **Based on:** Stage P production deployment + Session Redesign + ML Research Foundation
 
 
@@ -63,7 +63,7 @@ How to read this:
 | P23 - 4 GB Performance and Compatibility Certification | [0/5] |   0.0% | PENDING |
 | P24 - Windows Release Readiness and Docs Alignment ✅ DONE | [5/5] | 100.0% | DONE |
 | P25 - Ampere A1 Migration (Archived Fallback) 🟡 ON HOLD | [0/7] |   0.0% | PENDING |
-| P26 - OVH VPS Docker Compose Production Path 🔴 ACTIVE | [34/71] |  47.9% | IN PROGRESS |
+| P26 - Contabo VPS Docker Compose Production Path 🔴 ACTIVE | [34/71] |  47.9% | IN PROGRESS |
 | S1 - Trading Session Config Foundation | [0/11] |   0.0% | PENDING |
 | S2 - BFF Multi-Instrument Routing | [0/7] |   0.0% | PENDING |
 | S3 - Frontend Dashboard Redesign | [0/13] |   0.0% | PENDING |
@@ -85,15 +85,15 @@ How to read this:
 
 ## EXECUTION PRIORITY
 
-### TIER 1 — ACTIVE NOW: OVH VPS bootstrap + automated deploy
-Push TradersApp from GitHub Actions → OVH VPS → Docker Compose → live at `traders.app`.
-Everything below is blocked by the first successful OVH cutover.
+### TIER 1 — ACTIVE NOW: Contabo VPS bootstrap + automated deploy
+Push TradersApp from GitHub Actions → Contabo VPS → Docker Compose → live at `traders.app`.
+Everything below is blocked by the first successful Contabo cutover.
 
 ### TIER 2 — STAGING: runtime secrets + DNS cutover
-Once the OVH deploy automation is ready, load runtime secrets, point DNS, and verify the public hosts.
+Once the Contabo deploy automation is ready, load runtime secrets, point DNS, and verify the public hosts.
 
 ### TIER 3 — historical OCI archive / rollback path
-Keep the OCI k3s work as reference only until OVH is fully stable. Do not treat OCI as the active production route.
+Keep the OCI k3s work as reference only until Contabo is fully stable. Do not treat OCI as the active production route.
 
 ### TIER 4 — Backend ML Improvements
 All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live app when ready.
@@ -102,23 +102,23 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 
 ## PRODUCTION CONSTRAINTS
 
-- Production topology is OVH VPS-3 single-host Docker Compose. OCI k3s is archival evidence and fallback only.
+- Production topology is Contabo VPS single-host Docker Compose. OCI k3s is archival evidence and fallback only.
 - Keep the existing domain, but use the current registrar/DNS provider already attached to `traders.app` instead of adding a new paid platform.
 - Do not cut app features to fit the server. Reduce infrastructure overhead first; keep trading logic, accuracy checks, and robustness requirements intact.
 - Robustness on a single VPS means deterministic boot, repeatable deploys, working health checks, backups, and recovery procedures. It does not imply multi-node HA.
-- Public production hosts must terminate on the OVH edge: `traders.app`, `bff.traders.app`, and `api.traders.app`.
+- Public production hosts must terminate on the Contabo VPS edge: `traders.app`, `bff.traders.app`, and `api.traders.app`.
 
 ---
 
-## STAGE P — Production Deployment (Live 24x7 on OVH VPS + Docker Compose)
-*Target: GitHub Actions → single OVH VPS-3 → Docker Compose → `traders.app` + `bff.traders.app` + `api.traders.app`*
+## STAGE P — Production Deployment (Live 24x7 on Contabo VPS + Docker Compose)
+*Target: GitHub Actions → single Contabo VPS → Docker Compose → `traders.app` + `bff.traders.app` + `api.traders.app`*
 
 ### Current Checkpoint - 2026-04-20
-- Production target is now OVH VPS-3, not OCI k3s
-- Repo-side OVH deployment assets are the active workstream: Compose bundle, reverse proxy, bootstrap scripts, runtime env builder, and GitHub Actions deploy workflow
+- Production target is now Contabo VPS, not OCI k3s
+- Repo-side Contabo deployment assets are the active workstream: Compose bundle, reverse proxy, bootstrap scripts, runtime env builder, and GitHub Actions deploy workflow
 - OCI P09 and P25 remain in this file only as historical evidence and fallback, not as the current production plan
-- The current hard blocker is no longer OCI memory pressure; it is the first real OVH cutover with live VPS credentials, DNS, and runtime secrets
-- Success now means: `git push main` builds/pushes images, SSHes to OVH, runs Docker Compose, and leaves the public hosts healthy without laptop involvement
+- The current hard blocker is no longer OCI memory pressure; it is the first real Contabo cutover with live Contabo VPS credentials, DNS, and runtime secrets
+- Success now means: `git push main` builds/pushes images, SSHes to Contabo, runs Docker Compose, and leaves the public hosts healthy without laptop involvement
 
 
 ### P01 — OCI Compute Instance ✅ DONE
@@ -194,12 +194,12 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [x] All Docker images tagged with GitHub SHA from CI pipeline
 
 ### P09 - Core Deployment — SUPERSEDED by P25 ✅
-- P09 is fully deprecated. E2.1.Micro 1GB RAM cannot run k3s control plane + 4 pods without memory collapse. Ampere A1 Mumbai is capacity-exhausted. See P26 for the active OVH VPS-3 deployment path.
+- P09 is fully deprecated. E2.1.Micro 1GB RAM cannot run k3s control plane + 4 pods without memory collapse. Ampere A1 Mumbai is capacity-exhausted. See P26 for the active Contabo VPS deployment path.
 
-### P25 — Ampere A1 Migration (Archived Fallback) 🟡 ON HOLD
+### P25 — Ampere A1 / OVHcloud Migration (Archived Fallback) 🟡 ON HOLD
 *Historical fallback only. Do not treat this as the active production route.*
 
-**Archived note:** the cloud selection work ended with OVH as the active deployment target because A1 capacity remained unavailable and OCI k3s on E2.1.Micro stayed unstable. Keep the OCI/A1 notes below only as evidence and rollback context.
+**Archived note:** the cloud selection work ended with Contabo as the active deployment target because A1 capacity remained unavailable and OCI k3s on E2.1.Micro stayed unstable. Keep the OCI/A1 notes below only as evidence and rollback context.
 
   - Fix already applied: core runtime Deployments use `Recreate` in the minimal profile so the node does not schedule two generations at once
   - Fix already applied: production CI builds and pushes current commit SHA images before deploy
@@ -221,37 +221,36 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [ ] Smoke tests: `bff /health`, `ml-engine /health`, frontend `http://frontend:80`, `redis-cli ping`
 - [ ] KUBECONFIG_B64 secret in GitHub updated after each k3s cold restart
 
-### P26 — OVH VPS Docker Compose Production Path 🔴 ACTIVE
-*Supersedes P25 as the real production route. Single-host OVH VPS-3 with GitHub Actions deployment is now the target architecture.*
+### P26 — Contabo VPS Docker Compose Production Path 🔴 ACTIVE
+*Supersedes P25 as the real production route. Single-host Contabo VPS with GitHub Actions deployment is now the target architecture.*
 
-**Runbook:** See `docs/OVH_PRODUCTION_RUNBOOK.md`
+**Runbook:** See `docs/P26_Contabo_Deployment_Plan.md`
 
 #### P26 — Architecture Freeze
-- [x] Freeze production target as `OVH VPS-3` with `Docker Compose`, not OCI k3s
-- [x] Freeze production delivery model as `GitHub Actions -> GHCR -> OVH SSH deploy`
+- [x] Freeze production target as `Contabo VPS` with `Docker Compose`, not OCI k3s
+- [x] Freeze production delivery model as `GitHub Actions -> GHCR -> Contabo SSH deploy`
 - [x] Freeze public host layout as `traders.app`, `bff.traders.app`, and `api.traders.app`
 - [x] Keep OCI k3s artifacts in the repo as rollback/reference only, not as the default path
 
-#### P26 — Repo-Side OVH Execution
-- [x] Create a dedicated OVH runtime bundle with Compose, reverse proxy, and server-local configs
-- [x] Create an idempotent OVH bootstrap script for a fresh Ubuntu/Debian VPS
-- [x] Create an idempotent OVH deploy script that updates the runtime bundle, pulls GHCR images, and restarts the stack safely
+#### P26 — Repo-Side Contabo Execution
+- [x] Create a dedicated Contabo runtime bundle with Compose, reverse proxy, and server-local configs
+- [x] Create an idempotent Contabo bootstrap script for a fresh Ubuntu/Debian VPS
+- [x] Create an idempotent Contabo deploy script that updates the runtime bundle, pulls GHCR images, and restarts the stack safely
 - [x] Create a runtime env builder that turns Infisical or direct env secrets into a server-ready `.env`
-- [x] Create a dedicated GitHub Actions OVH deployment workflow
-- [x] Guard the old auto-production k3s path so OVH can become the active deploy target without deleting the legacy workflow
-- [x] Document the OVH production runbook, secrets contract, and cutover steps
+- [x] Create a dedicated GitHub Actions Contabo deployment workflow
+- [x] Guard the old auto-production k3s path so Contabo can become the active deploy target without deleting the legacy workflow
+- [x] Document the Contabo production runbook, secrets contract, and cutover steps
 
 #### P26 — Live Cutover (Pending Real Credentials)
-- [ ] Buy or provision the OVH VPS-3 instance
-- [ ] Add GitHub repository variable `PRODUCTION_DEPLOY_PLATFORM=ovh`
-- [ ] Add GitHub secrets for `OVH_SSH_HOST`, `OVH_SSH_USER`, and `OVH_SSH_PRIVATE_KEY`
-- [ ] Add either `OVH_APP_ENV` or keep `INFISICAL_TOKEN` available for runtime secret generation
-- [ ] Point `traders.app`, `bff.traders.app`, and `api.traders.app` DNS to the OVH VPS public IP
-- [ ] Run the first GitHub Actions OVH deploy and capture the bootstrap/deploy logs
+- [ ] Contabo VPS is bought and running — note the public IP address
+- [ ] Add GitHub secret: `CONTABO_SSH_KEY` (private SSH key content)
+- [ ] Add GitHub secret: `CONTABO_VPS_HOST` (VPS public IP address)
+- [ ] Add GitHub secret: `CONTABO_VPS_USER` (`root` or `deploy`)
+- [ ] Add GitHub secret: `CONTABO_DOMAIN` (`api.tradersapp.<yourdomain>`)
 - [ ] Confirm local health on the VPS for `frontend`, `bff`, `ml-engine`, `analysis-service`, and `redis`
 - [ ] Confirm public health for `https://traders.app`, `https://bff.traders.app/health`, and `https://api.traders.app/health`
-- [ ] Run the existing load-test suite against the OVH public edge and record the first real concurrency envelope
-- [ ] Archive the final OCI node details only after OVH is stable for at least one clean redeploy cycle
+- [ ] Run the existing load-test suite against the Contabo public edge and record the first real concurrency envelope
+- [ ] Archive the final OCI node details only after Contabo is stable for at least one clean redeploy cycle
 
 #### P09-C - `kubectl apply tradersapp-deployments.yaml` on OCI E2.1.Micro
 - Root cause to treat as authoritative until disproven: OCI E2.1.Micro `1 GB RAM` is too small for `k3s + etcd + kubelet + containerd + the TradersApp core-4 pods` when applied as one rollout step
@@ -545,7 +544,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-20 05:08`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-20 16:47`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Active Backlog    0.0%  [------------------------]
