@@ -81,7 +81,7 @@ services:
     restart: unless-stopped
     pull_policy: always
     init: true
-    command: ["node", "bff/analysis-server.mjs"]
+    command: ["node", "analysis-server.mjs"]
     ports:
       - "127.0.0.1:50051:50051"
       - "127.0.0.1:8082:8082"
