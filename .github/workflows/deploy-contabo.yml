@@ -111,9 +111,9 @@ jobs:
 
           OWNER_LC="${GITHUB_REPOSITORY_OWNER,,}"
 
-          DOMAIN="${{ vars.CONTABO_DOMAIN }}"
+          DOMAIN="${{ vars.TRADERSAPP_DOMAIN }}"
           if [ -z "${DOMAIN}" ]; then
-            DOMAIN="${{ vars.TRADERSAPP_DOMAIN }}"
+            DOMAIN="${{ vars.CONTABO_DOMAIN }}"
           fi
           if [ -z "${DOMAIN}" ]; then
             DOMAIN="traders.app"
@@ -127,6 +127,13 @@ jobs:
           API_HOST="${{ vars.API_PUBLIC_HOST }}"
           if [ -z "${API_HOST}" ]; then
             API_HOST="api.${DOMAIN}"
+          fi
+
+          if [[ "${DOMAIN}" == *.sslip.io ]] || [[ "${BFF_HOST}" == *.sslip.io ]] || [[ "${API_HOST}" == *.sslip.io ]]; then
+            if [ "${SKIP_PUBLIC_VERIFY}" != "true" ]; then
+              echo "::notice::Using sslip.io fallback runtime hosts; skipping public verification until production DNS is cut over."
+              SKIP_PUBLIC_VERIFY="true"
+            fi
           fi
 
           APP_ROOT="${{ vars.CONTABO_APP_ROOT }}"
