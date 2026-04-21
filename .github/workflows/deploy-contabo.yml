@@ -352,6 +352,7 @@ jobs:
           GHCR_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          mkdir -p .artifacts/contabo
           retry() {
             local max_attempts="$1"
             shift
@@ -375,8 +376,11 @@ jobs:
           REMOTE_GHCR_USERNAME='${{ github.actor }}'
 
           run_remote_deploy() {
-            printf '%s' "${GHCR_TOKEN}" | ssh -T contabo-vps \
-              "APP_ROOT='${REMOTE_APP_ROOT}' SKIP_BOOTSTRAP='${REMOTE_SKIP_BOOTSTRAP}' GHCR_USERNAME='${REMOTE_GHCR_USERNAME}' bash -lc 'set -euo pipefail; RELEASE_DIR=/tmp/tradersapp-contabo-release; tar -xzf \"\$RELEASE_DIR/contabo-bundle.tgz\" -C \"\$RELEASE_DIR\"; RELEASE_DIR=\"\$RELEASE_DIR\" APP_ROOT=\"\$APP_ROOT\" SKIP_BOOTSTRAP=\"\$SKIP_BOOTSTRAP\" GHCR_USERNAME=\"\$GHCR_USERNAME\" GHCR_TOKEN_STDIN=1 bash \"\$RELEASE_DIR/scripts/contabo/remote-run-deploy.sh\"'"
+            {
+              echo "=== bootstrap-and-deploy $(date -u +%Y-%m-%dT%H:%M:%SZ) ==="
+              printf '%s' "${GHCR_TOKEN}" | ssh -T contabo-vps \
+                "APP_ROOT='${REMOTE_APP_ROOT}' SKIP_BOOTSTRAP='${REMOTE_SKIP_BOOTSTRAP}' GHCR_USERNAME='${REMOTE_GHCR_USERNAME}' bash -lc 'set -euo pipefail; RELEASE_DIR=/tmp/tradersapp-contabo-release; tar -xzf \"\$RELEASE_DIR/contabo-bundle.tgz\" -C \"\$RELEASE_DIR\"; RELEASE_DIR=\"\$RELEASE_DIR\" APP_ROOT=\"\$APP_ROOT\" SKIP_BOOTSTRAP=\"\$SKIP_BOOTSTRAP\" GHCR_USERNAME=\"\$GHCR_USERNAME\" GHCR_TOKEN_STDIN=1 bash \"\$RELEASE_DIR/scripts/contabo/remote-run-deploy.sh\"'"
+            } 2>&1 | tee -a .artifacts/contabo/bootstrap-and-deploy.log
           }
 
           attempt=1
@@ -422,11 +426,11 @@ jobs:
           }
 
           capture_ps() {
-            run_remote_status ps > .artifacts/contabo/compose-ps.txt
+            run_remote_status ps > .artifacts/contabo/compose-ps.txt 2>&1
           }
 
           capture_logs() {
-            run_remote_status logs > .artifacts/contabo/compose-logs.txt
+            run_remote_status logs > .artifacts/contabo/compose-logs.txt 2>&1
           }
 
           attempt=1
