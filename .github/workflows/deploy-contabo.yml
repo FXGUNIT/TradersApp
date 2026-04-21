@@ -349,10 +349,9 @@ jobs:
       - name: Bootstrap and deploy on Contabo
         shell: bash
         env:
-          GHCR_TOKEN_B64: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          GHCR_TOKEN_B64="$(printf '%s' "${GHCR_TOKEN_B64}" | base64 -w0)"
           retry() {
             local max_attempts="$1"
             shift
@@ -371,13 +370,13 @@ jobs:
             done
           }
 
-          GHCR_TOKEN_FILE="$(mktemp)"
-          trap 'rm -f "${GHCR_TOKEN_FILE}"' EXIT
-          printf '%s' "${GHCR_TOKEN_B64}" > "${GHCR_TOKEN_FILE}"
-          retry 3 scp "${GHCR_TOKEN_FILE}" contabo-vps:/tmp/tradersapp-contabo-release/.ghcr-token.b64
+          REMOTE_APP_ROOT='${{ steps.context.outputs.app_root }}'
+          REMOTE_SKIP_BOOTSTRAP='${{ steps.context.outputs.skip_bootstrap }}'
+          REMOTE_GHCR_USERNAME='${{ github.actor }}'
 
           run_remote_deploy() {
-            ssh contabo-vps "set -euo pipefail; RELEASE_DIR='/tmp/tradersapp-contabo-release'; tar -xzf \"\${RELEASE_DIR}/contabo-bundle.tgz\" -C \"\${RELEASE_DIR}\"; RELEASE_DIR=\"\${RELEASE_DIR}\" APP_ROOT='${{ steps.context.outputs.app_root }}' SKIP_BOOTSTRAP='${{ steps.context.outputs.skip_bootstrap }}' GHCR_USERNAME='${{ github.actor }}' GHCR_TOKEN_B64_FILE=\"\${RELEASE_DIR}/.ghcr-token.b64\" bash \"\${RELEASE_DIR}/scripts/contabo/remote-run-deploy.sh\""
+            printf '%s' "${GHCR_TOKEN}" | ssh -T contabo-vps \
+              "APP_ROOT='${REMOTE_APP_ROOT}' SKIP_BOOTSTRAP='${REMOTE_SKIP_BOOTSTRAP}' GHCR_USERNAME='${REMOTE_GHCR_USERNAME}' bash -lc 'set -euo pipefail; RELEASE_DIR=/tmp/tradersapp-contabo-release; tar -xzf \"\$RELEASE_DIR/contabo-bundle.tgz\" -C \"\$RELEASE_DIR\"; RELEASE_DIR=\"\$RELEASE_DIR\" APP_ROOT=\"\$APP_ROOT\" SKIP_BOOTSTRAP=\"\$SKIP_BOOTSTRAP\" GHCR_USERNAME=\"\$GHCR_USERNAME\" GHCR_TOKEN_STDIN=1 bash \"\$RELEASE_DIR/scripts/contabo/remote-run-deploy.sh\"'"
           }
 
           attempt=1
@@ -397,6 +396,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p .artifacts/contabo
+          REMOTE_APP_ROOT='${{ steps.context.outputs.app_root }}'
           retry() {
             local max_attempts="$1"
             shift
@@ -415,12 +415,18 @@ jobs:
             done
           }
 
+          run_remote_status() {
+            local command_name="$1"
+            ssh -T contabo-vps \
+              "APP_ROOT='${REMOTE_APP_ROOT}' STATUS_COMMAND='${command_name}' bash -lc 'set -euo pipefail; RELEASE_DIR=/tmp/tradersapp-contabo-release; if [ -f \"\$RELEASE_DIR/contabo-bundle.tgz\" ] && [ ! -d \"\$RELEASE_DIR/scripts/contabo\" ]; then tar -xzf \"\$RELEASE_DIR/contabo-bundle.tgz\" -C \"\$RELEASE_DIR\"; fi; APP_ROOT=\"\$APP_ROOT\" bash \"\$RELEASE_DIR/scripts/contabo/remote-compose-status.sh\" \"\$STATUS_COMMAND\"'"
+          }
+
           capture_ps() {
-            ssh contabo-vps "set -euo pipefail; RELEASE_DIR='/tmp/tradersapp-contabo-release'; if [ -f \"\${RELEASE_DIR}/contabo-bundle.tgz\" ] && [ ! -d \"\${RELEASE_DIR}/scripts/contabo\" ]; then tar -xzf \"\${RELEASE_DIR}/contabo-bundle.tgz\" -C \"\${RELEASE_DIR}\"; fi; APP_ROOT='${{ steps.context.outputs.app_root }}' bash \"\${RELEASE_DIR}/scripts/contabo/remote-compose-status.sh\" ps" > .artifacts/contabo/compose-ps.txt
+            run_remote_status ps > .artifacts/contabo/compose-ps.txt
           }
 
           capture_logs() {
-            ssh contabo-vps "set -euo pipefail; RELEASE_DIR='/tmp/tradersapp-contabo-release'; if [ -f \"\${RELEASE_DIR}/contabo-bundle.tgz\" ] && [ ! -d \"\${RELEASE_DIR}/scripts/contabo\" ]; then tar -xzf \"\${RELEASE_DIR}/contabo-bundle.tgz\" -C \"\${RELEASE_DIR}\"; fi; APP_ROOT='${{ steps.context.outputs.app_root }}' bash \"\${RELEASE_DIR}/scripts/contabo/remote-compose-status.sh\" logs" > .artifacts/contabo/compose-logs.txt
+            run_remote_status logs > .artifacts/contabo/compose-logs.txt
           }
 
           attempt=1
