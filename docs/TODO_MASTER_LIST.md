@@ -7,7 +7,7 @@
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-21 14:36`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-21 15:01`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Master Backlog  51.4%  [############------------]
@@ -260,7 +260,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [x] New BFF image pulled to VPS (`f0079b9e24411297732a0151e7d27b129ced8819`) — proto path now resolves correctly
 - [x] All 5 core services locally healthy: `redis` ✅ `ml-engine` ✅ `analysis-service` ✅ `bff` ✅ `frontend` ✅ (2026-04-21 ~09:25 UTC)
 - [x] GitHub deploy-contabo workflow confirmed functional via manual SSH — `docker compose up` succeeds on VPS
-- [x] GitHub deploy-contabo `workflow_run` trigger replaced with `repository_dispatch` — CI now calls `gh workflow run deploy-contabo.yml` with full secrets access (commit `4221c20a`)
+- [x] GitHub deploy-contabo `workflow_run` trigger replaced with `repository_dispatch` — CI now calls the repository dispatch endpoint with commit SHA payload so `deploy-contabo.yml` receives the expected automatic-deploy context (commit `4221c20a`)
 - [ ] Automatic `Deploy to Contabo VPS` still fails in `Bootstrap and deploy on Contabo` after all three image pushes succeed; stabilize the remote bootstrap/deploy step on the VPS
 - [ ] Confirm public health for `https://traders.app`, `https://bff.traders.app/health`, and `https://api.traders.app/health`
 - [ ] Run the Contabo public-edge k6 suite and record the first concurrency envelope
@@ -560,7 +560,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-21 14:36`  -  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-21 15:01`  -  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Stage P Backlog  65.7%  [################--------]
