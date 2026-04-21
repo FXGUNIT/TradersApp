@@ -1,9 +1,6 @@
 name: Deploy to Contabo VPS
 
 on:
-  workflow_run:
-    workflows: ["CI/CD Pipeline"]
-    types: [completed]
   repository_dispatch:
     types: [deploy-contabo]
   workflow_dispatch:
