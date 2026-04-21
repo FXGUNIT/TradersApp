@@ -7,11 +7,11 @@
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-21 13:08`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-21 13:17`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Master Backlog  51.2%  [############------------]
-Tasks          done 129 | in progress 000 | blocked 000 | todo 123 | total 252
+Master Backlog  51.4%  [############------------]
+Tasks          done 130 | in progress 000 | blocked 000 | todo 123 | total 253
 ```
 
 How to read this:
@@ -22,7 +22,7 @@ How to read this:
 
 | Area | Tasks | Progress | Status |
 |---|---|---:|---|
-| Stage P | [129/197] |  65.5% | BLOCKED |
+| Stage P | [130/198] |  65.7% | BLOCKED |
 | Stage S | [0/47] |   0.0% | PENDING |
 | ML Research | [0/8] |   0.0% | PENDING |
 
@@ -30,8 +30,8 @@ How to read this:
 
 | Tier | Scope | Progress | Status |
 |---|---|---:|---|
-| TIER 1 | Stage P rollout path |  65.5% | BLOCKED |
-| TIER 2 | Bootstrap + minimal core | 100.0% | DONE |
+| TIER 1 | Stage P rollout path |  65.7% | BLOCKED |
+| TIER 2 | Bootstrap + minimal core |  52.6% | IN PROGRESS |
 | TIER 3 | OCI ingress + DNS cutover |   0.0% | BLOCKED |
 | TIER 4 | Stage S + ML backlog |   0.0% | PENDING |
 
@@ -47,6 +47,7 @@ How to read this:
 | P06 - CI/CD Pipeline (`deploy-k8s.yml`) DONE - minimal direct-apply path | [12/12] | 100.0% | DONE |
 | P07 - k3s Namespace + Secrets Bootstrap ✅ DONE | [3/3] | 100.0% | DONE |
 | P08 - Helm Chart Values ✅ DONE | [4/4] | 100.0% | DONE |
+| P09 - `kubectl apply tradersapp-deployments.yaml` on OCI E2.1.Micro | [23/50] |  46.0% | IN PROGRESS |
 | P10 - Stateful Services Inside Free Limits ✅ DONE | [5/5] | 100.0% | DONE |
 | P11 - Ingress / External Access BLOCKED BY P09 | [0/6] |   0.0% | BLOCKED |
 | P12 - DNS + TLS on Current Registrar ⏳ BLOCKED BY P11 | [0/5] |   0.0% | BLOCKED |
@@ -63,7 +64,7 @@ How to read this:
 | P23 - 4 GB Performance and Compatibility Certification | [0/5] |   0.0% | PENDING |
 | P24 - Windows Release Readiness and Docs Alignment ✅ DONE | [5/5] | 100.0% | DONE |
 | P25 - Ampere A1 / OVHcloud Migration (Archived Fallback) 🟡 ON HOLD | [0/7] |   0.0% | PENDING |
-| P26 - Contabo VPS Docker Compose Production Path 🔴 ACTIVE | [49/79] |  62.0% | IN PROGRESS |
+| P26 - Contabo VPS Docker Compose Production Path 🔴 ACTIVE | [26/30] |  86.7% | IN PROGRESS |
 | S1 - Trading Session Config Foundation | [0/11] |   0.0% | PENDING |
 | S2 - BFF Multi-Instrument Routing | [0/7] |   0.0% | PENDING |
 | S3 - Frontend Dashboard Redesign | [0/13] |   0.0% | PENDING |
@@ -559,7 +560,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-21 13:16`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-21 13:17`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Active Backlog    0.0%  [------------------------]
