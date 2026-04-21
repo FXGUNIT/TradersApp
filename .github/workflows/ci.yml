@@ -1516,6 +1516,7 @@ jobs:
     permissions:
       contents: write
       packages: write
+      actions: write
     steps:
       - name: Trigger deploy-contabo workflow
         run: |
