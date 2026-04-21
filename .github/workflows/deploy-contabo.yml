@@ -83,6 +83,14 @@ jobs:
             SKIP_BOOTSTRAP="true"
             SKIP_BUILD="false"
             SKIP_PUBLIC_VERIFY="false"
+          elif [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            # Called by CI via repository_dispatch — use client_payload or fall back to GITHUB_SHA
+            REF="${{ github.event.client_payload.ref || github.sha }}"
+            IMAGE_TAG="${{ github.event.client_payload.image_tag || github.sha }}"
+            COMPOSE_PROFILES="${{ vars.CONTABO_COMPOSE_PROFILES || 'core' }}"
+            SKIP_BOOTSTRAP="true"
+            SKIP_BUILD="false"
+            SKIP_PUBLIC_VERIFY="false"
           else
             REF="${{ inputs.ref }}"
             IMAGE_TAG="${{ inputs.image_tag }}"
