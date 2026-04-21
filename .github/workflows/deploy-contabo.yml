@@ -353,32 +353,31 @@ jobs:
         run: |
           set -euo pipefail
           GHCR_TOKEN_B64="$(printf '%s' "${GHCR_TOKEN_B64}" | base64 -w0)"
+          retry() {
+            local max_attempts="$1"
+            shift
+            local attempt=1
+            local status=0
+            while true; do
+              if "$@"; then
+                return 0
+              fi
+              status=$?
+              if [ "${attempt}" -ge "${max_attempts}" ]; then
+                return "${status}"
+              fi
+              sleep $(( attempt * 5 ))
+              attempt=$(( attempt + 1 ))
+            done
+          }
+
+          GHCR_TOKEN_FILE="$(mktemp)"
+          trap 'rm -f "${GHCR_TOKEN_FILE}"' EXIT
+          printf '%s' "${GHCR_TOKEN_B64}" > "${GHCR_TOKEN_FILE}"
+          retry 3 scp "${GHCR_TOKEN_FILE}" contabo-vps:/tmp/tradersapp-contabo-release/.ghcr-token.b64
+
           run_remote_deploy() {
-            ssh contabo-vps "APP_ROOT='${{ steps.context.outputs.app_root }}' SKIP_BOOTSTRAP='${{ steps.context.outputs.skip_bootstrap }}' GHCR_USERNAME='${{ github.actor }}' GHCR_TOKEN_B64='${GHCR_TOKEN_B64}' bash -s" <<'EOF'
-            set -euo pipefail
-            RELEASE_DIR="/tmp/tradersapp-contabo-release"
-            APP_ROOT="${APP_ROOT:-/opt/tradersapp}"
-            SKIP_BOOTSTRAP="${SKIP_BOOTSTRAP:-true}"
-            GHCR_USERNAME="${GHCR_USERNAME:-}"
-            GHCR_TOKEN_B64="${GHCR_TOKEN_B64:-}"
-            SUDO=""
-            if [ "$(id -u)" -ne 0 ]; then
-              SUDO="sudo"
-            fi
-
-            tar -xzf "${RELEASE_DIR}/contabo-bundle.tgz" -C "${RELEASE_DIR}"
-
-            if [ "${SKIP_BOOTSTRAP}" != "true" ]; then
-              ${SUDO} bash "${RELEASE_DIR}/scripts/contabo/setup-vps.sh" --app-root "${APP_ROOT}"
-            fi
-
-            printf '%s' "${GHCR_TOKEN_B64}" | base64 -d | ${SUDO} bash "${RELEASE_DIR}/scripts/contabo/deploy.sh" \
-              --bundle-root "${RELEASE_DIR}" \
-              --env-file "${RELEASE_DIR}/.env.contabo" \
-              --app-root "${APP_ROOT}" \
-              --ghcr-username "${GHCR_USERNAME}" \
-              --ghcr-token-stdin
-          EOF
+            ssh contabo-vps "set -euo pipefail; RELEASE_DIR='/tmp/tradersapp-contabo-release'; tar -xzf \"\${RELEASE_DIR}/contabo-bundle.tgz\" -C \"\${RELEASE_DIR}\"; RELEASE_DIR=\"\${RELEASE_DIR}\" APP_ROOT='${{ steps.context.outputs.app_root }}' SKIP_BOOTSTRAP='${{ steps.context.outputs.skip_bootstrap }}' GHCR_USERNAME='${{ github.actor }}' GHCR_TOKEN_B64_FILE=\"\${RELEASE_DIR}/.ghcr-token.b64\" bash \"\${RELEASE_DIR}/scripts/contabo/remote-run-deploy.sh\""
           }
 
           attempt=1
@@ -398,29 +397,30 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p .artifacts/contabo
+          retry() {
+            local max_attempts="$1"
+            shift
+            local attempt=1
+            local status=0
+            while true; do
+              if "$@"; then
+                return 0
+              fi
+              status=$?
+              if [ "${attempt}" -ge "${max_attempts}" ]; then
+                return "${status}"
+              fi
+              sleep $(( attempt * 5 ))
+              attempt=$(( attempt + 1 ))
+            done
+          }
 
           capture_ps() {
-            ssh contabo-vps "bash -s" <<EOF > .artifacts/contabo/compose-ps.txt
-            set -euo pipefail
-            APP_ROOT="${{ steps.context.outputs.app_root }}"
-            SUDO=""
-            if [ "\$(id -u)" -ne 0 ]; then
-              SUDO="sudo"
-            fi
-            \${SUDO} docker compose --project-name tradersapp --project-directory "\${APP_ROOT}/deploy/contabo" --env-file "\${APP_ROOT}/runtime/.env.contabo" -f "\${APP_ROOT}/deploy/contabo/docker-compose.yml" ps
-          EOF
+            ssh contabo-vps "set -euo pipefail; RELEASE_DIR='/tmp/tradersapp-contabo-release'; if [ -f \"\${RELEASE_DIR}/contabo-bundle.tgz\" ] && [ ! -d \"\${RELEASE_DIR}/scripts/contabo\" ]; then tar -xzf \"\${RELEASE_DIR}/contabo-bundle.tgz\" -C \"\${RELEASE_DIR}\"; fi; APP_ROOT='${{ steps.context.outputs.app_root }}' bash \"\${RELEASE_DIR}/scripts/contabo/remote-compose-status.sh\" ps" > .artifacts/contabo/compose-ps.txt
           }
 
           capture_logs() {
-            ssh contabo-vps "bash -s" <<EOF > .artifacts/contabo/compose-logs.txt
-            set -euo pipefail
-            APP_ROOT="${{ steps.context.outputs.app_root }}"
-            SUDO=""
-            if [ "\$(id -u)" -ne 0 ]; then
-              SUDO="sudo"
-            fi
-            \${SUDO} docker compose --project-name tradersapp --project-directory "\${APP_ROOT}/deploy/contabo" --env-file "\${APP_ROOT}/runtime/.env.contabo" -f "\${APP_ROOT}/deploy/contabo/docker-compose.yml" logs --tail 200
-          EOF
+            ssh contabo-vps "set -euo pipefail; RELEASE_DIR='/tmp/tradersapp-contabo-release'; if [ -f \"\${RELEASE_DIR}/contabo-bundle.tgz\" ] && [ ! -d \"\${RELEASE_DIR}/scripts/contabo\" ]; then tar -xzf \"\${RELEASE_DIR}/contabo-bundle.tgz\" -C \"\${RELEASE_DIR}\"; fi; APP_ROOT='${{ steps.context.outputs.app_root }}' bash \"\${RELEASE_DIR}/scripts/contabo/remote-compose-status.sh\" logs" > .artifacts/contabo/compose-logs.txt
           }
 
           attempt=1
