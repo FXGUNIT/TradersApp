@@ -259,6 +259,9 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [x] CI pipeline green through BFF Server step — ML Engine build + Integration Tests in progress
 - [ ] Wait for new BFF image with proto fix to reach GHCR, then restart analysis-service on VPS
 - [ ] Confirm local health for `bff` and `analysis-service` on VPS
+- [ ] Upstream gate before the VPS checks above: latest public GitHub Actions state on `2026-04-21` shows `CI/CD Pipeline` runs `1077` (`b2a65969`) and `1078` (`1b1807b5`) failed, so `Deploy to Contabo VPS` runs `11` and `12` were skipped and did not publish fresh images
+- [ ] Clear the current `main` CI blockers first: `Helm Chart Lint` still referenced deleted `k8s/helm/tradersapp`, and `Load Tests - Locust` failed at `Wait for ML Engine and BFF health`
+- [ ] Re-run `main` CI and confirm the current SHA reaches green completion before treating GHCR/image propagation as the next step
 - [ ] Confirm public health for `https://traders.app`, `https://bff.traders.app/health`, and `https://api.traders.app/health`
 - [ ] Run the Contabo public-edge k6 suite and record the first concurrency envelope
 - [ ] Archive the final OCI node details only after Contabo is stable for at least one clean redeploy cycle
@@ -557,7 +560,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-21 03:32`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-21 11:40`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Active Backlog    0.0%  [------------------------]
