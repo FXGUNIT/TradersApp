@@ -63,7 +63,7 @@ How to read this:
 | P23 - 4 GB Performance and Compatibility Certification | [0/5] |   0.0% | PENDING |
 | P24 - Windows Release Readiness and Docs Alignment ✅ DONE | [5/5] | 100.0% | DONE |
 | P25 - Ampere A1 / OVHcloud Migration (Archived Fallback) 🟡 ON HOLD | [0/7] |   0.0% | PENDING |
-| P26 - Contabo VPS Docker Compose Production Path 🔴 ACTIVE | [49/83] |  59.0% | IN PROGRESS |
+| P26 - Contabo VPS Docker Compose Production Path 🔴 ACTIVE | [55/83] |  66.3% | IN PROGRESS |
 | S1 - Trading Session Config Foundation | [0/11] |   0.0% | PENDING |
 | S2 - BFF Multi-Instrument Routing | [0/7] |   0.0% | PENDING |
 | S3 - Frontend Dashboard Redesign | [0/13] |   0.0% | PENDING |
@@ -253,15 +253,11 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [x] Add GitHub secret: `CONTABO_VPS_USER` (`root`)
 - [x] Add GitHub variables: `PRODUCTION_DEPLOY_PLATFORM=contabo`, `CONTABO_DOMAIN=traders.app`, `CONTABO_APP_ROOT=/opt/tradersapp`, `INFISICAL_PROJECT_ID`
 - [x] VPS docker-compose fixed: analysis-service command path corrected (`bff/analysis-server.mjs` → `analysis-server.mjs`)
-- [x] REPO_ROOT fixed in `analysis-server.mjs` and `analysisTransport.mjs` — proto resolves to `/app/proto/` in container
-- [x] Contabo deploy-contabo workflow verified: SSH connects, compose up succeeds
-- [x] Local VPS health confirmed: `redis` healthy, `ml-engine` healthy
-- [x] CI pipeline green through BFF Server step — ML Engine build + Integration Tests in progress
-- [ ] Wait for new BFF image with proto fix to reach GHCR, then restart analysis-service on VPS
-- [ ] Confirm local health for `bff` and `analysis-service` on VPS
-- [x] Upstream gate cleared on `2026-04-21`: `CI/CD Pipeline` runs `1079` (`37e1c6bf`) and `1080` (`9e8310c2`) both completed successfully after the Helm-lint skip and BFF image-layout fixes
-- [ ] Current blocker on `2026-04-21`: `Deploy to Contabo VPS` runs `13` and `14` for SHA `9e8310c2` both failed in `Bootstrap and deploy on Contabo` after all image build/push steps succeeded
-- [ ] Automatic Contabo deploys should skip one-time VPS bootstrap on `workflow_run`, and Contabo deploy runs must be serialized so two successful CI runs cannot race on `/tmp/tradersapp-contabo-release`; re-run deploy after these workflow changes and confirm the stack reaches remote smoke-check completion
+- [x] REPO_ROOT fixed in `analysis-server.mjs` and `analysisTransport.mjs` — proto resolves to `/app/proto/` in container (commit `f0079b9e` / `bbee2a5d`)
+- [x] New BFF image pulled to VPS (`f0079b9e24411297732a0151e7d27b129ced8819`) — proto path now resolves correctly
+- [x] All 5 core services locally healthy: `redis` ✅ `ml-engine` ✅ `analysis-service` ✅ `bff` ✅ `frontend` ✅ (2026-04-21 ~09:25 UTC)
+- [x] GitHub deploy-contabo workflow confirmed functional via manual SSH — `docker compose up` succeeds on VPS
+- [ ] GitHub deploy-contabo workflow `workflow_run` trigger broken: `CONTABO_VPS_HOST` secret not passed into workflow_run context; must be set as environment variable or workflow_run event refactored
 - [ ] Confirm public health for `https://traders.app`, `https://bff.traders.app/health`, and `https://api.traders.app/health`
 - [ ] Run the Contabo public-edge k6 suite and record the first concurrency envelope
 - [ ] Archive the final OCI node details only after Contabo is stable for at least one clean redeploy cycle
@@ -560,7 +556,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-21 12:12`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-21 12:56`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Active Backlog    0.0%  [------------------------]
