@@ -183,16 +183,24 @@ def strip_generated_blocks(markdown: str) -> str:
 def parse_master_checklist(markdown: str) -> list[ChecklistItem]:
     items: list[ChecklistItem] = []
     current_section = ""
+    current_phase_heading = ""
     current_subsection = ""
 
     for line in strip_generated_blocks(markdown).splitlines():
         section_match = re.match(r"^##\s+(.+)$", line.strip())
         if section_match:
             current_section = section_match.group(1).strip()
+            current_phase_heading = ""
             current_subsection = ""
             continue
 
-        subsection_match = re.match(r"^#{3,4}\s+(.+)$", line.strip())
+        phase_heading_match = re.match(r"^###\s+(.+)$", line.strip())
+        if phase_heading_match:
+            current_phase_heading = phase_heading_match.group(1).strip()
+            current_subsection = current_phase_heading
+            continue
+
+        subsection_match = re.match(r"^####\s+(.+)$", line.strip())
         if subsection_match:
             current_subsection = subsection_match.group(1).strip()
             continue
@@ -203,7 +211,13 @@ def parse_master_checklist(markdown: str) -> list[ChecklistItem]:
 
         status = _marker_to_status(task_match.group("mark"))
         task_title = task_match.group("title").strip()
-        item = classify_checklist_item(current_section, current_subsection, task_title, status)
+        item = classify_checklist_item(
+            current_section,
+            current_phase_heading,
+            current_subsection,
+            task_title,
+            status,
+        )
         if item is not None:
             items.append(item)
 
@@ -212,6 +226,7 @@ def parse_master_checklist(markdown: str) -> list[ChecklistItem]:
 
 def classify_checklist_item(
     current_section: str,
+    current_phase_heading: str,
     current_subsection: str,
     task_title: str,
     status: str,
@@ -219,9 +234,13 @@ def classify_checklist_item(
     normalized_section = current_section.upper()
 
     if normalized_section.startswith("STAGE P"):
-        phase_match = re.match(r"^(P\d{2})\b", current_subsection)
+        phase_source = current_subsection or current_phase_heading
+        phase_match = re.match(r"^(P\d{2})\b", phase_source)
         phase_id = phase_match.group(1) if phase_match else "P00"
-        phase_title = current_subsection or phase_id
+        if current_phase_heading and re.match(rf"^{re.escape(phase_id)}\b", current_phase_heading):
+            phase_title = current_phase_heading
+        else:
+            phase_title = phase_source or phase_id
         return ChecklistItem(
             area="Stage P",
             phase_id=phase_id,
@@ -320,7 +339,7 @@ def phase_sort_key(phase_id: str) -> tuple[int, int | str]:
 
 def clean_phase_title(phase_id: str, phase_title: str) -> str:
     cleaned = phase_title.strip()
-    cleaned = re.sub(rf"^{re.escape(phase_id)}\s*[-:â€”]*\s*", "", cleaned).strip()
+    cleaned = re.sub(rf"^{re.escape(phase_id)}(?:-[A-Z])?\s*[-:â€”]*\s*", "", cleaned).strip()
     cleaned = re.sub(rf"^Phase\s+{re.escape(phase_id)}\s*[-:â€”]*\s*", "", cleaned).strip()
     cleaned = cleaned.lstrip("-–—:â€” ").strip()
     return cleaned or phase_title
@@ -676,6 +695,8 @@ def _build_live_status_table(markdown: str) -> str:
         done = int(section["done"])
         todo = int(section["todo"])
         total = done + todo
+        if total == 0:
+            continue
         pct = (done / total * 100.0) if total else 0.0
         status_label = _infer_stage_p_status(heading, done, total)
 
@@ -691,7 +712,7 @@ def _build_live_status_table(markdown: str) -> str:
         done_tasks += done
         open_tasks += todo
 
-        label = re.sub(r"^P\d{2}\s*[-:—]*\s*", "", heading).strip()
+        label = re.sub(r"^P\d{2}(?:-[A-Z])?\s*[-:—]*\s*", "", heading).strip()
         rows.append(f"| {section_id} - {label} | [{done}/{total}] | {pct:5.1f}% | {status_label} |")
 
     timestamp = datetime.now().astimezone().strftime("%Y-%m-%d %H:%M")

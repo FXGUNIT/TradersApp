@@ -226,7 +226,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 *Supersedes P25 as the real production route. Single-host Contabo VPS with GitHub Actions deployment is now the target architecture.*
 
 **Runbook:** See `docs/P26_Contabo_Deployment_Plan.md`
-**Progress snapshot (2026-04-21):** Master backlog `130/253` complete (`51.4%`). Stage P `130/198` complete (`65.7%`). P26 `49/80` complete (`61.3%`).
+**Progress snapshot (2026-04-21):** Master backlog `130/253` complete (`51.4%`). Stage P `130/198` complete (`65.7%`). Active production phase `P26` is `26/30` complete (`86.7%`), while the legacy OCI recovery checkpoint `P09` is `23/50` complete (`46.0%`).
 **Current blocker:** GitHub Actions is now reaching the Contabo deploy path and pushing the `ml-engine`, `bff`, and `frontend` images, but `Deploy to Contabo VPS` still fails in `Bootstrap and deploy on Contabo` on the latest automatic runs.
 
 #### P26 — Architecture Freeze
@@ -559,7 +559,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-21 13:12`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-21 13:16`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Active Backlog    0.0%  [------------------------]
