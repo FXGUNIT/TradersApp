@@ -33,12 +33,14 @@
 
 {$BFF_PUBLIC_HOST} {
   import security_headers
+  tls off
   encode zstd gzip
   reverse_proxy bff:8788
 }
 
 {$API_PUBLIC_HOST} {
   import security_headers
+  tls off
   encode zstd gzip
   reverse_proxy ml-engine:8001
 }
