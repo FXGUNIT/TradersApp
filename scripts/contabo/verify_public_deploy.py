@@ -23,7 +23,7 @@ import socket
 import ssl
 import subprocess
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
@@ -59,6 +59,29 @@ def artifact_stamp() -> str:
 
 def normalize_base_url(value: str) -> str:
     return value.rstrip("/")
+
+
+def build_sample_candles(count: int = 20) -> list[dict[str, Any]]:
+    candles: list[dict[str, Any]] = []
+    base_price = 18500.0
+    base_time = datetime(2026, 4, 21, 9, 30, tzinfo=timezone.utc)
+
+    for index in range(count):
+        open_price = base_price + index * 2.0
+        close_price = open_price + 1.0
+        candles.append(
+            {
+                "symbol": "MNQ",
+                "timestamp": (base_time + timedelta(minutes=index * 5)).isoformat().replace("+00:00", "Z"),
+                "open": round(open_price, 2),
+                "high": round(close_price + 1.0, 2),
+                "low": round(open_price - 1.0, 2),
+                "close": round(close_price, 2),
+                "volume": 4200 + index * 20,
+            }
+        )
+
+    return candles
 
 
 def resolve_dns(host: str) -> CheckResult:
@@ -215,29 +238,12 @@ def json_post_probe(
 
 
 def build_predict_payload() -> dict[str, Any]:
-    candles: list[dict[str, Any]] = []
-    base_price = 18500.0
-    for index in range(6):
-        open_price = base_price + index * 3.0
-        close_price = open_price + 2.0
-        candles.append(
-            {
-                "symbol": "MNQ",
-                "timestamp": str(1712500000 + index * 300),
-                "open": round(open_price, 2),
-                "high": round(close_price + 1.5, 2),
-                "low": round(open_price - 1.0, 2),
-                "close": round(close_price, 2),
-                "volume": 4200 + index * 80,
-            }
-        )
-
     return {
         "symbol": "MNQ",
-        "candles": candles,
+        "candles": build_sample_candles(),
         "trades": [],
         "session_id": 1,
-        "mathEngineSnapshot": {
+        "math_engine_snapshot": {
             "amdPhase": "ACCUMULATION",
             "vrRegime": "NORMAL",
         },
@@ -379,6 +385,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
     bff_base_url = normalize_base_url(f"https://{args.bff_host}")
     api_base_url = normalize_base_url(f"https://{args.api_host}")
     hosts = [args.frontend_host, args.bff_host, args.api_host]
+    sample_candles = build_sample_candles()
 
     host_checks: dict[str, Any] = {}
     for host in hosts:
@@ -393,7 +400,20 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             "tls": asdict(tls),
         }
 
-    consensus_query = urlencode({"session": "1", "symbol": "MNQ"})
+    consensus_query = urlencode(
+        {
+            "session": "1",
+            "symbol": "MNQ",
+            "candles": json.dumps(sample_candles, separators=(",", ":")),
+            "mathEngine": json.dumps(
+                {
+                    "amdPhase": "ACCUMULATION",
+                    "vrRegime": "NORMAL",
+                },
+                separators=(",", ":"),
+            ),
+        }
+    )
     endpoints = {
         "frontend_home": http_probe(f"{frontend_base_url}/", timeout=args.timeout),
         "frontend_edge_health": http_probe(f"{frontend_base_url}/edge-health", timeout=args.timeout),

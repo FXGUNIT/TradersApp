@@ -53,26 +53,33 @@ def extract_metric(d: dict, key: str) -> Optional[dict]:
     return None
 
 
-def parse_p(d: dict, p_key: str, default: float = math.nan) -> float:
-    vals = extract_metric(d, p_key)
+def _to_float(value, default: float = math.nan) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def parse_p(d: dict, metric_key: str, p_key: str, default: float = math.nan) -> float:
+    vals = extract_metric(d, metric_key)
     if vals is None:
         return default
     v = vals.get("values", {})
-    return v.get(p_key, v.get(p_key.replace("p(", "p(").replace(")", ")").replace("p(95)", "p(95)"), default))
+    return _to_float(v.get(p_key, default), default)
 
 
 def parse_fail_rate(d: dict, fail_key: str) -> float:
     vals = extract_metric(d, fail_key)
     if vals is None:
         return 0.0
-    return (vals.get("values") or {}).get("rate", 0.0)
+    return _to_float((vals.get("values") or {}).get("rate", 0.0), 0.0)
 
 
 def parse_http_req_failed(d: dict) -> float:
     m = d.get("metrics", {})
     fail_metric = m.get("http_req_failed")
     if fail_metric:
-        return (fail_metric.get("values") or {}).get("rate", 0.0)
+        return _to_float((fail_metric.get("values") or {}).get("rate", 0.0), 0.0)
     return 0.0
 
 
@@ -100,8 +107,8 @@ def check_scenario(
     # Latency metric key for this scenario
     latency_key = f"{scenario}_latency_ms"
 
-    p95 = parse_p(d, "p(95)", latency_key)
-    p99 = parse_p(d, "p(99)", latency_key)
+    p95 = parse_p(d, latency_key, "p(95)")
+    p99 = parse_p(d, latency_key, "p(99)")
 
     # Failure rates — try scenario-specific, then generic http_req_failed
     fail_rate = parse_fail_rate(d, f"{scenario}_fail_rate")
@@ -112,8 +119,8 @@ def check_scenario(
     if math.isnan(p95):
         generic = d.get("metrics", {}).get("http_req_duration", {})
         vals = generic.get("values", {})
-        p95 = vals.get("p(95)", 0.0)
-        p99 = vals.get("p(99)", 0.0)
+        p95 = _to_float(vals.get("p(95)", 0.0), 0.0)
+        p99 = _to_float(vals.get("p(99)", 0.0), 0.0)
 
     p95_pass = p95 <= sla_p95
     p99_pass = p99 <= sla_p99

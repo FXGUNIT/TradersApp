@@ -48,19 +48,34 @@ const bffHealthFailRate = new Rate('bff_health_fail_rate');
 const bffMlHealthFailRate = new Rate('bff_ml_health_fail_rate');
 const mlPredictFailRate = new Rate('ml_predict_fail_rate');
 
+function buildSampleCandles(count = 20) {
+  const candles = [];
+  const basePrice = 18500.0;
+  const baseTime = Date.parse('2026-04-21T09:30:00Z');
+
+  for (let index = 0; index < count; index += 1) {
+    const openPrice = basePrice + index * 2.0;
+    const closePrice = openPrice + 1.0;
+    candles.push({
+      symbol: 'MNQ',
+      timestamp: new Date(baseTime + index * 5 * 60 * 1000).toISOString(),
+      open: Number(openPrice.toFixed(2)),
+      high: Number((closePrice + 1.0).toFixed(2)),
+      low: Number((openPrice - 1.0).toFixed(2)),
+      close: Number(closePrice.toFixed(2)),
+      volume: 4200 + index * 20,
+    });
+  }
+
+  return candles;
+}
+
 const predictPayload = {
   symbol: 'MNQ',
-  candles: [
-    { symbol: 'MNQ', timestamp: '1712500000', open: 18500.0, high: 18503.5, low: 18499.0, close: 18502.0, volume: 4200 },
-    { symbol: 'MNQ', timestamp: '1712500300', open: 18502.0, high: 18506.5, low: 18501.0, close: 18505.0, volume: 4280 },
-    { symbol: 'MNQ', timestamp: '1712500600', open: 18505.0, high: 18508.5, low: 18504.0, close: 18507.0, volume: 4360 },
-    { symbol: 'MNQ', timestamp: '1712500900', open: 18507.0, high: 18510.5, low: 18506.0, close: 18509.0, volume: 4440 },
-    { symbol: 'MNQ', timestamp: '1712501200', open: 18509.0, high: 18512.0, low: 18508.0, close: 18511.0, volume: 4520 },
-    { symbol: 'MNQ', timestamp: '1712501500', open: 18511.0, high: 18514.0, low: 18510.0, close: 18513.0, volume: 4600 },
-  ],
+  candles: buildSampleCandles(),
   trades: [],
   session_id: 1,
-  mathEngineSnapshot: {
+  math_engine_snapshot: {
     amdPhase: 'ACCUMULATION',
     vrRegime: 'NORMAL',
   },
