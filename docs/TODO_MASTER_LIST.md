@@ -7,7 +7,7 @@
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-21 18:59`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-21 19:00`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Master Backlog  51.8%  [############------------]
@@ -568,7 +568,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-21 18:59`  -  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-21 19:00`  -  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Stage P Backlog  66.0%  [################--------]
@@ -589,7 +589,7 @@ Checklist       done 132 | open 068 | total 200
 | P25 - Ampere A1 / OVHcloud Migration (Archived Fallback) 🟡 ON HOLD | [0/7] |   0.0% | PENDING |
 | P26 - Architecture Freeze | [4/4] | 100.0% | DONE |
 | P26 - Repo-Side Contabo Execution | [11/11] | 100.0% | DONE |
-| P26 - Live Cutover ✅ IN PROGRESS | [13/18] |  72.2% | IN PROGRESS |
+| P26 - Live Cutover ✅ IN PROGRESS | [13/17] |  76.5% | IN PROGRESS |
 | P09 - `kubectl apply tradersapp-deployments.yaml` on OCI E2.1.Micro | [23/50] |  46.0% | PENDING |
 | P10 - Stateful Services Inside Free Limits ✅ DONE | [5/5] | 100.0% | DONE |
 | P11 - Archived OCI ingress / external access reference | [0/6] |   0.0% | PENDING |
