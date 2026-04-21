@@ -101,6 +101,30 @@ wait_for_health() {
   return 1
 }
 
+wait_for_http() {
+  local label="$1"
+  local url="$2"
+
+  if ! curl --silent --show-error --fail --output /dev/null --connect-timeout 5 "$url"; then
+    echo "HTTP check ${label} did not become ready: ${url}" >&2
+    return 1
+  fi
+}
+
+wait_for_https_host() {
+  local label="$1"
+  local host="$2"
+  local path="$3"
+
+  if ! curl --silent --show-error --fail --output /dev/null --connect-timeout 5 \
+    --insecure \
+    --resolve "${host}:443:127.0.0.1" \
+    "https://${host}${path}"; then
+    echo "HTTP check ${label} did not become ready: https://${host}${path}" >&2
+    return 1
+  fi
+}
+
 echo "[deploy] Installing bundle into ${DEPLOY_ROOT}..."
 install -d -m 0755 -o "${APP_USER}" -g "${APP_USER}" "${APP_ROOT}" "${APP_ROOT}/deploy" "${DEPLOY_ROOT}" "${APP_ROOT}/runtime" "${APP_ROOT}/logs"
 rsync -a --delete "${BUNDLE_ROOT}/deploy/ovh/" "${DEPLOY_ROOT}/"
@@ -135,13 +159,13 @@ set -a
 . "${RUNTIME_ENV}"
 set +a
 
-curl -fsS http://127.0.0.1:8788/health >/dev/null
-curl -fsS http://127.0.0.1:8001/health >/dev/null
-curl -fsS http://127.0.0.1:8080/health >/dev/null
+wait_for_http "localhost bff /health" "http://127.0.0.1:8788/health"
+wait_for_http "localhost ml-engine /health" "http://127.0.0.1:8001/health"
+wait_for_http "localhost frontend /health" "http://127.0.0.1:8080/health"
 docker exec traders-redis redis-cli ping | grep -q PONG
-curl -fsS -H "Host: ${TRADERSAPP_DOMAIN}" http://127.0.0.1/edge-health >/dev/null
-curl -fsS -H "Host: ${BFF_PUBLIC_HOST}" http://127.0.0.1/health >/dev/null
-curl -fsS -H "Host: ${API_PUBLIC_HOST}" http://127.0.0.1/health >/dev/null
+wait_for_https_host "edge route ${TRADERSAPP_DOMAIN}" "${TRADERSAPP_DOMAIN}" "/edge-health"
+wait_for_https_host "edge route ${BFF_PUBLIC_HOST}" "${BFF_PUBLIC_HOST}" "/health"
+wait_for_https_host "edge route ${API_PUBLIC_HOST}" "${API_PUBLIC_HOST}" "/health"
 
 echo "[deploy] Capturing compose status..."
 run_as_app "${COMPOSE_CMD} ps" | tee "${APP_ROOT}/logs/compose-ps.log"

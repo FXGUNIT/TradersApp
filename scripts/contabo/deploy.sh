@@ -121,6 +121,17 @@ wait_for_http() {
   return 1
 }
 
+wait_for_https_host() {
+  local label="$1"
+  local host="$2"
+  local path="$3"
+  local max_tries="${4:-24}"
+
+  wait_for_http "${label}" "https://${host}${path}" "${max_tries}" \
+    --insecure \
+    --resolve "${host}:443:127.0.0.1"
+}
+
 dump_failure_context() {
   local exit_code="$?"
   trap - ERR
@@ -184,12 +195,14 @@ echo "  - localhost frontend /health"
 wait_for_http "localhost frontend /health" "http://127.0.0.1:8080/health" 12
 echo "  - localhost redis PING"
 docker exec traders-redis redis-cli ping | grep -q PONG
+# Resolve runtime hosts back to the local Caddy listener so edge smoke checks
+# do not depend on public DNS cutover.
 echo "  - local edge route for ${TRADERSAPP_DOMAIN}"
-wait_for_http "edge route ${TRADERSAPP_DOMAIN}" "http://127.0.0.1/edge-health" 24 -H "Host: ${TRADERSAPP_DOMAIN}"
+wait_for_https_host "edge route ${TRADERSAPP_DOMAIN}" "${TRADERSAPP_DOMAIN}" "/edge-health" 24
 echo "  - local edge route for ${BFF_PUBLIC_HOST}"
-wait_for_http "edge route ${BFF_PUBLIC_HOST}" "http://127.0.0.1/health" 24 -H "Host: ${BFF_PUBLIC_HOST}"
+wait_for_https_host "edge route ${BFF_PUBLIC_HOST}" "${BFF_PUBLIC_HOST}" "/health" 24
 echo "  - local edge route for ${API_PUBLIC_HOST}"
-wait_for_http "edge route ${API_PUBLIC_HOST}" "http://127.0.0.1/health" 24 -H "Host: ${API_PUBLIC_HOST}"
+wait_for_https_host "edge route ${API_PUBLIC_HOST}" "${API_PUBLIC_HOST}" "/health" 24
 
 echo "[deploy] Capturing compose status..."
 run_as_app "${COMPOSE_CMD} ps" | tee "${APP_ROOT}/logs/compose-ps.log"
