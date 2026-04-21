@@ -185,6 +185,7 @@ def parse_master_checklist(markdown: str) -> list[ChecklistItem]:
     current_section = ""
     current_phase_heading = ""
     current_subsection = ""
+    phase_titles_by_id: dict[str, str] = {}
 
     for line in strip_generated_blocks(markdown).splitlines():
         section_match = re.match(r"^##\s+(.+)$", line.strip())
@@ -198,6 +199,9 @@ def parse_master_checklist(markdown: str) -> list[ChecklistItem]:
         if phase_heading_match:
             current_phase_heading = phase_heading_match.group(1).strip()
             current_subsection = current_phase_heading
+            phase_id_match = re.match(r"^((?:P\d{2})|(?:S\d+)|(?:ML\d+))\b", current_phase_heading)
+            if phase_id_match:
+                phase_titles_by_id[phase_id_match.group(1)] = current_phase_heading
             continue
 
         subsection_match = re.match(r"^####\s+(.+)$", line.strip())
@@ -219,6 +223,7 @@ def parse_master_checklist(markdown: str) -> list[ChecklistItem]:
             status,
         )
         if item is not None:
+            item.phase_title = phase_titles_by_id.get(item.phase_id, item.phase_title)
             items.append(item)
 
     return items
@@ -237,7 +242,8 @@ def classify_checklist_item(
         phase_source = current_subsection or current_phase_heading
         phase_match = re.match(r"^(P\d{2})\b", phase_source)
         phase_id = phase_match.group(1) if phase_match else "P00"
-        if current_phase_heading and re.match(rf"^{re.escape(phase_id)}\b", current_phase_heading):
+        heading_phase_match = re.match(r"^(P\d{2})\b", current_phase_heading)
+        if heading_phase_match and heading_phase_match.group(1) == phase_id:
             phase_title = current_phase_heading
         else:
             phase_title = phase_source or phase_id
@@ -664,17 +670,41 @@ def _build_live_status_table(markdown: str) -> str:
 
     sections: list[dict[str, object]] = []
     current: dict[str, object] | None = None
-    heading_re = re.compile(r"^#{3,4}\s+(P\d{2})\b.*$")
+    current_phase_id = ""
+    phase_titles_by_id: dict[str, str] = {}
+    phase_heading_re = re.compile(r"^###\s+(P\d{2})\b.*$")
+    subsection_heading_re = re.compile(r"^####\s+(P\d{2})\b.*$")
     checkbox_re = re.compile(r"^-\s+\[(?P<mark>[ x])\]\s+(?P<title>.+)$")
 
     for line in stage_block.splitlines():
-        heading_match = heading_re.match(line.strip())
-        if heading_match:
+        stripped = line.strip()
+        phase_heading_match = phase_heading_re.match(stripped)
+        if phase_heading_match:
             if current is not None:
                 sections.append(current)
+            phase_id = phase_heading_match.group(1)
+            heading = stripped[4:].strip()
+            phase_titles_by_id[phase_id] = heading
+            current_phase_id = phase_id
             current = {
-                "id": heading_match.group(1),
-                "heading": line.strip()[4:].strip(),
+                "id": phase_id,
+                "heading": heading,
+                "done": 0,
+                "todo": 0,
+            }
+            continue
+
+        subsection_heading_match = subsection_heading_re.match(stripped)
+        if subsection_heading_match:
+            if current is not None:
+                sections.append(current)
+            phase_id = subsection_heading_match.group(1)
+            heading = stripped[5:].strip()
+            if phase_id != current_phase_id and phase_id in phase_titles_by_id:
+                heading = phase_titles_by_id[phase_id]
+            current = {
+                "id": phase_id,
+                "heading": heading,
                 "done": 0,
                 "todo": 0,
             }

@@ -7,7 +7,7 @@
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-21 16:44`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-21 16:51`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Master Backlog  51.4%  [############------------]
@@ -22,7 +22,7 @@ How to read this:
 
 | Area | Tasks | Progress | Status |
 |---|---|---:|---|
-| Stage P | [130/198] |  65.7% | KNOWN ISSUE |
+| Stage P | [130/198] |  65.7% | IN PROGRESS |
 | Stage S | [0/47] |   0.0% | PENDING |
 | ML Research | [0/8] |   0.0% | PENDING |
 
@@ -30,9 +30,9 @@ How to read this:
 
 | Tier | Scope | Progress | Status |
 |---|---|---:|---|
-| TIER 1 | Stage P rollout path |  65.7% | KNOWN ISSUE |
-| TIER 2 | Bootstrap + minimal core |  52.6% | IN PROGRESS |
-| TIER 3 | OCI ingress + DNS cutover |   0.0% | PENDING |
+| TIER 1 | Stage P overall |  65.7% | IN PROGRESS |
+| TIER 2 | Active Contabo production path |  86.7% | IN PROGRESS |
+| TIER 3 | Archived OCI fallback / evidence |  29.1% | ON HOLD |
 | TIER 4 | Stage S + ML backlog |   0.0% | PENDING |
 
 ### By Phase
@@ -47,14 +47,14 @@ How to read this:
 | P06 - CI/CD Pipeline (`deploy-k8s.yml`) DONE - minimal direct-apply path | [12/12] | 100.0% | DONE |
 | P07 - k3s Namespace + Secrets Bootstrap ✅ DONE | [3/3] | 100.0% | DONE |
 | P08 - Helm Chart Values ✅ DONE | [4/4] | 100.0% | DONE |
-| P09 - `kubectl apply tradersapp-deployments.yaml` on OCI E2.1.Micro | [23/50] |  46.0% | IN PROGRESS |
+| P09 - Archived OCI recovery checkpoint | [23/50] |  46.0% | ARCHIVED |
 | P10 - Stateful Services Inside Free Limits ✅ DONE | [5/5] | 100.0% | DONE |
-| P11 - Archived OCI ingress / external access reference | [0/6] |   0.0% | PENDING |
-| P12 - Archived OCI DNS + TLS reference | [0/5] |   0.0% | PENDING |
-| P13 - Archived OCI frontend hosting reference | [0/4] |   0.0% | PENDING |
+| P11 - Archived OCI ingress / external access reference | [0/6] |   0.0% | ARCHIVED |
+| P12 - Archived OCI DNS + TLS reference | [0/5] |   0.0% | ARCHIVED |
+| P13 - Archived OCI frontend hosting reference | [0/4] |   0.0% | ARCHIVED |
 | P14 - Observability 🔴 KNOWN ISSUE | [0/3] |   0.0% | KNOWN ISSUE |
-| P15 - Archived OCI backup & rollback reference | [0/3] |   0.0% | PENDING |
-| P16 - Archived OCI go-live sign-off reference | [0/4] |   0.0% | PENDING |
+| P15 - Archived OCI backup & rollback reference | [0/3] |   0.0% | ARCHIVED |
+| P16 - Archived OCI go-live sign-off reference | [0/4] |   0.0% | ARCHIVED |
 | P17 - Documentation Alignment ✅ DONE | [4/4] | 100.0% | DONE |
 | P18 - Windows Desktop Architecture Freeze | [5/5] | 100.0% | DONE |
 | P19 - Windows Installer Wizard | [5/5] | 100.0% | DONE |
@@ -63,7 +63,7 @@ How to read this:
 | P22 - Desktop Security and IP Hardening | [5/5] | 100.0% | DONE |
 | P23 - 4 GB Performance and Compatibility Certification | [0/5] |   0.0% | PENDING |
 | P24 - Windows Release Readiness and Docs Alignment ✅ DONE | [5/5] | 100.0% | DONE |
-| P25 - Ampere A1 / OVHcloud Migration (Archived Fallback) 🟡 ON HOLD | [0/7] |   0.0% | PENDING |
+| P25 - Ampere A1 / OVHcloud Migration (Archived Fallback) 🟡 ON HOLD | [0/7] |   0.0% | ON HOLD |
 | P26 - Contabo VPS Docker Compose Production Path 🔴 ACTIVE | [26/30] |  86.7% | IN PROGRESS |
 | S1 - Trading Session Config Foundation | [0/11] |   0.0% | PENDING |
 | S2 - BFF Multi-Instrument Routing | [0/7] |   0.0% | PENDING |
@@ -566,11 +566,11 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-21 16:44`  -  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-21 16:51`  -  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Stage P Backlog  65.7%  [################--------]
-Sections        done 018 | active 001 | blocked 000 | pending 009 | total 030
+Sections        done 018 | active 001 | blocked 000 | archived 007 | pending 002 | total 030
 Checklist       done 130 | open 068 | total 198
 ```
 
@@ -584,18 +584,18 @@ Checklist       done 130 | open 068 | total 198
 | P06 - CI/CD Pipeline (`deploy-k8s.yml`) DONE - minimal direct-apply path | [12/12] | 100.0% | DONE |
 | P07 - k3s Namespace + Secrets Bootstrap ✅ DONE | [3/3] | 100.0% | DONE |
 | P08 - Helm Chart Values ✅ DONE | [4/4] | 100.0% | DONE |
-| P25 - Ampere A1 / OVHcloud Migration (Archived Fallback) 🟡 ON HOLD | [0/7] |   0.0% | PENDING |
+| P25 - Ampere A1 / OVHcloud Migration (Archived Fallback) 🟡 ON HOLD | [0/7] |   0.0% | ON HOLD |
 | P26 - Architecture Freeze | [4/4] | 100.0% | DONE |
 | P26 - Repo-Side Contabo Execution | [11/11] | 100.0% | DONE |
 | P26 - Live Cutover ✅ IN PROGRESS | [11/15] |  73.3% | IN PROGRESS |
-| P09 - `kubectl apply tradersapp-deployments.yaml` on OCI E2.1.Micro | [23/50] |  46.0% | PENDING |
+| P09 - Archived OCI recovery checkpoint | [23/50] |  46.0% | ARCHIVED |
 | P10 - Stateful Services Inside Free Limits ✅ DONE | [5/5] | 100.0% | DONE |
-| P11 - Archived OCI ingress / external access reference | [0/6] |   0.0% | PENDING |
-| P12 - Archived OCI DNS + TLS reference | [0/5] |   0.0% | PENDING |
-| P13 - Archived OCI frontend hosting reference | [0/4] |   0.0% | PENDING |
+| P11 - Archived OCI ingress / external access reference | [0/6] |   0.0% | ARCHIVED |
+| P12 - Archived OCI DNS + TLS reference | [0/5] |   0.0% | ARCHIVED |
+| P13 - Archived OCI frontend hosting reference | [0/4] |   0.0% | ARCHIVED |
 | P14 - Observability 🔴 KNOWN ISSUE | [0/3] |   0.0% | KNOWN ISSUE |
-| P15 - Archived OCI backup & rollback reference | [0/3] |   0.0% | PENDING |
-| P16 - Archived OCI go-live sign-off reference | [0/4] |   0.0% | PENDING |
+| P15 - Archived OCI backup & rollback reference | [0/3] |   0.0% | ARCHIVED |
+| P16 - Archived OCI go-live sign-off reference | [0/4] |   0.0% | ARCHIVED |
 | P17 - Documentation Alignment ✅ DONE | [4/4] | 100.0% | DONE |
 | P18 - Windows Desktop Architecture Freeze | [5/5] | 100.0% | DONE |
 | P19 - Windows Installer Wizard | [5/5] | 100.0% | DONE |
