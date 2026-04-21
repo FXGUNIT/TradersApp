@@ -63,7 +63,7 @@ How to read this:
 | P23 - 4 GB Performance and Compatibility Certification | [0/5] |   0.0% | PENDING |
 | P24 - Windows Release Readiness and Docs Alignment ✅ DONE | [5/5] | 100.0% | DONE |
 | P25 - Ampere A1 / OVHcloud Migration (Archived Fallback) 🟡 ON HOLD | [0/7] |   0.0% | PENDING |
-| P26 - Contabo VPS Docker Compose Production Path 🔴 ACTIVE | [48/79] |  60.8% | IN PROGRESS |
+| P26 - Contabo VPS Docker Compose Production Path 🔴 ACTIVE | [49/79] |  62.0% | IN PROGRESS |
 | S1 - Trading Session Config Foundation | [0/11] |   0.0% | PENDING |
 | S2 - BFF Multi-Instrument Routing | [0/7] |   0.0% | PENDING |
 | S3 - Frontend Dashboard Redesign | [0/13] |   0.0% | PENDING |
@@ -257,7 +257,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [x] New BFF image pulled to VPS (`f0079b9e24411297732a0151e7d27b129ced8819`) — proto path now resolves correctly
 - [x] All 5 core services locally healthy: `redis` ✅ `ml-engine` ✅ `analysis-service` ✅ `bff` ✅ `frontend` ✅ (2026-04-21 ~09:25 UTC)
 - [x] GitHub deploy-contabo workflow confirmed functional via manual SSH — `docker compose up` succeeds on VPS
-- [ ] GitHub deploy-contabo workflow `workflow_run` trigger broken: `CONTABO_VPS_HOST` secret not passed into workflow_run context; must be set as environment variable or workflow_run event refactored
+- [x] GitHub deploy-contabo `workflow_run` trigger replaced with `repository_dispatch` — CI now calls `gh workflow run deploy-contabo.yml` with full secrets access (commit `4221c20a`)
 - [ ] Confirm public health for `https://traders.app`, `https://bff.traders.app/health`, and `https://api.traders.app/health`
 - [ ] Run the Contabo public-edge k6 suite and record the first concurrency envelope
 - [ ] Archive the final OCI node details only after Contabo is stable for at least one clean redeploy cycle
@@ -556,7 +556,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-21 13:08`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-21 13:11`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Active Backlog    0.0%  [------------------------]
