@@ -79,7 +79,8 @@ if [ "${GHCR_TOKEN_STDIN}" = "1" ]; then
 fi
 
 run_as_app() {
-  sudo -H -u "${APP_USER}" bash -lc "$*"
+  local command="$*"
+  sudo -H -u "${APP_USER}" bash -lc "cd '${DEPLOY_ROOT}' && ${command}"
 }
 
 wait_for_health() {
@@ -139,6 +140,7 @@ dump_failure_context() {
 echo "[deploy] Installing bundle into ${DEPLOY_ROOT}..."
 install -d -m 0755 -o "${APP_USER}" -g "${APP_USER}" "${APP_ROOT}" "${APP_ROOT}/deploy" "${DEPLOY_ROOT}" "${APP_ROOT}/runtime" "${APP_ROOT}/logs"
 rsync -a --delete "${BUNDLE_ROOT}/deploy/contabo/" "${DEPLOY_ROOT}/"
+chown -R "${APP_USER}:${APP_USER}" "${DEPLOY_ROOT}"
 install -m 0600 -o "${APP_USER}" -g "${APP_USER}" "${ENV_FILE}" "${RUNTIME_ENV}"
 
 if [ -n "${GHCR_USERNAME}" ] && [ -n "${GHCR_TOKEN}" ]; then
