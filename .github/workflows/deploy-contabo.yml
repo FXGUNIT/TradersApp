@@ -133,6 +133,14 @@ jobs:
           if [ -z "${APP_ROOT}" ]; then
             APP_ROOT="/opt/tradersapp"
           fi
+          case "${APP_ROOT}" in
+            /*)
+              ;;
+            *)
+              echo "::warning::CONTABO_APP_ROOT must be a POSIX absolute path on the remote Linux host. Falling back to /opt/tradersapp (got '${APP_ROOT}')."
+              APP_ROOT="/opt/tradersapp"
+              ;;
+          esac
 
           {
             echo "ref=${REF}"
