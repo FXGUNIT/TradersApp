@@ -347,13 +347,21 @@ def run_k6_suite(
         },
     }
 
-    ok = completed.returncode == 0 and summary_path.exists()
-    detail = "k6 public-edge run completed" if ok else f"k6 exited with code {completed.returncode}"
+    summary_exists = summary_path.exists()
+    thresholds_passed = completed.returncode == 0
+    ok = summary_exists
+    if thresholds_passed:
+        detail = "k6 public-edge run completed"
+    elif summary_exists:
+        detail = f"k6 public-edge run recorded with threshold breaches (exit code {completed.returncode})"
+    else:
+        detail = f"k6 exited with code {completed.returncode}"
 
     if summary_path.exists():
         data["summary"] = parse_k6_summary(summary_path)
     else:
         data["summary_missing"] = True
+    data["thresholds_passed"] = thresholds_passed
 
     return CheckResult(ok=ok, detail=detail, data=data)
 
@@ -478,7 +486,10 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             ml_base_url=api_base_url,
         )
         report["load_test"] = asdict(load_result)
-        task_status["contabo_public_load_envelope_recorded"] = {"ok": load_result.ok}
+        task_status["contabo_public_load_envelope_recorded"] = {
+            "ok": load_result.ok,
+            "thresholds_passed": load_result.data.get("thresholds_passed"),
+        }
     else:
         report["load_test"] = {
             "ok": False,

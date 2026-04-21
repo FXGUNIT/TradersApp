@@ -71,13 +71,6 @@ jobs:
 
           python scripts/contabo/verify_public_deploy.py "${args[@]}"
 
-      - name: Parse k6 SLO results
-        if: ${{ always() && inputs.with_k6 }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          python scripts/ci/parse_k6_results.py
-
       - name: Upload verification artifacts
         if: always()
         uses: actions/upload-artifact@v4
