@@ -297,21 +297,54 @@ jobs:
           install -m 700 -d ~/.ssh
           printf '%s\n' "${CONTABO_SSH_KEY}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -H "${CONTABO_VPS_HOST}" >> ~/.ssh/known_hosts
+          cat > ~/.ssh/config <<EOF
+          Host contabo-vps
+            HostName ${CONTABO_VPS_HOST}
+            User ${CONTABO_VPS_USER}
+            IdentityFile ~/.ssh/id_ed25519
+            IdentitiesOnly yes
+            BatchMode yes
+            ConnectTimeout 20
+            ConnectionAttempts 3
+            ServerAliveInterval 15
+            ServerAliveCountMax 3
+            StrictHostKeyChecking yes
+          EOF
+          chmod 600 ~/.ssh/config
+          ssh-keyscan -T 10 -H "${CONTABO_VPS_HOST}" >> ~/.ssh/known_hosts
         env:
           CONTABO_VPS_HOST: ${{ secrets.CONTABO_VPS_HOST }}
+          CONTABO_VPS_USER: ${{ secrets.CONTABO_VPS_USER }}
           CONTABO_SSH_KEY: ${{ secrets.CONTABO_SSH_KEY }}
 
       - name: Upload Contabo release bundle
         shell: bash
         run: |
           set -euo pipefail
+          retry() {
+            local max_attempts="$1"
+            shift
+            local attempt=1
+            local status=0
+            while true; do
+              if "$@"; then
+                return 0
+              fi
+              status=$?
+              if [ "${attempt}" -ge "${max_attempts}" ]; then
+                return "${status}"
+              fi
+              sleep $(( attempt * 5 ))
+              attempt=$(( attempt + 1 ))
+            done
+          }
+
           mkdir -p .artifacts/contabo
           tar -czf .artifacts/contabo/contabo-bundle.tgz deploy/contabo scripts/contabo
 
-          ssh "${{ secrets.CONTABO_VPS_USER }}@${{ secrets.CONTABO_VPS_HOST }}" "rm -rf /tmp/tradersapp-contabo-release && mkdir -p /tmp/tradersapp-contabo-release"
-          scp .artifacts/contabo/contabo-bundle.tgz "${{ secrets.CONTABO_VPS_USER }}@${{ secrets.CONTABO_VPS_HOST }}:/tmp/tradersapp-contabo-release/contabo-bundle.tgz"
-          scp .artifacts/contabo/.env.contabo "${{ secrets.CONTABO_VPS_USER }}@${{ secrets.CONTABO_VPS_HOST }}:/tmp/tradersapp-contabo-release/.env.contabo"
+          retry 3 ssh contabo-vps "rm -rf /tmp/tradersapp-contabo-release && mkdir -p /tmp/tradersapp-contabo-release"
+          retry 3 scp .artifacts/contabo/contabo-bundle.tgz contabo-vps:/tmp/tradersapp-contabo-release/contabo-bundle.tgz
+          retry 3 scp .artifacts/contabo/.env.contabo contabo-vps:/tmp/tradersapp-contabo-release/.env.contabo
 
       - name: Bootstrap and deploy on Contabo
         shell: bash
@@ -320,29 +353,44 @@ jobs:
         run: |
           set -euo pipefail
           GHCR_TOKEN_B64="$(printf '%s' "${GHCR_TOKEN_B64}" | base64 -w0)"
-
-          ssh "${{ secrets.CONTABO_VPS_USER }}@${{ secrets.CONTABO_VPS_HOST }}" "bash -s" <<EOF
+          run_remote_deploy() {
+            ssh contabo-vps "APP_ROOT='${{ steps.context.outputs.app_root }}' SKIP_BOOTSTRAP='${{ steps.context.outputs.skip_bootstrap }}' GHCR_USERNAME='${{ github.actor }}' GHCR_TOKEN_B64='${GHCR_TOKEN_B64}' bash -s" <<'EOF'
             set -euo pipefail
             RELEASE_DIR="/tmp/tradersapp-contabo-release"
-            APP_ROOT="${{ steps.context.outputs.app_root }}"
+            APP_ROOT="${APP_ROOT:-/opt/tradersapp}"
+            SKIP_BOOTSTRAP="${SKIP_BOOTSTRAP:-true}"
+            GHCR_USERNAME="${GHCR_USERNAME:-}"
+            GHCR_TOKEN_B64="${GHCR_TOKEN_B64:-}"
             SUDO=""
-            if [ "\$(id -u)" -ne 0 ]; then
+            if [ "$(id -u)" -ne 0 ]; then
               SUDO="sudo"
             fi
 
-            tar -xzf "\${RELEASE_DIR}/contabo-bundle.tgz" -C "\${RELEASE_DIR}"
+            tar -xzf "${RELEASE_DIR}/contabo-bundle.tgz" -C "${RELEASE_DIR}"
 
-            if [ "${{ steps.context.outputs.skip_bootstrap }}" != "true" ]; then
-              \${SUDO} bash "\${RELEASE_DIR}/scripts/contabo/setup-vps.sh" --app-root "\${APP_ROOT}"
+            if [ "${SKIP_BOOTSTRAP}" != "true" ]; then
+              ${SUDO} bash "${RELEASE_DIR}/scripts/contabo/setup-vps.sh" --app-root "${APP_ROOT}"
             fi
 
-            printf '%s' '${GHCR_TOKEN_B64}' | base64 -d | \${SUDO} bash "\${RELEASE_DIR}/scripts/contabo/deploy.sh" \
-              --bundle-root "\${RELEASE_DIR}" \
-              --env-file "\${RELEASE_DIR}/.env.contabo" \
-              --app-root "\${APP_ROOT}" \
-              --ghcr-username '${{ github.actor }}' \
+            printf '%s' "${GHCR_TOKEN_B64}" | base64 -d | ${SUDO} bash "${RELEASE_DIR}/scripts/contabo/deploy.sh" \
+              --bundle-root "${RELEASE_DIR}" \
+              --env-file "${RELEASE_DIR}/.env.contabo" \
+              --app-root "${APP_ROOT}" \
+              --ghcr-username "${GHCR_USERNAME}" \
               --ghcr-token-stdin
           EOF
+          }
+
+          attempt=1
+          max_attempts=3
+          until run_remote_deploy; do
+            status=$?
+            if [ "${attempt}" -ge "${max_attempts}" ]; then
+              exit "${status}"
+            fi
+            sleep $(( attempt * 5 ))
+            attempt=$(( attempt + 1 ))
+          done
 
       - name: Capture remote status
         if: always()
@@ -350,7 +398,9 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p .artifacts/contabo
-          ssh "${{ secrets.CONTABO_VPS_USER }}@${{ secrets.CONTABO_VPS_HOST }}" "bash -s" <<EOF > .artifacts/contabo/compose-ps.txt
+
+          capture_ps() {
+            ssh contabo-vps "bash -s" <<EOF > .artifacts/contabo/compose-ps.txt
             set -euo pipefail
             APP_ROOT="${{ steps.context.outputs.app_root }}"
             SUDO=""
@@ -359,7 +409,10 @@ jobs:
             fi
             \${SUDO} docker compose --project-name tradersapp --project-directory "\${APP_ROOT}/deploy/contabo" --env-file "\${APP_ROOT}/runtime/.env.contabo" -f "\${APP_ROOT}/deploy/contabo/docker-compose.yml" ps
           EOF
-          ssh "${{ secrets.CONTABO_VPS_USER }}@${{ secrets.CONTABO_VPS_HOST }}" "bash -s" <<EOF > .artifacts/contabo/compose-logs.txt
+          }
+
+          capture_logs() {
+            ssh contabo-vps "bash -s" <<EOF > .artifacts/contabo/compose-logs.txt
             set -euo pipefail
             APP_ROOT="${{ steps.context.outputs.app_root }}"
             SUDO=""
@@ -368,6 +421,28 @@ jobs:
             fi
             \${SUDO} docker compose --project-name tradersapp --project-directory "\${APP_ROOT}/deploy/contabo" --env-file "\${APP_ROOT}/runtime/.env.contabo" -f "\${APP_ROOT}/deploy/contabo/docker-compose.yml" logs --tail 200
           EOF
+          }
+
+          attempt=1
+          max_attempts=3
+          until capture_ps; do
+            status=$?
+            if [ "${attempt}" -ge "${max_attempts}" ]; then
+              exit "${status}"
+            fi
+            sleep $(( attempt * 5 ))
+            attempt=$(( attempt + 1 ))
+          done
+
+          attempt=1
+          until capture_logs; do
+            status=$?
+            if [ "${attempt}" -ge "${max_attempts}" ]; then
+              exit "${status}"
+            fi
+            sleep $(( attempt * 5 ))
+            attempt=$(( attempt + 1 ))
+          done
 
       - name: Verify public deployment
         if: steps.context.outputs.skip_public_verify != 'true'
