@@ -46,7 +46,7 @@ EXPOSE 8788
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD wget -qO- http://localhost:8788/health || exit 1
+    CMD wget -qO- http://127.0.0.1:8788/health >/dev/null 2>&1 || busybox wget -qO- http://127.0.0.1:8788/health >/dev/null 2>&1 || exit 1
 
 # Start
 CMD ["node", "server.mjs"]

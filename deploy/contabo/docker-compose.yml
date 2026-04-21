@@ -96,11 +96,15 @@ services:
         condition: service_healthy
     mem_limit: 1g
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8082/health || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "wget -qO- http://127.0.0.1:8082/ready >/dev/null 2>&1 || busybox wget -qO- http://127.0.0.1:8082/ready >/dev/null 2>&1 || exit 1",
+        ]
       interval: 30s
       timeout: 10s
       retries: 6
-      start_period: 20s
+      start_period: 30s
     logging: *default-logging
 
   bff:
@@ -134,7 +138,11 @@ services:
         condition: service_healthy
     mem_limit: 2g
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8788/health || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "wget -qO- http://127.0.0.1:8788/health >/dev/null 2>&1 || busybox wget -qO- http://127.0.0.1:8788/health >/dev/null 2>&1 || exit 1",
+        ]
       interval: 30s
       timeout: 10s
       retries: 6
@@ -150,7 +158,11 @@ services:
       - "127.0.0.1:8080:8080"
     mem_limit: 512m
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "wget -qO- http://127.0.0.1:8080/health >/dev/null 2>&1 || busybox wget -qO- http://127.0.0.1:8080/health >/dev/null 2>&1 || exit 1",
+        ]
       interval: 30s
       timeout: 10s
       retries: 6
