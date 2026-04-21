@@ -192,7 +192,7 @@ def parse_master_checklist(markdown: str) -> list[ChecklistItem]:
             current_subsection = ""
             continue
 
-        subsection_match = re.match(r"^###\s+(.+)$", line.strip())
+        subsection_match = re.match(r"^#{3,4}\s+(.+)$", line.strip())
         if subsection_match:
             current_subsection = subsection_match.group(1).strip()
             continue
@@ -630,7 +630,7 @@ def _build_live_status_table(markdown: str) -> str:
 
     sections: list[dict[str, object]] = []
     current: dict[str, object] | None = None
-    heading_re = re.compile(r"^###\s+(P\d{2})\b.*$")
+    heading_re = re.compile(r"^#{3,4}\s+(P\d{2})\b.*$")
     checkbox_re = re.compile(r"^-\s+\[(?P<mark>[ x])\]\s+(?P<title>.+)$")
 
     for line in stage_block.splitlines():
