@@ -7,7 +7,7 @@
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-21 15:01`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-21 16:44`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Master Backlog  51.4%  [############------------]
@@ -22,7 +22,7 @@ How to read this:
 
 | Area | Tasks | Progress | Status |
 |---|---|---:|---|
-| Stage P | [130/198] |  65.7% | BLOCKED |
+| Stage P | [130/198] |  65.7% | KNOWN ISSUE |
 | Stage S | [0/47] |   0.0% | PENDING |
 | ML Research | [0/8] |   0.0% | PENDING |
 
@@ -30,9 +30,9 @@ How to read this:
 
 | Tier | Scope | Progress | Status |
 |---|---|---:|---|
-| TIER 1 | Stage P rollout path |  65.7% | BLOCKED |
+| TIER 1 | Stage P rollout path |  65.7% | KNOWN ISSUE |
 | TIER 2 | Bootstrap + minimal core |  52.6% | IN PROGRESS |
-| TIER 3 | OCI ingress + DNS cutover |   0.0% | BLOCKED |
+| TIER 3 | OCI ingress + DNS cutover |   0.0% | PENDING |
 | TIER 4 | Stage S + ML backlog |   0.0% | PENDING |
 
 ### By Phase
@@ -49,12 +49,12 @@ How to read this:
 | P08 - Helm Chart Values ✅ DONE | [4/4] | 100.0% | DONE |
 | P09 - `kubectl apply tradersapp-deployments.yaml` on OCI E2.1.Micro | [23/50] |  46.0% | IN PROGRESS |
 | P10 - Stateful Services Inside Free Limits ✅ DONE | [5/5] | 100.0% | DONE |
-| P11 - Ingress / External Access BLOCKED BY P09 | [0/6] |   0.0% | BLOCKED |
-| P12 - DNS + TLS on Current Registrar ⏳ BLOCKED BY P11 | [0/5] |   0.0% | BLOCKED |
-| P13 - Frontend on OCI k3s BLOCKED BY P11 | [0/4] |   0.0% | BLOCKED |
+| P11 - Archived OCI ingress / external access reference | [0/6] |   0.0% | PENDING |
+| P12 - Archived OCI DNS + TLS reference | [0/5] |   0.0% | PENDING |
+| P13 - Archived OCI frontend hosting reference | [0/4] |   0.0% | PENDING |
 | P14 - Observability 🔴 KNOWN ISSUE | [0/3] |   0.0% | KNOWN ISSUE |
-| P15 - Backup & Rollback ⏳ BLOCKED BY P09 | [0/3] |   0.0% | BLOCKED |
-| P16 - Go-Live Sign-Off 🔴 BLOCKED BY P09 | [0/4] |   0.0% | BLOCKED |
+| P15 - Archived OCI backup & rollback reference | [0/3] |   0.0% | PENDING |
+| P16 - Archived OCI go-live sign-off reference | [0/4] |   0.0% | PENDING |
 | P17 - Documentation Alignment ✅ DONE | [4/4] | 100.0% | DONE |
 | P18 - Windows Desktop Architecture Freeze | [5/5] | 100.0% | DONE |
 | P19 - Windows Installer Wizard | [5/5] | 100.0% | DONE |
@@ -88,13 +88,13 @@ How to read this:
 
 ### TIER 1 — ACTIVE NOW: Contabo VPS bootstrap + automated deploy
 Push TradersApp from GitHub Actions → Contabo VPS → Docker Compose → live at `traders.app`.
-Everything below is blocked by the first successful Contabo cutover.
+Everything on the live production path is blocked by the first successful Contabo cutover.
 
 ### TIER 2 — STAGING: runtime secrets + DNS cutover
 Once the Contabo deploy automation is ready, load runtime secrets, point DNS, and verify the public hosts.
 
 ### TIER 3 — historical OCI archive / rollback path
-Keep the OCI k3s work as reference only until Contabo is fully stable. Do not treat OCI as the active production route.
+P09 and the OCI-only follow-on phases P11-P16 stay here as archival rollback context. Do not treat any OCI phase as required for the current Contabo production path.
 
 ### TIER 4 — Backend ML Improvements
 All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live app when ready.
@@ -118,7 +118,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - Production target is now Contabo VPS, not OCI k3s
 - Repo-side Contabo deployment assets are the active workstream: Compose bundle, reverse proxy, bootstrap scripts, runtime env builder, and GitHub Actions deploy workflow
 - Repo-side public verification is now wired three ways: local script, dedicated public-edge k6 suite, and GitHub Actions verification workflow
-- OCI P09 and P25 remain in this file only as historical evidence and fallback, not as the current production plan
+- OCI P09, P11-P16, and P25 remain in this file only as historical evidence and fallback, not as the current production plan
 - The current hard blocker is no longer OCI memory pressure; it is the first real Contabo cutover with live Contabo VPS credentials, DNS, and runtime secrets
 - Success now means: `git push main` builds/pushes images, SSHes to Contabo, runs Docker Compose, and leaves the public hosts healthy without laptop involvement
 
@@ -195,8 +195,9 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [x] `values.minimal.yaml` created — core 4 only (bff, frontend, ml-engine, redis) with pinned SHA tags
 - [x] All Docker images tagged with GitHub SHA from CI pipeline
 
-### P09 - Core Deployment — SUPERSEDED by P25 ✅
-- P09 is fully deprecated. E2.1.Micro 1GB RAM cannot run k3s control plane + 4 pods without memory collapse. Ampere A1 Mumbai is capacity-exhausted. See P26 for the active Contabo VPS deployment path.
+### P09 - Archived OCI recovery checkpoint
+- P09 is fully deprecated for active production. E2.1.Micro 1GB RAM cannot run k3s control plane + 4 pods without memory collapse. Ampere A1 Mumbai is capacity-exhausted. See P26 for the active Contabo VPS deployment path.
+- No additional P09 work is required for the current Contabo production path. Resume this branch only if Contabo is abandoned or an OCI rollback lab is explicitly requested.
 
 ### P25 — Ampere A1 / OVHcloud Migration (Archived Fallback) 🟡 ON HOLD
 *Historical fallback only. Do not treat this as the active production route.*
@@ -227,7 +228,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 *Supersedes P25 as the real production route. Single-host Contabo VPS with GitHub Actions deployment is now the target architecture.*
 
 **Runbook:** See `docs/P26_Contabo_Deployment_Plan.md`
-**Progress snapshot (2026-04-21):** Master backlog `130/253` complete (`51.4%`). Stage P `130/198` complete (`65.7%`). Active production phase `P26` is `26/30` complete (`86.7%`), while the legacy OCI recovery checkpoint `P09` is `23/50` complete (`46.0%`).
+**Progress snapshot (2026-04-21):** Master backlog `130/253` complete (`51.4%`). Stage P `130/198` complete (`65.7%`). Active production phase `P26` is `26/30` complete (`86.7%`). OCI archive phases remain in this file for rollback evidence only and are not part of the active critical path.
 **Current blocker:** GitHub Actions is now reaching the Contabo deploy path and pushing the `ml-engine`, `bff`, and `frontend` images, but `Deploy to Contabo VPS` still fails in `Bootstrap and deploy on Contabo` on the latest automatic runs.
 
 #### P26 — Architecture Freeze
@@ -335,7 +336,8 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [x] Defer MLflow/MinIO persistence until a genuinely free durable path is proven
   *(MLflow disabled in values.minimal.yaml — tracked as future Stage P improvement if RAM allows)*
 
-### P11 - Ingress / External Access BLOCKED BY P09
+### P11 - Archived OCI ingress / external access reference
+- OCI-only follow-on kept for rollback notes. Not required for the current Contabo go-live.
 - k3s runs with `--disable traefik --disable servicelb`, so external traffic must be handled explicitly
 - Automatic CI no longer bootstraps `ingress-nginx` / `cert-manager` before the core deploy on the free OCI node; edge bootstrap is now a separate post-core action to avoid destabilizing P09
 - External access is intentionally downstream of core runtime stability; do not treat ingress as the primary blocker while P09 is still failing on node pressure
@@ -346,7 +348,8 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [ ] Prove frontend, BFF, and ML engine all answer through ingress before touching final DNS
 - [ ] Ensure the ingress path is compatible with Let's Encrypt / cert-manager challenge flow
 
-### P12 — DNS + TLS on Current Registrar ⏳ BLOCKED BY P11
+### P12 - Archived OCI DNS + TLS reference
+- OCI-only DNS/TLS notes kept for rollback context. Not required for the current Contabo cutover.
 - Current live mismatch: `traders.app` resolves to the wrong edge, HTTPS is broken, and `api.traders.app` is still NXDOMAIN
 - Current authoritative DNS is on the existing registrar nameservers; keep that path instead of introducing another paid DNS layer
 - [ ] Fix the apex A record so `traders.app` points to the OCI ingress IP instead of the current wrong edge
@@ -355,7 +358,8 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [ ] Issue and validate Let's Encrypt certificates for apex + API/BFF hosts through cert-manager on k3s
 - [ ] Verify `https://traders.app`, `https://bff.traders.app/health`, and `https://api.traders.app/health`
 
-### P13 - Frontend on OCI k3s BLOCKED BY P11
+### P13 - Archived OCI frontend hosting reference
+- OCI-only frontend hosting notes kept for rollback context. Not required for the current Contabo cutover.
 - Production frontend must be served from OCI/k3s, not Vercel
 - [ ] Remove Vercel from the production go-live path and treat `vercel.json` as non-production only unless explicitly needed for previews
 - [ ] Serve the built frontend from the cluster alongside the backend stack
@@ -368,12 +372,14 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [ ] Smoke test monitoring via GitHub Actions on each deploy
 - [ ] Telegram/Discord alerts via CI/CD post-deploy hook
 
-### P15 — Backup & Rollback ⏳ BLOCKED BY P09
+### P15 - Archived OCI backup & rollback reference
+- OCI-only rollback notes kept for rollback context. Not required for the current Contabo production cutover.
 - [ ] Test `helm rollback tradersapp` on CI failure
 - [ ] Database migration rollback strategy
 - [ ] GitHub Actions `on_failure: rollback` job already wired in deploy-k8s.yml
 
-### P16 — Go-Live Sign-Off 🔴 BLOCKED BY P09
+### P16 - Archived OCI go-live sign-off reference
+- OCI-only sign-off notes kept for rollback context. Not required for the current Contabo production cutover.
 - [ ] Manual smoke test: load traders.app, check consensus signal renders
 - [ ] Manual smoke test: `bff.traders.app/health` and `api.traders.app/health` both return healthy over HTTPS
 - [ ] Paper trade for 1 week before any real money
@@ -560,11 +566,11 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-21 15:01`  -  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-21 16:44`  -  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Stage P Backlog  65.7%  [################--------]
-Sections        done 018 | active 001 | blocked 005 | pending 004 | total 030
+Sections        done 018 | active 001 | blocked 000 | pending 009 | total 030
 Checklist       done 130 | open 068 | total 198
 ```
 
@@ -584,12 +590,12 @@ Checklist       done 130 | open 068 | total 198
 | P26 - Live Cutover ✅ IN PROGRESS | [11/15] |  73.3% | IN PROGRESS |
 | P09 - `kubectl apply tradersapp-deployments.yaml` on OCI E2.1.Micro | [23/50] |  46.0% | PENDING |
 | P10 - Stateful Services Inside Free Limits ✅ DONE | [5/5] | 100.0% | DONE |
-| P11 - Ingress / External Access BLOCKED BY P09 | [0/6] |   0.0% | BLOCKED |
-| P12 - DNS + TLS on Current Registrar ⏳ BLOCKED BY P11 | [0/5] |   0.0% | BLOCKED |
-| P13 - Frontend on OCI k3s BLOCKED BY P11 | [0/4] |   0.0% | BLOCKED |
+| P11 - Archived OCI ingress / external access reference | [0/6] |   0.0% | PENDING |
+| P12 - Archived OCI DNS + TLS reference | [0/5] |   0.0% | PENDING |
+| P13 - Archived OCI frontend hosting reference | [0/4] |   0.0% | PENDING |
 | P14 - Observability 🔴 KNOWN ISSUE | [0/3] |   0.0% | KNOWN ISSUE |
-| P15 - Backup & Rollback ⏳ BLOCKED BY P09 | [0/3] |   0.0% | BLOCKED |
-| P16 - Go-Live Sign-Off 🔴 BLOCKED BY P09 | [0/4] |   0.0% | BLOCKED |
+| P15 - Archived OCI backup & rollback reference | [0/3] |   0.0% | PENDING |
+| P16 - Archived OCI go-live sign-off reference | [0/4] |   0.0% | PENDING |
 | P17 - Documentation Alignment ✅ DONE | [4/4] | 100.0% | DONE |
 | P18 - Windows Desktop Architecture Freeze | [5/5] | 100.0% | DONE |
 | P19 - Windows Installer Wizard | [5/5] | 100.0% | DONE |

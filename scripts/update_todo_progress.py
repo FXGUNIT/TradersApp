@@ -298,6 +298,10 @@ def infer_heading_status(heading: str, done: int, total: int) -> str:
     normalized = heading.lower()
     if total > 0 and done == total:
         return "DONE"
+    if "on hold" in normalized:
+        return "ON HOLD"
+    if "archived" in normalized or "superseded" in normalized:
+        return "ARCHIVED"
     if "current blocker" in normalized:
         return "CURRENT BLOCKER"
     if "blocked by" in normalized or normalized.endswith("blocked"):
@@ -316,14 +320,21 @@ def infer_heading_status(heading: str, done: int, total: int) -> str:
 def infer_aggregate_status(statuses: list[str], done: int, total: int) -> str:
     if total > 0 and done == total:
         return "DONE"
-    if "CURRENT BLOCKER" in statuses:
+    non_done = [status for status in statuses if status != "DONE"]
+    if not non_done:
+        return "DONE"
+    if "CURRENT BLOCKER" in non_done:
         return "CURRENT BLOCKER"
-    if "BLOCKED" in statuses:
-        return "BLOCKED"
-    if "KNOWN ISSUE" in statuses:
-        return "KNOWN ISSUE"
-    if "IN PROGRESS" in statuses:
+    if "IN PROGRESS" in non_done:
         return "IN PROGRESS"
+    if "BLOCKED" in non_done:
+        return "BLOCKED"
+    if "KNOWN ISSUE" in non_done:
+        return "KNOWN ISSUE"
+    if all(status == "ARCHIVED" for status in non_done):
+        return "ARCHIVED"
+    if all(status in {"ARCHIVED", "ON HOLD"} for status in non_done) and "ON HOLD" in non_done:
+        return "ON HOLD"
     return "PENDING"
 
 
@@ -368,9 +379,13 @@ def build_master_progress_block(markdown: str) -> str:
         bucket["items"].append(item)
 
     tier_defs = [
-        ("TIER 1", "Stage P rollout path", lambda item: item.area == "Stage P"),
-        ("TIER 2", "Bootstrap + minimal core", lambda item: item.phase_id in {"P07", "P08", "P09"}),
-        ("TIER 3", "OCI ingress + DNS cutover", lambda item: item.phase_id in {"P11", "P12", "P13"}),
+        ("TIER 1", "Stage P overall", lambda item: item.area == "Stage P"),
+        ("TIER 2", "Active Contabo production path", lambda item: item.phase_id == "P26"),
+        (
+            "TIER 3",
+            "Archived OCI fallback / evidence",
+            lambda item: item.phase_id in {"P09", "P11", "P12", "P13", "P15", "P16", "P25"},
+        ),
         ("TIER 4", "Stage S + ML backlog", lambda item: item.area in {"Stage S", "ML Research"}),
     ]
 
@@ -684,6 +699,7 @@ def _build_live_status_table(markdown: str) -> str:
     done_sections = 0
     active_sections = 0
     blocked_sections = 0
+    archived_sections = 0
     pending_sections = 0
     done_tasks = 0
     open_tasks = 0
@@ -706,6 +722,8 @@ def _build_live_status_table(markdown: str) -> str:
             active_sections += 1
         elif status_label.startswith("BLOCKED"):
             blocked_sections += 1
+        elif status_label in {"ARCHIVED", "ON HOLD"}:
+            archived_sections += 1
         else:
             pending_sections += 1
 
@@ -726,7 +744,7 @@ def _build_live_status_table(markdown: str) -> str:
         f"Generated: `{timestamp}`  -  Run `python scripts/update_todo_progress.py --once` to update\n\n"
         "```text\n"
         f"Stage P Backlog {backlog_pct:5.1f}%  {make_bar(backlog_pct, width=24)}\n"
-        f"Sections        done {format_count(done_sections)} | active {format_count(active_sections)} | blocked {format_count(blocked_sections)} | pending {format_count(pending_sections)} | total {format_count(section_total)}\n"
+        f"Sections        done {format_count(done_sections)} | active {format_count(active_sections)} | blocked {format_count(blocked_sections)} | archived {format_count(archived_sections)} | pending {format_count(pending_sections)} | total {format_count(section_total)}\n"
         f"Checklist       done {format_count(done_tasks)} | open {format_count(open_tasks)} | total {format_count(task_total)}\n"
         "```\n\n"
         "| Section | Tasks | Progress | Status |\n"
@@ -823,6 +841,10 @@ def _infer_stage_p_status(heading: str, done: int, total: int) -> str:
     normalized = heading.lower()
     if done == total and total > 0:
         return "DONE"
+    if "on hold" in normalized:
+        return "ON HOLD"
+    if "archived" in normalized or "superseded" in normalized:
+        return "ARCHIVED"
     if "current blocker" in normalized:
         return "CURRENT BLOCKER"
     if "blocked by" in normalized:
