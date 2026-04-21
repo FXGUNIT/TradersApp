@@ -7,11 +7,11 @@
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-20 19:27`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-21 12:12`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Master Backlog  48.2%  [############------------]
-Tasks          done 119 | in progress 000 | blocked 000 | todo 128 | total 247
+Master Backlog  50.8%  [############------------]
+Tasks          done 130 | in progress 000 | blocked 000 | todo 126 | total 256
 ```
 
 How to read this:
@@ -22,7 +22,7 @@ How to read this:
 
 | Area | Tasks | Progress | Status |
 |---|---|---:|---|
-| Stage P | [119/192] |  62.0% | BLOCKED |
+| Stage P | [130/201] |  64.7% | BLOCKED |
 | Stage S | [0/47] |   0.0% | PENDING |
 | ML Research | [0/8] |   0.0% | PENDING |
 
@@ -30,7 +30,7 @@ How to read this:
 
 | Tier | Scope | Progress | Status |
 |---|---|---:|---|
-| TIER 1 | Stage P rollout path |  62.0% | BLOCKED |
+| TIER 1 | Stage P rollout path |  64.7% | BLOCKED |
 | TIER 2 | Bootstrap + minimal core | 100.0% | DONE |
 | TIER 3 | OCI ingress + DNS cutover |   0.0% | BLOCKED |
 | TIER 4 | Stage S + ML backlog |   0.0% | PENDING |
@@ -62,8 +62,8 @@ How to read this:
 | P22 - Desktop Security and IP Hardening | [5/5] | 100.0% | DONE |
 | P23 - 4 GB Performance and Compatibility Certification | [0/5] |   0.0% | PENDING |
 | P24 - Windows Release Readiness and Docs Alignment ✅ DONE | [5/5] | 100.0% | DONE |
-| P25 - Ampere A1 Migration (Archived Fallback) 🟡 ON HOLD | [0/7] |   0.0% | PENDING |
-| P26 - Contabo VPS Docker Compose Production Path 🔴 ACTIVE | [44/74] |  59.5% | IN PROGRESS |
+| P25 - Ampere A1 / OVHcloud Migration (Archived Fallback) 🟡 ON HOLD | [0/7] |   0.0% | PENDING |
+| P26 - Contabo VPS Docker Compose Production Path 🔴 ACTIVE | [49/83] |  59.0% | IN PROGRESS |
 | S1 - Trading Session Config Foundation | [0/11] |   0.0% | PENDING |
 | S2 - BFF Multi-Instrument Routing | [0/7] |   0.0% | PENDING |
 | S3 - Frontend Dashboard Redesign | [0/13] |   0.0% | PENDING |
@@ -259,9 +259,9 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [x] CI pipeline green through BFF Server step — ML Engine build + Integration Tests in progress
 - [ ] Wait for new BFF image with proto fix to reach GHCR, then restart analysis-service on VPS
 - [ ] Confirm local health for `bff` and `analysis-service` on VPS
-- [ ] Upstream gate before the VPS checks above: latest public GitHub Actions state on `2026-04-21` shows `CI/CD Pipeline` runs `1077` (`b2a65969`) and `1078` (`1b1807b5`) failed, so `Deploy to Contabo VPS` runs `11` and `12` were skipped and did not publish fresh images
-- [ ] Clear the current `main` CI blockers first: `Helm Chart Lint` still referenced deleted `k8s/helm/tradersapp`, and `Load Tests - Locust` failed at `Wait for ML Engine and BFF health`
-- [ ] Re-run `main` CI and confirm the current SHA reaches green completion before treating GHCR/image propagation as the next step
+- [x] Upstream gate cleared on `2026-04-21`: `CI/CD Pipeline` runs `1079` (`37e1c6bf`) and `1080` (`9e8310c2`) both completed successfully after the Helm-lint skip and BFF image-layout fixes
+- [ ] Current blocker on `2026-04-21`: `Deploy to Contabo VPS` runs `13` and `14` for SHA `9e8310c2` both failed in `Bootstrap and deploy on Contabo` after all image build/push steps succeeded
+- [ ] Automatic Contabo deploys should skip one-time VPS bootstrap on `workflow_run`, and Contabo deploy runs must be serialized so two successful CI runs cannot race on `/tmp/tradersapp-contabo-release`; re-run deploy after these workflow changes and confirm the stack reaches remote smoke-check completion
 - [ ] Confirm public health for `https://traders.app`, `https://bff.traders.app/health`, and `https://api.traders.app/health`
 - [ ] Run the Contabo public-edge k6 suite and record the first concurrency envelope
 - [ ] Archive the final OCI node details only after Contabo is stable for at least one clean redeploy cycle
@@ -560,7 +560,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-21 11:40`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-21 12:12`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Active Backlog    0.0%  [------------------------]

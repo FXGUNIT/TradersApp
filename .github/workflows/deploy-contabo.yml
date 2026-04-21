@@ -46,6 +46,9 @@ jobs:
     name: Deploy Contabo VPS
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    concurrency:
+      group: deploy-contabo-production
+      cancel-in-progress: false
     if: |
       vars.PRODUCTION_DEPLOY_PLATFORM == 'contabo' &&
       (
@@ -71,7 +74,10 @@ jobs:
             REF="${{ github.event.workflow_run.head_sha }}"
             IMAGE_TAG="${{ github.event.workflow_run.head_sha }}"
             COMPOSE_PROFILES="${{ vars.CONTABO_COMPOSE_PROFILES || 'core' }}"
-            SKIP_BOOTSTRAP="false"
+            # The VPS bootstrap is a one-time host provisioning step.
+            # Automatic deploys should reuse the provisioned host and only
+            # push/pull images plus restart the stack.
+            SKIP_BOOTSTRAP="true"
             SKIP_BUILD="false"
             SKIP_PUBLIC_VERIFY="false"
           else
