@@ -806,7 +806,7 @@ def _infer_stage_p_status(heading: str, done: int, total: int) -> str:
         return "CURRENT BLOCKER"
     if "blocked by" in normalized:
         return "BLOCKED"
-    if "in progress" in normalized:
+    if "in progress" in normalized or " active" in normalized or normalized.endswith("active"):
         return "IN PROGRESS"
     if "known issue" in normalized:
         return "KNOWN ISSUE"

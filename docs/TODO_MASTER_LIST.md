@@ -226,6 +226,8 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 *Supersedes P25 as the real production route. Single-host Contabo VPS with GitHub Actions deployment is now the target architecture.*
 
 **Runbook:** See `docs/P26_Contabo_Deployment_Plan.md`
+**Progress snapshot (2026-04-21):** Master backlog `130/253` complete (`51.4%`). Stage P `130/198` complete (`65.7%`). P26 `49/80` complete (`61.3%`).
+**Current blocker:** GitHub Actions is now reaching the Contabo deploy path and pushing the `ml-engine`, `bff`, and `frontend` images, but `Deploy to Contabo VPS` still fails in `Bootstrap and deploy on Contabo` on the latest automatic runs.
 
 #### P26 — Architecture Freeze
 - [x] Freeze production target as `Contabo VPS` with `Docker Compose`, not OCI k3s
@@ -258,6 +260,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [x] All 5 core services locally healthy: `redis` ✅ `ml-engine` ✅ `analysis-service` ✅ `bff` ✅ `frontend` ✅ (2026-04-21 ~09:25 UTC)
 - [x] GitHub deploy-contabo workflow confirmed functional via manual SSH — `docker compose up` succeeds on VPS
 - [x] GitHub deploy-contabo `workflow_run` trigger replaced with `repository_dispatch` — CI now calls `gh workflow run deploy-contabo.yml` with full secrets access (commit `4221c20a`)
+- [ ] Automatic `Deploy to Contabo VPS` still fails in `Bootstrap and deploy on Contabo` after all three image pushes succeed; stabilize the remote bootstrap/deploy step on the VPS
 - [ ] Confirm public health for `https://traders.app`, `https://bff.traders.app/health`, and `https://api.traders.app/health`
 - [ ] Run the Contabo public-edge k6 suite and record the first concurrency envelope
 - [ ] Archive the final OCI node details only after Contabo is stable for at least one clean redeploy cycle
@@ -556,7 +559,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-21 13:11`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-21 13:12`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Active Backlog    0.0%  [------------------------]
