@@ -345,6 +345,7 @@ jobs:
           EOF
 
       - name: Capture remote status
+        if: always()
         shell: bash
         run: |
           set -euo pipefail

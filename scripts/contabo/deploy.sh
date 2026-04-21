@@ -101,6 +101,41 @@ wait_for_health() {
   return 1
 }
 
+wait_for_http() {
+  local label="$1"
+  local url="$2"
+  local max_tries="${3:-24}"
+  local attempt=1
+  shift 3
+
+  while [ "${attempt}" -le "${max_tries}" ]; do
+    if curl --silent --show-error --fail --output /dev/null --connect-timeout 5 "$@" "${url}"; then
+      return 0
+    fi
+    sleep 5
+    attempt=$((attempt + 1))
+  done
+
+  echo "HTTP check ${label} did not become ready: ${url}" >&2
+  return 1
+}
+
+dump_failure_context() {
+  local exit_code="$?"
+  trap - ERR
+  set +e
+
+  echo "[deploy] Failure detected. Capturing container diagnostics..." >&2
+  docker ps -a --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' >&2 || true
+
+  if [ -n "${COMPOSE_CMD:-}" ]; then
+    run_as_app "${COMPOSE_CMD} ps" >&2 || true
+    run_as_app "${COMPOSE_CMD} logs --tail 120" >&2 || true
+  fi
+
+  exit "${exit_code}"
+}
+
 echo "[deploy] Installing bundle into ${DEPLOY_ROOT}..."
 install -d -m 0755 -o "${APP_USER}" -g "${APP_USER}" "${APP_ROOT}" "${APP_ROOT}/deploy" "${DEPLOY_ROOT}" "${APP_ROOT}/runtime" "${APP_ROOT}/logs"
 rsync -a --delete "${BUNDLE_ROOT}/deploy/contabo/" "${DEPLOY_ROOT}/"
@@ -112,6 +147,7 @@ if [ -n "${GHCR_USERNAME}" ] && [ -n "${GHCR_TOKEN}" ]; then
 fi
 
 COMPOSE_CMD="docker compose --project-name tradersapp --project-directory '${DEPLOY_ROOT}' --env-file '${RUNTIME_ENV}' -f '${DEPLOY_ROOT}/docker-compose.yml'"
+trap 'dump_failure_context' ERR
 
 echo "[deploy] Pulling images..."
 run_as_app "${COMPOSE_CMD} pull"
@@ -129,6 +165,7 @@ wait_for_health traders-ml-engine
 wait_for_health traders-analysis-service
 wait_for_health traders-bff
 wait_for_health traders-frontend
+wait_for_health traders-edge 24
 
 echo "[deploy] Running smoke checks..."
 set -a
@@ -136,21 +173,21 @@ set -a
 set +a
 
 echo "  - localhost bff /health"
-curl -fsS http://127.0.0.1:8788/health >/dev/null
+wait_for_http "localhost bff /health" "http://127.0.0.1:8788/health" 12
 echo "  - localhost ml-engine /health"
-curl -fsS http://127.0.0.1:8001/health >/dev/null
+wait_for_http "localhost ml-engine /health" "http://127.0.0.1:8001/health" 12
 echo "  - localhost analysis-service /health"
-curl -fsS http://127.0.0.1:8082/health >/dev/null
+wait_for_http "localhost analysis-service /health" "http://127.0.0.1:8082/health" 12
 echo "  - localhost frontend /health"
-curl -fsS http://127.0.0.1:8080/health >/dev/null
+wait_for_http "localhost frontend /health" "http://127.0.0.1:8080/health" 12
 echo "  - localhost redis PING"
 docker exec traders-redis redis-cli ping | grep -q PONG
 echo "  - local edge route for ${TRADERSAPP_DOMAIN}"
-curl -fsS -H "Host: ${TRADERSAPP_DOMAIN}" http://127.0.0.1/edge-health >/dev/null
+wait_for_http "edge route ${TRADERSAPP_DOMAIN}" "http://127.0.0.1/edge-health" 24 -H "Host: ${TRADERSAPP_DOMAIN}"
 echo "  - local edge route for ${BFF_PUBLIC_HOST}"
-curl -fsS -H "Host: ${BFF_PUBLIC_HOST}" http://127.0.0.1/health >/dev/null
+wait_for_http "edge route ${BFF_PUBLIC_HOST}" "http://127.0.0.1/health" 24 -H "Host: ${BFF_PUBLIC_HOST}"
 echo "  - local edge route for ${API_PUBLIC_HOST}"
-curl -fsS -H "Host: ${API_PUBLIC_HOST}" http://127.0.0.1/health >/dev/null
+wait_for_http "edge route ${API_PUBLIC_HOST}" "http://127.0.0.1/health" 24 -H "Host: ${API_PUBLIC_HOST}"
 
 echo "[deploy] Capturing compose status..."
 run_as_app "${COMPOSE_CMD} ps" | tee "${APP_ROOT}/logs/compose-ps.log"
