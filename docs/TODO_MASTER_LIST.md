@@ -7,11 +7,11 @@
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-21 16:52`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-21 18:26`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Master Backlog  51.4%  [############------------]
-Tasks          done 130 | in progress 000 | blocked 000 | todo 123 | total 253
+Master Backlog  51.8%  [############------------]
+Tasks          done 131 | in progress 000 | blocked 000 | todo 122 | total 253
 ```
 
 How to read this:
@@ -22,7 +22,7 @@ How to read this:
 
 | Area | Tasks | Progress | Status |
 |---|---|---:|---|
-| Stage P | [130/198] |  65.7% | KNOWN ISSUE |
+| Stage P | [131/198] |  66.2% | KNOWN ISSUE |
 | Stage S | [0/47] |   0.0% | PENDING |
 | ML Research | [0/8] |   0.0% | PENDING |
 
@@ -30,7 +30,7 @@ How to read this:
 
 | Tier | Scope | Progress | Status |
 |---|---|---:|---|
-| TIER 1 | Stage P rollout path |  65.7% | KNOWN ISSUE |
+| TIER 1 | Stage P rollout path |  66.2% | KNOWN ISSUE |
 | TIER 2 | Bootstrap + minimal core |  52.6% | IN PROGRESS |
 | TIER 3 | OCI ingress + DNS cutover |   0.0% | PENDING |
 | TIER 4 | Stage S + ML backlog |   0.0% | PENDING |
@@ -64,7 +64,7 @@ How to read this:
 | P23 - 4 GB Performance and Compatibility Certification | [0/5] |   0.0% | PENDING |
 | P24 - Windows Release Readiness and Docs Alignment ✅ DONE | [5/5] | 100.0% | DONE |
 | P25 - Ampere A1 / OVHcloud Migration (Archived Fallback) 🟡 ON HOLD | [0/7] |   0.0% | PENDING |
-| P26 - Contabo VPS Docker Compose Production Path 🔴 ACTIVE | [26/30] |  86.7% | IN PROGRESS |
+| P26 - Contabo VPS Docker Compose Production Path 🔴 ACTIVE | [27/30] |  90.0% | IN PROGRESS |
 | S1 - Trading Session Config Foundation | [0/11] |   0.0% | PENDING |
 | S2 - BFF Multi-Instrument Routing | [0/7] |   0.0% | PENDING |
 | S3 - Frontend Dashboard Redesign | [0/13] |   0.0% | PENDING |
@@ -262,7 +262,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [x] All 5 core services locally healthy: `redis` ✅ `ml-engine` ✅ `analysis-service` ✅ `bff` ✅ `frontend` ✅ (2026-04-21 ~09:25 UTC)
 - [x] GitHub deploy-contabo workflow confirmed functional via manual SSH — `docker compose up` succeeds on VPS
 - [x] GitHub deploy-contabo `workflow_run` trigger replaced with `repository_dispatch` — CI now calls the repository dispatch endpoint with commit SHA payload so `deploy-contabo.yml` receives the expected automatic-deploy context (commit `4221c20a`)
-- [ ] Automatic `Deploy to Contabo VPS` still fails in `Bootstrap and deploy on Contabo` after all three image pushes succeed; stabilize the remote bootstrap/deploy step on the VPS
+- [x] Automatic/manual `Deploy to Contabo VPS` bootstrap path stabilized on Contabo after image pushes; workflow run `24723298075` passed end-to-end on commit `053289b6`
 - [ ] Confirm public health for `https://traders.app`, `https://bff.traders.app/health`, and `https://api.traders.app/health`
 - [ ] Run the Contabo public-edge k6 suite and record the first concurrency envelope
 - [ ] Archive the final OCI node details only after Contabo is stable for at least one clean redeploy cycle
@@ -566,12 +566,12 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-21 16:52`  -  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-21 18:26`  -  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Stage P Backlog  65.7%  [################--------]
+Stage P Backlog  66.2%  [################--------]
 Sections        done 018 | active 001 | blocked 000 | pending 009 | total 030
-Checklist       done 130 | open 068 | total 198
+Checklist       done 131 | open 067 | total 198
 ```
 
 | Section | Tasks | Progress | Status |
@@ -587,7 +587,7 @@ Checklist       done 130 | open 068 | total 198
 | P25 - Ampere A1 / OVHcloud Migration (Archived Fallback) 🟡 ON HOLD | [0/7] |   0.0% | PENDING |
 | P26 - Architecture Freeze | [4/4] | 100.0% | DONE |
 | P26 - Repo-Side Contabo Execution | [11/11] | 100.0% | DONE |
-| P26 - Live Cutover ✅ IN PROGRESS | [11/15] |  73.3% | IN PROGRESS |
+| P26 - Live Cutover ✅ IN PROGRESS | [12/15] |  80.0% | IN PROGRESS |
 | P09 - `kubectl apply tradersapp-deployments.yaml` on OCI E2.1.Micro | [23/50] |  46.0% | PENDING |
 | P10 - Stateful Services Inside Free Limits ✅ DONE | [5/5] | 100.0% | DONE |
 | P11 - Archived OCI ingress / external access reference | [0/6] |   0.0% | PENDING |
