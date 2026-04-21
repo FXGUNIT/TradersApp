@@ -560,16 +560,43 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-21 13:17`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-21 13:17`  -  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Active Backlog    0.0%  [------------------------]
-Stage Progress  00/00 complete
-Task Counts     done 000 | in progress 000 | blocked 000 | todo 000 | total 000
+Stage P Backlog  65.7%  [################--------]
+Sections        done 018 | active 001 | blocked 005 | pending 004 | total 030
+Checklist       done 130 | open 068 | total 198
 ```
 
 | Section | Tasks | Progress | Status |
 |---|---|---:|---|
-
+| P01 - OCI Compute Instance ✅ DONE | [4/4] | 100.0% | DONE |
+| P02 - k3s Installation & Configuration ✅ DONE | [6/6] | 100.0% | DONE |
+| P03 - k3s Auto-Restart on Boot ✅ DONE | [6/6] | 100.0% | DONE |
+| P04 - OCI Security Configuration ✅ DONE | [3/3] | 100.0% | DONE |
+| P05 - kubeconfig Secret (KUBECONFIG_B64) ✅ DONE | [4/4] | 100.0% | DONE |
+| P06 - CI/CD Pipeline (`deploy-k8s.yml`) DONE - minimal direct-apply path | [12/12] | 100.0% | DONE |
+| P07 - k3s Namespace + Secrets Bootstrap ✅ DONE | [3/3] | 100.0% | DONE |
+| P08 - Helm Chart Values ✅ DONE | [4/4] | 100.0% | DONE |
+| P25 - Ampere A1 / OVHcloud Migration (Archived Fallback) 🟡 ON HOLD | [0/7] |   0.0% | PENDING |
+| P26 - Architecture Freeze | [4/4] | 100.0% | DONE |
+| P26 - Repo-Side Contabo Execution | [11/11] | 100.0% | DONE |
+| P26 - Live Cutover ✅ IN PROGRESS | [11/15] |  73.3% | IN PROGRESS |
+| P09 - `kubectl apply tradersapp-deployments.yaml` on OCI E2.1.Micro | [23/50] |  46.0% | PENDING |
+| P10 - Stateful Services Inside Free Limits ✅ DONE | [5/5] | 100.0% | DONE |
+| P11 - Ingress / External Access BLOCKED BY P09 | [0/6] |   0.0% | BLOCKED |
+| P12 - DNS + TLS on Current Registrar ⏳ BLOCKED BY P11 | [0/5] |   0.0% | BLOCKED |
+| P13 - Frontend on OCI k3s BLOCKED BY P11 | [0/4] |   0.0% | BLOCKED |
+| P14 - Observability 🔴 KNOWN ISSUE | [0/3] |   0.0% | KNOWN ISSUE |
+| P15 - Backup & Rollback ⏳ BLOCKED BY P09 | [0/3] |   0.0% | BLOCKED |
+| P16 - Go-Live Sign-Off 🔴 BLOCKED BY P09 | [0/4] |   0.0% | BLOCKED |
+| P17 - Documentation Alignment ✅ DONE | [4/4] | 100.0% | DONE |
+| P18 - Windows Desktop Architecture Freeze | [5/5] | 100.0% | DONE |
+| P19 - Windows Installer Wizard | [5/5] | 100.0% | DONE |
+| P20 - Desktop Auth, Access Control, and Admin Kill Switch | [5/5] | 100.0% | DONE |
+| P21 - Self-Update System | [5/5] | 100.0% | DONE |
+| P22 - Desktop Security and IP Hardening | [5/5] | 100.0% | DONE |
+| P23 - 4 GB Performance and Compatibility Certification | [0/5] |   0.0% | PENDING |
+| P24 - Windows Release Readiness and Docs Alignment ✅ DONE | [5/5] | 100.0% | DONE |
 
 <!-- live-status:end -->
