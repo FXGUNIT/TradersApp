@@ -2,12 +2,13 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Install dependencies (BFF uses only Node.js built-ins — no external packages)
-COPY package.json ./
+# Build from repo root so the runtime layout is stable in CI and deploy workflows.
+COPY bff/package.json ./package.json
 RUN npm install --omit=dev --prefer-offline 2>/dev/null || true
 
-# Copy bff source
-COPY ./ ./
+# Copy runtime files
+COPY bff/ ./
+COPY proto/ ./proto/
 
 # Build args (secrets injected at Docker build time from GitHub Actions)
 ARG AI_GEMINI_PRO_KEY

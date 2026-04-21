@@ -201,7 +201,7 @@ jobs:
           set -euo pipefail
           IMAGE_SHA="ghcr.io/${{ steps.context.outputs.owner }}/bff:${{ steps.context.outputs.image_tag }}"
           IMAGE_LATEST="ghcr.io/${{ steps.context.outputs.owner }}/bff:latest"
-          docker build -t "${IMAGE_SHA}" -t "${IMAGE_LATEST}" --file bff/Dockerfile bff/
+          docker build -t "${IMAGE_SHA}" -t "${IMAGE_LATEST}" --file bff/Dockerfile .
           docker push "${IMAGE_SHA}"
           docker push "${IMAGE_LATEST}"
 

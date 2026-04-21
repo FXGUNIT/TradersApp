@@ -564,7 +564,12 @@ jobs:
           version: v3.16.3
 
       - name: Lint Helm chart
-        run: helm lint k8s/helm/tradersapp
+        run: |
+          if [ -d k8s/helm/tradersapp ]; then
+            helm lint k8s/helm/tradersapp
+          else
+            echo "::notice::Skipping Helm lint because the legacy OCI chart directory is not present in the Contabo-focused repo layout."
+          fi
 
   # -------------------------------------------------------------------------
   # Frontend: React + Vite

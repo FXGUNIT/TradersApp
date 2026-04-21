@@ -255,7 +255,7 @@ jobs:
             -t "${IMAGE_SHA}" \
             -t "${IMAGE_LATEST}" \
             --file bff/Dockerfile \
-            bff/
+            .
           docker push "${IMAGE_SHA}"
           docker push "${IMAGE_LATEST}"
 
