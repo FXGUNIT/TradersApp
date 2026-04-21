@@ -353,6 +353,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p .artifacts/contabo
+          GHCR_TOKEN_B64="$(printf '%s' "${GHCR_TOKEN}" | base64 -w0)"
           retry() {
             local max_attempts="$1"
             shift
@@ -378,8 +379,8 @@ jobs:
           run_remote_deploy() {
             {
               echo "=== bootstrap-and-deploy $(date -u +%Y-%m-%dT%H:%M:%SZ) ==="
-              printf '%s' "${GHCR_TOKEN}" | ssh -T contabo-vps \
-                "APP_ROOT='${REMOTE_APP_ROOT}' SKIP_BOOTSTRAP='${REMOTE_SKIP_BOOTSTRAP}' GHCR_USERNAME='${REMOTE_GHCR_USERNAME}' bash -lc 'set -euo pipefail; RELEASE_DIR=/tmp/tradersapp-contabo-release; tar -xzf \"\$RELEASE_DIR/contabo-bundle.tgz\" -C \"\$RELEASE_DIR\"; RELEASE_DIR=\"\$RELEASE_DIR\" APP_ROOT=\"\$APP_ROOT\" SKIP_BOOTSTRAP=\"\$SKIP_BOOTSTRAP\" GHCR_USERNAME=\"\$GHCR_USERNAME\" GHCR_TOKEN_STDIN=1 bash \"\$RELEASE_DIR/scripts/contabo/remote-run-deploy.sh\"'"
+              printf '%s' "${GHCR_TOKEN_B64}" | ssh -T contabo-vps \
+                "APP_ROOT='${REMOTE_APP_ROOT}' SKIP_BOOTSTRAP='${REMOTE_SKIP_BOOTSTRAP}' GHCR_USERNAME='${REMOTE_GHCR_USERNAME}' bash -lc 'set -euo pipefail; RELEASE_DIR=/tmp/tradersapp-contabo-release; cat > \"\$RELEASE_DIR/.ghcr-token.b64\"; tar -xzf \"\$RELEASE_DIR/contabo-bundle.tgz\" -C \"\$RELEASE_DIR\"; RELEASE_DIR=\"\$RELEASE_DIR\" APP_ROOT=\"\$APP_ROOT\" SKIP_BOOTSTRAP=\"\$SKIP_BOOTSTRAP\" GHCR_USERNAME=\"\$GHCR_USERNAME\" GHCR_TOKEN_B64_FILE=\"\$RELEASE_DIR/.ghcr-token.b64\" bash \"\$RELEASE_DIR/scripts/contabo/remote-run-deploy.sh\"'"
             } 2>&1 | tee -a .artifacts/contabo/bootstrap-and-deploy.log
           }
 
