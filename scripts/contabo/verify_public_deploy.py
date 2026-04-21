@@ -347,9 +347,7 @@ def run_k6_suite(
         },
     }
 
-    summary_exists = summary_path.exists()
-    thresholds_passed = completed.returncode == 0
-    ok = summary_exists
+    ok = summary_exists  # success = envelope captured; threshold breaches are recorded separately
     if thresholds_passed:
         detail = "k6 public-edge run completed"
     elif summary_exists:
