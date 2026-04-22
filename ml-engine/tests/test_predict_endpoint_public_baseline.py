@@ -9,6 +9,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 import _routes_workflow
+import data_quality.validation_pipeline as dq_mod
 
 
 def _build_public_baseline_payload() -> dict:
@@ -153,7 +154,7 @@ def _build_feature_frame(df: pd.DataFrame) -> pd.DataFrame:
 
 
 @pytest.mark.integration
-def test_predict_endpoint_accepts_recent_public_baseline_payload(monkeypatch):
+def test_predict_endpoint_accepts_recent_public_baseline_payload(monkeypatch, tmp_path):
     cache = _FakeCache()
     registry = _RecordingRegistryClient()
     aggregator = _RecordingConsensusAggregator()
@@ -176,6 +177,8 @@ def test_predict_endpoint_accepts_recent_public_baseline_payload(monkeypatch):
     monkeypatch.setattr(_routes_workflow, "MAMBA_AVAILABLE", False)
     monkeypatch.setattr(_routes_workflow, "get_mamba_prediction", lambda *args, **kwargs: {"ok": False})
     monkeypatch.setattr(_routes_workflow, "MODEL_SIZES", {})
+    monkeypatch.setattr(dq_mod, "REQUIRE_GX", False)
+    monkeypatch.setattr(dq_mod, "DQ_QUARANTINE_DIR", tmp_path / "dq_rejections")
 
     app = FastAPI()
     app.add_api_route("/predict", _routes_workflow.predict_endpoint, methods=["POST"])
