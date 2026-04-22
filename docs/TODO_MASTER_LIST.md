@@ -7,7 +7,7 @@
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-22 18:31`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-22 19:29`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Master Backlog  52.5%  [#############-----------]
@@ -196,6 +196,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [x] All Docker images tagged with GitHub SHA from CI pipeline
 
 ### P09 - Archived OCI recovery checkpoint
+> ⚠️ P09 is ARCHIVED. Contabo VPS (P26) is the active production path. Do not work on P09 unless Contabo is abandoned.
 - P09 is fully deprecated for active production. E2.1.Micro 1GB RAM cannot run k3s control plane + 4 pods without memory collapse. Ampere A1 Mumbai is capacity-exhausted. See P26 for the active Contabo VPS deployment path.
 - No additional P09 work is required for the current Contabo production path. Resume this branch only if Contabo is abandoned or an OCI rollback lab is explicitly requested.
 
@@ -341,6 +342,7 @@ Fallback-host note: DNS cutover to Cloudflare → Contabo done (2026-04-22). `tr
   *(MLflow disabled in values.minimal.yaml — tracked as future Stage P improvement if RAM allows)*
 
 ### P11 - Archived OCI ingress / external access reference
+> ⚠️ ARCHIVED — OCI-only. Not required for Contabo production path. Kept for rollback context only.
 - OCI-only follow-on kept for rollback notes. Not required for the current Contabo go-live.
 - k3s runs with `--disable traefik --disable servicelb`, so external traffic must be handled explicitly
 - Automatic CI no longer bootstraps `ingress-nginx` / `cert-manager` before the core deploy on the free OCI node; edge bootstrap is now a separate post-core action to avoid destabilizing P09
@@ -353,6 +355,7 @@ Fallback-host note: DNS cutover to Cloudflare → Contabo done (2026-04-22). `tr
 - [ ] Ensure the ingress path is compatible with Let's Encrypt / cert-manager challenge flow
 
 ### P12 - Archived OCI DNS + TLS reference
+> ⚠️ ARCHIVED — OCI-only. Not required for Contabo production path. Kept for rollback context only.
 - OCI-only DNS/TLS notes kept for rollback context. Not required for the current Contabo cutover.
 - Current live mismatch: `traders.app` resolves to the wrong edge, HTTPS is broken, and `api.traders.app` is still NXDOMAIN
 - Current authoritative DNS is on the existing registrar nameservers; keep that path instead of introducing another paid DNS layer
@@ -363,6 +366,7 @@ Fallback-host note: DNS cutover to Cloudflare → Contabo done (2026-04-22). `tr
 - [ ] Verify `https://traders.app`, `https://bff.traders.app/health`, and `https://api.traders.app/health`
 
 ### P13 - Archived OCI frontend hosting reference
+> ⚠️ ARCHIVED — OCI-only. Not required for Contabo production path. Kept for rollback context only.
 - OCI-only frontend hosting notes kept for rollback context. Not required for the current Contabo cutover.
 - Production frontend must be served from OCI/k3s, not Vercel
 - [ ] Remove Vercel from the production go-live path and treat `vercel.json` as non-production only unless explicitly needed for previews
@@ -571,7 +575,7 @@ Fallback-host note: DNS cutover to Cloudflare → Contabo done (2026-04-22). `tr
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-22 18:31`  -  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-22 19:29`  -  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Stage P Backlog  67.0%  [################--------]
