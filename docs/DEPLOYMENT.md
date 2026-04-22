@@ -9,16 +9,24 @@
 
 - Single `Contabo VPS`
 - `GitHub Actions -> GHCR -> SSH -> Docker Compose`
-- Public hosts:
-  - `traders.app`
-  - `bff.traders.app`
-  - `api.traders.app`
+- Public host family is pending domain approval. Current requested production hosts are:
+  - `tradergunit.is-a.dev`
+  - `bff.tradergunit.is-a.dev`
+  - `api.tradergunit.is-a.dev`
+- Until approval completes, public proof uses the Contabo fallback hosts:
+  - `173.249.18.14.sslip.io`
+  - `bff.173.249.18.14.sslip.io`
+  - `api.173.249.18.14.sslip.io`
 - Runtime bundle:
   - [deploy/contabo/docker-compose.yml](/e:/TradersApp/deploy/contabo/docker-compose.yml:1)
   - [deploy/contabo/Caddyfile](/e:/TradersApp/deploy/contabo/Caddyfile:1)
   - [scripts/contabo/setup-vps.sh](/e:/TradersApp/scripts/contabo/setup-vps.sh:1)
   - [scripts/contabo/deploy.sh](/e:/TradersApp/scripts/contabo/deploy.sh:1)
   - [docs/P26_Contabo_Deployment_Plan.md](/e:/TradersApp/docs/P26_Contabo_Deployment_Plan.md:1)
+
+`traders.app` is not currently under repo-controlled DNS. Treat older `traders.app`
+references in archived OCI sections below as historical context, not as the live
+Contabo cutover target.
 
 ## Archived OCI Reference
 

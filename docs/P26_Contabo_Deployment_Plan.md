@@ -148,6 +148,9 @@ Body:
 - One of:
   - `CONTABO_APP_ENV`
   - `INFISICAL_TOKEN` + `INFISICAL_PROJECT_ID`
+- Optional lightweight alert fan-out:
+  - `SLACK_WEBHOOK_URL`
+  - `DISCORD_WEBHOOK_URL`
 
 ## Expected Runtime Env Contract
 
@@ -209,6 +212,7 @@ python scripts/ci/parse_k6_results.py
 Artifacts:
 
 - `.artifacts/contabo/public-readiness-<timestamp>.json`
+- `.artifacts/contabo/public-summary-<run_id>.md`
 - `.artifacts/k6-slo-<timestamp>/summary-contabo-public-edge.json`
 - `.artifacts/k6-slo-<timestamp>/k6-contabo-public-edge.log`
 - `contabo-public-verification-<run_id>` GitHub Actions artifact when the workflow is used
@@ -250,8 +254,19 @@ ssh <user>@<host>
 sudo systemctl restart tradersapp.service
 ```
 
+The deploy evidence bundle now captures:
+
+- bootstrap/deploy transcript
+- `docker compose ps`
+- `docker compose logs --tail 200`
+- `docker compose images`
+- `systemctl status tradersapp.service`
+- `journalctl -u tradersapp.service -n 200`
+- public verification JSON and markdown summary when public verification runs
+
 ## Rollback
 
 - Re-run `Deploy to Contabo VPS` with a known-good SHA in `workflow_dispatch`
 - The workflow rebuilds, republishes, and redeploys using that image tag
 - Keep `CONTABO_COMPOSE_PROFILES=core` until the first two clean redeploy cycles are stable
+- When rollback is triggered after a failed deploy, review the uploaded `contabo-deploy-evidence-<run_id>` artifact before retrying so the next attempt starts from the last known failure mode instead of guessing

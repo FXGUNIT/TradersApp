@@ -29,6 +29,19 @@ case "${COMMAND_NAME}" in
       -f "${APP_ROOT}/deploy/contabo/docker-compose.yml" \
       logs --tail 200
     ;;
+  images)
+    run_privileged docker compose \
+      --project-name tradersapp \
+      --project-directory "${APP_ROOT}/deploy/contabo" \
+      --env-file "${APP_ROOT}/runtime/.env.contabo" \
+      -f "${APP_ROOT}/deploy/contabo/docker-compose.yml" \
+      images
+    ;;
+  systemd)
+    run_privileged systemctl status tradersapp.service --no-pager --full || true
+    printf '\n===== journalctl tradersapp.service =====\n'
+    run_privileged journalctl -u tradersapp.service -n 200 --no-pager || true
+    ;;
   *)
     echo "Unknown command: ${COMMAND_NAME}" >&2
     exit 1

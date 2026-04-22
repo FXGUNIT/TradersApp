@@ -36,6 +36,7 @@ jobs:
       appcast_url: ${{ steps.urls.outputs.appcast_url }}
       updates_base_url: ${{ steps.urls.outputs.updates_base_url }}
       release_notes_base_url: ${{ steps.urls.outputs.release_notes_base_url }}
+      desktop_bff_url: ${{ steps.desktop_urls.outputs.desktop_bff_url }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -118,6 +119,26 @@ jobs:
           "updates_base_url=$updatesBaseUrl" >> $env:GITHUB_OUTPUT
           "release_notes_base_url=$releaseNotesBaseUrl" >> $env:GITHUB_OUTPUT
 
+      - name: Resolve desktop web endpoint
+        id: desktop_urls
+        shell: pwsh
+        run: |
+          $desktopBffUrl = "${{ vars.DESKTOP_BFF_URL }}"
+          if ([string]::IsNullOrWhiteSpace($desktopBffUrl)) {
+            $publicHost = "${{ vars.BFF_PUBLIC_HOST }}"
+            if ([string]::IsNullOrWhiteSpace($publicHost)) {
+              $desktopBffUrl = "https://bff.traders.app"
+            }
+            elseif ($publicHost -match '^https?://') {
+              $desktopBffUrl = $publicHost.TrimEnd('/')
+            }
+            else {
+              $desktopBffUrl = "https://$($publicHost.TrimEnd('/'))"
+            }
+          }
+
+          "desktop_bff_url=$desktopBffUrl" >> $env:GITHUB_OUTPUT
+
       - name: Validate signing and update secrets
         shell: pwsh
         run: |
@@ -161,7 +182,7 @@ jobs:
       - name: Build desktop web bundle
         shell: pwsh
         env:
-          DESKTOP_BFF_URL: https://bff.traders.app
+          DESKTOP_BFF_URL: ${{ steps.desktop_urls.outputs.desktop_bff_url }}
           DESKTOP_APP_VERSION: ${{ steps.version.outputs.desktop_version }}
         run: npm run build:desktop:web
 

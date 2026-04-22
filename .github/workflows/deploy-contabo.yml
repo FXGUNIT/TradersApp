@@ -61,7 +61,7 @@ jobs:
       )
     environment:
       name: production
-      url: https://traders.app
+      url: https://${{ vars.TRADERSAPP_DOMAIN || vars.CONTABO_DOMAIN || 'traders.app' }}
 
     steps:
       - name: Resolve deploy context
@@ -449,6 +449,14 @@ jobs:
             run_remote_status logs > .artifacts/contabo/compose-logs.txt 2>&1 || true
           }
 
+          capture_images() {
+            run_remote_status images > .artifacts/contabo/compose-images.txt 2>&1 || true
+          }
+
+          capture_systemd() {
+            run_remote_status systemd > .artifacts/contabo/systemd-status.txt 2>&1 || true
+          }
+
           attempt=1
           max_attempts=3
           until capture_ps; do
@@ -470,6 +478,26 @@ jobs:
             attempt=$(( attempt + 1 ))
           done
 
+          attempt=1
+          until capture_images; do
+            status=$?
+            if [ "${attempt}" -ge "${max_attempts}" ]; then
+              exit "${status}"
+            fi
+            sleep $(( attempt * 5 ))
+            attempt=$(( attempt + 1 ))
+          done
+
+          attempt=1
+          until capture_systemd; do
+            status=$?
+            if [ "${attempt}" -ge "${max_attempts}" ]; then
+              exit "${status}"
+            fi
+            sleep $(( attempt * 5 ))
+            attempt=$(( attempt + 1 ))
+          done
+
       - name: Verify public deployment
         if: steps.context.outputs.skip_public_verify != 'true'
         shell: bash
@@ -481,6 +509,18 @@ jobs:
             --api-host "${{ steps.context.outputs.api_host }}" \
             --output ".artifacts/contabo/public-readiness-${{ github.run_id }}.json"
 
+      - name: Summarize public verification
+        if: always() && steps.context.outputs.skip_public_verify != 'true'
+        id: public_summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/contabo/summarize_public_report.py \
+            --input ".artifacts/contabo/public-readiness-${{ github.run_id }}.json" \
+            --markdown-out ".artifacts/contabo/public-summary-${{ github.run_id }}.md" \
+            --step-summary "${GITHUB_STEP_SUMMARY}" \
+            --github-output "${GITHUB_OUTPUT}"
+
       - name: Upload Contabo deploy evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -488,6 +528,35 @@ jobs:
           name: contabo-deploy-evidence-${{ github.run_id }}
           path: .artifacts/contabo/
           retention-days: 14
+
+      - name: Send deploy alert
+        if: always()
+        shell: bash
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          set -euo pipefail
+          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          STATUS="success"
+          TITLE="Contabo deploy succeeded"
+          BODY="Domain: https://${{ steps.context.outputs.domain }} | Image tag: ${{ steps.context.outputs.image_tag }} | Public verify skipped: ${{ steps.context.outputs.skip_public_verify }}"
+
+          if [ "${{ job.status }}" != "success" ]; then
+            STATUS="error"
+            TITLE="Contabo deploy failed"
+            BODY="Domain: https://${{ steps.context.outputs.domain }} | Review artifact contabo-deploy-evidence-${{ github.run_id }} for compose, systemd, and bootstrap logs."
+          elif [ "${{ steps.public_summary.outputs.hard_failures || 'false' }}" = "true" ]; then
+            STATUS="error"
+            TITLE="Contabo deploy passed restart but public verification failed"
+            BODY="Failed checks: ${{ steps.public_summary.outputs.failed_checks || 'unknown' }} | Domain: https://${{ steps.context.outputs.domain }}"
+          fi
+
+          python scripts/ci/send_webhook_alert.py \
+            --status "${STATUS}" \
+            --title "${TITLE}" \
+            --body "${BODY}" \
+            --run-url "${RUN_URL}"
 
       - name: Publish summary
         shell: bash
@@ -502,4 +571,5 @@ jobs:
             echo "- API health: \`https://${{ steps.context.outputs.api_host }}/health\`"
             echo "- Compose profiles: \`${{ steps.context.outputs.compose_profiles }}\`"
             echo "- Public verification skipped: \`${{ steps.context.outputs.skip_public_verify }}\`"
+            echo "- Evidence artifact: \`contabo-deploy-evidence-${{ github.run_id }}\`"
           } >> "${GITHUB_STEP_SUMMARY}"

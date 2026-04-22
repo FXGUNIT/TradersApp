@@ -7,6 +7,19 @@ param(
     [double]$MaxIdleRamMb = 500,
     [int]$LaunchTimeoutSeconds = 30,
     [int]$IdleSettleSeconds = 20,
+    [string]$ReferenceMachineLabel = "",
+    [ValidateSet("not-run", "pass", "fail")]
+    [string]$VisibleLoginStatus = "not-run",
+    [string]$VisibleLoginNotes = "",
+    [ValidateSet("not-run", "pass", "fail")]
+    [string]$DegradedNetworkStatus = "not-run",
+    [string]$DegradedNetworkNotes = "",
+    [ValidateSet("not-run", "pass", "fail")]
+    [string]$ForcedLogoutStatus = "not-run",
+    [string]$ForcedLogoutNotes = "",
+    [ValidateSet("not-run", "pass", "fail")]
+    [string]$SignedReleaseStatus = "not-run",
+    [string]$SignedReleaseNotes = "",
     [switch]$SkipRuntimeProbe,
     [switch]$KeepAppOpen
 )
@@ -87,6 +100,32 @@ function Get-FileNameMatches {
     }
 
     return @($matches | Sort-Object -Unique)
+}
+
+function Get-SourceAudit {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][hashtable]$Checks
+    )
+
+    $sourceText = if (Test-Path -LiteralPath $Path) {
+        Get-Content -LiteralPath $Path -Raw
+    } else {
+        ""
+    }
+
+    $results = [ordered]@{
+        path = $Path
+        exists = [bool](Test-Path -LiteralPath $Path)
+        checks = [ordered]@{}
+    }
+
+    foreach ($checkName in $Checks.Keys) {
+        $pattern = $Checks[$checkName]
+        $results.checks[$checkName] = [bool]($sourceText -match $pattern)
+    }
+
+    return $results
 }
 
 function Get-StatusLabel {
@@ -232,6 +271,24 @@ $ocrAuditDesktopWebPath = if ($resolvedDesktopWebDir) { $resolvedDesktopWebDir }
 $ocrAudit = Get-OcrAudit -RepoRoot $repoRoot -DesktopWebPath $ocrAuditDesktopWebPath
 $gpuPayloadMatches = if ($releaseRoot) { Get-FileNameMatches -RootPath $releaseRoot -Patterns $gpuFilePatterns } else { @() }
 $sidecarPayloadMatches = if ($releaseRoot) { Get-FileNameMatches -RootPath $releaseRoot -Patterns $sidecarFilePatterns } else { @() }
+$connectionStatusAudit = Get-SourceAudit -Path (Join-Path $repoRoot "src/features/shell/useConnectionStatusEffect.js") -Checks @{
+    onlineEventListener = 'window\.addEventListener\("online"'
+    offlineEventListener = 'window\.addEventListener\("offline"'
+    reconnectToast = 'Network bridge restored\. Data synchronization in progress'
+    offlineToast = 'Network link severed\. Verify connection strength and retry'
+    reconnectEvent = 'CustomEvent\("connectionRestored"'
+    disconnectEvent = 'CustomEvent\("connectionLost"'
+}
+$desktopPolicyAudit = Get-SourceAudit -Path (Join-Path $repoRoot "src/features/shell/useDesktopClientPolicy.js") -Checks @{
+    policyPolling = 'DESKTOP_POLICY_POLL_MS'
+    maintenanceMode = 'maintenanceActive'
+    forceLogout = 'forceLogout'
+    notifyDesktopPolicy = 'notifyDesktopPolicy'
+    minimumVersionEnforcement = 'MINIMUM_DESKTOP_VERSION_REQUIRED'
+    handleLogout = 'handleLogout'
+}
+$connectionStatusReady = $connectionStatusAudit.exists -and -not ($connectionStatusAudit.checks.Values -contains $false)
+$desktopPolicyReady = $desktopPolicyAudit.exists -and -not ($desktopPolicyAudit.checks.Values -contains $false)
 
 $staticAudit = [ordered]@{
     desktopExeFound = [bool]$resolvedDesktopExePath
@@ -246,6 +303,10 @@ $staticAudit = [ordered]@{
     gpuFreePayload = $gpuPayloadMatches.Count -eq 0
     sidecarPayloadMatches = @($sidecarPayloadMatches)
     sidecarPayloadAbsent = $sidecarPayloadMatches.Count -eq 0
+    connectionStatusAudit = $connectionStatusAudit
+    connectionStatusReady = $connectionStatusReady
+    desktopPolicyAudit = $desktopPolicyAudit
+    desktopPolicyReady = $desktopPolicyReady
 }
 
 $runtimeAudit = [ordered]@{
@@ -268,9 +329,31 @@ $overallChecks = [ordered]@{
         $staticAudit.desktopWebDirFound -and
         $staticAudit.ocrLazyLoaded -and
         $staticAudit.gpuFreePayload -and
-        $staticAudit.sidecarPayloadAbsent
+        $staticAudit.sidecarPayloadAbsent -and
+        $staticAudit.connectionStatusReady -and
+        $staticAudit.desktopPolicyReady
     )
     runtimeAuditPass = $null
+}
+
+$manualValidation = [ordered]@{
+    referenceMachineLabel = (Get-DisplayValue -Value $ReferenceMachineLabel -Fallback "unspecified")
+    visibleLogin = [ordered]@{
+        status = $VisibleLoginStatus
+        notes = $VisibleLoginNotes
+    }
+    degradedNetwork = [ordered]@{
+        status = $DegradedNetworkStatus
+        notes = $DegradedNetworkNotes
+    }
+    forcedLogout = [ordered]@{
+        status = $ForcedLogoutStatus
+        notes = $ForcedLogoutNotes
+    }
+    signedReleasePayload = [ordered]@{
+        status = $SignedReleaseStatus
+        notes = $SignedReleaseNotes
+    }
 }
 
 $process = $null
@@ -370,6 +453,7 @@ $report = [ordered]@{
     staticAudit = $staticAudit
     runtimeAudit = $runtimeAudit
     overallChecks = $overallChecks
+    manualValidation = $manualValidation
     manualGatesRemaining = $manualGatesRemaining
 }
 
@@ -403,6 +487,7 @@ $markdownLines = @(
     "# P23 Desktop Certification Evidence",
     "",
     ('- Generated: `' + $report.generatedAt + '`'),
+    ('- Reference machine: `' + $manualValidation.referenceMachineLabel + '`'),
     ('- Desktop EXE: `' + $displayDesktopExePath + '`'),
     ('- Desktop web bundle: `' + $displayDesktopWebDir + '`'),
     ('- JSON artifact: `' + $jsonPath + '`'),
@@ -414,6 +499,8 @@ $markdownLines = @(
     "- OCR remains lazy-loaded: **$(Get-StatusLabel $staticAudit.ocrLazyLoaded)**",
     "- GPU-specific payload absent: **$(Get-StatusLabel $staticAudit.gpuFreePayload)**",
     "- Local sidecar payload absent: **$(Get-StatusLabel $staticAudit.sidecarPayloadAbsent)**",
+    "- Degraded-network hook path present: **$(Get-StatusLabel $staticAudit.connectionStatusReady)**",
+    "- Forced-logout / policy hook path present: **$(Get-StatusLabel $staticAudit.desktopPolicyReady)**",
     ""
 )
 
@@ -440,6 +527,18 @@ if ($staticAudit.sidecarPayloadMatches.Count -gt 0) {
     }
     $markdownLines += ""
 }
+
+$markdownLines += "Connection-status source checks:"
+foreach ($checkName in $staticAudit.connectionStatusAudit.checks.Keys) {
+    $markdownLines += ('- `' + $checkName + '` — **' + (Get-StatusLabel $staticAudit.connectionStatusAudit.checks[$checkName]) + '**')
+}
+$markdownLines += ""
+
+$markdownLines += "Desktop-policy source checks:"
+foreach ($checkName in $staticAudit.desktopPolicyAudit.checks.Keys) {
+    $markdownLines += ('- `' + $checkName + '` — **' + (Get-StatusLabel $staticAudit.desktopPolicyAudit.checks[$checkName]) + '**')
+}
+$markdownLines += ""
 
 $markdownLines += @(
     "## Runtime Audit",
@@ -477,6 +576,29 @@ $markdownLines += @(
 
 foreach ($manualGate in $manualGatesRemaining) {
     $markdownLines += "- $manualGate"
+}
+
+$markdownLines += @(
+    "",
+    "## Manual Validation Status",
+    "",
+    ('- Visible login route: **' + $manualValidation.visibleLogin.status.ToUpperInvariant() + '**'),
+    ('- Degraded-network flow: **' + $manualValidation.degradedNetwork.status.ToUpperInvariant() + '**'),
+    ('- Forced logout / minimum-version flow: **' + $manualValidation.forcedLogout.status.ToUpperInvariant() + '**'),
+    ('- Signed release payload rerun: **' + $manualValidation.signedReleasePayload.status.ToUpperInvariant() + '**')
+)
+
+if (-not [string]::IsNullOrWhiteSpace($manualValidation.visibleLogin.notes)) {
+    $markdownLines += ('- Visible login notes: ' + $manualValidation.visibleLogin.notes)
+}
+if (-not [string]::IsNullOrWhiteSpace($manualValidation.degradedNetwork.notes)) {
+    $markdownLines += ('- Degraded-network notes: ' + $manualValidation.degradedNetwork.notes)
+}
+if (-not [string]::IsNullOrWhiteSpace($manualValidation.forcedLogout.notes)) {
+    $markdownLines += ('- Forced logout notes: ' + $manualValidation.forcedLogout.notes)
+}
+if (-not [string]::IsNullOrWhiteSpace($manualValidation.signedReleasePayload.notes)) {
+    $markdownLines += ('- Signed payload notes: ' + $manualValidation.signedReleasePayload.notes)
 }
 
 $markdownLines | Set-Content -LiteralPath $markdownPath

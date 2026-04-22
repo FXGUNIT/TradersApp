@@ -9,11 +9,25 @@ const outDir = resolve(repoRoot, "dist", "desktop-web");
 
 mkdirSync(outDir, { recursive: true });
 
+function normalizeHttpsUrl(value) {
+  if (!value) {
+    return "";
+  }
+
+  const trimmed = String(value).trim().replace(/\/$/, "");
+  if (!trimmed) {
+    return "";
+  }
+
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+}
+
 const env = {
   ...process.env,
   VITE_DESKTOP_BUILD: "true",
   VITE_BFF_URL:
-    process.env.DESKTOP_BFF_URL ||
+    normalizeHttpsUrl(process.env.DESKTOP_BFF_URL) ||
+    normalizeHttpsUrl(process.env.BFF_PUBLIC_HOST) ||
     process.env.VITE_BFF_URL ||
     "https://bff.traders.app",
   VITE_APP_VERSION:

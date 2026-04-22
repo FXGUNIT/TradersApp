@@ -22,10 +22,14 @@ cutover. They should be switched by the prepared branch
 - `vite.config.js`
 - `vercel.json`
 - `scripts/windows/build-desktop-web.mjs`
+- `.github/workflows/windows-release.yml`
+- `.github/workflows/deploy-contabo.yml`
+- `.github/workflows/verify-contabo-public.yml`
 - `desktop/windows/installer/TradersApp.Package/Package.wxs`
 - `desktop/windows/installer/TradersApp.Bundle/Bundle.wxs`
 - `telegram-bridge/index.js`
 - `telegram-bridge/aiProviders.js`
+- `docs/DEPLOYMENT.md`
 
 ## Legacy Docs And Archived Paths
 
@@ -74,6 +78,9 @@ release after the cutover branch is merged.
   - `https://github.com/FXGUNIT/TradersApp/releases/latest/download/appcast.xml`
 - Off-box fallback verification against `sslip.io` was captured successfully in
   GitHub Actions run `24772564179`.
+- The prepared cutover branch exists, but it must be refreshed from current
+  `main` before final merge because `main` has moved since that branch was first
+  staged.
 
 ## Execution Order After Approval
 

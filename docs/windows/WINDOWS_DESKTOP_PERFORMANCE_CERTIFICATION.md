@@ -43,6 +43,22 @@ The script captures:
 - built `ocr-*.js` chunk presence in `dist/desktop-web`
 - absence of known GPU runtime binaries in the release payload
 - absence of obvious local sidecar payload files in the desktop release root
+- source-level proof that degraded-network hooks still exist in `useConnectionStatusEffect.js`
+- source-level proof that forced-logout and minimum-version enforcement still exist in `useDesktopClientPolicy.js`
+
+You can also record manual gate outcomes directly into the evidence file:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\windows\certify-desktop-performance.ps1 `
+  -DesktopExePath "C:\Program Files\TradersApp\TradersApp.Desktop.exe" `
+  -ReferenceMachineLabel "win11-4gb-ref-01" `
+  -VisibleLoginStatus pass `
+  -DegradedNetworkStatus pass `
+  -DegradedNetworkNotes "NIC disabled for 45s; reconnect toast observed; session recovered." `
+  -ForcedLogoutStatus fail `
+  -ForcedLogoutNotes "Policy route did not collapse back to login within 60s." `
+  -SignedReleaseStatus pass
+```
 
 ## Certification Flow
 
@@ -61,6 +77,10 @@ The script does not replace operator verification. Record these alongside the ar
 2. Degraded-network behavior shows the expected offline state, then reconnect recovery, without crashing the shell.
 3. Forced logout, maintenance mode, and minimum desktop version enforcement all collapse the route back to login.
 4. The same checks pass on the final signed release payload, not only on a local developer build.
+
+The certification script now includes explicit `manualValidation` fields in both
+JSON and Markdown output so those outcomes can be attached to the same evidence
+bundle instead of being tracked separately.
 
 ## Network And Policy Validation
 
