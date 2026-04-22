@@ -104,6 +104,99 @@ def _fast_hint_levels(key_levels: dict | None) -> str:
     return hashlib.md5("|".join(f"{k}={v}" for k, v in items).encode()).hexdigest()[:12]
 
 
+_LEGACY_US_TIMEZONES = {"America/New_York", "US/Eastern", "EST5EDT"}
+
+
+def _time_to_minutes(clock: str | None) -> int:
+    if not clock:
+        return 0
+    hour_str, minute_str = clock.split(":")[:2]
+    return int(hour_str) * 60 + int(minute_str)
+
+
+def _timezone_name(series: pd.Series) -> str | None:
+    try:
+        tz = series.dt.tz
+    except (AttributeError, TypeError):
+        return None
+    if tz is None:
+        return None
+    return getattr(tz, "key", getattr(tz, "zone", str(tz)))
+
+
+def _normalize_session_context(
+    session_context: dict | None = None,
+    timestamps: pd.Series | None = None,
+) -> dict:
+    if session_context:
+        if "by_id" in session_context:
+            return session_context
+        by_id = {
+            int(session_id): dict(session_cfg)
+            for session_id, session_cfg in session_context.items()
+            if isinstance(session_id, int)
+        }
+        if by_id:
+            by_name = {
+                session_cfg.get("name", config.SESSION_ID_TO_NAME.get(session_id, f"session_{session_id}")): dict(session_cfg)
+                for session_id, session_cfg in by_id.items()
+            }
+            default_timezone = session_context.get("default_timezone") or next(
+                (
+                    session_cfg.get("timezone")
+                    for session_cfg in by_id.values()
+                    if session_cfg.get("timezone")
+                ),
+                config.DEFAULT_SESSION_TIMEZONE,
+            )
+            return {
+                "by_id": by_id,
+                "by_name": by_name,
+                "default_timezone": default_timezone,
+                "source": "caller",
+            }
+
+    if timestamps is not None:
+        parsed = timestamps
+        if not pd.api.types.is_datetime64_any_dtype(parsed):
+            parsed = pd.to_datetime(parsed)
+        if _timezone_name(parsed) in _LEGACY_US_TIMEZONES:
+            return config.get_session_context(use_legacy_us=True)
+
+    return config.get_session_context()
+
+
+def _localize_to_session_timezone(timestamps: pd.Series, session_context: dict) -> pd.Series:
+    if not pd.api.types.is_datetime64_any_dtype(timestamps):
+        timestamps = pd.to_datetime(timestamps)
+
+    timezone = session_context.get("default_timezone", config.DEFAULT_SESSION_TIMEZONE)
+    tz_name = _timezone_name(timestamps)
+    if tz_name is None:
+        return timestamps.dt.tz_localize(timezone, nonexistent="shift_forward", ambiguous="infer")
+    return timestamps.dt.tz_convert(timezone)
+
+
+def _session_context_fingerprint(session_context: dict) -> str:
+    parts = [session_context.get("default_timezone", "unknown")]
+    for session_id, session_cfg in sorted(session_context["by_id"].items()):
+        parts.append(
+            f"{session_id}:{session_cfg.get('name')}:{session_cfg.get('start')}:{session_cfg.get('end')}:{session_cfg.get('timezone')}"
+        )
+    return hashlib.md5("|".join(parts).encode()).hexdigest()[:16]
+
+
+def _session_boundary_minutes(session_context: dict, boundary_key: str) -> dict[int, int]:
+    return {
+        int(session_id): _time_to_minutes(
+            session_cfg.get(boundary_key)
+            or session_cfg.get(f"{boundary_key}_local")
+            or session_cfg.get(f"{boundary_key}_et")
+        )
+        for session_id, session_cfg in session_context["by_id"].items()
+    }
+
+
 # -------------------------------------------------------------------------
 # Stage cache utilities (exp-4 through exp-8)
 # -------------------------------------------------------------------------
@@ -132,36 +225,47 @@ def _stage_cache_put(stage_id: int, fingerprint: str, result: pd.DataFrame) -> N
 # Session segmenter (exp-7: cached)
 # -------------------------------------------------------------------------
 
-def assign_session_ids(df: pd.DataFrame, timestamp_col: str = "timestamp") -> pd.DataFrame:
+def assign_session_ids(
+    df: pd.DataFrame,
+    timestamp_col: str = "timestamp",
+    session_context: dict | None = None,
+) -> pd.DataFrame:
     """
-    Assign session_id to each candle row based on Eastern Time.
-    session_id: 0 = pre-market (4:00-9:15), 1 = main (9:30-16:00), 2 = post (16:01-20:00)
+    Assign session_id to each candle row using the configured session context.
+    session_id: 0 = pre-market, 1 = main trading, 2 = post-market
 
     exp-7: Cached by timestamp signature for repeated streams.
     """
+    session_context = _normalize_session_context(session_context, df.get(timestamp_col))
+
     # Stage cache (exp-7)
-    fp = _fingerprint_df(df)
+    fp = f"{_fingerprint_df(df)}_{_session_context_fingerprint(session_context)}"
     cached = _stage_cache_get(7, fp)
     if cached is not None:
         return cached
 
     df = df.copy()
-    if not pd.api.types.is_datetime64_any_dtype(df[timestamp_col]):
-        df[timestamp_col] = pd.to_datetime(df[timestamp_col])
+    session_clock = _localize_to_session_timezone(df[timestamp_col], session_context)
+    hm = session_clock.dt.hour * 60 + session_clock.dt.minute
 
-    # Convert to ET (UTC-5 / UTC-4 depending on DST)
-    et = df[timestamp_col].dt.tz_convert("America/New_York")
-    hm = et.dt.hour * 60 + et.dt.minute
+    conditions = []
+    session_ids = []
+    for session_id, session_cfg in sorted(
+        session_context["by_id"].items(),
+        key=lambda item: _time_to_minutes(item[1].get("start")),
+    ):
+        start_minute = _time_to_minutes(session_cfg.get("start"))
+        end_minute = _time_to_minutes(session_cfg.get("end"))
+        conditions.append((hm >= start_minute) & (hm < end_minute))
+        session_ids.append(int(session_id))
 
-    # Slice: [0,570] pre, (570,965] main, (965,1200] post
-    conditions = [
-        hm <= 555,               # pre: up to 09:15 (4:00*60=240 to 9:15*60=555)
-        (hm >= 570) & (hm <= 960),  # main: 09:30 (570) to 16:00 (960)
-        hm > 960,                # post: after 16:00
-    ]
-    df["session_id"] = np.select(conditions, [0, 1, 2], default=1)
-    df["et_hour"] = et.dt.hour
-    df["et_minute"] = et.dt.minute
+    default_session_id = config.SESSION_NAME_TO_ID.get("main_trading", 1)
+    df["session_id"] = np.select(conditions, session_ids, default=default_session_id).astype(int)
+    df["session_hour"] = session_clock.dt.hour
+    df["session_minute"] = session_clock.dt.minute
+    # Keep legacy alias columns so older callers do not break.
+    df["et_hour"] = df["session_hour"]
+    df["et_minute"] = df["session_minute"]
 
     _stage_cache_put(7, fp, df)
     return df
@@ -240,48 +344,55 @@ def compute_candle_features(df: pd.DataFrame) -> pd.DataFrame:
 # Time features
 # -------------------------------------------------------------------------
 
-def compute_time_features(df: pd.DataFrame) -> pd.DataFrame:
+def compute_time_features(
+    df: pd.DataFrame,
+    session_context: dict | None = None,
+) -> pd.DataFrame:
     """
     Compute all time-based features.
     exp-5: Cached by timestamp/session signature.
     """
-    ts_fp = f"ts_{_fingerprint_df(df)}"
+    session_context = _normalize_session_context(session_context, df.get("timestamp"))
+    ts_fp = f"ts_{_fingerprint_df(df)}_{_session_context_fingerprint(session_context)}"
     cached = _stage_cache_get(5, ts_fp)
     if cached is not None:
         return cached
 
     df = df.copy()
-
-    if not pd.api.types.is_datetime64_any_dtype(df["timestamp"]):
-        df["timestamp"] = pd.to_datetime(df["timestamp"])
-
-    et = df["timestamp"].dt.tz_convert("America/New_York")
-    df["hour_of_day"] = et.dt.hour
-    df["day_of_week"] = et.dt.dayofweek   # 0=Monday
-    df["date"] = et.dt.date
+    session_clock = _localize_to_session_timezone(df["timestamp"], session_context)
+    df["hour_of_day"] = session_clock.dt.hour
+    df["day_of_week"] = session_clock.dt.dayofweek   # 0=Monday
+    df["date"] = session_clock.dt.date
 
     # Session percentage elapsed
     sess_counts = df.groupby(["date", "session_id"])["timestamp"].transform("count")
     df["session_candle_count"] = df.groupby(["date", "session_id"])["timestamp"].cumcount() + 1
     df["session_pct"] = df["session_candle_count"] / sess_counts.replace(0, 1)
 
-    # Minutes into session
-    sess_start = {
-        0: 240,   # 04:00 ET
-        1: 570,   # 09:30 ET
-        2: 961,   # 16:01 ET
-    }
-    hm = et.dt.hour * 60 + et.dt.minute
-    df["minutes_into_session"] = hm - df["session_id"].map(sess_start)
+    session_starts = _session_boundary_minutes(session_context, "start")
+    session_ends = _session_boundary_minutes(session_context, "end")
+    main_session_id = config.SESSION_NAME_TO_ID.get("main_trading", 1)
+    default_start = session_starts.get(main_session_id, 0)
+    default_end = session_ends.get(main_session_id, default_start + 60)
+
+    hm = session_clock.dt.hour * 60 + session_clock.dt.minute
+    df["minutes_into_session"] = (
+        hm - df["session_id"].map(session_starts).fillna(default_start)
+    ).clip(lower=0)
 
     # Boolean time periods
     df["is_first_30min"] = (df["minutes_into_session"] <= 30).astype(float)
+    remaining_minutes = df["session_id"].map(session_ends).fillna(default_end) - hm
     df["is_last_30min"] = (
-        (df["session_id"] == 1) & (df["minutes_into_session"] >= 870)  # 14:30+
+        (df["session_id"] == main_session_id) & (remaining_minutes <= 30) & (remaining_minutes > 0)
     ).astype(float)
+    main_midpoint = (default_start + default_end) / 2
+    lunch_start = int(main_midpoint - 30)
+    lunch_end = int(main_midpoint + 30)
     df["is_lunch_hour"] = (
-        ((et.dt.hour == 12) | ((et.dt.hour == 11) & (et.dt.minute >= 30))) &
-        (df["session_id"] == 1)
+        (df["session_id"] == main_session_id) &
+        (hm >= lunch_start) &
+        (hm < lunch_end)
     ).astype(float)
 
     _stage_cache_put(5, ts_fp, df)
@@ -468,7 +579,11 @@ def compute_historical_features(
 # Cross-session features
 # -------------------------------------------------------------------------
 
-def compute_cross_session_features(df: pd.DataFrame, session_agg: pd.DataFrame) -> pd.DataFrame:
+def compute_cross_session_features(
+    df: pd.DataFrame,
+    session_agg: pd.DataFrame,
+    session_context: dict | None = None,
+) -> pd.DataFrame:
     """
     Compute features from previous/next session data.
     R-2026-04-04-01: Normalize production candle-side trade_date to datetime before merge.
@@ -484,9 +599,9 @@ def compute_cross_session_features(df: pd.DataFrame, session_agg: pd.DataFrame) 
     session_agg["trade_date"] = pd.to_datetime(session_agg["trade_date"])
 
     # R-2026-04-04-01: Normalize candle-side trade_date to datetime (fixes dtype merge error)
-    ts_series = df["timestamp"].dt
-    raw_dates = ts_series.date
-    df["trade_date"] = pd.to_datetime(raw_dates)
+    session_context = _normalize_session_context(session_context, df.get("timestamp"))
+    session_clock = _localize_to_session_timezone(df["timestamp"], session_context)
+    df["trade_date"] = pd.to_datetime(session_clock.dt.date)
 
     # Align session_agg trade_date to same timezone (naive after to_datetime)
     try:
@@ -521,7 +636,10 @@ def compute_cross_session_features(df: pd.DataFrame, session_agg: pd.DataFrame) 
 # Labels
 # -------------------------------------------------------------------------
 
-def compute_labels(df: pd.DataFrame) -> pd.DataFrame:
+def compute_labels(
+    df: pd.DataFrame,
+    session_context: dict | None = None,
+) -> pd.DataFrame:
     """Compute ML training labels."""
     df = df.copy()
     close = df["close"]
@@ -533,8 +651,11 @@ def compute_labels(df: pd.DataFrame) -> pd.DataFrame:
     # Label 3: AMD alignment (computed separately)
     # Label 4: Alpha (already in trade_log)
     # Label 5: Session direction
-    session_close = df.groupby([df["timestamp"].dt.date, "session_id"])["close"].transform("last")
-    session_open  = df.groupby([df["timestamp"].dt.date, "session_id"])["close"].transform("first")
+    session_context = _normalize_session_context(session_context, df.get("timestamp"))
+    session_clock = _localize_to_session_timezone(df["timestamp"], session_context)
+    session_dates = session_clock.dt.date
+    session_close = df.groupby([session_dates, "session_id"])["close"].transform("last")
+    session_open  = df.groupby([session_dates, "session_id"])["close"].transform("first")
     df["label_session_dir"] = (session_close > session_open).astype(int)
 
     return df
@@ -550,6 +671,7 @@ def engineer_features(
     session_agg_df: pd.DataFrame | None = None,
     math_engine_snapshot: dict | None = None,
     key_levels: dict | None = None,
+    session_context: dict | None = None,
 ) -> pd.DataFrame:
     """
     Full feature engineering pipeline.
@@ -574,6 +696,11 @@ def engineer_features(
     if candles_df.empty:
         return candles_df.copy()
 
+    resolved_session_context = _normalize_session_context(
+        session_context,
+        candles_df.get("timestamp"),
+    )
+
     # exp-10: Cheap fast-hint path before full cache-key construction.
     # Compare a lightweight signature first to avoid expensive fingerprint.
     fast_hint = (
@@ -582,6 +709,7 @@ def engineer_features(
         _fast_hint_session(session_agg_df),
         _fingerprint_dict(math_engine_snapshot),
         _fast_hint_levels(key_levels),
+        _session_context_fingerprint(resolved_session_context),
     )
 
     # exp-9: Full-call memoization for identical inputs.
@@ -593,13 +721,13 @@ def engineer_features(
     df = candles_df.copy()
 
     # 1. Assign session IDs
-    df = assign_session_ids(df)
+    df = assign_session_ids(df, session_context=resolved_session_context)
 
     # 2. Compute per-candle technical features
     df = compute_candle_features(df)
 
     # 3. Compute time features
-    df = compute_time_features(df)
+    df = compute_time_features(df, session_context=resolved_session_context)
 
     # 4. Compute key level features
     df = compute_level_features(df, key_levels)
@@ -640,11 +768,13 @@ def engineer_features(
 
     # 9. Cross-session features
     df = compute_cross_session_features(
-        df, session_agg_df if session_agg_df is not None else pd.DataFrame()
+        df,
+        session_agg_df if session_agg_df is not None else pd.DataFrame(),
+        session_context=resolved_session_context,
     )
 
     # 10. Compute labels
-    df = compute_labels(df)
+    df = compute_labels(df, session_context=resolved_session_context)
 
     # exp-9: Store result in full-call cache (limit 200 entries)
     if len(_FULL_CACHE) >= 200:

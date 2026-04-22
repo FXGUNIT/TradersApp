@@ -20,18 +20,55 @@ from sklearn.metrics import roc_auc_score
 import lightgbm as lgb
 
 # ── NSE India session support ──────────────────────────────────────────────
+_LEGACY_US_TIMEZONES = {"America/New_York", "US/Eastern", "EST5EDT"}
 try:
     from infrastructure.session_loader import SessionLoader
-    _nse_loader = SessionLoader()
-    NSE_SESSION_CONFIG = {
-        "pre_market": _nse_loader.get_session("pre_market"),
-        "main_trading": _nse_loader.get_session("main_trading"),
-        "post_market": _nse_loader.get_session("post_market"),
-    }
-    _NSE_AVAILABLE = True
+    _SESSION_LOADER = SessionLoader()
 except Exception:
-    NSE_SESSION_CONFIG = None
-    _NSE_AVAILABLE = False
+    _SESSION_LOADER = None
+
+
+def _timezone_name(series: pd.Series) -> str | None:
+    try:
+        tz = series.dt.tz
+    except (AttributeError, TypeError):
+        return None
+    if tz is None:
+        return None
+    return getattr(tz, "key", getattr(tz, "zone", str(tz)))
+
+
+def _resolve_session_context(
+    candles_df: pd.DataFrame | None = None,
+    *,
+    use_nse: bool = False,
+) -> dict:
+    if use_nse:
+        return config.get_session_context()
+    if candles_df is not None and "timestamp" in candles_df.columns:
+        timestamps = candles_df["timestamp"]
+        if not pd.api.types.is_datetime64_any_dtype(timestamps):
+            timestamps = pd.to_datetime(timestamps)
+        if _timezone_name(timestamps) in _LEGACY_US_TIMEZONES:
+            return config.get_session_context(use_legacy_us=True)
+    return config.get_session_context()
+
+
+def _localize_to_session_timezone(timestamps: pd.Series, session_context: dict) -> pd.Series:
+    if not pd.api.types.is_datetime64_any_dtype(timestamps):
+        timestamps = pd.to_datetime(timestamps)
+    timezone = session_context.get("default_timezone", config.DEFAULT_SESSION_TIMEZONE)
+    tz_name = _timezone_name(timestamps)
+    if tz_name is None:
+        return timestamps.dt.tz_localize(timezone, nonexistent="shift_forward", ambiguous="infer")
+    return timestamps.dt.tz_convert(timezone)
+
+
+def _time_to_minutes(clock: str | None) -> int:
+    if not clock:
+        return 0
+    hour_str, minute_str = clock.split(":")[:2]
+    return int(hour_str) * 60 + int(minute_str)
 
 
 class SessionProbabilityModel:
