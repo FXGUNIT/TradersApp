@@ -8,8 +8,12 @@ _TZ_KOLKATA = "Asia/Kolkata"
 _SessionName = Literal["pre_market", "main_trading", "post_market", "closed"]
 
 # Map canonical names used by callers to the YAML key names in trading_sessions.yaml.
-_SESSION_KEY_MAP = {
+_CALLER_TO_YAML_SESSION_KEY_MAP = {
     "main_trading": "regular",
+}
+
+_YAML_TO_CALLER_SESSION_KEY_MAP = {
+    "regular": "main_trading",
 }
 
 
@@ -48,7 +52,7 @@ class SessionLoader:
                 if naive it is assumed to already be Asia/Kolkata.
 
         Returns:
-            "pre_market" | "regular" | "post_market" | "closed"
+            "pre_market" | "main_trading" | "post_market" | "closed"
         """
         if dt.tzinfo is None:
             # Naive datetime is treated as Asia/Kolkata
@@ -64,8 +68,8 @@ class SessionLoader:
         for key, sess in self._cfg["sessions"].items():
             start = time.fromisoformat(sess["start"])
             end   = time.fromisoformat(sess["end"])
-            if start <= t <= end:
-                canonical = _SESSION_KEY_MAP.get(key, key)
+            if start <= t < end:
+                canonical = _YAML_TO_CALLER_SESSION_KEY_MAP.get(key, key)
                 return canonical  # type: ignore[return-value]
 
         return "closed"
@@ -97,7 +101,7 @@ class SessionLoader:
             The session config dict (with name, start, end, timezone, type),
             or None if the session name is not defined in the YAML.
         """
-        yaml_key = _SESSION_KEY_MAP.get(name, name)
+        yaml_key = _CALLER_TO_YAML_SESSION_KEY_MAP.get(name, name)
         return self._cfg["sessions"].get(yaml_key)
 
     def holiday_dates(self) -> list[str]:

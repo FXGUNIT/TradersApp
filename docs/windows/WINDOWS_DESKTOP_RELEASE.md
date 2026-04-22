@@ -66,14 +66,15 @@ dotnet build desktop/windows/installer/TradersApp.Bundle/TradersApp.Bundle.wixpr
 python -m pytest bff/tests/test_r07_route_contracts.py -q
 ```
 
-Before tagging a release candidate, run the `P23` certification harness on both 4 GB reference machines and retain the generated artifacts:
+Before tagging a release candidate, run the `P23` wrapper on both 4 GB reference machines and retain the generated run directories:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\windows\certify-desktop-performance.ps1 `
+powershell -ExecutionPolicy Bypass -File .\scripts\windows\run-p23-reference-certification.ps1 `
+  -ReferenceMachineLabel "win11-4gb-ref-01" `
   -DesktopExePath .\desktop\windows\TradersApp.Desktop\bin\Release\net8.0-windows\TradersApp.Desktop.exe
 ```
 
-See `docs/windows/WINDOWS_DESKTOP_PERFORMANCE_CERTIFICATION.md` for the full `P23` sign-off sequence.
+See [WINDOWS_P23_REFERENCE_MACHINE_RUNBOOK.md](/e:/TradersApp/docs/windows/WINDOWS_P23_REFERENCE_MACHINE_RUNBOOK.md) for the full `P23` sign-off sequence and [WINDOWS_DESKTOP_PERFORMANCE_CERTIFICATION.md](/e:/TradersApp/docs/windows/WINDOWS_DESKTOP_PERFORMANCE_CERTIFICATION.md) for harness details.
 
 ## Installer Outputs
 

@@ -3,6 +3,7 @@ ML Engine Configuration — All hyperparameters in one place.
 """
 import os
 from pathlib import Path
+from typing import Any
 
 BASE_DIR = Path(__file__).parent
 DATA_DIR = BASE_DIR / "data"
@@ -42,30 +43,188 @@ MODEL_REGISTRY_MAX_CACHED_INSTANCES = int(os.getenv("MODEL_REGISTRY_MAX_CACHED_I
 MODEL_REGISTRY_CACHE_PREFIX = os.getenv("MODEL_REGISTRY_CACHE_PREFIX", "tradersapp:model_registry")
 
 # Session definitions (Eastern Time)
-SESSION_CONFIG = {
-    0: {"name": "pre_market",  "start_et": "04:00", "end_et": "09:15", "label": "Pre"},
-    1: {"name": "main_trading", "start_et": "09:30", "end_et": "16:00", "label": "Main"},
-    2: {"name": "post_market", "start_et": "16:01", "end_et": "20:00", "label": "Post"},
+SESSION_ID_TO_NAME = {
+    0: "pre_market",
+    1: "main_trading",
+    2: "post_market",
 }
+SESSION_NAME_TO_ID = {name: sid for sid, name in SESSION_ID_TO_NAME.items()}
+SESSION_LABELS = {
+    0: "Pre",
+    1: "Main",
+    2: "Post",
+}
+SESSION_TYPES = tuple(SESSION_ID_TO_NAME.values())
 
 # ── Session definitions (NSE India — loaded from YAML) ─────────────────────
 # This replaces hardcoded Eastern Time sessions above for NSE-specific usage.
 # The SESSION_CONFIG dict above is kept for backward compatibility with any
 # code that depends on numeric keys 0/1/2.
-def _load_nse_sessions():
+_CANONICAL_SESSION_FALLBACK = {
+    "pre_market": {
+        "name": "Pre-Market Session",
+        "start": "09:00",
+        "end": "09:15",
+        "timezone": "Asia/Kolkata",
+        "type": "pre_market",
+    },
+    "main_trading": {
+        "name": "Regular Session",
+        "start": "09:15",
+        "end": "15:30",
+        "timezone": "Asia/Kolkata",
+        "type": "regular",
+    },
+    "post_market": {
+        "name": "Post-Market Session",
+        "start": "15:30",
+        "end": "16:00",
+        "timezone": "Asia/Kolkata",
+        "type": "post_market",
+    },
+}
+
+_LEGACY_US_SESSION_DEFS = {
+    "pre_market": {
+        "name": "Pre-Market Session",
+        "start": "04:00",
+        "end": "09:15",
+        "timezone": "America/New_York",
+        "type": "pre_market",
+    },
+    "main_trading": {
+        "name": "Main Trading Session",
+        "start": "09:30",
+        "end": "16:00",
+        "timezone": "America/New_York",
+        "type": "main_trading",
+    },
+    "post_market": {
+        "name": "Post-Market Session",
+        "start": "16:01",
+        "end": "20:00",
+        "timezone": "America/New_York",
+        "type": "post_market",
+    },
+}
+
+
+def _copy_session_context(session_context: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "by_id": {sid: dict(cfg) for sid, cfg in session_context["by_id"].items()},
+        "by_name": {name: dict(cfg) for name, cfg in session_context["by_name"].items()},
+        "default_timezone": session_context["default_timezone"],
+        "source": session_context["source"],
+    }
+
+
+def _normalize_session_entry(
+    session_id: int,
+    session_name: str,
+    raw_session: dict[str, Any],
+    default_timezone: str,
+) -> dict[str, Any]:
+    start = raw_session.get("start")
+    end = raw_session.get("end")
+    timezone = raw_session.get("timezone", default_timezone)
+    return {
+        "id": session_id,
+        "name": session_name,
+        "label": SESSION_LABELS.get(session_id, session_name.replace("_", " ").title()),
+        "display_name": raw_session.get("name", session_name.replace("_", " ").title()),
+        "start": start,
+        "end": end,
+        "start_local": start,
+        "end_local": end,
+        "start_et": start,
+        "end_et": end,
+        "timezone": timezone,
+        "type": session_name,
+        "yaml_type": raw_session.get("type", session_name),
+    }
+
+
+def _build_session_context(
+    named_sessions: dict[str, dict[str, Any]],
+    *,
+    default_timezone: str,
+    source: str,
+) -> dict[str, Any]:
+    by_id: dict[int, dict[str, Any]] = {}
+    by_name: dict[str, dict[str, Any]] = {}
+    for session_id, session_name in SESSION_ID_TO_NAME.items():
+        raw_session = named_sessions.get(session_name)
+        if raw_session is None and session_name == "main_trading":
+            raw_session = named_sessions.get("regular")
+        if raw_session is None:
+            raise KeyError(f"Missing session definition for {session_name}")
+        normalized = _normalize_session_entry(session_id, session_name, raw_session, default_timezone)
+        by_id[session_id] = normalized
+        by_name[session_name] = dict(normalized)
+    return {
+        "by_id": by_id,
+        "by_name": by_name,
+        "default_timezone": default_timezone,
+        "source": source,
+    }
+
+
+def _load_session_context() -> dict[str, Any]:
     try:
         from infrastructure.session_loader import SessionLoader
-        loader = SessionLoader()
-        return {
-            "pre_market": loader.get_session("pre_market"),
-            "main_trading": loader.get_session("main_trading"),
-            "post_market": loader.get_session("post_market"),
-            "default_timezone": "Asia/Kolkata",
-        }
-    except Exception:
-        return None
 
-NSE_SESSION_CONFIG = _load_nse_sessions()
+        loader = SessionLoader()
+        raw_sessions = {
+            session_name: loader.get_session(session_name)
+            for session_name in SESSION_TYPES
+        }
+        default_timezone = next(
+            (
+                session.get("timezone")
+                for session in raw_sessions.values()
+                if session and session.get("timezone")
+            ),
+            "Asia/Kolkata",
+        )
+        return _build_session_context(
+            raw_sessions,
+            default_timezone=default_timezone,
+            source="session_loader",
+        )
+    except Exception:
+        return _build_session_context(
+            _CANONICAL_SESSION_FALLBACK,
+            default_timezone="Asia/Kolkata",
+            source="fallback",
+        )
+
+
+SESSION_CONTEXT = _load_session_context()
+LEGACY_US_SESSION_CONTEXT = _build_session_context(
+    _LEGACY_US_SESSION_DEFS,
+    default_timezone="America/New_York",
+    source="legacy_us",
+)
+DEFAULT_SESSION_TIMEZONE = SESSION_CONTEXT["default_timezone"]
+
+
+def get_session_context(*, use_legacy_us: bool = False) -> dict[str, Any]:
+    return _copy_session_context(LEGACY_US_SESSION_CONTEXT if use_legacy_us else SESSION_CONTEXT)
+
+
+SESSION_CONFIG = {
+    session_id: dict(session_cfg)
+    for session_id, session_cfg in SESSION_CONTEXT["by_id"].items()
+}
+LEGACY_US_SESSION_CONFIG = {
+    session_id: dict(session_cfg)
+    for session_id, session_cfg in LEGACY_US_SESSION_CONTEXT["by_id"].items()
+}
+NSE_SESSION_CONFIG = {
+    session_name: dict(session_cfg)
+    for session_name, session_cfg in SESSION_CONTEXT["by_name"].items()
+}
+NSE_SESSION_CONFIG["default_timezone"] = DEFAULT_SESSION_TIMEZONE
 
 # AMD Phase encoding
 AMD_PHASES = ["ACCUMULATION", "MANIPULATION", "DISTRIBUTION", "TRANSITION", "UNCLEAR"]

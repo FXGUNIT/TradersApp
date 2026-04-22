@@ -2,6 +2,8 @@
 
 `P23` is the hardware-compatibility gate for the Windows thin client. The repo now provides an evidence harness, but the final sign-off still requires real runs on Windows 10 x64 and Windows 11 x64 reference machines with `4 GB RAM` and no discrete GPU.
 
+Use [WINDOWS_P23_REFERENCE_MACHINE_RUNBOOK.md](/e:/TradersApp/docs/windows/WINDOWS_P23_REFERENCE_MACHINE_RUNBOOK.md) for the operator sequence. This document is the harness and evidence overview.
+
 ## Scope
 
 This certification covers:
@@ -15,26 +17,35 @@ This certification covers:
 
 ## Evidence Harness
 
-Run the certification script from the repo root on each reference machine:
+Run the wrapper from the repo root on each reference machine:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\windows\certify-desktop-performance.ps1 `
+powershell -ExecutionPolicy Bypass -File .\scripts\windows\run-p23-reference-certification.ps1 `
+  -ReferenceMachineLabel "win11-4gb-ref-01" `
   -DesktopExePath .\desktop\windows\TradersApp.Desktop\bin\Release\net8.0-windows\TradersApp.Desktop.exe
 ```
 
 For an installed release payload, pass the installed executable path instead:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\windows\certify-desktop-performance.ps1 `
+powershell -ExecutionPolicy Bypass -File .\scripts\windows\run-p23-reference-certification.ps1 `
+  -ReferenceMachineLabel "win10-4gb-ref-01" `
   -DesktopExePath "C:\Program Files\TradersApp\TradersApp.Desktop.exe"
 ```
 
-Artifacts are written to `.artifacts/windows/p23/`:
+The wrapper creates a dedicated run directory below `.artifacts/windows/p23/` and writes:
+
+- `reference-machine-profile.json`
+- `reference-machine-profile.md`
+- `manual-check-template.md`
+- `p23-reference-run.log`
+
+The underlying harness still emits:
 
 - `desktop-p23-certification-*.json`
 - `desktop-p23-certification-*.md`
 
-The script captures:
+The harness captures:
 
 - shell window ready time
 - working set and private memory after the idle settle period
@@ -49,9 +60,9 @@ The script captures:
 You can also record manual gate outcomes directly into the evidence file:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\windows\certify-desktop-performance.ps1 `
-  -DesktopExePath "C:\Program Files\TradersApp\TradersApp.Desktop.exe" `
+powershell -ExecutionPolicy Bypass -File .\scripts\windows\run-p23-reference-certification.ps1 `
   -ReferenceMachineLabel "win11-4gb-ref-01" `
+  -DesktopExePath "C:\Program Files\TradersApp\TradersApp.Desktop.exe" `
   -VisibleLoginStatus pass `
   -DegradedNetworkStatus pass `
   -DegradedNetworkNotes "NIC disabled for 45s; reconnect toast observed; session recovered." `
@@ -63,11 +74,12 @@ powershell -ExecutionPolicy Bypass -File .\scripts\windows\certify-desktop-perfo
 ## Certification Flow
 
 1. Build the desktop web bundle with `npm run build:desktop:web`.
-2. Build the desktop shell in `Release`.
-3. Run `scripts/windows/certify-desktop-performance.ps1` on a Windows 10 x64 4 GB machine.
-4. Run the same script on a Windows 11 x64 4 GB machine.
-5. Store both JSON and Markdown artifacts with the release evidence.
-6. Only mark `P23` complete after both reference machines pass and the manual checks below are captured.
+2. Build the desktop shell in `Release` or install the signed release payload.
+3. Run `scripts/windows/run-p23-reference-certification.ps1` on a Windows 10 x64 4 GB machine.
+4. Run the same wrapper on a Windows 11 x64 4 GB machine.
+5. Capture manual degraded-network, forced-logout, and signed-payload outcomes in a follow-up rerun.
+6. Store the entire run directories with the release evidence.
+7. Only mark `P23` complete after both reference machines pass.
 
 ## Manual Checks Still Required
 
@@ -81,6 +93,8 @@ The script does not replace operator verification. Record these alongside the ar
 The certification script now includes explicit `manualValidation` fields in both
 JSON and Markdown output so those outcomes can be attached to the same evidence
 bundle instead of being tracked separately.
+
+The automated timing is for shell-window readiness. The visible login route still requires operator confirmation during the runbook.
 
 ## Network And Policy Validation
 

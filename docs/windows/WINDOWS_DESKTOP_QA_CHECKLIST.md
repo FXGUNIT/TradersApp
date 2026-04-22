@@ -11,7 +11,7 @@
 
 ## Desktop Runtime Behavior
 
-- [ ] Run `powershell -ExecutionPolicy Bypass -File .\scripts\windows\certify-desktop-performance.ps1 ...` on each 4 GB reference machine and archive the JSON/Markdown artifacts.
+- [ ] Run `powershell -ExecutionPolicy Bypass -File .\scripts\windows\run-p23-reference-certification.ps1 ...` on each 4 GB reference machine and archive the full run directories.
 - [ ] Confirm login screen loads within the startup budget on a 4 GB RAM laptop.
 - [ ] Confirm idle desktop memory stays within the budget after login and first navigation.
 - [ ] Confirm core screens match the web UI and no desktop-only regressions appear.
@@ -26,6 +26,10 @@
 - [ ] Confirm a blocked user cannot sign in again while the status remains `BLOCKED`.
 - [ ] Confirm maintenance mode forces a shell-level exit path.
 - [ ] Confirm minimum desktop version enforcement prompts an update check and logs the user out.
+
+Reference sequence:
+
+- Follow [WINDOWS_P23_REFERENCE_MACHINE_RUNBOOK.md](/e:/TradersApp/docs/windows/WINDOWS_P23_REFERENCE_MACHINE_RUNBOOK.md) for cold start, degraded-network, forced-logout, and signed-payload reruns.
 
 ## Update Flow
 

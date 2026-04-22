@@ -1,30 +1,43 @@
 /**
- * Instrument Registry — maps trading symbols to their ML model configuration.
- * Single source of truth for which ML engine handles which instrument.
+ * Instrument registry: canonical symbol lookup plus per-instrument ML routing.
+ * This stays intentionally small but provides the basics needed for future
+ * multi-symbol routing without forcing callers to understand aliases or env
+ * override details.
+ *
+ * Environment overrides:
+ * - ML_ENGINE_URL / ML_ENGINE_INTERNAL_URL: shared fallback base URL
+ * - DEFAULT_INSTRUMENT: overrides the default canonical symbol
+ * - INSTRUMENT_REGISTRY_JSON: JSON object keyed by symbol for overrides/additions
+ * - ML_ENGINE_URL__<SYMBOL>: per-symbol ML base URL override
+ *
  * @module instrumentRegistry
  */
 
 /**
  * @typedef {Object} InstrumentConfig
- * @property {string} symbol         - Ticker symbol (e.g. "NIFTY", "BANKNIFTY")
- * @property {string} mlEngineUrl   - Base URL for the ML engine serving this symbol
- * @property {string} sessionType   - "nse" | "forex" | "crypto"
- * @property {number} timezoneOffset - UTC offset in minutes (e.g. 330 for IST)
+ * @property {string} symbol
+ * @property {string[]} aliases
+ * @property {string} mlEngineUrl
+ * @property {string} sessionType
+ * @property {number} timezoneOffset
+ * @property {string} timeframe
+ * @property {string[]} models
  */
 
-/** @type {Record<string, InstrumentConfig>} */
-const INSTRUMENT_REGISTRY = {
+const FALLBACK_ML_ENGINE_URL = "http://ml-engine:8001";
+
+const BUILTIN_INSTRUMENTS = Object.freeze({
   NIFTY: {
     symbol: "NIFTY",
-    mlEngineUrl: process.env.ML_ENGINE_URL || "http://ml-engine:8001",
+    aliases: ["NIFTY 50", "NIFTY50"],
     sessionType: "nse",
-    timezoneOffset: 330, // IST = UTC+5:30
+    timezoneOffset: 330,
     timeframe: "5min",
     models: ["direction", "regime", "session", "magnitude"],
   },
   BANKNIFTY: {
     symbol: "BANKNIFTY",
-    mlEngineUrl: process.env.ML_ENGINE_URL || "http://ml-engine:8001",
+    aliases: ["BANK NIFTY", "NIFTYBANK"],
     sessionType: "nse",
     timezoneOffset: 330,
     timeframe: "5min",
@@ -32,45 +45,310 @@ const INSTRUMENT_REGISTRY = {
   },
   NSEOPTIONS: {
     symbol: "NSEOPTIONS",
-    mlEngineUrl: process.env.ML_ENGINE_URL || "http://ml-engine:8001",
+    aliases: ["NSE OPTIONS", "NIFTY OPTIONS"],
     sessionType: "nse",
     timezoneOffset: 330,
     timeframe: "5min",
     models: ["direction", "regime", "alpha"],
   },
-};
+});
 
-/** Default instrument when none specified */
-const DEFAULT_INSTRUMENT = "NIFTY";
+const unknownSymbolWarnings = new Set();
 
-/**
- * Get the config for an instrument symbol.
- * @param {string} [symbol=DEFAULT_INSTRUMENT]
- * @returns {InstrumentConfig}
- */
-function getInstrumentConfig(symbol = DEFAULT_INSTRUMENT) {
-  if (!INSTRUMENT_REGISTRY[symbol]) {
-    console.warn(`[instrumentRegistry] Unknown symbol "${symbol}", defaulting to ${DEFAULT_INSTRUMENT}`);
-    return INSTRUMENT_REGISTRY[DEFAULT_INSTRUMENT];
+function isPlainObject(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function deepFreeze(value) {
+  if (!value || typeof value !== "object" || Object.isFrozen(value)) {
+    return value;
   }
-  return INSTRUMENT_REGISTRY[symbol];
+
+  for (const child of Object.values(value)) {
+    deepFreeze(child);
+  }
+
+  return Object.freeze(value);
+}
+
+function normalizeInstrumentSymbol(symbol) {
+  return String(symbol ?? "").trim().toUpperCase();
+}
+
+function toLookupKey(symbol) {
+  return normalizeInstrumentSymbol(symbol).replace(/[\s._-]+/g, "");
+}
+
+function toEnvKey(symbol) {
+  return normalizeInstrumentSymbol(symbol).replace(/[^A-Z0-9]+/g, "_");
+}
+
+function normalizeBaseUrl(url, fallback = FALLBACK_ML_ENGINE_URL) {
+  const trimmed = String(url ?? "").trim();
+  if (!trimmed) {
+    return fallback;
+  }
+
+  return trimmed.replace(/\/+$/, "");
+}
+
+function parseInteger(value, fallback) {
+  const parsed = Number.parseInt(String(value ?? ""), 10);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function ensureArray(value) {
+  if (Array.isArray(value)) {
+    return value;
+  }
+
+  if (value === undefined || value === null || value === "") {
+    return [];
+  }
+
+  return [value];
+}
+
+function uniqueStrings(values, formatter = (value) => String(value).trim()) {
+  const seen = new Set();
+  const result = [];
+
+  for (const value of values || []) {
+    const formatted = formatter(value);
+    if (!formatted || seen.has(formatted)) {
+      continue;
+    }
+    seen.add(formatted);
+    result.push(formatted);
+  }
+
+  return result;
+}
+
+function resolvePerInstrumentMlUrl(symbol, explicitValue, fallbackUrl) {
+  const envValue = process.env[`ML_ENGINE_URL__${toEnvKey(symbol)}`];
+  return normalizeBaseUrl(envValue || explicitValue || fallbackUrl, fallbackUrl);
+}
+
+function parseInstrumentRegistryOverrides() {
+  const raw = process.env.INSTRUMENT_REGISTRY_JSON;
+  if (!raw) {
+    return {};
+  }
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (!isPlainObject(parsed)) {
+      console.warn(
+        "[instrumentRegistry] INSTRUMENT_REGISTRY_JSON must be a JSON object keyed by symbol; ignoring override.",
+      );
+      return {};
+    }
+    return parsed;
+  } catch (error) {
+    console.warn(
+      `[instrumentRegistry] Failed to parse INSTRUMENT_REGISTRY_JSON: ${error.message}`,
+    );
+    return {};
+  }
+}
+
+function mergeRawRegistry(baseRegistry, overrides) {
+  const merged = { ...baseRegistry };
+
+  for (const [key, rawOverride] of Object.entries(overrides || {})) {
+    if (!isPlainObject(rawOverride)) {
+      console.warn(
+        `[instrumentRegistry] Override for "${key}" must be an object; ignoring.`,
+      );
+      continue;
+    }
+
+    const canonicalSymbol = normalizeInstrumentSymbol(rawOverride.symbol || key);
+    if (!canonicalSymbol) {
+      console.warn("[instrumentRegistry] Encountered empty instrument key; ignoring.");
+      continue;
+    }
+
+    merged[canonicalSymbol] = {
+      ...(merged[canonicalSymbol] || {}),
+      ...rawOverride,
+      symbol: canonicalSymbol,
+    };
+  }
+
+  return merged;
+}
+
+function buildInstrumentConfig(rawConfig, fallbackUrl) {
+  const canonicalSymbol = normalizeInstrumentSymbol(rawConfig?.symbol);
+  if (!canonicalSymbol) {
+    return null;
+  }
+
+  const aliases = uniqueStrings(
+    ensureArray(rawConfig.aliases),
+    (value) => normalizeInstrumentSymbol(value),
+  ).filter((value) => value && value !== canonicalSymbol);
+
+  const config = {
+    symbol: canonicalSymbol,
+    aliases,
+    mlEngineUrl: resolvePerInstrumentMlUrl(
+      canonicalSymbol,
+      rawConfig.mlEngineUrl,
+      fallbackUrl,
+    ),
+    sessionType: String(rawConfig.sessionType || "nse").trim().toLowerCase() || "nse",
+    timezoneOffset: parseInteger(rawConfig.timezoneOffset, 0),
+    timeframe: String(rawConfig.timeframe || "5min").trim() || "5min",
+    models: uniqueStrings(ensureArray(rawConfig.models)),
+  };
+
+  return deepFreeze(config);
+}
+
+function buildRegistryState() {
+  const sharedMlEngineUrl = normalizeBaseUrl(
+    process.env.ML_ENGINE_URL || process.env.ML_ENGINE_INTERNAL_URL,
+    FALLBACK_ML_ENGINE_URL,
+  );
+
+  const mergedRawRegistry = mergeRawRegistry(
+    BUILTIN_INSTRUMENTS,
+    parseInstrumentRegistryOverrides(),
+  );
+
+  const bySymbol = {};
+  const lookup = new Map();
+
+  for (const rawConfig of Object.values(mergedRawRegistry)) {
+    const config = buildInstrumentConfig(rawConfig, sharedMlEngineUrl);
+    if (!config) {
+      continue;
+    }
+
+    bySymbol[config.symbol] = config;
+    lookup.set(toLookupKey(config.symbol), config.symbol);
+    for (const alias of config.aliases) {
+      lookup.set(toLookupKey(alias), config.symbol);
+    }
+  }
+
+  const availableSymbols = Object.keys(bySymbol);
+  if (availableSymbols.length === 0) {
+    throw new Error(
+      "[instrumentRegistry] No instruments are registered after applying overrides.",
+    );
+  }
+
+  const requestedDefault = normalizeInstrumentSymbol(
+    process.env.DEFAULT_INSTRUMENT || "NIFTY",
+  );
+  const resolvedDefault = bySymbol[requestedDefault]
+    ? requestedDefault
+    : lookup.get(toLookupKey(requestedDefault)) || null;
+  const defaultSymbol = resolvedDefault || availableSymbols[0];
+
+  return {
+    bySymbol: deepFreeze(bySymbol),
+    lookup,
+    defaultSymbol,
+  };
+}
+
+const registryState = buildRegistryState();
+
+/** @type {Readonly<Record<string, InstrumentConfig>>} */
+const INSTRUMENT_REGISTRY = registryState.bySymbol;
+
+/** Default canonical symbol when callers omit or send an unknown symbol. */
+const DEFAULT_INSTRUMENT = registryState.defaultSymbol;
+
+function resolveInstrumentSymbol(symbol, { fallbackToDefault = true } = {}) {
+  const normalized = normalizeInstrumentSymbol(symbol);
+  if (!normalized) {
+    return fallbackToDefault ? DEFAULT_INSTRUMENT : null;
+  }
+
+  if (INSTRUMENT_REGISTRY[normalized]) {
+    return normalized;
+  }
+
+  const byAlias = registryState.lookup.get(toLookupKey(normalized));
+  if (byAlias) {
+    return byAlias;
+  }
+
+  return fallbackToDefault ? DEFAULT_INSTRUMENT : null;
+}
+
+function warnUnknownSymbol(symbol) {
+  if (!symbol || unknownSymbolWarnings.has(symbol)) {
+    return;
+  }
+
+  unknownSymbolWarnings.add(symbol);
+  console.warn(
+    `[instrumentRegistry] Unknown symbol "${symbol}", defaulting to ${DEFAULT_INSTRUMENT}`,
+  );
 }
 
 /**
- * List all registered instrument symbols.
- * @returns {string[]}
+ * Get a canonical instrument config.
+ * Backward compatible behavior: unknown symbols still fall back to the default.
+ *
+ * @param {string} [symbol=DEFAULT_INSTRUMENT]
+ * @param {{ strict?: boolean }} [options]
+ * @returns {InstrumentConfig | null}
  */
+function getInstrumentConfig(symbol = DEFAULT_INSTRUMENT, options = {}) {
+  const strict = Boolean(options.strict);
+  const resolved = resolveInstrumentSymbol(symbol, {
+    fallbackToDefault: !strict,
+  });
+
+  if (!resolved) {
+    return null;
+  }
+
+  const normalized = normalizeInstrumentSymbol(symbol);
+  if (
+    !strict &&
+    normalized &&
+    !INSTRUMENT_REGISTRY[normalized] &&
+    !registryState.lookup.has(toLookupKey(normalized))
+  ) {
+    warnUnknownSymbol(normalized);
+  }
+
+  return INSTRUMENT_REGISTRY[resolved];
+}
+
+function getMlEngineUrl(symbol = DEFAULT_INSTRUMENT, options = {}) {
+  return getInstrumentConfig(symbol, options)?.mlEngineUrl ?? null;
+}
+
 function listInstruments() {
   return Object.keys(INSTRUMENT_REGISTRY);
 }
 
-/**
- * Check if an instrument is registered.
- * @param {string} symbol
- * @returns {boolean}
- */
-function isRegistered(symbol) {
-  return symbol in INSTRUMENT_REGISTRY;
+function listInstrumentConfigs() {
+  return listInstruments().map((symbol) => INSTRUMENT_REGISTRY[symbol]);
 }
 
-export { INSTRUMENT_REGISTRY, DEFAULT_INSTRUMENT, getInstrumentConfig, listInstruments, isRegistered };
+function isRegistered(symbol) {
+  return Boolean(resolveInstrumentSymbol(symbol, { fallbackToDefault: false }));
+}
+
+export {
+  DEFAULT_INSTRUMENT,
+  INSTRUMENT_REGISTRY,
+  getInstrumentConfig,
+  getMlEngineUrl,
+  isRegistered,
+  listInstrumentConfigs,
+  listInstruments,
+  normalizeInstrumentSymbol,
+  resolveInstrumentSymbol,
+};
