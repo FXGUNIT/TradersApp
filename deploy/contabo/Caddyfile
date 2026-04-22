@@ -30,13 +30,44 @@
   }
 }
 
+tradergunit.is-a.dev {
+  import security_headers
+  encode zstd gzip
+
+  @edge_health path /edge-health
+  handle @edge_health {
+    respond "ok" 200
+  }
+
+  @api path /api/* /ws* /socket.io/*
+  handle @api {
+    reverse_proxy bff:8788
+  }
+
+  handle {
+    reverse_proxy frontend:8080
+  }
+}
+
 {$BFF_PUBLIC_HOST} {
   import security_headers
   encode zstd gzip
   reverse_proxy bff:8788
 }
 
+bff.tradergunit.is-a.dev {
+  import security_headers
+  encode zstd gzip
+  reverse_proxy bff:8788
+}
+
 {$API_PUBLIC_HOST} {
+  import security_headers
+  encode zstd gzip
+  reverse_proxy ml-engine:8001
+}
+
+api.tradergunit.is-a.dev {
   import security_headers
   encode zstd gzip
   reverse_proxy ml-engine:8001
