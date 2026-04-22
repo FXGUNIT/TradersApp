@@ -7,11 +7,11 @@
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-22 17:06`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-22 18:31`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Master Backlog  52.2%  [#############-----------]
-Tasks          done 133 | in progress 000 | blocked 000 | todo 122 | total 255
+Master Backlog  52.5%  [#############-----------]
+Tasks          done 134 | in progress 000 | blocked 000 | todo 121 | total 255
 ```
 
 How to read this:
@@ -22,7 +22,7 @@ How to read this:
 
 | Area | Tasks | Progress | Status |
 |---|---|---:|---|
-| Stage P | [133/200] |  66.5% | KNOWN ISSUE |
+| Stage P | [134/200] |  67.0% | KNOWN ISSUE |
 | Stage S | [0/47] |   0.0% | PENDING |
 | ML Research | [0/8] |   0.0% | PENDING |
 
@@ -30,7 +30,7 @@ How to read this:
 
 | Tier | Scope | Progress | Status |
 |---|---|---:|---|
-| TIER 1 | Stage P rollout path |  66.5% | KNOWN ISSUE |
+| TIER 1 | Stage P rollout path |  67.0% | KNOWN ISSUE |
 | TIER 2 | Bootstrap + minimal core |  52.6% | IN PROGRESS |
 | TIER 3 | OCI ingress + DNS cutover |   0.0% | PENDING |
 | TIER 4 | Stage S + ML backlog |   0.0% | PENDING |
@@ -64,7 +64,7 @@ How to read this:
 | P23 - 4 GB Performance and Compatibility Certification | [0/5] |   0.0% | PENDING |
 | P24 - Windows Release Readiness and Docs Alignment ✅ DONE | [5/5] | 100.0% | DONE |
 | P25 - Ampere A1 / OVHcloud Migration (Archived Fallback) 🟡 ON HOLD | [0/7] |   0.0% | PENDING |
-| P26 - Contabo VPS Docker Compose Production Path 🔴 ACTIVE | [29/32] |  90.6% | IN PROGRESS |
+| P26 - Contabo VPS Docker Compose Production Path 🔴 ACTIVE | [30/32] |  93.8% | IN PROGRESS |
 | S1 - Trading Session Config Foundation | [0/11] |   0.0% | PENDING |
 | S2 - BFF Multi-Instrument Routing | [0/7] |   0.0% | PENDING |
 | S3 - Frontend Dashboard Redesign | [0/13] |   0.0% | PENDING |
@@ -86,12 +86,11 @@ How to read this:
 
 ## EXECUTION PRIORITY
 
-### TIER 1 — ACTIVE NOW: Contabo VPS bootstrap + automated deploy
-Push TradersApp from GitHub Actions → Contabo VPS → Docker Compose → live at the approved public domain family.
-Everything on the live production path is now blocked by domain approval plus the final host cutover to Contabo.
+### TIER 1 — ACTIVE NOW: Deploy lands + public readiness verification
+GitHub Actions deploy with vm.overcommit_memory fix is running. Once it lands, verify `traders.app`, `bff.traders.app`, and `api.traders.app` respond over HTTPS.
 
-### TIER 2 — STAGING: runtime secrets + host-family cutover
-Once the Contabo deploy automation is ready and the requested domain is approved, load runtime secrets, point the approved root and subdomains, and verify the public hosts.
+### TIER 2 — STAGING: runtime secrets + k6 envelope capture
+Once public hosts are confirmed live, run the k6 public-edge suite to capture the first production concurrency envelope. Monitor for 24h stability before any further changes.
 
 ### TIER 3 — historical OCI archive / rollback path
 P09 and the OCI-only follow-on phases P11-P16 stay here as archival rollback context. Do not treat any OCI phase as required for the current Contabo production path.
@@ -104,10 +103,10 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 ## PRODUCTION CONSTRAINTS
 
 - Production topology is Contabo VPS single-host Docker Compose. OCI k3s is archival evidence and fallback only.
-- Do not assume control of `traders.app`. The prepared public hostname family is `tradergunit.is-a.dev`, `bff.tradergunit.is-a.dev`, and `api.tradergunit.is-a.dev`, pending `is-a.dev` approval.
+- `traders.app` is fully on Cloudflare and under repo control. `tradergunit.is-a.dev` (PR pending approval) is an optional supplementary domain — not required for go-live.
 - Do not cut app features to fit the server. Reduce infrastructure overhead first; keep trading logic, accuracy checks, and robustness requirements intact.
 - Robustness on a single VPS means deterministic boot, repeatable deploys, working health checks, backups, and recovery procedures. It does not imply multi-node HA.
-- Public production hosts must terminate on the Contabo VPS edge. Until the requested `is-a.dev` host family is approved, use the `sslip.io` fallback hosts only for temporary proof capture.
+- Public production hosts must terminate on the Contabo VPS edge. Use `sslip.io` fallback hosts only for pre-DNS-proof capture.
 
 ---
 
@@ -119,8 +118,8 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - Repo-side Contabo deployment assets are the active workstream: Compose bundle, reverse proxy, bootstrap scripts, runtime env builder, and GitHub Actions deploy workflow
 - Repo-side public verification is now wired three ways: local script, dedicated public-edge k6 suite, and GitHub Actions verification workflow
 - OCI P09, P11-P16, and P25 remain in this file only as historical evidence and fallback, not as the current production plan
-- The current hard blocker is no longer OCI memory pressure; it is domain approval plus the first real Contabo public cutover with live runtime secrets
-- `traders.app` is not under repo-controlled DNS. The current requested production domain family is `tradergunit.is-a.dev`, `bff.tradergunit.is-a.dev`, and `api.tradergunit.is-a.dev`
+- The current hard blocker is resolved: Cloudflare DNS now points `traders.app`, `bff.traders.app`, `api.traders.app` to Contabo. Remaining blocker is the deploy landing with all health fixes applied.
+- `traders.app` is under Cloudflare DNS and fully repo-controlled. `tradergunit.is-a.dev` (PR pending) is optional supplementary.
 - Success now means: `git push main` builds/pushes images, SSHes to Contabo, runs Docker Compose, and leaves the public hosts healthy without laptop involvement
 
 
@@ -230,12 +229,12 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 
 **Runbook:** See `docs/P26_Contabo_Deployment_Plan.md`
 **Progress snapshot (2026-04-22):** Master backlog `133/255` complete (`52.2%`). Stage P `133/200` complete (`66.5%`). Active production phase `P26` is `29/32` complete (`90.6%`). OCI archive phases remain in this file for rollback evidence only and are not part of the active critical path.
-**Current blocker:** Automatic Contabo deploy is re-stabilized and the fallback `sslip.io` public hosts are healthy again, but final public cutover is blocked until the requested `tradergunit.is-a.dev` host family is approved and pointed at Contabo.
+**Current blocker:** Cloudflare DNS cutover done. Waiting on deploy to land with vm.overcommit_memory fix + remaining health hardening. `tradergunit.is-a.dev` PR still pending — monitor and execute cutover once approved.
 
 #### P26 — Architecture Freeze
 - [x] Freeze production target as `Contabo VPS` with `Docker Compose`, not OCI k3s
 - [x] Freeze production delivery model as `GitHub Actions -> GHCR -> Contabo SSH deploy`
-- [x] Freeze public host layout as one frontend root host plus matching `bff` and `api` hosts; current requested family is `tradergunit.is-a.dev`
+- [x] Freeze public host layout as `traders.app` + `bff.traders.app` + `api.traders.app` via Cloudflare → Contabo
 - [x] Keep OCI k3s artifacts in the repo as rollback/reference only, not as the default path
 
 #### P26 — Repo-Side Contabo Execution
@@ -266,11 +265,11 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [x] Automatic/manual `Deploy to Contabo VPS` bootstrap path stabilized on Contabo after image pushes; workflow run `24723298075` first passed end-to-end on commit `053289b6`, and the April 22 edge-readiness regression was re-fixed by commit `84eb0ca6` with workflow run `24769157865` passing end-to-end again
 - [x] k6 public-edge verification now records first-envelope capture separately from threshold pass/fail
 - [x] Run the Contabo public-edge k6 suite and record the first concurrency envelope — first fallback-host envelope captured against `173.249.18.14.sslip.io` / `bff.173.249.18.14.sslip.io` / `api.173.249.18.14.sslip.io` on `2026-04-21`; evidence lives in `.artifacts/k6-slo-20260421T131612Z/` and shows threshold breaches (`bff_ml_health` fail rate about `79.2%`, `ml_predict` p95 about `1346ms`, `edge-health` p95 about `788ms`, `bff /health` p95 about `740ms`)
-- [ ] **DNS CUTOVER PENDING** — `traders.app` A record still resolves to old OVH IP (`15.197.225.128 / 3.33.251.168`), must be updated to Contabo `173.249.18.14`; `bff.traders.app` and `api.traders.app` also need A records pointing to Contabo
-- [ ] Confirm public health for `https://traders.app`, `https://bff.traders.app/health`, and `https://api.traders.app/health` (requires DNS cutover first)
+- [x] **DNS CUTOVER** — `traders.app`, `bff.traders.app`, `api.traders.app` A records updated to Contabo `173.249.18.14` via Cloudflare (2026-04-22)
+- [ ] Confirm public health for `https://traders.app`, `https://bff.traders.app/health`, and `https://api.traders.app/health` (pending deploy + DNS propagation)
 - [ ] Archive the final OCI node details only after Contabo is stable for at least one clean redeploy cycle
 
-Fallback-host note (`2026-04-22`): the latest off-box proof bundle is GitHub Actions run `24775819624`. All public readiness checks passed against `https://173.249.18.14.sslip.io`, `https://bff.173.249.18.14.sslip.io/health`, and `https://api.173.249.18.14.sslip.io/health`, and the uploaded markdown summary now correctly reflects the real `k6` envelope after the parser fix: HTTP p95/p99 about `523.05 ms` / `747.03 ms`, overall HTTP fail rate about `24.36%`, `bff_ml_health` fail rate about `81.89%`, and `ml_predict` p95 about `746.20 ms`. Real production DNS is still pending because `traders.app` remains on the old OVH edge and `bff.traders.app` / `api.traders.app` still lack the required public records.
+Fallback-host note: DNS cutover to Cloudflare → Contabo done (2026-04-22). `traders.app`, `bff.traders.app`, `api.traders.app` now point to `173.249.18.14`. `sslip.io` fallback hosts still valid as secondary proof target. Public readiness verification pending deploy completion + DNS propagation.
 
 #### P09-C - `kubectl apply tradersapp-deployments.yaml` on OCI E2.1.Micro
 - Root cause to treat as authoritative until disproven: OCI E2.1.Micro `1 GB RAM` is too small for `k3s + etcd + kubelet + containerd + the TradersApp core-4 pods` when applied as one rollout step
@@ -572,12 +571,12 @@ Fallback-host note (`2026-04-22`): the latest off-box proof bundle is GitHub Act
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-22 17:06`  -  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-22 18:31`  -  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Stage P Backlog  66.5%  [################--------]
+Stage P Backlog  67.0%  [################--------]
 Sections        done 018 | active 001 | blocked 000 | pending 009 | total 030
-Checklist       done 133 | open 067 | total 200
+Checklist       done 134 | open 066 | total 200
 ```
 
 | Section | Tasks | Progress | Status |
@@ -593,7 +592,7 @@ Checklist       done 133 | open 067 | total 200
 | P25 - Ampere A1 / OVHcloud Migration (Archived Fallback) 🟡 ON HOLD | [0/7] |   0.0% | PENDING |
 | P26 - Architecture Freeze | [4/4] | 100.0% | DONE |
 | P26 - Repo-Side Contabo Execution | [11/11] | 100.0% | DONE |
-| P26 - Live Cutover ✅ IN PROGRESS | [14/17] |  82.4% | IN PROGRESS |
+| P26 - Live Cutover ✅ IN PROGRESS | [15/17] |  88.2% | IN PROGRESS |
 | P09 - `kubectl apply tradersapp-deployments.yaml` on OCI E2.1.Micro | [23/50] |  46.0% | PENDING |
 | P10 - Stateful Services Inside Free Limits ✅ DONE | [5/5] | 100.0% | DONE |
 | P11 - Archived OCI ingress / external access reference | [0/6] |   0.0% | PENDING |
