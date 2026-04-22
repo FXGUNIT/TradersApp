@@ -7,12 +7,18 @@
 ## Current Domain State
 
 - Do not assume ownership of `traders.app`. That domain is not currently under repo-controlled DNS.
-- The prepared production hostname family is:
-  - `tradergunit.is-a.dev`
-  - `bff.tradergunit.is-a.dev`
-  - `api.tradergunit.is-a.dev`
-- Root request PR:
-  - `https://github.com/is-a-dev/register/pull/36802`
+- The original root request `#36802` was closed by `is-a.dev` maintainers as:
+  - `reason: not dev related`
+  - `reason: incomplete pr`
+- The corrected hostname family is:
+  - developer root: `tradergunit.is-a.dev`
+  - project frontend: `traders.tradergunit.is-a.dev`
+  - BFF: `bff.traders.tradergunit.is-a.dev`
+  - API: `api.traders.tradergunit.is-a.dev`
+- The root resubmission now needs:
+  - a dev-facing landing page at the root host
+  - the full `is-a.dev` PR template completed
+  - a public preview link plus screenshot proof
 - Until the root request is merged, public proof should continue on the Contabo fallback hosts:
   - `https://173.249.18.14.sslip.io`
   - `https://bff.173.249.18.14.sslip.io/health`
@@ -71,94 +77,34 @@
 - `CONTABO_APP_ROOT=/opt/tradersapp` (optional if unchanged)
 - `CONTABO_COMPOSE_PROFILES=core` for first cutover; add `mlops` or `observability` later when needed
 
-## Domain Cutover Checklist - `tradergunit.is-a.dev`
+## Domain Approval And Cutover Checklist
 
-Use this exact sequence once the root `is-a.dev` request is merged:
+Use this exact sequence from now on:
 
-1. Confirm `tradergunit.is-a.dev` resolves publicly.
-2. Open and merge the prepared follow-on `is-a.dev` requests for:
-   - `api.tradergunit.is-a.dev`
-   - `bff.tradergunit.is-a.dev`
-3. Update GitHub repository variables to the new host family:
-   - `TRADERSAPP_DOMAIN=tradergunit.is-a.dev`
-   - `CONTABO_DOMAIN=tradergunit.is-a.dev`
-   - `BFF_PUBLIC_HOST=bff.tradergunit.is-a.dev`
-   - `API_PUBLIC_HOST=api.tradergunit.is-a.dev`
-4. Keep `PRODUCTION_DEPLOY_PLATFORM=contabo` and `CONTABO_COMPOSE_PROFILES=core` unchanged.
-5. Merge or cherry-pick the prepared cutover branch:
-   - `prep/tradergunit-domain-cutover`
-6. Run `Deploy to Contabo VPS`.
-7. Run `Verify Contabo Public Deploy` against:
-   - `https://tradergunit.is-a.dev`
-   - `https://bff.tradergunit.is-a.dev/health`
-   - `https://api.tradergunit.is-a.dev/health`
-8. Only after those checks pass, mark the DNS/public-health P26 items complete.
+1. Resubmit the root `is-a.dev` request for `tradergunit.is-a.dev` as a developer/personal site.
+2. Point the root-request preview to the developer landing route:
+   - `https://173.249.18.14.sslip.io/developer`
+3. After the root request is merged, open and merge the nested requests for:
+   - `traders.tradergunit.is-a.dev`
+   - `bff.traders.tradergunit.is-a.dev`
+   - `api.traders.tradergunit.is-a.dev`
+4. Update GitHub repository variables to the new project host family:
+   - `TRADERSAPP_DOMAIN=traders.tradergunit.is-a.dev`
+   - `CONTABO_DOMAIN=traders.tradergunit.is-a.dev`
+   - `BFF_PUBLIC_HOST=bff.traders.tradergunit.is-a.dev`
+   - `API_PUBLIC_HOST=api.traders.tradergunit.is-a.dev`
+5. Keep `PRODUCTION_DEPLOY_PLATFORM=contabo` and `CONTABO_COMPOSE_PROFILES=core` unchanged.
+6. Merge or cherry-pick the prepared nested-domain cutover branch.
+7. Run `Deploy to Contabo VPS`.
+8. Run `Verify Contabo Public Deploy` against:
+   - `https://traders.tradergunit.is-a.dev`
+   - `https://bff.traders.tradergunit.is-a.dev/health`
+   - `https://api.traders.tradergunit.is-a.dev/health`
+9. Only after those checks pass, mark the DNS/public-health P26 items complete.
 
-Prepared artifacts already staged for this cutover:
+Prepared materials for the corrected submission path live in:
 
-- `is-a.dev` root PR:
-  `https://github.com/is-a-dev/register/pull/36802`
-- Follow-on fork branches:
-  - `FXGUNIT/register:fxgunit/api-tradergunit-domain`
-  - `FXGUNIT/register:fxgunit/bff-tradergunit-domain`
-- Repo cutover branch:
-  - `origin/prep/tradergunit-domain-cutover` at `ff29f140`
-
-## Prepared Follow-On PR Text
-
-Use these verbatim once the root request is merged.
-
-### `api.tradergunit.is-a.dev`
-
-PR URL:
-- `https://github.com/FXGUNIT/register/pull/new/fxgunit/api-tradergunit-domain`
-
-Title:
-
-```text
-Add api.tradergunit.is-a.dev
-```
-
-Body:
-
-```text
-## Summary
-- request `api.tradergunit.is-a.dev` for the TradersApp backend API
-- point the subdomain to the self-hosted Contabo VPS
-- use it as the public API host for the production stack
-
-## DNS
-- `A 173.249.18.14`
-
-## Notes
-- root domain request already merged: `tradergunit.is-a.dev`
-```
-
-### `bff.tradergunit.is-a.dev`
-
-PR URL:
-- `https://github.com/FXGUNIT/register/pull/new/fxgunit/bff-tradergunit-domain`
-
-Title:
-
-```text
-Add bff.tradergunit.is-a.dev
-```
-
-Body:
-
-```text
-## Summary
-- request `bff.tradergunit.is-a.dev` for the TradersApp backend-for-frontend host
-- point the subdomain to the self-hosted Contabo VPS
-- use it as the public BFF host for the production stack
-
-## DNS
-- `A 173.249.18.14`
-
-## Notes
-- root domain request already merged: `tradergunit.is-a.dev`
-```
+- [docs/IS_A_DEV_RESUBMISSION_PLAN.md](/e:/TradersApp/docs/IS_A_DEV_RESUBMISSION_PLAN.md:1)
 
 ## Required GitHub Secrets
 

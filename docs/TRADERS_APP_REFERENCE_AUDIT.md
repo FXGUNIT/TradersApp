@@ -3,15 +3,19 @@
 **Last updated:** 2026-04-22
 
 This audit exists to separate real production blockers from harmless legacy text
-while `tradergunit.is-a.dev` is still pending approval.
+while the corrected nested-domain `is-a.dev` path is being prepared.
 
 ## Active Production Path
 
 These references are part of the live Contabo path or the next planned domain
-cutover. The refreshed branch `origin/prep/tradergunit-domain-cutover`
-(current tip `ff29f140`) already stages the hostname swap for the hardcoded
-defaults below. Variable-driven surfaces still require the GitHub repo vars to
-be updated during cutover.
+cutover. The next cutover branch will target the corrected host family:
+
+- `traders.tradergunit.is-a.dev`
+- `bff.traders.tradergunit.is-a.dev`
+- `api.traders.tradergunit.is-a.dev`
+
+Variable-driven surfaces still require the GitHub repo vars to be updated
+during cutover.
 
 - `deploy/contabo/runtime.env.example`
 - `deploy/contabo/Dockerfile.frontend`
@@ -89,17 +93,20 @@ release after the cutover branch is merged.
 - Off-box fallback verification against `sslip.io` was re-captured
   successfully in GitHub Actions run `24775819624`, and the summary markdown
   now reflects the real `k6` envelope values after the parser fix on `main`.
-- The prepared cutover branch has already been refreshed from current `main`
-  and includes the hidden-artifact upload fix plus the corrected `k6` summary
-  parser.
+- The developer-root landing page now exists on `main` so the root `is-a.dev`
+  resubmission can point to a dev-facing preview instead of the product root.
+- The first root request `#36802` is no longer a blocker to monitor; it was
+  closed and must be replaced with the corrected resubmission path.
 
 ## Execution Order After Approval
 
-1. Confirm root PR `#36802` is merged and `tradergunit.is-a.dev` resolves.
-2. Open and merge the prepared `api` and `bff` `is-a.dev` requests.
-3. Merge or cherry-pick `prep/tradergunit-domain-cutover`.
-4. Update GitHub repo variables to the new root, `bff`, and `api` hosts.
+1. Merge the corrected root request for `tradergunit.is-a.dev`.
+2. Open and merge the nested `traders`, `bff.traders`, and `api.traders`
+   `is-a.dev` requests.
+3. Merge or cherry-pick the nested-domain cutover prep branch.
+4. Update GitHub repo variables to the `traders.tradergunit.is-a.dev` host
+   family.
 5. Run `Deploy to Contabo VPS`.
-6. Run `Verify Contabo Public Deploy` against the `tradergunit.is-a.dev` host family.
+6. Run `Verify Contabo Public Deploy` against the nested host family.
 7. Rebuild the desktop web bundle before the next Windows release so generated
    assets pick up the new BFF host.

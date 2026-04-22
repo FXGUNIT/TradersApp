@@ -253,6 +253,9 @@ class _PositionProxy:
     def __init__(self, context: "StrategyContext") -> None:
         self._context = context
 
+    def __bool__(self) -> bool:
+        return self._context.position is not None
+
     @property
     def size(self) -> float:
         return 0.0 if self._context.position is None else self._context.position.size
