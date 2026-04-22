@@ -304,10 +304,11 @@ def infer_heading_status(heading: str, done: int, total: int) -> str:
     normalized = heading.lower()
     if total > 0 and done == total:
         return "DONE"
-    if "on hold" in normalized:
-        return "ON HOLD"
+    # Check archived BEFORE on-hold so an "Archived Fallback" phase wins over ON HOLD
     if "archived" in normalized or "superseded" in normalized:
         return "ARCHIVED"
+    if "on hold" in normalized:
+        return "ON HOLD"
     # Also treat a phase as ARCHIVED when it contains a body-level warning note
     # (the warning note is stored separately in phase_titles_by_id as the heading
     # only, so this catches phases that have the warning in body text but not heading).
