@@ -1,5 +1,5 @@
 {
-  "appCastUrl": "https://downloads.traders.app/windows/appcast.xml",
+  "appCastUrl": "https://github.com/FXGUNIT/TradersApp/releases/latest/download/appcast.xml",
   "appCastPublicKey": "BASE64_ED25519_PUBLIC_KEY",
   "updateCheckIntervalHours": 6
 }

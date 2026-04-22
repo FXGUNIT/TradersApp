@@ -27,6 +27,10 @@ GitHub repository variables:
 - `WINDOWS_UPDATES_BASE_URL`
 - `WINDOWS_RELEASE_NOTES_BASE_URL`
 
+If the custom Windows update URLs are not set, the release workflow already
+falls back to GitHub Releases for the appcast and update payloads. That is the
+safe default path while the public domain cutover is still unsettled.
+
 ## Release Workflow
 
 Workflow file: `.github/workflows/windows-release.yml`
@@ -90,6 +94,9 @@ The signed release payload contains:
 - The desktop update path expects both Authenticode-signed installers and valid NetSparkle signatures.
 - The bundle currently includes the packaged WebView2 bootstrapper when `WEBVIEW2_BOOTSTRAPPER_URL` is configured.
 - If `WEBVIEW2_OFFLINE_INSTALLER_URL` is configured and the workflow input is enabled, the offline Evergreen runtime installer is attached as a release asset for support use.
+- The built-in fallback appcast URL is GitHub Releases:
+  `https://github.com/FXGUNIT/TradersApp/releases/latest/download/appcast.xml`
+  Set `WINDOWS_APPCAST_URL` only when you intentionally move updates to a dedicated host later.
 
 ## Known Limitation
 

@@ -37,6 +37,39 @@
 - `CONTABO_APP_ROOT=/opt/tradersapp` (optional if unchanged)
 - `CONTABO_COMPOSE_PROFILES=core` for first cutover; add `mlops` or `observability` later when needed
 
+## Domain Cutover Checklist - `tradergunit.is-a.dev`
+
+Use this exact sequence once the root `is-a.dev` request is merged:
+
+1. Confirm `tradergunit.is-a.dev` resolves publicly.
+2. Open and merge the prepared follow-on `is-a.dev` requests for:
+   - `api.tradergunit.is-a.dev`
+   - `bff.tradergunit.is-a.dev`
+3. Update GitHub repository variables to the new host family:
+   - `TRADERSAPP_DOMAIN=tradergunit.is-a.dev`
+   - `CONTABO_DOMAIN=tradergunit.is-a.dev`
+   - `BFF_PUBLIC_HOST=bff.tradergunit.is-a.dev`
+   - `API_PUBLIC_HOST=api.tradergunit.is-a.dev`
+4. Keep `PRODUCTION_DEPLOY_PLATFORM=contabo` and `CONTABO_COMPOSE_PROFILES=core` unchanged.
+5. Merge or cherry-pick the prepared cutover branch:
+   - `prep/tradergunit-domain-cutover`
+6. Run `Deploy to Contabo VPS`.
+7. Run `Verify Contabo Public Deploy` against:
+   - `https://tradergunit.is-a.dev`
+   - `https://bff.tradergunit.is-a.dev/health`
+   - `https://api.tradergunit.is-a.dev/health`
+8. Only after those checks pass, mark the DNS/public-health P26 items complete.
+
+Prepared artifacts already staged for this cutover:
+
+- `is-a.dev` root PR:
+  `https://github.com/is-a-dev/register/pull/36802`
+- Follow-on fork branches:
+  - `FXGUNIT/register:fxgunit/api-tradergunit-domain`
+  - `FXGUNIT/register:fxgunit/bff-tradergunit-domain`
+- Repo cutover branch:
+  - `origin/prep/tradergunit-domain-cutover`
+
 ## Required GitHub Secrets
 
 - `CONTABO_VPS_HOST`

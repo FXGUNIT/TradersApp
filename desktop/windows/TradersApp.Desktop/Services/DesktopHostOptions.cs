@@ -34,7 +34,7 @@ internal static class DesktopHostOptions
     public static string AppCastUrl => ResolveSetting(
         "TRADERSAPP_APPCAST_URL",
         RuntimeSettings.AppCastUrl,
-        "https://downloads.traders.app/windows/appcast.xml");
+        "https://github.com/FXGUNIT/TradersApp/releases/latest/download/appcast.xml");
 
     public static string AppCastPublicKey =>
         ResolveSetting("TRADERSAPP_APPCAST_PUBLIC_KEY", RuntimeSettings.AppCastPublicKey, string.Empty);
