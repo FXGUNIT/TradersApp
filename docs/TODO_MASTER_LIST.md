@@ -7,7 +7,7 @@
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-22 19:32`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-22 19:34`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Master Backlog  52.5%  [#############-----------]
@@ -580,7 +580,7 @@ Fallback-host note: DNS cutover to Cloudflare → Contabo done (2026-04-22). `tr
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-22 19:32`  -  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-22 19:34`  -  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Stage P Backlog  67.0%  [################--------]
@@ -601,14 +601,14 @@ Checklist       done 134 | open 066 | total 200
 | P25 - Ampere A1 / OVHcloud Migration (Archived Fallback) 🟡 ON HOLD | [0/7] |   0.0% | PENDING |
 | P26 - Architecture Freeze | [4/4] | 100.0% | DONE |
 | P26 - Repo-Side Contabo Execution | [11/11] | 100.0% | DONE |
-| P26 - Live Cutover ✅ IN PROGRESS | [15/17] |  88.2% | IN PROGRESS |
+| P26 - Live Cutover ✅ **ARCHIVED** | [15/17] |  88.2% | **ARCHIVED** |
 | P09 - `kubectl apply tradersapp-deployments.yaml` on OCI E2.1.Micro (ARCHIVED — P26 is active) | [23/50] |  46.0% | IN PROGRESS |
 | P10 - Stateful Services Inside Free Limits ✅ DONE | [5/5] | 100.0% | DONE |
-| P11 - Archived OCI ingress / external access reference | [0/6] |   0.0% | PENDING |
-| P12 - Archived OCI DNS + TLS reference | [0/5] |   0.0% | PENDING |
+| P11 - Archived OCI ingress / external access reference | [0/6] |   0.0% | **ARCHIVED** |
+| P12 - Archived OCI DNS + TLS reference | [0/5] |   0.0% | **ARCHIVED** |
 | P13 - Archived OCI frontend hosting reference | [0/4] |   0.0% | PENDING |
 | P14 - Observability 🔴 KNOWN ISSUE | [0/3] |   0.0% | KNOWN ISSUE |
-| P15 - Archived OCI backup & rollback reference | [0/3] |   0.0% | PENDING |
+| P15 - Archived OCI backup & rollback reference | [0/3] |   0.0% | **ARCHIVED** |
 | P16 - Archived OCI go-live sign-off reference | [0/4] |   0.0% | PENDING |
 | P17 - Documentation Alignment ✅ DONE | [4/4] | 100.0% | DONE |
 | P18 - Windows Desktop Architecture Freeze | [5/5] | 100.0% | DONE |
