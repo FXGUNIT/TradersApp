@@ -71,7 +71,7 @@ The rest of this document describes the old OCI k3s path kept for audit and roll
 - [ ] Neon account (https://neon.tech) — PostgreSQL *(optional — not in core runtime)*
 
 ### Domain
-- [ ] Purchase domain or use existing (e.g., `traders.app`)
+- [ ] Purchase domain or use an approved nested host family (e.g., `traders.tradergunit.is-a.dev`)
 - [ ] Transfer to Cloudflare or update nameservers
 
 ---
@@ -84,7 +84,7 @@ After OCI ingress is live (P11/P12), add these records in Cloudflare DNS:
 
 | Type | Name | Content | Proxy | SSL |
 |---|---|---|---|---|
-| A | traders.app | `144.24.112.249` | Proxied | Strict |
+| A | traders.tradergunit.is-a.dev | `144.24.112.249` | Proxied | Strict |
 | A | www | `144.24.112.249` | Proxied | Strict |
 | CNAME | api | `144.24.112.249` | Proxied | Strict |
 | CNAME | bff | `144.24.112.249` | Proxied | Strict |
@@ -118,7 +118,7 @@ After OCI ingress is live (P11/P12), add these records in Cloudflare DNS:
 ### Page Rules (optional)
 
 ```
-If URL matches: traders.app/*
+If URL matches: traders.tradergunit.is-a.dev/*
 Then:
   - Cache Level: Cache Everything
   - Edge Cache TTL: 1 hour
