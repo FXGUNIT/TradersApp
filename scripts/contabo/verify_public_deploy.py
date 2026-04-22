@@ -255,26 +255,40 @@ def parse_k6_summary(summary_path: Path) -> dict[str, Any]:
     metrics = summary.get("metrics", {})
 
     def values_for(metric_name: str) -> dict[str, Any]:
-        return (metrics.get(metric_name) or {}).get("values", {})
+        metric = metrics.get(metric_name) or {}
+        values = metric.get("values")
+        if isinstance(values, dict) and values:
+            return values
+        if isinstance(metric, dict):
+            return metric
+        return {}
+
+    def rate_value(metric_name: str) -> float:
+        values = values_for(metric_name)
+        if "rate" in values:
+            return float(values.get("rate", 0.0))
+        if "value" in values:
+            return float(values.get("value", 0.0))
+        return 0.0
 
     load_summary = {
         "http_req_duration_ms": {
             "p95": values_for("http_req_duration").get("p(95)"),
             "p99": values_for("http_req_duration").get("p(99)"),
         },
-        "http_req_failed_pct": round(float(values_for("http_req_failed").get("rate", 0.0)) * 100, 4),
+        "http_req_failed_pct": round(rate_value("http_req_failed") * 100, 4),
         "custom_metrics": {},
     }
 
     for metric_name, metric_data in metrics.items():
         if metric_name.endswith("_latency_ms"):
             load_summary["custom_metrics"][metric_name] = {
-                "p95": (metric_data.get("values") or {}).get("p(95)"),
-                "p99": (metric_data.get("values") or {}).get("p(99)"),
+                "p95": values_for(metric_name).get("p(95)"),
+                "p99": values_for(metric_name).get("p(99)"),
             }
         elif metric_name.endswith("_fail_rate"):
             load_summary["custom_metrics"][metric_name] = {
-                "rate_pct": round(float((metric_data.get("values") or {}).get("rate", 0.0)) * 100, 4),
+                "rate_pct": round(rate_value(metric_name) * 100, 4),
             }
 
     return load_summary
