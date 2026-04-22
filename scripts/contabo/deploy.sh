@@ -165,6 +165,9 @@ trap 'dump_failure_context' ERR
 echo "[deploy] Pulling images..."
 run_as_app "${COMPOSE_CMD} pull"
 
+echo "[deploy] Setting vm.overcommit_memory=1 (host kernel sysctl)..."
+sysctl -w vm.overcommit_memory=1 2>/dev/null || true
+
 echo "[deploy] Clearing stale Caddy volumes (autosave.json carries old TLS config)..."
 run_as_app "docker volume rm tradersapp_caddy_data tradersapp_caddy_config 2>/dev/null || true"
 run_as_app "docker volume rm caddy_data caddy_config 2>/dev/null || true"

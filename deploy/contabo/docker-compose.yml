@@ -42,8 +42,6 @@ services:
     image: redis:7-alpine
     container_name: traders-redis
     restart: unless-stopped
-    sysctls:
-      - vm.overcommit_memory=1
     command: redis-server --save 60 1000 --appendonly yes --loglevel warning
     ports:
       - "127.0.0.1:6379:6379"
