@@ -72,6 +72,9 @@ services:
       REDIS_PORT: ${REDIS_PORT}
       MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI:-}
       NODE_ENV: production
+      OTEL_ENABLED: "false"
+      OTEL_TRACES_EXPORTER: "none"
+      OTEL_METRICS_EXPORTER: "none"
     volumes:
       - ml_data:/data
       - ml_models:/models
