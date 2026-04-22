@@ -10,7 +10,7 @@ export default defineConfig({
         target:
           process.env.VITE_BFF_URL ||
           (process.env.NODE_ENV === "production"
-            ? "https://bff.traders.app"
+            ? "https://bff.traders.tradergunit.is-a.dev"
             : "http://127.0.0.1:8788"),
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ""),

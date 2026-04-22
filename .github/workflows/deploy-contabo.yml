@@ -61,7 +61,7 @@ jobs:
       )
     environment:
       name: production
-      url: https://${{ vars.TRADERSAPP_DOMAIN || vars.CONTABO_DOMAIN || 'traders.app' }}
+      url: https://${{ vars.TRADERSAPP_DOMAIN || vars.CONTABO_DOMAIN || 'traders.tradergunit.is-a.dev' }}
 
     steps:
       - name: Resolve deploy context
@@ -116,7 +116,7 @@ jobs:
             DOMAIN="${{ vars.CONTABO_DOMAIN }}"
           fi
           if [ -z "${DOMAIN}" ]; then
-            DOMAIN="traders.app"
+            DOMAIN="traders.tradergunit.is-a.dev"
           fi
 
           BFF_HOST="${{ vars.BFF_PUBLIC_HOST }}"

@@ -19,9 +19,9 @@ Options:
   --output FILE            Destination .env file
   --ghcr-owner OWNER       GHCR owner/org (required if absent from base env)
   --image-tag TAG          Image tag to deploy (default: latest)
-  --domain HOST            traders.app root domain
-  --bff-host HOST          bff.traders.app public hostname
-  --api-host HOST          api.traders.app public hostname
+  --domain HOST            traders.tradergunit.is-a.dev frontend host
+  --bff-host HOST          bff.traders.tradergunit.is-a.dev public hostname
+  --api-host HOST          api.traders.tradergunit.is-a.dev public hostname
   --compose-profiles LIST  Optional compose profiles, comma-separated
 EOF
 }
@@ -87,7 +87,7 @@ if [ -z "${IMAGE_TAG}" ]; then
 fi
 
 if [ -z "${TRADERSAPP_DOMAIN}" ]; then
-  TRADERSAPP_DOMAIN="traders.app"
+  TRADERSAPP_DOMAIN="traders.tradergunit.is-a.dev"
 fi
 
 if [ -z "${BFF_PUBLIC_HOST}" ]; then

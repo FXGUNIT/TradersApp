@@ -9,9 +9,9 @@ RUN npm ci
 COPY . .
 
 # Build arg for Contabo (Caddy handles routing, nginx serves static files only)
-# Override at build time: --build-arg VITE_BFF_URL=https://bff.traders.app
-ARG VITE_BFF_URL=https://bff.traders.app
-ARG VITE_API_URL=https://api.traders.app
+# Override at build time: --build-arg VITE_BFF_URL=https://bff.traders.tradergunit.is-a.dev
+ARG VITE_BFF_URL=https://bff.traders.tradergunit.is-a.dev
+ARG VITE_API_URL=https://api.traders.tradergunit.is-a.dev
 ENV VITE_BFF_URL=${VITE_BFF_URL}
 ENV VITE_API_URL=${VITE_API_URL}
 

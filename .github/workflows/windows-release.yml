@@ -127,7 +127,7 @@ jobs:
           if ([string]::IsNullOrWhiteSpace($desktopBffUrl)) {
             $publicHost = "${{ vars.BFF_PUBLIC_HOST }}"
             if ([string]::IsNullOrWhiteSpace($publicHost)) {
-              $desktopBffUrl = "https://bff.traders.app"
+              $desktopBffUrl = "https://bff.traders.tradergunit.is-a.dev"
             }
             elseif ($publicHost -match '^https?://') {
               $desktopBffUrl = $publicHost.TrimEnd('/')

@@ -55,7 +55,7 @@ tradergunit.is-a.dev {
   reverse_proxy bff:8788
 }
 
-bff.tradergunit.is-a.dev {
+bff.traders.tradergunit.is-a.dev {
   import security_headers
   encode zstd gzip
   reverse_proxy bff:8788
@@ -67,7 +67,7 @@ bff.tradergunit.is-a.dev {
   reverse_proxy ml-engine:8001
 }
 
-api.tradergunit.is-a.dev {
+api.traders.tradergunit.is-a.dev {
   import security_headers
   encode zstd gzip
   reverse_proxy ml-engine:8001

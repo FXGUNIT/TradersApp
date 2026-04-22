@@ -9,10 +9,11 @@
 
 - Single `Contabo VPS`
 - `GitHub Actions -> GHCR -> SSH -> Docker Compose`
-- Public host family is pending domain approval. Current requested production hosts are:
-  - `tradergunit.is-a.dev`
-  - `bff.tradergunit.is-a.dev`
-  - `api.tradergunit.is-a.dev`
+- Public host family is pending domain approval. The corrected requested production hosts are:
+  - developer root: `tradergunit.is-a.dev`
+  - frontend: `traders.tradergunit.is-a.dev`
+  - BFF: `bff.traders.tradergunit.is-a.dev`
+  - API: `api.traders.tradergunit.is-a.dev`
 - Until approval completes, public proof uses the Contabo fallback hosts:
   - `173.249.18.14.sslip.io`
   - `bff.173.249.18.14.sslip.io`
@@ -234,8 +235,8 @@ PYTHONUNBUFFERED=1
 NODE_ENV=production
 BFF_HOST=0.0.0.0
 BFF_PORT=8788
-ML_ENGINE_URL=https://api.traders.app
-BFF_ALLOWED_ORIGINS=https://traders.app
+ML_ENGINE_URL=https://api.traders.tradergunit.is-a.dev
+BFF_ALLOWED_ORIGINS=https://traders.tradergunit.is-a.dev
 
 # AI Providers (at least one)
 AI_GROQ_TURBO_KEY=
@@ -295,9 +296,9 @@ In GitHub repo → Settings → Secrets and variables → Actions → Variables:
 
 | Variable | Value |
 |---|---|
-| `ML_ENGINE_URL` | `https://api.traders.app` |
-| `BFF_URL` | `https://bff.traders.app` |
-| `FRONTEND_URL` | `https://traders.app` |
+| `ML_ENGINE_URL` | `https://api.traders.tradergunit.is-a.dev` |
+| `BFF_URL` | `https://bff.traders.tradergunit.is-a.dev` |
+| `FRONTEND_URL` | `https://traders.tradergunit.is-a.dev` |
 
 ---
 
@@ -350,9 +351,9 @@ gh workflow run rollback.yml -f version=2026-04-01
 
 | Service | URL | Expected |
 |---|---|---|
-| ML Engine | `https://api.traders.app/health` | `{"ok": true, ...}` |
-| BFF | `https://bff.traders.app/health` | `{"ok": true, ...}` |
-| Frontend | `https://traders.app` | HTTP 200 |
+| ML Engine | `https://api.traders.tradergunit.is-a.dev/health` | `{"ok": true, ...}` |
+| BFF | `https://bff.traders.tradergunit.is-a.dev/health` | `{"ok": true, ...}` |
+| Frontend | `https://traders.tradergunit.is-a.dev` | HTTP 200 |
 
 ---
 

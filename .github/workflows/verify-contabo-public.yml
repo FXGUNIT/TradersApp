@@ -6,15 +6,15 @@ on:
       frontend_host:
         description: "Frontend public host"
         required: false
-        default: "traders.app"
+        default: "traders.tradergunit.is-a.dev"
       bff_host:
         description: "BFF public host"
         required: false
-        default: "bff.traders.app"
+        default: "bff.traders.tradergunit.is-a.dev"
       api_host:
         description: "ML Engine public host"
         required: false
-        default: "api.traders.app"
+        default: "api.traders.tradergunit.is-a.dev"
       timeout_seconds:
         description: "Probe timeout in seconds"
         required: false
