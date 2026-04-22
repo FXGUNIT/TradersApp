@@ -143,11 +143,27 @@ const ML_ENGINE_BASE = String(
     "http://ml-engine:8001",
 ).trim();
 const ML_REQUEST_TIMEOUT_MS = 30_000;
+const ML_HEALTH_TIMEOUT_MS = Number.parseInt(
+  process.env.ML_HEALTH_TIMEOUT_MS || "5000",
+  10,
+);
+const ML_HEALTH_CACHE_TTL_MS = Math.max(
+  0,
+  Number.parseInt(process.env.ML_HEALTH_CACHE_TTL_MS || "5000", 10),
+);
+const ML_HEALTH_STALE_GRACE_MS = Math.max(
+  ML_HEALTH_CACHE_TTL_MS,
+  Number.parseInt(process.env.ML_HEALTH_STALE_GRACE_MS || "30000", 10),
+);
 const ML_AUX_WARN_COOLDOWN_MS = Number.parseInt(
   process.env.ML_AUX_WARN_COOLDOWN_MS || "60000",
   10,
 );
 const auxWarningState = new Map();
+const mlHealthCacheState = {
+  current: null,
+  inFlight: null,
+};
 
 function normalizeAuxMlError(error) {
   if (!error) {
@@ -181,6 +197,54 @@ function logAuxMlWarning(operation, error) {
   console.warn(
     `[consensusEngine] ${operation} unavailable; continuing without it: ${message}`,
   );
+}
+
+function getMlHealthCacheAgeMs(entry) {
+  if (!entry?.fetchedAt) {
+    return null;
+  }
+  return Math.max(0, Date.now() - entry.fetchedAt);
+}
+
+function buildMlHealthCachePayload(entry, state, extra = {}) {
+  const ageMs = getMlHealthCacheAgeMs(entry);
+  return {
+    ...entry.payload,
+    cache: {
+      state,
+      age_ms: ageMs,
+      ttl_ms: ML_HEALTH_CACHE_TTL_MS,
+      stale_grace_ms: ML_HEALTH_STALE_GRACE_MS,
+      fetched_at: new Date(entry.fetchedAt).toISOString(),
+    },
+    ...extra,
+  };
+}
+
+function setMlHealthCache(payload) {
+  mlHealthCacheState.current = {
+    payload,
+    fetchedAt: Date.now(),
+  };
+  return mlHealthCacheState.current;
+}
+
+async function refreshMlHealthCache() {
+  if (mlHealthCacheState.inFlight) {
+    return await mlHealthCacheState.inFlight;
+  }
+
+  mlHealthCacheState.inFlight = (async () => {
+    try {
+      const response = await mlRequest("/health", null, ML_HEALTH_TIMEOUT_MS);
+      const cacheEntry = setMlHealthCache({ ok: true, ...response });
+      return buildMlHealthCachePayload(cacheEntry, "live");
+    } finally {
+      mlHealthCacheState.inFlight = null;
+    }
+  })();
+
+  return await mlHealthCacheState.inFlight;
 }
 
 async function mlRequest(
@@ -423,10 +487,31 @@ export async function triggerMlTraining(mode = "incremental", options = {}) {
  * Check if ML Engine is healthy.
  */
 export async function checkMlHealth() {
+  const cacheEntry = mlHealthCacheState.current;
+  const cacheAgeMs = getMlHealthCacheAgeMs(cacheEntry);
+
+  if (
+    cacheEntry &&
+    cacheAgeMs !== null &&
+    cacheAgeMs <= ML_HEALTH_CACHE_TTL_MS
+  ) {
+    return buildMlHealthCachePayload(cacheEntry, "cached");
+  }
+
   try {
-    const res = await mlRequest("/health", null, 5_000);
-    return { ok: true, ...res };
+    return await refreshMlHealthCache();
   } catch (err) {
+    if (
+      cacheEntry &&
+      cacheAgeMs !== null &&
+      cacheAgeMs <= ML_HEALTH_STALE_GRACE_MS
+    ) {
+      logAuxMlWarning("health", err);
+      return buildMlHealthCachePayload(cacheEntry, "stale-fallback", {
+        degraded: true,
+        upstream_error: err.message,
+      });
+    }
     return { ok: false, error: err.message };
   }
 }
@@ -579,4 +664,9 @@ export function createConsensusEngineService() {
     getPhysicsRegime,
     buildMlFeatureVector,
   };
+}
+
+export function __resetMlHealthCacheForTests() {
+  mlHealthCacheState.current = null;
+  mlHealthCacheState.inFlight = null;
 }

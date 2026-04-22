@@ -187,6 +187,16 @@ Body:
   - `ML_ENGINE_URL`
   - `ML_ANALYSIS_GRPC_ADDR`
 
+Optional BFF health hardening knobs for the public `/ml/health` route:
+
+- `ML_HEALTH_TIMEOUT_MS` default `5000`
+- `ML_HEALTH_CACHE_TTL_MS` default `5000`
+- `ML_HEALTH_STALE_GRACE_MS` default `30000`
+
+These keep short bursts of public health probes from stampeding the ML engine
+while still surfacing a recent last-known-good payload when the upstream health
+call flaps briefly.
+
 ## First Cutover
 
 1. Provision the Contabo VPS and confirm SSH access.
