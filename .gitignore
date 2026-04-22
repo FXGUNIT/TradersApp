@@ -44,6 +44,7 @@ bff/.env.local
 .artifacts/
 .copilot-build/
 .copilot-ml-image/
+.tmp/
 .tmp_chrome_arch_view/
 .tmp_ci/
 .tmp_r*/
