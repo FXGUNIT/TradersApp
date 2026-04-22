@@ -181,7 +181,6 @@ wait_for_health traders-ml-engine
 wait_for_health traders-analysis-service
 wait_for_health traders-bff
 wait_for_health traders-frontend
-wait_for_health traders-edge 24
 
 echo "[deploy] Running smoke checks..."
 set -a
@@ -199,13 +198,15 @@ wait_for_http "localhost frontend /health" "http://127.0.0.1:8080/health" 12
 echo "  - localhost redis PING"
 docker exec traders-redis redis-cli ping | grep -q PONG
 # Resolve runtime hosts back to the local Caddy listener so edge smoke checks
-# do not depend on public DNS cutover.
+# do not depend on public DNS cutover. These routed HTTPS probes are the
+# authoritative readiness signal for Caddy; container health may stay in
+# "starting" while automatic TLS finishes warming.
 echo "  - local edge route for ${TRADERSAPP_DOMAIN}"
-wait_for_https_host "edge route ${TRADERSAPP_DOMAIN}" "${TRADERSAPP_DOMAIN}" "/edge-health" 24
+wait_for_https_host "edge route ${TRADERSAPP_DOMAIN}" "${TRADERSAPP_DOMAIN}" "/edge-health" 36
 echo "  - local edge route for ${BFF_PUBLIC_HOST}"
-wait_for_https_host "edge route ${BFF_PUBLIC_HOST}" "${BFF_PUBLIC_HOST}" "/health" 24
+wait_for_https_host "edge route ${BFF_PUBLIC_HOST}" "${BFF_PUBLIC_HOST}" "/health" 36
 echo "  - local edge route for ${API_PUBLIC_HOST}"
-wait_for_https_host "edge route ${API_PUBLIC_HOST}" "${API_PUBLIC_HOST}" "/health" 24
+wait_for_https_host "edge route ${API_PUBLIC_HOST}" "${API_PUBLIC_HOST}" "/health" 36
 
 echo "[deploy] Capturing compose status..."
 run_as_app "${COMPOSE_CMD} ps" | tee "${APP_ROOT}/logs/compose-ps.log"
