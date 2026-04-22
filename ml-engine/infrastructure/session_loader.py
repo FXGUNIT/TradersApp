@@ -5,7 +5,12 @@ from datetime import date, datetime, time
 from typing import Literal
 
 _TZ_KOLKATA = "Asia/Kolkata"
-_SessionName = Literal["pre_market", "regular", "post_market", "closed"]
+_SessionName = Literal["pre_market", "main_trading", "post_market", "closed"]
+
+# Map canonical names used by callers to the YAML key names in trading_sessions.yaml.
+_SESSION_KEY_MAP = {
+    "main_trading": "regular",
+}
 
 
 class SessionLoader:
@@ -60,7 +65,8 @@ class SessionLoader:
             start = time.fromisoformat(sess["start"])
             end   = time.fromisoformat(sess["end"])
             if start <= t <= end:
-                return key  # type: ignore[return-value]
+                canonical = _SESSION_KEY_MAP.get(key, key)
+                return canonical  # type: ignore[return-value]
 
         return "closed"
 
@@ -79,6 +85,20 @@ class SessionLoader:
     def all_sessions(self) -> dict:
         """Return the raw sessions dict from the YAML for cases that need metadata."""
         return self._cfg["sessions"]
+
+    def get_session(self, name: _SessionName) -> dict | None:
+        """
+        Return the raw config dict for a named session.
+
+        Args:
+            name: "pre_market" | "main_trading" | "post_market" | "closed"
+
+        Returns:
+            The session config dict (with name, start, end, timezone, type),
+            or None if the session name is not defined in the YAML.
+        """
+        yaml_key = _SESSION_KEY_MAP.get(name, name)
+        return self._cfg["sessions"].get(yaml_key)
 
     def holiday_dates(self) -> list[str]:
         """Return the list of ISO-format holiday strings."""

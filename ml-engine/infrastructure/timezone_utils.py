@@ -33,7 +33,7 @@ def from_kolkata(dt: datetime) -> datetime:
     return dt.astimezone(ZoneInfo("UTC"))
 
 
-def is_dst_active(tz: str) -> bool:
+def is_dst_active(tz: str | ZoneInfo) -> bool:
     """
     Return whether DST is currently active in the named IANA timezone.
 
@@ -41,7 +41,10 @@ def is_dst_active(tz: str) -> bool:
     UTC offset against the standard (non-DST) UTC offset at the same UTC
     instant. If they differ, DST is in effect.
     """
-    zi = ZoneInfo(tz)
+    if isinstance(tz, ZoneInfo):
+        zi = tz
+    else:
+        zi = ZoneInfo(tz)
     now_utc = datetime.now(ZoneInfo("UTC"))
     # Current offset including any DST shift
     offset_now = now_utc.astimezone(zi).utcoffset()

@@ -48,6 +48,25 @@ SESSION_CONFIG = {
     2: {"name": "post_market", "start_et": "16:01", "end_et": "20:00", "label": "Post"},
 }
 
+# ── Session definitions (NSE India — loaded from YAML) ─────────────────────
+# This replaces hardcoded Eastern Time sessions above for NSE-specific usage.
+# The SESSION_CONFIG dict above is kept for backward compatibility with any
+# code that depends on numeric keys 0/1/2.
+def _load_nse_sessions():
+    try:
+        from infrastructure.session_loader import SessionLoader
+        loader = SessionLoader()
+        return {
+            "pre_market": loader.get_session("pre_market"),
+            "main_trading": loader.get_session("main_trading"),
+            "post_market": loader.get_session("post_market"),
+            "default_timezone": "Asia/Kolkata",
+        }
+    except Exception:
+        return None
+
+NSE_SESSION_CONFIG = _load_nse_sessions()
+
 # AMD Phase encoding
 AMD_PHASES = ["ACCUMULATION", "MANIPULATION", "DISTRIBUTION", "TRANSITION", "UNCLEAR"]
 

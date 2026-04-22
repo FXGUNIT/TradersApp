@@ -19,6 +19,20 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import roc_auc_score
 import lightgbm as lgb
 
+# ── NSE India session support ──────────────────────────────────────────────
+try:
+    from infrastructure.session_loader import SessionLoader
+    _nse_loader = SessionLoader()
+    NSE_SESSION_CONFIG = {
+        "pre_market": _nse_loader.get_session("pre_market"),
+        "main_trading": _nse_loader.get_session("main_trading"),
+        "post_market": _nse_loader.get_session("post_market"),
+    }
+    _NSE_AVAILABLE = True
+except Exception:
+    NSE_SESSION_CONFIG = None
+    _NSE_AVAILABLE = False
+
 
 class SessionProbabilityModel:
     """
@@ -43,6 +57,23 @@ class SessionProbabilityModel:
             )),
         ])
         self._is_trained = False
+
+    def get_session_for_instrument(self, timestamp, use_nse=False):
+        """
+        Return session name for a given timestamp.
+
+        Args:
+            timestamp: datetime or pandas Timestamp (in Asia/Kolkata for NSE, UTC for US)
+            use_nse: if True, use NSE India sessions; else use Eastern Time sessions
+
+        Returns:
+            "pre_market", "main_trading", "post_market", or "closed"
+        """
+        if not use_nse or not _NSE_AVAILABLE:
+            # Fallback to existing Eastern Time logic via assign_session_ids
+            return None  # let existing logic handle it
+
+        return _nse_loader.get_current_session(timestamp)
 
     def _prepare_session_features(self, candles_df: pd.DataFrame) -> pd.DataFrame:
         """
