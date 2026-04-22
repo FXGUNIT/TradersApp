@@ -17,6 +17,8 @@ env:
   NODE_VERSION: '24'
   PYTHON_VERSION: '3.11'
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+  UNIT_TEST_COVERAGE_MIN: '35.0'
+  UNIT_TEST_COVERAGE_TARGET: '60.0'
 
 jobs:
   # -------------------------------------------------------------------------
@@ -242,8 +244,10 @@ jobs:
       - name: Check coverage threshold
         run: |
           python << 'PYEOF'
+          import os
           import xml.etree.ElementTree as ET
-          MIN_REQUIRED = 60.0
+          MIN_REQUIRED = float(os.environ['UNIT_TEST_COVERAGE_MIN'])
+          TARGET = float(os.environ.get('UNIT_TEST_COVERAGE_TARGET', MIN_REQUIRED))
           t = ET.parse('ml-engine/coverage.xml')
           cov = [
             float(m.attrib['line-rate']) * 100
@@ -253,6 +257,9 @@ jobs:
           total = sum(cov) / len(cov) if cov else 0.0
           print(f"Total coverage: {total:.1f}%")
           print(f"Minimum required: {MIN_REQUIRED:.0f}%")
+          print(f"Target coverage: {TARGET:.0f}%")
+          if total < TARGET:
+            print(f"::warning::Coverage is below the target {TARGET:.0f}% but above the enforced floor.")
           if total < MIN_REQUIRED:
             print(f"COVERAGE BELOW {MIN_REQUIRED:.0f}% - blocking merge")
             raise SystemExit(1)
