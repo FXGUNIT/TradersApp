@@ -7,7 +7,7 @@
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-22 15:57`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-22 17:06`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Master Backlog  52.2%  [#############-----------]
@@ -270,7 +270,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [ ] Confirm public health for `https://traders.app`, `https://bff.traders.app/health`, and `https://api.traders.app/health` (requires DNS cutover first)
 - [ ] Archive the final OCI node details only after Contabo is stable for at least one clean redeploy cycle
 
-Fallback-host note (`2026-04-22`): off-box checks are back to green after the edge readiness fix in commit `84eb0ca6` — `https://173.249.18.14.sslip.io/edge-health`, `https://bff.173.249.18.14.sslip.io/health`, and `https://api.173.249.18.14.sslip.io/health` all returned `200` on `2026-04-22`. Real production DNS is still pending: `traders.app` resolves to the old OVH edge, and `bff.traders.app` / `api.traders.app` still need public A records.
+Fallback-host note (`2026-04-22`): the latest off-box proof bundle is GitHub Actions run `24775819624`. All public readiness checks passed against `https://173.249.18.14.sslip.io`, `https://bff.173.249.18.14.sslip.io/health`, and `https://api.173.249.18.14.sslip.io/health`, and the uploaded markdown summary now correctly reflects the real `k6` envelope after the parser fix: HTTP p95/p99 about `523.05 ms` / `747.03 ms`, overall HTTP fail rate about `24.36%`, `bff_ml_health` fail rate about `81.89%`, and `ml_predict` p95 about `746.20 ms`. Real production DNS is still pending because `traders.app` remains on the old OVH edge and `bff.traders.app` / `api.traders.app` still lack the required public records.
 
 #### P09-C - `kubectl apply tradersapp-deployments.yaml` on OCI E2.1.Micro
 - Root cause to treat as authoritative until disproven: OCI E2.1.Micro `1 GB RAM` is too small for `k3s + etcd + kubelet + containerd + the TradersApp core-4 pods` when applied as one rollout step
@@ -438,6 +438,7 @@ Fallback-host note (`2026-04-22`): off-box checks are back to green after the ed
 
 ### P23 - 4 GB Performance and Compatibility Certification
 - Repo-side certification harness is now `scripts/windows/certify-desktop-performance.ps1`; it emits JSON/Markdown evidence for shell startup, idle RAM, OCR lazy-loading, GPU-free payload, and child-process checks
+- Latest local baseline evidence was captured on `2026-04-22` at `.artifacts/windows/p23/desktop-p23-certification-20260422-164945.{json,md}`: shell ready `5.23s`, idle working set about `16.5 MB`, private memory about `3.3 MB`, and no child sidecar processes observed. This is useful prep evidence, but it is not the final 4 GB reference-machine sign-off.
 - Full `P23` sign-off still requires manual runs on Windows 10 x64 and Windows 11 x64 `4 GB RAM` reference machines plus degraded-network and forced-logout proof
 - [ ] Validate cold start to login screen at `<= 8s` on Windows 10/11 x64 4 GB reference machines
 - [ ] Validate idle RAM at `<= 500 MB` after the shell and web UI fully load
@@ -571,7 +572,7 @@ Fallback-host note (`2026-04-22`): off-box checks are back to green after the ed
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-22 15:57`  -  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-22 17:06`  -  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Stage P Backlog  66.5%  [################--------]

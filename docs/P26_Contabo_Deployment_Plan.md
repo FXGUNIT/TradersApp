@@ -18,6 +18,26 @@
   - `https://bff.173.249.18.14.sslip.io/health`
   - `https://api.173.249.18.14.sslip.io/health`
 
+## Latest Fallback-Host Evidence
+
+- Latest off-box verification workflow:
+  - `Verify Contabo Public Deploy` run `24775819624`
+- Result:
+  - all eight public readiness checks passed against the `sslip.io` host family
+  - uploaded artifact download worked after the hidden-artifact fix
+  - the generated markdown summary now shows the real `k6` envelope values after
+    the parser fix on `main`
+- Current fallback-host envelope from that run still breaches thresholds:
+  - HTTP duration p95/p99 about `523.05 ms` / `747.03 ms`
+  - overall HTTP fail rate about `24.36%`
+  - `bff_ml_health` fail rate about `81.89%`
+  - `ml_predict` latency p95/p99 about `746.20 ms` / `989.00 ms`
+- Practical meaning:
+  - reachability, DNS, TLS, and the basic health chain are green on the fallback
+    hosts
+  - the next remaining work before public cutover is domain approval plus later
+    performance hardening against the `bff_ml_health` load threshold failures
+
 ## Topology
 
 - Public edge: Caddy on the VPS, terminating the approved root frontend host plus matching `bff` and `api` hosts
@@ -82,7 +102,7 @@ Prepared artifacts already staged for this cutover:
   - `FXGUNIT/register:fxgunit/api-tradergunit-domain`
   - `FXGUNIT/register:fxgunit/bff-tradergunit-domain`
 - Repo cutover branch:
-  - `origin/prep/tradergunit-domain-cutover`
+  - `origin/prep/tradergunit-domain-cutover` at `ff29f140`
 
 ## Prepared Follow-On PR Text
 

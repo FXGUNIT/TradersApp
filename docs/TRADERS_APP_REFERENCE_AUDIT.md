@@ -8,8 +8,10 @@ while `tradergunit.is-a.dev` is still pending approval.
 ## Active Production Path
 
 These references are part of the live Contabo path or the next planned domain
-cutover. They should be switched by the prepared branch
-`prep/tradergunit-domain-cutover` after the root domain request is approved.
+cutover. The refreshed branch `origin/prep/tradergunit-domain-cutover`
+(current tip `ff29f140`) already stages the hostname swap for the hardcoded
+defaults below. Variable-driven surfaces still require the GitHub repo vars to
+be updated during cutover.
 
 - `deploy/contabo/runtime.env.example`
 - `deploy/contabo/Dockerfile.frontend`
@@ -27,9 +29,17 @@ cutover. They should be switched by the prepared branch
 - `.github/workflows/verify-contabo-public.yml`
 - `desktop/windows/installer/TradersApp.Package/Package.wxs`
 - `desktop/windows/installer/TradersApp.Bundle/Bundle.wxs`
-- `telegram-bridge/index.js`
-- `telegram-bridge/aiProviders.js`
 - `docs/DEPLOYMENT.md`
+
+## Variable-Driven Production Surfaces
+
+These files stay on `main` but already honor repo variables or GitHub Releases
+fallbacks, so they do not need additional code edits for the domain cutover if
+the cutover checklist is followed.
+
+- `.github/workflows/windows-release.yml`
+- `desktop/windows/TradersApp.Desktop/Services/DesktopHostOptions.cs`
+- `docs/windows/WINDOWS_DESKTOP_RELEASE.md`
 
 ## Legacy Docs And Archived Paths
 
@@ -76,11 +86,12 @@ release after the cutover branch is merged.
 - Windows desktop app updates no longer depend on `downloads.traders.app`.
 - The built-in desktop appcast fallback is GitHub Releases:
   - `https://github.com/FXGUNIT/TradersApp/releases/latest/download/appcast.xml`
-- Off-box fallback verification against `sslip.io` was captured successfully in
-  GitHub Actions run `24772564179`.
-- The prepared cutover branch exists, but it must be refreshed from current
-  `main` before final merge because `main` has moved since that branch was first
-  staged.
+- Off-box fallback verification against `sslip.io` was re-captured
+  successfully in GitHub Actions run `24775819624`, and the summary markdown
+  now reflects the real `k6` envelope values after the parser fix on `main`.
+- The prepared cutover branch has already been refreshed from current `main`
+  and includes the hidden-artifact upload fix plus the corrected `k6` summary
+  parser.
 
 ## Execution Order After Approval
 
