@@ -17,6 +17,16 @@ import {
   getMLNewsReactions,
 } from "../services/consensusEngine.mjs";
 import { fetchBreakingNews } from "../services/breakingNewsService.mjs";
+import {
+  recordSuccess as cbRecordSuccess,
+  recordFailure as cbRecordFailure,
+  isOpen as cbIsOpen,
+  shouldAllowRequest as cbShouldAllowRequest,
+} from "../services/circuitBreakerRegistry.mjs";
+import {
+  resolveInstrumentSymbol,
+  getInstrumentConfig,
+} from "../services/instrumentRegistry.mjs";
 
 export function createConsensusRouteHandler({
   json,
@@ -30,15 +40,30 @@ export function createConsensusRouteHandler({
     // GET /ml/consensus
     if (req.method === "GET" && pathname === "/ml/consensus") {
       try {
+        const rawSymbol = url.searchParams.get("symbol") || "MNQ";
+        const symbol = resolveInstrumentSymbol(rawSymbol);
+
+        // Per-instrument circuit breaker check
+        if (!cbShouldAllowRequest(symbol)) {
+          json(res, 503, {
+            ok: false,
+            error: "Circuit open for this instrument",
+            instrument: symbol,
+            circuitBreaker: cbIsOpen(symbol) ? "open" : "closed",
+          }, origin);
+          return true;
+        }
+
         const mathEngine = _parseQueryJson(url.searchParams.get("mathEngine"));
         const recentCandles = _parseQueryJson(url.searchParams.get("candles")) || [];
         const keyLevels = _parseQueryJson(url.searchParams.get("keyLevels")) || {};
         const sessionId = parseInt(url.searchParams.get("session") || "1", 10);
-        const symbol = url.searchParams.get("symbol") || "MNQ";
 
         // Fetch ML consensus + breaking news in parallel (news non-blocking, 3s timeout)
-        const [result, newsResult] = await Promise.all([
-          getMlConsensus({
+        let result;
+        let consensusError = null;
+        try {
+          result = await getMlConsensus({
             mathEngine,
             recentCandles,
             keyLevels,
@@ -46,9 +71,15 @@ export function createConsensusRouteHandler({
             symbol,
             requestId,
             idempotencyKey,
-          }),
-          fetchBreakingNews({ maxItems: 15, minImpact: 'LOW' }).catch(() => ({ items: [], total: 0 })),
-        ]);
+          });
+          cbRecordSuccess(symbol);
+        } catch (err) {
+          consensusError = err;
+          cbRecordFailure(symbol);
+          throw err;
+        }
+
+        const newsResult = await fetchBreakingNews({ maxItems: 15, minImpact: 'LOW' }).catch(() => ({ items: [], total: 0 }));
 
         // Merge breaking news into consensus response
         result.breaking_news = {
@@ -101,6 +132,10 @@ export function createConsensusRouteHandler({
           avg_alpha_ticks: newsReactions.avg_alpha_ticks || 0,
           validated_pct: newsReactions.validated_pct || 0,
         };
+
+        // Attach per-instrument metadata
+        result.instrument = getInstrumentConfig(symbol);
+        result.circuitBreakerState = cbIsOpen(symbol) ? "open" : "closed";
 
         json(res, result.ok ? 200 : 503, result, origin);
         return true;
@@ -158,10 +193,29 @@ export function createConsensusRouteHandler({
     // GET /ml/regime — full physics-based regime (HMM + FP-FK + Tsallis q + Hurst)
     if (req.method === "GET" && pathname === "/ml/regime") {
       try {
+        const rawSymbol = url.searchParams.get("symbol") || "MNQ";
+        const symbol = resolveInstrumentSymbol(rawSymbol);
+
+        if (!cbShouldAllowRequest(symbol)) {
+          json(res, 503, {
+            ok: false,
+            error: "Circuit open for this instrument",
+            instrument: symbol,
+            circuitBreaker: cbIsOpen(symbol) ? "open" : "closed",
+          }, origin);
+          return true;
+        }
+
         const candles = _parseQueryJson(url.searchParams.get("candles")) || [];
-        const result = await getPhysicsRegime(candles, {
-          requestId,
-        });
+        let result;
+        try {
+          result = await getPhysicsRegime(candles, { requestId });
+          cbRecordSuccess(symbol);
+        } catch (err) {
+          cbRecordFailure(symbol);
+          throw err;
+        }
+        result.circuitBreakerState = cbIsOpen(symbol) ? "open" : "closed";
         json(res, result.ok !== false ? 200 : 503, result, origin);
         return true;
       } catch (err) {

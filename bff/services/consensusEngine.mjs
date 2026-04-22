@@ -29,6 +29,13 @@ import {
   refreshAgentHeartbeat,
   reportAgentError,
 } from "./boardRoomAgentReporter.mjs";
+import {
+  recordSuccess as cbRecordSuccess,
+  recordFailure as cbRecordFailure,
+  isOpen as cbIsOpen,
+  shouldAllowRequest as cbShouldAllowRequest,
+} from "./circuitBreakerRegistry.mjs";
+import { getInstrumentConfig } from "./instrumentRegistry.mjs";
 
 const CONSENSUS_AGENT = "ConsensusEngine";
 
@@ -341,7 +348,44 @@ export async function getMlConsensus({
   requestId = null,
   idempotencyKey = null,
 } = {}) {
+  const resolvedSymbol = symbol;
   const features = buildMlFeatureVector(mathEngine, recentCandles, keyLevels, sessionId);
+
+  // Per-instrument circuit breaker gate
+  if (!shouldAllowRequest(resolvedSymbol)) {
+    return {
+      ok: false,
+      source: "circuit_breaker_fallback",
+      instrument: getInstrumentConfig(resolvedSymbol),
+      circuitBreaker: cbIsOpen(resolvedSymbol) ? "open" : "closed",
+      timestamp: new Date().toISOString(),
+      signal: "NEUTRAL",
+      confidence: 0.5,
+      error: "Circuit breaker open for this instrument",
+      votes: {},
+      session: {
+        id: sessionId,
+        name: ["Pre-Market", "Main Trading", "Post-Market"][sessionId] || "Main Trading",
+        session_pct: features.session_pct,
+        minutes_into_session: features.minutes_into_session,
+      },
+      alpha: null,
+      expected_move: null,
+      rrr: null,
+      exit_plan: null,
+      position_sizing: null,
+      regime: null,
+      timing: {
+        enter_now: false,
+        reason: "Circuit breaker open for this instrument — NEUTRAL signal",
+        P_profitable_entry_now: 0.5,
+      },
+      models_used: 0,
+      data_trades_analyzed: 0,
+      model_freshness: "circuit_breaker_open",
+      feature_vector: features,
+    };
+  }
 
   try {
     const mlResult = await mlRequest(
@@ -353,11 +397,13 @@ export async function getMlConsensus({
         session_id: sessionId,
         math_engine_snapshot: mathEngine,
         key_levels: keyLevels,
-        symbol,
+        symbol: resolvedSymbol,
       },
       ML_REQUEST_TIMEOUT_MS,
       { requestId, idempotencyKey },
     );
+
+    cbRecordSuccess(resolvedSymbol);
 
     const sessionNames = ["Pre-Market", "Main Trading", "Post-Market"];
 
@@ -385,9 +431,12 @@ export async function getMlConsensus({
       data_trades_analyzed: mlResult.data_trades_analyzed || 0,
       model_freshness: mlResult.model_freshness || "unknown",
       feature_vector: features,
+      instrument: getInstrumentConfig(resolvedSymbol),
+      circuitBreaker: cbIsOpen(resolvedSymbol) ? "open" : "closed",
     };
   } catch (err) {
     const isCircuitOpen = err.code === "CIRCUIT_OPEN";
+    cbRecordFailure(resolvedSymbol);
     console.error(
       isCircuitOpen
         ? "[consensusEngine] Circuit breaker OPEN — ML Engine failing"
@@ -402,6 +451,8 @@ export async function getMlConsensus({
     return {
       ok: false,
       source: isCircuitOpen ? "circuit_breaker_fallback" : "ml_engine_fallback",
+      instrument: getInstrumentConfig(resolvedSymbol),
+      circuitBreaker: cbIsOpen(resolvedSymbol) ? "open" : "closed",
       circuit_breaker: {
         state: _mlCircuitBreaker.state,
         failure_count: _mlCircuitBreaker._failureCount,

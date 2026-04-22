@@ -89,6 +89,7 @@ import { createTerminalRouteHandler } from "./routes/terminalRoutes.mjs";
 import { createOnboardingRouteHandler } from "./routes/onboardingRoutes.mjs";
 import { createSupportRouteHandler } from "./routes/supportRoutes.mjs";
 import { createBoardRoomRouteHandler } from "./routes/boardRoomRoutes.mjs";
+import { createCalendarRouteHandler } from "./routes/calendarRoutes.mjs";
 import { startBoardRoomCron } from "./board-room/cron/index.mjs";
 import { boardRoomService } from "./services/boardRoomService.mjs";
 import boardRoomTelegram from "./services/boardRoomTelegram.mjs";
@@ -503,6 +504,7 @@ const dispatcher = createDispatcher({
   createSupportRouteHandler,
   createTradeCalcRouteHandler,
   createBoardRoomRouteHandler,
+  createCalendarRouteHandler,
   // J01: Telegram proxy — token removed from browser bundles
   handleTelegramSendMessage,
   handleTelegramSendForensicAlert,
