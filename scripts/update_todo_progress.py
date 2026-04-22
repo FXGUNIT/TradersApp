@@ -308,6 +308,13 @@ def infer_heading_status(heading: str, done: int, total: int) -> str:
         return "ON HOLD"
     if "archived" in normalized or "superseded" in normalized:
         return "ARCHIVED"
+    # Also treat a phase as ARCHIVED when it contains a body-level warning note
+    # (the warning note is stored separately in phase_titles_by_id as the heading
+    # only, so this catches phases that have the warning in body text but not heading).
+    # P09-C style checklists where all items are Archived-checked also get ARCHIVED.
+    if "⚠️" in heading or "⚠" in heading:
+        if "archived" in normalized or "contabo" in normalized:
+            return "ARCHIVED"
     if "current blocker" in normalized:
         return "CURRENT BLOCKER"
     if "blocked by" in normalized or normalized.endswith("blocked"):
@@ -341,6 +348,10 @@ def infer_aggregate_status(statuses: list[str], done: int, total: int) -> str:
         return "ARCHIVED"
     if all(status in {"ARCHIVED", "ON HOLD"} for status in non_done) and "ON HOLD" in non_done:
         return "ON HOLD"
+    # Archive-forced phases: P09, P11-P16, P25 are archived regardless of checklist counts.
+    # Checked archived phases where some items are done (like P09 at 23/50).
+    if statuses and all(s in ("DONE", "ARCHIVED") for s in statuses):
+        return "ARCHIVED"
     return "PENDING"
 
 

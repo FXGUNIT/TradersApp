@@ -7,7 +7,7 @@
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-22 19:44`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-22 19:49`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Master Backlog  52.5%  [#############-----------]
@@ -580,7 +580,7 @@ Fallback-host note: DNS cutover to Cloudflare → Contabo done (2026-04-22). `tr
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-22 19:44`  -  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-22 19:49`  -  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Stage P Backlog  67.0%  [################--------]
