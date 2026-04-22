@@ -142,32 +142,32 @@ function Write-ReferenceMachineProfileMarkdown {
     $lines = @(
         "# P23 Reference Machine Profile",
         "",
-        ("- Generated: `" + $Profile.generatedAt + "`"),
-        ("- Label: `" + $Profile.referenceMachineLabel + "`"),
-        ("- Computer name: `" + $Profile.computerName + "`"),
+        ('- Generated: `{0}`' -f $Profile.generatedAt),
+        ('- Label: `{0}`' -f $Profile.referenceMachineLabel),
+        ('- Computer name: `{0}`' -f $Profile.computerName),
         "",
         "## Operating System",
         "",
-        ("- Caption: `" + (Get-DisplayValue -Value $Profile.operatingSystem.caption) + "`"),
-        ("- Version: `" + (Get-DisplayValue -Value $Profile.operatingSystem.version) + "`"),
-        ("- Build: `" + (Get-DisplayValue -Value $Profile.operatingSystem.buildNumber) + "`"),
-        ("- Architecture: `" + (Get-DisplayValue -Value $Profile.operatingSystem.architecture) + "`"),
-        ("- Last boot: `" + (Get-DisplayValue -Value $Profile.operatingSystem.lastBootUpTime) + "`"),
+        ('- Caption: `{0}`' -f (Get-DisplayValue -Value $Profile.operatingSystem.caption)),
+        ('- Version: `{0}`' -f (Get-DisplayValue -Value $Profile.operatingSystem.version)),
+        ('- Build: `{0}`' -f (Get-DisplayValue -Value $Profile.operatingSystem.buildNumber)),
+        ('- Architecture: `{0}`' -f (Get-DisplayValue -Value $Profile.operatingSystem.architecture)),
+        ('- Last boot: `{0}`' -f (Get-DisplayValue -Value $Profile.operatingSystem.lastBootUpTime)),
         "",
         "## Hardware",
         "",
-        ("- Manufacturer: `" + (Get-DisplayValue -Value $Profile.hardware.manufacturer) + "`"),
-        ("- Model: `" + (Get-DisplayValue -Value $Profile.hardware.model) + "`"),
-        ("- Total RAM: `" + $Profile.hardware.totalPhysicalMemoryMb + " MB (" + $Profile.hardware.totalPhysicalMemoryGb + " GB)`"),
-        ("- Approximate 4 GB class: `" + $Profile.hardware.approximateFourGbClass + "`"),
-        ("- Logical processor count: `" + $Profile.hardware.logicalProcessorCount + "`"),
+        ('- Manufacturer: `{0}`' -f (Get-DisplayValue -Value $Profile.hardware.manufacturer)),
+        ('- Model: `{0}`' -f (Get-DisplayValue -Value $Profile.hardware.model)),
+        ('- Total RAM: `{0} MB ({1} GB)`' -f $Profile.hardware.totalPhysicalMemoryMb, $Profile.hardware.totalPhysicalMemoryGb),
+        ('- Approximate 4 GB class: `{0}`' -f $Profile.hardware.approximateFourGbClass),
+        ('- Logical processor count: `{0}`' -f $Profile.hardware.logicalProcessorCount),
         ""
     )
 
     if ($Profile.hardware.processorNames.Count -gt 0) {
         $lines += "Processor(s):"
         foreach ($processorName in $Profile.hardware.processorNames) {
-            $lines += ("- `" + $processorName + "`")
+            $lines += ('- `{0}`' -f $processorName)
         }
         $lines += ""
     }
@@ -176,7 +176,7 @@ function Write-ReferenceMachineProfileMarkdown {
         $lines += "Video controller(s):"
         foreach ($videoController in $Profile.hardware.videoControllers) {
             $adapterRam = Get-DisplayValue -Value $videoController.adapterRamMb
-            $lines += ("- `" + $videoController.name + "` | RAM MB: `" + $adapterRam + "` | Driver: `" + (Get-DisplayValue -Value $videoController.driverVersion) + "`")
+            $lines += ('- `{0}` | RAM MB: `{1}` | Driver: `{2}`' -f $videoController.name, $adapterRam, (Get-DisplayValue -Value $videoController.driverVersion))
         }
         $lines += ""
     }
@@ -185,7 +185,7 @@ function Write-ReferenceMachineProfileMarkdown {
         $lines += "## Network Adapters"
         $lines += ""
         foreach ($adapter in $Profile.networkAdapters) {
-            $lines += ("- `" + $adapter.name + "` | Status: `" + (Get-DisplayValue -Value $adapter.status) + "` | Link: `" + (Get-DisplayValue -Value $adapter.linkSpeed) + "` | MAC: `" + (Get-DisplayValue -Value $adapter.macAddress) + "`")
+            $lines += ('- `{0}` | Status: `{1}` | Link: `{2}` | MAC: `{3}`' -f $adapter.name, (Get-DisplayValue -Value $adapter.status), (Get-DisplayValue -Value $adapter.linkSpeed), (Get-DisplayValue -Value $adapter.macAddress))
         }
         $lines += ""
     }
@@ -210,10 +210,10 @@ function Write-ManualTemplate {
     $lines = [System.Collections.Generic.List[string]]::new()
     $lines.Add("# P23 Manual Check Template")
     $lines.Add("")
-    $lines.Add("- Run directory: `" + $RunDirectory + "`")
-    $lines.Add("- Reference machine label: `" + $Label + "`")
+    $lines.Add(('- Run directory: `{0}`' -f $RunDirectory))
+    $lines.Add(('- Reference machine label: `{0}`' -f $Label))
     if (-not [string]::IsNullOrWhiteSpace($DesktopExePath)) {
-        $lines.Add("- Desktop EXE path: `" + $DesktopExePath + "`")
+        $lines.Add(('- Desktop EXE path: `{0}`' -f $DesktopExePath))
     }
     $lines.Add("")
     $lines.Add("## Required Manual Outcomes")
@@ -225,21 +225,21 @@ function Write-ManualTemplate {
     $lines.Add("")
     $lines.Add("## Suggested Rerun Command")
     $lines.Add("")
-    $lines.Add("```powershell")
-    $lines.Add("powershell -ExecutionPolicy Bypass -File .\\scripts\\windows\\run-p23-reference-certification.ps1 `")
-    $lines.Add("  -ReferenceMachineLabel """ + $Label + """ `")
+    $lines.Add('```powershell')
+    $lines.Add('powershell -ExecutionPolicy Bypass -File .\scripts\windows\run-p23-reference-certification.ps1 ' + '`')
+    $lines.Add((('  -ReferenceMachineLabel "{0}" ' -f $Label) + '`'))
     if (-not [string]::IsNullOrWhiteSpace($DesktopExePath)) {
-        $lines.Add("  -DesktopExePath """ + $DesktopExePath + """ `")
+        $lines.Add((('  -DesktopExePath "{0}" ' -f $DesktopExePath) + '`'))
     }
-    $lines.Add("  -VisibleLoginStatus pass `")
-    $lines.Add("  -VisibleLoginNotes ""Login visible at 6.8s after cold launch."" `")
-    $lines.Add("  -DegradedNetworkStatus pass `")
-    $lines.Add("  -DegradedNetworkNotes ""Disabled active NIC for 45s; offline and reconnect toasts observed; shell stayed open."" `")
-    $lines.Add("  -ForcedLogoutStatus pass `")
-    $lines.Add("  -ForcedLogoutNotes ""Admin block forced the route back to login on next policy poll."" `")
-    $lines.Add("  -SignedReleaseStatus pass `")
-    $lines.Add("  -SignedReleaseNotes ""Installed signed release payload in Program Files.""")
-    $lines.Add("```")
+    $lines.Add('  -VisibleLoginStatus pass ' + '`')
+    $lines.Add('  -VisibleLoginNotes "Login visible at 6.8s after cold launch." ' + '`')
+    $lines.Add('  -DegradedNetworkStatus pass ' + '`')
+    $lines.Add('  -DegradedNetworkNotes "Disabled active NIC for 45s; offline and reconnect toasts observed; shell stayed open." ' + '`')
+    $lines.Add('  -ForcedLogoutStatus pass ' + '`')
+    $lines.Add('  -ForcedLogoutNotes "Admin block forced the route back to login on next policy poll." ' + '`')
+    $lines.Add('  -SignedReleaseStatus pass ' + '`')
+    $lines.Add('  -SignedReleaseNotes "Installed signed release payload in Program Files."')
+    $lines.Add('```')
 
     Write-MarkdownFile -Path $Path -Lines @($lines)
 }
