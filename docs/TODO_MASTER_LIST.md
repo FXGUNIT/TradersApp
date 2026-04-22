@@ -7,7 +7,7 @@
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-22 19:29`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-22 19:31`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Master Backlog  52.5%  [#############-----------]
@@ -47,7 +47,7 @@ How to read this:
 | P06 - CI/CD Pipeline (`deploy-k8s.yml`) DONE - minimal direct-apply path | [12/12] | 100.0% | DONE |
 | P07 - k3s Namespace + Secrets Bootstrap ✅ DONE | [3/3] | 100.0% | DONE |
 | P08 - Helm Chart Values ✅ DONE | [4/4] | 100.0% | DONE |
-| P09 - `kubectl apply tradersapp-deployments.yaml` on OCI E2.1.Micro | [23/50] |  46.0% | IN PROGRESS |
+| P09 - `kubectl apply tradersapp-deployments.yaml` on OCI E2.1.Micro (ARCHIVED — P26 is active) | [23/50] |  46.0% | IN PROGRESS |
 | P10 - Stateful Services Inside Free Limits ✅ DONE | [5/5] | 100.0% | DONE |
 | P11 - Archived OCI ingress / external access reference | [0/6] |   0.0% | PENDING |
 | P12 - Archived OCI DNS + TLS reference | [0/5] |   0.0% | PENDING |
@@ -201,6 +201,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - No additional P09 work is required for the current Contabo production path. Resume this branch only if Contabo is abandoned or an OCI rollback lab is explicitly requested.
 
 ### P25 — Ampere A1 / OVHcloud Migration (Archived Fallback) 🟡 ON HOLD
+> ⚠️ ARCHIVED FALLBACK — Contabo is active. This path is closed unless Contabo is abandoned.
 *Historical fallback only. Do not treat this as the active production route.*
 
 **Archived note:** the cloud selection work ended with Contabo as the active deployment target because A1 capacity remained unavailable and OCI k3s on E2.1.Micro stayed unstable. Keep the OCI/A1 notes below only as evidence and rollback context.
@@ -272,7 +273,8 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 
 Fallback-host note: DNS cutover to Cloudflare → Contabo done (2026-04-22). `traders.app`, `bff.traders.app`, `api.traders.app` now point to `173.249.18.14`. `sslip.io` fallback hosts still valid as secondary proof target. Public readiness verification pending deploy completion + DNS propagation.
 
-#### P09-C - `kubectl apply tradersapp-deployments.yaml` on OCI E2.1.Micro
+#### P09-C - `kubectl apply tradersapp-deployments.yaml` on OCI E2.1.Micro (ARCHIVED — P26 is active)
+> ⚠️ P09-C is ARCHIVED. Contabo VPS (P26) is the active production path. Do not work on P09-C unless Contabo is abandoned.
 - Root cause to treat as authoritative until disproven: OCI E2.1.Micro `1 GB RAM` is too small for `k3s + etcd + kubelet + containerd + the TradersApp core-4 pods` when applied as one rollout step
 - Goal: break the remaining P09 blocker into 50 atomic steps so memory pressure, runtime corruption, and rollout ordering can be debugged without another blind full-manifest retry
 - Live OCI facts from 2026-04-19:
@@ -375,18 +377,21 @@ Fallback-host note: DNS cutover to Cloudflare → Contabo done (2026-04-22). `tr
 - [ ] Re-check CSP, API base URLs, and frontend environment wiring for the OCI-hosted domains
 
 ### P14 — Observability 🔴 KNOWN ISSUE
+> Note: Contabo edge health is now verified. Jaeger OTLP spam is disabled in ml-engine. Lightweight GitHub Actions log monitoring is the current path.
 - Prometheus + Grafana stack too heavy for E2.1.Micro (1GB RAM)
 - [ ] Deploy lightweight alternatives: k8s event exporter, GitHub Actions log streaming
 - [ ] Smoke test monitoring via GitHub Actions on each deploy
 - [ ] Telegram/Discord alerts via CI/CD post-deploy hook
 
 ### P15 - Archived OCI backup & rollback reference
+> ⚠️ ARCHIVED — OCI-only. Not required for Contabo production path. Kept for rollback context only.
 - OCI-only rollback notes kept for rollback context. Not required for the current Contabo production cutover.
 - [ ] Test `helm rollback tradersapp` on CI failure
 - [ ] Database migration rollback strategy
 - [ ] GitHub Actions `on_failure: rollback` job already wired in deploy-k8s.yml
 
 ### P16 - Archived OCI go-live sign-off reference
+> ⚠️ ARCHIVED — OCI-only. Not required for Contabo production path. Kept for rollback context only.
 - OCI-only sign-off notes kept for rollback context. Not required for the current Contabo production cutover.
 - [ ] Manual smoke test: load traders.app, check consensus signal renders
 - [ ] Manual smoke test: `bff.traders.app/health` and `api.traders.app/health` both return healthy over HTTPS
@@ -575,11 +580,11 @@ Fallback-host note: DNS cutover to Cloudflare → Contabo done (2026-04-22). `tr
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-22 19:29`  -  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-22 19:31`  -  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Stage P Backlog  67.0%  [################--------]
-Sections        done 018 | active 001 | blocked 000 | pending 009 | total 030
+Sections        done 018 | active 002 | blocked 000 | pending 008 | total 030
 Checklist       done 134 | open 066 | total 200
 ```
 
@@ -597,7 +602,7 @@ Checklist       done 134 | open 066 | total 200
 | P26 - Architecture Freeze | [4/4] | 100.0% | DONE |
 | P26 - Repo-Side Contabo Execution | [11/11] | 100.0% | DONE |
 | P26 - Live Cutover ✅ IN PROGRESS | [15/17] |  88.2% | IN PROGRESS |
-| P09 - `kubectl apply tradersapp-deployments.yaml` on OCI E2.1.Micro | [23/50] |  46.0% | PENDING |
+| P09 - `kubectl apply tradersapp-deployments.yaml` on OCI E2.1.Micro (ARCHIVED — P26 is active) | [23/50] |  46.0% | IN PROGRESS |
 | P10 - Stateful Services Inside Free Limits ✅ DONE | [5/5] | 100.0% | DONE |
 | P11 - Archived OCI ingress / external access reference | [0/6] |   0.0% | PENDING |
 | P12 - Archived OCI DNS + TLS reference | [0/5] |   0.0% | PENDING |
