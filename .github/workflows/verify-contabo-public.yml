@@ -28,6 +28,9 @@ on:
 permissions:
   contents: read
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   verify:
     name: Verify Public Edge
@@ -92,6 +95,7 @@ jobs:
             .artifacts/contabo/
             .artifacts/k6-slo-*/
           if-no-files-found: ignore
+          include-hidden-files: true
           retention-days: 14
 
       - name: Send verification alert
