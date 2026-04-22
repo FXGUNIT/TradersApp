@@ -7,7 +7,7 @@
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-22 14:24`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-22 15:57`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Master Backlog  52.2%  [#############-----------]
@@ -87,11 +87,11 @@ How to read this:
 ## EXECUTION PRIORITY
 
 ### TIER 1 — ACTIVE NOW: Contabo VPS bootstrap + automated deploy
-Push TradersApp from GitHub Actions → Contabo VPS → Docker Compose → live at `traders.app`.
-Everything on the live production path is now blocked by public edge recovery plus the final DNS cutover to Contabo.
+Push TradersApp from GitHub Actions → Contabo VPS → Docker Compose → live at the approved public domain family.
+Everything on the live production path is now blocked by domain approval plus the final host cutover to Contabo.
 
-### TIER 2 — STAGING: runtime secrets + DNS cutover
-Once the Contabo deploy automation is ready, load runtime secrets, point DNS, and verify the public hosts.
+### TIER 2 — STAGING: runtime secrets + host-family cutover
+Once the Contabo deploy automation is ready and the requested domain is approved, load runtime secrets, point the approved root and subdomains, and verify the public hosts.
 
 ### TIER 3 — historical OCI archive / rollback path
 P09 and the OCI-only follow-on phases P11-P16 stay here as archival rollback context. Do not treat any OCI phase as required for the current Contabo production path.
@@ -104,22 +104,23 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 ## PRODUCTION CONSTRAINTS
 
 - Production topology is Contabo VPS single-host Docker Compose. OCI k3s is archival evidence and fallback only.
-- Keep the existing domain, but use the current registrar/DNS provider already attached to `traders.app` instead of adding a new paid platform.
+- Do not assume control of `traders.app`. The prepared public hostname family is `tradergunit.is-a.dev`, `bff.tradergunit.is-a.dev`, and `api.tradergunit.is-a.dev`, pending `is-a.dev` approval.
 - Do not cut app features to fit the server. Reduce infrastructure overhead first; keep trading logic, accuracy checks, and robustness requirements intact.
 - Robustness on a single VPS means deterministic boot, repeatable deploys, working health checks, backups, and recovery procedures. It does not imply multi-node HA.
-- Public production hosts must terminate on the Contabo VPS edge: `traders.app`, `bff.traders.app`, and `api.traders.app`.
+- Public production hosts must terminate on the Contabo VPS edge. Until the requested `is-a.dev` host family is approved, use the `sslip.io` fallback hosts only for temporary proof capture.
 
 ---
 
 ## STAGE P — Production Deployment (Live 24x7 on Contabo VPS + Docker Compose)
-*Target: GitHub Actions → single Contabo VPS → Docker Compose → `traders.app` + `bff.traders.app` + `api.traders.app`*
+*Target: GitHub Actions → single Contabo VPS → Docker Compose → approved root frontend host + matching `bff` and `api` hosts*
 
 ### Current Checkpoint - 2026-04-20
 - Production target is now Contabo VPS, not OCI k3s
 - Repo-side Contabo deployment assets are the active workstream: Compose bundle, reverse proxy, bootstrap scripts, runtime env builder, and GitHub Actions deploy workflow
 - Repo-side public verification is now wired three ways: local script, dedicated public-edge k6 suite, and GitHub Actions verification workflow
 - OCI P09, P11-P16, and P25 remain in this file only as historical evidence and fallback, not as the current production plan
-- The current hard blocker is no longer OCI memory pressure; it is the first real Contabo cutover with live Contabo VPS credentials, DNS, and runtime secrets
+- The current hard blocker is no longer OCI memory pressure; it is domain approval plus the first real Contabo public cutover with live runtime secrets
+- `traders.app` is not under repo-controlled DNS. The current requested production domain family is `tradergunit.is-a.dev`, `bff.tradergunit.is-a.dev`, and `api.tradergunit.is-a.dev`
 - Success now means: `git push main` builds/pushes images, SSHes to Contabo, runs Docker Compose, and leaves the public hosts healthy without laptop involvement
 
 
@@ -229,12 +230,12 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 
 **Runbook:** See `docs/P26_Contabo_Deployment_Plan.md`
 **Progress snapshot (2026-04-22):** Master backlog `133/255` complete (`52.2%`). Stage P `133/200` complete (`66.5%`). Active production phase `P26` is `29/32` complete (`90.6%`). OCI archive phases remain in this file for rollback evidence only and are not part of the active critical path.
-**Current blocker:** Automatic Contabo deploy is re-stabilized and the fallback `sslip.io` public hosts are healthy again, but final public cutover is still blocked because real DNS has not moved to Contabo.
+**Current blocker:** Automatic Contabo deploy is re-stabilized and the fallback `sslip.io` public hosts are healthy again, but final public cutover is blocked until the requested `tradergunit.is-a.dev` host family is approved and pointed at Contabo.
 
 #### P26 — Architecture Freeze
 - [x] Freeze production target as `Contabo VPS` with `Docker Compose`, not OCI k3s
 - [x] Freeze production delivery model as `GitHub Actions -> GHCR -> Contabo SSH deploy`
-- [x] Freeze public host layout as `traders.app`, `bff.traders.app`, and `api.traders.app`
+- [x] Freeze public host layout as one frontend root host plus matching `bff` and `api` hosts; current requested family is `tradergunit.is-a.dev`
 - [x] Keep OCI k3s artifacts in the repo as rollback/reference only, not as the default path
 
 #### P26 — Repo-Side Contabo Execution
@@ -255,7 +256,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [x] Add GitHub secret: `CONTABO_SSH_KEY` (private SSH key content)
 - [x] Add GitHub secret: `CONTABO_VPS_HOST` (VPS public IP address)
 - [x] Add GitHub secret: `CONTABO_VPS_USER` (`root`)
-- [x] Add GitHub variables: `PRODUCTION_DEPLOY_PLATFORM=contabo`, `CONTABO_DOMAIN=traders.app`, `CONTABO_APP_ROOT=/opt/tradersapp`, `INFISICAL_PROJECT_ID`
+- [x] Add GitHub variables: `PRODUCTION_DEPLOY_PLATFORM=contabo`, `CONTABO_DOMAIN=<current placeholder>`, `CONTABO_APP_ROOT=/opt/tradersapp`, `INFISICAL_PROJECT_ID`
 - [x] VPS docker-compose fixed: analysis-service command path corrected (`bff/analysis-server.mjs` → `analysis-server.mjs`)
 - [x] REPO_ROOT fixed in `analysis-server.mjs` and `analysisTransport.mjs` — proto resolves to `/app/proto/` in container (commit `f0079b9e` / `bbee2a5d`)
 - [x] New BFF image pulled to VPS (`f0079b9e24411297732a0151e7d27b129ced8819`) — proto path now resolves correctly
@@ -570,7 +571,7 @@ Fallback-host note (`2026-04-22`): off-box checks are back to green after the ed
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-22 14:24`  -  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-22 15:57`  -  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Stage P Backlog  66.5%  [################--------]

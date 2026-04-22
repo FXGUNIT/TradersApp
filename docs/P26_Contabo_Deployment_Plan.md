@@ -4,9 +4,23 @@
 **Target:** `Contabo VPS` single host with `Docker Compose`  
 **Pipeline:** `push main` -> `CI/CD Pipeline` -> `Deploy to Contabo VPS`
 
+## Current Domain State
+
+- Do not assume ownership of `traders.app`. That domain is not currently under repo-controlled DNS.
+- The prepared production hostname family is:
+  - `tradergunit.is-a.dev`
+  - `bff.tradergunit.is-a.dev`
+  - `api.tradergunit.is-a.dev`
+- Root request PR:
+  - `https://github.com/is-a-dev/register/pull/36802`
+- Until the root request is merged, public proof should continue on the Contabo fallback hosts:
+  - `https://173.249.18.14.sslip.io`
+  - `https://bff.173.249.18.14.sslip.io/health`
+  - `https://api.173.249.18.14.sslip.io/health`
+
 ## Topology
 
-- Public edge: Caddy on the VPS, terminating `traders.app`, `bff.traders.app`, and `api.traders.app`
+- Public edge: Caddy on the VPS, terminating the approved root frontend host plus matching `bff` and `api` hosts
 - Runtime: `frontend`, `bff`, `ml-engine`, `analysis-service`, `redis`
 - Optional profiles:
   - `mlops`: `postgres`, `minio`, `mlflow`
@@ -31,9 +45,9 @@
 ## Required GitHub Variables
 
 - `PRODUCTION_DEPLOY_PLATFORM=contabo` so successful `main` CI runs hand production deploys to the Contabo workflow instead of the legacy OCI job
-- `CONTABO_DOMAIN=traders.app` (optional if unchanged)
-- `BFF_PUBLIC_HOST=bff.traders.app` (optional if unchanged)
-- `API_PUBLIC_HOST=api.traders.app` (optional if unchanged)
+- `CONTABO_DOMAIN=<approved-root-domain>`
+- `BFF_PUBLIC_HOST=<approved-bff-domain>`
+- `API_PUBLIC_HOST=<approved-api-domain>`
 - `CONTABO_APP_ROOT=/opt/tradersapp` (optional if unchanged)
 - `CONTABO_COMPOSE_PROFILES=core` for first cutover; add `mlops` or `observability` later when needed
 
@@ -70,6 +84,62 @@ Prepared artifacts already staged for this cutover:
 - Repo cutover branch:
   - `origin/prep/tradergunit-domain-cutover`
 
+## Prepared Follow-On PR Text
+
+Use these verbatim once the root request is merged.
+
+### `api.tradergunit.is-a.dev`
+
+PR URL:
+- `https://github.com/FXGUNIT/register/pull/new/fxgunit/api-tradergunit-domain`
+
+Title:
+
+```text
+Add api.tradergunit.is-a.dev
+```
+
+Body:
+
+```text
+## Summary
+- request `api.tradergunit.is-a.dev` for the TradersApp backend API
+- point the subdomain to the self-hosted Contabo VPS
+- use it as the public API host for the production stack
+
+## DNS
+- `A 173.249.18.14`
+
+## Notes
+- root domain request already merged: `tradergunit.is-a.dev`
+```
+
+### `bff.tradergunit.is-a.dev`
+
+PR URL:
+- `https://github.com/FXGUNIT/register/pull/new/fxgunit/bff-tradergunit-domain`
+
+Title:
+
+```text
+Add bff.tradergunit.is-a.dev
+```
+
+Body:
+
+```text
+## Summary
+- request `bff.tradergunit.is-a.dev` for the TradersApp backend-for-frontend host
+- point the subdomain to the self-hosted Contabo VPS
+- use it as the public BFF host for the production stack
+
+## DNS
+- `A 173.249.18.14`
+
+## Notes
+- root domain request already merged: `tradergunit.is-a.dev`
+```
+
 ## Required GitHub Secrets
 
 - `CONTABO_VPS_HOST`
@@ -97,7 +167,7 @@ Prepared artifacts already staged for this cutover:
 ## First Cutover
 
 1. Provision the Contabo VPS and confirm SSH access.
-2. Point DNS for `traders.app`, `bff.traders.app`, and `api.traders.app` to the VPS IP.
+2. Point the approved root, `bff`, and `api` hosts to the VPS IP.
 3. Add the required GitHub variables and secrets.
 4. Run the bootstrap once on the VPS:
 
@@ -108,9 +178,9 @@ curl -fsSL https://raw.githubusercontent.com/fxgunit/TradersApp/main/scripts/con
 
 5. Push to `main` or run `Deploy to Contabo VPS` manually.
 6. Confirm remote health:
-   - `https://traders.app`
-   - `https://bff.traders.app/health`
-   - `https://api.traders.app/health`
+   - `https://<approved-root-domain>`
+   - `https://<approved-bff-domain>/health`
+   - `https://<approved-api-domain>/health`
 7. The deploy workflow now runs `scripts/contabo/verify_public_deploy.py` after the remote restart unless manual dispatch sets `skip_public_verify=true`.
 
 ## Public Verification
@@ -146,10 +216,10 @@ Artifacts:
 The dedicated Contabo public-edge suite intentionally targets the active host
 layout and low-blast-radius routes:
 
-- `https://traders.app/edge-health`
-- `https://bff.traders.app/health`
-- `https://bff.traders.app/ml/health`
-- `https://api.traders.app/predict`
+- `https://<approved-root-domain>/edge-health`
+- `https://<approved-bff-domain>/health`
+- `https://<approved-bff-domain>/ml/health`
+- `https://<approved-api-domain>/predict`
 
 ## Remote Layout
 
