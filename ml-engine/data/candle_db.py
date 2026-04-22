@@ -33,6 +33,37 @@ SQLITE_TRADE_LOG_POLICY_COLUMNS = {
     "is_training_eligible": "INTEGER",
 }
 
+SQLITE_SESSION_METADATA_COLUMNS = {
+    "candles_5min": {
+        "session_name": "TEXT NOT NULL DEFAULT 'main_trading'",
+        "session_timezone": "TEXT NOT NULL DEFAULT 'Asia/Kolkata'",
+        "trade_date_local": "TEXT",
+    },
+    "session_aggregates": {
+        "session_name": "TEXT NOT NULL DEFAULT 'main_trading'",
+        "session_timezone": "TEXT NOT NULL DEFAULT 'Asia/Kolkata'",
+    },
+    "trade_log": {
+        "session_name": "TEXT DEFAULT 'main_trading'",
+        "session_timezone": "TEXT DEFAULT 'Asia/Kolkata'",
+        "trade_date_local": "TEXT",
+    },
+    "signal_log": {
+        "session_name": "TEXT NOT NULL DEFAULT 'main_trading'",
+        "session_timezone": "TEXT NOT NULL DEFAULT 'Asia/Kolkata'",
+        "trade_date_local": "TEXT",
+        "regime": "TEXT",
+        "regime_confidence": "REAL",
+        "market_regime": "TEXT",
+        "session_phase": "TEXT",
+        "votes_json": "TEXT",
+        "consensus_json": "TEXT",
+        "matched_trade_id": "INTEGER",
+        "outcome_result": "TEXT",
+        "outcome_correct": "INTEGER",
+    },
+}
+
 POSTGRES_TRADE_LOG_POLICY_COLUMNS = {
     "source_uid": "TEXT",
     "source_role": "TEXT",
@@ -206,16 +237,45 @@ class SQLiteBackend(DatabaseBackend):
     def _init_schema(self):
         schema = SCHEMA_SQLITE.read_text()
         with self.conn() as c:
-            c.executescript(schema)
-            existing_columns = {
-                row[1] for row in c.execute("PRAGMA table_info(trade_log)").fetchall()
-            }
-            for column_name, column_type in SQLITE_TRADE_LOG_POLICY_COLUMNS.items():
-                if column_name in existing_columns:
-                    continue
-                c.execute(
-                    f"ALTER TABLE trade_log ADD COLUMN {column_name} {column_type}"
-                )
+            try:
+                c.executescript(schema)
+            except sqlite3.OperationalError as exc:
+                if "no such column" not in str(exc):
+                    raise
+                c.rollback()
+                self._apply_compat_migrations(c)
+                c.executescript(schema)
+            self._apply_compat_migrations(c)
+
+    def _apply_compat_migrations(self, conn: sqlite3.Connection) -> None:
+        for table_name, columns in SQLITE_SESSION_METADATA_COLUMNS.items():
+            self._ensure_sqlite_columns(conn, table_name, columns)
+        self._ensure_sqlite_columns(conn, "trade_log", SQLITE_TRADE_LOG_POLICY_COLUMNS)
+
+    def _ensure_sqlite_columns(
+        self,
+        conn: sqlite3.Connection,
+        table_name: str,
+        columns: dict[str, str],
+    ) -> None:
+        existing_tables = {
+            row[0]
+            for row in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            ).fetchall()
+        }
+        if table_name not in existing_tables:
+            return
+
+        existing_columns = {
+            row[1] for row in conn.execute(f"PRAGMA table_info({table_name})").fetchall()
+        }
+        for column_name, column_type in columns.items():
+            if column_name in existing_columns:
+                continue
+            conn.execute(
+                f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}"
+            )
 
     # ── Candle operations ──────────────────────────────────────────────────────
 
