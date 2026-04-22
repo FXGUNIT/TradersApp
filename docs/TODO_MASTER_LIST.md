@@ -1,5 +1,5 @@
 # TODO Master List
-**Last Updated:** 2026-04-22
+**Last Updated:** 2026-04-23
 **Status:** P26 ACTIVE — Contabo VPS + Docker Compose is the production path
 **Based on:** Stage P production deployment + Session Redesign + ML Research Foundation
 
@@ -7,7 +7,7 @@
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-22 22:17`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-23 05:15`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Master Backlog  58.0%  [##############----------]
@@ -236,7 +236,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 
 **Runbook:** See `docs/P26_Contabo_Deployment_Plan.md`
 **Progress snapshot (2026-04-22):** Master backlog `148/255` complete (`58.0%`). Stage P `134/200` complete (`67.0%`). Active production phase `P26` is `30/32` complete (`93.8%`). OCI archive phases remain in this file for rollback evidence only and are not part of the active critical path.
-**Current blocker:** branded domain ownership/control is still unresolved. The previous `tradergunit.is-a.dev` PR was closed; the corrected developer-root resubmission plus nested-domain cutover path is now the blocker. Keep the `sslip.io` fallback hosts as the public proof surface until approval lands.
+**Current blocker:** domain registration still needed. `tradergunit.is-a.dev` PR was closed without merge; `traders.app` Cloudflare zone is configured but not authoritative. Register a domain via any registrar, update Cloudflare A records to `173.249.18.14`, and the edge goes live. `sslip.io` fallback hosts remain the active public proof surface.
 
 #### P26 — Architecture Freeze
 - [x] Freeze production target as `Contabo VPS` with `Docker Compose`, not OCI k3s
@@ -273,10 +273,10 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [x] k6 public-edge verification now records first-envelope capture separately from threshold pass/fail
 - [x] Run the Contabo public-edge k6 suite and record the first concurrency envelope — first fallback-host envelope captured against `173.249.18.14.sslip.io` / `bff.173.249.18.14.sslip.io` / `api.173.249.18.14.sslip.io` on `2026-04-21`; evidence lives in `.artifacts/k6-slo-20260421T131612Z/` and shows threshold breaches (`bff_ml_health` fail rate about `79.2%`, `ml_predict` p95 about `1346ms`, `edge-health` p95 about `788ms`, `bff /health` p95 about `740ms`)
 - [x] **DNS CUTOVER** — `traders.app`, `bff.traders.app`, `api.traders.app` A records updated to Contabo `173.249.18.14` via Cloudflare (2026-04-22)
-- [ ] Confirm public health for `https://traders.app`, `https://bff.traders.app/health`, and `https://api.traders.app/health` (pending deploy + DNS propagation)
+- [ ] Confirm public health for `https://traders.app`, `https://bff.traders.app/health`, and `https://api.traders.app/health` (pending domain registration + DNS propagation)
 - [ ] Archive the final OCI node details only after Contabo is stable for at least one clean redeploy cycle
 
-Fallback-host note: DNS cutover to Cloudflare → Contabo done (2026-04-22). `traders.app`, `bff.traders.app`, `api.traders.app` now point to `173.249.18.14`. `sslip.io` fallback hosts still valid as secondary proof target. Public readiness verification pending deploy completion + DNS propagation.
+Fallback-host note: `sslip.io` hosts (`173.249.18.14.sslip.io`) are the active public proof surface. Domain registration + Cloudflare A record update will activate branded URLs. DNS propagated (TTL 3600s); allow up to 60 min from last change.
 
 #### P09-C - `kubectl apply tradersapp-deployments.yaml` on OCI E2.1.Micro (ARCHIVED — P26 is active)
 > ⚠️ P09-C is ARCHIVED. Contabo VPS (P26) is the active production path. Do not work on P09-C unless Contabo is abandoned.
@@ -585,7 +585,7 @@ Fallback-host note: DNS cutover to Cloudflare → Contabo done (2026-04-22). `tr
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-22 22:17`  -  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-23 05:15`  -  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Stage P Backlog  67.0%  [################--------]
