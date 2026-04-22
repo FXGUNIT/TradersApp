@@ -13,7 +13,6 @@
 
 {$TRADERSAPP_DOMAIN} {
   import security_headers
-  tls off
   encode zstd gzip
 
   @edge_health path /edge-health
