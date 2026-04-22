@@ -6,6 +6,7 @@ ENV_FILE=""
 APP_ROOT="/opt/tradersapp"
 GHCR_USERNAME=""
 GHCR_TOKEN_STDIN="0"
+IMAGE_TAG=""
 
 usage() {
   cat <<'EOF'
@@ -17,6 +18,7 @@ Options:
   --app-root DIR           Installation root on the server (default: /opt/tradersapp)
   --ghcr-username USER     GHCR username for docker login
   --ghcr-token-stdin       Read GHCR token from stdin
+  --image-tag TAG          Docker image tag for this deploy (e.g. commit SHA)
 EOF
 }
 
@@ -41,6 +43,10 @@ while [ "$#" -gt 0 ]; do
     --ghcr-token-stdin)
       GHCR_TOKEN_STDIN="1"
       shift
+      ;;
+    --image-tag)
+      IMAGE_TAG="$2"
+      shift 2
       ;;
     --help|-h)
       usage
@@ -162,8 +168,23 @@ fi
 COMPOSE_CMD="docker compose --project-name tradersapp --project-directory '${DEPLOY_ROOT}' --env-file '${RUNTIME_ENV}' -f '${DEPLOY_ROOT}/docker-compose.yml'"
 trap 'dump_failure_context' ERR
 
-echo "[deploy] Pulling images..."
-run_as_app "${COMPOSE_CMD} pull"
+# Guard: refuse to deploy if less than 20GB free on root filesystem
+AVAILABLE_KB=$(df --output=avail / | tail -1 | tr -d ' ')
+if [ "${AVAILABLE_KB}" -lt 20000000 ]; then
+  echo "[deploy] ERROR: Only $(df -h / | tail -1 | awk '{print $4}') free on / — refusing to pull images." >&2
+  echo "[deploy] Run 'docker image prune -a -f' to reclaim space." >&2
+  exit 1
+fi
+
+echo "[deploy] Pulling only images needed for this deployment..."
+OWNER="fxgunit"
+if [ -n "${IMAGE_TAG}" ]; then
+  run_as_app "docker pull ghcr.io/${OWNER}/bff:${IMAGE_TAG}"
+  run_as_app "docker pull ghcr.io/${OWNER}/ml-engine:${IMAGE_TAG}"
+  run_as_app "docker pull ghcr.io/${OWNER}/frontend:${IMAGE_TAG}"
+fi
+run_as_app "docker pull caddy:2.9.1-alpine"
+run_as_app "docker pull redis:7-alpine"
 
 echo "[deploy] Setting vm.overcommit_memory=1 (host kernel sysctl)..."
 sysctl -w vm.overcommit_memory=1 2>/dev/null || true
