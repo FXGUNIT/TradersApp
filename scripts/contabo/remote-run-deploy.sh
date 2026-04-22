@@ -7,6 +7,7 @@ SKIP_BOOTSTRAP="${SKIP_BOOTSTRAP:-true}"
 GHCR_USERNAME="${GHCR_USERNAME:-}"
 GHCR_TOKEN_B64_FILE="${GHCR_TOKEN_B64_FILE:-}"
 GHCR_TOKEN_STDIN="${GHCR_TOKEN_STDIN:-0}"
+IMAGE_TAG="${IMAGE_TAG:-}"
 
 run_privileged() {
   if [ "$(id -u)" -ne 0 ]; then
@@ -30,6 +31,8 @@ deploy_args=(
   --env-file "${RELEASE_DIR}/.env.contabo"
   --app-root "${APP_ROOT}"
 )
+
+[ -n "${IMAGE_TAG}" ] && deploy_args+=(--image-tag "${IMAGE_TAG}")
 
 if [ -n "${GHCR_USERNAME}" ]; then
   deploy_args+=(--ghcr-username "${GHCR_USERNAME}")

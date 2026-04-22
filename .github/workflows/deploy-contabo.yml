@@ -390,12 +390,20 @@ jobs:
           REMOTE_APP_ROOT='${{ steps.context.outputs.app_root }}'
           REMOTE_SKIP_BOOTSTRAP='${{ steps.context.outputs.skip_bootstrap }}'
           REMOTE_GHCR_USERNAME='${{ github.actor }}'
+          REMOTE_IMAGE_TAG='${{ steps.context.outputs.image_tag }}'
+
+          # Check available disk on Contabo VPS before deploying
+          AVAILABLE_KB=$(ssh contabo-vps "df --output=avail / | tail -1" 2>/dev/null | tr -d ' ')
+          if [ -z "${AVAILABLE_KB}" ] || [ "${AVAILABLE_KB}" -lt 20000000 ]; then
+            echo "::error::Contabo VPS has less than 20GB free (${AVAILABLE_KB}KB). Prune images first: ssh contabo-vps 'docker image prune -a -f'"
+            exit 1
+          fi
 
           run_remote_deploy() {
             {
               echo "=== bootstrap-and-deploy $(date -u +%Y-%m-%dT%H:%M:%SZ) ==="
               printf '%s' "${GHCR_TOKEN_B64}" | ssh -T contabo-vps \
-                "APP_ROOT='${REMOTE_APP_ROOT}' SKIP_BOOTSTRAP='${REMOTE_SKIP_BOOTSTRAP}' GHCR_USERNAME='${REMOTE_GHCR_USERNAME}' bash -lc 'set -euo pipefail; RELEASE_DIR=/tmp/tradersapp-contabo-release; cat > \"\$RELEASE_DIR/.ghcr-token.b64\"; tar -xzf \"\$RELEASE_DIR/contabo-bundle.tgz\" -C \"\$RELEASE_DIR\"; RELEASE_DIR=\"\$RELEASE_DIR\" APP_ROOT=\"\$APP_ROOT\" SKIP_BOOTSTRAP=\"\$SKIP_BOOTSTRAP\" GHCR_USERNAME=\"\$GHCR_USERNAME\" GHCR_TOKEN_B64_FILE=\"\$RELEASE_DIR/.ghcr-token.b64\" bash \"\$RELEASE_DIR/scripts/contabo/remote-run-deploy.sh\"'"
+                "APP_ROOT='${REMOTE_APP_ROOT}' SKIP_BOOTSTRAP='${REMOTE_SKIP_BOOTSTRAP}' GHCR_USERNAME='${REMOTE_GHCR_USERNAME}' IMAGE_TAG='${REMOTE_IMAGE_TAG}' bash -lc 'set -euo pipefail; RELEASE_DIR=/tmp/tradersapp-contabo-release; cat > \"\$RELEASE_DIR/.ghcr-token.b64\"; tar -xzf \"\$RELEASE_DIR/contabo-bundle.tgz\" -C \"\$RELEASE_DIR\"; RELEASE_DIR=\"\$RELEASE_DIR\" APP_ROOT=\"\$APP_ROOT\" SKIP_BOOTSTRAP=\"\$SKIP_BOOTSTRAP\" GHCR_USERNAME=\"\$GHCR_USERNAME\" IMAGE_TAG=\"\$IMAGE_TAG\" GHCR_TOKEN_B64_FILE=\"\$RELEASE_DIR/.ghcr-token.b64\" bash \"\$RELEASE_DIR/scripts/contabo/remote-run-deploy.sh\"'"
             } 2>&1 | tee -a .artifacts/contabo/bootstrap-and-deploy.log
           }
 
