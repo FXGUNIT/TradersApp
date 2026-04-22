@@ -7,7 +7,7 @@
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-22 10:10`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-22 10:11`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Master Backlog  52.2%  [#############-----------]
@@ -88,7 +88,7 @@ How to read this:
 
 ### TIER 1 — ACTIVE NOW: Contabo VPS bootstrap + automated deploy
 Push TradersApp from GitHub Actions → Contabo VPS → Docker Compose → live at `traders.app`.
-Everything on the live production path is blocked by the first successful Contabo cutover.
+Everything on the live production path is now blocked by public edge recovery plus the final DNS cutover to Contabo.
 
 ### TIER 2 — STAGING: runtime secrets + DNS cutover
 Once the Contabo deploy automation is ready, load runtime secrets, point DNS, and verify the public hosts.
@@ -228,7 +228,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 *Supersedes P25 as the real production route. Single-host Contabo VPS with GitHub Actions deployment is now the target architecture.*
 
 **Runbook:** See `docs/P26_Contabo_Deployment_Plan.md`
-**Progress snapshot (2026-04-22):** Master backlog `131/253` complete (`51.8%`). Stage P `131/198` complete (`66.2%`). Active production phase `P26` is `29/32` complete (`90.6%`). OCI archive phases remain in this file for rollback evidence only and are not part of the active critical path.
+**Progress snapshot (2026-04-22):** Master backlog `133/255` complete (`52.2%`). Stage P `133/200` complete (`66.5%`). Active production phase `P26` is `29/32` complete (`90.6%`). OCI archive phases remain in this file for rollback evidence only and are not part of the active critical path.
 **Current blocker:** Automatic Contabo deploy is fixed, but final public cutover is still blocked because real DNS has not moved to Contabo and the fallback `sslip.io` public hosts that passed on `2026-04-21` were refusing `:443` again during the latest local verification on `2026-04-22`.
 
 #### P26 — Architecture Freeze
@@ -570,7 +570,7 @@ Fallback-host note (`2026-04-22`): latest local report `.artifacts/contabo/publi
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-22 10:10`  -  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-22 10:11`  -  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Stage P Backlog  66.5%  [################--------]
