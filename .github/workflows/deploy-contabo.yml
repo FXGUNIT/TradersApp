@@ -116,7 +116,7 @@ jobs:
             DOMAIN="${{ vars.CONTABO_DOMAIN }}"
           fi
           if [ -z "${DOMAIN}" ]; then
-            DOMAIN="traders.app"
+            DOMAIN="tradergunit.is-a.dev"
           fi
 
           BFF_HOST="${{ vars.BFF_PUBLIC_HOST }}"

@@ -14,7 +14,7 @@
 
     <Property Id="ApplicationFolderName" Value="TradersApp Desktop" />
     <Property Id="WixAppFolder" Value="WixPerMachineFolder" />
-    <Property Id="ARPURLINFOABOUT" Value="https://traders.app" />
+    <Property Id="ARPURLINFOABOUT" Value="https://tradergunit.is-a.dev" />
     <Property Id="ARPNOREPAIR" Value="0" />
     <Property Id="ARPNOMODIFY" Value="0" />
 

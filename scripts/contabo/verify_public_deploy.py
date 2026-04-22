@@ -32,9 +32,9 @@ from urllib.request import Request, urlopen
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_FRONTEND_HOST = "traders.app"
-DEFAULT_BFF_HOST = "bff.traders.app"
-DEFAULT_API_HOST = "api.traders.app"
+DEFAULT_FRONTEND_HOST = "tradergunit.is-a.dev"
+DEFAULT_BFF_HOST = "bff.tradergunit.is-a.dev"
+DEFAULT_API_HOST = "api.tradergunit.is-a.dev"
 DEFAULT_TIMEOUT_SECONDS = 15.0
 
 

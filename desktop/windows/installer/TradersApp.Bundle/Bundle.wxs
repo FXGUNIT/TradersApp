@@ -6,7 +6,7 @@
       Manufacturer="TradersApp"
       Version="$(DesktopVersion)"
       UpgradeCode="{0FBF4C0A-BB81-4613-B717-273978E6A4A0}"
-      AboutUrl="https://traders.app"
+      AboutUrl="https://tradergunit.is-a.dev"
       Compressed="yes">
 
     <BootstrapperApplication>
