@@ -7,7 +7,7 @@
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-22 10:11`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-22 14:24`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Master Backlog  52.2%  [#############-----------]
@@ -229,7 +229,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 
 **Runbook:** See `docs/P26_Contabo_Deployment_Plan.md`
 **Progress snapshot (2026-04-22):** Master backlog `133/255` complete (`52.2%`). Stage P `133/200` complete (`66.5%`). Active production phase `P26` is `29/32` complete (`90.6%`). OCI archive phases remain in this file for rollback evidence only and are not part of the active critical path.
-**Current blocker:** Automatic Contabo deploy is fixed, but final public cutover is still blocked because real DNS has not moved to Contabo and the fallback `sslip.io` public hosts that passed on `2026-04-21` were refusing `:443` again during the latest local verification on `2026-04-22`.
+**Current blocker:** Automatic Contabo deploy is re-stabilized and the fallback `sslip.io` public hosts are healthy again, but final public cutover is still blocked because real DNS has not moved to Contabo.
 
 #### P26 — Architecture Freeze
 - [x] Freeze production target as `Contabo VPS` with `Docker Compose`, not OCI k3s
@@ -262,14 +262,14 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [x] All 5 core services locally healthy: `redis` ✅ `ml-engine` ✅ `analysis-service` ✅ `bff` ✅ `frontend` ✅ (2026-04-21 ~09:25 UTC)
 - [x] GitHub deploy-contabo workflow confirmed functional via manual SSH — `docker compose up` succeeds on VPS
 - [x] GitHub deploy-contabo `workflow_run` trigger replaced with `repository_dispatch` — CI now calls the repository dispatch endpoint with commit SHA payload so `deploy-contabo.yml` receives the expected automatic-deploy context (commit `4221c20a`)
-- [x] Automatic/manual `Deploy to Contabo VPS` bootstrap path stabilized on Contabo after image pushes; workflow run `24723298075` passed end-to-end on commit `053289b6`
+- [x] Automatic/manual `Deploy to Contabo VPS` bootstrap path stabilized on Contabo after image pushes; workflow run `24723298075` first passed end-to-end on commit `053289b6`, and the April 22 edge-readiness regression was re-fixed by commit `84eb0ca6` with workflow run `24769157865` passing end-to-end again
 - [x] k6 public-edge verification now records first-envelope capture separately from threshold pass/fail
 - [x] Run the Contabo public-edge k6 suite and record the first concurrency envelope — first fallback-host envelope captured against `173.249.18.14.sslip.io` / `bff.173.249.18.14.sslip.io` / `api.173.249.18.14.sslip.io` on `2026-04-21`; evidence lives in `.artifacts/k6-slo-20260421T131612Z/` and shows threshold breaches (`bff_ml_health` fail rate about `79.2%`, `ml_predict` p95 about `1346ms`, `edge-health` p95 about `788ms`, `bff /health` p95 about `740ms`)
 - [ ] **DNS CUTOVER PENDING** — `traders.app` A record still resolves to old OVH IP (`15.197.225.128 / 3.33.251.168`), must be updated to Contabo `173.249.18.14`; `bff.traders.app` and `api.traders.app` also need A records pointing to Contabo
 - [ ] Confirm public health for `https://traders.app`, `https://bff.traders.app/health`, and `https://api.traders.app/health` (requires DNS cutover first)
 - [ ] Archive the final OCI node details only after Contabo is stable for at least one clean redeploy cycle
 
-Fallback-host note (`2026-04-22`): latest local report `.artifacts/contabo/public-readiness-sslip-current.json` shows the `*.173.249.18.14.sslip.io` public hosts refusing `:443`, so fresh off-box public evidence must be recaptured after edge reachability is restored.
+Fallback-host note (`2026-04-22`): off-box checks are back to green after the edge readiness fix in commit `84eb0ca6` — `https://173.249.18.14.sslip.io/edge-health`, `https://bff.173.249.18.14.sslip.io/health`, and `https://api.173.249.18.14.sslip.io/health` all returned `200` on `2026-04-22`. Real production DNS is still pending: `traders.app` resolves to the old OVH edge, and `bff.traders.app` / `api.traders.app` still need public A records.
 
 #### P09-C - `kubectl apply tradersapp-deployments.yaml` on OCI E2.1.Micro
 - Root cause to treat as authoritative until disproven: OCI E2.1.Micro `1 GB RAM` is too small for `k3s + etcd + kubelet + containerd + the TradersApp core-4 pods` when applied as one rollout step
@@ -570,7 +570,7 @@ Fallback-host note (`2026-04-22`): latest local report `.artifacts/contabo/publi
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-22 10:11`  -  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-22 14:24`  -  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Stage P Backlog  66.5%  [################--------]
