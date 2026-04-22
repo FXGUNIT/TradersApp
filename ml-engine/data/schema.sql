@@ -11,11 +11,15 @@ CREATE TABLE IF NOT EXISTS candles_5min (
     volume          INTEGER NOT NULL,
     tick_volume     INTEGER DEFAULT 0,
     session_id      INTEGER NOT NULL DEFAULT 1,
+    session_name    TEXT NOT NULL DEFAULT 'main_trading',
+    session_timezone TEXT NOT NULL DEFAULT 'Asia/Kolkata',
+    trade_date_local TEXT,
     created_at      TEXT DEFAULT (datetime('now')),
     UNIQUE(timestamp, symbol)
 );
 CREATE INDEX IF NOT EXISTS idx_candles_ts ON candles_5min(timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_candles_sess ON candles_5min(session_id, timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_candles_session_name ON candles_5min(session_name, timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_candles_sym ON candles_5min(symbol, timestamp DESC);
 
 -- Precomputed session aggregates
@@ -24,6 +28,8 @@ CREATE TABLE IF NOT EXISTS session_aggregates (
     trade_date          TEXT NOT NULL,
     symbol              TEXT DEFAULT 'MNQ',
     session_id          INTEGER NOT NULL,
+    session_name        TEXT NOT NULL DEFAULT 'main_trading',
+    session_timezone    TEXT NOT NULL DEFAULT 'Asia/Kolkata',
 
     -- Price
     session_high        REAL NOT NULL,
@@ -53,6 +59,7 @@ CREATE TABLE IF NOT EXISTS session_aggregates (
     UNIQUE(trade_date, symbol, session_id)
 );
 CREATE INDEX IF NOT EXISTS idx_session_date ON session_aggregates(trade_date DESC);
+CREATE INDEX IF NOT EXISTS idx_session_name_date ON session_aggregates(session_name, trade_date DESC);
 
 -- Historical trade log (ML training labels)
 CREATE TABLE IF NOT EXISTS trade_log (
@@ -66,6 +73,9 @@ CREATE TABLE IF NOT EXISTS trade_log (
     exit_price      REAL,
     direction       INTEGER NOT NULL,
     session_id      INTEGER NOT NULL,
+    session_name    TEXT DEFAULT 'main_trading',
+    session_timezone TEXT DEFAULT 'Asia/Kolkata',
+    trade_date_local TEXT,
 
     -- Outcome
     pnl_ticks       REAL,
@@ -106,6 +116,7 @@ CREATE TABLE IF NOT EXISTS trade_log (
     UNIQUE(entry_time, symbol)
 );
 CREATE INDEX IF NOT EXISTS idx_trade_session ON trade_log(session_id, entry_time DESC);
+CREATE INDEX IF NOT EXISTS idx_trade_session_name ON trade_log(session_name, entry_time DESC);
 CREATE INDEX IF NOT EXISTS idx_trade_result ON trade_log(result, entry_time DESC);
 
 -- Model metadata
@@ -158,6 +169,9 @@ CREATE TABLE IF NOT EXISTS signal_log (
     signal_time         TEXT NOT NULL,
     symbol              TEXT NOT NULL DEFAULT 'MNQ',
     session_id          INTEGER NOT NULL DEFAULT 1,
+    session_name        TEXT NOT NULL DEFAULT 'main_trading',
+    session_timezone    TEXT NOT NULL DEFAULT 'Asia/Kolkata',
+    trade_date_local    TEXT,
 
     -- Signal output
     signal              TEXT NOT NULL,  -- LONG / SHORT / NEUTRAL

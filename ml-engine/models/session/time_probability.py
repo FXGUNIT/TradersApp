@@ -1,53 +1,84 @@
 """
-Time-of-Day Probability Model — predicts best entry windows per session.
-Trains on historical trade log: which 5-min buckets historically have highest win rate?
-Uses LightGBM to predict P(profitable_entry | time_features).
+Time-of-day probability model.
+
+Predicts the probability of a profitable entry for a given wall-clock bucket,
+using the canonical session configuration loaded through `config.py`.
 """
+
+from __future__ import annotations
+
+import os
+import sys
+from zoneinfo import ZoneInfo
+
+import lightgbm as lgb
 import numpy as np
 import pandas as pd
-import sys, os
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-import config
-from training.cross_validator import TimeSeriesCrossValidator
-
 from sklearn.calibration import CalibratedClassifierCV
+from sklearn.metrics import accuracy_score, log_loss, roc_auc_score
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import roc_auc_score, accuracy_score, log_loss
-import lightgbm as lgb
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
+import config
+from training.cross_validator import TimeSeriesCrossValidator
 
 
 class TimeProbabilityModel:
     """
-    Predicts probability of profitable entry for each 5-min time bucket.
-    Uses historical win rate by time-of-day + current conditions.
+    Predicts probability of profitable entry for each time bucket.
+
+    The model is session-aware: start times, labels, and timezone come from the
+    YAML-backed session context rather than hardcoded US-market assumptions.
     """
 
     name = "time_probability"
     model_type = "session"
 
     def __init__(self):
-        self.pipeline = Pipeline([
-            ("scaler", StandardScaler()),
-            ("clf", CalibratedClassifierCV(
-                lgb.LGBMClassifier(
-                    n_estimators=200,
-                    max_depth=4,
-                    learning_rate=0.05,
-                    num_leaves=15,
-                    min_child_samples=30,
-                    subsample=0.8,
-                    colsample_bytree=0.8,
-                    is_unbalance=True,
-                    random_state=42,
-                    n_jobs=-1,
-                    verbose=-1,
+        self._session_context = config.get_session_context()
+        self._session_timezone_name = self._session_context["default_timezone"]
+        self._session_timezone = ZoneInfo(self._session_timezone_name)
+        self._default_session_id = config.SESSION_NAME_TO_ID["main_trading"]
+        self._session_start_minutes = {
+            session_id: self._to_minutes(session_cfg["start"])
+            for session_id, session_cfg in self._session_context["by_id"].items()
+        }
+        self._session_labels = {
+            session_id: session_cfg["label"]
+            for session_id, session_cfg in self._session_context["by_id"].items()
+        }
+        self._session_display_names = {
+            session_id: session_cfg["display_name"]
+            for session_id, session_cfg in self._session_context["by_id"].items()
+        }
+
+        self.pipeline = Pipeline(
+            [
+                ("scaler", StandardScaler()),
+                (
+                    "clf",
+                    CalibratedClassifierCV(
+                        lgb.LGBMClassifier(
+                            n_estimators=200,
+                            max_depth=4,
+                            learning_rate=0.05,
+                            num_leaves=15,
+                            min_child_samples=30,
+                            subsample=0.8,
+                            colsample_bytree=0.8,
+                            is_unbalance=True,
+                            random_state=42,
+                            n_jobs=-1,
+                            verbose=-1,
+                        ),
+                        method="isotonic",
+                        cv=5,
+                    ),
                 ),
-                method="isotonic",
-                cv=5,
-            )),
-        ])
+            ]
+        )
         self._is_trained = False
         self._cv_scores: list[float] = []
         self._time_bucket_win_rates: dict[int, float] = {}
@@ -59,10 +90,7 @@ class TimeProbabilityModel:
         feature_cols: list[str] | None = None,
         verbose: bool = True,
     ) -> dict:
-        """
-        Train on trade log to predict P(profitable_entry | time_features).
-        Creates one row per trade with time features and label=is_win.
-        """
+        """Train on historical trade log rows."""
         if trade_log.empty:
             if verbose:
                 print("  TimeProbabilityModel: no trade data, using defaults")
@@ -72,7 +100,6 @@ class TimeProbabilityModel:
         trade_log = trade_log.dropna(subset=["entry_time"]).copy()
         trade_log["entry_time"] = pd.to_datetime(trade_log["entry_time"])
 
-        # Create time features
         X, y = self._build_time_features(trade_log)
 
         if len(X) < 50:
@@ -102,26 +129,27 @@ class TimeProbabilityModel:
             ll = log_loss(y_val, proba)
 
             self._cv_scores.append(roc_auc)
-            fold_metrics.append({
-                "fold": fold_idx + 1,
-                "roc_auc": round(roc_auc, 4),
-                "accuracy": round(acc, 4),
-            })
+            fold_metrics.append(
+                {
+                    "fold": fold_idx + 1,
+                    "roc_auc": round(roc_auc, 4),
+                    "accuracy": round(acc, 4),
+                    "log_loss": round(ll, 4),
+                }
+            )
 
             if verbose:
                 print(f"  Fold {fold_idx + 1}: ROC-AUC={roc_auc:.4f}  Acc={acc:.4f}")
 
         self.pipeline.fit(X, y)
         self._is_trained = True
-
-        # Compute time bucket win rates
         self._compute_time_buckets(X, y)
 
         result = {
             "model": self.name,
-            "cv_roc_auc_mean": round(np.mean(self._cv_scores), 4),
-            "cv_roc_auc_std": round(np.std(self._cv_scores), 4),
-            "cv_accuracy_mean": round(np.mean([f["accuracy"] for f in fold_metrics]), 4),
+            "cv_roc_auc_mean": round(float(np.mean(self._cv_scores)), 4),
+            "cv_roc_auc_std": round(float(np.std(self._cv_scores)), 4),
+            "cv_accuracy_mean": round(float(np.mean([f["accuracy"] for f in fold_metrics])), 4),
             "time_buckets": {str(k): round(v, 4) for k, v in self._time_bucket_win_rates.items()},
             "best_buckets": self._best_buckets(),
             "session_win_rates": {str(k): round(v, 4) for k, v in self._session_win_rates.items()},
@@ -129,77 +157,78 @@ class TimeProbabilityModel:
         }
 
         if verbose:
-            print(f"  TimeProbabilityModel CV ROC-AUC: {result['cv_roc_auc_mean']:.4f} ± {result['cv_roc_auc_std']:.4f}")
+            print(
+                "  TimeProbabilityModel CV ROC-AUC: "
+                f"{result['cv_roc_auc_mean']:.4f} +/- {result['cv_roc_auc_std']:.4f}"
+            )
             print(f"  Best time buckets: {self._best_buckets()}")
 
         return result
 
     def _build_time_features(self, trade_log: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series]:
-        """Build time-only feature matrix from trade log."""
-        et = trade_log["entry_time"].dt.tz_convert("America/New_York") if trade_log["entry_time"].dt.tz else trade_log["entry_time"]
-        hm = et.dt.hour * 60 + et.dt.minute
+        session_times = self._localize_entry_times(trade_log["entry_time"])
+        wall_clock_minutes = session_times.dt.hour * 60 + session_times.dt.minute
+        session_ids = trade_log.get(
+            "session_id",
+            pd.Series([self._default_session_id] * len(trade_log), index=trade_log.index),
+        ).fillna(self._default_session_id).astype(int)
 
-        X = pd.DataFrame({
-            "hour_of_day": et.dt.hour,
-            "minute_of_hour": et.dt.minute,
-            "time_bucket_5min": hm // 5,
-            "time_bucket_15min": hm // 15,
-            "day_of_week": et.dt.dayofweek,
-            "session_id": trade_log.get("session_id", pd.Series([1] * len(trade_log))).fillna(1).astype(int),
-            "minutes_into_session": self._minutes_into_session(et, trade_log.get("session_id", pd.Series([1] * len(trade_log)))),
-        })
+        X = pd.DataFrame(
+            {
+                "hour_of_day": session_times.dt.hour,
+                "minute_of_hour": session_times.dt.minute,
+                "time_bucket_5min": wall_clock_minutes // 5,
+                "time_bucket_15min": wall_clock_minutes // 15,
+                "day_of_week": session_times.dt.dayofweek,
+                "session_id": session_ids,
+                "minutes_into_session": self._minutes_into_session(wall_clock_minutes, session_ids),
+            }
+        )
 
         y = (trade_log["result"] == "win").astype(int)
         return X, y
 
-    def _minutes_into_session(self, et: pd.Series, session_ids: pd.Series) -> np.ndarray:
-        """Compute minutes elapsed since session start."""
-        session_starts = {
-            0: 4 * 60,   # Pre-market: 4:00 AM
-            1: 9 * 60 + 30,  # Main: 9:30 AM
-            2: 16 * 60 + 1,  # Post: 4:01 PM
-        }
-        session_starts_arr = session_ids.map(session_starts).fillna(9 * 60 + 30).values
-        hm = (et.dt.hour * 60 + et.dt.minute).values
-        return np.maximum(0, hm - session_starts_arr)
+    def _minutes_into_session(self, wall_clock_minutes: pd.Series, session_ids: pd.Series) -> np.ndarray:
+        default_start = self._session_start_minutes[self._default_session_id]
+        session_starts_arr = (
+            session_ids.map(self._session_start_minutes).fillna(default_start).astype(int).values
+        )
+        return np.maximum(0, wall_clock_minutes.astype(int).values - session_starts_arr)
 
     def _compute_time_buckets(self, X: pd.DataFrame, y: pd.Series) -> None:
-        """Compute win rate per 15-min bucket."""
         self._time_bucket_win_rates = {}
-        for bucket in range(0, 96):  # 0-95 for 96 15-min buckets in 24h
+        for bucket in range(0, 96):
             mask = X["time_bucket_15min"] == bucket
             if mask.sum() >= 5:
                 self._time_bucket_win_rates[bucket] = float(y[mask].mean())
 
         self._session_win_rates = {}
-        for sid in [0, 1, 2]:
+        for sid in self._session_context["by_id"]:
             mask = X["session_id"] == sid
             if mask.sum() >= 5:
                 self._session_win_rates[sid] = float(y[mask].mean())
 
     def _compute_defaults(self, X: pd.DataFrame, y: pd.Series) -> None:
-        """Use historical averages when not enough data."""
         self._time_bucket_win_rates = {}
         self._session_win_rates = {}
-        for sid in [0, 1, 2]:
+        for sid in self._session_context["by_id"]:
             mask = X["session_id"] == sid if "session_id" in X.columns else pd.Series([False] * len(X))
             if mask.sum() > 0:
                 self._session_win_rates[sid] = float(y[mask].mean())
 
     def _best_buckets(self) -> list[dict]:
-        """Return top 3 best performing 15-min time buckets."""
         sorted_buckets = sorted(
             self._time_bucket_win_rates.items(),
-            key=lambda x: x[1],
+            key=lambda item: item[1],
             reverse=True,
         )[:3]
         return [
             {
-                "bucket": b,
-                "start_time": f"{b * 15 // 60:02d}:{(b * 15) % 60:02d}",
-                "win_rate": round(wr, 4),
+                "bucket": bucket,
+                "start_time": f"{bucket * 15 // 60:02d}:{(bucket * 15) % 60:02d}",
+                "win_rate": round(win_rate, 4),
             }
-            for b, wr in sorted_buckets
+            for bucket, win_rate in sorted_buckets
         ]
 
     def predict(
@@ -220,34 +249,33 @@ class TimeProbabilityModel:
         hm = hour * 60 + minute
         minutes_in = self._minutes_into_session_for_time(hour, minute, session_id)
 
-        X = pd.DataFrame([{
-            "hour_of_day": hour,
-            "minute_of_hour": minute,
-            "time_bucket_5min": hm // 5,
-            "time_bucket_15min": bucket,
-            "day_of_week": day_of_week,
-            "session_id": session_id,
-            "minutes_into_session": minutes_in,
-        }])
+        X = pd.DataFrame(
+            [
+                {
+                    "hour_of_day": hour,
+                    "minute_of_hour": minute,
+                    "time_bucket_5min": hm // 5,
+                    "time_bucket_15min": bucket,
+                    "day_of_week": day_of_week,
+                    "session_id": session_id,
+                    "minutes_into_session": minutes_in,
+                }
+            ]
+        )
 
-        # Blend ML prediction with historical bucket win rate
         try:
             ml_proba = float(self.pipeline.predict_proba(X)[:, 1])
         except Exception:
-            ml_proba = 0.5  # fallback when not trained
+            ml_proba = 0.5
+
         bucket_wr = self._time_bucket_win_rates.get(bucket, 0.5)
         session_wr = self._session_win_rates.get(session_id, 0.5)
-
-        # Blend: 50% ML, 30% bucket, 20% session
         blended = 0.5 * ml_proba + 0.3 * bucket_wr + 0.2 * session_wr
         blended = float(np.clip(blended, 0.01, 0.99))
 
         confidence = max(blended, 1 - blended)
         best_buckets = self._best_buckets()
-
-        recommendation = self._get_recommendation(
-            blended, session_id, best_buckets, hour, minute
-        )
+        recommendation = self._get_recommendation(blended, session_id, best_buckets)
 
         return {
             "P_profitable": round(blended, 4),
@@ -259,12 +287,8 @@ class TimeProbabilityModel:
             "recommendation": recommendation,
         }
 
-    def _minutes_into_session_for_time(
-        self, hour: int, minute: int, session_id: int
-    ) -> int:
-        """Compute minutes into session for a specific hour:minute."""
-        session_starts = {0: 4 * 60, 1: 9 * 60 + 30, 2: 16 * 60 + 1}
-        start = session_starts.get(session_id, 9 * 60 + 30)
+    def _minutes_into_session_for_time(self, hour: int, minute: int, session_id: int) -> int:
+        start = self._session_start_minutes.get(session_id, self._session_start_minutes[self._default_session_id])
         return max(0, hour * 60 + minute - start)
 
     def _get_recommendation(
@@ -272,24 +296,46 @@ class TimeProbabilityModel:
         p_profitable: float,
         session_id: int,
         best_buckets: list[dict],
-        current_hour: int,
-        current_minute: int,
     ) -> str:
-        """Generate human-readable recommendation."""
-        if session_id == 0:
-            return "Pre-market: trade initial directional moves only. Best window: 04:30-05:30 ET."
-        elif session_id == 2:
-            return "Post-market: fade extensions only. Best window: 16:15-17:00 ET."
+        session_name = self._session_display_names.get(session_id, "Main Trading Session")
+        session_label = self._session_labels.get(session_id, "Main")
+        best_window = best_buckets[0]["start_time"] if best_buckets else "N/A"
 
-        # Main session
+        if session_id == config.SESSION_NAME_TO_ID["pre_market"]:
+            return (
+                f"{session_name}: trade opening imbalance only. "
+                f"Best historical window: {best_window} {self._session_timezone_name}."
+            )
+
+        if session_id == config.SESSION_NAME_TO_ID["post_market"]:
+            return (
+                f"{session_name}: treat moves as lower-liquidity continuation/fade setups. "
+                f"Best historical window: {best_window} {self._session_timezone_name}."
+            )
+
         if p_profitable >= 0.60:
-            return f"HIGH PROBABILITY window. P(win)={p_profitable:.0%}. Best historical: {best_buckets[0]['start_time'] if best_buckets else 'N/A'} ET."
-        elif p_profitable >= 0.52:
-            return f"Moderate edge. P(win)={p_profitable:.0%}. Best historical: {best_buckets[0]['start_time'] if best_buckets else 'N/A'} ET."
-        elif p_profitable >= 0.48:
+            return (
+                f"HIGH PROBABILITY window for {session_label}. "
+                f"P(win)={p_profitable:.0%}. Best historical: {best_window} {self._session_timezone_name}."
+            )
+        if p_profitable >= 0.52:
+            return (
+                f"Moderate edge. P(win)={p_profitable:.0%}. "
+                f"Best historical: {best_window} {self._session_timezone_name}."
+            )
+        if p_profitable >= 0.48:
             return f"Weak edge. P(win)={p_profitable:.0%}. Consider skipping this window."
-        else:
-            return f"NEGATIVE EDGE. P(win)={p_profitable:.0%}. Avoid entries — shift to next high-alpha window."
+        return f"NEGATIVE EDGE. P(win)={p_profitable:.0%}. Avoid entries and shift to the next high-alpha window."
+
+    def _localize_entry_times(self, entry_times: pd.Series) -> pd.Series:
+        if entry_times.dt.tz is not None:
+            return entry_times.dt.tz_convert(self._session_timezone)
+        return entry_times
+
+    @staticmethod
+    def _to_minutes(value: str) -> int:
+        hour, minute = value.split(":")
+        return int(hour) * 60 + int(minute)
 
     @property
     def is_trained(self) -> bool:
