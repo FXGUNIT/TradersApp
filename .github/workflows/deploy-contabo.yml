@@ -527,6 +527,7 @@ jobs:
         with:
           name: contabo-deploy-evidence-${{ github.run_id }}
           path: .artifacts/contabo/
+          include-hidden-files: true
           retention-days: 14
 
       - name: Send deploy alert
