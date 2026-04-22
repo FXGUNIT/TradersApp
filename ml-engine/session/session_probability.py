@@ -100,17 +100,35 @@ class SessionProbabilityModel:
         Return session name for a given timestamp.
 
         Args:
-            timestamp: datetime or pandas Timestamp (in Asia/Kolkata for NSE, UTC for US)
-            use_nse: if True, use NSE India sessions; else use Eastern Time sessions
+            timestamp: datetime or pandas Timestamp
+            use_nse: force the canonical NSE session context
 
         Returns:
             "pre_market", "main_trading", "post_market", or "closed"
         """
-        if not use_nse or not _NSE_AVAILABLE:
-            # Fallback to existing Eastern Time logic via assign_session_ids
-            return None  # let existing logic handle it
+        ts = pd.Series([timestamp])
+        session_context = _resolve_session_context(
+            pd.DataFrame({"timestamp": ts}),
+            use_nse=use_nse,
+        )
+        session_clock = _localize_to_session_timezone(ts, session_context)
+        local_ts = session_clock.iloc[0]
 
-        return _nse_loader.get_current_session(timestamp)
+        if _SESSION_LOADER is not None and session_context["default_timezone"] == config.DEFAULT_SESSION_TIMEZONE:
+            if not _SESSION_LOADER.is_trading_day(local_ts.date()):
+                return "closed"
+
+        minute_of_day = local_ts.hour * 60 + local_ts.minute
+        for session_id, session_cfg in sorted(
+            session_context["by_id"].items(),
+            key=lambda item: _time_to_minutes(item[1].get("start")),
+        ):
+            start_minute = _time_to_minutes(session_cfg.get("start"))
+            end_minute = _time_to_minutes(session_cfg.get("end"))
+            if start_minute <= minute_of_day < end_minute:
+                return config.SESSION_ID_TO_NAME.get(int(session_id), session_cfg.get("name", "main_trading"))
+
+        return "closed"
 
     def _prepare_session_features(self, candles_df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -124,8 +142,11 @@ class SessionProbabilityModel:
         if not pd.api.types.is_datetime64_any_dtype(df["timestamp"]):
             df["timestamp"] = pd.to_datetime(df["timestamp"])
 
-        df = assign_session_ids(df)
-        df["trade_date"] = df["timestamp"].dt.date
+        session_context = _resolve_session_context(df)
+        df = assign_session_ids(df, session_context=session_context)
+        session_clock = _localize_to_session_timezone(df["timestamp"], session_context)
+        df["trade_date"] = session_clock.dt.date
+        df["session_day_of_week"] = session_clock.dt.dayofweek
 
         results = []
         for (date, sess_id), grp in df.groupby(["trade_date", "session_id"]):
@@ -155,6 +176,7 @@ class SessionProbabilityModel:
             row = {
                 "trade_date": str(date),
                 "session_id": int(sess_id),
+                "session_name": config.SESSION_ID_TO_NAME.get(int(sess_id), "main_trading"),
                 "session_range_pct": (grp["high"].max() - grp["low"].min()) / grp["low"].min() if grp["low"].min() > 0 else 0,
                 "gap_pct": gap_pct,
                 "volume_ratio": grp["volume"].iloc[-5:].mean() / grp["volume"].mean() if grp["volume"].mean() > 0 else 1.0,
@@ -164,7 +186,7 @@ class SessionProbabilityModel:
                 "direction": direction,
                 "label": 1 if direction > 0 else 0,
                 "candle_count": len(grp),
-                "day_of_week": grp["timestamp"].iloc[0].dayofweek,
+                "day_of_week": int(grp["session_day_of_week"].iloc[0]),
                 "session_open": grp["open"].iloc[0],
                 "session_close": grp["close"].iloc[-1],
                 "prev_day_direction": 0,  # computed from trade log
@@ -223,20 +245,22 @@ class SessionProbabilityModel:
         Falls back to historical base rates if not trained.
         """
         base_rates = {0: 0.52, 1: 0.55, 2: 0.50}
+        session_ids = sorted(config.SESSION_CONFIG.keys())
 
         if not self._is_trained:
             return {
                 sid: {
+                    "session_name": config.SESSION_ID_TO_NAME.get(sid, "main_trading"),
                     "P_up": base_rates.get(sid, 0.5),
                     "confidence": 0.0,
                     "note": "Model not trained — using base rates",
                 }
-                for sid in [0, 1, 2]
+                for sid in session_ids
             }
 
         # Predict for each session type
         results = {}
-        for sid in [0, 1, 2]:
+        for sid in session_ids:
             X = pd.DataFrame([{
                 "session_range_pct": 0.008,
                 "gap_pct": 0.0,
@@ -248,6 +272,7 @@ class SessionProbabilityModel:
             }])
             p_up = self.pipeline.predict_proba(X)[0, 1]
             results[sid] = {
+                "session_name": config.SESSION_ID_TO_NAME.get(sid, "main_trading"),
                 "P_up": round(float(p_up), 4),
                 "P_down": round(float(1 - p_up), 4),
                 "confidence": round(float(max(p_up, 1 - p_up)), 4),
@@ -256,29 +281,43 @@ class SessionProbabilityModel:
         return results
 
 
-def get_best_entry_time(session_id: int = 1) -> dict:
+def get_best_entry_time(session_id: int = 1, session_context: dict | None = None) -> dict:
     """
     Returns best entry window for each session based on historical analysis.
     These are known optimal windows from the plan — in production,
     the time_probability model replaces these with ML-predicted values.
     """
-    windows = {
-        0: {  # Pre-market
-            "best_window": "04:30-05:30 ET",
-            "edge_type": "fade initial move",
-            "P_win_known": 0.52,
-        },
-        1: {  # Main
-            "best_window": "10:00-11:30 ET",
-            "edge_type": "follow session bias after first 30min",
-            "P_win_known": 0.58,
-            "worst_window": "11:30-13:00 ET",
-            "worst_P_win": 0.51,
-        },
-        2: {  # Post-market
-            "best_window": "16:15-17:00 ET",
-            "edge_type": "fade extensions only",
-            "P_win_known": 0.50,
-        },
+    session_context = session_context or config.get_session_context()
+    session_cfg = session_context["by_id"].get(session_id, session_context["by_id"][1])
+    timezone = session_cfg.get("timezone", session_context.get("default_timezone", config.DEFAULT_SESSION_TIMEZONE))
+    timezone_label = "IST" if timezone == "Asia/Kolkata" else "ET"
+
+    start_minute = _time_to_minutes(session_cfg.get("start"))
+    end_minute = _time_to_minutes(session_cfg.get("end"))
+
+    def _format_window(start_total_minutes: int, end_total_minutes: int) -> str:
+        return (
+            f"{start_total_minutes // 60:02d}:{start_total_minutes % 60:02d}"
+            f"-{end_total_minutes // 60:02d}:{end_total_minutes % 60:02d} {timezone_label}"
+        )
+
+    best_end = min(end_minute, start_minute + 90)
+    window = {
+        "session_name": session_cfg.get("name", config.SESSION_ID_TO_NAME.get(session_id, "main_trading")),
+        "best_window": _format_window(start_minute, best_end),
+        "P_win_known": {0: 0.52, 1: 0.58, 2: 0.50}.get(session_id, 0.55),
     }
-    return windows.get(session_id, windows[1])
+
+    if session_id == config.SESSION_NAME_TO_ID.get("pre_market", 0):
+        window["edge_type"] = "trade only after the opening auction stabilizes"
+        return window
+
+    if session_id == config.SESSION_NAME_TO_ID.get("post_market", 2):
+        window["edge_type"] = "fade late-session extensions only"
+        return window
+
+    midpoint = int((start_minute + end_minute) / 2)
+    window["edge_type"] = "follow session bias after the opening range"
+    window["worst_window"] = _format_window(max(start_minute, midpoint - 30), min(end_minute, midpoint + 30))
+    window["worst_P_win"] = 0.51
+    return window
