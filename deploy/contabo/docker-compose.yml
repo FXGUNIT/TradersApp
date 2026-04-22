@@ -42,6 +42,8 @@ services:
     image: redis:7-alpine
     container_name: traders-redis
     restart: unless-stopped
+    sysctls:
+      - vm.overcommit_memory=1
     command: redis-server --save 60 1000 --appendonly yes --loglevel warning
     ports:
       - "127.0.0.1:6379:6379"
@@ -50,9 +52,9 @@ services:
     mem_limit: 768m
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 15s
+      interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 3
     logging: *default-logging
 
   ml-engine:

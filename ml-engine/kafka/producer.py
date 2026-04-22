@@ -207,7 +207,7 @@ class KafkaProducerClient:
             # E02: transactional.id makes the producer the sole writer for this
             # producer instance across restarts. Each pod must have a unique value.
             "transactional.id": f"traders-ml-engine-{os.environ.get('MY_POD_NAME', socket.gethostname())}",
-            "transactional_id.conflict_timeout.ms": 30000,
+            "transactional.id.timeout.ms": 30000,
             "compression.type": "zstd",            # Compress messages
             "linger.ms": 5,                       # Batch up to 5ms
             "batch.size": 16384,                  # 16KB batch size

@@ -199,7 +199,7 @@ class KafkaConsumerClient:
             "session.timeout.ms": 30000,
             "max.poll.interval.ms": 300000,
             "fetch.min.bytes": 1,
-            "fetch.max.wait.ms": 500,
+            "fetch.wait.max.ms": 500,
             **kwargs,
         }
 

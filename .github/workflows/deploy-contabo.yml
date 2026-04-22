@@ -442,11 +442,11 @@ jobs:
           }
 
           capture_ps() {
-            run_remote_status ps > .artifacts/contabo/compose-ps.txt 2>&1
+            run_remote_status ps > .artifacts/contabo/compose-ps.txt 2>&1 || true
           }
 
           capture_logs() {
-            run_remote_status logs > .artifacts/contabo/compose-logs.txt 2>&1
+            run_remote_status logs > .artifacts/contabo/compose-logs.txt 2>&1 || true
           }
 
           attempt=1
