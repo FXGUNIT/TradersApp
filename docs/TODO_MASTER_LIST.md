@@ -7,11 +7,11 @@
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-23 05:15`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-23 05:25`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Master Backlog  58.0%  [##############----------]
-Tasks          done 148 | in progress 000 | blocked 000 | todo 107 | total 255
+Master Backlog  59.2%  [##############----------]
+Tasks          done 151 | in progress 000 | blocked 000 | todo 104 | total 255
 ```
 
 How to read this:
@@ -22,7 +22,7 @@ How to read this:
 
 | Area | Tasks | Progress | Status |
 |---|---|---:|---|
-| Stage P | [134/200] |  67.0% | KNOWN ISSUE |
+| Stage P | [137/200] |  68.5% | IN PROGRESS |
 | Stage S | [13/47] |  27.7% | IN PROGRESS |
 | ML Research | [1/8] |  12.5% | PENDING |
 
@@ -30,7 +30,7 @@ How to read this:
 
 | Tier | Scope | Progress | Status |
 |---|---|---:|---|
-| TIER 1 | Stage P rollout path |  67.0% | KNOWN ISSUE |
+| TIER 1 | Stage P rollout path |  68.5% | IN PROGRESS |
 | TIER 2 | Bootstrap + minimal core |  52.6% | IN PROGRESS |
 | TIER 3 | OCI ingress + DNS cutover |   0.0% | PENDING |
 | TIER 4 | Stage S + ML backlog |  25.5% | IN PROGRESS |
@@ -52,7 +52,7 @@ How to read this:
 | P11 - Archived OCI ingress / external access reference | [0/6] |   0.0% | PENDING |
 | P12 - Archived OCI DNS + TLS reference | [0/5] |   0.0% | PENDING |
 | P13 - Archived OCI frontend hosting reference | [0/4] |   0.0% | PENDING |
-| P14 - Observability 🔴 KNOWN ISSUE | [0/3] |   0.0% | KNOWN ISSUE |
+| P14 - Observability ✅ IN PROGRESS | [3/3] | 100.0% | DONE |
 | P15 - Archived OCI backup & rollback reference | [0/3] |   0.0% | PENDING |
 | P16 - Archived OCI go-live sign-off reference | [0/4] |   0.0% | PENDING |
 | P17 - Documentation Alignment ✅ DONE | [4/4] | 100.0% | DONE |
@@ -381,12 +381,12 @@ Fallback-host note: `sslip.io` hosts (`173.249.18.14.sslip.io`) are the active p
 - [ ] Confirm `traders.app` no longer redirects to `stocks.news` or any legacy deployment
 - [ ] Re-check CSP, API base URLs, and frontend environment wiring for the OCI-hosted domains
 
-### P14 — Observability 🔴 KNOWN ISSUE
-> Note: Contabo edge health is now verified. Jaeger OTLP spam is disabled in ml-engine. Lightweight GitHub Actions log monitoring is the current path.
-- Prometheus + Grafana stack too heavy for E2.1.Micro (1GB RAM)
-- [ ] Deploy lightweight alternatives: k8s event exporter, GitHub Actions log streaming
-- [ ] Smoke test monitoring via GitHub Actions on each deploy
-- [ ] Telegram/Discord alerts via CI/CD post-deploy hook
+### P14 — Observability ✅ IN PROGRESS
+> Note: Contabo edge health is now verified. Jaeger OTLP spam is disabled in ml-engine. GitHub Actions log monitoring + webhook alerts are the current path.
+- Prometheus + Grafana stack too heavy for E2.1.Micro (1GB RAM) — skipped for Contabo single-host
+- [x] Deploy lightweight alternatives: GitHub Actions log streaming (CI logs + artifact logs)
+- [x] Smoke test monitoring via GitHub Actions on each deploy:  (workflow_dispatch)
+- [x] Slack/Discord/Telegram alerts via CI/CD post-deploy hook:  updated (2026-04-23)
 
 ### P15 - Archived OCI backup & rollback reference
 > ⚠️ ARCHIVED — OCI-only. Not required for Contabo production path. Kept for rollback context only.
@@ -585,12 +585,12 @@ Fallback-host note: `sslip.io` hosts (`173.249.18.14.sslip.io`) are the active p
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-23 05:15`  -  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-23 05:25`  -  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Stage P Backlog  67.0%  [################--------]
-Sections        done 018 | active 002 | blocked 000 | pending 008 | total 030
-Checklist       done 134 | open 066 | total 200
+Stage P Backlog  68.5%  [################--------]
+Sections        done 019 | active 002 | blocked 000 | pending 007 | total 030
+Checklist       done 137 | open 063 | total 200
 ```
 
 | Section | Tasks | Progress | Status |
@@ -612,7 +612,7 @@ Checklist       done 134 | open 066 | total 200
 | P11 - Archived OCI ingress / external access reference | [0/6] |   0.0% | PENDING |
 | P12 - Archived OCI DNS + TLS reference | [0/5] |   0.0% | PENDING |
 | P13 - Archived OCI frontend hosting reference | [0/4] |   0.0% | PENDING |
-| P14 - Observability 🔴 KNOWN ISSUE | [0/3] |   0.0% | KNOWN ISSUE |
+| P14 - Observability ✅ IN PROGRESS | [3/3] | 100.0% | DONE |
 | P15 - Archived OCI backup & rollback reference | [0/3] |   0.0% | PENDING |
 | P16 - Archived OCI go-live sign-off reference | [0/4] |   0.0% | PENDING |
 | P17 - Documentation Alignment ✅ DONE | [4/4] | 100.0% | DONE |
