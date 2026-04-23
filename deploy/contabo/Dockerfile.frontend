@@ -7,8 +7,8 @@ RUN npm ci
 
 COPY . .
 
-ARG VITE_BFF_URL=https://bff.traders.app
-ARG VITE_API_URL=https://api.traders.app
+ARG VITE_BFF_URL=https://bff.173.249.18.14.sslip.io
+ARG VITE_API_URL=https://api.173.249.18.14.sslip.io
 ENV VITE_BFF_URL=${VITE_BFF_URL}
 ENV VITE_API_URL=${VITE_API_URL}
 

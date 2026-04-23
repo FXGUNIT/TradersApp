@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Legacy traders.app DNS helper kept for archived Cloudflare-managed host flows.
+# The current canonical public frontend is https://tradergunit.pages.dev/.
 # Updates Cloudflare DNS A records for TradersApp after Contabo deployment.
 # Requires CLOUDFLARE_API_EMAIL and CLOUDFLARE_API_KEY env vars.
 # Usage: ./update-cloudflare-dns.sh <contabo_ip>

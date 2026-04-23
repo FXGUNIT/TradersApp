@@ -1,4 +1,4 @@
-const DEFAULT_PROOF_FRONTEND = "https://173.249.18.14.sslip.io/";
+const DEFAULT_PROOF_FRONTEND = "https://tradergunit.pages.dev/";
 const DEFAULT_PROOF_BFF = "https://bff.173.249.18.14.sslip.io/health";
 const DEFAULT_PROOF_API = "https://api.173.249.18.14.sslip.io/health";
 

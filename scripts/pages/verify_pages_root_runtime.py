@@ -23,10 +23,10 @@ from urllib.request import Request, urlopen
 DEFAULT_ROOT_URL = "https://tradergunit.pages.dev"
 DEFAULT_BFF_BASE_URL = "https://bff.173.249.18.14.sslip.io"
 DEFAULT_API_BASE_URL = "https://api.173.249.18.14.sslip.io"
-DEFAULT_PROJECT_PREVIEW_URL = "https://173.249.18.14.sslip.io/"
+DEFAULT_PROJECT_PREVIEW_URL = "https://tradergunit.pages.dev/"
 DEFAULT_FALLBACK_BFF_BASE_URL = "https://bff.173.249.18.14.sslip.io"
 DEFAULT_FALLBACK_API_BASE_URL = "https://api.173.249.18.14.sslip.io"
-DEFAULT_FALLBACK_PROJECT_PREVIEW_URL = "https://173.249.18.14.sslip.io/"
+DEFAULT_FALLBACK_PROJECT_PREVIEW_URL = "https://tradergunit.pages.dev/"
 DEFAULT_TIMEOUT_SECONDS = 15.0
 EXPECTED_SECURITY_HEADERS = (
     "content-security-policy",

@@ -9,6 +9,7 @@ TRADERSAPP_DOMAIN="${TRADERSAPP_DOMAIN:-}"
 BFF_PUBLIC_HOST="${BFF_PUBLIC_HOST:-}"
 API_PUBLIC_HOST="${API_PUBLIC_HOST:-}"
 COMPOSE_PROFILES="${COMPOSE_PROFILES:-core}"
+CANONICAL_PUBLIC_FRONTEND="https://tradergunit.pages.dev"
 
 usage() {
   cat <<'EOF'
@@ -19,9 +20,9 @@ Options:
   --output FILE            Destination .env file
   --ghcr-owner OWNER       GHCR owner/org (required if absent from base env)
   --image-tag TAG          Image tag to deploy (default: latest)
-  --domain HOST            173.249.18.14.sslip.io public frontend hostname
-  --bff-host HOST          bff.173.249.18.14.sslip.io public hostname
-  --api-host HOST          api.173.249.18.14.sslip.io public hostname
+  --domain HOST            Contabo runtime-edge frontend hostname (default: 173.249.18.14.sslip.io)
+  --bff-host HOST          Contabo runtime-edge BFF hostname
+  --api-host HOST          Contabo runtime-edge API hostname
   --compose-profiles LIST  Optional compose profiles, comma-separated
 EOF
 }
@@ -135,7 +136,7 @@ COMPOSE_PROFILES=${COMPOSE_PROFILES}
 NODE_ENV=production
 BFF_HOST=0.0.0.0
 BFF_PORT=8788
-BFF_ALLOWED_ORIGINS=https://${TRADERSAPP_DOMAIN},https://${BFF_PUBLIC_HOST},https://${API_PUBLIC_HOST}
+BFF_ALLOWED_ORIGINS=${CANONICAL_PUBLIC_FRONTEND},https://${TRADERSAPP_DOMAIN},https://${BFF_PUBLIC_HOST},https://${API_PUBLIC_HOST}
 REDIS_HOST=redis
 REDIS_PORT=6379
 ML_ENGINE_URL=http://ml-engine:8001

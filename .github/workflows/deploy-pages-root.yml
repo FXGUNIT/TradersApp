@@ -65,7 +65,7 @@ jobs:
 
       - name: Build root bundle
         env:
-          VITE_PROOF_FRONTEND: https://${{ vars.TRADERSAPP_DOMAIN || vars.CONTABO_DOMAIN || '173.249.18.14.sslip.io' }}/
+          VITE_PROOF_FRONTEND: https://tradergunit.pages.dev/
           VITE_PROOF_BFF: https://${{ vars.BFF_PUBLIC_HOST || format('bff.{0}', vars.TRADERSAPP_DOMAIN || vars.CONTABO_DOMAIN || '173.249.18.14.sslip.io') }}/health
           VITE_PROOF_API: https://${{ vars.API_PUBLIC_HOST || format('api.{0}', vars.TRADERSAPP_DOMAIN || vars.CONTABO_DOMAIN || '173.249.18.14.sslip.io') }}/health
         run: npm run build
@@ -113,7 +113,7 @@ jobs:
             --root-url "https://tradergunit.pages.dev" \
             --bff-base-url "https://${{ vars.BFF_PUBLIC_HOST || format('bff.{0}', vars.TRADERSAPP_DOMAIN || vars.CONTABO_DOMAIN || '173.249.18.14.sslip.io') }}" \
             --api-base-url "https://${{ vars.API_PUBLIC_HOST || format('api.{0}', vars.TRADERSAPP_DOMAIN || vars.CONTABO_DOMAIN || '173.249.18.14.sslip.io') }}" \
-            --project-preview-url "https://${{ vars.TRADERSAPP_DOMAIN || vars.CONTABO_DOMAIN || '173.249.18.14.sslip.io' }}/" \
+            --project-preview-url "https://tradergunit.pages.dev/" \
             --output ".artifacts/pages-root/verification-${{ github.run_id }}.json" \
             --step-summary "${GITHUB_STEP_SUMMARY}"
 
@@ -151,7 +151,7 @@ jobs:
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           STATUS="success"
           TITLE="Pages root deploy verification passed"
-          BODY="Root: https://tradergunit.pages.dev | Frontend: https://${{ vars.TRADERSAPP_DOMAIN || vars.CONTABO_DOMAIN || '173.249.18.14.sslip.io' }}/ | BFF: https://${{ vars.BFF_PUBLIC_HOST || format('bff.{0}', vars.TRADERSAPP_DOMAIN || vars.CONTABO_DOMAIN || '173.249.18.14.sslip.io') }}/health | API: https://${{ vars.API_PUBLIC_HOST || format('api.{0}', vars.TRADERSAPP_DOMAIN || vars.CONTABO_DOMAIN || '173.249.18.14.sslip.io') }}/health"
+          BODY="Root: https://tradergunit.pages.dev | Public frontend: https://tradergunit.pages.dev/ | BFF: https://${{ vars.BFF_PUBLIC_HOST || format('bff.{0}', vars.TRADERSAPP_DOMAIN || vars.CONTABO_DOMAIN || '173.249.18.14.sslip.io') }}/health | API: https://${{ vars.API_PUBLIC_HOST || format('api.{0}', vars.TRADERSAPP_DOMAIN || vars.CONTABO_DOMAIN || '173.249.18.14.sslip.io') }}/health"
 
           if [ "${{ job.status }}" != "success" ]; then
             STATUS="error"

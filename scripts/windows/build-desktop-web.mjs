@@ -29,7 +29,7 @@ const env = {
     normalizeHttpsUrl(process.env.DESKTOP_BFF_URL) ||
     normalizeHttpsUrl(process.env.BFF_PUBLIC_HOST) ||
     process.env.VITE_BFF_URL ||
-    "https://bff.traders.app",
+    "https://bff.173.249.18.14.sslip.io",
   VITE_APP_VERSION:
     process.env.DESKTOP_APP_VERSION ||
     process.env.VITE_APP_VERSION ||

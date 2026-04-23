@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Stage P public endpoint probe for TradersApp.
+"""Legacy Stage P public endpoint probe for archived traders.app / OCI flows.
 
 This script performs deterministic checks for:
 1) DNS resolution
@@ -7,6 +7,8 @@ This script performs deterministic checks for:
 3) HTTPS endpoint availability
 
 It writes a timestamped JSON report for use in Stage P proof artifacts.
+
+The active canonical public frontend is now https://tradergunit.pages.dev/.
 """
 
 from __future__ import annotations

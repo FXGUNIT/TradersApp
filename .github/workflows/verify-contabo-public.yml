@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       frontend_host:
-        description: "Frontend public host"
+        description: "Contabo edge frontend host"
         required: false
         default: "173.249.18.14.sslip.io"
       bff_host:
@@ -109,7 +109,7 @@ jobs:
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           STATUS="success"
           TITLE="Contabo public verification passed"
-          BODY="Frontend: https://${{ inputs.frontend_host }} | BFF: https://${{ inputs.bff_host }}/health | API: https://${{ inputs.api_host }}/health"
+          BODY="Runtime edge: https://${{ inputs.frontend_host }} | BFF: https://${{ inputs.bff_host }}/health | API: https://${{ inputs.api_host }}/health"
 
           if [ "${{ job.status }}" != "success" ]; then
             STATUS="error"
@@ -134,7 +134,7 @@ jobs:
           {
             echo "## Contabo public verification"
             echo ""
-            echo "- Frontend: \`https://${{ inputs.frontend_host }}\`"
+            echo "- Runtime edge: \`https://${{ inputs.frontend_host }}\`"
             echo "- BFF health: \`https://${{ inputs.bff_host }}/health\`"
             echo "- API health: \`https://${{ inputs.api_host }}/health\`"
             echo "- k6 suite: \`${{ inputs.with_k6 }}\`"

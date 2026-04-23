@@ -19,21 +19,21 @@ const WORKSTREAMS = [
 const TIMELINE = [
   {
     step: "01",
-    title: "Cloudflare root",
+    title: "Canonical public root",
     body:
-      "tradergunit.pages.dev is the stable public developer root and portfolio surface.",
+      "tradergunit.pages.dev is the main public frontend entry and the stable portfolio surface for the project.",
   },
   {
     step: "02",
-    title: "Live project runtime",
+    title: "Runtime services",
     body:
-      "The trading application stays on the existing Contabo-backed runtime until the frontend and BFF boundary are cleaned up for a wider move.",
+      "Contabo continues to carry the current runtime edge for the BFF and API while the canonical public entry stays fixed on Pages.",
   },
   {
     step: "03",
-    title: "Custom domain later",
+    title: "Optional future branding",
     body:
-      "Once branding and domain ownership are finalized, the same public root can be moved behind a custom domain without changing the product stack first.",
+      "If branding changes later, it should alias the same public root instead of silently replacing the canonical host again.",
   },
 ];
 
@@ -49,11 +49,11 @@ function hostLabel(url) {
 
 const STACK_STATUS = [
   {
-    label: "Developer root",
+    label: "Canonical public root",
     value: DEVELOPER_ROOT_HOST,
   },
   {
-    label: "Project frontend",
+    label: "Public frontend target",
     value: hostLabel(PRIMARY_PROJECT_HOST),
   },
   {
@@ -69,15 +69,15 @@ const STACK_STATUS = [
 const PROOF_TARGETS = [
   {
     href: PRIMARY_PROJECT_HOST,
-    label: "Current frontend preview",
+    label: "Canonical public frontend",
   },
   {
     href: BFF_HEALTH_HOST,
-    label: "Current BFF health",
+    label: "Runtime BFF health",
   },
   {
     href: API_HEALTH_HOST,
-    label: "Current API health",
+    label: "Runtime API health",
   },
 ];
 
@@ -98,7 +98,6 @@ function currentHostname() {
 }
 
 export default function DeveloperRootLanding() {
-  const previewUrl = currentPreviewUrl();
   const hostname = currentHostname();
 
   return (
@@ -108,19 +107,20 @@ export default function DeveloperRootLanding() {
           <p className="developer-root-kicker">FXGUNIT // software systems</p>
           <h1>Developer root for Gunit&apos;s live trading infrastructure.</h1>
           <p className="developer-root-summary">
-            This Cloudflare Pages root is the public developer-facing home for
-            the stack behind TradersApp: a React trading shell, Node BFF,
-            Python ML engine, Windows thin client, and Contabo-backed runtime.
+            This Cloudflare Pages site is the canonical public entry for
+            TradersApp and the developer-facing home for the stack behind it:
+            a React trading shell, Node BFF, Python ML engine, Windows thin
+            client, and Contabo-backed runtime services.
           </p>
           <div className="developer-root-actions">
             <a href={GITHUB_PROFILE} target="_blank" rel="noreferrer">
               GitHub Profile
             </a>
-            <a href={PRIMARY_PROJECT_HOST} target="_blank" rel="noreferrer">
-              Project Preview
+            <a href={BFF_HEALTH_HOST} target="_blank" rel="noreferrer">
+              Runtime BFF Health
             </a>
-            <a href={previewUrl} target="_blank" rel="noreferrer">
-              This Landing Route
+            <a href={API_HEALTH_HOST} target="_blank" rel="noreferrer">
+              Runtime API Health
             </a>
           </div>
         </div>
@@ -143,10 +143,9 @@ export default function DeveloperRootLanding() {
         <article>
           <h2>Current build focus</h2>
           <p>
-            Shipping a globally reachable trading workstation without local
-            sidecars on user machines. The public root stays developer-facing
-            while the live product runtime continues on the current Contabo
-            fallback host family.
+            Keeping `tradergunit.pages.dev` as the single public entry point
+            while the Contabo runtime edge remains verifiable and stable for
+            the BFF and API service layer.
           </p>
         </article>
 

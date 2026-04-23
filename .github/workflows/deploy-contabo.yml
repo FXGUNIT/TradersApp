@@ -61,7 +61,7 @@ jobs:
       )
     environment:
       name: production
-      url: https://${{ vars.TRADERSAPP_DOMAIN || vars.CONTABO_DOMAIN || '173.249.18.14.sslip.io' }}
+      url: https://tradergunit.pages.dev
 
     steps:
       - name: Resolve deploy context
@@ -131,7 +131,7 @@ jobs:
 
           if [[ "${DOMAIN}" == *.sslip.io ]] || [[ "${BFF_HOST}" == *.sslip.io ]] || [[ "${API_HOST}" == *.sslip.io ]]; then
             if [ "${SKIP_PUBLIC_VERIFY}" != "true" ]; then
-              echo "::notice::Using sslip.io fallback runtime hosts; skipping public verification until production DNS is cut over."
+              echo "::notice::Using sslip.io runtime-edge proof hosts; skipping Contabo public verification until a non-fallback runtime host is configured. The canonical public frontend remains https://tradergunit.pages.dev/."
               SKIP_PUBLIC_VERIFY="true"
             fi
           fi
@@ -603,16 +603,16 @@ jobs:
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           STATUS="success"
           TITLE="Contabo deploy succeeded"
-          BODY="Domain: https://${{ steps.context.outputs.domain }} | Image tag: ${{ steps.context.outputs.image_tag }} | Public verify skipped: ${{ steps.context.outputs.skip_public_verify }}"
+          BODY="Public frontend: https://tradergunit.pages.dev | Runtime edge: https://${{ steps.context.outputs.domain }} | Image tag: ${{ steps.context.outputs.image_tag }} | Public verify skipped: ${{ steps.context.outputs.skip_public_verify }}"
 
           if [ "${{ job.status }}" != "success" ]; then
             STATUS="error"
             TITLE="Contabo deploy failed"
-            BODY="Domain: https://${{ steps.context.outputs.domain }} | Review artifact contabo-deploy-evidence-${{ github.run_id }} for compose, systemd, and bootstrap logs."
+            BODY="Runtime edge: https://${{ steps.context.outputs.domain }} | Review artifact contabo-deploy-evidence-${{ github.run_id }} for compose, systemd, and bootstrap logs."
           elif [ "${{ steps.public_summary.outputs.hard_failures || 'false' }}" = "true" ]; then
             STATUS="error"
             TITLE="Contabo deploy passed restart but public verification failed"
-            BODY="Failed checks: ${{ steps.public_summary.outputs.failed_checks || 'unknown' }} | Domain: https://${{ steps.context.outputs.domain }}"
+            BODY="Failed checks: ${{ steps.public_summary.outputs.failed_checks || 'unknown' }} | Runtime edge: https://${{ steps.context.outputs.domain }}"
           fi
 
           python scripts/ci/send_webhook_alert.py \
@@ -627,9 +627,10 @@ jobs:
           {
             echo "## Contabo deploy complete"
             echo ""
+            echo "- Public frontend: \`https://tradergunit.pages.dev\`"
             echo "- Commit: \`${{ steps.context.outputs.ref }}\`"
             echo "- Image tag: \`${{ steps.context.outputs.image_tag }}\`"
-            echo "- Domain: \`https://${{ steps.context.outputs.domain }}\`"
+            echo "- Runtime edge: \`https://${{ steps.context.outputs.domain }}\`"
             echo "- BFF health: \`https://${{ steps.context.outputs.bff_host }}/health\`"
             echo "- API health: \`https://${{ steps.context.outputs.api_host }}/health\`"
             echo "- Compose profiles: \`${{ steps.context.outputs.compose_profiles }}\`"

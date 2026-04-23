@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Verify public Contabo deployment readiness and optional load envelope.
+"""Verify public Contabo runtime-edge deployment readiness and optional load envelope.
 
 This script is the repo-side verification harness for the active Contabo
 production path. It performs:
 
 1. DNS resolution for the public hosts
 2. TLS handshakes for the public hosts
-3. HTTP probes for the public edge, BFF, and ML Engine hosts
+3. HTTP probes for the runtime edge, BFF, and ML Engine hosts
 4. Optional k6 load execution against low-blast-radius public routes
 
 Outputs:
