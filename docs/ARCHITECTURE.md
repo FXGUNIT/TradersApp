@@ -142,7 +142,7 @@
 
 **Latency SLA:** ML Consensus < 200ms (hard limit) · BFF → ML Engine < 5s timeout
 
-**Known gaps:** SQLite WAL mode enabled (thread-safe concurrent reads). Drift detection with continual learning (EWC + replay buffer). SLA monitoring with P50/P95/P99 per endpoint.
+**Known gaps:** SLA monitoring with P50/P95/P99 per endpoint.
 
 ---
 

@@ -7,11 +7,11 @@
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-23 20:28`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-23 22:10`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Master Backlog  69.4%  [#################-------]
-Tasks          done 177 | in progress 000 | blocked 000 | todo 078 | total 255
+Master Backlog  75.7%  [##################------]
+Tasks          done 193 | in progress 000 | blocked 000 | todo 062 | total 255
 ```
 
 How to read this:
@@ -23,8 +23,8 @@ How to read this:
 | Area | Tasks | Progress | Status |
 |---|---|---:|---|
 | Stage P | [138/200] |  69.0% | IN PROGRESS |
-| Stage S | [38/47] |  80.9% | PENDING |
-| ML Research | [1/8] |  12.5% | PENDING |
+| Stage S | [47/47] | 100.0% | DONE |
+| ML Research | [8/8] | 100.0% | DONE |
 
 ### By Tier
 
@@ -33,7 +33,7 @@ How to read this:
 | TIER 1 | Stage P overall |  69.0% | IN PROGRESS |
 | TIER 2 | Active Contabo production path |  96.9% | IN PROGRESS |
 | TIER 3 | Archived OCI fallback / evidence |  29.1% | ARCHIVED |
-| TIER 4 | Stage S + ML backlog |  70.9% | PENDING |
+| TIER 4 | Stage S + ML backlog | 100.0% | DONE |
 
 ### By Phase
 
@@ -69,15 +69,15 @@ How to read this:
 | S2 - BFF Multi-Instrument Routing | [7/7] | 100.0% | DONE |
 | S3 - Frontend Dashboard Redesign | [13/13] | 100.0% | DONE |
 | S4 - Options Module (Greenfield) | [7/7] | 100.0% | DONE |
-| S5 - Economic Calendar & Expiry Calendar | [0/5] |   0.0% | PENDING |
-| S6 - Database + Trade Logging | [0/4] |   0.0% | PENDING |
-| ML1 - Volatility Surface建模 (Bergomi-like) | [0/1] |   0.0% | PENDING |
-| ML2 - HMM Regime Detection (upgrade from FP-FK) | [0/1] |   0.0% | PENDING |
-| ML3 - Anomalous Diffusion (Lévy processes) | [0/1] |   0.0% | PENDING |
-| ML4 - Mamba Sequence Model | [0/1] |   0.0% | PENDING |
-| ML5 - PFHedge for Greeks-aware hedging | [0/1] |   0.0% | PENDING |
-| ML6 - Alpha Signal Ensemble | [0/1] |   0.0% | PENDING |
-| ML7 - Continual Learning (EWC + replay buffer) | [0/1] |   0.0% | PENDING |
+| S5 - Economic Calendar & Expiry Calendar | [5/5] | 100.0% | DONE |
+| S6 - Database + Trade Logging | [4/4] | 100.0% | DONE |
+| ML1 - Volatility Surface建模 (Bergomi-like) | [1/1] | 100.0% | DONE |
+| ML2 - HMM Regime Detection (upgrade from FP-FK) | [1/1] | 100.0% | DONE |
+| ML3 - Anomalous Diffusion (Lévy processes) | [1/1] | 100.0% | DONE |
+| ML4 - Mamba Sequence Model | [1/1] | 100.0% | DONE |
+| ML5 - PFHedge for Greeks-aware hedging | [1/1] | 100.0% | DONE |
+| ML6 - Alpha Signal Ensemble | [1/1] | 100.0% | DONE |
+| ML7 - Continual Learning (EWC + replay buffer) | [1/1] | 100.0% | DONE |
 | ML8 - Backtesting rig (kernc-backtesting) | [1/1] | 100.0% | DONE |
 
 <!-- master-progress:end -->
@@ -526,30 +526,30 @@ Fallback-host note: `sslip.io` hosts (`173.249.18.14.sslip.io`) remain the activ
 - [x] S4-07 — Update position sizing panel for options
 
 ### Phase S5 — Economic Calendar & Expiry Calendar
-- [ ] S5-01 — Create `bff/services/expiryCalendar.mjs`
-- [ ] S5-02 — Create `ml-engine/calendar/_seeds.py`
-- [ ] S5-03 — Create `ml-engine/calendar/forex_seeds.py`
-- [ ] S5-04 — Create `bff/services/forexFactoryScraper.mjs`
-- [ ] S5-05 — Update `bff/services/breakingNewsService.mjs`
+- [x] S5-01 — Create `bff/services/expiryCalendar.mjs`
+- [x] S5-02 — Create `ml-engine/calendar/_seeds.py`
+- [x] S5-03 — Create `ml-engine/calendar/forex_seeds.py`
+- [x] S5-04 — Create `bff/services/forexFactoryScraper.mjs`
+- [x] S5-05 — Update `bff/services/breakingNewsService.mjs`
 
 ### Phase S6 — Database + Trade Logging
-- [ ] S6-01 — Run ALTER TABLE migration for session metadata
-- [ ] S6-02 — Create `ml-engine/data/candle_db.py` trade log insert
-- [ ] S6-03 — Implement partial exit tracking
-- [ ] S6-04 — Create paper trade log view
+- [x] S6-01 — Run ALTER TABLE migration for session metadata
+- [x] S6-02 — Create `ml-engine/data/candle_db.py` trade log insert
+- [x] S6-03 — Implement partial exit tracking
+- [x] S6-04 — Create paper trade log view
 
 ---
 
 ## STAGES ML1–ML8 — ML Engine Research & Implementation
 *See: `ml_engine_research_foundation.md` for full reading list and architecture*
 
-- [ ] ML1 — Volatility Surface建模 (Bergomi-like)
-- [ ] ML2 — HMM Regime Detection (upgrade from FP-FK)
-- [ ] ML3 — Anomalous Diffusion (Lévy processes)
-- [ ] ML4 — Mamba Sequence Model
-- [ ] ML5 — PFHedge for Greeks-aware hedging
-- [ ] ML6 — Alpha Signal Ensemble
-- [ ] ML7 — Continual Learning (EWC + replay buffer)
+- [x] ML1 — Volatility Surface建模 (Bergomi-like)
+- [x] ML2 — HMM Regime Detection (upgrade from FP-FK)
+- [x] ML3 — Anomalous Diffusion (Lévy processes)
+- [x] ML4 — Mamba Sequence Model
+- [x] ML5 — PFHedge for Greeks-aware hedging
+- [x] ML6 — Alpha Signal Ensemble
+- [x] ML7 — Continual Learning (EWC + replay buffer)
 - [x] ML8 — Backtesting rig (kernc-backtesting)
 
 ---
@@ -584,7 +584,7 @@ Fallback-host note: `sslip.io` hosts (`173.249.18.14.sslip.io`) remain the activ
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-23 20:28`  -  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-23 22:10`  -  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Stage P Backlog  69.0%  [#################-------]

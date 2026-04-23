@@ -87,7 +87,7 @@ This register provides a business-level summary of all Architecture Decision Rec
 | ADR-009 | ✅ Complete | Infisical integrated in CI/CD |
 | ADR-010 | ✅ Complete | BFF deployed and operational |
 | ADR-011 | ✅ Complete | Physics models implemented |
-| ADR-012 | 🔄 Partial | EWC implemented, replay buffer planned |
+| ADR-012 | ✅ Complete | EWC + replay buffer implemented and covered by repo-local tests |
 | ADR-013 | 🔄 Partial | Unit tests exist, chaos engineering partial |
 | ADR-014 | ✅ Complete | Observability stack deployed |
 | ADR-015 | 🔄 Partial | Keycloak deployed, not integrated with BFF |
