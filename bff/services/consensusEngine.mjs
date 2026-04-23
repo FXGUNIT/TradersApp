@@ -352,7 +352,7 @@ export async function getMlConsensus({
   const features = buildMlFeatureVector(mathEngine, recentCandles, keyLevels, sessionId);
 
   // Per-instrument circuit breaker gate
-  if (!shouldAllowRequest(resolvedSymbol)) {
+  if (!cbShouldAllowRequest(resolvedSymbol)) {
     return {
       ok: false,
       source: "circuit_breaker_fallback",
