@@ -1,11 +1,12 @@
 # Admin Auth BFF Setup
 
-This project no longer verifies the admin password in the browser. The frontend now calls the local BFF route `/api/admin/verify-password`, and the BFF checks the hash from environment secrets.
+This project no longer verifies the admin password in the browser. The frontend sends the plain password to the BFF over HTTPS, and the BFF checks the hash from server-side environment secrets.
 
 ## What Changed
 
 - Frontend admin unlock now calls `src/services/adminAuthService.js`.
 - Backend verification runs in `bff/server.mjs`.
+- Browser bundles no longer read `VITE_MASTER_SALT`.
 - Local Vite dev now proxies `/api/*` to `http://127.0.0.1:8788/*`.
 - The BFF includes a 3-attempt lockout over a 15-minute window.
 
@@ -18,6 +19,7 @@ Store these in Infisical for the BFF runtime:
 - `BFF_HOST` optional, defaults to `127.0.0.1`
 - `BFF_PORT` optional, defaults to `8788`
 - `BFF_ALLOWED_ORIGINS` optional, comma-separated origins for non-local deployments
+- `BFF_TELEGRAM_BOT_TOKEN` and `BFF_TELEGRAM_CHAT_ID` if Telegram alerts are enabled
 
 Frontend runtime values:
 
@@ -39,9 +41,7 @@ Server-only AI / notification values:
 - `AI_CEREBRAS_KEY`
 - `AI_DEEPSEEK_KEY`
 - `AI_SAMBANOVA_KEY`
-- `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` if Telegram alerts are enabled
-
-Do not keep provider secrets under `VITE_*` names. Those are browser-exposed by design.
+Do not keep `MASTER_SALT`, admin hashes, AI provider keys, or Telegram bot credentials under `VITE_*` names. Those are browser-exposed by design.
 
 See `.env.example` for the full key list.
 
@@ -97,5 +97,6 @@ Expected response:
 
 - Keep `BFF_ADMIN_PASS_HASH` and `MASTER_SALT` server-side only.
 - Reverse proxy `/api` to the BFF or set `VITE_BFF_URL` to the deployed BFF origin.
+- For `tradergunit.pages.dev`, set `VITE_BFF_URL` explicitly and include `https://tradergunit.pages.dev` in `BFF_ALLOWED_ORIGINS`.
 - Do not expose the admin plain password in any frontend env file.
 - The admin unlock flow will fail closed if the BFF secret is missing.
