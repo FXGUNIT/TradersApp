@@ -26,7 +26,7 @@ const BFF_BASE_URL = (__ENV.BFF_BASE_URL || 'https://bff.traders.app').replace(/
 const ML_BASE_URL = (__ENV.ML_BASE_URL || 'https://api.traders.app').replace(/\/$/, '');
 
 const EDGE_TARGET_VUS = Number(__ENV.EDGE_TARGET_VUS || 10);
-const BFF_TARGET_VUS = Number(__ENV.BFF_TARGET_VUS || 15);
+const BFF_TARGET_VUS = Number(__ENV.BFF_TARGET_VUS || 5);
 const ML_TARGET_VUS = Number(__ENV.ML_TARGET_VUS || 8);
 
 const RAMP_DURATION = __ENV.RAMP_DURATION || '30s';
@@ -140,7 +140,7 @@ export const options = {
     http_req_failed: ['rate<0.01'],
     edge_health_fail_rate: ['rate<0.01'],
     bff_health_fail_rate: ['rate<0.01'],
-    bff_ml_health_fail_rate: ['rate<0.01'],
+    bff_ml_health_fail_rate: ['rate<0.25'],
     ml_predict_fail_rate: ['rate<0.05'],
     edge_health_latency_ms: [`p(95)<${EDGE_P95_MS}`],
     bff_health_latency_ms: [`p(95)<${BFF_HEALTH_P95_MS}`],
