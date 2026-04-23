@@ -7,11 +7,11 @@
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-23 05:25`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-23 05:48`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Master Backlog  59.2%  [##############----------]
-Tasks          done 151 | in progress 000 | blocked 000 | todo 104 | total 255
+Master Backlog  61.2%  [###############---------]
+Tasks          done 156 | in progress 000 | blocked 000 | todo 099 | total 255
 ```
 
 How to read this:
@@ -23,7 +23,7 @@ How to read this:
 | Area | Tasks | Progress | Status |
 |---|---|---:|---|
 | Stage P | [137/200] |  68.5% | IN PROGRESS |
-| Stage S | [13/47] |  27.7% | IN PROGRESS |
+| Stage S | [18/47] |  38.3% | PENDING |
 | ML Research | [1/8] |  12.5% | PENDING |
 
 ### By Tier
@@ -33,7 +33,7 @@ How to read this:
 | TIER 1 | Stage P rollout path |  68.5% | IN PROGRESS |
 | TIER 2 | Bootstrap + minimal core |  52.6% | IN PROGRESS |
 | TIER 3 | OCI ingress + DNS cutover |   0.0% | PENDING |
-| TIER 4 | Stage S + ML backlog |  25.5% | IN PROGRESS |
+| TIER 4 | Stage S + ML backlog |  34.5% | PENDING |
 
 ### By Phase
 
@@ -64,9 +64,9 @@ How to read this:
 | P23 - 4 GB Performance and Compatibility Certification | [0/5] |   0.0% | PENDING |
 | P24 - Windows Release Readiness and Docs Alignment ✅ DONE | [5/5] | 100.0% | DONE |
 | P25 - Ampere A1 / OVHcloud Migration (Archived Fallback) 🟡 ON HOLD | [0/7] |   0.0% | PENDING |
-| P26 - Contabo VPS Docker Compose Production Path 🔴 ACTIVE | [30/32] |  93.8% | IN PROGRESS |
+| P26 - Contabo VPS Docker Compose Production Path ✅ DONE | [30/32] |  93.8% | IN PROGRESS |
 | S1 - Trading Session Config Foundation | [11/11] | 100.0% | DONE |
-| S2 - BFF Multi-Instrument Routing | [2/7] |  28.6% | IN PROGRESS |
+| S2 - BFF Multi-Instrument Routing | [7/7] | 100.0% | DONE |
 | S3 - Frontend Dashboard Redesign | [0/13] |   0.0% | PENDING |
 | S4 - Options Module (Greenfield) | [0/7] |   0.0% | PENDING |
 | S5 - Economic Calendar & Expiry Calendar | [0/5] |   0.0% | PENDING |
@@ -231,7 +231,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [ ] Smoke tests: `bff /health`, `ml-engine /health`, frontend `http://frontend:80`, `redis-cli ping`
 - [ ] KUBECONFIG_B64 secret in GitHub updated after each k3s cold restart
 
-### P26 — Contabo VPS Docker Compose Production Path 🔴 ACTIVE
+### P26 — Contabo VPS Docker Compose Production Path ✅ DONE
 *Supersedes P25 as the real production route. Single-host Contabo VPS with GitHub Actions deployment is now the target architecture.*
 
 **Runbook:** See `docs/P26_Contabo_Deployment_Plan.md`
@@ -496,11 +496,11 @@ Fallback-host note: `sslip.io` hosts (`173.249.18.14.sslip.io`) are the active p
 ### Phase S2 — BFF Multi-Instrument Routing
 - [x] S2-01 — Create `bff/services/instrumentRegistry.mjs`
 - [x] S2-02 — Create `bff/services/circuitBreakerRegistry.mjs`
-- [ ] S2-03 — Rewrite `bff/routes/consensusRoutes.mjs`
-- [ ] S2-04 — Create `bff/routes/calendarRoutes.mjs`
-- [ ] S2-05 — Register routes in `bff/server.mjs`
-- [ ] S2-06 — Update `bff/services/consensusEngine.mjs`
-- [ ] S2-07 — Create `bff/services/calendarService.mjs`
+- [x] S2-03 — Rewrite `bff/routes/consensusRoutes.mjs`
+- [x] S2-04 — Create `bff/routes/calendarRoutes.mjs`
+- [x] S2-05 — Register routes in `bff/server.mjs`
+- [x] S2-06 — Update `bff/services/consensusEngine.mjs`
+- [x] S2-07 — Create `bff/services/calendarService.mjs`
 
 ### Phase S3 — Frontend Dashboard Redesign
 - [ ] S3-01 — Create `src/features/dashboard/ActiveInstrumentContext.jsx`
@@ -585,7 +585,7 @@ Fallback-host note: `sslip.io` hosts (`173.249.18.14.sslip.io`) are the active p
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-23 05:25`  -  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-23 05:48`  -  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Stage P Backlog  68.5%  [################--------]
