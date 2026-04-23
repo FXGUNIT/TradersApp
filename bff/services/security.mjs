@@ -468,11 +468,16 @@ export function getRateLimitConfig(pathname) {
   if (pathname.startsWith("/admin/")) {
     return { name: "admin", ...RATE_LIMIT_CONFIGS.admin };
   }
+  if (
+    pathname === "/health" ||
+    pathname === "/ai/status" ||
+    pathname === "/ml/health" ||
+    pathname === "/ml/status"
+  ) {
+    return { name: "health", ...RATE_LIMIT_CONFIGS.health };
+  }
   if (pathname.startsWith("/ai/")) {
     return { name: "aiChat", ...RATE_LIMIT_CONFIGS.aiChat };
-  }
-  if (pathname === "/health" || pathname === "/ai/status") {
-    return { name: "health", ...RATE_LIMIT_CONFIGS.health };
   }
   return { name: "global", ...RATE_LIMIT_CONFIGS.global };
 }

@@ -286,7 +286,7 @@ def parse_k6_summary(summary_path: Path) -> dict[str, Any]:
                 "p95": values_for(metric_name).get("p(95)"),
                 "p99": values_for(metric_name).get("p(99)"),
             }
-        elif metric_name.endswith("_fail_rate"):
+        elif metric_name.endswith("_fail_rate") or metric_name.endswith("_rate"):
             load_summary["custom_metrics"][metric_name] = {
                 "rate_pct": round(rate_value(metric_name) * 100, 4),
             }

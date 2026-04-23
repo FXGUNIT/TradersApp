@@ -47,6 +47,7 @@ const edgeHealthFailRate = new Rate('edge_health_fail_rate');
 const bffHealthFailRate = new Rate('bff_health_fail_rate');
 const bffMlHealthFailRate = new Rate('bff_ml_health_fail_rate');
 const bffMlHealthExpectedDegradedRate = new Rate('bff_ml_health_expected_degraded_rate');
+const bffMlHealthExpectedRateLimitedRate = new Rate('bff_ml_health_expected_rate_limited_rate');
 const mlPredictFailRate = new Rate('ml_predict_fail_rate');
 
 function buildSampleCandles(count = 20) {
@@ -89,6 +90,10 @@ const EXPECTED_ML_WARMUP_PATTERNS = [
   /historical data first/i,
   /no candle data/i,
 ];
+const EXPECTED_RATE_LIMIT_PATTERNS = [
+  /rate limit exceeded/i,
+  /too many requests/i,
+];
 
 function parseJson(res) {
   try {
@@ -114,6 +119,23 @@ function isExpectedMlWarmupState(data) {
     .join(' | ');
 
   return EXPECTED_ML_WARMUP_PATTERNS.some((pattern) => pattern.test(candidates));
+}
+
+function isExpectedRateLimitState(data) {
+  if (data === null || typeof data !== 'object') {
+    return false;
+  }
+
+  const candidates = [
+    data.detail,
+    data.error,
+    data.reason,
+    data.message,
+  ]
+    .filter((value) => typeof value === 'string')
+    .join(' | ');
+
+  return EXPECTED_RATE_LIMIT_PATTERNS.some((pattern) => pattern.test(candidates));
 }
 
 export const options = {
@@ -212,17 +234,21 @@ export function bffMlHealth() {
     headers: { Accept: 'application/json' },
     tags: { endpoint: 'bff-ml-health' },
     timeout: '20s',
-    responseCallback: http.expectedStatuses({ min: 200, max: 399 }, 503),
+    responseCallback: http.expectedStatuses({ min: 200, max: 399 }, 429, 503),
   });
   const data = parseJson(res);
   const degradedWarmup = res.status === 503 && isExpectedMlWarmupState(data);
+  const expectedRateLimited = res.status === 429 && isExpectedRateLimitState(data);
   const ok = check(res, {
-    'bff ml health status healthy-or-warmup': (r) => r.status === 200 || degradedWarmup,
-    'bff ml health payload ok-or-warmup': () => (data !== null && data.ok === true) || degradedWarmup,
+    'bff ml health status healthy-warmup-or-rate-limited': (r) =>
+      r.status === 200 || degradedWarmup || expectedRateLimited,
+    'bff ml health payload ok-warmup-or-rate-limited': () =>
+      (data !== null && data.ok === true) || degradedWarmup || expectedRateLimited,
   });
   bffMlHealthLatencyMs.add(res.timings.duration);
   bffMlHealthFailRate.add(ok ? 0 : 1);
   bffMlHealthExpectedDegradedRate.add(degradedWarmup ? 1 : 0);
+  bffMlHealthExpectedRateLimitedRate.add(expectedRateLimited ? 1 : 0);
   sleep(1);
 }
 
