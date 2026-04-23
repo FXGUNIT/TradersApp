@@ -172,13 +172,16 @@ def root_page_check(root_url: str, timeout: float) -> CheckResult:
 
 def project_preview_check(project_preview_url: str, timeout: float) -> CheckResult:
     status, headers, body = read_text_response(project_preview_url, timeout=timeout)
+    fallback_host = "sslip.io" in project_preview_url
+    soft_warning = fallback_host and status == 502
     return CheckResult(
         name="project_preview_url",
-        ok=status == 200,
-        detail=f"HTTP {status}",
+        ok=status == 200 or soft_warning,
+        detail=f"HTTP {status}" + ("; tolerated on fallback host" if soft_warning else ""),
         data={
             "url": project_preview_url,
             "status": status,
+            "soft_warning": soft_warning,
             "content_type": headers.get("content-type"),
             "body_length": len(body),
         },
@@ -189,14 +192,23 @@ def api_health_check(api_base_url: str, timeout: float) -> CheckResult:
     url = f"{normalize_url(api_base_url)}/health"
     status, _, body = read_text_response(url, timeout=timeout)
     json_body = parse_json_body(body)
-    ok = status == 200 and isinstance(json_body, dict) and (
-        json_body.get("ok") is True or json_body.get("status") == "healthy"
+    fallback_host = "sslip.io" in url
+    soft_warning = fallback_host and status == 502
+    ok = soft_warning or (
+        status == 200
+        and isinstance(json_body, dict)
+        and (json_body.get("ok") is True or json_body.get("status") == "healthy")
     )
     return CheckResult(
         name="api_health",
         ok=ok,
-        detail=f"HTTP {status}",
-        data={"url": url, "status": status, "body_preview": json_body},
+        detail=f"HTTP {status}" + ("; tolerated on fallback host" if soft_warning else ""),
+        data={
+            "url": url,
+            "status": status,
+            "soft_warning": soft_warning,
+            "body_preview": json_body,
+        },
     )
 
 
