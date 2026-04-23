@@ -142,27 +142,24 @@ _loadEnvFiles();
 
 const PORT = Number(process.env.BFF_PORT || 8788);
 const HOST = process.env.BFF_HOST || "0.0.0.0";
-const MASTER_SALT =
-  process.env.MASTER_SALT || process.env.VITE_MASTER_SALT || "";
+const MASTER_SALT = process.env.MASTER_SALT || "";
 const ADMIN_PASS_HASH =
   process.env.BFF_ADMIN_PASS_HASH ||
   process.env.ADMIN_PASS_HASH ||
-  process.env.VITE_ADMIN_PASS_HASH ||
   "";
-const ALLOWED_ORIGINS = String(process.env.BFF_ALLOWED_ORIGINS || "")
+const CONFIGURED_ALLOWED_ORIGINS = String(process.env.BFF_ALLOWED_ORIGINS || "")
   .split(",")
   .map((v) => v.trim())
   .filter(Boolean);
-const TELEGRAM_BOT_TOKEN =
-  process.env.TELEGRAM_BOT_TOKEN ||
-  process.env.BFF_TELEGRAM_BOT_TOKEN ||
-  process.env.VITE_TELEGRAM_BOT_TOKEN ||
-  "";
-const TELEGRAM_CHAT_ID =
-  process.env.TELEGRAM_CHAT_ID ||
-  process.env.BFF_TELEGRAM_CHAT_ID ||
-  process.env.VITE_TELEGRAM_CHAT_ID ||
-  "";
+const ALLOWED_ORIGINS =
+  CONFIGURED_ALLOWED_ORIGINS.length === 0
+    ? []
+    : Array.from(
+        new Set([
+          ...CONFIGURED_ALLOWED_ORIGINS,
+          "https://tradergunit.pages.dev",
+        ]),
+      );
 const ADMIN_ATTEMPT_LIMIT = 3;
 const ADMIN_LOCKOUT_WINDOW_MS = 15 * 60 * 1000;
 const DESKTOP_MINIMUM_VERSION =
@@ -176,14 +173,14 @@ const AI_PROVIDER_DEFINITIONS = [
   {
     key: "groq",
     name: "Groq",
-    envNames: ["AI_GROQ_TURBO_KEY", "GROQ_TURBO_KEY", "VITE_GROQ_TURBO_KEY"],
+    envNames: ["AI_GROQ_TURBO_KEY", "GROQ_TURBO_KEY"],
     model: "llama-3.3-70b-versatile",
     apiUrl: "https://api.groq.com/openai/v1/chat/completions",
   },
   {
     key: "gemini",
     name: "Gemini",
-    envNames: ["AI_GEMINI_PRO_KEY", "GEMINI_PRO_KEY", "VITE_GEMINI_PRO_KEY"],
+    envNames: ["AI_GEMINI_PRO_KEY", "GEMINI_PRO_KEY"],
     model: "gemini-2.0-flash",
     apiUrl:
       "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
@@ -196,8 +193,6 @@ const AI_PROVIDER_DEFINITIONS = [
       "AI_OPENROUTER_MIND_BETA",
       "OPENROUTER_MIND_ALPHA",
       "OPENROUTER_MIND_BETA",
-      "VITE_OPENROUTER_MIND_ALPHA",
-      "VITE_OPENROUTER_MIND_BETA",
     ],
     model: "openai/gpt-4o-mini",
     apiUrl: "https://openrouter.ai/api/v1/chat/completions",
@@ -205,21 +200,21 @@ const AI_PROVIDER_DEFINITIONS = [
   {
     key: "cerebras",
     name: "Cerebras",
-    envNames: ["AI_CEREBRAS_KEY", "CEREBRAS_KEY", "VITE_CEREBRAS_KEY"],
+    envNames: ["AI_CEREBRAS_KEY", "CEREBRAS_KEY"],
     model: "llama-3.3-70b",
     apiUrl: "https://api.cerebras.ai/v1/chat/completions",
   },
   {
     key: "deepseek",
     name: "DeepSeek",
-    envNames: ["AI_DEEPSEEK_KEY", "DEEPSEEK_KEY", "VITE_DEEPSEEK_KEY"],
+    envNames: ["AI_DEEPSEEK_KEY", "DEEPSEEK_KEY"],
     model: "deepseek-chat",
     apiUrl: "https://api.deepseek.com/v1/chat/completions",
   },
   {
     key: "sambanova",
     name: "SambaNova",
-    envNames: ["AI_SAMBANOVA_KEY", "SAMBANOVA_KEY", "VITE_SAMBANOVA_KEY"],
+    envNames: ["AI_SAMBANOVA_KEY", "SAMBANOVA_KEY"],
     model: "Llama-3.2-90B-Vision",
     apiUrl: "https://api.sambanova.ai/v1/chat/completions",
   },

@@ -4,6 +4,7 @@ import {
   clearAdminToken,
   getAdminToken as getStoredAdminToken,
 } from "../../services/sessionStore.js";
+import { resolveBffBaseUrl } from "../../services/runtimeConfig.js";
 import { sendTelegramAlert } from "../../utils/securityAlertUtils.js";
 
 export function useAdminSessionRestoreEffect({
@@ -20,15 +21,16 @@ export function useAdminSessionRestoreEffect({
     restoreAttempted.current = true;
 
     const attemptRestore = async () => {
+      const bffBaseUrl = resolveBffBaseUrl();
       try {
         const savedAdminStatus = localStorage.getItem("isAdminAuthenticated");
         const storedToken = await getStoredAdminToken();
 
-        if (savedAdminStatus === "true" && storedToken) {
+        if (savedAdminStatus === "true" && storedToken && bffBaseUrl) {
           // Validate token against BFF before restoring
           try {
             const res = await fetch(
-              `${import.meta.env.VITE_BFF_URL || "/api"}/admin/session`,
+              `${bffBaseUrl}/admin/session`,
               {
                 method: "GET",
                 headers: {

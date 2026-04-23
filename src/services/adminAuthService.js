@@ -3,18 +3,10 @@ import {
   getAdminToken as getStoredAdminToken,
   setAdminToken as setStoredAdminToken,
 } from "./sessionStore.js";
+import { resolveBffBaseUrl } from "./runtimeConfig.js";
 
 const ADMIN_DEVICE_KEY = "TradersApp_AdminDeviceId";
 const ADMIN_REMEMBER_KEY = "TradersApp_AdminRemember";
-
-const resolveBffBaseUrl = () => {
-  const configured = String(import.meta.env.VITE_BFF_URL || "").trim();
-  if (configured) {
-    return configured.replace(/\/+$/, "");
-  }
-
-  return "/api";
-};
 
 /** Generate or retrieve a persistent device fingerprint for this browser. */
 export function getDeviceFingerprint() {

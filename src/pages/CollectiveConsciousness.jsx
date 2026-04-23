@@ -7,6 +7,7 @@ import AiEnginesStatus from '../components/AiEnginesStatus.jsx';
 import BreakingNewsPanel from '../components/BreakingNewsPanel.jsx';
 import { runDeliberation, councilStage, MASTER_INTELLIGENCE_SYSTEM_PROMPT } from '../services/ai-router.js';
 import { hasBff } from '../services/gateways/base.js';
+import { resolveBffBaseUrl } from '../services/runtimeConfig.js';
 import { getISTState } from '../utils/tradingUtils.js';
 import {
   Brain,           // 🧠 Collective Consciousness header
@@ -60,7 +61,7 @@ const STAGE_ORDER = ['stage1', 'stage2', 'stage3', 'stage4', 'stage5', 'complete
 const COLLECTIVE_CONSCIOUSNESS_WINDOW_MS = 24 * 60 * 60 * 1000;
 const COLLECTIVE_CONSCIOUSNESS_STANDARD_LIMIT = 10;
 const COLLECTIVE_CONSCIOUSNESS_PREMIUM_LIMIT = 50;
-const BFF_API_BASE = String(import.meta.env.VITE_BFF_URL || '').trim() || '/api';
+const BFF_API_BASE = resolveBffBaseUrl();
 
 function normalizeUsageState(profile = {}, override = null) {
   const source =

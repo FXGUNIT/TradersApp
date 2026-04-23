@@ -1,25 +1,25 @@
 export const calculatePasswordStrength = (password) => {
   if (!password) return 0;
   let strength = 0;
-  
+
   if (password.length >= 8) strength++;
   if (password.length >= 12) strength++;
   if (/[a-z]/.test(password) && /[A-Z]/.test(password)) strength++;
   if (/\d/.test(password)) strength++;
   if (/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password)) strength++;
-  
+
   return Math.min(strength, 3);
 };
 
 export const getStrengthLabel = (strength) => {
-  if (strength <= 1) return { label: 'Weak', color: '#FF453A' };
-  if (strength === 2) return { label: 'Medium', color: '#FF9500' };
-  return { label: 'Strong', color: '#34C759' };
+  if (strength <= 1) return { label: "Weak", color: "#FF453A" };
+  if (strength === 2) return { label: "Medium", color: "#FF9500" };
+  return { label: "Strong", color: "#34C759" };
 };
 
 export const isValidGmailAddress = (email) => {
   const trimmed = email.trim().toLowerCase();
-  return trimmed.endsWith('@gmail.com') && trimmed.split('@')[0].length > 0;
+  return trimmed.endsWith("@gmail.com") && trimmed.split("@")[0].length > 0;
 };
 
 export const isPasswordExpired = (lastChangedTimestamp) => {
@@ -33,95 +33,93 @@ export const isPasswordExpired = (lastChangedTimestamp) => {
 export const copyToClipboardSecure = async (text, showToast) => {
   try {
     await navigator.clipboard.writeText(text);
-    showToast('Data packet delivered. Clipboard stands ready.', 'success');
-    
+    showToast("Data packet delivered. Clipboard stands ready.", "success");
+
     setTimeout(async () => {
       try {
-        await navigator.clipboard.writeText('');
-      } catch (e) {
-        console.warn('Could not clear clipboard:', e);
+        await navigator.clipboard.writeText("");
+      } catch (error) {
+        console.warn("Could not clear clipboard:", error);
       }
     }, 60000);
   } catch (error) {
-    console.error('Failed to copy:', error);
-    showToast('Copy buffer full. Try again soon.', 'error');
+    console.error("Failed to copy:", error);
+    showToast("Copy buffer full. Try again soon.", "error");
   }
-};
-
-export const hashAdminPasswordWithSalt = async (password) => {
-  const MASTER_SALT = import.meta.env.VITE_MASTER_SALT;
-  // J02: No hardcoded fallback — require explicit configuration
-  if (!MASTER_SALT) {
-    throw new Error('MASTER_SALT not configured — set VITE_MASTER_SALT env var');
-  }
-  const saltedPassword = password + MASTER_SALT;
-  
-  const encoder = new TextEncoder();
-  const data = encoder.encode(saltedPassword);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-  
-  return hashHex;
 };
 
 export const detectGPUSupport = () => {
   try {
-    const testEl = document.createElement('div');
-    testEl.style.transform = 'translateZ(0)';
-    
-    const hasTransformZ = testEl.style.transform !== '';
-    const hasSupportsRule = CSS && CSS.supports && CSS.supports('transform', 'translateZ(0)');
-    
-    const canvas = document.createElement('canvas');
-    const gl = canvas.getContext('webgl', { failIfMajorPerformanceCaveat: false });
+    const testEl = document.createElement("div");
+    testEl.style.transform = "translateZ(0)";
+
+    const hasTransformZ = testEl.style.transform !== "";
+    const hasSupportsRule =
+      typeof CSS !== "undefined" &&
+      CSS.supports &&
+      CSS.supports("transform", "translateZ(0)");
+
+    const canvas = document.createElement("canvas");
+    const gl = canvas.getContext("webgl", {
+      failIfMajorPerformanceCaveat: false,
+    });
     const hasWebGL = !!gl;
-    
+
     const isGPUAccelerated = hasTransformZ && (hasSupportsRule || hasWebGL);
-    
     const result = {
       supported: isGPUAccelerated,
       hasTransformZ,
       hasSupportsRule,
       hasWebGL,
-      agent: navigator.userAgent.split(' ').slice(-1)[0]
+      agent: navigator.userAgent.split(" ").slice(-1)[0],
     };
-    
+
     if (isGPUAccelerated) {
-      console.log('✅ GPU Acceleration: ENABLED (TransformZ + WebGL)');
+      console.log("GPU Acceleration: ENABLED (TransformZ + WebGL)");
     } else {
-      console.log('⚠️ GPU Acceleration: FALLBACK MODE (CPU rendering)');
+      console.log("GPU Acceleration: FALLBACK MODE (CPU rendering)");
     }
-    
+
     return result;
   } catch (error) {
-    console.warn('GPU detection error:', error);
+    console.warn("GPU detection error:", error);
     return { supported: false, error: error.message };
   }
 };
 
-export const withExponentialBackoff = async (fn, maxRetries = 3, initialDelay = 100) => {
+export const withExponentialBackoff = async (
+  fn,
+  maxRetries = 3,
+  initialDelay = 100,
+) => {
   let lastError;
-  
+
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       return await fn();
     } catch (error) {
       lastError = error;
-      
+
       if (attempt === maxRetries) {
-        console.error(`Operation failed after ${maxRetries + 1} attempts:`, error);
+        console.error(
+          `Operation failed after ${maxRetries + 1} attempts:`,
+          error,
+        );
         throw error;
       }
-      
+
       const delayMs = initialDelay * Math.pow(2, attempt);
-      console.warn(`Attempt ${attempt + 1} failed, retrying in ${delayMs}ms...`, error.message);
-      
-      await new Promise(resolve => setTimeout(resolve, delayMs));
+      console.warn(
+        `Attempt ${attempt + 1} failed, retrying in ${delayMs}ms...`,
+        error.message,
+      );
+
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
     }
   }
-  
+
   throw lastError;
 };
 
-export const formatPhoneNumber = (phone = '') => phone.replace(/\D/g, '').slice(0, 10);
+export const formatPhoneNumber = (phone = "") =>
+  phone.replace(/\D/g, "").slice(0, 10);

@@ -74,7 +74,6 @@ const main = async () => {
   const customSalt =
     getArgValue("--salt") ||
     process.env.MASTER_SALT ||
-    process.env.VITE_MASTER_SALT ||
     "";
   const salt = customSalt || DEFAULT_MASTER_SALT;
   const passwordFromArg = process.argv[2]?.startsWith("--")

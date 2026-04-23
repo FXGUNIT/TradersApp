@@ -1,5 +1,6 @@
 import { checkInputForPrivilegeEscalation } from "./leakagePreventionModule.js";
 import { hasBff } from "./gateways/base.js";
+import { resolveBffBaseUrl } from "./runtimeConfig.js";
 
 export const AI_STATUS_REFRESH_MS = 5 * 60 * 1000;
 const BOARD_ROOM_FRONTEND_AGENT = "FrontendAI.Router";
@@ -14,10 +15,7 @@ const AI_ENGINE_DEFINITIONS = [
   { key: "sambanova", name: "SambaNova" },
 ];
 
-const apiBase = () => {
-  const configured = String(import.meta.env.VITE_BFF_URL || "").trim();
-  return configured || "/api";
-};
+const apiBase = () => resolveBffBaseUrl();
 
 const apiUrl = (path) => `${apiBase()}${path}`;
 
