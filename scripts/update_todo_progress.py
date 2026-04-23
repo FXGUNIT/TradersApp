@@ -454,6 +454,8 @@ def build_master_progress_block(markdown: str) -> str:
 
     for tier_name, scope_label, matcher in tier_defs:
         tier_items = [item for item in items if matcher(item)]
+        if not tier_items:
+            continue
         tier_summary = summarize_checklist_items(tier_items)
         phase_statuses = []
         seen_phase_ids = {item.phase_id for item in tier_items}

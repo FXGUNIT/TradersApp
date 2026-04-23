@@ -7,11 +7,11 @@
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-24 01:34`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-24 01:41`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Master Backlog  76.1%  [##################------]
-Tasks          done 194 | in progress 000 | blocked 000 | todo 061 | total 255
+Master Backlog  78.2%  [###################-----]
+Tasks          done 194 | in progress 000 | blocked 000 | todo 054 | total 248
 ```
 
 How to read this:
@@ -22,7 +22,7 @@ How to read this:
 
 | Area | Tasks | Progress | Status |
 |---|---|---:|---|
-| Stage P | [139/200] |  69.5% | PENDING |
+| Stage P | [139/193] |  72.0% | PENDING |
 | Stage S | [47/47] | 100.0% | DONE |
 | ML Research | [8/8] | 100.0% | DONE |
 
@@ -30,9 +30,9 @@ How to read this:
 
 | Tier | Scope | Progress | Status |
 |---|---|---:|---|
-| TIER 1 | Stage P overall |  69.5% | PENDING |
+| TIER 1 | Stage P overall |  72.0% | PENDING |
 | TIER 2 | Active Contabo production path | 100.0% | DONE |
-| TIER 3 | Archived OCI fallback / evidence |  29.1% | ARCHIVED |
+| TIER 3 | Archived OCI fallback / evidence |  31.9% | ARCHIVED |
 | TIER 4 | Stage S + ML backlog | 100.0% | DONE |
 
 ### By Phase
@@ -47,7 +47,7 @@ How to read this:
 | P06 - CI/CD Pipeline (`deploy-k8s.yml`) DONE - minimal direct-apply path | [12/12] | 100.0% | DONE |
 | P07 - k3s Namespace + Secrets Bootstrap ✅ DONE | [3/3] | 100.0% | DONE |
 | P08 - Helm Chart Values ✅ DONE | [4/4] | 100.0% | DONE |
-| P09 - Archived OCI recovery checkpoint | [23/50] |  46.0% | ARCHIVED |
+| P09 - `kubectl apply tradersapp-deployments.yaml` on OCI E2.1.Micro (ARCHIVED — P26 is active) | [23/50] |  46.0% | ARCHIVED |
 | P10 - Stateful Services Inside Free Limits ✅ DONE | [5/5] | 100.0% | DONE |
 | P11 - Archived OCI ingress / external access reference | [0/6] |   0.0% | ARCHIVED |
 | P12 - Archived OCI DNS + TLS reference | [0/5] |   0.0% | ARCHIVED |
@@ -63,7 +63,6 @@ How to read this:
 | P22 - Desktop Security and IP Hardening | [5/5] | 100.0% | DONE |
 | P23 - 4 GB Performance and Compatibility Certification | [0/5] |   0.0% | PENDING |
 | P24 - Windows Release Readiness and Docs Alignment ✅ DONE | [5/5] | 100.0% | DONE |
-| P25 - Ampere A1 / OVHcloud Migration (Archived Fallback) 🟡 ON HOLD | [0/7] |   0.0% | ARCHIVED |
 | P26 - Contabo VPS Docker Compose Production Path 🔴 ACTIVE | [32/32] | 100.0% | DONE |
 | S1 - Trading Session Config Foundation | [11/11] | 100.0% | DONE |
 | S2 - BFF Multi-Instrument Routing | [7/7] | 100.0% | DONE |
@@ -93,7 +92,7 @@ The canonical public frontend is `https://tradergunit.pages.dev/`. Keep Pages he
 Fallback public reachability is already green on `sslip.io`. The next technical work is reducing the `bff_ml_health` failure burst and keeping better public-proof artifacts ready for the final domain cutover.
 
 ### TIER 3 — historical OCI archive / rollback path
-P09 and the OCI-only follow-on phases P11-P16 stay here as archival rollback context. Do not treat any OCI phase as required for the current Contabo production path.
+The archived OCI fallback checklists were removed from this live master list. If that path is ever reopened, use the archived runbooks and recovery notes instead of treating OCI work as current backlog.
 
 ### TIER 4 — Backend ML Improvements
 All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live app when ready.
@@ -117,7 +116,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - Production target is now Contabo VPS, not OCI k3s
 - Repo-side Contabo deployment assets are the active workstream: Compose bundle, reverse proxy, bootstrap scripts, runtime env builder, and GitHub Actions deploy workflow
 - Repo-side public verification is now wired three ways: local script, dedicated public-edge k6 suite, and GitHub Actions verification workflow
-- OCI P09, P11-P16, and P25 remain in this file only as historical evidence and fallback, not as the current production plan
+- OCI fallback checklists were removed from this live master list; archived runbooks remain available if that branch is ever reopened
 - `tradergunit.pages.dev` is now the canonical public frontend and must be treated as the default public URL
 - Contabo runtime proof remains on the current `sslip.io` host family:
   - `173.249.18.14.sslip.io`
@@ -199,43 +198,20 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [x] `values.minimal.yaml` created — core 4 only (bff, frontend, ml-engine, redis) with pinned SHA tags
 - [x] All Docker images tagged with GitHub SHA from CI pipeline
 
-### P09 - Archived OCI recovery checkpoint
-> ⚠️ P09 is ARCHIVED. Contabo VPS (P26) is the active production path. Do not work on P09 unless Contabo is abandoned.
-- P09 is fully deprecated for active production. E2.1.Micro 1GB RAM cannot run k3s control plane + 4 pods without memory collapse. Ampere A1 Mumbai is capacity-exhausted. See P26 for the active Contabo VPS deployment path.
-- No additional P09 work is required for the current Contabo production path. Resume this branch only if Contabo is abandoned or an OCI rollback lab is explicitly requested.
+### Archived OCI / A1 fallback scope
+The old OCI recovery backlog, OCI ingress and DNS follow-ons, and the Ampere A1 fallback checklist were removed from this live master list because they are not actionable on the current Contabo production path.
 
-### P25 — Ampere A1 / OVHcloud Migration (Archived Fallback) 🟡 ON HOLD
-> ⚠️ ARCHIVED FALLBACK — Contabo is active. This path is closed unless Contabo is abandoned.
-*Historical fallback only. Do not treat this as the active production route.*
-
-**Archived note:** the cloud selection work ended with Contabo as the active deployment target because A1 capacity remained unavailable and OCI k3s on E2.1.Micro stayed unstable. Keep the OCI/A1 notes below only as evidence and rollback context.
-
-  - Fix already applied: core runtime Deployments use `Recreate` in the minimal profile so the node does not schedule two generations at once
-  - Fix already applied: production CI builds and pushes current commit SHA images before deploy
-  - Fix already applied: production CI now renders deterministic staged core manifests from the minimal Helm values, validates each slice, and applies them in the order `redis -> ml-engine -> bff -> frontend`
-  - Fix already applied: automatic production CI defers `ingress-nginx` + `cert-manager` until after the core runtime stabilizes
-  - Fix already applied: `scripts/k8s/recover-node-pressure.sh` now runs before the minimal apply and again on retry paths; it deletes terminal pods, removes stale kubelet/pod log directories by active pod UID, truncates oversized pod logs, avoids projected service-account mounts, and waits up to 300 seconds for the node taint to clear
-  - Fix already applied: the minimal runtime now sets explicit `ephemeral-storage` requests/limits and `emptyDir` size limits for core services to reduce the chance of another uncontrolled disk-pressure cascade
-  - Fix now added: when deploy diagnostics show overlayfs snapshot corruption, recovery switches from image pruning to a safer host-side runtime reset using the K3s `k3s-killall.sh` reset path plus `k3s` restart
-  - Fix now added: `scripts/k8s/check-oci-core-preflight.sh` blocks the staged deploy if the node still shows pressure conditions or, when SSH metrics are configured, if remote memory, swap, or filesystem thresholds are below the provisional safety floor
-  - Fix now added: `scripts/k8s/render-core-minimal-manifests.sh` now emits `05-core-budget.md` and `05-core-budget.json`, defining the current 1 GB node budget split as OS `160 MiB`, control-plane `190 MiB`, safe resident app budget `674 MiB`, summed core pod requests `512 MiB`, and residual headroom `162 MiB`
-  - Fix now added: `scripts/k8s/deploy-core-minimal.sh` now persists per-stage rollout evidence under `artifacts/k8s/deploy-core-minimal/<timestamp>/`, including preflight output, cluster events, remote memory snapshots when SSH is configured, and pod logs/describes for each staged service; both deploy workflows upload that directory as a CI artifact
-  - Fix now added: `scripts/k8s/run-core-isolation-matrix.sh` can execute the exact P09 validation order for singles, pairings, triple, and full-stack bring-up using the same staged deploy path and evidence capture, with `--dry-run` support and stop-on-first-failure behavior
-  - Operational note: when the API will not stabilize, the existing cold-restart pattern is still `systemctl restart k3s` and, only if required, clearing the etcd data dir before recreating kubeconfig
-- [ ] Clear both failure modes on the OCI node: `DiskPressure` and broken containerd overlayfs snapshot state
-- [ ] Prove the safer runtime repair path restores sandbox creation after the overlayfs `failed to stat parent` failure
-- [ ] values.minimal.yaml direct-apply deploy completes with exactly one Running/Ready pod each for `redis`, `ml-engine`, `bff`, and `frontend`
-- [ ] Confirm the cluster is running the current CI commit SHA images for `bff`, `frontend`, and `ml-engine`
-- [ ] Verify stale ReplicaSets / invalid-image pods are fully gone after the new cleanup path
-- [ ] Smoke tests: `bff /health`, `ml-engine /health`, frontend `http://frontend:80`, `redis-cli ping`
-- [ ] KUBECONFIG_B64 secret in GitHub updated after each k3s cold restart
+If that branch is ever reopened, use the archived references instead:
+- `docs/OCI-DEPLOYMENT-RUNBOOK.md`
+- `docs/SETUP.md`
+- `docs/STAGE_P_DNS_SETUP.md`
+- `docs/STAGE_P_24X7_EXECUTION_CHECKLIST.md`
 
 ### P26 — Contabo VPS Docker Compose Production Path 🔴 ACTIVE
-*Supersedes P25 as the real production route. Single-host Contabo VPS with GitHub Actions deployment is now the target architecture.*
+*Single-host Contabo VPS with GitHub Actions deployment is the target production architecture.*
 
 **Runbook:** See `docs/P26_Contabo_Deployment_Plan.md`
-**Progress snapshot (2026-04-23):** Master backlog `167/255` complete (`65.5%`). Stage P `138/200` complete (`69.0%`). Active production phase `P26` is `31/32` complete (`96.9%`). OCI archive phases remain in this file for rollback evidence only and are not part of the active critical path.
-**Current blocker:** the remaining P26 item is refreshing off-box public-health evidence so the canonical frontend (`tradergunit.pages.dev`) and the current Contabo runtime proof hosts stay aligned in one contract.
+**Progress snapshot (2026-04-24):** `P26` is complete. The remaining live Stage P backlog is the Windows desktop certification work in `P23`.
 
 #### P26 — Architecture Freeze
 - [x] Freeze production target as `Contabo VPS` with `Docker Compose`, not OCI k3s
@@ -256,7 +232,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [x] Create a manual GitHub Actions verification workflow for off-box public proof capture
 - [x] Tighten the remote deploy smoke checks so localhost health explicitly covers `frontend`, `bff`, `ml-engine`, `analysis-service`, and `redis`
 
-#### P26 — Live Cutover ✅ IN PROGRESS
+#### P26 — Live Cutover ✅ DONE
 - [x] Contabo VPS is bought and running — public IP `173.249.18.14`
 - [x] Add GitHub secret: `CONTABO_SSH_KEY` (private SSH key content)
 - [x] Add GitHub secret: `CONTABO_VPS_HOST` (VPS public IP address)
@@ -584,12 +560,12 @@ Fallback-host note: `sslip.io` hosts (`173.249.18.14.sslip.io`) remain the activ
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-24 01:34`  -  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-24 01:41`  -  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Stage P Backlog  69.5%  [#################-------]
-Sections        done 020 | active 000 | blocked 000 | archived 007 | pending 001 | total 030
-Checklist       done 139 | open 061 | total 200
+Stage P Backlog  72.0%  [#################-------]
+Sections        done 020 | active 000 | blocked 000 | archived 006 | pending 001 | total 028
+Checklist       done 139 | open 054 | total 193
 ```
 
 | Section | Tasks | Progress | Status |
@@ -602,11 +578,10 @@ Checklist       done 139 | open 061 | total 200
 | P06 - CI/CD Pipeline (`deploy-k8s.yml`) DONE - minimal direct-apply path | [12/12] | 100.0% | DONE |
 | P07 - k3s Namespace + Secrets Bootstrap ✅ DONE | [3/3] | 100.0% | DONE |
 | P08 - Helm Chart Values ✅ DONE | [4/4] | 100.0% | DONE |
-| P25 - Ampere A1 / OVHcloud Migration (Archived Fallback) 🟡 ON HOLD | [0/7] |   0.0% | ON HOLD |
 | P26 - Architecture Freeze | [4/4] | 100.0% | DONE |
 | P26 - Repo-Side Contabo Execution | [11/11] | 100.0% | DONE |
-| P26 - Live Cutover ✅ IN PROGRESS | [17/17] | 100.0% | DONE |
-| P09 - Archived OCI recovery checkpoint | [23/50] |  46.0% | ARCHIVED |
+| P26 - Live Cutover ✅ DONE | [17/17] | 100.0% | DONE |
+| P09 - `kubectl apply tradersapp-deployments.yaml` on OCI E2.1.Micro (ARCHIVED — P26 is active) | [23/50] |  46.0% | ARCHIVED |
 | P10 - Stateful Services Inside Free Limits ✅ DONE | [5/5] | 100.0% | DONE |
 | P11 - Archived OCI ingress / external access reference | [0/6] |   0.0% | ARCHIVED |
 | P12 - Archived OCI DNS + TLS reference | [0/5] |   0.0% | ARCHIVED |
