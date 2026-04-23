@@ -5,6 +5,407 @@
   margin-bottom: 12px;
 }
 
+.cc-chat-shell {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px 16px;
+}
+
+.cc-chat-layout {
+  max-width: 1280px;
+  margin: 0 auto;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(0, 1.75fr) minmax(280px, 0.95fr);
+  align-items: start;
+}
+
+.cc-chat-main,
+.cc-chat-rail {
+  display: grid;
+  gap: 16px;
+}
+
+.cc-usage-card,
+.cc-chat-stream,
+.cc-rail-card {
+  border-radius: 20px;
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+  background:
+    radial-gradient(circle at top left, rgba(10, 132, 255, 0.08), transparent 35%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.12);
+}
+
+.cc-usage-card,
+.cc-rail-card {
+  padding: 18px;
+}
+
+.cc-usage-card {
+  display: grid;
+  gap: 10px;
+}
+
+.cc-usage-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.cc-usage-card__badge,
+.cc-chat-eyebrow {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.7px;
+  text-transform: uppercase;
+}
+
+.cc-usage-card__meta {
+  font-size: 12px;
+}
+
+.cc-usage-card__copy {
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.cc-usage-card__alert {
+  display: grid;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+}
+
+.cc-usage-card__actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.cc-chat-stream {
+  display: grid;
+  gap: 20px;
+  padding: 22px 22px 26px;
+}
+
+.cc-chat-stream__header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+}
+
+.cc-chat-stream__headline {
+  display: grid;
+  gap: 8px;
+}
+
+.cc-chat-title {
+  margin: 0;
+  font-size: clamp(1.75rem, 2vw, 2.2rem);
+  line-height: 1;
+}
+
+.cc-chat-subtitle {
+  margin: 0;
+  max-width: 560px;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.cc-chat-stream__pill {
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+}
+
+.cc-chat-welcome {
+  min-height: 42vh;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  gap: 14px;
+  padding: 24px 12px 8px;
+}
+
+.cc-chat-welcome__icon {
+  opacity: 0.32;
+}
+
+.cc-chat-welcome__title {
+  margin: 0;
+  font-size: clamp(1.5rem, 1.8vw, 2rem);
+}
+
+.cc-chat-welcome__copy {
+  margin: 0;
+  max-width: 560px;
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+.cc-chip-grid {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.cc-chip {
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+  padding: 8px 14px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-secondary, #9ca3af);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+.cc-chip:hover {
+  border-color: rgba(10, 132, 255, 0.55);
+  color: var(--aura-status-info, #0a84ff);
+  transform: translateY(-1px);
+}
+
+.cc-message {
+  display: grid;
+  gap: 6px;
+}
+
+.cc-message--user {
+  justify-items: end;
+}
+
+.cc-message__label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+.cc-message__bubble {
+  width: min(100%, 860px);
+}
+
+.cc-message--user .cc-message__bubble {
+  max-width: min(75%, 520px);
+  padding: 12px 18px;
+  border-radius: 16px;
+}
+
+.cc-message__text,
+.cc-message__rendered {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+.cc-fast-loader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 18px 0 0;
+}
+
+.cc-fast-loader__spinner {
+  width: 20px;
+  height: 20px;
+  border: 2.5px solid var(--border-subtle, rgba(255, 200, 0, 0.15));
+  border-radius: 50%;
+  animation: cc-spin 0.6s linear infinite;
+}
+
+.cc-fast-loader__label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.cc-rail-card {
+  display: grid;
+  gap: 14px;
+}
+
+.cc-rail-card--hero {
+  background:
+    radial-gradient(circle at top left, rgba(124, 58, 237, 0.16), transparent 38%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
+}
+
+.cc-rail-title {
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.cc-rail-copy {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.8;
+}
+
+.cc-rail-stats {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.cc-rail-stat {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+}
+
+.cc-rail-stat__value {
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.cc-rail-stat__label {
+  font-size: 10px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--text-secondary, #9ca3af);
+}
+
+.cc-phase-list {
+  display: grid;
+  gap: 10px;
+}
+
+.cc-phase-item {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  align-items: start;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+  background: rgba(255, 255, 255, 0.03);
+  transition: border-color 160ms ease, transform 160ms ease, background 160ms ease;
+}
+
+.cc-phase-item.is-active {
+  border-color: rgba(10, 132, 255, 0.55);
+  background: rgba(10, 132, 255, 0.08);
+  transform: translateY(-1px);
+}
+
+.cc-phase-item.is-complete {
+  border-color: rgba(48, 209, 88, 0.35);
+  background: rgba(48, 209, 88, 0.06);
+}
+
+.cc-phase-item__icon {
+  margin-top: 1px;
+}
+
+.cc-phase-item__body {
+  display: grid;
+  gap: 4px;
+}
+
+.cc-phase-item__title {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.6;
+}
+
+.cc-phase-item__meta {
+  font-size: 11px;
+}
+
+.cc-composer-shell {
+  padding: 16px 20px 18px;
+  flex-shrink: 0;
+}
+
+.cc-composer {
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.cc-composer__inner {
+  position: relative;
+}
+
+.cc-composer__input {
+  width: 100%;
+  min-height: 52px;
+  max-height: 120px;
+  padding: 14px 50px 14px 18px;
+  border-radius: 16px;
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+  resize: none;
+  outline: none;
+  font-size: 14px;
+  font-family: inherit;
+  line-height: 1.5;
+  transition: border-color 160ms ease, transform 160ms ease;
+  box-sizing: border-box;
+}
+
+.cc-composer__input:focus {
+  transform: translateY(-1px);
+}
+
+.cc-composer__submit {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  transition: transform 160ms ease, opacity 160ms ease;
+}
+
+.cc-composer__submit:not(:disabled):hover {
+  transform: translateY(-1px);
+}
+
+.cc-composer__caption {
+  max-width: 960px;
+  margin: 8px auto 0;
+  text-align: center;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+}
+
+.cc-composer__mode {
+  max-width: 960px;
+  margin: 10px auto 0;
+  padding: 8px 16px;
+  border-radius: 10px;
+  border: 1px solid;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
 .cc-dashboard-grid--secondary {
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
 }
@@ -106,6 +507,32 @@
 }
 
 @media (max-width: 720px) {
+  .cc-chat-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .cc-chat-stream,
+  .cc-usage-card,
+  .cc-rail-card {
+    padding: 16px;
+  }
+
+  .cc-chat-stream__header {
+    padding-bottom: 14px;
+  }
+
+  .cc-rail-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .cc-message--user .cc-message__bubble {
+    max-width: 100%;
+  }
+
+  .cc-composer-shell {
+    padding: 14px 12px 16px;
+  }
+
   .cc-switcher__button {
     min-width: 120px;
   }
