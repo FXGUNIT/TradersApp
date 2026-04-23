@@ -260,7 +260,7 @@ const json = (res, statusCode, payload, origin = "*") => {
     "Access-Control-Allow-Origin": origin,
     "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
     "Access-Control-Allow-Headers":
-      "Content-Type, Authorization, Idempotency-Key, X-Request-ID",
+      "Content-Type, Authorization, Idempotency-Key, X-Request-ID, x-tradersapp-install-id",
     "Access-Control-Expose-Headers":
       "Idempotency-Key, Retry-After, X-RateLimit-Remaining, X-RateLimit-Reset, X-Request-ID",
   };
