@@ -4,6 +4,9 @@ Quantitative trading intelligence platform - multi-model consensus signals for f
 
 Canonical public frontend: `https://tradergunit.pages.dev/`
 
+Public root contract: `/` renders the live TradersApp shell. Any developer-only
+runtime diagnostics must stay isolated under `/developer`.
+
 ## Quick Start
 
 | What you need | Where to look |

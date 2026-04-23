@@ -5,6 +5,8 @@
 ## Canonical Contract
 
 - Canonical public frontend: `https://tradergunit.pages.dev/`
+- Root `/` must render the real TradersApp app shell, not a developer splash.
+- Developer-only diagnostics are allowed only on `https://tradergunit.pages.dev/developer`.
 - Current Contabo runtime proof hosts:
   - `https://173.249.18.14.sslip.io`
   - `https://bff.173.249.18.14.sslip.io/health`
@@ -18,6 +20,7 @@
 - `src/App.jsx`
 - `src/config/proofHosts.js`
 - `src/features/landing/DeveloperRootLanding.jsx`
+- `src/services/runtimeConfig.js`
 - `deploy/contabo/runtime.env.example`
 - `deploy/contabo/Dockerfile.frontend`
 - `scripts/contabo/build-runtime-env.sh`
@@ -37,6 +40,7 @@
 
 - `tradergunit.pages.dev`
   This is the real public frontend and should be treated as the default answer.
+  Root `/` is the live app. `/developer` is an explicit diagnostics surface.
 - `173.249.18.14.sslip.io`
   This is the current Contabo runtime-edge proof host family. It is still real,
   but it is not the canonical public frontend.

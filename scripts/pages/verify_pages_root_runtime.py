@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Verify the Cloudflare Pages developer root and its live runtime dependencies.
+"""Verify the Cloudflare Pages frontend root and its live runtime dependencies.
 
-This script checks the public developer root plus the current BFF/API endpoints
-that the root links to and depends on operationally. It is intentionally narrow:
-the goal is to catch regressions in the public root contract and in the
-cross-origin runtime path used from `tradergunit.pages.dev`.
+This script checks the public app root plus the current BFF/API endpoints that
+the frontend depends on operationally. It is intentionally narrow: the goal is
+to catch regressions in the public root contract and in the cross-origin
+runtime path used from `tradergunit.pages.dev`.
 """
 
 from __future__ import annotations

@@ -4,7 +4,10 @@ import fs from "node:fs";
 import path from "node:path";
 import { chromium } from "@playwright/test";
 
-const EXPECTED_H1 = "Developer root for Gunit's live trading infrastructure.";
+const EXPECTED_TITLE = "TradersApp";
+const EXPECTED_H1 = "Welcome back";
+const EXPECTED_PRIMARY_CTA = "Continue with Google";
+const REJECTED_H1 = "Developer root for Gunit's live trading infrastructure.";
 
 function parseArgs(argv) {
   const args = {
@@ -57,8 +60,17 @@ async function main() {
     const h1 = collapseWhitespace(await page.locator("h1").first().textContent());
     const title = collapseWhitespace(await page.title());
     const hostname = await page.evaluate(() => window.location.hostname);
+    const ctaVisible = await page
+      .getByRole("button", { name: EXPECTED_PRIMARY_CTA })
+      .isVisible()
+      .catch(() => false);
     const status = response?.status() ?? 0;
-    const ok = status === 200 && h1 === EXPECTED_H1;
+    const ok =
+      status === 200 &&
+      title === EXPECTED_TITLE &&
+      h1 === EXPECTED_H1 &&
+      ctaVisible &&
+      h1 !== REJECTED_H1;
 
     report = {
       ok,
@@ -67,14 +79,21 @@ async function main() {
       h1,
       title,
       hostname,
+      ctaVisible,
+      expectedTitle: EXPECTED_TITLE,
       expectedH1: EXPECTED_H1,
+      expectedPrimaryCta: EXPECTED_PRIMARY_CTA,
+      rejectedH1: REJECTED_H1,
     };
   } catch (error) {
     report = {
       ok: false,
       url: args.url,
       error: String(error?.message || error),
+      expectedTitle: EXPECTED_TITLE,
       expectedH1: EXPECTED_H1,
+      expectedPrimaryCta: EXPECTED_PRIMARY_CTA,
+      rejectedH1: REJECTED_H1,
     };
   } finally {
     await page.close();

@@ -104,7 +104,7 @@ def build_markdown(report: dict, browser: dict) -> tuple[str, dict[str, str]]:
         ]
     )
     lines.append(
-        f"| `browser_rendered_landing_page` | `{'pass' if browser_ok else 'fail'}` | "
+        f"| `browser_rendered_app_shell` | `{'pass' if browser_ok else 'fail'}` | "
         f"{browser.get('h1') or browser.get('error') or 'no detail'} |"
     )
     for check in checks:

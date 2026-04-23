@@ -2,13 +2,15 @@ import React from "react";
 import {
   API_HEALTH_HOST,
   BFF_HEALTH_HOST,
-  PRIMARY_PROJECT_HOST,
+  CANONICAL_PUBLIC_FRONTEND_HOST,
+  CANONICAL_PUBLIC_FRONTEND_URL,
+  DEVELOPER_PREVIEW_PATH,
 } from "../../config/proofHosts";
 import "./developerRootLanding.css";
 
-const DEVELOPER_ROOT_HOST = "tradergunit.pages.dev";
+const DEVELOPER_ROOT_HOST = CANONICAL_PUBLIC_FRONTEND_HOST;
+const LIVE_APP_URL = CANONICAL_PUBLIC_FRONTEND_URL;
 const GITHUB_PROFILE = "https://github.com/FXGUNIT";
-const PREVIEW_ROUTE = "/developer";
 const WORKSTREAMS = [
   "React + Vite shell for the operator-facing frontend",
   "Node.js BFF for auth, policy, orchestration, and API fan-out",
@@ -19,21 +21,19 @@ const WORKSTREAMS = [
 const TIMELINE = [
   {
     step: "01",
-    title: "Canonical public root",
-    body:
-      "tradergunit.pages.dev is the main public frontend entry and the stable portfolio surface for the project.",
+    title: "Live app root",
+    body: `The public frontend now lives at ${LIVE_APP_URL} and should always open the real TradersApp shell first.`,
   },
   {
     step: "02",
-    title: "Runtime services",
-    body:
-      "Contabo continues to carry the current runtime edge for the BFF and API while the canonical public entry stays fixed on Pages.",
+    title: "Developer proof page",
+    body: `This diagnostics surface is explicit-only at ${DEVELOPER_PREVIEW_PATH} so it cannot silently replace the live app again.`,
   },
   {
     step: "03",
-    title: "Optional future branding",
+    title: "Runtime services",
     body:
-      "If branding changes later, it should alias the same public root instead of silently replacing the canonical host again.",
+      "Contabo continues to carry the current runtime edge for the BFF and API while the canonical public entry stays fixed on Pages.",
   },
 ];
 
@@ -49,12 +49,12 @@ function hostLabel(url) {
 
 const STACK_STATUS = [
   {
-    label: "Canonical public root",
-    value: DEVELOPER_ROOT_HOST,
+    label: "Live app root",
+    value: hostLabel(LIVE_APP_URL),
   },
   {
-    label: "Public frontend target",
-    value: hostLabel(PRIMARY_PROJECT_HOST),
+    label: "Developer preview path",
+    value: DEVELOPER_PREVIEW_PATH,
   },
   {
     label: "BFF health",
@@ -68,8 +68,8 @@ const STACK_STATUS = [
 
 const PROOF_TARGETS = [
   {
-    href: PRIMARY_PROJECT_HOST,
-    label: "Canonical public frontend",
+    href: LIVE_APP_URL,
+    label: "Open live TradersApp",
   },
   {
     href: BFF_HEALTH_HOST,
@@ -83,10 +83,10 @@ const PROOF_TARGETS = [
 
 function currentPreviewUrl() {
   if (typeof window === "undefined") {
-    return PREVIEW_ROUTE;
+    return DEVELOPER_PREVIEW_PATH;
   }
 
-  return `${window.location.origin}${PREVIEW_ROUTE}`;
+  return `${window.location.origin}${DEVELOPER_PREVIEW_PATH}`;
 }
 
 function currentHostname() {
@@ -105,14 +105,18 @@ export default function DeveloperRootLanding() {
       <section className="developer-root-hero">
         <div className="developer-root-copy">
           <p className="developer-root-kicker">FXGUNIT // software systems</p>
-          <h1>Developer root for Gunit&apos;s live trading infrastructure.</h1>
+          <h1>Developer diagnostics for the TradersApp runtime.</h1>
           <p className="developer-root-summary">
-            This Cloudflare Pages site is the canonical public entry for
-            TradersApp and the developer-facing home for the stack behind it:
-            a React trading shell, Node BFF, Python ML engine, Windows thin
-            client, and Contabo-backed runtime services.
+            The live public app is the root of
+            {` ${DEVELOPER_ROOT_HOST} `}
+            and this page exists only as an explicit developer preview at
+            {` ${DEVELOPER_PREVIEW_PATH} `}.
+            Use it to inspect the current runtime contract behind the app shell:
+            React frontend, Node BFF, Python ML engine, Windows thin client,
+            and Contabo-backed services.
           </p>
           <div className="developer-root-actions">
+            <a href={LIVE_APP_URL}>Open Live App</a>
             <a href={GITHUB_PROFILE} target="_blank" rel="noreferrer">
               GitHub Profile
             </a>
@@ -141,11 +145,12 @@ export default function DeveloperRootLanding() {
 
       <section className="developer-root-grid">
         <article>
-          <h2>Current build focus</h2>
+          <h2>Current contract</h2>
           <p>
-            Keeping `tradergunit.pages.dev` as the single public entry point
-            while the Contabo runtime edge remains verifiable and stable for
-            the BFF and API service layer.
+            Root `/` must always open the full TradersApp frontend. This page is
+            intentionally isolated under
+            {` ${DEVELOPER_PREVIEW_PATH} `}
+            so the live public entry cannot drift back to a splash screen.
           </p>
         </article>
 
@@ -179,6 +184,13 @@ export default function DeveloperRootLanding() {
             <li>Windows 4 GB certification harness and runbook evidence</li>
             <li>event-driven backtesting rig for NSE session-aware research</li>
           </ul>
+        </article>
+      </section>
+
+      <section className="developer-root-grid">
+        <article>
+          <h2>Current preview URL</h2>
+          <p>{currentPreviewUrl()}</p>
         </article>
       </section>
 

@@ -351,7 +351,7 @@ gh workflow run rollback.yml -f version=2026-04-01
 
 | Service | URL | Expected |
 |---|---|---|
-| Canonical frontend | `https://tradergunit.pages.dev` | HTTP 200 + landing page |
+| Canonical frontend | `https://tradergunit.pages.dev` | HTTP 200 + app shell (`Welcome back`) |
 | Runtime edge | `https://173.249.18.14.sslip.io` | HTTP 200 |
 | BFF | `https://bff.173.249.18.14.sslip.io/health` | `{"ok": true, ...}` |
 | ML Engine | `https://api.173.249.18.14.sslip.io/health` | `{"ok": true, ...}` |
@@ -362,8 +362,9 @@ gh workflow run rollback.yml -f version=2026-04-01
 
 After every deployment, verify:
 
-- [ ] `https://tradergunit.pages.dev` returns 200 with the expected developer-root `h1`
+- [ ] `https://tradergunit.pages.dev` returns 200 with the live app shell (`Welcome back` + `Continue with Google`)
 - [ ] Pages root security headers are present (CSP, `X-Frame-Options`, `X-Content-Type-Options`, `Permissions-Policy`)
+- [ ] Optional diagnostics page stays isolated at `https://tradergunit.pages.dev/developer`
 - [ ] `https://173.249.18.14.sslip.io` returns 200 for the current runtime edge
 - [ ] `GET /health` returns 200 on all runtime services
 - [ ] `GET /ai/status` returns AI provider configuration

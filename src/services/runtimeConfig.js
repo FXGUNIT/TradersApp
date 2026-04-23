@@ -1,4 +1,7 @@
-const PAGES_ROOT_HOSTS = new Set(["tradergunit.pages.dev"]);
+import {
+  CANONICAL_PUBLIC_FRONTEND_HOST,
+  PUBLIC_BFF_BASE_URL,
+} from "../config/proofHosts.js";
 
 function getHostname() {
   if (typeof window === "undefined") {
@@ -8,10 +11,11 @@ function getHostname() {
   return String(window.location.hostname || "").trim().toLowerCase();
 }
 
-function isPagesDeveloperRootHost(hostname) {
+function isCanonicalFrontendHost(hostname) {
+  const normalized = String(hostname || "").trim().toLowerCase();
   return (
-    PAGES_ROOT_HOSTS.has(hostname) ||
-    hostname.endsWith(".tradergunit.pages.dev")
+    normalized === CANONICAL_PUBLIC_FRONTEND_HOST ||
+    normalized.endsWith(`.${CANONICAL_PUBLIC_FRONTEND_HOST}`)
   );
 }
 
@@ -21,8 +25,8 @@ export function resolveBffBaseUrl() {
     return configured.replace(/\/+$/, "");
   }
 
-  if (isPagesDeveloperRootHost(getHostname())) {
-    return "";
+  if (isCanonicalFrontendHost(getHostname())) {
+    return PUBLIC_BFF_BASE_URL;
   }
 
   return "/api";

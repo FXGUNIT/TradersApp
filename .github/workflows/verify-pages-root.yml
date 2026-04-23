@@ -53,7 +53,7 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Verify browser-rendered landing page
+      - name: Verify browser-rendered app shell
         shell: bash
         run: |
           set -euo pipefail

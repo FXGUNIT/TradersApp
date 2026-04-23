@@ -65,6 +65,7 @@ jobs:
 
       - name: Build root bundle
         env:
+          VITE_BFF_URL: https://${{ vars.BFF_PUBLIC_HOST || format('bff.{0}', vars.TRADERSAPP_DOMAIN || vars.CONTABO_DOMAIN || '173.249.18.14.sslip.io') }}
           VITE_PROOF_FRONTEND: https://tradergunit.pages.dev/
           VITE_PROOF_BFF: https://${{ vars.BFF_PUBLIC_HOST || format('bff.{0}', vars.TRADERSAPP_DOMAIN || vars.CONTABO_DOMAIN || '173.249.18.14.sslip.io') }}/health
           VITE_PROOF_API: https://${{ vars.API_PUBLIC_HOST || format('api.{0}', vars.TRADERSAPP_DOMAIN || vars.CONTABO_DOMAIN || '173.249.18.14.sslip.io') }}/health
@@ -75,7 +76,7 @@ jobs:
         run: |
           set -euo pipefail
           test -f public/_headers
-          grep -q "tradergunit.pages.dev" src/App.jsx
+          grep -q 'DEVELOPER_PREVIEW_PATH' src/App.jsx
 
       - name: Deploy to Cloudflare Pages
         env:
@@ -95,7 +96,7 @@ jobs:
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Verify browser-rendered landing page
+      - name: Verify browser-rendered app shell
         shell: bash
         run: |
           set -euo pipefail
