@@ -65,8 +65,8 @@ def build_markdown(report: dict, browser: dict) -> tuple[str, dict[str, str]]:
         if isinstance(target, dict)
     )
     runtime_fallback_hosts = any(
-        "sslip.io" in str(target.get("requested_url", "")) or
-        "sslip.io" in str(target.get("effective_url", ""))
+        bool(target.get("used_fallback")) or
+        str(target.get("requested_url", "")) != str(target.get("effective_url", ""))
         for target in target_resolution.values()
         if isinstance(target, dict)
     )
