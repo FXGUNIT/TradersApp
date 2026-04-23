@@ -6,6 +6,7 @@ Holds: /train, /train-sync, /predict, /regime, and all per-route helper function
 """
 import hashlib
 import json
+import os
 import time
 import traceback
 
@@ -68,6 +69,31 @@ try:
     from features.feast_client import get_all_features as feast_get_all_features
 except Exception:
     feast_get_all_features = lambda **kw: {}
+
+
+def _predict_sync_dq_validation_enabled() -> bool:
+    """Prediction serving should not block on heavyweight DQ unless explicitly enabled."""
+    return os.environ.get("PREDICT_SYNC_DQ_VALIDATION", "false").lower() == "true"
+
+
+def _prepare_regime_feature_frame(feature_df: pd.DataFrame) -> pd.DataFrame:
+    """Normalize the feature frame to the minimum regime-model contract."""
+    regime_df = feature_df.copy()
+    for col in [
+        "vr",
+        "adx",
+        "atr",
+        "ci",
+        "vwap",
+        "amd_ACCUMULATION",
+        "amd_MANIPULATION",
+        "amd_DISTRIBUTION",
+        "amd_TRANSITION",
+        "amd_UNCLEAR",
+    ]:
+        if col not in regime_df.columns:
+            regime_df[col] = 0.0
+    return regime_df
 
 try:
     from models.mamba.mamba_sequence_model import get_mamba_prediction, MAMBA_AVAILABLE, MODEL_SIZES
@@ -227,8 +253,9 @@ def predict_endpoint(request: PredictRequest, raw_request: FastAPIRequest, respo
         elif PROMETHEUS_AVAILABLE and record_prometheus_cache:
             record_prometheus_cache(hit=False)
 
-        # Build DataFrames
-        df = pd.DataFrame(_normalize_records(request.candles)) if request.candles else pd.DataFrame()
+        # Build DataFrames once; downstream feature engineering reuses these frames.
+        normalized_candles = _normalize_records(request.candles) if request.candles else None
+        df = pd.DataFrame(normalized_candles) if normalized_candles else pd.DataFrame()
         if not df.empty:
             df["timestamp"] = pd.to_datetime(df["timestamp"])
         else:
@@ -239,8 +266,8 @@ def predict_endpoint(request: PredictRequest, raw_request: FastAPIRequest, respo
         trade_df = pd.DataFrame(_normalize_records(request.trades)) if request.trades else None
         me = request.math_engine_snapshot or {}
 
-        # Validate
-        if request.candles:
+        # Predict is a serving path; sync DQ remains opt-in to avoid inflating tail latency.
+        if request.candles and _predict_sync_dq_validation_enabled():
             try:
                 from data_quality.validation_pipeline import validate_incoming_dataset
                 validate_incoming_dataset(df=df, dataset_type="candles",
@@ -249,7 +276,8 @@ def predict_endpoint(request: PredictRequest, raw_request: FastAPIRequest, respo
                 pass  # Never block prediction for DQ failures
 
         # Get model votes via registry
-        votes_result = get_model_registry_client().predict(
+        registry_client = get_model_registry_client()
+        votes_result = registry_client.predict(
             candles_df=df, trade_log_df=trade_df,
             math_engine_snapshot=me, key_levels=request.key_levels,
         )
@@ -257,6 +285,7 @@ def predict_endpoint(request: PredictRequest, raw_request: FastAPIRequest, respo
         consensus = votes_result.get("consensus", {})
 
         # Build features
+        feat_df = pd.DataFrame()
         if not df.empty:
             feat_df = engineer_features(df, trade_df, None, me, request.key_levels)
             feat_vec = get_feature_vector(feat_df)
@@ -292,13 +321,10 @@ def predict_endpoint(request: PredictRequest, raw_request: FastAPIRequest, respo
         # Physics regime
         try:
             if not df.empty:
-                feat_for_regime = engineer_features(df)
-                for col in ["vr", "adx", "atr", "ci", "vwap",
-                            "amd_ACCUMULATION", "amd_MANIPULATION", "amd_DISTRIBUTION",
-                            "amd_TRANSITION", "amd_UNCLEAR"]:
-                    if col not in feat_for_regime.columns:
-                        feat_for_regime[col] = 0.0
-                regime_result = get_model_registry_client().advance_regime(feat_for_regime)
+                feat_for_regime = _prepare_regime_feature_frame(
+                    feat_df if not feat_df.empty else engineer_features(df)
+                )
+                regime_result = registry_client.advance_regime(feat_for_regime)
                 output["physics_regime"] = {
                     "regime": regime_result["regime"],
                     "regime_id": regime_result["regime_id"],

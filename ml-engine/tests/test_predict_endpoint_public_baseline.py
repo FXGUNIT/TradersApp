@@ -159,6 +159,7 @@ def test_predict_endpoint_accepts_recent_public_baseline_payload(monkeypatch, tm
     registry = _RecordingRegistryClient()
     aggregator = _RecordingConsensusAggregator()
     kafka_publications: list[dict] = []
+    engineered_feature_calls: list[pd.DataFrame] = []
 
     monkeypatch.setattr(_routes_workflow, "PROMETHEUS_AVAILABLE", False)
     monkeypatch.setattr(_routes_workflow, "get_cache", lambda: cache)
@@ -167,7 +168,11 @@ def test_predict_endpoint_accepts_recent_public_baseline_payload(monkeypatch, tm
     monkeypatch.setattr(_routes_workflow, "consensus_agg", aggregator)
     monkeypatch.setattr(_routes_workflow, "store", _FakeStore())
     monkeypatch.setattr(_routes_workflow, "feast_get_all_features", lambda **kwargs: {"feature_from_feast": 9.0})
-    monkeypatch.setattr(_routes_workflow, "engineer_features", lambda df, *args, **kwargs: _build_feature_frame(df))
+    monkeypatch.setattr(
+        _routes_workflow,
+        "engineer_features",
+        lambda df, *args, **kwargs: engineered_feature_calls.append(df.copy()) or _build_feature_frame(df),
+    )
     monkeypatch.setattr(_routes_workflow, "get_feature_vector", lambda feat_df: feat_df)
     monkeypatch.setattr(_routes_workflow, "publish_consensus_to_kafka", lambda **kwargs: kafka_publications.append(kwargs))
     monkeypatch.setattr(_routes_workflow, "get_request_id", lambda: "req-public-baseline-001")
@@ -204,6 +209,7 @@ def test_predict_endpoint_accepts_recent_public_baseline_payload(monkeypatch, tm
     assert second_body["_cached"] is True
     assert len(registry.predict_calls) == 1
     assert len(registry.advance_calls) == 1
+    assert len(engineered_feature_calls) == 1
 
     predict_call = registry.predict_calls[0]
     candles_df = predict_call["candles_df"]
