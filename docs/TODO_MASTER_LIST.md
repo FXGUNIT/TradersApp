@@ -7,11 +7,11 @@
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-24 01:59`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-24 02:12`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Master Backlog  10.0%  [##----------------------]
-Tasks          done 001 | in progress 000 | blocked 000 | todo 009 | total 010
+Master Backlog  40.0%  [##########--------------]
+Tasks          done 004 | in progress 000 | blocked 000 | todo 006 | total 010
 ```
 
 How to read this:
@@ -22,7 +22,7 @@ How to read this:
 
 | Area | Tasks | Progress | Status |
 |---|---|---:|---|
-| Stage P | [1/10] |  10.0% | IN PROGRESS |
+| Stage P | [4/10] |  40.0% | IN PROGRESS |
 | Stage S | [0/0] |   0.0% | DONE |
 | ML Research | [0/0] |   0.0% | DONE |
 
@@ -30,9 +30,9 @@ How to read this:
 
 | Tier | Scope | Progress | Status |
 |---|---|---:|---|
-| TIER 1 | Stage P overall |  10.0% | IN PROGRESS |
+| TIER 1 | Stage P overall |  40.0% | IN PROGRESS |
 | TIER 2 | Active Contabo production path |   0.0% | DONE |
-| TIER 3 | Archived OCI fallback / evidence |  20.0% | IN PROGRESS |
+| TIER 3 | Archived OCI fallback / evidence |  80.0% | IN PROGRESS |
 | TIER 4 | Stage S + ML backlog |   0.0% | DONE |
 
 ### By Phase
@@ -40,7 +40,7 @@ How to read this:
 | Phase | Tasks | Progress | Status |
 |---|---|---:|---|
 | P23 - 4 GB Performance and Compatibility Certification | [0/5] |   0.0% | PENDING |
-| P25 - NY Lunch Trading Block 🔴 IN PROGRESS | [1/5] |  20.0% | IN PROGRESS |
+| P25 - NY Lunch Trading Block 🔴 IN PROGRESS | [4/5] |  80.0% | IN PROGRESS |
 
 <!-- master-progress:end -->
 
@@ -93,9 +93,9 @@ All Stages S1–S6 and ML1–ML8 are background. Implement carefully, update liv
 - `getMlConsensus` in `bff/services/consensusEngine.mjs` returns NEUTRAL + reason during block
 - `checkNyLunchVeto()` in `bff/services/boardRoomService.mjs` fires RiskOfficer veto during block
 - [x] Task 1: Create `bff/services/tradingHoursService.mjs` + tests ✅ DONE
-- [ ] Task 2: Update `bff/services/consensusEngine.mjs` — block ML call during lunch
-- [ ] Task 3: Update `bff/services/boardRoomService.mjs` — RiskOfficer lunch veto
-- [ ] Task 4: Document in `DOMAIN-RULES.md` and `EDGE-CASES.md`
+- [x] Task 2: Update `bff/services/consensusEngine.mjs` — block ML call during lunch ✅ DONE
+- [x] Task 3: Update `bff/services/boardRoomAgentReporter.mjs` — RiskOfficer lunch veto ✅ DONE
+- [x] Task 4: Document in `DOMAIN-RULES.md` and `EDGE-CASES.md` ✅ DONE
 - [ ] Task 5: Verify end-to-end with BFF health check
 
 > **Archived OCI / A1 fallback scope:** If that path reopens, see `docs/OCI-DEPLOYMENT-RUNBOOK.md`, `docs/SETUP.md`, `docs/STAGE_P_DNS_SETUP.md`, `docs/STAGE_P_24X7_EXECUTION_CHECKLIST.md`
@@ -158,17 +158,17 @@ All Stages S1–S6 and ML1–ML8 are background. Implement carefully, update liv
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-24 01:59`  -  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-24 02:12`  -  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Stage P Backlog  10.0%  [##----------------------]
+Stage P Backlog  40.0%  [##########--------------]
 Sections        done 000 | active 001 | blocked 000 | archived 000 | pending 001 | total 002
-Checklist       done 001 | open 009 | total 010
+Checklist       done 004 | open 006 | total 010
 ```
 
 | Section | Tasks | Progress | Status |
 |---|---|---:|---|
 | P23 - 4 GB Performance and Compatibility Certification | [0/5] |   0.0% | PENDING |
-| P25 - NY Lunch Trading Block 🔴 IN PROGRESS | [1/5] |  20.0% | IN PROGRESS |
+| P25 - NY Lunch Trading Block 🔴 IN PROGRESS | [4/5] |  80.0% | IN PROGRESS |
 
 <!-- live-status:end -->
