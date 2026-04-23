@@ -60,10 +60,27 @@ const PHASE_DEFINITIONS = [
 ];
 
 const STAGE_ORDER = ['stage1', 'stage2', 'stage3', 'stage4', 'stage5', 'complete'];
+const STARTER_PROMPTS = ['MNQ analysis', 'Risk management', 'Market structure', 'Session bias today'];
 const COLLECTIVE_CONSCIOUSNESS_WINDOW_MS = 24 * 60 * 60 * 1000;
 const COLLECTIVE_CONSCIOUSNESS_STANDARD_LIMIT = 10;
 const COLLECTIVE_CONSCIOUSNESS_PREMIUM_LIMIT = 50;
 const BFF_API_BASE = resolveBffBaseUrl();
+
+function getPhaseStatus(index, activeIndex, isProcessing, hasConversation) {
+  if (!isProcessing) {
+    return hasConversation ? 'complete' : 'idle';
+  }
+
+  if (index < activeIndex) {
+    return 'complete';
+  }
+
+  if (index === activeIndex) {
+    return 'active';
+  }
+
+  return 'idle';
+}
 
 function normalizeUsageState(profile = {}, override = null) {
   const source =
@@ -190,6 +207,9 @@ export default function CollectiveConsciousness({
   const mutedColor = "var(--text-secondary, #9CA3AF)";
   const inputBg = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.03)';
   const inputBorder = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
+  const hasConversation = messages.length > 0;
+  const currentPhaseIndex = STAGE_ORDER.indexOf(councilStage.current);
+  const activePhaseIndex = isProcessing ? Math.max(currentPhaseIndex, 0) : -1;
 
   const scrollToBottom = useCallback(() => {
     setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
@@ -214,6 +234,18 @@ export default function CollectiveConsciousness({
 
     return () => clearInterval(interval);
   }, [liveUsageState.resetTimestamp]);
+
+  useEffect(() => {
+    if (!isProcessing) {
+      return undefined;
+    }
+
+    const interval = setInterval(() => {
+      setClockNow(Date.now());
+    }, 400);
+
+    return () => clearInterval(interval);
+  }, [isProcessing]);
 
   const handleSubmit = async () => {
     const trimmed = input.trim();

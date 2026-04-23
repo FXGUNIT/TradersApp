@@ -18,6 +18,7 @@ import { ModelVotesPanel } from "./ModelVotesPanel.jsx";
 import { NewsCountdown } from "./NewsCountdown.jsx";
 import { PhysicsRegimeSection } from "./PhysicsRegimeSection.jsx";
 import { PositionSizingPanel } from "./PositionSizingPanel.jsx";
+import { PreSessionBriefing } from "./PreSessionBriefing.jsx";
 import { RRRRecommendation } from "./RRRRecommendation.jsx";
 import { SessionProbabilityPanel } from "./SessionProbabilityPanel.jsx";
 import { SignalBadge, SIGNAL_COLOR_MAP } from "./SignalBadge.jsx";
@@ -71,6 +72,9 @@ export const MlConsensusTab = React.memo(function MlConsensusTab({ theme: _theme
   const signal = consensus?.signal || "NEUTRAL";
   const confidence = consensus?.confidence;
   const session = consensus?.session || { id: 1, name: "Main Trading", session_pct: 0, minutes_into_session: 0 };
+  const timing = consensus?.timing || null;
+  const alpha = consensus?.alpha || null;
+  const instrument = consensus?.instrument || activeInstrument;
   const sc = SIGNAL_COLOR_MAP[signal];
   const sinceRefresh = lastRefresh
     ? `${Math.round((Date.now() - lastRefresh.getTime()) / 1000)}s ago`
@@ -264,18 +268,27 @@ export const MlConsensusTab = React.memo(function MlConsensusTab({ theme: _theme
               </div>
             </div>
 
-            <SessionProbabilityPanel session={session} />
+            <PreSessionBriefing
+              instrument={instrument}
+              session={session}
+              timing={timing}
+              alpha={alpha}
+              signal={signal}
+              confidence={confidence || 0}
+            />
+
+            <SessionProbabilityPanel session={session} timing={timing} alpha={alpha} />
 
             {consensus.regime && !consensus.regime.error && (
               <PhysicsRegimeSection regime={consensus.regime} />
             )}
 
-            <AlphaDisplay alpha={consensus.alpha} />
+            <AlphaDisplay alpha={alpha} />
             <ExpectedMovePanel expected_move={consensus.expected_move} />
             <RRRRecommendation rrr={consensus.rrr} />
             <ExitStrategyPanel exit_plan={consensus.exit_plan} />
             <PositionSizingPanel position_sizing={consensus.position_sizing} />
-            <TimingRecommendation timing={consensus.timing} />
+            <TimingRecommendation timing={timing} />
             <ModelVotesPanel votes={consensus.votes} />
             <NewsCountdown consensus={consensus} />
             <TradeReturnCalculator consensus={consensus} />
