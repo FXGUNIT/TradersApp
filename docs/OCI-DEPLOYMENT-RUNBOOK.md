@@ -1,111 +1,89 @@
-# TradersApp — Oracle Cloud Deployment Runbook
+# TradersApp - OCI Deployment Runbook
 
-## Current Status (2026-04-10)
+Archived reference only.
 
-**Oracle Cloud Always Free VM deployed and running.**
-- **VM:** tradersapp-oci | Oracle Linux 8.10 x86_64 | E2.1.Micro (1 OCPU, 1 GB RAM)
-- **Public IP:** 80.225.216.5
-- **Private IP:** 10.0.0.41
-- **Instance ID:** ocid1.instance.oc1.ap-mumbai-1.anrg6ljrnris7pyc47ad4ljq23on3fbl43ee4nmgxlvsfjmwcs6pu5k6vgsq
-- **SSH Key:** `~/.oci/tradersapp_ssh_key`
+The active production path is `Contabo VPS + Docker Compose`. Use
+[docs/P26_Contabo_Deployment_Plan.md](/e:/TradersApp/docs/P26_Contabo_Deployment_Plan.md:1)
+for live production work.
 
-## What's Running
+## Archive Status
 
-| Service | Status | Access |
-|---------|--------|--------|
-| Redis 7.2.4 | Running (PID 13299) | SSH only |
-| TradersApp repo | Cloned | Via SSH |
+- Archive date: `2026-04-23`
+- Active replacement: `P26 - Contabo VPS Docker Compose Production Path`
+- Why OCI was archived:
+  - the OCI `E2.1.Micro` node only has `1 GB RAM`
+  - the repo's own archived checkpoint concluded that `k3s + etcd + kubelet +
+    containerd + the TradersApp core-4 pods` was too heavy for that node as a
+    durable production target
+  - Contabo proved at least one clean redeploy cycle and public fallback-host
+    readiness, so OCI moved to rollback-only status
 
-## Redis Connection
+## Evidence That Allowed Archiving
 
-- **Host:** `80.225.216.5`
-- **Port:** `6379`
-- **Auth:** `tradersapp_redis_pass`
-- **Max Memory:** 768 MB (LRU eviction)
-- **Version:** 7.2.4
-- **Auto-start:** systemd service `tradersapp-redis.service` enabled
+- Clean Contabo redeploy evidence exists in
+  `.artifacts/gh-run-24723298075/`:
+  - `bootstrap-and-deploy.log` shows the deploy completed successfully
+  - `compose-ps.txt` shows `redis`, `ml-engine`, `analysis-service`, `bff`,
+    `frontend`, and the Caddy edge healthy on the VPS
+- Latest public fallback-host readiness evidence exists in:
+  - `.artifacts/contabo/public-readiness-live-now.json`
+  - `.artifacts/gh-run-24829111561/verification-24829111561.json`
+- The only remaining active P26 blocker is branded-domain approval and DNS
+  propagation for the `is-a.dev` host family, not Contabo stack bring-up
 
-## How to Connect
+## Final Known OCI Facts
 
-### Via SSH tunnel (recommended for laptop use)
-```bash
-ssh -L 16379:127.0.0.1:6379 -i ~/.oci/tradersapp_ssh_key opc@80.225.216.5
+- Provider: Oracle Cloud Infrastructure, `ap-mumbai-1`
+- Shape: `VM.Standard.E2.1.Micro`
+- Public IP: `144.24.112.249`
+- Hostname / node: `tradersapp-oci`
+- OS: `Oracle Linux 8.10 aarch64`
+- SSH user: `opc`
+- k3s install style: manual binary install with swap enabled
+- Swap: `2 GB`
+- kubeconfig externalization: replace `127.0.0.1` with `144.24.112.249`
+- Security requirement: OCI security-list ingress alone was not enough;
+  `firewalld` also had to allow `6443/tcp`
 
-# Then on your laptop, in another terminal:
-redis-cli -p 16379 -a tradersapp_redis_pass
-```
+## OCI Details Still Worth Keeping
 
-### Via SSH directly
-```bash
-ssh -i ~/.oci/tradersapp_ssh_key opc@80.225.216.5
-redis-cli -a tradersapp_redis_pass PING
-```
+These details remain useful only if OCI is ever revived as a rollback lab.
 
-## Important Notes
+- k3s startup required `--tls-san=144.24.112.249`
+- The k3s server process must not be started with `KUBECONFIG` set in the
+  process environment
+- `KUBECONFIG_B64` had to be refreshed after cold restarts because regenerated
+  kubeconfigs changed contents and tokens
+- The direct-apply minimal profile was the only realistic way to approach OCI
+  on this node class
+- OCI ingress / DNS / TLS phases `P11` to `P16` remain archived in
+  [docs/TODO_MASTER_LIST.md](/e:/TradersApp/docs/TODO_MASTER_LIST.md:351)
 
-### External Port Access (ISP Limitation)
-- SSH (port 22): **accessible** from your laptop's network ✓
-- Redis (port 6379): **blocked** by your laptop's ISP/at-home firewall ✗
-- **Fix:** Create SSH tunnel (`ssh -L`) to access Redis from your laptop
+## Why This Is Not The Live Path
 
-### Why This Matters
-Redis on the VM is the in-memory cache for your ML Engine. When your laptop's
-BFF connects to Redis, it needs the Redis host address. Update your laptop's
-`.env.local` or BFF environment:
+- The node could not be treated as a stable home for the control plane plus the
+  app runtime
+- OCI phases `P09`, `P11` to `P16`, and `P25` are preserved as historical
+  evidence and rollback context only
+- Current live deployment, verification, and recovery flow is centered on
+  Contabo
 
-```
-REDIS_HOST=80.225.216.5   # or use SSH tunnel local address
-REDIS_PORT=6379
-REDIS_PASS=tradersapp_redis_pass
-```
+## If OCI Ever Has To Be Reopened
 
-If your ISP blocks port 6379, set up the SSH tunnel above and use:
-```
-REDIS_HOST=127.0.0.1
-REDIS_PORT=16379
-```
+Only reopen OCI if Contabo is abandoned or an explicit rollback lab is needed.
 
-## System Status
-```
-ssh -i ~/.oci/tradersapp_ssh_key opc@80.225.216.5 "free -h && uptime && systemctl status tradersapp-redis | head -6"
-```
+Use this order:
 
-## Scripts
+1. Re-read the archived OCI checkpoints in
+   [docs/TODO_MASTER_LIST.md](/e:/TradersApp/docs/TODO_MASTER_LIST.md:203).
+2. Re-validate basic host health on `144.24.112.249`.
+3. Reconfirm swap, `firewalld`, and TLS SAN settings before touching CI.
+4. Recreate and re-upload `KUBECONFIG_B64`.
+5. Treat `P09-C` as the source of truth for any renewed OCI debugging work.
 
-| Script | Purpose |
-|--------|---------|
-| `scripts/oci/redis-install.sh` | Download Redis binary and install (1GB RAM safe) |
-| `scripts/oci/redis-build.sh` | Build Redis from source with Oracle agents stopped |
-| `scripts/oci/redis-status.sh` | Check VM and Redis status |
-| `scripts/oci/cloud-init-minimal.sh` | Cloud-init user data for new E2.1.Micro VMs |
+## Source Of Truth
 
-## Upgrading to Ampere A1 (4 OCPU, 24 GB)
-
-Ampere A1.Flex (Always Free — 4 OCPU, 24 GB RAM) is periodically available.
-When Mumbai region has capacity, you can resize:
-
-1. Terminate E2.1.Micro (save the subnet/security list)
-2. Launch A1.Flex with the same subnet in the same AD
-3. Run `scripts/oci/redis-install.sh` on the new VM
-4. Docker Compose stack will then run with ML Engine + BFF + Frontend + MLflow
-
-```python
-# Launch command for Ampere A1.Flex (when capacity available)
-launch_req = oci.core.models.LaunchInstanceDetails(
-    compartment_id="<tenancy-ocid>",
-    availability_domain="KTQz:AP-MUMBAI-1-AD-1",
-    source_details=oci.core.models.InstanceSourceViaImageDetails(
-        image_id="ocid1.image.oc1.ap-mumbai-1.aaaaaaaautknb2ulmj2kxpr6u47yl5pg6waylkie6azowejnplvcvkbxwixq"
-    ),
-    shape="VM.Standard.A1.Flex",
-    subnet_id="ocid1.subnet.oc1.ap-mumbai-1.aaaaaaaa7il7h7u2iwcjd3xzus6f46do5435pole5agkyn5emj4aj5l25zva",
-    shape_config=oci.core.models.LaunchInstanceShapeConfigDetails(
-        ocpus=1.0, memory_in_gbs=6.0
-    ),
-)
-```
-
-## Cost Guardrails
-- Budget alert: $1/month with $0.01 threshold ✓
-- E2.1.Micro: Always Free (no bill risk) ✓
-- A1.Flex: Always Free only if within 4 OCPU/24 GB limits ✓
+- Active production runbook:
+  [docs/P26_Contabo_Deployment_Plan.md](/e:/TradersApp/docs/P26_Contabo_Deployment_Plan.md:1)
+- Active master backlog:
+  [docs/TODO_MASTER_LIST.md](/e:/TradersApp/docs/TODO_MASTER_LIST.md:1)

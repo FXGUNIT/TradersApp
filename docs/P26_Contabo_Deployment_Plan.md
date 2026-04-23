@@ -6,34 +6,42 @@
 
 ## Current Domain State
 
-- The stable public developer root is `https://tradergunit.pages.dev`.
-- Keep the trading application off Cloudflare Pages for now. Pages is the developer root only.
-- The product runtime remains on the free `sslip.io` Contabo-backed host family.
+- Temporary developer-root proof is still available at
+  `https://tradergunit.pages.dev`.
+- The branded free-host target pending maintainer approval is:
+  - `https://tradergunit.is-a.dev`
+  - `https://traders.tradergunit.is-a.dev`
+  - `https://bff.traders.tradergunit.is-a.dev/health`
+  - `https://api.traders.tradergunit.is-a.dev/health`
+- Keep the trading application runtime off Cloudflare Pages. Pages remains
+  proof-only until the `is-a.dev` root and nested hosts are approved.
+- Until `is-a.dev` approval plus DNS propagation lands, the product runtime
+  remains on the free `sslip.io` Contabo-backed host family.
 - The current public proof endpoints are still the Contabo fallback hosts:
   - `https://173.249.18.14.sslip.io`
   - `https://bff.173.249.18.14.sslip.io/health`
   - `https://api.173.249.18.14.sslip.io/health`
-- Do not plan around buying a domain. The active path is the free-host topology above.
+- Do not plan around buying a domain. The active free path is the approved
+  `is-a.dev` host family, with `sslip.io` fallback proof until that approval
+  lands.
 
 ## Latest Fallback-Host Evidence
 
-- Latest off-box verification workflow:
-  - `Verify Contabo Public Deploy` run `24775819624`
+- Clean redeploy evidence exists in `.artifacts/gh-run-24723298075/`:
+  - `bootstrap-and-deploy.log` shows a successful VPS bootstrap plus deploy
+  - `compose-ps.txt` shows `redis`, `ml-engine`, `analysis-service`, `bff`,
+    `frontend`, and the Caddy edge healthy after the redeploy
+- Latest public readiness evidence exists in:
+  - `.artifacts/contabo/public-readiness-live-now.json`
+  - `.artifacts/gh-run-24829111561/verification-24829111561.json`
 - Result:
-  - all eight public readiness checks passed against the `sslip.io` host family
-  - uploaded artifact download worked after the hidden-artifact fix
-  - the generated markdown summary now shows the real `k6` envelope values after
-    the parser fix on `main`
-- Current fallback-host envelope from that run still breaches thresholds:
-  - HTTP duration p95/p99 about `523.05 ms` / `747.03 ms`
-  - overall HTTP fail rate about `24.36%`
-  - `bff_ml_health` fail rate about `81.89%`
-  - `ml_predict` latency p95/p99 about `746.20 ms` / `989.00 ms`
+  - DNS and TLS are green for the fallback `sslip.io` host family
+  - `frontend`, `bff`, and `api` health checks are green on the Contabo edge
+  - deeper BFF and API routes are answering publicly from the fallback hosts
 - Practical meaning:
-  - reachability, DNS, TLS, and the basic health chain are green on the fallback
-    hosts
-  - the next remaining work is performance hardening against the
-    `bff_ml_health` load threshold failures, not paid-domain cutover
+  - the Contabo stack is stable enough to treat OCI as archived rollback context
+  - the main remaining blocker is the branded `is-a.dev` cutover, not initial
+    Contabo host bring-up
 
 ## Topology
 
@@ -92,6 +100,24 @@ Use this exact sequence from now on:
    - `https://bff.173.249.18.14.sslip.io/health`
    - `https://api.173.249.18.14.sslip.io/health`
 9. Only after those checks pass, mark the public-health items complete.
+
+## Branded Cutover Once Approved
+
+Run this only after the `tradergunit.is-a.dev` root request is approved and the
+nested-host follow-on requests are merged.
+
+1. Merge the prepared repo cutover branch for the nested-host family.
+2. Update repository variables to the branded host set:
+   - `TRADERSAPP_DOMAIN=traders.tradergunit.is-a.dev`
+   - `CONTABO_DOMAIN=traders.tradergunit.is-a.dev`
+   - `BFF_PUBLIC_HOST=bff.traders.tradergunit.is-a.dev`
+   - `API_PUBLIC_HOST=api.traders.tradergunit.is-a.dev`
+3. Run `Deploy to Contabo VPS`.
+4. Run `Verify Contabo Public Deploy` against:
+   - `https://traders.tradergunit.is-a.dev`
+   - `https://bff.traders.tradergunit.is-a.dev/health`
+   - `https://api.traders.tradergunit.is-a.dev/health`
+5. Only after those checks pass, close the remaining public-health TODO item.
 
 ## Required GitHub Secrets
 
