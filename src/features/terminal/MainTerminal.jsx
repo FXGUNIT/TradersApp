@@ -56,6 +56,11 @@ import {
   runPremarketAnalysisWithAi,
   runTradePlanWithAi,
 } from "../../services/clients/TerminalAnalyticsClient.js";
+import {
+  buildManualJournalEntry,
+  buildP2JournalEntry,
+  countConsecutiveLosses,
+} from "./terminalAiHandlers.js";
 import { getISTState } from "../../utils/tradingUtils.js";
 import { usePasteListener } from "./terminalPasteListener.js";
 import {
@@ -1210,7 +1215,10 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
       const response = extractChoiceText(data, 'No response.');
       
       setP2Out(response);
-      setP2Jf({ exit: '', result: 'win', pnl: '', balAfter: '', lessons: '', amdPhase: currentAMD });
+      setP2Jf({
+        ...buildP2JournalState(),
+        amdPhase: currentAMD,
+      });
       
       setTimeout(() => p2Ref.current?.scrollIntoView({ behavior: 'smooth' }), 100);
     } catch { 
@@ -1237,37 +1245,19 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
       return;
     }
     
-    const entry = { 
-      date: today, 
-      instrument: f.instrument, 
-      direction: f.direction, 
-      tradeType: f.tradeType, 
-      amdPhase: p2Jf.amdPhase || currentAMD, 
-      rrr: f.rrr, 
-      result: p2Jf.result, 
-      entry: f.entryPrice, 
-      exit: p2Jf.exit, 
-      actualExit: p2Jf.exit,
-      predictedTP1: Number.isFinite(predictedP2TP1) ? predictedP2TP1.toFixed(2) : "",
-      predictedSL: Number.isFinite(predictedP2SL) ? predictedP2SL.toFixed(2) : "",
-      contracts: String(contracts), 
-      pnl: p2Jf.pnl, 
-      session: 'Trading Hours', 
-      balAfter: p2Jf.balAfter, 
-      setup: `${f.timeIST || '?'} IST | ${f.direction} @ ${f.entryPrice} | ${f.rrr}`, 
-      lessons: p2Jf.lessons,
-      id: `trade-${Date.now()}`
-    };
+    const entry = buildP2JournalEntry({
+      p2Jf,
+      f,
+      currentAMD,
+      predictedP2TP1,
+      predictedP2SL,
+      today,
+      contracts,
+    });
     
     setJournal((prev) => {
       const updated = [...prev, entry];
-      // Count consecutive losses from the end of the journal
-      let streak = 0;
-      const journalWithNew = [...prev, entry];
-      for (let i = journalWithNew.length - 1; i >= 0; i--) {
-        if (journalWithNew[i].result === "loss") streak++;
-        else break;
-      }
+      const streak = countConsecutiveLosses(updated);
       if (streak >= MAX_CONSECUTIVE_LOSSES) {
         const until = Date.now() + CIRCUIT_COOLDOWN_MS;
         setCircuitUntil(until);
@@ -1284,6 +1274,10 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
     }
     
     setShowP2TradeForm(false); 
+    setP2Jf((previous) => ({
+      ...buildP2JournalState(),
+      amdPhase: previous.amdPhase || currentAMD,
+    }));
     setErr(''); 
     showToast?.('Trade vector recorded. Journal synchronized.', 'success');
   };
@@ -1300,15 +1294,24 @@ Current Balance: $${curBal || '?'} | HWM: $${hwmVal || '?'}`;
       setJf(p => ({ ...p, _err: "A loss must have a negative P&L." }));
       return;
     }
-    const entryPrice = Number.parseFloat(jf.entry);
-    const fallbackPredictedTP1 = Number.isFinite(entryPrice)
-      ? entryPrice +
-        (jf.direction === "Long" ? 1 : -1) *
-          slPts *
-          parseRrrMultiple(jf.rrr)
-      : null;
-    setJournal(prev => [...prev, { ...jf, actualExit: jf.exit, predictedTP1: jf.predictedTP1 || (Number.isFinite(fallbackPredictedTP1) ? fallbackPredictedTP1.toFixed(2) : ""), id: `trade-${Date.now()}` }]);
-    setJf(p => ({ ...p, entry: '', exit: '', predictedTP1: '', actualExit: '', pnl: '', setup: '', lessons: '', balAfter: '' }));
+    const entry = buildManualJournalEntry({ jf, slPts });
+    setJournal(prev => [...prev, entry]);
+    setJf(p => ({
+      ...p,
+      entry: '',
+      exit: '',
+      predictedTP1: '',
+      actualExit: '',
+      pnl: '',
+      partialExitCount: '',
+      partialExitQty: '',
+      partialExitPnl: '',
+      remainingQty: '',
+      setup: '',
+      lessons: '',
+      balAfter: '',
+      _err: '',
+    }));
   };
 
   // Get name for greeting

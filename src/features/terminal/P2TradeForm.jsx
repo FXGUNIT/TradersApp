@@ -148,6 +148,34 @@ export default function P2TradeForm({
                   mono
                 />
                 <Field
+                  label="PARTIAL EXITS"
+                  value={p2Jf.partialExitCount}
+                  onChange={sp2("partialExitCount")}
+                  type="number"
+                  mono
+                />
+                <Field
+                  label="EXIT QTY"
+                  value={p2Jf.partialExitQty}
+                  onChange={sp2("partialExitQty")}
+                  type="number"
+                  mono
+                />
+                <Field
+                  label="EXIT P&L ($)"
+                  value={p2Jf.partialExitPnl}
+                  onChange={sp2("partialExitPnl")}
+                  type="number"
+                  mono
+                />
+                <Field
+                  label="REMAINING QTY"
+                  value={p2Jf.remainingQty}
+                  onChange={sp2("remainingQty")}
+                  type="number"
+                  mono
+                />
+                <Field
                   label="BALANCE AFTER ($)"
                   value={p2Jf.balAfter}
                   onChange={sp2("balAfter")}
