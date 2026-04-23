@@ -110,22 +110,36 @@ export async function fetchNewsSystemStatus() {
     };
   }
 
+  // Try /ml/consensus first — has both live + scheduled in one call
   const consensus = await bffFetch("/ml/consensus?session=1");
   if (consensus) {
+    const news = consensus?.news || {};
+    const hasScheduled = Boolean(news?.next_event);
+    const isRiskWindow = news?.trade_allowed === false || Boolean(news?.warning);
+
     return {
       liveNews: buildLiveNewsSignal(consensus, null),
-      scheduledNews: buildScheduledNewsSignal(consensus),
+      scheduledNews: hasScheduled
+        ? buildScheduledNewsSignal(consensus)
+        : createSignal("Scheduled News", "inactive", {
+            detail: "No scheduled event is active right now.",
+            nextEvent: null,
+            tradeAllowed: true,
+          }),
       refreshedAt,
     };
   }
 
-  const breaking = await bffFetch("/news/breaking?fresh=true");
-  if (breaking) {
+  // Fallback: call news endpoints directly (ML consensus may fail if no candles loaded)
+  const [breaking, upcoming] = await Promise.all([
+    bffFetch("/news/breaking?fresh=true"),
+    bffFetch("/news/upcoming"),
+  ]);
+
+  if (breaking || upcoming) {
     return {
       liveNews: buildLiveNewsSignal(null, breaking),
-      scheduledNews: createSignal("Scheduled News", "offline", {
-        detail: "Scheduled-event source is unavailable.",
-      }),
+      scheduledNews: buildScheduledNewsSignal(upcoming ? { news: upcoming } : null),
       refreshedAt,
     };
   }
