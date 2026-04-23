@@ -65,9 +65,9 @@ jobs:
 
       - name: Build root bundle
         env:
-          VITE_PUBLIC_PROJECT_PREVIEW_URL: https://${{ vars.TRADERSAPP_DOMAIN }}/
-          VITE_PUBLIC_BFF_HEALTH_URL: https://${{ vars.BFF_PUBLIC_HOST }}/health
-          VITE_PUBLIC_API_HEALTH_URL: https://${{ vars.API_PUBLIC_HOST }}/health
+          VITE_PUBLIC_PROJECT_PREVIEW_URL: https://${{ vars.TRADERSAPP_DOMAIN || vars.CONTABO_DOMAIN || 'traders.app' }}/
+          VITE_PUBLIC_BFF_HEALTH_URL: https://${{ vars.BFF_PUBLIC_HOST || format('bff.{0}', vars.TRADERSAPP_DOMAIN || vars.CONTABO_DOMAIN || 'traders.app') }}/health
+          VITE_PUBLIC_API_HEALTH_URL: https://${{ vars.API_PUBLIC_HOST || format('api.{0}', vars.TRADERSAPP_DOMAIN || vars.CONTABO_DOMAIN || 'traders.app') }}/health
         run: npm run build
 
       - name: Verify Pages root contract
@@ -111,9 +111,9 @@ jobs:
           mkdir -p .artifacts/pages-root
           python scripts/pages/verify_pages_root_runtime.py \
             --root-url "https://tradergunit.pages.dev" \
-            --bff-base-url "https://${{ vars.BFF_PUBLIC_HOST }}" \
-            --api-base-url "https://${{ vars.API_PUBLIC_HOST }}" \
-            --project-preview-url "https://${{ vars.TRADERSAPP_DOMAIN }}/" \
+            --bff-base-url "https://${{ vars.BFF_PUBLIC_HOST || format('bff.{0}', vars.TRADERSAPP_DOMAIN || vars.CONTABO_DOMAIN || 'traders.app') }}" \
+            --api-base-url "https://${{ vars.API_PUBLIC_HOST || format('api.{0}', vars.TRADERSAPP_DOMAIN || vars.CONTABO_DOMAIN || 'traders.app') }}" \
+            --project-preview-url "https://${{ vars.TRADERSAPP_DOMAIN || vars.CONTABO_DOMAIN || 'traders.app' }}/" \
             --output ".artifacts/pages-root/verification-${{ github.run_id }}.json" \
             --step-summary "${GITHUB_STEP_SUMMARY}"
 
@@ -151,7 +151,7 @@ jobs:
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           STATUS="success"
           TITLE="Pages root deploy verification passed"
-          BODY="Root: https://tradergunit.pages.dev | Frontend: https://${{ vars.TRADERSAPP_DOMAIN }}/ | BFF: https://${{ vars.BFF_PUBLIC_HOST }}/health | API: https://${{ vars.API_PUBLIC_HOST }}/health"
+          BODY="Root: https://tradergunit.pages.dev | Frontend: https://${{ vars.TRADERSAPP_DOMAIN || vars.CONTABO_DOMAIN || 'traders.app' }}/ | BFF: https://${{ vars.BFF_PUBLIC_HOST || format('bff.{0}', vars.TRADERSAPP_DOMAIN || vars.CONTABO_DOMAIN || 'traders.app') }}/health | API: https://${{ vars.API_PUBLIC_HOST || format('api.{0}', vars.TRADERSAPP_DOMAIN || vars.CONTABO_DOMAIN || 'traders.app') }}/health"
 
           if [ "${{ job.status }}" != "success" ]; then
             STATUS="error"

@@ -6,23 +6,19 @@
 
 ## Current Domain State
 
-- Do not assume ownership of `traders.app`. That domain is not currently under repo-controlled DNS.
-- The original root request `#36802` was closed by `is-a.dev` maintainers as:
-  - `reason: not dev related`
-  - `reason: incomplete pr`
-- The corrected hostname family is:
-  - developer root: `tradergunit.is-a.dev`
-  - project frontend: `traders.tradergunit.is-a.dev`
-  - BFF: `bff.traders.tradergunit.is-a.dev`
-  - API: `api.traders.tradergunit.is-a.dev`
-- The root resubmission now needs:
-  - a dev-facing landing page at the root host
-  - the full `is-a.dev` PR template completed
-  - a public preview link plus screenshot proof
-- Until the root request is merged, public proof should continue on the Contabo fallback hosts:
+- The stable public developer root is `https://tradergunit.pages.dev`.
+- Keep the trading application off Cloudflare Pages for now. Pages is the developer root only.
+- The product runtime remains on the Contabo-backed host family until an owned custom domain is attached.
+- The current public proof endpoints are still the Contabo fallback hosts:
   - `https://173.249.18.14.sslip.io`
   - `https://bff.173.249.18.14.sslip.io/health`
   - `https://api.173.249.18.14.sslip.io/health`
+- The next domain move is a custom-domain cutover, not another `is-a.dev` submission.
+- Target custom-domain mapping:
+  - developer root: `<domain>` or `www.<domain>` on Cloudflare Pages
+  - product frontend: `app.<domain>`
+  - BFF: `bff.<domain>`
+  - API: `api.<domain>`
 
 ## Latest Fallback-Host Evidence
 
@@ -41,8 +37,8 @@
 - Practical meaning:
   - reachability, DNS, TLS, and the basic health chain are green on the fallback
     hosts
-  - the next remaining work before public cutover is domain approval plus later
-    performance hardening against the `bff_ml_health` load threshold failures
+  - the next remaining work before public cutover is owned-domain cutover plus
+    later performance hardening against the `bff_ml_health` load threshold failures
 
 ## Topology
 
@@ -71,40 +67,38 @@
 ## Required GitHub Variables
 
 - `PRODUCTION_DEPLOY_PLATFORM=contabo` so successful `main` CI runs hand production deploys to the Contabo workflow instead of the legacy OCI job
-- `CONTABO_DOMAIN=<approved-root-domain>`
-- `BFF_PUBLIC_HOST=<approved-bff-domain>`
-- `API_PUBLIC_HOST=<approved-api-domain>`
+- `CONTABO_DOMAIN=<product-frontend-domain>` such as `app.<domain>`; this is the fallback source of truth when `TRADERSAPP_DOMAIN` is unset
+- `TRADERSAPP_DOMAIN=<product-frontend-domain>` recommended so Pages-root workflows, alerts, and verifier inputs all show the same public frontend host
+- `BFF_PUBLIC_HOST=<public-bff-domain>` such as `bff.<domain>`
+- `API_PUBLIC_HOST=<public-api-domain>` such as `api.<domain>`
 - `CONTABO_APP_ROOT=/opt/tradersapp` (optional if unchanged)
 - `CONTABO_COMPOSE_PROFILES=core` for first cutover; add `mlops` or `observability` later when needed
 
-## Domain Approval And Cutover Checklist
+## Custom Domain Cutover Checklist
 
 Use this exact sequence from now on:
 
-1. Resubmit the root `is-a.dev` request for `tradergunit.is-a.dev` as a developer/personal site.
-2. Point the root-request preview to the developer landing route:
-   - `https://173.249.18.14.sslip.io/developer`
-3. After the root request is merged, open and merge the nested requests for:
-   - `traders.tradergunit.is-a.dev`
-   - `bff.traders.tradergunit.is-a.dev`
-   - `api.traders.tradergunit.is-a.dev`
-4. Update GitHub repository variables to the new project host family:
-   - `TRADERSAPP_DOMAIN=traders.tradergunit.is-a.dev`
-   - `CONTABO_DOMAIN=traders.tradergunit.is-a.dev`
-   - `BFF_PUBLIC_HOST=bff.traders.tradergunit.is-a.dev`
-   - `API_PUBLIC_HOST=api.traders.tradergunit.is-a.dev`
+1. Buy or attach the owned domain in Cloudflare DNS.
+2. Attach the developer root hostname to the existing Cloudflare Pages project:
+   - `<domain>` or `www.<domain>` -> `tradergunit`
+3. Point the runtime hostnames to the current Contabo edge:
+   - `app.<domain>`
+   - `bff.<domain>`
+   - `api.<domain>`
+4. Update GitHub repository variables to the new host family:
+   - `TRADERSAPP_DOMAIN=app.<domain>`
+   - `CONTABO_DOMAIN=app.<domain>`
+   - `BFF_PUBLIC_HOST=bff.<domain>`
+   - `API_PUBLIC_HOST=api.<domain>`
 5. Keep `PRODUCTION_DEPLOY_PLATFORM=contabo` and `CONTABO_COMPOSE_PROFILES=core` unchanged.
-6. Merge or cherry-pick the prepared nested-domain cutover branch.
-7. Run `Deploy to Contabo VPS`.
-8. Run `Verify Contabo Public Deploy` against:
-   - `https://traders.tradergunit.is-a.dev`
-   - `https://bff.traders.tradergunit.is-a.dev/health`
-   - `https://api.traders.tradergunit.is-a.dev/health`
-9. Only after those checks pass, mark the DNS/public-health P26 items complete.
-
-Prepared materials for the corrected submission path live in:
-
-- [docs/IS_A_DEV_RESUBMISSION_PLAN.md](/e:/TradersApp/docs/IS_A_DEV_RESUBMISSION_PLAN.md:1)
+6. Run `Deploy to Contabo VPS`.
+7. Run `Deploy Pages Root`.
+8. Run `Verify Pages Root Runtime`.
+9. Run `Verify Contabo Public Deploy` against:
+   - `https://app.<domain>`
+   - `https://bff.<domain>/health`
+   - `https://api.<domain>/health`
+10. Only after those checks pass, mark the DNS/public-health P26 items complete.
 
 ## Required GitHub Secrets
 
@@ -146,21 +140,23 @@ call flaps briefly.
 ## First Cutover
 
 1. Provision the Contabo VPS and confirm SSH access.
-2. Point the approved root, `bff`, and `api` hosts to the VPS IP.
-3. Add the required GitHub variables and secrets.
-4. Run the bootstrap once on the VPS:
+2. Attach the owned developer-root hostname to Cloudflare Pages.
+3. Point `app`, `bff`, and `api` hosts to the VPS IP.
+4. Add the required GitHub variables and secrets.
+5. Run the bootstrap once on the VPS:
 
 ```bash
 ssh root@<contabo-ip>
 curl -fsSL https://raw.githubusercontent.com/fxgunit/TradersApp/main/scripts/contabo/setup-vps.sh | sudo bash
 ```
 
-5. Push to `main` or run `Deploy to Contabo VPS` manually.
-6. Confirm remote health:
-   - `https://<approved-root-domain>`
-   - `https://<approved-bff-domain>/health`
-   - `https://<approved-api-domain>/health`
-7. The deploy workflow now runs `scripts/contabo/verify_public_deploy.py` after the remote restart unless manual dispatch sets `skip_public_verify=true`.
+6. Push to `main` or run `Deploy to Contabo VPS` manually.
+7. Run `Deploy Pages Root` so the developer landing picks up the new public host variables.
+8. Confirm remote health:
+   - `https://app.<domain>`
+   - `https://bff.<domain>/health`
+   - `https://api.<domain>/health`
+9. The deploy workflow now runs `scripts/contabo/verify_public_deploy.py` after the remote restart unless manual dispatch sets `skip_public_verify=true`.
 
 ## Public Verification
 
@@ -196,10 +192,10 @@ Artifacts:
 The dedicated Contabo public-edge suite intentionally targets the active host
 layout and low-blast-radius routes:
 
-- `https://<approved-root-domain>/edge-health`
-- `https://<approved-bff-domain>/health`
-- `https://<approved-bff-domain>/ml/health`
-- `https://<approved-api-domain>/predict`
+- `https://app.<domain>/edge-health`
+- `https://bff.<domain>/health`
+- `https://bff.<domain>/ml/health`
+- `https://api.<domain>/predict`
 
 ## Remote Layout
 
