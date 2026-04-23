@@ -1,11 +1,71 @@
 import React from "react";
 import "./developerRootLanding.css";
 
+const DEVELOPER_ROOT_HOST = "tradergunit.pages.dev";
 const PRIMARY_PROJECT_HOST = "https://173.249.18.14.sslip.io/";
 const BFF_HEALTH_HOST = "https://bff.173.249.18.14.sslip.io/health";
 const API_HEALTH_HOST = "https://api.173.249.18.14.sslip.io/health";
 const GITHUB_PROFILE = "https://github.com/FXGUNIT";
 const PREVIEW_ROUTE = "/developer";
+const STACK_STATUS = [
+  {
+    label: "Developer root",
+    value: DEVELOPER_ROOT_HOST,
+  },
+  {
+    label: "Project frontend",
+    value: "173.249.18.14.sslip.io",
+  },
+  {
+    label: "BFF health",
+    value: "bff.173.249.18.14.sslip.io/health",
+  },
+  {
+    label: "API health",
+    value: "api.173.249.18.14.sslip.io/health",
+  },
+];
+const WORKSTREAMS = [
+  "React + Vite shell for the operator-facing frontend",
+  "Node.js BFF for auth, policy, orchestration, and API fan-out",
+  "Python ML engine for inference, research, and model services",
+  "Windows thin client packaging for low-friction local access",
+  "Contabo-hosted runtime with Redis and containerized service edges",
+];
+const PROOF_TARGETS = [
+  {
+    href: PRIMARY_PROJECT_HOST,
+    label: "Current frontend fallback host",
+  },
+  {
+    href: BFF_HEALTH_HOST,
+    label: "Current BFF health",
+  },
+  {
+    href: API_HEALTH_HOST,
+    label: "Current API health",
+  },
+];
+const TIMELINE = [
+  {
+    step: "01",
+    title: "Cloudflare root",
+    body:
+      "tradergunit.pages.dev is the stable public developer root and portfolio surface.",
+  },
+  {
+    step: "02",
+    title: "Live project runtime",
+    body:
+      "The trading application stays on the existing Contabo-backed runtime until the frontend and BFF boundary are cleaned up for a wider move.",
+  },
+  {
+    step: "03",
+    title: "Custom domain later",
+    body:
+      "Once branding and domain ownership are finalized, the same public root can be moved behind a custom domain without changing the product stack first.",
+  },
+];
 
 function currentPreviewUrl() {
   if (typeof window === "undefined") {
@@ -17,10 +77,10 @@ function currentPreviewUrl() {
 
 function currentHostname() {
   if (typeof window === "undefined") {
-    return "tradergunit.is-a.dev";
+    return DEVELOPER_ROOT_HOST;
   }
 
-  return window.location.hostname || "tradergunit.is-a.dev";
+  return window.location.hostname || DEVELOPER_ROOT_HOST;
 }
 
 export default function DeveloperRootLanding() {
@@ -34,9 +94,9 @@ export default function DeveloperRootLanding() {
           <p className="developer-root-kicker">FXGUNIT // software systems</p>
           <h1>Developer root for Gunit&apos;s live trading infrastructure.</h1>
           <p className="developer-root-summary">
-            This root host is the software-development home for the stack behind
-            TradersApp: a React trading shell, Node BFF, Python ML engine,
-            Windows thin client, and self-hosted deployment path on Contabo.
+            This Cloudflare Pages root is the public developer-facing home for
+            the stack behind TradersApp: a React trading shell, Node BFF,
+            Python ML engine, Windows thin client, and Contabo-backed runtime.
           </p>
           <div className="developer-root-actions">
             <a href={GITHUB_PROFILE} target="_blank" rel="noreferrer">
@@ -53,21 +113,15 @@ export default function DeveloperRootLanding() {
 
         <aside className="developer-root-status">
           <div>
-            <span>Root host mode</span>
+            <span>Current host</span>
             <strong>{hostname}</strong>
           </div>
-          <div>
-            <span>Project frontend</span>
-            <strong>traders.tradergunit.is-a.dev</strong>
-          </div>
-          <div>
-            <span>BFF host</span>
-            <strong>bff.traders.tradergunit.is-a.dev</strong>
-          </div>
-          <div>
-            <span>API host</span>
-            <strong>api.traders.tradergunit.is-a.dev</strong>
-          </div>
+          {STACK_STATUS.map(({ label, value }) => (
+            <div key={label}>
+              <span>{label}</span>
+              <strong>{value}</strong>
+            </div>
+          ))}
         </aside>
       </section>
 
@@ -76,41 +130,31 @@ export default function DeveloperRootLanding() {
           <h2>Current build focus</h2>
           <p>
             Shipping a globally reachable trading workstation without local
-            sidecars on user machines. The root host stays developer-facing;
-            the project itself lives under nested subdomains to match the
-            is-a.dev policy.
+            sidecars on user machines. The public root stays developer-facing
+            while the live product runtime continues on the current Contabo
+            fallback host family.
           </p>
         </article>
 
         <article>
           <h2>Core stack</h2>
           <ul>
-            <li>React + Vite frontend for the trading shell</li>
-            <li>Node.js BFF for orchestration, policy, and transport</li>
-            <li>Python ML engine for consensus, regime, and research loops</li>
-            <li>Windows thin client with packaged web assets</li>
-            <li>Contabo edge with Caddy, Redis, and containerized services</li>
+            {WORKSTREAMS.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
           </ul>
         </article>
 
         <article>
           <h2>Live proof targets</h2>
           <ul>
-            <li>
-              <a href={PRIMARY_PROJECT_HOST} target="_blank" rel="noreferrer">
-                Current frontend fallback host
-              </a>
-            </li>
-            <li>
-              <a href={BFF_HEALTH_HOST} target="_blank" rel="noreferrer">
-                Current BFF health
-              </a>
-            </li>
-            <li>
-              <a href={API_HEALTH_HOST} target="_blank" rel="noreferrer">
-                Current API health
-              </a>
-            </li>
+            {PROOF_TARGETS.map(({ href, label }) => (
+              <li key={href}>
+                <a href={href} target="_blank" rel="noreferrer">
+                  {label}
+                </a>
+              </li>
+            ))}
           </ul>
         </article>
 
@@ -126,30 +170,13 @@ export default function DeveloperRootLanding() {
       </section>
 
       <section className="developer-root-timeline">
-        <div>
-          <span>01</span>
-          <h3>Dev root</h3>
-          <p>
-            tradergunit.is-a.dev remains the developer-facing home and
-            portfolio surface.
-          </p>
-        </div>
-        <div>
-          <span>02</span>
-          <h3>Project host</h3>
-          <p>
-            TradersApp frontend moves to traders.tradergunit.is-a.dev once the
-            root is approved.
-          </p>
-        </div>
-        <div>
-          <span>03</span>
-          <h3>Service hosts</h3>
-          <p>
-            BFF and ML engine use nested service hosts under the project label
-            so the production surface stays consistent.
-          </p>
-        </div>
+        {TIMELINE.map(({ step, title, body }) => (
+          <div key={step}>
+            <span>{step}</span>
+            <h3>{title}</h3>
+            <p>{body}</p>
+          </div>
+        ))}
       </section>
     </main>
   );
