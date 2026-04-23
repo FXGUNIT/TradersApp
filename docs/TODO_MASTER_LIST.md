@@ -7,11 +7,11 @@
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-23 19:31`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-23 19:41`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Master Backlog  61.6%  [###############---------]
-Tasks          done 157 | in progress 000 | blocked 000 | todo 098 | total 255
+Master Backlog  65.5%  [################--------]
+Tasks          done 167 | in progress 000 | blocked 000 | todo 088 | total 255
 ```
 
 How to read this:
@@ -23,7 +23,7 @@ How to read this:
 | Area | Tasks | Progress | Status |
 |---|---|---:|---|
 | Stage P | [138/200] |  69.0% | IN PROGRESS |
-| Stage S | [18/47] |  38.3% | PENDING |
+| Stage S | [28/47] |  59.6% | IN PROGRESS |
 | ML Research | [1/8] |  12.5% | PENDING |
 
 ### By Tier
@@ -33,7 +33,7 @@ How to read this:
 | TIER 1 | Stage P overall |  69.0% | IN PROGRESS |
 | TIER 2 | Active Contabo production path |  96.9% | IN PROGRESS |
 | TIER 3 | Archived OCI fallback / evidence |  29.1% | ARCHIVED |
-| TIER 4 | Stage S + ML backlog |  34.5% | PENDING |
+| TIER 4 | Stage S + ML backlog |  52.7% | IN PROGRESS |
 
 ### By Phase
 
@@ -67,7 +67,7 @@ How to read this:
 | P26 - Contabo VPS Docker Compose Production Path 🔴 ACTIVE | [31/32] |  96.9% | IN PROGRESS |
 | S1 - Trading Session Config Foundation | [11/11] | 100.0% | DONE |
 | S2 - BFF Multi-Instrument Routing | [7/7] | 100.0% | DONE |
-| S3 - Frontend Dashboard Redesign | [0/13] |   0.0% | PENDING |
+| S3 - Frontend Dashboard Redesign | [10/13] |  76.9% | IN PROGRESS |
 | S4 - Options Module (Greenfield) | [0/7] |   0.0% | PENDING |
 | S5 - Economic Calendar & Expiry Calendar | [0/5] |   0.0% | PENDING |
 | S6 - Database + Trade Logging | [0/4] |   0.0% | PENDING |
@@ -503,19 +503,19 @@ Fallback-host note: `sslip.io` hosts (`173.249.18.14.sslip.io`) remain the activ
 - [x] S2-07 — Create `bff/services/calendarService.mjs`
 
 ### Phase S3 — Frontend Dashboard Redesign
-- [ ] S3-01 — Create `src/features/dashboard/ActiveInstrumentContext.jsx`
-- [ ] S3-02 — Create `src/features/dashboard/InstrumentSwitcher.jsx`
-- [ ] S3-03 — Create `src/features/dashboard/MarketTimelineClock.jsx`
-- [ ] S3-04 — Create `src/features/dashboard/SessionStatusPanel.jsx`
-- [ ] S3-05 — Create `src/features/calendar/EventCalendarCompact.jsx`
-- [ ] S3-06 — Create `src/features/calendar/ExpiryCalendarPanel.jsx`
+- [x] S3-01 — Create `src/features/dashboard/ActiveInstrumentContext.jsx`
+- [x] S3-02 — Create `src/features/dashboard/InstrumentSwitcher.jsx`
+- [x] S3-03 — Create `src/features/dashboard/MarketTimelineClock.jsx`
+- [x] S3-04 — Create `src/features/dashboard/SessionStatusPanel.jsx`
+- [x] S3-05 — Create `src/features/calendar/EventCalendarCompact.jsx`
+- [x] S3-06 — Create `src/features/calendar/ExpiryCalendarPanel.jsx`
 - [ ] S3-07 — Redesign `src/pages/CollectiveConsciousness.jsx`
-- [ ] S3-08 — Create `src/pages/CollectiveConsciousness.css`
-- [ ] S3-09 — Update `src/features/consensus/consensusGateway.js`
-- [ ] S3-10 — Create `src/services/calendarGateway.js`
+- [x] S3-08 — Create `src/pages/CollectiveConsciousness.css`
+- [x] S3-09 — Update `src/features/consensus/consensusGateway.js`
+- [x] S3-10 — Create `src/services/calendarGateway.js`
 - [ ] S3-11 — Update `src/features/consensus/SessionProbabilityPanel.jsx`
 - [ ] S3-12 — Create pre-session briefing component
-- [ ] S3-13 — Create `src/features/dashboard/InstrumentQuickStats.jsx`
+- [x] S3-13 — Create `src/features/dashboard/InstrumentQuickStats.jsx`
 
 ### Phase S4 — Options Module (Greenfield)
 - [ ] S4-01 — Create `src/features/options/optionsGateway.js` (Dhan API)
@@ -585,7 +585,7 @@ Fallback-host note: `sslip.io` hosts (`173.249.18.14.sslip.io`) remain the activ
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-23 19:31`  -  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-23 19:41`  -  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Stage P Backlog  69.0%  [#################-------]
