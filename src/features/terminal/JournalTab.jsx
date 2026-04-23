@@ -9,6 +9,7 @@ import {
 } from "./terminalHelperComponents";
 import { CSS_VARS } from "../../styles/cssVars.js";
 import TerminalJournalOverview from "./TerminalJournalOverview.jsx";
+import PaperTradeLogView from "./PaperTradeLogView.jsx";
 import TimeOfDayHeatmap from "./TimeOfDayHeatmap.jsx";
 import { computePayoutTrajectory } from "./journalMetrics.js";
 
@@ -281,6 +282,38 @@ export default function JournalTab({
               placeholder="P&L"
               value={jf.pnl}
               onChange={sjf("pnl")}
+              type="number"
+              mono
+            />
+            <Field
+              label="PARTIAL EXITS"
+              placeholder="0"
+              value={jf.partialExitCount}
+              onChange={sjf("partialExitCount")}
+              type="number"
+              mono
+            />
+            <Field
+              label="EXIT QTY"
+              placeholder="Qty closed early"
+              value={jf.partialExitQty}
+              onChange={sjf("partialExitQty")}
+              type="number"
+              mono
+            />
+            <Field
+              label="EXIT P&L ($)"
+              placeholder="Partial exit P&L"
+              value={jf.partialExitPnl}
+              onChange={sjf("partialExitPnl")}
+              type="number"
+              mono
+            />
+            <Field
+              label="REMAINING QTY"
+              placeholder="Open runner qty"
+              value={jf.remainingQty}
+              onChange={sjf("remainingQty")}
               type="number"
               mono
             />
