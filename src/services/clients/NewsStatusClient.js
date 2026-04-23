@@ -169,7 +169,7 @@ export async function fetchNewsSystemStatus() {
       Number(upcomingNextEvent.timeUntil_min) >= SCHEDULED_NEWS_RECENT_WINDOW_MIN &&
       Number(upcomingNextEvent.timeUntil_min) <= SCHEDULED_NEWS_ACTIVE_WINDOW_MIN;
     const isRiskWindow =
-      !upcomingTradeAllowed || upcomingWarning || isWithinWindow;
+      upcomingTradeAllowed === false || upcomingWarning || isWithinWindow;
 
     let scheduledNewsSignal;
     if (isRiskWindow) {
