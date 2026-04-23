@@ -89,6 +89,20 @@ run_as_app() {
   sudo -H -u "${APP_USER}" bash -lc "cd '${DEPLOY_ROOT}' && ${command}"
 }
 
+check_available_kb() {
+  df --output=avail / | tail -1 | tr -d ' '
+}
+
+prune_unused_docker_artifacts() {
+  echo "[deploy] Low disk detected on /. Attempting one-time Docker cleanup..." >&2
+  docker system df || true
+  docker builder prune -af || true
+  docker image prune -a -f || true
+  docker container prune -f || true
+  docker network prune -f || true
+  echo "[deploy] Disk after cleanup: $(df -h / | tail -1 | awk '{print $4}') free on /." >&2
+}
+
 wait_for_health() {
   local name="$1"
   local max_tries="${2:-90}"
@@ -168,8 +182,15 @@ fi
 COMPOSE_CMD="docker compose --project-name tradersapp --project-directory '${DEPLOY_ROOT}' --env-file '${RUNTIME_ENV}' -f '${DEPLOY_ROOT}/docker-compose.yml'"
 trap 'dump_failure_context' ERR
 
+AVAILABLE_KB="$(check_available_kb)"
+if [ "${AVAILABLE_KB}" -lt 20000000 ]; then
+  echo "[deploy] Only $(df -h / | tail -1 | awk '{print $4}') free on / before image pulls." >&2
+  prune_unused_docker_artifacts
+  AVAILABLE_KB="$(check_available_kb)"
+fi
+
 # Guard: refuse to deploy if less than 20GB free on root filesystem
-AVAILABLE_KB=$(df --output=avail / | tail -1 | tr -d ' ')
+AVAILABLE_KB="${AVAILABLE_KB:-$(check_available_kb)}"
 if [ "${AVAILABLE_KB}" -lt 20000000 ]; then
   echo "[deploy] ERROR: Only $(df -h / | tail -1 | awk '{print $4}') free on / — refusing to pull images." >&2
   echo "[deploy] Run 'docker image prune -a -f' to reclaim space." >&2

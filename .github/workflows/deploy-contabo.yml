@@ -392,10 +392,23 @@ jobs:
           REMOTE_GHCR_USERNAME='${{ github.actor }}'
           REMOTE_IMAGE_TAG='${{ steps.context.outputs.image_tag }}'
 
+          remote_available_kb() {
+            ssh contabo-vps "df --output=avail / | tail -1" 2>/dev/null | tr -d ' '
+          }
+
+          remote_prune_unused_docker_artifacts() {
+            echo "::warning::Low disk detected on Contabo VPS. Attempting one-time Docker cleanup before deploy."
+            ssh contabo-vps "if sudo -n true 2>/dev/null; then SUDO='sudo -n'; else SUDO=''; fi; \$SUDO docker system df || true; \$SUDO docker builder prune -af || true; \$SUDO docker image prune -a -f || true; \$SUDO docker container prune -f || true; \$SUDO docker network prune -f || true; df -h / | tail -1" 2>&1
+          }
+
           # Check available disk on Contabo VPS before deploying
-          AVAILABLE_KB=$(ssh contabo-vps "df --output=avail / | tail -1" 2>/dev/null | tr -d ' ')
+          AVAILABLE_KB="$(remote_available_kb)"
+          if [ -n "${AVAILABLE_KB}" ] && [ "${AVAILABLE_KB}" -lt 20000000 ]; then
+            remote_prune_unused_docker_artifacts
+            AVAILABLE_KB="$(remote_available_kb)"
+          fi
           if [ -z "${AVAILABLE_KB}" ] || [ "${AVAILABLE_KB}" -lt 20000000 ]; then
-            echo "::error::Contabo VPS has less than 20GB free (${AVAILABLE_KB}KB). Prune images first: ssh contabo-vps 'docker image prune -a -f'"
+            echo "::error::Contabo VPS still has less than 20GB free after cleanup (${AVAILABLE_KB}KB)."
             exit 1
           fi
 
