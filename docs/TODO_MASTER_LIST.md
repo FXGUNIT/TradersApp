@@ -7,11 +7,11 @@
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-24 02:12`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-24 02:14`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Master Backlog  40.0%  [##########--------------]
-Tasks          done 004 | in progress 000 | blocked 000 | todo 006 | total 010
+Master Backlog  50.0%  [############------------]
+Tasks          done 005 | in progress 000 | blocked 000 | todo 005 | total 010
 ```
 
 How to read this:
@@ -22,7 +22,7 @@ How to read this:
 
 | Area | Tasks | Progress | Status |
 |---|---|---:|---|
-| Stage P | [4/10] |  40.0% | IN PROGRESS |
+| Stage P | [5/10] |  50.0% | PENDING |
 | Stage S | [0/0] |   0.0% | DONE |
 | ML Research | [0/0] |   0.0% | DONE |
 
@@ -30,9 +30,9 @@ How to read this:
 
 | Tier | Scope | Progress | Status |
 |---|---|---:|---|
-| TIER 1 | Stage P overall |  40.0% | IN PROGRESS |
+| TIER 1 | Stage P overall |  50.0% | PENDING |
 | TIER 2 | Active Contabo production path |   0.0% | DONE |
-| TIER 3 | Archived OCI fallback / evidence |  80.0% | IN PROGRESS |
+| TIER 3 | Archived OCI fallback / evidence | 100.0% | DONE |
 | TIER 4 | Stage S + ML backlog |   0.0% | DONE |
 
 ### By Phase
@@ -40,7 +40,7 @@ How to read this:
 | Phase | Tasks | Progress | Status |
 |---|---|---:|---|
 | P23 - 4 GB Performance and Compatibility Certification | [0/5] |   0.0% | PENDING |
-| P25 - NY Lunch Trading Block 🔴 IN PROGRESS | [4/5] |  80.0% | IN PROGRESS |
+| P25 - NY Lunch Trading Block ✅ DONE | [5/5] | 100.0% | DONE |
 
 <!-- master-progress:end -->
 
@@ -84,19 +84,19 @@ All Stages S1–S6 and ML1–ML8 are background. Implement carefully, update liv
 - [ ] Validate degraded-network handling, reconnect flow, forced logout on desktop
 - [ ] Confirm desktop release never starts local BFF or ML sidecar services
 
-### P25 - NY Lunch Trading Block 🔴 IN PROGRESS
+### P25 - NY Lunch Trading Block ✅ DONE
 - Plan: `docs/superpowers/plans/2026-04-24-ny-lunch-trading-block.md`
 - Blocks all trading signals during NY lunch (12:00–1:00 PM ET)
   - DST active (Mar–Nov): 21:30–22:30 IST
   - DST inactive (Nov–Mar): 22:30–23:30 IST
 - `isNyLunchBreakActive(istHour, istMinute)` in `bff/services/tradingHoursService.mjs`
 - `getMlConsensus` in `bff/services/consensusEngine.mjs` returns NEUTRAL + reason during block
-- `checkNyLunchVeto()` in `bff/services/boardRoomService.mjs` fires RiskOfficer veto during block
+- `checkNyLunchVeto()` in `bff/services/boardRoomAgentReporter.mjs` fires RiskOfficer veto during block
 - [x] Task 1: Create `bff/services/tradingHoursService.mjs` + tests ✅ DONE
 - [x] Task 2: Update `bff/services/consensusEngine.mjs` — block ML call during lunch ✅ DONE
 - [x] Task 3: Update `bff/services/boardRoomAgentReporter.mjs` — RiskOfficer lunch veto ✅ DONE
 - [x] Task 4: Document in `DOMAIN-RULES.md` and `EDGE-CASES.md` ✅ DONE
-- [ ] Task 5: Verify end-to-end with BFF health check
+- [x] Task 5: Verify end-to-end — BFF /health verified ✅ DONE
 
 > **Archived OCI / A1 fallback scope:** If that path reopens, see `docs/OCI-DEPLOYMENT-RUNBOOK.md`, `docs/SETUP.md`, `docs/STAGE_P_DNS_SETUP.md`, `docs/STAGE_P_24X7_EXECUTION_CHECKLIST.md`
 
@@ -158,17 +158,17 @@ All Stages S1–S6 and ML1–ML8 are background. Implement carefully, update liv
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-24 02:12`  -  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-24 02:14`  -  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Stage P Backlog  40.0%  [##########--------------]
-Sections        done 000 | active 001 | blocked 000 | archived 000 | pending 001 | total 002
-Checklist       done 004 | open 006 | total 010
+Stage P Backlog  50.0%  [############------------]
+Sections        done 001 | active 000 | blocked 000 | archived 000 | pending 001 | total 002
+Checklist       done 005 | open 005 | total 010
 ```
 
 | Section | Tasks | Progress | Status |
 |---|---|---:|---|
 | P23 - 4 GB Performance and Compatibility Certification | [0/5] |   0.0% | PENDING |
-| P25 - NY Lunch Trading Block 🔴 IN PROGRESS | [4/5] |  80.0% | IN PROGRESS |
+| P25 - NY Lunch Trading Block ✅ DONE | [5/5] | 100.0% | DONE |
 
 <!-- live-status:end -->
