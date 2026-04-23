@@ -1,5 +1,7 @@
 # Stage P — Observability Validation
 
+> **Archived legacy validation guide.** The active public frontend is `https://tradergunit.pages.dev/`, and the current Contabo runtime proof hosts remain on `sslip.io`. Hostnames like `traders.app`, `bff.traders.app`, and `api.traders.app` below are historical OCI-era references.
+
 **Stage:** P11
 **Purpose:** Prove that production observability (metrics, logs, traces) is correctly wired end-to-end.
 **Run after:** P01–P10 complete, production endpoints publicly reachable, all required GitHub secrets and variables seeded.

@@ -1,5 +1,7 @@
 # Stage P Production Activation Proof
 
+> **Archived legacy proof bundle.** The active public frontend is `https://tradergunit.pages.dev/`, and the current Contabo runtime proof hosts remain on `sslip.io`. Any `traders.app` findings below are historical Stage P evidence only.
+
 **Run date:** 2026-04-15 IST  
 **Scope:** P01-P11 execution evidence (public reachability and deploy-readiness gates)
 

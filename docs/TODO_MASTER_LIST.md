@@ -7,7 +7,7 @@
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-23 19:41`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-23 19:55`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Master Backlog  65.5%  [################--------]
@@ -86,8 +86,8 @@ How to read this:
 
 ## EXECUTION PRIORITY
 
-### TIER 1 — ACTIVE NOW: corrected domain path + Contabo fallback proof
-The active blocker is domain ownership/control, not the Contabo fallback edge. Keep the fallback hosts green, resubmit the corrected `is-a.dev` developer root, and only then cut the project frontend plus `bff`/`api` nested hosts.
+### TIER 1 — ACTIVE NOW: canonical pages.dev frontend + Contabo runtime proof
+The canonical public frontend is `https://tradergunit.pages.dev/`. Keep Pages healthy, keep the Contabo runtime proof hosts green, and do not block Stage P on `is-a.dev` unless a future hostname migration is explicitly reopened.
 
 ### TIER 2 — STAGING: performance hardening + k6 envelope capture
 Fallback public reachability is already green on `sslip.io`. The next technical work is reducing the `bff_ml_health` failure burst and keeping better public-proof artifacts ready for the final domain cutover.
@@ -103,29 +103,28 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 ## PRODUCTION CONSTRAINTS
 
 - Production topology is Contabo VPS single-host Docker Compose. OCI k3s is archival evidence and fallback only.
-- Do not assume ownership of `traders.app`. That domain is not currently under repo-controlled DNS, so the corrected live path is the `tradergunit.is-a.dev` developer root plus nested `traders`, `bff.traders`, and `api.traders` hosts once approved.
+- The canonical public frontend is `tradergunit.pages.dev`. Do not treat `traders.app` or `tradergunit.is-a.dev` as the active production target in this repo unless that plan is explicitly reopened.
 - Do not cut app features to fit the server. Reduce infrastructure overhead first; keep trading logic, accuracy checks, and robustness requirements intact.
 - Robustness on a single VPS means deterministic boot, repeatable deploys, working health checks, backups, and recovery procedures. It does not imply multi-node HA.
-- Public production hosts must terminate on the Contabo VPS edge. Use `sslip.io` fallback hosts only for pre-DNS-proof capture.
+- Public runtime services currently terminate on the Contabo VPS edge via the `sslip.io` proof hosts. The user-facing frontend entry point is `tradergunit.pages.dev`.
 
 ---
 
 ## STAGE P — Production Deployment (Live 24x7 on Contabo VPS + Docker Compose)
-*Target: GitHub Actions → single Contabo VPS → Docker Compose → approved project frontend host under a developer root + matching `bff` and `api` hosts*
+*Target: GitHub Actions → Cloudflare Pages canonical frontend (`tradergunit.pages.dev`) + single Contabo VPS runtime edge for `bff` and `api`*
 
 ### Current Checkpoint - 2026-04-22
 - Production target is now Contabo VPS, not OCI k3s
 - Repo-side Contabo deployment assets are the active workstream: Compose bundle, reverse proxy, bootstrap scripts, runtime env builder, and GitHub Actions deploy workflow
 - Repo-side public verification is now wired three ways: local script, dedicated public-edge k6 suite, and GitHub Actions verification workflow
 - OCI P09, P11-P16, and P25 remain in this file only as historical evidence and fallback, not as the current production plan
-- Fallback public proof is currently captured on `sslip.io`, not on a controlled branded domain
-- The first `tradergunit.is-a.dev` request was closed by `is-a.dev` maintainers because it was not developer-root shaped and the PR template was incomplete
-- The corrected public host plan is:
-  - `tradergunit.is-a.dev` for the developer root
-  - `traders.tradergunit.is-a.dev` for the product frontend
-  - `bff.traders.tradergunit.is-a.dev`
-  - `api.traders.tradergunit.is-a.dev`
-- Success now means: `git push main` builds/pushes images, SSHes to Contabo, keeps the fallback hosts healthy, and then cuts the approved nested domain family without laptop involvement
+- `tradergunit.pages.dev` is now the canonical public frontend and must be treated as the default public URL
+- Contabo runtime proof remains on the current `sslip.io` host family:
+  - `173.249.18.14.sslip.io`
+  - `bff.173.249.18.14.sslip.io`
+  - `api.173.249.18.14.sslip.io`
+- The earlier `is-a.dev` cutover path is retired for the active production plan and should not block Stage P
+- Success now means: `git push main` refreshes the Pages root, keeps the Contabo runtime proof hosts healthy, and preserves one clear public-host contract without laptop involvement
 
 
 ### P01 — OCI Compute Instance ✅ DONE
@@ -235,8 +234,8 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 *Supersedes P25 as the real production route. Single-host Contabo VPS with GitHub Actions deployment is now the target architecture.*
 
 **Runbook:** See `docs/P26_Contabo_Deployment_Plan.md`
-**Progress snapshot (2026-04-23):** Master backlog `156/255` complete (`61.2%`). Stage P `137/200` complete (`68.5%`). Active production phase `P26` is `30/32` complete (`93.8%`). OCI archive phases remain in this file for rollback evidence only and are not part of the active critical path.
-**Current blocker:** the corrected developer-root request for `tradergunit.is-a.dev` is open with passing checks, but it still needs `is-a.dev` maintainer approval before the nested production hosts can be registered. `sslip.io` fallback hosts remain the active public proof surface until that approval lands.
+**Progress snapshot (2026-04-23):** Master backlog `167/255` complete (`65.5%`). Stage P `138/200` complete (`69.0%`). Active production phase `P26` is `31/32` complete (`96.9%`). OCI archive phases remain in this file for rollback evidence only and are not part of the active critical path.
+**Current blocker:** the remaining P26 item is refreshing off-box public-health evidence so the canonical frontend (`tradergunit.pages.dev`) and the current Contabo runtime proof hosts stay aligned in one contract.
 
 #### P26 — Architecture Freeze
 - [x] Freeze production target as `Contabo VPS` with `Docker Compose`, not OCI k3s
@@ -272,11 +271,11 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [x] Automatic/manual `Deploy to Contabo VPS` bootstrap path stabilized on Contabo after image pushes; workflow run `24723298075` first passed end-to-end on commit `053289b6`, and the April 22 edge-readiness regression was re-fixed by commit `84eb0ca6` with workflow run `24769157865` passing end-to-end again
 - [x] k6 public-edge verification now records first-envelope capture separately from threshold pass/fail
 - [x] Run the Contabo public-edge k6 suite and record the first concurrency envelope — fallback-host evidence exists for both the first baseline and the 2026-04-23 follow-up run; latest results show `edge_health` and `bff_health` green, `ml_predict` p95 improved to about `1277ms`, and `/ml/health` is now treated as an expected degraded state when the ML engine reports missing training/candle data rather than as a generic transport regression
-- [x] **DOMAIN CUTOVER PLAN READY** — the root developer-domain PR is open at `is-a-dev/register#36827`, the nested-host follow-on branches are prepared, and the repo cutover branch `prep/tradergunit-nested-domain-cutover` is ready to merge after approval
-- [ ] Confirm public health for `https://traders.tradergunit.is-a.dev`, `https://bff.traders.tradergunit.is-a.dev/health`, and `https://api.traders.tradergunit.is-a.dev/health` (pending `is-a.dev` approval + DNS propagation)
+- [x] **DOMAIN CONTRACT ALIGNED** — `tradergunit.pages.dev` is the canonical public frontend, and the current Contabo runtime proof family remains the `sslip.io` host set until a deliberate future hostname migration is chosen
+- [ ] Confirm public health for `https://tradergunit.pages.dev/`, `https://bff.173.249.18.14.sslip.io/health`, and `https://api.173.249.18.14.sslip.io/health` after workflow/default-host alignment
 - [x] Archive the final OCI node details after Contabo proved a clean redeploy cycle and fallback-host public readiness; see `docs/OCI-DEPLOYMENT-RUNBOOK.md` (2026-04-23)
 
-Fallback-host note: `sslip.io` hosts (`173.249.18.14.sslip.io`) remain the active public proof surface. Branded URLs switch only after `tradergunit.is-a.dev` is approved and the nested hosts are registered.
+Fallback-host note: `sslip.io` hosts (`173.249.18.14.sslip.io`) remain the active Contabo runtime proof surface. The canonical public frontend is `https://tradergunit.pages.dev/`.
 
 #### P09-C - `kubectl apply tradersapp-deployments.yaml` on OCI E2.1.Micro (ARCHIVED — P26 is active)
 > ⚠️ P09-C is ARCHIVED. Contabo VPS (P26) is the active production path. Do not work on P09-C unless Contabo is abandoned.
@@ -585,7 +584,7 @@ Fallback-host note: `sslip.io` hosts (`173.249.18.14.sslip.io`) remain the activ
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-23 19:41`  -  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-23 19:55`  -  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Stage P Backlog  69.0%  [#################-------]

@@ -1,5 +1,7 @@
 # Stage P — DNS Setup Guide (Beginner-Friendly)
 
+> **Archived legacy DNS guide.** The current canonical public frontend is `https://tradergunit.pages.dev/`. Active Contabo runtime proof remains on the `sslip.io` host family. `traders.app` references below are historical OCI notes only.
+
 **Scoped to:** `docs/` — DNS configuration guide for TradersApp production deployment
 
 **Last Updated:** 2026-04-19

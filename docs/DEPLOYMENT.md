@@ -1,6 +1,6 @@
 # Deployment Guide — TradersApp
 
-**Last updated:** 2026-04-20
+**Last updated:** 2026-04-23
 **Status:** Contabo VPS + Docker Compose is the active production path. OCI k3s is archived fallback only. See `docs/P26_Contabo_Deployment_Plan.md`.
 
 ---
@@ -9,14 +9,14 @@
 
 - Single `Contabo VPS`
 - `GitHub Actions -> GHCR -> SSH -> Docker Compose`
-- Public host family is pending domain approval. Current requested production hosts are:
-  - `tradergunit.is-a.dev`
-  - `bff.tradergunit.is-a.dev`
-  - `api.tradergunit.is-a.dev`
-- Until approval completes, public proof uses the Contabo fallback hosts:
+- Canonical public frontend:
+  - `tradergunit.pages.dev`
+- Current Contabo runtime proof hosts:
   - `173.249.18.14.sslip.io`
   - `bff.173.249.18.14.sslip.io`
   - `api.173.249.18.14.sslip.io`
+- `is-a.dev` is retired for the active path and should not be treated as a
+  pending blocker.
 - Runtime bundle:
   - [deploy/contabo/docker-compose.yml](/e:/TradersApp/deploy/contabo/docker-compose.yml:1)
   - [deploy/contabo/Caddyfile](/e:/TradersApp/deploy/contabo/Caddyfile:1)
@@ -24,9 +24,10 @@
   - [scripts/contabo/deploy.sh](/e:/TradersApp/scripts/contabo/deploy.sh:1)
   - [docs/P26_Contabo_Deployment_Plan.md](/e:/TradersApp/docs/P26_Contabo_Deployment_Plan.md:1)
 
-`traders.app` is not currently under repo-controlled DNS. Treat older `traders.app`
-references in archived OCI sections below as historical context, not as the live
-Contabo cutover target.
+`traders.app` is not currently under repo-controlled DNS. Treat older
+`traders.app` references in archived OCI sections below as historical context,
+not as the live Contabo target. The user-facing frontend entry point is
+`https://tradergunit.pages.dev/`.
 
 ## Archived OCI Reference
 
@@ -350,10 +351,10 @@ gh workflow run rollback.yml -f version=2026-04-01
 
 | Service | URL | Expected |
 |---|---|---|
-| Pages root | `https://tradergunit.pages.dev` | HTTP 200 + developer-root landing page |
-| ML Engine | `https://api.traders.app/health` | `{"ok": true, ...}` |
-| BFF | `https://bff.traders.app/health` | `{"ok": true, ...}` |
-| Frontend | `https://traders.app` | HTTP 200 |
+| Canonical frontend | `https://tradergunit.pages.dev` | HTTP 200 + landing page |
+| Runtime edge | `https://173.249.18.14.sslip.io` | HTTP 200 |
+| BFF | `https://bff.173.249.18.14.sslip.io/health` | `{"ok": true, ...}` |
+| ML Engine | `https://api.173.249.18.14.sslip.io/health` | `{"ok": true, ...}` |
 
 ---
 
@@ -363,7 +364,8 @@ After every deployment, verify:
 
 - [ ] `https://tradergunit.pages.dev` returns 200 with the expected developer-root `h1`
 - [ ] Pages root security headers are present (CSP, `X-Frame-Options`, `X-Content-Type-Options`, `Permissions-Policy`)
-- [ ] `GET /health` returns 200 on all services
+- [ ] `https://173.249.18.14.sslip.io` returns 200 for the current runtime edge
+- [ ] `GET /health` returns 200 on all runtime services
 - [ ] `GET /ai/status` returns AI provider configuration
 - [ ] `GET /news/countdown` returns news event data
 - [ ] `GET /ml/health` returns ML engine status

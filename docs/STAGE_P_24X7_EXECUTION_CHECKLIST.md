@@ -1,5 +1,7 @@
 # Stage P 24x7 Go-Live Execution Checklist
 
+> **Archived legacy checklist.** The active public frontend is `https://tradergunit.pages.dev/`, and the live Contabo runtime proof hosts remain on `sslip.io`. The `traders.app` instructions below are historical OCI-era material only.
+
 Last verified: 2026-04-16 20:33 IST (2026-04-16T15:03Z)
 Repo: FXGUNIT/TradersApp
 

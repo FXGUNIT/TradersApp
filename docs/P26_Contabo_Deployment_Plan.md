@@ -6,24 +6,18 @@
 
 ## Current Domain State
 
-- Temporary developer-root proof is still available at
-  `https://tradergunit.pages.dev`.
-- The branded free-host target pending maintainer approval is:
-  - `https://tradergunit.is-a.dev`
-  - `https://traders.tradergunit.is-a.dev`
-  - `https://bff.traders.tradergunit.is-a.dev/health`
-  - `https://api.traders.tradergunit.is-a.dev/health`
-- Keep the trading application runtime off Cloudflare Pages. Pages remains
-  proof-only until the `is-a.dev` root and nested hosts are approved.
-- Until `is-a.dev` approval plus DNS propagation lands, the product runtime
-  remains on the free `sslip.io` Contabo-backed host family.
-- The current public proof endpoints are still the Contabo fallback hosts:
+- Canonical public frontend is `https://tradergunit.pages.dev`.
+- Keep runtime services off Cloudflare Pages. Pages is the main public entry;
+  Contabo remains the current runtime edge for BFF/API proof and backend
+  hosting.
+- The current public proof endpoints for the Contabo runtime edge are:
   - `https://173.249.18.14.sslip.io`
   - `https://bff.173.249.18.14.sslip.io/health`
   - `https://api.173.249.18.14.sslip.io/health`
-- Do not plan around buying a domain. The active free path is the approved
-  `is-a.dev` host family, with `sslip.io` fallback proof until that approval
-  lands.
+- `is-a.dev` is retired for the active production path. Do not treat it as a
+  blocker or pending cutover.
+- Do not plan around buying or reviving another hostname family unless a future
+  migration is explicitly reopened.
 
 ## Latest Fallback-Host Evidence
 
@@ -40,12 +34,12 @@
   - deeper BFF and API routes are answering publicly from the fallback hosts
 - Practical meaning:
   - the Contabo stack is stable enough to treat OCI as archived rollback context
-  - the main remaining blocker is the branded `is-a.dev` cutover, not initial
-    Contabo host bring-up
+  - the remaining work is keeping the Pages frontend contract and Contabo
+    runtime proof aligned in one runbook, not waiting on `is-a.dev`
 
 ## Topology
 
-- Public edge: Caddy on the VPS, terminating the approved root frontend host plus matching `bff` and `api` hosts
+- Public edge: Caddy on the VPS, terminating the current runtime-edge host plus matching `bff` and `api` hosts
 - Runtime: `frontend`, `bff`, `ml-engine`, `analysis-service`, `redis`
 - Optional profiles:
   - `mlops`: `postgres`, `minio`, `mlflow`
@@ -71,22 +65,26 @@
 
 - `PRODUCTION_DEPLOY_PLATFORM=contabo` so successful `main` CI runs hand production deploys to the Contabo workflow instead of the legacy OCI job
 - `CONTABO_DOMAIN=173.249.18.14.sslip.io`
-- `TRADERSAPP_DOMAIN=173.249.18.14.sslip.io` recommended so Pages-root workflows, alerts, and verifier inputs all show the same public frontend host
+- `TRADERSAPP_DOMAIN=173.249.18.14.sslip.io` for the Contabo runtime edge bundle
 - `BFF_PUBLIC_HOST=bff.173.249.18.14.sslip.io`
 - `API_PUBLIC_HOST=api.173.249.18.14.sslip.io`
 - `CONTABO_APP_ROOT=/opt/tradersapp` (optional if unchanged)
 - `CONTABO_COMPOSE_PROFILES=core` for first cutover; add `mlops` or `observability` later when needed
 
+The canonical public frontend `https://tradergunit.pages.dev/` is fixed by the
+Pages workflows and should not be reinterpreted through the Contabo runtime
+variables above.
+
 ## Free Topology Checklist
 
 Use this exact sequence from now on:
 
-1. Keep `tradergunit.pages.dev` as the stable developer root.
+1. Keep `tradergunit.pages.dev` as the canonical public frontend.
 2. Keep the runtime host family on:
    - `173.249.18.14.sslip.io`
    - `bff.173.249.18.14.sslip.io`
    - `api.173.249.18.14.sslip.io`
-3. Update GitHub repository variables only if they drift away from the free host family:
+3. Update GitHub repository variables only if the Contabo runtime hosts drift away from the current proof family:
    - `TRADERSAPP_DOMAIN=173.249.18.14.sslip.io`
    - `CONTABO_DOMAIN=173.249.18.14.sslip.io`
    - `BFF_PUBLIC_HOST=bff.173.249.18.14.sslip.io`
@@ -101,23 +99,13 @@ Use this exact sequence from now on:
    - `https://api.173.249.18.14.sslip.io/health`
 9. Only after those checks pass, mark the public-health items complete.
 
-## Branded Cutover Once Approved
+## Optional Future Branded Host Migration
 
-Run this only after the `tradergunit.is-a.dev` root request is approved and the
-nested-host follow-on requests are merged.
+No branded-host migration is active right now.
 
-1. Merge the prepared repo cutover branch for the nested-host family.
-2. Update repository variables to the branded host set:
-   - `TRADERSAPP_DOMAIN=traders.tradergunit.is-a.dev`
-   - `CONTABO_DOMAIN=traders.tradergunit.is-a.dev`
-   - `BFF_PUBLIC_HOST=bff.traders.tradergunit.is-a.dev`
-   - `API_PUBLIC_HOST=api.traders.tradergunit.is-a.dev`
-3. Run `Deploy to Contabo VPS`.
-4. Run `Verify Contabo Public Deploy` against:
-   - `https://traders.tradergunit.is-a.dev`
-   - `https://bff.traders.tradergunit.is-a.dev/health`
-   - `https://api.traders.tradergunit.is-a.dev/health`
-5. Only after those checks pass, close the remaining public-health TODO item.
+If a future migration is intentionally reopened, write a fresh runbook from the
+current `tradergunit.pages.dev` + Contabo runtime-edge contract instead of
+reviving the retired `is-a.dev` plan.
 
 ## Required GitHub Secrets
 
@@ -159,7 +147,7 @@ call flaps briefly.
 ## First Cutover
 
 1. Provision the Contabo VPS and confirm SSH access.
-2. Keep `tradergunit.pages.dev` attached to Cloudflare Pages.
+2. Keep `tradergunit.pages.dev` attached to Cloudflare Pages as the canonical public frontend.
 3. Point `173.249.18.14.sslip.io`, `bff.173.249.18.14.sslip.io`, and `api.173.249.18.14.sslip.io` at the VPS IP.
 4. Add the required GitHub variables and secrets.
 5. Run the bootstrap once on the VPS:
@@ -170,8 +158,9 @@ curl -fsSL https://raw.githubusercontent.com/fxgunit/TradersApp/main/scripts/con
 ```
 
 6. Push to `main` or run `Deploy to Contabo VPS` manually.
-7. Run `Deploy Pages Root` so the developer landing picks up the active free-host variables.
+7. Run `Deploy Pages Root` so `tradergunit.pages.dev` stays aligned with the current runtime proof hosts.
 8. Confirm remote health:
+   - `https://tradergunit.pages.dev`
    - `https://173.249.18.14.sslip.io`
    - `https://bff.173.249.18.14.sslip.io/health`
    - `https://api.173.249.18.14.sslip.io/health`

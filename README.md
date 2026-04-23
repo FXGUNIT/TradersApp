@@ -2,6 +2,8 @@
 
 Quantitative trading intelligence platform - multi-model consensus signals for futures trading.
 
+Canonical public frontend: `https://tradergunit.pages.dev/`
+
 ## Quick Start
 
 | What you need | Where to look |
