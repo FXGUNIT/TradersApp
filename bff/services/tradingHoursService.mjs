@@ -8,6 +8,20 @@
 const IST_OFFSET_MS = (5 * 60 * 60 * 1000) + (30 * 60 * 1000);
 
 /**
+ * Parses a GMT-offset string (e.g. "GMT-4" or "GMT-5") to a numeric hour offset.
+ * @param {string} str
+ * @returns {number}
+ */
+const parseOffset = (str) => {
+  if (!str) return 0;
+  const match = str.match(/GMT([+-])(\d+)/);
+  if (match) {
+    return match[1] === '-' ? -parseInt(match[2], 10) : parseInt(match[2], 10);
+  }
+  return 0;
+};
+
+/**
  * Returns true if New York is currently in Daylight Saving Time.
  * Uses Intl.DateTimeFormat with America/New_York timezone to compare
  * the UTC offset in January (standard time) vs July (daylight time).
@@ -16,15 +30,6 @@ const IST_OFFSET_MS = (5 * 60 * 60 * 1000) + (30 * 60 * 1000);
  * @returns {boolean} true if NY is in DST, false otherwise
  */
 export function isNyInDst(date = new Date()) {
-  // Get the offset (in minutes) for the given date in America/New_York
-  const nyOffset = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/New_York',
-    timeZoneName: 'shortOffset',
-  }).formatToParts(date).find(p => p.type === 'timeZoneName');
-
-  // Format again to get hour/minute and compute offset
-  // Simpler: compute offset by checking January and July offsets via a reference approach
-  // Use January and July of the same year to determine standard vs daylight offsets
   const year = date.getUTCFullYear();
 
   // Get offset for January (standard time)
@@ -43,22 +48,10 @@ export function isNyInDst(date = new Date()) {
   }).formatToParts(julDate);
   const julOffsetStr = julParts.find(p => p.type === 'timeZoneName')?.value ?? '';
 
-  // If July offset differs from January offset, DST is observed
-  // Parse offset strings like "GMT-4" or "GMT-5"
-  const parseOffset = (str) => {
-    if (!str) return 0;
-    const match = str.match(/GMT([+-])(\d+)/);
-    if (match) {
-      return match[1] === '-' ? -parseInt(match[2], 10) : parseInt(match[2], 10);
-    }
-    return 0;
-  };
-
   const janOffset = parseOffset(janOffsetStr);
   const julOffset = parseOffset(julOffsetStr);
 
-  // July offset is larger (less negative) than January when DST is active
-  // e.g., EST = -5, EDT = -4, so -4 > -5
+  // Get offset for the given date
   const nyOffsetForDate = new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/New_York',
     timeZoneName: 'shortOffset',
@@ -111,7 +104,8 @@ export function isNyLunchBlockActive(now = new Date()) {
   const istHour   = istDate.getUTCHours();
   const istMinute = istDate.getUTCMinutes();
 
-  const blocked = isNyLunchBreakActive(istHour, istMinute);
+  const dst = isNyInDst(now);
+  const blocked = isNyLunchBreakActive(istHour, istMinute, dst);
 
   if (blocked) {
     return {
