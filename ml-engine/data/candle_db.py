@@ -31,6 +31,11 @@ SQLITE_TRADE_LOG_POLICY_COLUMNS = {
     "days_used": "INTEGER",
     "source_days_used": "INTEGER",
     "is_training_eligible": "INTEGER",
+    "partial_exit_count": "INTEGER DEFAULT 0",
+    "partial_exit_qty": "REAL",
+    "partial_exit_pnl_dollars": "REAL",
+    "remaining_qty": "REAL",
+    "exit_legs_json": "TEXT",
 }
 
 SQLITE_SESSION_METADATA_COLUMNS = {
@@ -65,11 +70,36 @@ SQLITE_SESSION_METADATA_COLUMNS = {
 }
 
 POSTGRES_TRADE_LOG_POLICY_COLUMNS = {
+    "session_name": "TEXT DEFAULT 'main_trading'",
+    "session_timezone": "TEXT DEFAULT 'Asia/Kolkata'",
+    "trade_date_local": "TEXT",
     "source_uid": "TEXT",
     "source_role": "TEXT",
     "days_used": "INTEGER",
     "source_days_used": "INTEGER",
     "is_training_eligible": "BOOLEAN",
+    "partial_exit_count": "INTEGER DEFAULT 0",
+    "partial_exit_qty": "DOUBLE PRECISION",
+    "partial_exit_pnl_dollars": "DOUBLE PRECISION",
+    "remaining_qty": "DOUBLE PRECISION",
+    "exit_legs_json": "TEXT",
+}
+
+POSTGRES_SESSION_METADATA_COLUMNS = {
+    "candles_5min": {
+        "session_name": "TEXT NOT NULL DEFAULT 'main_trading'",
+        "session_timezone": "TEXT NOT NULL DEFAULT 'Asia/Kolkata'",
+        "trade_date_local": "TEXT",
+    },
+    "session_aggregates": {
+        "session_name": "TEXT NOT NULL DEFAULT 'main_trading'",
+        "session_timezone": "TEXT NOT NULL DEFAULT 'Asia/Kolkata'",
+    },
+    "signal_log": {
+        "session_name": "TEXT NOT NULL DEFAULT 'main_trading'",
+        "session_timezone": "TEXT NOT NULL DEFAULT 'Asia/Kolkata'",
+        "trade_date_local": "TEXT",
+    },
 }
 
 
@@ -411,15 +441,17 @@ class SQLiteBackend(DatabaseBackend):
                 """
                 INSERT OR REPLACE INTO trade_log
                 (entry_time, exit_time, symbol, entry_price, exit_price,
-                 direction, session_id, pnl_ticks, pnl_dollars, result,
+                 direction, session_id, session_name, session_timezone, trade_date_local,
+                 pnl_ticks, pnl_dollars, result,
                  target_rrr, actual_rrr, rrr_met, amd_phase,
                  adx_entry, atr_entry, ci_entry, vwap_entry,
                  vwap_slope_entry, vr_entry, volatility_regime,
                  expected_move_ticks, actual_move_ticks, alpha_raw,
+                 partial_exit_count, partial_exit_qty, partial_exit_pnl_dollars, remaining_qty, exit_legs_json,
                  holding_minutes, exit_type, source_uid, source_role,
                  days_used, source_days_used, is_training_eligible)
                 VALUES
-                (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     row.get("entry_time"),
@@ -429,6 +461,9 @@ class SQLiteBackend(DatabaseBackend):
                     row.get("exit_price"),
                     row.get("direction"),
                     row.get("session_id"),
+                    row.get("session_name", "main_trading"),
+                    row.get("session_timezone", "Asia/Kolkata"),
+                    row.get("trade_date_local"),
                     row.get("pnl_ticks"),
                     row.get("pnl_dollars"),
                     row.get("result"),
@@ -446,6 +481,11 @@ class SQLiteBackend(DatabaseBackend):
                     row.get("expected_move_ticks"),
                     row.get("actual_move_ticks"),
                     row.get("alpha_raw"),
+                    row.get("partial_exit_count", 0),
+                    row.get("partial_exit_qty"),
+                    row.get("partial_exit_pnl_dollars"),
+                    row.get("remaining_qty"),
+                    row.get("exit_legs_json"),
                     row.get("holding_minutes"),
                     row.get("exit_type"),
                     row.get("source_uid"),
@@ -960,6 +1000,23 @@ class PostgresBackend(DatabaseBackend):
         with self.conn() as c:
             c.execute(schema)
             with c.cursor() as cur:
+                for table_name, columns in POSTGRES_SESSION_METADATA_COLUMNS.items():
+                    cur.execute(
+                        """
+                        SELECT column_name
+                        FROM information_schema.columns
+                        WHERE table_name = %s
+                        """,
+                        (table_name,),
+                    )
+                    existing_columns = {row[0] for row in cur.fetchall()}
+                    for column_name, column_type in columns.items():
+                        if column_name in existing_columns:
+                            continue
+                        cur.execute(
+                            f"ALTER TABLE {table_name} ADD COLUMN IF NOT EXISTS {column_name} {column_type}"
+                        )
+
                 cur.execute(
                     """
                     SELECT column_name
@@ -1158,24 +1215,34 @@ class PostgresBackend(DatabaseBackend):
                     """
                     INSERT INTO trade_log
                     (entry_time, exit_time, symbol, entry_price, exit_price,
-                     direction, session_id, pnl_ticks, pnl_dollars, result,
+                     direction, session_id, session_name, session_timezone, trade_date_local,
+                     pnl_ticks, pnl_dollars, result,
                      target_rrr, actual_rrr, rrr_met, amd_phase,
                      adx_entry, atr_entry, ci_entry, vwap_entry,
                      vwap_slope_entry, vr_entry, volatility_regime,
                      expected_move_ticks, actual_move_ticks, alpha_raw,
+                     partial_exit_count, partial_exit_qty, partial_exit_pnl_dollars, remaining_qty, exit_legs_json,
                      holding_minutes, exit_type, source_uid, source_role,
                      days_used, source_days_used, is_training_eligible)
                     VALUES
-                    (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT (entry_time, symbol) DO UPDATE SET
                         exit_time = EXCLUDED.exit_time,
                         exit_price = EXCLUDED.exit_price,
+                        session_name = EXCLUDED.session_name,
+                        session_timezone = EXCLUDED.session_timezone,
+                        trade_date_local = EXCLUDED.trade_date_local,
                         pnl_ticks = EXCLUDED.pnl_ticks,
                         pnl_dollars = EXCLUDED.pnl_dollars,
                         result = EXCLUDED.result,
                         target_rrr = EXCLUDED.target_rrr,
                         actual_rrr = EXCLUDED.actual_rrr,
                         rrr_met = EXCLUDED.rrr_met,
+                        partial_exit_count = EXCLUDED.partial_exit_count,
+                        partial_exit_qty = EXCLUDED.partial_exit_qty,
+                        partial_exit_pnl_dollars = EXCLUDED.partial_exit_pnl_dollars,
+                        remaining_qty = EXCLUDED.remaining_qty,
+                        exit_legs_json = EXCLUDED.exit_legs_json,
                         holding_minutes = EXCLUDED.holding_minutes,
                         exit_type = EXCLUDED.exit_type,
                         source_uid = EXCLUDED.source_uid,
@@ -1192,6 +1259,9 @@ class PostgresBackend(DatabaseBackend):
                         row.get("exit_price"),
                         row.get("direction"),
                         row.get("session_id"),
+                        row.get("session_name", "main_trading"),
+                        row.get("session_timezone", "Asia/Kolkata"),
+                        row.get("trade_date_local"),
                         row.get("pnl_ticks"),
                         row.get("pnl_dollars"),
                         row.get("result"),
@@ -1209,6 +1279,11 @@ class PostgresBackend(DatabaseBackend):
                         row.get("expected_move_ticks"),
                         row.get("actual_move_ticks"),
                         row.get("alpha_raw"),
+                        row.get("partial_exit_count", 0),
+                        row.get("partial_exit_qty"),
+                        row.get("partial_exit_pnl_dollars"),
+                        row.get("remaining_qty"),
+                        row.get("exit_legs_json"),
                         row.get("holding_minutes"),
                         row.get("exit_type"),
                         row.get("source_uid"),

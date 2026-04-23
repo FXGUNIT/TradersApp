@@ -103,6 +103,53 @@ def test_sqlite_backend_migrates_legacy_session_metadata_columns(tmp_db_path):
 
     assert {"session_name", "session_timezone", "trade_date_local"} <= candles_columns
     assert {"session_name", "session_timezone"} <= aggregates_columns
-    assert {"session_name", "session_timezone", "trade_date_local"} <= trade_log_columns
+    assert {
+        "session_name",
+        "session_timezone",
+        "trade_date_local",
+        "partial_exit_count",
+        "partial_exit_qty",
+        "partial_exit_pnl_dollars",
+        "remaining_qty",
+        "exit_legs_json",
+    } <= trade_log_columns
     assert {"session_name", "session_timezone", "trade_date_local"} <= signal_log_columns
     assert "idx_candles_session_name" in index_names
+
+
+def test_sqlite_backend_upsert_trade_persists_partial_exit_metadata(tmp_db_path):
+    backend = SQLiteBackend(tmp_db_path)
+
+    backend.upsert_trade(
+        {
+            "entry_time": "2026-04-23T09:15:00+05:30",
+            "exit_time": "2026-04-23T10:05:00+05:30",
+            "symbol": "MNQ",
+            "entry_price": 100.0,
+            "exit_price": 108.0,
+            "direction": 1,
+            "session_id": 1,
+            "session_name": "main_trading",
+            "session_timezone": "Asia/Kolkata",
+            "trade_date_local": "2026-04-23",
+            "pnl_ticks": 32.0,
+            "pnl_dollars": 64.0,
+            "result": "win",
+            "target_rrr": 2.0,
+            "partial_exit_count": 2,
+            "partial_exit_qty": 1.0,
+            "partial_exit_pnl_dollars": 40.0,
+            "remaining_qty": 0.0,
+            "exit_legs_json": '[{"qty": 1, "price": 104.0}, {"qty": 1, "price": 108.0}]',
+        }
+    )
+
+    trade_log = backend.get_trade_log(limit=10, symbol="MNQ")
+    backend.close()
+
+    row = trade_log.iloc[0]
+    assert row["partial_exit_count"] == 2
+    assert row["partial_exit_qty"] == 1.0
+    assert row["partial_exit_pnl_dollars"] == 40.0
+    assert row["remaining_qty"] == 0.0
+    assert row["exit_legs_json"].startswith("[")

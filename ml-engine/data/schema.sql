@@ -103,6 +103,11 @@ CREATE TABLE IF NOT EXISTS trade_log (
     expected_move_ticks  REAL,
     actual_move_ticks    REAL,
     alpha_raw            REAL,
+    partial_exit_count   INTEGER DEFAULT 0,
+    partial_exit_qty     REAL,
+    partial_exit_pnl_dollars REAL,
+    remaining_qty        REAL,
+    exit_legs_json       TEXT,
 
     -- Holding
     holding_minutes      REAL,

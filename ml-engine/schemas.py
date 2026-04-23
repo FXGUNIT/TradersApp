@@ -40,10 +40,18 @@ class TradeInput(BaseModel):
     exit_price: Optional[float] = None
     direction: int
     session_id: int
+    session_name: Optional[str] = None
+    session_timezone: Optional[str] = None
+    trade_date_local: Optional[str] = None
     pnl_ticks: Optional[float] = None
     pnl_dollars: Optional[float] = None
     result: Optional[str] = None
     amd_phase: Optional[str] = None
+    partial_exit_count: Optional[int] = Field(default=None, ge=0)
+    partial_exit_qty: Optional[float] = None
+    partial_exit_pnl_dollars: Optional[float] = None
+    remaining_qty: Optional[float] = None
+    exit_legs_json: Optional[str] = None
 
 
 class UploadCandlesRequest(BaseModel):
