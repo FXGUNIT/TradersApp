@@ -28,14 +28,17 @@ const SENTIMENT_COLORS = {
   neutral: { color: '#8E8E93', Icon: Minus },
 };
 
-function formatTimeAgo(isoString) {
-  const diff = Date.now() - new Date(isoString).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
+function formatRelativeTime(isoString) {
+  const diffMs = Date.now() - new Date(isoString).getTime();
+  const future = diffMs < 0;
+  const mins = Math.floor(Math.abs(diffMs) / 60000);
+
+  if (mins < 1) return future ? 'in <1m' : 'just now';
+  if (mins < 60) return future ? `in ${mins}m` : `${mins}m ago`;
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
+  if (hrs < 24) return future ? `in ${hrs}h` : `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return future ? `in ${days}d` : `${days}d ago`;
 }
 
 function NewsItem({ item, isNew, onReactionLogged }) {
@@ -117,7 +120,7 @@ function NewsItem({ item, isNew, onReactionLogged }) {
               {item.sourceName}
             </span>
             <span style={{ fontSize: 9.5, color: 'var(--text-tertiary)' }}>
-              {formatTimeAgo(item.publishedAt)}
+              {formatRelativeTime(item.publishedAt)}
             </span>
             {item.keywords?.slice(0, 2).map(kw => (
               <span key={kw} style={{

@@ -234,7 +234,10 @@ export async function fetchOptionsExpiries({ symbol = "NIFTY", count = 6 } = {})
   }
 
   try {
-    const fallback = await fetchExpiryCalendar({ count });
+    const fallback = await fetchExpiryCalendar({
+      count,
+      symbol: underlying.symbol,
+    });
     return {
       success: true,
       ok: true,

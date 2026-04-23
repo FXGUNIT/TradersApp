@@ -9,10 +9,10 @@
  */
 import {
   getCurrentMarketStatus,
-  getUpcomingExpiryDates,
   getMarketHolidays,
   getSessionDetails,
 } from "../services/calendarService.mjs";
+import { getUpcomingExpiryDates } from "../services/expiryCalendar.mjs";
 
 export function createCalendarRouteHandler({ json, readJsonBody }) {
   return async function handleCalendarRoute(req, res, url, origin) {
@@ -35,7 +35,9 @@ export function createCalendarRouteHandler({ json, readJsonBody }) {
     if (req.method === "GET" && pathname === "/calendar/expiry") {
       try {
         const count = Math.max(1, Math.min(12, parseInt(url.searchParams.get("count") || "4", 10)));
-        const result = getUpcomingExpiryDates(count);
+        const symbol = url.searchParams.get("symbol") || "NIFTY";
+        const includeMonthly = url.searchParams.get("includeMonthly") !== "false";
+        const result = getUpcomingExpiryDates({ count, symbol, includeMonthly });
         json(res, 200, { ok: true, count: result.length, expiries: result }, origin);
         return true;
       } catch (err) {

@@ -23,8 +23,20 @@ export async function fetchMarketNow() {
   return fetchCalendarJson("/calendar/now");
 }
 
-export async function fetchExpiryCalendar({ count = 4 } = {}) {
-  return fetchCalendarJson(`/calendar/expiry?count=${encodeURIComponent(count)}`);
+export async function fetchExpiryCalendar({ count = 4, symbol, includeMonthly } = {}) {
+  const params = new URLSearchParams({
+    count: String(count),
+  });
+
+  if (symbol) {
+    params.set("symbol", String(symbol));
+  }
+
+  if (includeMonthly === false) {
+    params.set("includeMonthly", "false");
+  }
+
+  return fetchCalendarJson(`/calendar/expiry?${params.toString()}`);
 }
 
 export async function fetchMarketHolidays({ year } = {}) {

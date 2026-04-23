@@ -6,6 +6,7 @@
 
 import { getRedisClient } from "./redis-session-store.mjs";
 import { isOutboundUrlAllowed } from "./security.mjs";
+import { FOREX_FACTORY_URL, scrapeForexFactory } from "./forexFactoryScraper.mjs";
 import {
   classifySentiment,
   classifyImpact,
@@ -275,6 +276,42 @@ async function fetchFinnhub() {
   return allItems;
 }
 
+async function fetchForexFactoryCalendar() {
+  try {
+    const events = await scrapeForexFactory({
+      daysAhead: 3,
+      minImpact: 2,
+    });
+
+    return events.slice(0, 12).map((event) => {
+      const title = `${event.currency}: ${event.title}`;
+      const detail = event.time_until_min >= 60
+        ? `${Math.round(event.time_until_min / 60)}h until scheduled release`
+        : `${event.time_until_min}m until scheduled release`;
+
+      return {
+        id: generateNewsId("forexfactory", title, event.datetime),
+        source: "forexfactory",
+        sourceName: "Forex Factory",
+        title,
+        description: `${event.impactLabel} impact macro event. ${detail}.`,
+        url: FOREX_FACTORY_URL,
+        publishedAt: event.datetime,
+        sentiment: "neutral",
+        impact: event.impactLabel,
+        category: "economic_calendar",
+        imageUrl: null,
+        keywords: [...new Set([event.currency.toLowerCase(), "macro", "calendar"])],
+        reactionLogged: false,
+        scheduledAt: event.datetime,
+      };
+    });
+  } catch (err) {
+    logNewsSourceWarning("Forex Factory", err);
+    return [];
+  }
+}
+
 // ─── Source: NewsData.io ─────────────────────────────────────────────────────
 
 async function fetchNewsData() {
@@ -462,6 +499,7 @@ export async function fetchBreakingNews(options = {}) {
     fetchFinnhub(),
     fetchNewsData(),
     fetchYahooFinanceRSS(),
+    fetchForexFactoryCalendar(),
     includeAllSources ? fetchGDELT() : Promise.resolve([]),
   ]);
 
@@ -492,6 +530,7 @@ export async function fetchBreakingNews(options = {}) {
     finnhub: FINNHUB_API_KEY ? "configured" : "no_key",
     newsdata: NEWS_API_KEY ? "configured" : "no_key",
     yahoo: "always_on",
+    forexfactory: "always_on",
     gdelt: "fallback",
   };
   await writeBreakingNewsSnapshot({

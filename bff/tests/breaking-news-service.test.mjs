@@ -34,6 +34,17 @@ test("fetchBreakingNews includes Yahoo and GDELT items when optional providers s
   </item>
 </channel></rss>
 `.trim();
+  const forexFactoryHtml = `
+<table>
+  <tr class="calendar__row calendar_row">
+    <td class="calendar__cell calendar__date">Tomorrow</td>
+    <td class="calendar__cell calendar__time">8:30am</td>
+    <td class="calendar__cell calendar__currency">USD</td>
+    <td class="calendar__cell calendar__impact"><span class="impact impact--high"></span></td>
+    <td class="calendar__cell calendar__event">Core CPI m/m</td>
+  </tr>
+</table>
+`.trim();
   const gdeltPayload = {
     articles: [
       {
@@ -47,6 +58,12 @@ test("fetchBreakingNews includes Yahoo and GDELT items when optional providers s
 
   globalThis.fetch = async (url) => {
     requests.push(String(url));
+    if (String(url).includes("forexfactory.com")) {
+      return {
+        ok: true,
+        text: async () => forexFactoryHtml,
+      };
+    }
     if (String(url).includes("feeds.finance.yahoo.com")) {
       return {
         ok: true,
@@ -84,6 +101,8 @@ test("fetchBreakingNews includes Yahoo and GDELT items when optional providers s
     assert.ok(result.items.length >= 2);
     assert.ok(result.items.some((item) => item.source === "yahoo"));
     assert.ok(result.items.some((item) => item.source === "gdelt"));
+    assert.ok(result.items.some((item) => item.source === "forexfactory"));
+    assert.ok(requests.some((url) => url.includes("forexfactory.com")));
     assert.ok(requests.some((url) => url.includes("feeds.finance.yahoo.com")));
     assert.ok(requests.some((url) => url.includes("gdeltproject.org")));
   } finally {

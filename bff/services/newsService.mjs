@@ -19,6 +19,7 @@ import {
   refreshAgentHeartbeat,
   reportAgentError,
 } from "./boardRoomAgentReporter.mjs";
+import { scrapeForexFactory as scrapeForexFactoryCalendar } from "./forexFactoryScraper.mjs";
 import { isOutboundUrlAllowed } from "./security.mjs";
 
 const FOREX_FACTORY_URL = "https://www.forexfactory.com/calendar";
@@ -71,23 +72,10 @@ export async function scrapeForexFactory() {
     focus: "Scraping Forex Factory calendar.",
   });
   try {
-    if (!isOutboundUrlAllowed(FOREX_FACTORY_URL)) { console.error("[newsService] SSRF blocked FOREX_FACTORY_URL"); return null; }
-    const response = await fetch(FOREX_FACTORY_URL, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        Accept:
-          "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.5",
-      },
+    return await scrapeForexFactoryCalendar({
+      daysAhead: 7,
+      minImpact: STAR_THRESHOLD,
     });
-
-    if (!response.ok) {
-      throw new Error(`Forex Factory responded ${response.status}`);
-    }
-
-    const html = await response.text();
-    return parseForexFactoryHTML(html);
   } catch (err) {
     console.error("[newsService] Forex Factory scrape failed:", err.message);
     void reportAgentError({

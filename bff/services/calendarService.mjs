@@ -14,14 +14,15 @@
  * @module calendarService
  */
 
+import { getUpcomingExpiryDates as getUpcomingExpiryDatesFromRules } from "./expiryCalendar.mjs";
+
 const IST_OFFSET_MS = 5 * 60 * 60 * 1000 + 30 * 60 * 1000; // UTC+5:30
 
 // ── Time helpers ──────────────────────────────────────────────────────────────
 
 /** Returns current IST time as a plain object. */
 function nowIST() {
-  const utc = Date.now() + new Date().getTimezoneOffset() * 60 * 1000;
-  const istMs = utc + IST_OFFSET_MS;
+  const istMs = Date.now() + IST_OFFSET_MS;
   const d = new Date(istMs);
   return {
     ms: istMs,
@@ -144,8 +145,7 @@ function nextTradingDayMs(fromMs) {
 
 /** Format ms as an IST ISO string. */
 function toISTIso(ms) {
-  const utc = ms - new Date().getTimezoneOffset() * 60 * 1000 + IST_OFFSET_MS;
-  return new Date(utc).toISOString().replace("Z", "+05:30");
+  return new Date(ms + IST_OFFSET_MS).toISOString().replace("Z", "+05:30");
 }
 
 // ── Public API ───────────────────────────────────────────────────────────────
@@ -247,59 +247,7 @@ export function getCurrentMarketStatus() {
  * @returns {Array<{ date: string, type: string, daysUntil: number, sessionImpact: string }>}
  */
 export function getUpcomingExpiryDates(count = 4) {
-  const ist = nowIST();
-  const currentMs = ist.ms;
-  const results = [];
-
-  // Weekly: every Friday
-  let week = new Date(currentMs);
-  week.setUTCDate(week.getUTCDate() + ((7 - week.getUTCDay() + 5) % 7 || 7)); // next Friday
-  week.setUTCHours(0, 0, 0, 0);
-
-  for (let i = 0; i < count * 2 && results.length < count; i++) {
-    const expiryMs = week.getTime() - IST_OFFSET_MS; // convert to UTC for storage
-    const daysUntil = Math.round((expiryMs - currentMs) / (24 * 60 * 60 * 1000));
-    if (daysUntil < 0) {
-      week.setUTCDate(week.getUTCDate() + 7);
-      continue;
-    }
-    results.push({
-      date: new Date(expiryMs).toISOString().split("T")[0],
-      type: "WEEKLY",
-      daysUntil,
-      sessionImpact: "High volatility pre-expiry; avoid short-dated options",
-    });
-    week.setUTCDate(week.getUTCDate() + 7);
-  }
-
-  // Monthly: last Thursday of each month
-  let month = new Date(Date.UTC(ist.year, ist.month - 1, 1));
-  while (results.length < count) {
-    // Move to last day of month
-    const lastDay = new Date(Date.UTC(month.getUTCFullYear(), month.getUTCMonth() + 1, 0));
-    let thursday = lastDay;
-    while (thursday.getUTCDay() !== 4) {
-      thursday.setUTCDate(thursday.getUTCDate() - 1);
-    }
-    const expiryMs = thursday.getTime() - IST_OFFSET_MS;
-    const daysUntil = Math.round((expiryMs - currentMs) / (24 * 60 * 60 * 1000));
-    if (daysUntil < 0) {
-      month.setUTCMonth(month.getUTCMonth() + 1);
-      continue;
-    }
-    results.push({
-      date: new Date(expiryMs).toISOString().split("T")[0],
-      type: "MONTHLY",
-      daysUntil,
-      sessionImpact: "Highest volatility; rolling preferred",
-    });
-    month.setUTCMonth(month.getUTCMonth() + 1);
-  }
-
-  // Sort by daysUntil and slice to count
-  return results
-    .sort((a, b) => a.daysUntil - b.daysUntil)
-    .slice(0, count);
+  return getUpcomingExpiryDatesFromRules(count);
 }
 
 /**
