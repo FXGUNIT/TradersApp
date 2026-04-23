@@ -432,6 +432,7 @@ export async function getMlConsensus({
       model_freshness: "ny_lunch_block",
       feature_vector: features,
       instrument: getInstrumentConfig(resolvedSymbol),
+      circuitBreaker: cbIsOpen(resolvedSymbol) ? "open" : "closed",
       timestamp: new Date().toISOString(),
     };
   }
