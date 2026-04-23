@@ -1,13 +1,13 @@
 # TODO Master List
 
 **Last Updated:** 2026-04-24
-**Status:** P26 DONE — Contabo VPS live | P25 DONE — NY Lunch Block | P23 checklist done on assumed local ref, signed-release proof pending
+**Status:** P26 DONE — Contabo VPS live | P25 DONE — NY Lunch Block | P23 DONE | local signed-release proof DONE
 
 
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-24 04:34`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-24 05:26`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Master Backlog 100.0%  [########################]
@@ -48,8 +48,8 @@ How to read this:
 
 ## EXECUTION PRIORITY
 
-### TIER 1 — ACTIVE NOW: signed desktop release proof
-P23 checklist is closed on the assumed local reference-equivalent laptop. Remaining work is a real signed-installer rerun once an Authenticode-signed payload exists.
+### TIER 1 — ACTIVE NOW: no open Stage P checklist items
+P23 and the local signed-release proof are closed on this laptop. Public production signing still belongs to the GitHub Actions release workflow when a CA-backed certificate is required.
 
 ### TIER 2 — STAGING: performance hardening + k6 envelope capture
 Reduce `bff_ml_health` failure burst, keep public-proof artifacts ready for domain cutover.
@@ -80,7 +80,8 @@ All Stages S1–S6 and ML1–ML8 are background. Implement carefully, update liv
 - Local baseline (2026-04-22): shell ready 5.23s, idle WS ~16.5 MB, private memory ~3.3 MB, no sidecar processes
 - Assumed local reference-equivalent evidence (2026-04-24): [desktop-p23-certification-20260424-043343.md](/e:/TradersApp/.artifacts/windows/p23/desktop-p23-certification-20260424-043343.md:1) — shell ready 0.58s, idle WS 26.1 MB, OCR lazy-load PASS, no sidecar processes, manual gates recorded PASS per user instruction on this laptop
 - Runbook: `docs/windows/WINDOWS_P23_REFERENCE_MACHINE_RUNBOOK.md`
-- Signed release proof is still pending: current installer at `desktop/windows/installer/TradersApp.Bundle/bin/Release/TradersApp.Desktop.Setup.exe` is `NotSigned` on this laptop
+- Local signed-release proof (2026-04-24): [desktop-local-signed-release-proof-20260424-052600.md](/e:/TradersApp/.artifacts/windows/release-proof/desktop-local-signed-release-proof-20260424-052600.md:1) — desktop EXE, MSI, and setup bundle now carry an embedded Authenticode signer on this laptop; MSI/setup SHA-256 sidecars were regenerated after signing
+- Production/public trust caveat: this local proof uses a self-signed laptop-generated certificate, so `Get-AuthenticodeSignature` reports `UnknownError` instead of a publicly trusted chain
 - [x] Validate cold start to login screen at `<= 8s` on the assumed local reference-equivalent laptop
 - [x] Validate idle RAM at `<= 500 MB` after shell + web UI fully load on the assumed local reference-equivalent laptop
 - [x] Confirm OCR and heavy modules remain lazy-loaded, no discrete GPU required on the assumed local reference-equivalent laptop
@@ -161,7 +162,7 @@ All Stages S1–S6 and ML1–ML8 are background. Implement carefully, update liv
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-24 04:34`  -  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-24 05:26`  -  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Stage P Backlog 100.0%  [########################]
