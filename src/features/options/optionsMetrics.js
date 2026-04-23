@@ -234,7 +234,7 @@ export function buildExpiryPlan({ expiries = [], timing, signal }) {
 export function formatPrice(value, options = {}) {
   const numeric = numberOrNull(value);
   if (numeric === null) {
-    return "—";
+    return "-";
   }
 
   const {
@@ -258,7 +258,7 @@ export function formatPrice(value, options = {}) {
 export function formatPercent(value, maximumFractionDigits = 0) {
   const numeric = numberOrNull(value);
   if (numeric === null) {
-    return "—";
+    return "-";
   }
 
   return `${(numeric * 100).toFixed(maximumFractionDigits)}%`;
@@ -267,7 +267,7 @@ export function formatPercent(value, maximumFractionDigits = 0) {
 export function formatSigned(value, suffix = "") {
   const numeric = numberOrNull(value);
   if (numeric === null) {
-    return "—";
+    return "-";
   }
 
   const formatted = new Intl.NumberFormat("en-IN", {

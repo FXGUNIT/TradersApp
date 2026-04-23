@@ -16,6 +16,7 @@ import { ExpectedMovePanel } from "./ExpectedMovePanel.jsx";
 import { ExitStrategyPanel } from "./ExitStrategyPanel.jsx";
 import { ModelVotesPanel } from "./ModelVotesPanel.jsx";
 import { NewsCountdown } from "./NewsCountdown.jsx";
+import { OptionsModulePanel } from "../options/OptionsModulePanel.jsx";
 import { PhysicsRegimeSection } from "./PhysicsRegimeSection.jsx";
 import { PositionSizingPanel } from "./PositionSizingPanel.jsx";
 import { PreSessionBriefing } from "./PreSessionBriefing.jsx";
@@ -75,6 +76,7 @@ export const MlConsensusTab = React.memo(function MlConsensusTab({ theme: _theme
   const timing = consensus?.timing || null;
   const alpha = consensus?.alpha || null;
   const instrument = consensus?.instrument || activeInstrument;
+  const isOptionsInstrument = activeInstrument.symbol === "NSEOPTIONS";
   const sc = SIGNAL_COLOR_MAP[signal];
   const sinceRefresh = lastRefresh
     ? `${Math.round((Date.now() - lastRefresh.getTime()) / 1000)}s ago`
@@ -279,6 +281,10 @@ export const MlConsensusTab = React.memo(function MlConsensusTab({ theme: _theme
 
             <SessionProbabilityPanel session={session} timing={timing} alpha={alpha} />
 
+            {isOptionsInstrument && (
+              <OptionsModulePanel activeInstrument={activeInstrument} consensus={consensus} />
+            )}
+
             {consensus.regime && !consensus.regime.error && (
               <PhysicsRegimeSection regime={consensus.regime} />
             )}
@@ -287,7 +293,7 @@ export const MlConsensusTab = React.memo(function MlConsensusTab({ theme: _theme
             <ExpectedMovePanel expected_move={consensus.expected_move} />
             <RRRRecommendation rrr={consensus.rrr} />
             <ExitStrategyPanel exit_plan={consensus.exit_plan} />
-            <PositionSizingPanel position_sizing={consensus.position_sizing} />
+            <PositionSizingPanel position_sizing={consensus.position_sizing} instrument={activeInstrument} />
             <TimingRecommendation timing={timing} />
             <ModelVotesPanel votes={consensus.votes} />
             <NewsCountdown consensus={consensus} />

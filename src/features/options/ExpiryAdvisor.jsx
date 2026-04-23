@@ -5,11 +5,11 @@ import { MetricRow } from "../consensus/MetricRow.jsx";
 
 function formatExpiry(expiry) {
   if (!expiry?.date) {
-    return "—";
+    return "-";
   }
 
   const label = expiry.daysUntil !== null && expiry.daysUntil !== undefined
-    ? `${expiry.date} · ${expiry.daysUntil}d`
+    ? `${expiry.date} - ${expiry.daysUntil}d`
     : expiry.date;
 
   return label;

@@ -5,7 +5,7 @@ import { formatPrice } from "./optionsMetrics.js";
 
 function formatOi(value) {
   if (typeof value !== "number" || !Number.isFinite(value)) {
-    return "—";
+    return "-";
   }
 
   return new Intl.NumberFormat("en-IN", {
@@ -77,7 +77,7 @@ export const OptionsStrikePanel = React.memo(function OptionsStrikePanel({
                       {isAtm ? "ATM" : "Strike"}
                     </div>
                     <div style={{ fontSize: 14, fontWeight: 800, color: "var(--text-primary)" }}>
-                      {row?.strike ?? "—"}
+                      {row?.strike ?? "-"}
                     </div>
                   </div>
 

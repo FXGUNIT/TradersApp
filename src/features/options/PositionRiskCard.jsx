@@ -61,7 +61,7 @@ export const PositionRiskCard = React.memo(function PositionRiskCard({
         value={
           typeof modelRiskBudget === "number"
             ? `$${modelRiskBudget.toFixed(0)}`
-            : "—"
+            : "-"
         }
         sub="Current sizing engine remains futures-native; validate broker margin before execution"
       />

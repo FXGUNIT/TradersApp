@@ -33,7 +33,7 @@ export const VolRegimeIndicator = React.memo(function VolRegimeIndicator({
         value={formatPercent(regime?.sweepProb)}
         sub={
           typeof expectedMove?.uncertainty_band === "number"
-            ? `Uncertainty band ±${(expectedMove.uncertainty_band / 2).toFixed(0)} ticks`
+            ? `Uncertainty band +/-${(expectedMove.uncertainty_band / 2).toFixed(0)} ticks`
             : "Using current session feature vector"
         }
       />
