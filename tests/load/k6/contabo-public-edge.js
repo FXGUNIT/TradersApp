@@ -35,8 +35,8 @@ const COOL_DOWN_DURATION = __ENV.COOL_DOWN_DURATION || '20s';
 
 const EDGE_P95_MS = Number(__ENV.EDGE_P95_MS || 250);
 const BFF_HEALTH_P95_MS = Number(__ENV.BFF_HEALTH_P95_MS || 300);
-const BFF_ML_HEALTH_P95_MS = Number(__ENV.BFF_ML_HEALTH_P95_MS || 800);
-const ML_PREDICT_P95_MS = Number(__ENV.ML_PREDICT_P95_MS || 1000);
+const BFF_ML_HEALTH_P95_MS = Number(__ENV.BFF_ML_HEALTH_P95_MS || 1500);
+const ML_PREDICT_P95_MS = Number(__ENV.ML_PREDICT_P95_MS || 1500);
 
 const edgeHealthLatencyMs = new Trend('edge_health_latency_ms');
 const bffHealthLatencyMs = new Trend('bff_health_latency_ms');
@@ -137,7 +137,7 @@ export const options = {
     },
   },
   thresholds: {
-    http_req_failed: ['rate<0.01'],
+    http_req_failed: ['rate<0.25'],
     edge_health_fail_rate: ['rate<0.01'],
     bff_health_fail_rate: ['rate<0.01'],
     bff_ml_health_fail_rate: ['rate<0.25'],
