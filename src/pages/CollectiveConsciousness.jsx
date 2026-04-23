@@ -1,4 +1,5 @@
 import { MlConsensusTab } from '../features/consensus/MlConsensusTab.jsx';
+import { CollectiveConsciousnessChatShell } from '../features/consensus/CollectiveConsciousnessChatShell.jsx';
 import { WarRoomLoader } from '../features/consensus/WarRoomLoader.jsx';
 import { ActiveInstrumentProvider } from '../features/dashboard/ActiveInstrumentContext.jsx';
 import React, { useState, useRef, useEffect, useCallback } from 'react';
@@ -210,6 +211,8 @@ export default function CollectiveConsciousness({
   const hasConversation = messages.length > 0;
   const currentPhaseIndex = STAGE_ORDER.indexOf(councilStage.current);
   const activePhaseIndex = isProcessing ? Math.max(currentPhaseIndex, 0) : -1;
+  const hasBffEnabled = hasBff();
+  const councilLabel = councilStage.label;
 
   const scrollToBottom = useCallback(() => {
     setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
@@ -346,6 +349,13 @@ User Question: ${trimmed}`;
       handleSubmit();
     }
   };
+
+  const handlePromptSelect = useCallback((value, options = {}) => {
+    setInput(value);
+    if (!options.replace) {
+      inputRef.current?.focus();
+    }
+  }, []);
 
   const handleUpgradeRequest = useCallback(async () => {
     if (!hasBff() || upgradeRequestState.status === 'sending') {
@@ -501,6 +511,38 @@ User Question: ${trimmed}`;
           <MlConsensusTab theme={theme} normalizedTheme={normalizedTheme} />
         </ActiveInstrumentProvider>
       ) : (
+      <>
+      <CollectiveConsciousnessChatShell
+        messages={messages}
+        isProcessing={isProcessing}
+        isFastMode={isFastMode}
+        textColor={textColor}
+        mutedColor={mutedColor}
+        isDark={isDark}
+        liveUsageState={liveUsageState}
+        formatRemainingTime={formatRemainingTime}
+        upgradeRequestState={upgradeRequestState}
+        handleUpgradeRequest={handleUpgradeRequest}
+        hasBffEnabled={hasBffEnabled}
+        engineModeLabel={engineModeLabel}
+        configuredEngineCount={configuredEngineCount}
+        onlineEngineCount={onlineEngineCount}
+        phaseDefinitions={PHASE_DEFINITIONS}
+        getPhaseStatus={getPhaseStatus}
+        activePhaseIndex={activePhaseIndex}
+        hasConversation={hasConversation}
+        councilLabel={councilLabel}
+        onPromptSelect={handlePromptSelect}
+        chatEndRef={chatEndRef}
+        input={input}
+        inputBg={inputBg}
+        inputBorder={inputBorder}
+        inputRef={inputRef}
+        handleSubmit={handleSubmit}
+        handleKeyDown={handleKeyDown}
+        auraColors={AURA_COLORS}
+      />
+      {false && (
       <div style={{
         flex: 1,
         overflowY: 'auto',
@@ -791,8 +833,10 @@ User Question: ${trimmed}`;
           <div ref={chatEndRef} />
         </div>
       </div>
-      )}  {/* closes ternary: : ( <div>...chat...</div> ) */}
+      )}
+      </>)}  {/* closes ternary: : ( <div>...chat...</div> ) */}
       {/* Input bar */}
+      {false && (
       <div style={{
         padding: '16px 20px',
         borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
@@ -913,6 +957,7 @@ User Question: ${trimmed}`;
           }
         `}</style>
       </div>
+      )}
 
     </div>
   );
