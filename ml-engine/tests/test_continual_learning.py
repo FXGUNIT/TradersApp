@@ -34,7 +34,7 @@ def patched_continual_paths(tmpdir: Path, replay_name: str, history_name: str):
     rollback_dir = base / "rollbacks"
 
     for directory in (base, fisher_dir, checkpoint_dir, rollback_dir):
-      directory.mkdir(parents=True, exist_ok=True)
+        directory.mkdir(parents=True, exist_ok=True)
 
     with (
         patch("infrastructure.continual_learning.CONTINUAL_LEARNING_DIR", base),
