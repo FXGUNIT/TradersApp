@@ -7,11 +7,11 @@
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-24 00:51`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-24 01:34`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Master Backlog  75.7%  [##################------]
-Tasks          done 193 | in progress 000 | blocked 000 | todo 062 | total 255
+Master Backlog  76.1%  [##################------]
+Tasks          done 194 | in progress 000 | blocked 000 | todo 061 | total 255
 ```
 
 How to read this:
@@ -22,7 +22,7 @@ How to read this:
 
 | Area | Tasks | Progress | Status |
 |---|---|---:|---|
-| Stage P | [138/200] |  69.0% | IN PROGRESS |
+| Stage P | [139/200] |  69.5% | PENDING |
 | Stage S | [47/47] | 100.0% | DONE |
 | ML Research | [8/8] | 100.0% | DONE |
 
@@ -30,8 +30,8 @@ How to read this:
 
 | Tier | Scope | Progress | Status |
 |---|---|---:|---|
-| TIER 1 | Stage P overall |  69.0% | IN PROGRESS |
-| TIER 2 | Active Contabo production path |  96.9% | IN PROGRESS |
+| TIER 1 | Stage P overall |  69.5% | PENDING |
+| TIER 2 | Active Contabo production path | 100.0% | DONE |
 | TIER 3 | Archived OCI fallback / evidence |  29.1% | ARCHIVED |
 | TIER 4 | Stage S + ML backlog | 100.0% | DONE |
 
@@ -64,7 +64,7 @@ How to read this:
 | P23 - 4 GB Performance and Compatibility Certification | [0/5] |   0.0% | PENDING |
 | P24 - Windows Release Readiness and Docs Alignment ✅ DONE | [5/5] | 100.0% | DONE |
 | P25 - Ampere A1 / OVHcloud Migration (Archived Fallback) 🟡 ON HOLD | [0/7] |   0.0% | ARCHIVED |
-| P26 - Contabo VPS Docker Compose Production Path 🔴 ACTIVE | [31/32] |  96.9% | IN PROGRESS |
+| P26 - Contabo VPS Docker Compose Production Path 🔴 ACTIVE | [32/32] | 100.0% | DONE |
 | S1 - Trading Session Config Foundation | [11/11] | 100.0% | DONE |
 | S2 - BFF Multi-Instrument Routing | [7/7] | 100.0% | DONE |
 | S3 - Frontend Dashboard Redesign | [13/13] | 100.0% | DONE |
@@ -272,7 +272,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [x] k6 public-edge verification now records first-envelope capture separately from threshold pass/fail
 - [x] Run the Contabo public-edge k6 suite and record the first concurrency envelope — fallback-host evidence exists for both the first baseline and the 2026-04-23 follow-up run; latest results show `edge_health` and `bff_health` green, `ml_predict` p95 improved to about `1277ms`, and `/ml/health` is now treated as an expected degraded state when the ML engine reports missing training/candle data rather than as a generic transport regression
 - [x] **DOMAIN CONTRACT ALIGNED** — `tradergunit.pages.dev` is the canonical public frontend, and the current Contabo runtime proof family remains the `sslip.io` host set until a deliberate future hostname migration is chosen
-- [ ] Confirm public health for `https://tradergunit.pages.dev/`, `https://bff.173.249.18.14.sslip.io/health`, and `https://api.173.249.18.14.sslip.io/health` after workflow/default-host alignment
+- [x] Confirm public health for `https://tradergunit.pages.dev/`, `https://bff.173.249.18.14.sslip.io/health`, and `https://api.173.249.18.14.sslip.io/health` after workflow/default-host alignment — validated `2026-04-24` via `.artifacts/pages-root/manual-runtime-verification.json`, `.artifacts/pages-root/manual-browser-verification.json`, and `.artifacts/pages-root/manual-summary.md` (all checks passed, no fallback hosts used)
 - [x] Archive the final OCI node details after Contabo proved a clean redeploy cycle and fallback-host public readiness; see `docs/OCI-DEPLOYMENT-RUNBOOK.md` (2026-04-23)
 
 Fallback-host note: `sslip.io` hosts (`173.249.18.14.sslip.io`) remain the active Contabo runtime proof surface. The canonical public frontend is `https://tradergunit.pages.dev/`.
@@ -584,12 +584,12 @@ Fallback-host note: `sslip.io` hosts (`173.249.18.14.sslip.io`) remain the activ
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-24 00:51`  -  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-24 01:34`  -  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Stage P Backlog  69.0%  [#################-------]
-Sections        done 019 | active 001 | blocked 000 | archived 007 | pending 001 | total 030
-Checklist       done 138 | open 062 | total 200
+Stage P Backlog  69.5%  [#################-------]
+Sections        done 020 | active 000 | blocked 000 | archived 007 | pending 001 | total 030
+Checklist       done 139 | open 061 | total 200
 ```
 
 | Section | Tasks | Progress | Status |
@@ -605,7 +605,7 @@ Checklist       done 138 | open 062 | total 200
 | P25 - Ampere A1 / OVHcloud Migration (Archived Fallback) 🟡 ON HOLD | [0/7] |   0.0% | ON HOLD |
 | P26 - Architecture Freeze | [4/4] | 100.0% | DONE |
 | P26 - Repo-Side Contabo Execution | [11/11] | 100.0% | DONE |
-| P26 - Live Cutover ✅ IN PROGRESS | [16/17] |  94.1% | IN PROGRESS |
+| P26 - Live Cutover ✅ IN PROGRESS | [17/17] | 100.0% | DONE |
 | P09 - Archived OCI recovery checkpoint | [23/50] |  46.0% | ARCHIVED |
 | P10 - Stateful Services Inside Free Limits ✅ DONE | [5/5] | 100.0% | DONE |
 | P11 - Archived OCI ingress / external access reference | [0/6] |   0.0% | ARCHIVED |
