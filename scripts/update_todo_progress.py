@@ -399,11 +399,6 @@ def build_master_progress_block(markdown: str) -> str:
     tier_defs = [
         ("TIER 1", "Stage P overall", lambda item: item.area == "Stage P"),
         ("TIER 2", "Active Contabo production path", lambda item: item.phase_id == "P26"),
-        (
-            "TIER 3",
-            "Archived OCI fallback / evidence",
-            lambda item: item.phase_id in {"P09", "P11", "P12", "P13", "P15", "P16", "P25"},
-        ),
         ("TIER 4", "Stage S + ML backlog", lambda item: item.area in {"Stage S", "ML Research"}),
     ]
 
