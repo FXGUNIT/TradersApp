@@ -1,4 +1,9 @@
 import React from "react";
+import {
+  API_HEALTH_HOST,
+  BFF_HEALTH_HOST,
+  PRIMARY_PROJECT_HOST,
+} from "../../config/proofHosts";
 import "./developerRootLanding.css";
 
 const DEVELOPER_ROOT_HOST = "tradergunit.pages.dev";
@@ -32,20 +37,6 @@ const TIMELINE = [
   },
 ];
 
-function normalizeAbsoluteUrl(value, fallback) {
-  const candidate = String(value || "").trim();
-  if (!candidate) {
-    return fallback;
-  }
-
-  return candidate.endsWith("/") ? candidate : `${candidate}/`;
-}
-
-function normalizeHealthUrl(value, fallback) {
-  const candidate = String(value || "").trim();
-  return candidate || fallback;
-}
-
 function hostLabel(url) {
   try {
     const parsed = new URL(url);
@@ -55,19 +46,6 @@ function hostLabel(url) {
     return url;
   }
 }
-
-const PRIMARY_PROJECT_HOST = normalizeAbsoluteUrl(
-  import.meta.env.VITE_PUBLIC_PROJECT_PREVIEW_URL,
-  "https://173.249.18.14.sslip.io/"
-);
-const BFF_HEALTH_HOST = normalizeHealthUrl(
-  import.meta.env.VITE_PUBLIC_BFF_HEALTH_URL,
-  "https://bff.173.249.18.14.sslip.io/health"
-);
-const API_HEALTH_HOST = normalizeHealthUrl(
-  import.meta.env.VITE_PUBLIC_API_HEALTH_URL,
-  "https://api.173.249.18.14.sslip.io/health"
-);
 
 const STACK_STATUS = [
   {

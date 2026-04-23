@@ -65,9 +65,9 @@ jobs:
 
       - name: Build root bundle
         env:
-          VITE_PUBLIC_PROJECT_PREVIEW_URL: https://${{ vars.TRADERSAPP_DOMAIN || vars.CONTABO_DOMAIN || 'traders.app' }}/
-          VITE_PUBLIC_BFF_HEALTH_URL: https://${{ vars.BFF_PUBLIC_HOST || format('bff.{0}', vars.TRADERSAPP_DOMAIN || vars.CONTABO_DOMAIN || 'traders.app') }}/health
-          VITE_PUBLIC_API_HEALTH_URL: https://${{ vars.API_PUBLIC_HOST || format('api.{0}', vars.TRADERSAPP_DOMAIN || vars.CONTABO_DOMAIN || 'traders.app') }}/health
+          VITE_PROOF_FRONTEND: https://${{ vars.TRADERSAPP_DOMAIN || vars.CONTABO_DOMAIN || 'traders.app' }}/
+          VITE_PROOF_BFF: https://${{ vars.BFF_PUBLIC_HOST || format('bff.{0}', vars.TRADERSAPP_DOMAIN || vars.CONTABO_DOMAIN || 'traders.app') }}/health
+          VITE_PROOF_API: https://${{ vars.API_PUBLIC_HOST || format('api.{0}', vars.TRADERSAPP_DOMAIN || vars.CONTABO_DOMAIN || 'traders.app') }}/health
         run: npm run build
 
       - name: Verify Pages root contract
