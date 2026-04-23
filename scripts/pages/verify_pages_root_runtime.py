@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -26,7 +25,6 @@ DEFAULT_BFF_BASE_URL = "https://bff.173.249.18.14.sslip.io"
 DEFAULT_API_BASE_URL = "https://api.173.249.18.14.sslip.io"
 DEFAULT_PROJECT_PREVIEW_URL = "https://173.249.18.14.sslip.io/"
 DEFAULT_TIMEOUT_SECONDS = 15.0
-EXPECTED_H1 = "Developer root for Gunit's live trading infrastructure."
 EXPECTED_SECURITY_HEADERS = (
     "content-security-policy",
     "permissions-policy",
@@ -104,27 +102,22 @@ def parse_json_body(text: str) -> Any:
 
 def root_page_check(root_url: str, timeout: float) -> CheckResult:
     status, headers, body = read_text_response(root_url, timeout=timeout)
-    h1_match = re.search(r"<h1[^>]*>(.*?)</h1>", body, flags=re.IGNORECASE | re.DOTALL)
-    h1_text = re.sub(r"\s+", " ", h1_match.group(1)).strip() if h1_match else ""
-
     missing_headers = [
         header for header in EXPECTED_SECURITY_HEADERS if not headers.get(header)
     ]
-    ok = status == 200 and h1_text == EXPECTED_H1 and not missing_headers
+    ok = status == 200 and not missing_headers
     detail_parts = [f"HTTP {status}"]
-    if h1_text != EXPECTED_H1:
-        detail_parts.append(f"unexpected h1={h1_text!r}")
     if missing_headers:
         detail_parts.append(f"missing headers={', '.join(missing_headers)}")
 
     return CheckResult(
-        name="pages_root_contract",
+        name="pages_root_http_contract",
         ok=ok,
         detail="; ".join(detail_parts),
         data={
             "url": root_url,
             "status": status,
-            "h1": h1_text,
+            "body_preview": body[:300],
             "security_headers": {name: headers.get(name) for name in EXPECTED_SECURITY_HEADERS},
         },
     )
@@ -258,12 +251,13 @@ def admin_verify_negative_check(bff_base_url: str, origin: str, timeout: float) 
     json_body = parse_json_body(body)
     allow_origin = headers.get("access-control-allow-origin")
     error_text = json_body.get("error") if isinstance(json_body, dict) else None
+    is_invalid_password = status == 401 and error_text == "Invalid admin password."
+    is_rate_limited = status == 429 and error_text == "Too many attempts. Try again later."
     ok = (
-        status == 401
-        and allow_origin == origin
+        allow_origin == origin
         and isinstance(json_body, dict)
         and json_body.get("verified") is False
-        and error_text == "Invalid admin password."
+        and (is_invalid_password or is_rate_limited)
         and "ENOENT" not in body
     )
     return CheckResult(

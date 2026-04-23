@@ -37,6 +37,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -66,6 +78,15 @@ jobs:
             echo "api_base_url=${API_BASE_URL}"
             echo "project_preview_url=${PROJECT_PREVIEW_URL}"
           } >> "${GITHUB_OUTPUT}"
+
+      - name: Verify browser-rendered landing page
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .artifacts/pages-root
+          node scripts/pages/verify_pages_root_browser.mjs \
+            --url "${{ inputs.root_url }}" \
+            --output ".artifacts/pages-root/browser-${{ github.run_id }}.json"
 
       - name: Verify Pages root runtime
         shell: bash

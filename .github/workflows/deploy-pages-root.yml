@@ -85,6 +85,18 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Verify browser-rendered landing page
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .artifacts/pages-root
+          node scripts/pages/verify_pages_root_browser.mjs \
+            --url "https://tradergunit.pages.dev" \
+            --output ".artifacts/pages-root/browser-${{ github.run_id }}.json"
+
       - name: Verify Pages root runtime
         shell: bash
         run: |
@@ -119,5 +131,6 @@ jobs:
             echo "- Commit: \`${GITHUB_SHA}\`"
             echo "- Build command: \`npm ci && npm run build\`"
             echo "- Deploy mode: \`wrangler pages deploy dist --project-name tradergunit\`"
+            echo "- Browser contract: \`browser-${{ github.run_id }}.json\`"
             echo "- Verification artifact: \`pages-root-verification-${{ github.run_id }}\`"
           } >> "${GITHUB_STEP_SUMMARY}"
