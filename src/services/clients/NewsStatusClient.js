@@ -136,6 +136,8 @@ export async function fetchNewsSystemStatus() {
     bffFetch("/news/upcoming"),
   ]);
 
+  console.debug("[NewsStatus] fallback — breaking:", breaking ? "ok" : "null", "upcoming:", upcoming ? "ok" : "null");
+
   if (breaking !== null || upcoming !== null) {
     const liveItems = Array.isArray(breaking?.items) ? breaking.items : [];
     const highImpactCount = Number(breaking?.highImpactCount || 0);
