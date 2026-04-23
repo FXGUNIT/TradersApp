@@ -8,17 +8,12 @@
 
 - The stable public developer root is `https://tradergunit.pages.dev`.
 - Keep the trading application off Cloudflare Pages for now. Pages is the developer root only.
-- The product runtime remains on the Contabo-backed host family until an owned custom domain is attached.
+- The product runtime remains on the free `sslip.io` Contabo-backed host family.
 - The current public proof endpoints are still the Contabo fallback hosts:
   - `https://173.249.18.14.sslip.io`
   - `https://bff.173.249.18.14.sslip.io/health`
   - `https://api.173.249.18.14.sslip.io/health`
-- The next domain move is a custom-domain cutover, not another `is-a.dev` submission.
-- Target custom-domain mapping:
-  - developer root: `<domain>` or `www.<domain>` on Cloudflare Pages
-  - product frontend: `app.<domain>`
-  - BFF: `bff.<domain>`
-  - API: `api.<domain>`
+- Do not plan around buying a domain. The active path is the free-host topology above.
 
 ## Latest Fallback-Host Evidence
 
@@ -37,8 +32,8 @@
 - Practical meaning:
   - reachability, DNS, TLS, and the basic health chain are green on the fallback
     hosts
-  - the next remaining work before public cutover is owned-domain cutover plus
-    later performance hardening against the `bff_ml_health` load threshold failures
+  - the next remaining work is performance hardening against the
+    `bff_ml_health` load threshold failures, not paid-domain cutover
 
 ## Topology
 
@@ -67,38 +62,36 @@
 ## Required GitHub Variables
 
 - `PRODUCTION_DEPLOY_PLATFORM=contabo` so successful `main` CI runs hand production deploys to the Contabo workflow instead of the legacy OCI job
-- `CONTABO_DOMAIN=<product-frontend-domain>` such as `app.<domain>`; this is the fallback source of truth when `TRADERSAPP_DOMAIN` is unset
-- `TRADERSAPP_DOMAIN=<product-frontend-domain>` recommended so Pages-root workflows, alerts, and verifier inputs all show the same public frontend host
-- `BFF_PUBLIC_HOST=<public-bff-domain>` such as `bff.<domain>`
-- `API_PUBLIC_HOST=<public-api-domain>` such as `api.<domain>`
+- `CONTABO_DOMAIN=173.249.18.14.sslip.io`
+- `TRADERSAPP_DOMAIN=173.249.18.14.sslip.io` recommended so Pages-root workflows, alerts, and verifier inputs all show the same public frontend host
+- `BFF_PUBLIC_HOST=bff.173.249.18.14.sslip.io`
+- `API_PUBLIC_HOST=api.173.249.18.14.sslip.io`
 - `CONTABO_APP_ROOT=/opt/tradersapp` (optional if unchanged)
 - `CONTABO_COMPOSE_PROFILES=core` for first cutover; add `mlops` or `observability` later when needed
 
-## Custom Domain Cutover Checklist
+## Free Topology Checklist
 
 Use this exact sequence from now on:
 
-1. Buy or attach the owned domain in Cloudflare DNS.
-2. Attach the developer root hostname to the existing Cloudflare Pages project:
-   - `<domain>` or `www.<domain>` -> `tradergunit`
-3. Point the runtime hostnames to the current Contabo edge:
-   - `app.<domain>`
-   - `bff.<domain>`
-   - `api.<domain>`
-4. Update GitHub repository variables to the new host family:
-   - `TRADERSAPP_DOMAIN=app.<domain>`
-   - `CONTABO_DOMAIN=app.<domain>`
-   - `BFF_PUBLIC_HOST=bff.<domain>`
-   - `API_PUBLIC_HOST=api.<domain>`
-5. Keep `PRODUCTION_DEPLOY_PLATFORM=contabo` and `CONTABO_COMPOSE_PROFILES=core` unchanged.
-6. Run `Deploy to Contabo VPS`.
-7. Run `Deploy Pages Root`.
-8. Run `Verify Pages Root Runtime`.
-9. Run `Verify Contabo Public Deploy` against:
-   - `https://app.<domain>`
-   - `https://bff.<domain>/health`
-   - `https://api.<domain>/health`
-10. Only after those checks pass, mark the DNS/public-health P26 items complete.
+1. Keep `tradergunit.pages.dev` as the stable developer root.
+2. Keep the runtime host family on:
+   - `173.249.18.14.sslip.io`
+   - `bff.173.249.18.14.sslip.io`
+   - `api.173.249.18.14.sslip.io`
+3. Update GitHub repository variables only if they drift away from the free host family:
+   - `TRADERSAPP_DOMAIN=173.249.18.14.sslip.io`
+   - `CONTABO_DOMAIN=173.249.18.14.sslip.io`
+   - `BFF_PUBLIC_HOST=bff.173.249.18.14.sslip.io`
+   - `API_PUBLIC_HOST=api.173.249.18.14.sslip.io`
+4. Keep `PRODUCTION_DEPLOY_PLATFORM=contabo` and `CONTABO_COMPOSE_PROFILES=core` unchanged.
+5. Run `Deploy to Contabo VPS`.
+6. Run `Deploy Pages Root`.
+7. Run `Verify Pages Root Runtime`.
+8. Run `Verify Contabo Public Deploy` against:
+   - `https://173.249.18.14.sslip.io`
+   - `https://bff.173.249.18.14.sslip.io/health`
+   - `https://api.173.249.18.14.sslip.io/health`
+9. Only after those checks pass, mark the public-health items complete.
 
 ## Required GitHub Secrets
 
@@ -140,8 +133,8 @@ call flaps briefly.
 ## First Cutover
 
 1. Provision the Contabo VPS and confirm SSH access.
-2. Attach the owned developer-root hostname to Cloudflare Pages.
-3. Point `app`, `bff`, and `api` hosts to the VPS IP.
+2. Keep `tradergunit.pages.dev` attached to Cloudflare Pages.
+3. Point `173.249.18.14.sslip.io`, `bff.173.249.18.14.sslip.io`, and `api.173.249.18.14.sslip.io` at the VPS IP.
 4. Add the required GitHub variables and secrets.
 5. Run the bootstrap once on the VPS:
 
@@ -151,11 +144,11 @@ curl -fsSL https://raw.githubusercontent.com/fxgunit/TradersApp/main/scripts/con
 ```
 
 6. Push to `main` or run `Deploy to Contabo VPS` manually.
-7. Run `Deploy Pages Root` so the developer landing picks up the new public host variables.
+7. Run `Deploy Pages Root` so the developer landing picks up the active free-host variables.
 8. Confirm remote health:
-   - `https://app.<domain>`
-   - `https://bff.<domain>/health`
-   - `https://api.<domain>/health`
+   - `https://173.249.18.14.sslip.io`
+   - `https://bff.173.249.18.14.sslip.io/health`
+   - `https://api.173.249.18.14.sslip.io/health`
 9. The deploy workflow now runs `scripts/contabo/verify_public_deploy.py` after the remote restart unless manual dispatch sets `skip_public_verify=true`.
 
 ## Public Verification
@@ -192,10 +185,10 @@ Artifacts:
 The dedicated Contabo public-edge suite intentionally targets the active host
 layout and low-blast-radius routes:
 
-- `https://app.<domain>/edge-health`
-- `https://bff.<domain>/health`
-- `https://bff.<domain>/ml/health`
-- `https://api.<domain>/predict`
+- `https://173.249.18.14.sslip.io/edge-health`
+- `https://bff.173.249.18.14.sslip.io/health`
+- `https://bff.173.249.18.14.sslip.io/ml/health`
+- `https://api.173.249.18.14.sslip.io/predict`
 
 ## Remote Layout
 

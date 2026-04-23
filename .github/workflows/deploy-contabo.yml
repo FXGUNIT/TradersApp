@@ -61,7 +61,7 @@ jobs:
       )
     environment:
       name: production
-      url: https://${{ vars.TRADERSAPP_DOMAIN || vars.CONTABO_DOMAIN || 'traders.app' }}
+      url: https://${{ vars.TRADERSAPP_DOMAIN || vars.CONTABO_DOMAIN || '173.249.18.14.sslip.io' }}
 
     steps:
       - name: Resolve deploy context
@@ -116,7 +116,7 @@ jobs:
             DOMAIN="${{ vars.CONTABO_DOMAIN }}"
           fi
           if [ -z "${DOMAIN}" ]; then
-            DOMAIN="traders.app"
+            DOMAIN="173.249.18.14.sslip.io"
           fi
 
           BFF_HOST="${{ vars.BFF_PUBLIC_HOST }}"

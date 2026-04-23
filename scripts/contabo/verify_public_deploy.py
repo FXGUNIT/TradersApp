@@ -32,9 +32,9 @@ from urllib.request import Request, urlopen
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_FRONTEND_HOST = "traders.app"
-DEFAULT_BFF_HOST = "bff.traders.app"
-DEFAULT_API_HOST = "api.traders.app"
+DEFAULT_FRONTEND_HOST = "173.249.18.14.sslip.io"
+DEFAULT_BFF_HOST = "bff.173.249.18.14.sslip.io"
+DEFAULT_API_HOST = "api.173.249.18.14.sslip.io"
 DEFAULT_TIMEOUT_SECONDS = 15.0
 
 
