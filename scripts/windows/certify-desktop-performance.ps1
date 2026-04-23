@@ -32,10 +32,6 @@ if ([string]::IsNullOrWhiteSpace($DesktopExePath)) {
     $DesktopExePath = Join-Path $repoRoot "desktop/windows/TradersApp.Desktop/bin/Release/net8.0-windows/TradersApp.Desktop.exe"
 }
 
-if ([string]::IsNullOrWhiteSpace($DesktopWebDir)) {
-    $DesktopWebDir = Join-Path $repoRoot "dist/desktop-web"
-}
-
 if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
     $OutputDirectory = Join-Path $repoRoot ".artifacts/windows/p23"
 }
@@ -48,6 +44,53 @@ function Resolve-ExistingPath {
     }
 
     return (Resolve-Path -LiteralPath $Path).Path
+}
+
+function Resolve-DesktopWebBundle {
+    param(
+        [string]$ExplicitPath,
+        [Parameter(Mandatory = $true)][string]$RepoRoot,
+        [string]$ReleaseRoot
+    )
+
+    if (-not [string]::IsNullOrWhiteSpace($ExplicitPath)) {
+        return [PSCustomObject]@{
+            resolvedPath = Resolve-ExistingPath -Path $ExplicitPath
+            source = "explicit"
+        }
+    }
+
+    $candidateDefinitions = @()
+    if (-not [string]::IsNullOrWhiteSpace($ReleaseRoot)) {
+        $candidateDefinitions += [PSCustomObject]@{
+            path = Join-Path $ReleaseRoot "webapp"
+            source = "release-webapp"
+        }
+    }
+
+    $candidateDefinitions += [PSCustomObject]@{
+        path = Join-Path $RepoRoot "dist/desktop-web"
+        source = "dist-desktop-web"
+    }
+    $candidateDefinitions += [PSCustomObject]@{
+        path = Join-Path $RepoRoot "desktop/windows/TradersApp.Desktop/webapp"
+        source = "repo-webapp"
+    }
+
+    foreach ($candidate in $candidateDefinitions) {
+        $resolvedPath = Resolve-ExistingPath -Path $candidate.path
+        if ($resolvedPath) {
+            return [PSCustomObject]@{
+                resolvedPath = $resolvedPath
+                source = $candidate.source
+            }
+        }
+    }
+
+    return [PSCustomObject]@{
+        resolvedPath = $null
+        source = "not-found"
+    }
 }
 
 function Get-RecursiveChildProcesses {
@@ -218,7 +261,6 @@ function Wait-ForMainWindow {
 }
 
 $resolvedDesktopExePath = Resolve-ExistingPath -Path $DesktopExePath
-$resolvedDesktopWebDir = Resolve-ExistingPath -Path $DesktopWebDir
 
 New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
 $resolvedOutputDirectory = (Resolve-Path -LiteralPath $OutputDirectory).Path
@@ -232,6 +274,9 @@ $releaseRoot = if ($resolvedDesktopExePath) {
 } else {
     $null
 }
+
+$desktopWebBundle = Resolve-DesktopWebBundle -ExplicitPath $DesktopWebDir -RepoRoot $repoRoot -ReleaseRoot $releaseRoot
+$resolvedDesktopWebDir = $desktopWebBundle.resolvedPath
 
 $gpuFilePatterns = @(
     "*cuda*",
@@ -295,6 +340,7 @@ $staticAudit = [ordered]@{
     desktopExePath = $resolvedDesktopExePath
     desktopWebDirFound = [bool]$resolvedDesktopWebDir
     desktopWebDir = $resolvedDesktopWebDir
+    desktopWebDirSource = $desktopWebBundle.source
     releaseRoot = $releaseRoot
     ocrDynamicImportFound = $ocrAudit.dynamicImportFound
     ocrChunkPaths = @($ocrAudit.ocrChunkPaths)
@@ -490,6 +536,7 @@ $markdownLines = @(
     ('- Reference machine: `' + $manualValidation.referenceMachineLabel + '`'),
     ('- Desktop EXE: `' + $displayDesktopExePath + '`'),
     ('- Desktop web bundle: `' + $displayDesktopWebDir + '`'),
+    ('- Desktop web bundle source: `' + (Get-DisplayValue -Value $staticAudit.desktopWebDirSource) + '`'),
     ('- JSON artifact: `' + $jsonPath + '`'),
     "",
     "## Static Audit",

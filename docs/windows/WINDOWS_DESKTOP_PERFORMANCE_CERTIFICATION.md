@@ -51,11 +51,18 @@ The harness captures:
 - working set and private memory after the idle settle period
 - child-process tree for sidecar detection
 - OCR lazy-load evidence from `src/features/terminal/terminalOcrService.js`
-- built `ocr-*.js` chunk presence in `dist/desktop-web`
+- built `ocr-*.js` chunk presence in the resolved desktop web bundle
 - absence of known GPU runtime binaries in the release payload
 - absence of obvious local sidecar payload files in the desktop release root
 - source-level proof that degraded-network hooks still exist in `useConnectionStatusEffect.js`
 - source-level proof that forced-logout and minimum-version enforcement still exist in `useDesktopClientPolicy.js`
+
+Bundle resolution order:
+
+1. explicit `-DesktopWebDir` override
+2. packaged `webapp` beside the target desktop executable
+3. repo build output at `dist/desktop-web`
+4. repo fallback at `desktop/windows/TradersApp.Desktop/webapp`
 
 You can also record manual gate outcomes directly into the evidence file:
 

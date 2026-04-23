@@ -1,13 +1,13 @@
 # TODO Master List
 
 **Last Updated:** 2026-04-24
-**Status:** P26 DONE — Contabo VPS live | P25 NY Lunch Block in progress | P23 Windows cert pending
+**Status:** P26 DONE — Contabo VPS live | P25 DONE — NY Lunch Block | P23 repo-side cert ready, reference-machine sign-off pending
 
 
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-24 02:14`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-24 03:43`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Master Backlog  50.0%  [############------------]
@@ -48,8 +48,8 @@ How to read this:
 
 ## EXECUTION PRIORITY
 
-### TIER 1 — ACTIVE NOW: P25 NY Lunch Trading Block + P23 Windows Desktop Cert
-`docs/superpowers/plans/2026-04-24-ny-lunch-trading-block.md` — 5-task plan, Task 1 done
+### TIER 1 — ACTIVE NOW: P23 Windows Desktop Cert reference-machine sign-off
+Repo-side harness, runbook, and local baseline are ready. Remaining work is the real Windows 10/11 x64 4 GB certification pass.
 
 ### TIER 2 — STAGING: performance hardening + k6 envelope capture
 Reduce `bff_ml_health` failure burst, keep public-proof artifacts ready for domain cutover.
@@ -76,8 +76,10 @@ All Stages S1–S6 and ML1–ML8 are background. Implement carefully, update liv
 
 ### P23 - 4 GB Performance and Compatibility Certification
 - Repo-side harness: `scripts/windows/certify-desktop-performance.ps1` — shell startup, idle RAM, OCR lazy-load, GPU-free payload, child-process checks
+- Harness path resolution (2026-04-24): auto-detects packaged `webapp` beside the target EXE, then falls back to `dist/desktop-web` or repo `desktop/windows/TradersApp.Desktop/webapp`
 - Local baseline (2026-04-22): shell ready 5.23s, idle WS ~16.5 MB, private memory ~3.3 MB, no sidecar processes
-- Full sign-off still requires manual runs on Windows 10/11 x64 4 GB reference machines
+- Runbook: `docs/windows/WINDOWS_P23_REFERENCE_MACHINE_RUNBOOK.md`
+- Full sign-off still requires manual runs on Windows 10/11 x64 4 GB reference machines and signed-payload reruns
 - [ ] Validate cold start to login screen at `<= 8s` on 4 GB reference machines
 - [ ] Validate idle RAM at `<= 500 MB` after shell + web UI fully load
 - [ ] Confirm OCR and heavy modules remain lazy-loaded, no discrete GPU required
@@ -158,7 +160,7 @@ All Stages S1–S6 and ML1–ML8 are background. Implement carefully, update liv
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-24 02:14`  -  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-24 03:43`  -  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Stage P Backlog  50.0%  [############------------]

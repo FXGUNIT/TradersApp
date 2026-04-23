@@ -47,6 +47,13 @@ Recommended machine prep:
 
 Run the wrapper from the repo root. It creates a dedicated run directory, captures the machine profile, starts a transcript, and then calls the existing certification harness.
 
+The harness auto-detects the desktop web bundle in this order:
+
+1. explicit `-DesktopWebDir`
+2. packaged `webapp` folder next to the target desktop executable
+3. repo `dist/desktop-web`
+4. repo `desktop/windows/TradersApp.Desktop/webapp`
+
 Local release build example:
 
 ```powershell
@@ -92,6 +99,8 @@ The PowerShell harness automatically captures:
 - absence of obvious sidecar payload files
 - presence of degraded-network source hooks
 - presence of forced-logout / minimum-version policy hooks
+
+You only need `-DesktopWebDir` when the packaged `webapp` is missing and you want to point the harness at a specific alternate bundle.
 
 Important accuracy note:
 
