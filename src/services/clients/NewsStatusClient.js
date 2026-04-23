@@ -97,6 +97,7 @@ function buildScheduledNewsSignal(consensus = null) {
 
 export async function fetchNewsSystemStatus() {
   const refreshedAt = new Date().toISOString();
+  console.debug("[NewsStatus] hasBff:", hasBff(), "| VITE_BFF_URL:", import.meta.env.VITE_BFF_URL);
 
   if (!hasBff()) {
     return {
