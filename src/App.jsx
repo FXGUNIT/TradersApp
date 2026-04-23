@@ -13,7 +13,6 @@ import { AppProviders } from "./features/identity/AppProviders.jsx";
 import { TradersRegimentInner } from "./TradersRegimentInner.jsx";
 
 const DEV_ROOT_HOSTS = new Set([
-  "tradergunit.pages.dev",
   "tradergunit.is-a.dev",
 ]);
 const DEV_PREVIEW_PATHS = new Set([
