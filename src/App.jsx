@@ -12,7 +12,10 @@ import DeveloperRootLanding from "./features/landing/DeveloperRootLanding.jsx";
 import { AppProviders } from "./features/identity/AppProviders.jsx";
 import { TradersRegimentInner } from "./TradersRegimentInner.jsx";
 
-const DEV_ROOT_HOSTS = new Set(["tradergunit.is-a.dev"]);
+const DEV_ROOT_HOSTS = new Set([
+  "tradergunit.pages.dev",
+  "tradergunit.is-a.dev",
+]);
 const DEV_PREVIEW_PATHS = new Set([
   "/developer",
   "/developer/",
@@ -27,7 +30,11 @@ function shouldRenderDeveloperLanding() {
 
   const hostname = String(window.location.hostname || "").trim().toLowerCase();
   const pathname = String(window.location.pathname || "").trim().toLowerCase();
-  return DEV_ROOT_HOSTS.has(hostname) || DEV_PREVIEW_PATHS.has(pathname);
+  return (
+    DEV_ROOT_HOSTS.has(hostname) ||
+    hostname.endsWith(".tradergunit.pages.dev") ||
+    DEV_PREVIEW_PATHS.has(pathname)
+  );
 }
 
 export default function TradersRegiment() {
