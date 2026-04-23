@@ -6,7 +6,7 @@
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-24 01:56`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-24 01:57`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Master Backlog   0.0%  [------------------------]
@@ -88,10 +88,6 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - Success now means: `git push main` refreshes the Pages root, keeps the Contabo runtime proof hosts healthy, and preserves one clear public-host contract without laptop involvement
 
 
-### P01 — OCI Compute Instance ✅ DONE
-
-### P02 — k3s Installation & Configuration ✅ DONE
-
 > **k3s startup command (run manually after instance restart):**
 > ```bash
 > ssh opc@144.24.112.249
@@ -106,17 +102,7 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 >   --disable metrics-server --disable local-storage
 > ```
 
-### P03 — k3s Auto-Restart on Boot ✅ DONE
-
-### P04 — OCI Security Configuration ✅ DONE
-
-### P05 — kubeconfig Secret (KUBECONFIG_B64) ✅ DONE
-
 ### P06 - CI/CD Pipeline (`deploy-k8s.yml`) DONE - minimal direct-apply path
-
-### P07 — k3s Namespace + Secrets Bootstrap ✅ DONE
-
-### P08 — Helm Chart Values ✅ DONE
 
 ### Archived OCI / A1 fallback scope
 The old OCI recovery backlog, OCI ingress and DNS follow-ons, and the Ampere A1 fallback checklist were removed from this live master list because they are not actionable on the current Contabo production path.
@@ -141,20 +127,10 @@ If that branch is ever reopened, use the archived references instead:
 
 Fallback-host note: `sslip.io` hosts (`173.249.18.14.sslip.io`) remain the active Contabo runtime proof surface. The canonical public frontend is `https://tradergunit.pages.dev/`.
 
-### P10 — Stateful Services Inside Free Limits ✅ DONE
-  *(PostgreSQL, MLflow, MinIO, Kafka, Feast, Triton, vLLM, Keycloak all disabled in `values.minimal.yaml`)*
-  *(MLflow disabled in values.minimal.yaml — tracked as future Stage P improvement if RAM allows)*
 
-### P14 — Observability ✅ DONE
 > Note: Contabo edge health is now verified. Jaeger OTLP spam is disabled in ml-engine. GitHub Actions log monitoring + webhook alerts are the current path.
 - Prometheus + Grafana stack too heavy for E2.1.Micro (1GB RAM) — skipped for Contabo single-host
 
-### P17 — Documentation Alignment ✅ DONE
-  - `docs/GO_LIVE_CERTIFICATE.md` — topology table, SLO, alert channels, rollback sections fully rewritten for OCI k3s
-  - `docs/DEPLOYMENT.md` — infrastructure overview, OCI k3s setup, CI/CD, secrets, rollback sections rewritten
-  - `docs/STAGE_P_DNS_SETUP.md` — DNS targets changed from Railway/Vercel to OCI k3s node IP (144.24.112.249), staging.traders.app deprecated
-  - `docs/SETUP.md` — Railway/Vercel setup replaced with OCI k3s bootstrap and Cloudflare DNS steps
-  - `docs/STAGE_P_24X7_EXECUTION_CHECKLIST.md` — DNS targets and deploy trigger replaced with OCI kubectl commands
 
 ### P18 - Windows Desktop Architecture Freeze
 
@@ -255,11 +231,11 @@ Fallback-host note: `sslip.io` hosts (`173.249.18.14.sslip.io`) remain the activ
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-24 01:56`  -  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-24 01:57`  -  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Stage P Backlog   0.0%  [------------------------]
-Sections        done 000 | active 001 | blocked 000 | archived 000 | pending 001 | total 023
+Sections        done 000 | active 001 | blocked 000 | archived 000 | pending 001 | total 013
 Checklist       done 000 | open 010 | total 010
 ```
 
