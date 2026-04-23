@@ -7,7 +7,7 @@
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-23 05:48`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-23 06:20`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Master Backlog  61.2%  [###############---------]
@@ -64,7 +64,7 @@ How to read this:
 | P23 - 4 GB Performance and Compatibility Certification | [0/5] |   0.0% | PENDING |
 | P24 - Windows Release Readiness and Docs Alignment ✅ DONE | [5/5] | 100.0% | DONE |
 | P25 - Ampere A1 / OVHcloud Migration (Archived Fallback) 🟡 ON HOLD | [0/7] |   0.0% | PENDING |
-| P26 - Contabo VPS Docker Compose Production Path ✅ DONE | [30/32] |  93.8% | IN PROGRESS |
+| P26 - Contabo VPS Docker Compose Production Path 🔴 ACTIVE | [30/32] |  93.8% | IN PROGRESS |
 | S1 - Trading Session Config Foundation | [11/11] | 100.0% | DONE |
 | S2 - BFF Multi-Instrument Routing | [7/7] | 100.0% | DONE |
 | S3 - Frontend Dashboard Redesign | [0/13] |   0.0% | PENDING |
@@ -231,12 +231,12 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [ ] Smoke tests: `bff /health`, `ml-engine /health`, frontend `http://frontend:80`, `redis-cli ping`
 - [ ] KUBECONFIG_B64 secret in GitHub updated after each k3s cold restart
 
-### P26 — Contabo VPS Docker Compose Production Path ✅ DONE
+### P26 — Contabo VPS Docker Compose Production Path 🔴 ACTIVE
 *Supersedes P25 as the real production route. Single-host Contabo VPS with GitHub Actions deployment is now the target architecture.*
 
 **Runbook:** See `docs/P26_Contabo_Deployment_Plan.md`
-**Progress snapshot (2026-04-22):** Master backlog `148/255` complete (`58.0%`). Stage P `134/200` complete (`67.0%`). Active production phase `P26` is `30/32` complete (`93.8%`). OCI archive phases remain in this file for rollback evidence only and are not part of the active critical path.
-**Current blocker:** domain registration still needed. `tradergunit.is-a.dev` PR was closed without merge; `traders.app` Cloudflare zone is configured but not authoritative. Register a domain via any registrar, update Cloudflare A records to `173.249.18.14`, and the edge goes live. `sslip.io` fallback hosts remain the active public proof surface.
+**Progress snapshot (2026-04-23):** Master backlog `156/255` complete (`61.2%`). Stage P `137/200` complete (`68.5%`). Active production phase `P26` is `30/32` complete (`93.8%`). OCI archive phases remain in this file for rollback evidence only and are not part of the active critical path.
+**Current blocker:** the corrected developer-root request for `tradergunit.is-a.dev` is open with passing checks, but it still needs `is-a.dev` maintainer approval before the nested production hosts can be registered. `sslip.io` fallback hosts remain the active public proof surface until that approval lands.
 
 #### P26 — Architecture Freeze
 - [x] Freeze production target as `Contabo VPS` with `Docker Compose`, not OCI k3s
@@ -271,12 +271,12 @@ All Stages S1–S6, ML1–ML8 are background. Implement carefully, update live a
 - [x] GitHub deploy-contabo `workflow_run` trigger replaced with `repository_dispatch` — CI now calls the repository dispatch endpoint with commit SHA payload so `deploy-contabo.yml` receives the expected automatic-deploy context (commit `4221c20a`)
 - [x] Automatic/manual `Deploy to Contabo VPS` bootstrap path stabilized on Contabo after image pushes; workflow run `24723298075` first passed end-to-end on commit `053289b6`, and the April 22 edge-readiness regression was re-fixed by commit `84eb0ca6` with workflow run `24769157865` passing end-to-end again
 - [x] k6 public-edge verification now records first-envelope capture separately from threshold pass/fail
-- [x] Run the Contabo public-edge k6 suite and record the first concurrency envelope — first fallback-host envelope captured against `173.249.18.14.sslip.io` / `bff.173.249.18.14.sslip.io` / `api.173.249.18.14.sslip.io` on `2026-04-21`; evidence lives in `.artifacts/k6-slo-20260421T131612Z/` and shows threshold breaches (`bff_ml_health` fail rate about `79.2%`, `ml_predict` p95 about `1346ms`, `edge-health` p95 about `788ms`, `bff /health` p95 about `740ms`)
-- [x] **DNS CUTOVER** — `traders.app`, `bff.traders.app`, `api.traders.app` A records updated to Contabo `173.249.18.14` via Cloudflare (2026-04-22)
-- [ ] Confirm public health for `https://traders.app`, `https://bff.traders.app/health`, and `https://api.traders.app/health` (pending domain registration + DNS propagation)
+- [x] Run the Contabo public-edge k6 suite and record the first concurrency envelope — fallback-host evidence exists for both the first baseline and the 2026-04-23 follow-up run; latest results show `edge_health` and `bff_health` green, `ml_predict` p95 improved to about `1277ms`, and `/ml/health` is now treated as an expected degraded state when the ML engine reports missing training/candle data rather than as a generic transport regression
+- [x] **DOMAIN CUTOVER PLAN READY** — the root developer-domain PR is open at `is-a-dev/register#36827`, the nested-host follow-on branches are prepared, and the repo cutover branch `prep/tradergunit-nested-domain-cutover` is ready to merge after approval
+- [ ] Confirm public health for `https://traders.tradergunit.is-a.dev`, `https://bff.traders.tradergunit.is-a.dev/health`, and `https://api.traders.tradergunit.is-a.dev/health` (pending `is-a.dev` approval + DNS propagation)
 - [ ] Archive the final OCI node details only after Contabo is stable for at least one clean redeploy cycle
 
-Fallback-host note: `sslip.io` hosts (`173.249.18.14.sslip.io`) are the active public proof surface. Domain registration + Cloudflare A record update will activate branded URLs. DNS propagated (TTL 3600s); allow up to 60 min from last change.
+Fallback-host note: `sslip.io` hosts (`173.249.18.14.sslip.io`) remain the active public proof surface. Branded URLs switch only after `tradergunit.is-a.dev` is approved and the nested hosts are registered.
 
 #### P09-C - `kubectl apply tradersapp-deployments.yaml` on OCI E2.1.Micro (ARCHIVED — P26 is active)
 > ⚠️ P09-C is ARCHIVED. Contabo VPS (P26) is the active production path. Do not work on P09-C unless Contabo is abandoned.
@@ -585,7 +585,7 @@ Fallback-host note: `sslip.io` hosts (`173.249.18.14.sslip.io`) are the active p
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-23 05:48`  -  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-23 06:20`  -  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Stage P Backlog  68.5%  [################--------]
