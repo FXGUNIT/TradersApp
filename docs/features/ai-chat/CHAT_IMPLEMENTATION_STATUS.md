@@ -125,7 +125,7 @@ The following files are part of a working, integrated system that has been verif
 - The core chat logic in `FloatingChatWidget.jsx` and `ChatHelpline.tsx`
 - The Telegram service integration in `telegramService.js`
 - The import and usage of ChatHelpline in `App.jsx`
-- The environment variable names in `.env` (VITE_TELEGRAM_BOT_TOKEN, VITE_TELEGRAM_CHAT_ID, VITE_N8N_WEBHOOK_URL)
+- The environment variable names in `.env` (`BFF_TELEGRAM_BOT_TOKEN`, `BFF_TELEGRAM_CHAT_ID`, `VITE_N8N_WEBHOOK_URL`)
 - Any changes that would alter the expected data format sent to/received from the n8n webhooks
 
 ### VERIFICATION BEFORE MODIFICATION:
