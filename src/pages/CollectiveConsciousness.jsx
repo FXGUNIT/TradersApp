@@ -1,6 +1,8 @@
 import { MlConsensusTab } from '../features/consensus/MlConsensusTab.jsx';
 import { WarRoomLoader } from '../features/consensus/WarRoomLoader.jsx';
+import { ActiveInstrumentProvider } from '../features/dashboard/ActiveInstrumentContext.jsx';
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import './CollectiveConsciousness.css';
 import MessageRenderer from '../components/MessageRenderer.jsx';
 import ThemeSwitcher from '../components/ThemeSwitcher.jsx';
 import AiEnginesStatus from '../components/AiEnginesStatus.jsx';
@@ -463,7 +465,9 @@ User Question: ${trimmed}`;
 
       {/* Tab content */}
       {activeTab === 'ml' ? (
-        <MlConsensusTab theme={theme} normalizedTheme={normalizedTheme} />
+        <ActiveInstrumentProvider>
+          <MlConsensusTab theme={theme} normalizedTheme={normalizedTheme} />
+        </ActiveInstrumentProvider>
       ) : (
       <div style={{
         flex: 1,

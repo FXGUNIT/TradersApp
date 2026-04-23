@@ -1,0 +1,112 @@
+.cc-dashboard-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  margin-bottom: 12px;
+}
+
+.cc-dashboard-grid--secondary {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.cc-switcher {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at top left, rgba(10, 132, 255, 0.12), transparent 42%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+}
+
+.cc-switcher__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.8px;
+  text-transform: uppercase;
+  color: var(--text-secondary, #8e8e93);
+}
+
+.cc-switcher__row {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.cc-switcher__button {
+  min-width: 140px;
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-secondary, #9ca3af);
+  cursor: pointer;
+  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+  text-align: left;
+}
+
+.cc-switcher__button:hover {
+  transform: translateY(-1px);
+  border-color: rgba(10, 132, 255, 0.45);
+}
+
+.cc-switcher__button.is-active {
+  background: rgba(10, 132, 255, 0.12);
+  border-color: rgba(10, 132, 255, 0.75);
+  color: var(--text-primary, #f8fafc);
+}
+
+.cc-switcher__button-title {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+}
+
+.cc-switcher__button-meta {
+  font-size: 11px;
+}
+
+.cc-mini-list {
+  display: grid;
+  gap: 10px;
+}
+
+.cc-mini-list__item {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+}
+
+.cc-mini-list__title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-primary, #f8fafc);
+}
+
+.cc-mini-list__meta {
+  font-size: 11px;
+  color: var(--text-secondary, #9ca3af);
+}
+
+.cc-empty-panel {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-secondary, #9ca3af);
+}
+
+@media (max-width: 720px) {
+  .cc-switcher__button {
+    min-width: 120px;
+  }
+}
