@@ -136,10 +136,72 @@ export async function fetchNewsSystemStatus() {
     bffFetch("/news/upcoming"),
   ]);
 
-  if (breaking || upcoming) {
+  if (breaking !== null || upcoming !== null) {
+    const liveItems = Array.isArray(breaking?.items) ? breaking.items : [];
+    const highImpactCount = Number(breaking?.highImpactCount || 0);
+
+    const liveNewsSignal =
+      liveItems.length > 0 || highImpactCount > 0
+        ? createSignal("Live News", "active", {
+            detail:
+              highImpactCount > 0
+                ? `${liveItems.length} live headline(s), ${highImpactCount} high impact.`
+                : `${liveItems.length} live headline(s) detected.`,
+            count: liveItems.length,
+            highImpactCount,
+          })
+        : createSignal("Live News", "inactive", {
+            detail: "No live headline is active right now.",
+            count: 0,
+            highImpactCount: 0,
+          });
+
+    // /news/upcoming shape: { ok, events, next_event, upcoming_count, high_impact_count }
+    const upcomingNextEvent = upcoming?.next_event || null;
+    const upcomingTradeAllowed = upcoming?.trade_allowed !== false;
+    const upcomingWarning = Boolean(upcoming?.warning);
+    const hasUpcomingEvent = Boolean(upcomingNextEvent?.title);
+    const isWithinWindow =
+      hasUpcomingEvent &&
+      upcomingNextEvent?.timeUntil_min !== null &&
+      upcomingNextEvent?.timeUntil_min !== undefined &&
+      Number.isFinite(Number(upcomingNextEvent.timeUntil_min)) &&
+      Number(upcomingNextEvent.timeUntil_min) >= SCHEDULED_NEWS_RECENT_WINDOW_MIN &&
+      Number(upcomingNextEvent.timeUntil_min) <= SCHEDULED_NEWS_ACTIVE_WINDOW_MIN;
+    const isRiskWindow =
+      !upcomingTradeAllowed || upcomingWarning || isWithinWindow;
+
+    let scheduledNewsSignal;
+    if (isRiskWindow) {
+      scheduledNewsSignal = createSignal("Scheduled News", "active", {
+        detail: upcomingNextEvent?.title
+          ? `${upcomingNextEvent.title} in ${upcomingNextEvent.timeUntil_min} min.`
+          : upcomingWarning && upcoming?.warning
+            ? upcoming.warning
+            : "Scheduled-event window is active.",
+        nextEvent: upcomingNextEvent,
+        tradeAllowed: upcomingTradeAllowed,
+      });
+    } else if (hasUpcomingEvent) {
+      scheduledNewsSignal = createSignal("Scheduled News", "inactive", {
+        detail:
+          Number.isFinite(Number(upcomingNextEvent.timeUntil_min))
+            ? `${upcomingNextEvent.title} in ${upcomingNextEvent.timeUntil_min} min.`
+            : `${upcomingNextEvent.title} is queued, but not active right now.`,
+        nextEvent: upcomingNextEvent,
+        tradeAllowed: upcomingTradeAllowed,
+      });
+    } else {
+      scheduledNewsSignal = createSignal("Scheduled News", "inactive", {
+        detail: "No upcoming news is scheduled right now.",
+        nextEvent: null,
+        tradeAllowed: true,
+      });
+    }
+
     return {
-      liveNews: buildLiveNewsSignal(null, breaking),
-      scheduledNews: buildScheduledNewsSignal(upcoming ? { news: upcoming } : null),
+      liveNews: liveNewsSignal,
+      scheduledNews: scheduledNewsSignal,
       refreshedAt,
     };
   }
