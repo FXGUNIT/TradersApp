@@ -1,0 +1,92 @@
+name: Verify Pages Root Runtime
+
+on:
+  workflow_dispatch:
+    inputs:
+      root_url:
+        description: "Cloudflare Pages root URL"
+        required: false
+        default: "https://tradergunit.pages.dev"
+      bff_base_url:
+        description: "Public BFF base URL"
+        required: false
+        default: ""
+      api_base_url:
+        description: "Public API base URL"
+        required: false
+        default: ""
+      project_preview_url:
+        description: "Current project preview URL"
+        required: false
+        default: ""
+      timeout_seconds:
+        description: "Probe timeout in seconds"
+        required: false
+        default: "15"
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify Pages Root Runtime
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Resolve runtime URLs
+        id: runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          BFF_BASE_URL="${{ inputs.bff_base_url }}"
+          API_BASE_URL="${{ inputs.api_base_url }}"
+          PROJECT_PREVIEW_URL="${{ inputs.project_preview_url }}"
+
+          if [ -z "${BFF_BASE_URL}" ]; then
+            BFF_BASE_URL="https://${{ vars.BFF_PUBLIC_HOST }}"
+          fi
+          if [ -z "${API_BASE_URL}" ]; then
+            API_BASE_URL="https://${{ vars.API_PUBLIC_HOST }}"
+          fi
+          if [ -z "${PROJECT_PREVIEW_URL}" ]; then
+            PROJECT_PREVIEW_URL="https://${{ vars.TRADERSAPP_DOMAIN }}/"
+          fi
+
+          {
+            echo "bff_base_url=${BFF_BASE_URL}"
+            echo "api_base_url=${API_BASE_URL}"
+            echo "project_preview_url=${PROJECT_PREVIEW_URL}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Verify Pages root runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .artifacts/pages-root
+          python scripts/pages/verify_pages_root_runtime.py \
+            --root-url "${{ inputs.root_url }}" \
+            --bff-base-url "${{ steps.runtime.outputs.bff_base_url }}" \
+            --api-base-url "${{ steps.runtime.outputs.api_base_url }}" \
+            --project-preview-url "${{ steps.runtime.outputs.project_preview_url }}" \
+            --timeout "${{ inputs.timeout_seconds }}" \
+            --output ".artifacts/pages-root/verification-${{ github.run_id }}.json" \
+            --step-summary "${GITHUB_STEP_SUMMARY}"
+
+      - name: Upload verification artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pages-root-verification-${{ github.run_id }}
+          path: .artifacts/pages-root/
+          if-no-files-found: ignore
+          include-hidden-files: true
+          retention-days: 14

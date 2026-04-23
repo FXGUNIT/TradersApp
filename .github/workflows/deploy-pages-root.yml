@@ -9,6 +9,7 @@ on:
       - "package.json"
       - "package-lock.json"
       - "public/**"
+      - "scripts/pages/**"
       - "src/**"
       - "vite.config.js"
   workflow_dispatch:
@@ -79,6 +80,34 @@ jobs:
             --branch main \
             --commit-hash "${GITHUB_SHA}"
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Verify Pages root runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .artifacts/pages-root
+          python scripts/pages/verify_pages_root_runtime.py \
+            --root-url "https://tradergunit.pages.dev" \
+            --bff-base-url "https://${{ vars.BFF_PUBLIC_HOST }}" \
+            --api-base-url "https://${{ vars.API_PUBLIC_HOST }}" \
+            --project-preview-url "https://${{ vars.TRADERSAPP_DOMAIN }}/" \
+            --output ".artifacts/pages-root/verification-${{ github.run_id }}.json" \
+            --step-summary "${GITHUB_STEP_SUMMARY}"
+
+      - name: Upload Pages verification artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pages-root-verification-${{ github.run_id }}
+          path: .artifacts/pages-root/
+          if-no-files-found: ignore
+          include-hidden-files: true
+          retention-days: 14
+
       - name: Publish summary
         shell: bash
         run: |
@@ -90,4 +119,5 @@ jobs:
             echo "- Commit: \`${GITHUB_SHA}\`"
             echo "- Build command: \`npm ci && npm run build\`"
             echo "- Deploy mode: \`wrangler pages deploy dist --project-name tradergunit\`"
+            echo "- Verification artifact: \`pages-root-verification-${{ github.run_id }}\`"
           } >> "${GITHUB_STEP_SUMMARY}"

@@ -350,6 +350,7 @@ gh workflow run rollback.yml -f version=2026-04-01
 
 | Service | URL | Expected |
 |---|---|---|
+| Pages root | `https://tradergunit.pages.dev` | HTTP 200 + developer-root landing page |
 | ML Engine | `https://api.traders.app/health` | `{"ok": true, ...}` |
 | BFF | `https://bff.traders.app/health` | `{"ok": true, ...}` |
 | Frontend | `https://traders.app` | HTTP 200 |
@@ -360,12 +361,16 @@ gh workflow run rollback.yml -f version=2026-04-01
 
 After every deployment, verify:
 
+- [ ] `https://tradergunit.pages.dev` returns 200 with the expected developer-root `h1`
+- [ ] Pages root security headers are present (CSP, `X-Frame-Options`, `X-Content-Type-Options`, `Permissions-Policy`)
 - [ ] `GET /health` returns 200 on all services
 - [ ] `GET /ai/status` returns AI provider configuration
 - [ ] `GET /news/countdown` returns news event data
 - [ ] `GET /ml/health` returns ML engine status
 - [ ] Frontend loads without console errors
 - [ ] No CORS errors in browser
+- [ ] BFF routes called from the Pages root origin return the expected CORS header
+- [ ] Negative admin verify returns a normal auth failure, not a filesystem/runtime error
 - [ ] Rate limit headers present (`X-RateLimit-Remaining`)
 - [ ] Security headers present (CSP, X-Frame-Options, etc.)
 - [ ] No 5xx errors in k3s pod logs (`kubectl get pods -n tradersapp`)
