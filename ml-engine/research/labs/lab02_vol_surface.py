@@ -24,6 +24,7 @@ import sys as _sys
 if _sys.stdout.encoding and 'cp' in _sys.stdout.encoding:
     _sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 
+from pathlib import Path
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -252,6 +253,7 @@ def plot_vol_surface(surface, atm_spot=SPOT, out_path=None):
     """Plot 2D cross-sections: ATM term structure and skew per expiry."""
     if out_path is None:
         out_path = "ml-engine/research/labs/vol_surface.png"
+    out_path = Path(out_path)
 
     strikes = sorted(surface.keys())
     atm_strike = round(atm_spot / 50) * 50
@@ -303,7 +305,13 @@ def plot_vol_surface(surface, atm_spot=SPOT, out_path=None):
     ax3.grid(True, alpha=0.3, axis='y')
 
     plt.tight_layout()
-    plt.savefig(out_path, dpi=150, bbox_inches='tight')
+    try:
+        plt.savefig(out_path, dpi=150, bbox_inches='tight')
+    except PermissionError:
+        fallback_dir = Path(".tmp") / "research-labs"
+        fallback_dir.mkdir(parents=True, exist_ok=True)
+        out_path = fallback_dir / out_path.name
+        plt.savefig(out_path, dpi=150, bbox_inches='tight')
     print(f"  [Saved: {out_path}]")
     plt.close()
 
