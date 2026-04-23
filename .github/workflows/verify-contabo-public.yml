@@ -6,15 +6,15 @@ on:
       frontend_host:
         description: "Frontend public host"
         required: false
-        default: "173.249.18.14.sslip.io"
+        default: "traders.app"
       bff_host:
         description: "BFF public host"
         required: false
-        default: "bff.173.249.18.14.sslip.io"
+        default: "bff.traders.app"
       api_host:
         description: "ML Engine public host"
         required: false
-        default: "api.173.249.18.14.sslip.io"
+        default: "api.traders.app"
       timeout_seconds:
         description: "Probe timeout in seconds"
         required: false
