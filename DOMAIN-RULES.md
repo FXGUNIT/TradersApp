@@ -17,6 +17,12 @@
 
 ### Session Rules
 - Best sessions: **London (07:00-09:00 UTC), New York (13:30-16:00 UTC)**
+- **NY Lunch Block (HARD RULE — no exceptions):** No trading signals in any asset during NY lunch
+  (12:00–1:00 PM ET). Low volume and elevated chop make directional trades unreliable.
+  - DST active (Mar–Nov): 21:30–22:30 IST
+  - DST inactive (Nov–Mar): 22:30–23:30 IST
+  - `isNyLunchBreakActive(istHour, istMinute)` in `bff/services/tradingHoursService.mjs`
+  - Effect: `getMlConsensus` returns NEUTRAL, Board Room RiskOfficer fires veto
 - Avoid trading: first 15 min of RTH open (high noise), last 30 min of RTH close (chop)
 - Friday afternoon: reduce size by 50% (weekend gap risk)
 - Holiday sessions: reduce size by 50% (thin liquidity)

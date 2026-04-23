@@ -14,6 +14,7 @@
 - [ ] **Early close days** (e.g., day before Thanksgiving) — Shorter RTH session, model must not assume full 6.5h session.
 - [ ] **Triple witching / options expiry** — High volatility, anomalous volume. Regime detector should upweight anomaly sensitivity.
 - [ ] **First trading day of month** — Month-end portfolio rebalancing effects. May cause momentum anomalies.
+- [ ] **NY Lunch Block** — 12:00–1:00 PM ET daily. Low volume, high chop, directional signals unreliable. `isNyLunchBreakActive()` gates all consensus signals and fires Board Room RiskOfficer veto. DST-aware IST conversion handled automatically: block fires 21:30–22:30 IST (DST) / 22:30–23:30 IST (no DST).
 
 ### Data Quality
 - [ ] **Missing candles** — Network gap or data provider downtime. Must not interpolate silently. Flag and use previous valid state.
