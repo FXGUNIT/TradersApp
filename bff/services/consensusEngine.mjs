@@ -24,6 +24,7 @@
 import { recordMlEngineRequest, setCircuitBreakerState } from "../metrics.mjs";
 import { predictConsensusTransport } from "./analysisTransport.mjs";
 import { buildMlFeatureVector } from "./consensusAggregator.mjs";
+import { isNyLunchBreakActive } from "./tradingHoursService.mjs";
 import {
   ensureAgentHeartbeat,
   refreshAgentHeartbeat,
@@ -384,6 +385,54 @@ export async function getMlConsensus({
       data_trades_analyzed: 0,
       model_freshness: "circuit_breaker_open",
       feature_vector: features,
+    };
+  }
+
+  // NY lunch block: 12:00–13:00 ET → 21:30–22:30 IST (DST) / 22:30–23:30 IST (no DST)
+  const nowUtc = new Date();
+  const istParts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Kolkata",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(nowUtc);
+  const istHour = parseInt(istParts.find((p) => p.type === "hour")?.value ?? "0", 10);
+  const istMinute = parseInt(istParts.find((p) => p.type === "minute")?.value ?? "0", 10);
+
+  if (isNyLunchBreakActive(istHour, istMinute)) {
+    return {
+      ok: false,
+      source: "ny_lunch_block",
+      signal: "NEUTRAL",
+      confidence: 0.5,
+      timing: {
+        enter_now: false,
+        reason:
+          "NY lunch block active — ML Engine calls blocked 12:00–13:00 ET " +
+          "(21:30–22:30 IST during DST, 22:30–23:30 IST outside DST). " +
+          "Enter manually with firm rules only.",
+        ny_lunch_block: true,
+        P_profitable_entry_now: 0.5,
+      },
+      votes: {},
+      session: {
+        id: sessionId,
+        name: ["Pre-Market", "Main Trading", "Post-Market"][sessionId] || "Main Trading",
+        session_pct: features.session_pct,
+        minutes_into_session: features.minutes_into_session,
+      },
+      alpha: null,
+      expected_move: null,
+      rrr: null,
+      exit_plan: null,
+      position_sizing: null,
+      regime: null,
+      models_used: 0,
+      data_trades_analyzed: 0,
+      model_freshness: "ny_lunch_block",
+      feature_vector: features,
+      instrument: getInstrumentConfig(resolvedSymbol),
+      timestamp: new Date().toISOString(),
     };
   }
 
