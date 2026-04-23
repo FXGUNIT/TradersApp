@@ -1,4 +1,5 @@
 import boardRoomService from "./boardRoomService.mjs";
+import { isNyLunchBreakActive } from "./tradingHoursService.mjs";
 
 const HEARTBEAT_INTERVAL_MS = Math.max(
   60_000,
@@ -11,6 +12,41 @@ const ERROR_THROTTLE_MS = Math.max(
 
 const heartbeatLoops = new Map();
 const errorCooldowns = new Map();
+
+/**
+ * RiskOfficer lunch block check — called before any agent milestone is posted.
+ * If NY lunch break is active, logs a veto and returns early.
+ * Returns { veto: true, reason: string } if blocked, { veto: false } otherwise.
+ */
+export function checkNyLunchVeto() {
+  const now = new Date();
+  const istHour = parseInt(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Kolkata",
+      hour: "numeric",
+      hour12: false,
+    }).format(now),
+    10,
+  );
+  const istMinute = parseInt(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Kolkata",
+      minute: "numeric",
+      hour12: false,
+    }).format(now),
+    10,
+  );
+  if (isNyLunchBreakActive(istHour, istMinute)) {
+    return {
+      veto: true,
+      reason:
+        "NY lunch break (12:00–1:00 PM ET) — RiskOfficer veto. No trading signals during this window.",
+      vetoSource: "ny_lunch_riskofficer",
+      timestamp: new Date().toISOString(),
+    };
+  }
+  return { veto: false };
+}
 
 function isEnabled() {
   return String(process.env.BOARD_ROOM_AGENT_REPORTING || "true").toLowerCase() !== "false";
@@ -111,6 +147,11 @@ export async function reportAgentError({
     return null;
   }
 
+  const lunchVeto = checkNyLunchVeto();
+  if (lunchVeto.veto) {
+    return null;
+  }
+
   const message = normalizeError(error);
   if (shouldThrottle(agent, message)) {
     return null;
@@ -137,6 +178,11 @@ export async function openAgentThread({
     return null;
   }
 
+  const lunchVeto = checkNyLunchVeto();
+  if (lunchVeto.veto) {
+    return null;
+  }
+
   return boardRoomService.createThread({
     title,
     description: description || "",
@@ -156,6 +202,12 @@ export async function postAgentMilestone({
   linkedPR = null,
 } = {}) {
   if (!isEnabled() || !agent || !threadId || !content) {
+    return null;
+  }
+
+  const lunchVeto = checkNyLunchVeto();
+  if (lunchVeto.veto) {
+    // Veto fires silently — do not post milestone during NY lunch
     return null;
   }
 
@@ -179,6 +231,7 @@ export function __resetBoardRoomAgentReporterForTests() {
 }
 
 export default {
+  checkNyLunchVeto,
   ensureAgentHeartbeat,
   openAgentThread,
   postAgentMilestone,
