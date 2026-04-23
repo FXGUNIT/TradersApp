@@ -3,7 +3,8 @@
  * Uses temp-file + rename for crash-safe writes.
  * renameSync is atomic on POSIX; best-effort rename on Windows (same volume = safe).
  */
-import { writeFileSync, renameSync, existsSync } from "node:fs";
+import { writeFileSync, renameSync, existsSync, mkdirSync } from "node:fs";
+import { dirname } from "node:path";
 
 const TMP_CHARS = "abcdefghijklmnopqrstuvwxyz0123456789";
 
@@ -24,6 +25,7 @@ export function writeAtomic(path, data) {
   const content = `${JSON.stringify(data, null, 2)}\n`;
   const tmp = tmpName(path);
   try {
+    mkdirSync(dirname(path), { recursive: true });
     writeFileSync(tmp, content, "utf8");
     renameSync(tmp, path);
   } catch (err) {
