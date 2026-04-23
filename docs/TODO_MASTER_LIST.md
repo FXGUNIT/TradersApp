@@ -7,11 +7,11 @@
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-24 01:41`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-24 01:42`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Master Backlog  78.2%  [###################-----]
-Tasks          done 194 | in progress 000 | blocked 000 | todo 054 | total 248
+Master Backlog  97.2%  [#######################-]
+Tasks          done 171 | in progress 000 | blocked 000 | todo 005 | total 176
 ```
 
 How to read this:
@@ -22,7 +22,7 @@ How to read this:
 
 | Area | Tasks | Progress | Status |
 |---|---|---:|---|
-| Stage P | [139/193] |  72.0% | PENDING |
+| Stage P | [116/121] |  95.9% | PENDING |
 | Stage S | [47/47] | 100.0% | DONE |
 | ML Research | [8/8] | 100.0% | DONE |
 
@@ -30,9 +30,9 @@ How to read this:
 
 | Tier | Scope | Progress | Status |
 |---|---|---:|---|
-| TIER 1 | Stage P overall |  72.0% | PENDING |
+| TIER 1 | Stage P overall |  95.9% | PENDING |
 | TIER 2 | Active Contabo production path | 100.0% | DONE |
-| TIER 3 | Archived OCI fallback / evidence |  31.9% | ARCHIVED |
+| TIER 3 | Archived OCI fallback / evidence |   0.0% | DONE |
 | TIER 4 | Stage S + ML backlog | 100.0% | DONE |
 
 ### By Phase
@@ -47,14 +47,8 @@ How to read this:
 | P06 - CI/CD Pipeline (`deploy-k8s.yml`) DONE - minimal direct-apply path | [12/12] | 100.0% | DONE |
 | P07 - k3s Namespace + Secrets Bootstrap ✅ DONE | [3/3] | 100.0% | DONE |
 | P08 - Helm Chart Values ✅ DONE | [4/4] | 100.0% | DONE |
-| P09 - `kubectl apply tradersapp-deployments.yaml` on OCI E2.1.Micro (ARCHIVED — P26 is active) | [23/50] |  46.0% | ARCHIVED |
 | P10 - Stateful Services Inside Free Limits ✅ DONE | [5/5] | 100.0% | DONE |
-| P11 - Archived OCI ingress / external access reference | [0/6] |   0.0% | ARCHIVED |
-| P12 - Archived OCI DNS + TLS reference | [0/5] |   0.0% | ARCHIVED |
-| P13 - Archived OCI frontend hosting reference | [0/4] |   0.0% | ARCHIVED |
-| P14 - Observability ✅ IN PROGRESS | [3/3] | 100.0% | DONE |
-| P15 - Archived OCI backup & rollback reference | [0/3] |   0.0% | ARCHIVED |
-| P16 - Archived OCI go-live sign-off reference | [0/4] |   0.0% | ARCHIVED |
+| P14 - Observability ✅ DONE | [3/3] | 100.0% | DONE |
 | P17 - Documentation Alignment ✅ DONE | [4/4] | 100.0% | DONE |
 | P18 - Windows Desktop Architecture Freeze | [5/5] | 100.0% | DONE |
 | P19 - Windows Installer Wizard | [5/5] | 100.0% | DONE |
@@ -253,67 +247,6 @@ If that branch is ever reopened, use the archived references instead:
 
 Fallback-host note: `sslip.io` hosts (`173.249.18.14.sslip.io`) remain the active Contabo runtime proof surface. The canonical public frontend is `https://tradergunit.pages.dev/`.
 
-#### P09-C - `kubectl apply tradersapp-deployments.yaml` on OCI E2.1.Micro (ARCHIVED — P26 is active)
-> ⚠️ P09-C is ARCHIVED. Contabo VPS (P26) is the active production path. Do not work on P09-C unless Contabo is abandoned.
-- Root cause to treat as authoritative until disproven: OCI E2.1.Micro `1 GB RAM` is too small for `k3s + etcd + kubelet + containerd + the TradersApp core-4 pods` when applied as one rollout step
-- Goal: break the remaining P09 blocker into 50 atomic steps so memory pressure, runtime corruption, and rollout ordering can be debugged without another blind full-manifest retry
-- Live OCI facts from 2026-04-19:
-  - Current reachable OCI node is `tradersapp-oci` at `144.24.112.249` on `VM.Standard.E2.1.Micro`; working SSH key is `C:\Users\Asus\.ssh\id_ed25519`
-  - Previous hard failure was not only RAM: `k3s` was crash-looping on `no space left on device` while creating `etcd-tmp`; `/var/lib/rancher/k3s/agent/containerd` had consumed the root filesystem and inodes
-  - Host-side recovery cleared containerd/kubelet debris, dropped root usage from `100%` to roughly `32-40%`, and restored a healthy `k3s` API on `:6443`
-  - Single-service live results are now real: `redis` passes, `bff` passes, `ml-engine` fails during rollout/ContainerCreating, and `frontend` fails even with `bff` running because `nginx.conf` had a startup-time `/ws` upstream resolution bug
-  - Multi-service live runs are now trustworthy after fixing the staged-apply loop and SSH evidence capture; `bff + frontend` still causes `k3s` restarts, with journal showing `failed to start networking: unable to initialize network policy controller: error getting node subnet`
-- [x] P09-C01 - Capture fresh baseline memory on the node before any repair: `free -m`, `vmstat 1 5`, and `/proc/meminfo`
-- [x] P09-C02 - Capture current control-plane memory by process: `ps aux --sort=-%mem | head -20`
-- [x] P09-C03 - Record `systemctl status k3s` and `journalctl -u k3s -n 300 --no-pager` from the failing node
-- [x] P09-C04 - Record `kubectl get nodes -o wide` and `kubectl describe node tradersapp-oci` after a failed apply
-- [x] P09-C05 - Record `kubectl get pods -A -o wide` with restart counts and current node placement
-- [x] P09-C06 - Record `kubectl get events -A --sort-by=.lastTimestamp | tail -200` to preserve the exact failure sequence
-- [x] P09-C07 - Capture current ephemeral storage usage with `df -h`, `df -i`, and `du -sh /var/lib/rancher/k3s/*`
-- [x] P09-C08 - Save one full failure bundle under a dated runbook artifact path so later retries compare against the same evidence format
-- [ ] P09-C09 - Quantify resident memory used by `etcd`, `kubelet`, `containerd`, and `k3s server` separately
-- [ ] P09-C10 - Decide whether embedded `etcd` must remain or whether the node should switch to a lighter single-node k3s datastore path
-- [ ] P09-C11 - If embedded `etcd` remains, document the exact minimum safe free-memory floor required before any application pods start
-- [ ] P09-C12 - Audit current k3s server flags and remove any non-essential control-plane add-ons still consuming memory
-- [ ] P09-C13 - Audit kubelet eviction thresholds and image-garbage-collection thresholds for better low-memory behavior on 1 GB RAM
-- [ ] P09-C14 - Audit whether swap is actually active and helping under pressure instead of causing unusable thrash
-- [ ] P09-C15 - Audit `systemd` service limits for k3s and confirm they are not making reclaim behavior worse
-- [x] P09-C16 - Define a hard node-memory budget table for control-plane, OS, and each core TradersApp pod before another deploy attempt
-- [x] P09-C17 - Extract the direct-apply CI manifest into per-service logical chunks instead of one all-at-once apply unit
-- [x] P09-C18 - Create a dedicated `redis-only` manifest slice for isolated bring-up testing
-- [x] P09-C19 - Create a dedicated `ml-engine-only` manifest slice for isolated bring-up testing
-- [x] P09-C20 - Create a dedicated `bff-only` manifest slice for isolated bring-up testing
-- [x] P09-C21 - Create a dedicated `frontend-only` manifest slice for isolated bring-up testing
-- [x] P09-C22 - Add a reproducible manifest-generation command that emits the split apply order from the same source values as CI
-- [x] P09-C23 - Make the split manifests deterministic so line diffs show only intentional resource changes between retries
-- [x] P09-C24 - Add a dry-run validation step for every split manifest before the node sees a real apply
-- [ ] P09-C25 - Measure real startup RSS and steady-state RSS for `redis` when deployed alone on the node
-- [ ] P09-C26 - Measure real startup RSS and steady-state RSS for `ml-engine` when deployed alone on the node
-- [ ] P09-C27 - Measure real startup RSS and steady-state RSS for `bff` when deployed alone on the node
-- [ ] P09-C28 - Measure real startup RSS and steady-state RSS for `frontend` when deployed alone on the node
-- [ ] P09-C29 - Lower `redis` requests and limits to the smallest stable envelope proven by isolated testing
-- [ ] P09-C30 - Lower `ml-engine` requests and limits to the smallest stable envelope proven by isolated testing
-- [ ] P09-C31 - Lower `bff` requests and limits to the smallest stable envelope proven by isolated testing
-- [ ] P09-C32 - Lower `frontend` requests and limits to the smallest stable envelope proven by isolated testing
-- [ ] P09-C33 - Re-check that `ml-engine` is not still pulling in hidden heavy dependencies at runtime such as Kafka, Triton, or model warm-load paths
-- [ ] P09-C34 - Re-check that `bff` is not still depending on disabled services through startup probes, env wiring, or transport fallbacks
-- [ ] P09-C35 - Re-check that `frontend` serves static assets only and does not trigger unnecessary sidecars or extra processes
-- [ ] P09-C36 - Re-check that `redis` remains ephemeral and does not request storage classes or PVC-related init work
-- [ ] P09-C37 - Harden the runtime repair script so overlayfs corruption recovery runs before any new pod scheduling attempt
-- [x] P09-C38 - Add a preflight gate that aborts deployment immediately if free memory is below the minimum safe floor from P09-C16
-- [x] P09-C39 - Add a preflight gate that aborts deployment immediately if `DiskPressure=True` or inode pressure is already present
-- [x] P09-C40 - Apply the split manifests one service at a time in the exact order `redis -> ml-engine -> bff -> frontend`
-- [x] P09-C41 - After each service apply, wait for either `Ready` or a failure event and record memory, events, and pod logs before moving on
-- [x] P09-C42 - Identify the first exact service and lifecycle stage that re-triggers memory collapse or overlayfs corruption
-- [ ] P09-C43 - If a single service alone breaks the node, stop full-stack testing and reduce that service further before any combined retry
-- [ ] P09-C44 - If all four services run individually, test the minimal combined pairings `redis+bff`, `redis+ml-engine`, and `redis+frontend`
-- [ ] P09-C45 - If pairings hold, test the three-service stack `redis + ml-engine + bff` before adding the frontend
-- [ ] P09-C46 - Only after staged pair/triple validation, retry full `kubectl apply tradersapp-deployments.yaml`
-- [ ] P09-C47 - Confirm the successful full-stack run keeps exactly one Ready pod each for `redis`, `ml-engine`, `bff`, and `frontend`
-- [ ] P09-C48 - Confirm the successful full-stack run still leaves enough free memory headroom to survive one pod restart without node collapse
-- [x] P09-C49 - Update the production deploy workflow so CI uses the proven staged-apply order instead of a blind one-shot core rollout
-- [ ] P09-C50 - Rewrite the P09 checkpoint note with the final proven memory envelope, staged rollout order, and recovery procedure for future cold starts
-
 ### P10 — Stateful Services Inside Free Limits ✅ DONE
 - [x] Audit each stateful component and classify it as required-for-production or removable-from-runtime
   *(PostgreSQL, MLflow, MinIO, Kafka, Feast, Triton, vLLM, Keycloak all disabled in `values.minimal.yaml`)*
@@ -323,60 +256,12 @@ Fallback-host note: `sslip.io` hosts (`173.249.18.14.sslip.io`) remain the activ
 - [x] Defer MLflow/MinIO persistence until a genuinely free durable path is proven
   *(MLflow disabled in values.minimal.yaml — tracked as future Stage P improvement if RAM allows)*
 
-### P11 - Archived OCI ingress / external access reference
-> ⚠️ ARCHIVED — OCI-only. Not required for Contabo production path. Kept for rollback context only.
-- OCI-only follow-on kept for rollback notes. Not required for the current Contabo go-live.
-- k3s runs with `--disable traefik --disable servicelb`, so external traffic must be handled explicitly
-- Automatic CI no longer bootstraps `ingress-nginx` / `cert-manager` before the core deploy on the free OCI node; edge bootstrap is now a separate post-core action to avoid destabilizing P09
-- External access is intentionally downstream of core runtime stability; do not treat ingress as the primary blocker while P09 is still failing on node pressure
-- [ ] Standardize on one free edge path: `ingress-nginx` on OCI k3s, not Vercel, Railway, or another proxy dependency
-- [ ] Expose `ingress-nginx` on the OCI node with a free-compatible service path once P09 is stable (NodePort is acceptable for debugging; final production path must remain OCI-only)
-- [ ] Route `traders.app`, `bff.traders.app`, and `api.traders.app` through the same OCI public IP and ingress controller
-- [ ] Keep NodePort only as a temporary debugging fallback, not the final public architecture
-- [ ] Prove frontend, BFF, and ML engine all answer through ingress before touching final DNS
-- [ ] Ensure the ingress path is compatible with Let's Encrypt / cert-manager challenge flow
-
-### P12 - Archived OCI DNS + TLS reference
-> ⚠️ ARCHIVED — OCI-only. Not required for Contabo production path. Kept for rollback context only.
-- OCI-only DNS/TLS notes kept for rollback context. Not required for the current Contabo cutover.
-- Current live mismatch: `traders.app` resolves to the wrong edge, HTTPS is broken, and `api.traders.app` is still NXDOMAIN
-- Current authoritative DNS is on the existing registrar nameservers; keep that path instead of introducing another paid DNS layer
-- [ ] Fix the apex A record so `traders.app` points to the OCI ingress IP instead of the current wrong edge
-- [ ] Create `bff.traders.app` and `api.traders.app` DNS records against the same OCI edge
-- [ ] Remove or replace legacy DNS entries that still send traffic to the wrong AWS / old frontend path
-- [ ] Issue and validate Let's Encrypt certificates for apex + API/BFF hosts through cert-manager on k3s
-- [ ] Verify `https://traders.app`, `https://bff.traders.app/health`, and `https://api.traders.app/health`
-
-### P13 - Archived OCI frontend hosting reference
-> ⚠️ ARCHIVED — OCI-only. Not required for Contabo production path. Kept for rollback context only.
-- OCI-only frontend hosting notes kept for rollback context. Not required for the current Contabo cutover.
-- Production frontend must be served from OCI/k3s, not Vercel
-- [ ] Remove Vercel from the production go-live path and treat `vercel.json` as non-production only unless explicitly needed for previews
-- [ ] Serve the built frontend from the cluster alongside the backend stack
-- [ ] Confirm `traders.app` no longer redirects to `stocks.news` or any legacy deployment
-- [ ] Re-check CSP, API base URLs, and frontend environment wiring for the OCI-hosted domains
-
-### P14 — Observability ✅ IN PROGRESS
+### P14 — Observability ✅ DONE
 > Note: Contabo edge health is now verified. Jaeger OTLP spam is disabled in ml-engine. GitHub Actions log monitoring + webhook alerts are the current path.
 - Prometheus + Grafana stack too heavy for E2.1.Micro (1GB RAM) — skipped for Contabo single-host
 - [x] Deploy lightweight alternatives: GitHub Actions log streaming (CI logs + artifact logs)
 - [x] Smoke test monitoring via GitHub Actions on each deploy:  (workflow_dispatch)
 - [x] Slack/Discord/Telegram alerts via CI/CD post-deploy hook:  updated (2026-04-23)
-
-### P15 - Archived OCI backup & rollback reference
-> ⚠️ ARCHIVED — OCI-only. Not required for Contabo production path. Kept for rollback context only.
-- OCI-only rollback notes kept for rollback context. Not required for the current Contabo production cutover.
-- [ ] Test `helm rollback tradersapp` on CI failure
-- [ ] Database migration rollback strategy
-- [ ] GitHub Actions `on_failure: rollback` job already wired in deploy-k8s.yml
-
-### P16 - Archived OCI go-live sign-off reference
-> ⚠️ ARCHIVED — OCI-only. Not required for Contabo production path. Kept for rollback context only.
-- OCI-only sign-off notes kept for rollback context. Not required for the current Contabo production cutover.
-- [ ] Manual smoke test: load traders.app, check consensus signal renders
-- [ ] Manual smoke test: `bff.traders.app/health` and `api.traders.app/health` both return healthy over HTTPS
-- [ ] Paper trade for 1 week before any real money
-- [ ] Board Room deliberation rule applies to all signals
 
 ### P17 — Documentation Alignment ✅ DONE
 - [x] Rewrite or archive any Stage P docs that still reference Railway/Vercel as the production path
@@ -560,12 +445,12 @@ Fallback-host note: `sslip.io` hosts (`173.249.18.14.sslip.io`) remain the activ
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-24 01:41`  -  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-24 01:42`  -  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Stage P Backlog  72.0%  [#################-------]
-Sections        done 020 | active 000 | blocked 000 | archived 006 | pending 001 | total 028
-Checklist       done 139 | open 054 | total 193
+Stage P Backlog  95.9%  [#######################-]
+Sections        done 020 | active 000 | blocked 000 | archived 000 | pending 001 | total 022
+Checklist       done 116 | open 005 | total 121
 ```
 
 | Section | Tasks | Progress | Status |
@@ -581,14 +466,8 @@ Checklist       done 139 | open 054 | total 193
 | P26 - Architecture Freeze | [4/4] | 100.0% | DONE |
 | P26 - Repo-Side Contabo Execution | [11/11] | 100.0% | DONE |
 | P26 - Live Cutover ✅ DONE | [17/17] | 100.0% | DONE |
-| P09 - `kubectl apply tradersapp-deployments.yaml` on OCI E2.1.Micro (ARCHIVED — P26 is active) | [23/50] |  46.0% | ARCHIVED |
 | P10 - Stateful Services Inside Free Limits ✅ DONE | [5/5] | 100.0% | DONE |
-| P11 - Archived OCI ingress / external access reference | [0/6] |   0.0% | ARCHIVED |
-| P12 - Archived OCI DNS + TLS reference | [0/5] |   0.0% | ARCHIVED |
-| P13 - Archived OCI frontend hosting reference | [0/4] |   0.0% | ARCHIVED |
-| P14 - Observability ✅ IN PROGRESS | [3/3] | 100.0% | DONE |
-| P15 - Archived OCI backup & rollback reference | [0/3] |   0.0% | ARCHIVED |
-| P16 - Archived OCI go-live sign-off reference | [0/4] |   0.0% | ARCHIVED |
+| P14 - Observability ✅ DONE | [3/3] | 100.0% | DONE |
 | P17 - Documentation Alignment ✅ DONE | [4/4] | 100.0% | DONE |
 | P18 - Windows Desktop Architecture Freeze | [5/5] | 100.0% | DONE |
 | P19 - Windows Installer Wizard | [5/5] | 100.0% | DONE |
