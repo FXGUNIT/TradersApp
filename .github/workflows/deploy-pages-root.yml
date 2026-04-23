@@ -64,6 +64,10 @@ jobs:
         run: npm ci
 
       - name: Build root bundle
+        env:
+          VITE_PUBLIC_PROJECT_PREVIEW_URL: https://${{ vars.TRADERSAPP_DOMAIN }}/
+          VITE_PUBLIC_BFF_HEALTH_URL: https://${{ vars.BFF_PUBLIC_HOST }}/health
+          VITE_PUBLIC_API_HEALTH_URL: https://${{ vars.API_PUBLIC_HOST }}/health
         run: npm run build
 
       - name: Verify Pages root contract

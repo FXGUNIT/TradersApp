@@ -2,49 +2,14 @@ import React from "react";
 import "./developerRootLanding.css";
 
 const DEVELOPER_ROOT_HOST = "tradergunit.pages.dev";
-const PRIMARY_PROJECT_HOST = "https://173.249.18.14.sslip.io/";
-const BFF_HEALTH_HOST = "https://bff.173.249.18.14.sslip.io/health";
-const API_HEALTH_HOST = "https://api.173.249.18.14.sslip.io/health";
 const GITHUB_PROFILE = "https://github.com/FXGUNIT";
 const PREVIEW_ROUTE = "/developer";
-const STACK_STATUS = [
-  {
-    label: "Developer root",
-    value: DEVELOPER_ROOT_HOST,
-  },
-  {
-    label: "Project frontend",
-    value: "173.249.18.14.sslip.io",
-  },
-  {
-    label: "BFF health",
-    value: "bff.173.249.18.14.sslip.io/health",
-  },
-  {
-    label: "API health",
-    value: "api.173.249.18.14.sslip.io/health",
-  },
-];
 const WORKSTREAMS = [
   "React + Vite shell for the operator-facing frontend",
   "Node.js BFF for auth, policy, orchestration, and API fan-out",
   "Python ML engine for inference, research, and model services",
   "Windows thin client packaging for low-friction local access",
   "Contabo-hosted runtime with Redis and containerized service edges",
-];
-const PROOF_TARGETS = [
-  {
-    href: PRIMARY_PROJECT_HOST,
-    label: "Current frontend fallback host",
-  },
-  {
-    href: BFF_HEALTH_HOST,
-    label: "Current BFF health",
-  },
-  {
-    href: API_HEALTH_HOST,
-    label: "Current API health",
-  },
 ];
 const TIMELINE = [
   {
@@ -64,6 +29,77 @@ const TIMELINE = [
     title: "Custom domain later",
     body:
       "Once branding and domain ownership are finalized, the same public root can be moved behind a custom domain without changing the product stack first.",
+  },
+];
+
+function normalizeAbsoluteUrl(value, fallback) {
+  const candidate = String(value || "").trim();
+  if (!candidate) {
+    return fallback;
+  }
+
+  return candidate.endsWith("/") ? candidate : `${candidate}/`;
+}
+
+function normalizeHealthUrl(value, fallback) {
+  const candidate = String(value || "").trim();
+  return candidate || fallback;
+}
+
+function hostLabel(url) {
+  try {
+    const parsed = new URL(url);
+    const path = parsed.pathname && parsed.pathname !== "/" ? parsed.pathname : "";
+    return `${parsed.host}${path}`;
+  } catch {
+    return url;
+  }
+}
+
+const PRIMARY_PROJECT_HOST = normalizeAbsoluteUrl(
+  import.meta.env.VITE_PUBLIC_PROJECT_PREVIEW_URL,
+  "https://173.249.18.14.sslip.io/"
+);
+const BFF_HEALTH_HOST = normalizeHealthUrl(
+  import.meta.env.VITE_PUBLIC_BFF_HEALTH_URL,
+  "https://bff.173.249.18.14.sslip.io/health"
+);
+const API_HEALTH_HOST = normalizeHealthUrl(
+  import.meta.env.VITE_PUBLIC_API_HEALTH_URL,
+  "https://api.173.249.18.14.sslip.io/health"
+);
+
+const STACK_STATUS = [
+  {
+    label: "Developer root",
+    value: DEVELOPER_ROOT_HOST,
+  },
+  {
+    label: "Project frontend",
+    value: hostLabel(PRIMARY_PROJECT_HOST),
+  },
+  {
+    label: "BFF health",
+    value: hostLabel(BFF_HEALTH_HOST),
+  },
+  {
+    label: "API health",
+    value: hostLabel(API_HEALTH_HOST),
+  },
+];
+
+const PROOF_TARGETS = [
+  {
+    href: PRIMARY_PROJECT_HOST,
+    label: "Current frontend preview",
+  },
+  {
+    href: BFF_HEALTH_HOST,
+    label: "Current BFF health",
+  },
+  {
+    href: API_HEALTH_HOST,
+    label: "Current API health",
   },
 ];
 
