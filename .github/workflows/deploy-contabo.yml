@@ -230,6 +230,46 @@ jobs:
           INFISICAL_TOKEN: ${{ secrets.INFISICAL_TOKEN }}
           INFISICAL_PROJECT_ID: ${{ secrets.INFISICAL_PROJECT_ID }}
 
+      - name: Export build args from prepared runtime env
+        shell: bash
+        run: |
+          set -euo pipefail
+          python <<'PY'
+          import os
+          from pathlib import Path
+
+          env_path = Path(".artifacts/contabo/.env.contabo")
+          keys = [
+              "BFF_ADMIN_PASS_HASH",
+              "MASTER_SALT",
+              "FINNHUB_API_KEY",
+              "NEWS_API_KEY",
+              "AI_GEMINI_PRO_KEY",
+              "AI_GROQ_TURBO_KEY",
+              "AI_OPENROUTER_MIND_ALPHA",
+              "AI_OPENROUTER_MIND_BETA",
+              "AI_CEREBRAS_KEY",
+              "AI_DEEPSEEK_KEY",
+              "AI_SAMBANOVA_KEY",
+          ]
+
+          values = {}
+          for raw in env_path.read_text(encoding="utf-8").splitlines():
+              line = raw.strip()
+              if not line or line.startswith("#") or "=" not in line:
+                  continue
+              key, value = line.split("=", 1)
+              values[key] = value
+
+          github_env = Path(os.environ["GITHUB_ENV"])
+          with github_env.open("a", encoding="utf-8") as handle:
+              for key in keys:
+                  value = values.get(key, "")
+                  if value:
+                      print(f"::add-mask::{value}")
+                  handle.write(f"{key}<<__EOF__\n{value}\n__EOF__\n")
+          PY
+
       - name: Login to GHCR
         if: steps.context.outputs.skip_build != 'true'
         uses: docker/login-action@v3
@@ -246,15 +286,15 @@ jobs:
           IMAGE_SHA="ghcr.io/${{ steps.context.outputs.owner }}/ml-engine:${{ steps.context.outputs.image_tag }}"
           IMAGE_LATEST="ghcr.io/${{ steps.context.outputs.owner }}/ml-engine:latest"
           docker build \
-            --build-arg FINNHUB_API_KEY="${{ secrets.FINNHUB_API_KEY }}" \
-            --build-arg NEWS_API_KEY="${{ secrets.NEWS_API_KEY }}" \
-            --build-arg AI_GEMINI_PRO_KEY="${{ secrets.AI_GEMINI_PRO_KEY }}" \
-            --build-arg AI_GROQ_TURBO_KEY="${{ secrets.AI_GROQ_TURBO_KEY }}" \
-            --build-arg AI_OPENROUTER_MIND_ALPHA="${{ secrets.AI_OPENROUTER_MIND_ALPHA }}" \
-            --build-arg AI_OPENROUTER_MIND_BETA="${{ secrets.AI_OPENROUTER_MIND_BETA }}" \
-            --build-arg AI_CEREBRAS_KEY="${{ secrets.AI_CEREBRAS_KEY }}" \
-            --build-arg AI_DEEPSEEK_KEY="${{ secrets.AI_DEEPSEEK_KEY }}" \
-            --build-arg AI_SAMBANOVA_KEY="${{ secrets.AI_SAMBANOVA_KEY }}" \
+            --build-arg FINNHUB_API_KEY="${FINNHUB_API_KEY:-}" \
+            --build-arg NEWS_API_KEY="${NEWS_API_KEY:-}" \
+            --build-arg AI_GEMINI_PRO_KEY="${AI_GEMINI_PRO_KEY:-}" \
+            --build-arg AI_GROQ_TURBO_KEY="${AI_GROQ_TURBO_KEY:-}" \
+            --build-arg AI_OPENROUTER_MIND_ALPHA="${AI_OPENROUTER_MIND_ALPHA:-}" \
+            --build-arg AI_OPENROUTER_MIND_BETA="${AI_OPENROUTER_MIND_BETA:-}" \
+            --build-arg AI_CEREBRAS_KEY="${AI_CEREBRAS_KEY:-}" \
+            --build-arg AI_DEEPSEEK_KEY="${AI_DEEPSEEK_KEY:-}" \
+            --build-arg AI_SAMBANOVA_KEY="${AI_SAMBANOVA_KEY:-}" \
             -t "${IMAGE_SHA}" \
             -t "${IMAGE_LATEST}" \
             --file ml-engine/Dockerfile \
@@ -270,17 +310,17 @@ jobs:
           IMAGE_SHA="ghcr.io/${{ steps.context.outputs.owner }}/bff:${{ steps.context.outputs.image_tag }}"
           IMAGE_LATEST="ghcr.io/${{ steps.context.outputs.owner }}/bff:latest"
           docker build \
-            --build-arg BFF_ADMIN_PASS_HASH="${{ secrets.BFF_ADMIN_PASS_HASH }}" \
-            --build-arg MASTER_SALT="${{ secrets.MASTER_SALT }}" \
-            --build-arg FINNHUB_API_KEY="${{ secrets.FINNHUB_API_KEY }}" \
-            --build-arg NEWS_API_KEY="${{ secrets.NEWS_API_KEY }}" \
-            --build-arg AI_GEMINI_PRO_KEY="${{ secrets.AI_GEMINI_PRO_KEY }}" \
-            --build-arg AI_GROQ_TURBO_KEY="${{ secrets.AI_GROQ_TURBO_KEY }}" \
-            --build-arg AI_OPENROUTER_MIND_ALPHA="${{ secrets.AI_OPENROUTER_MIND_ALPHA }}" \
-            --build-arg AI_OPENROUTER_MIND_BETA="${{ secrets.AI_OPENROUTER_MIND_BETA }}" \
-            --build-arg AI_CEREBRAS_KEY="${{ secrets.AI_CEREBRAS_KEY }}" \
-            --build-arg AI_DEEPSEEK_KEY="${{ secrets.AI_DEEPSEEK_KEY }}" \
-            --build-arg AI_SAMBANOVA_KEY="${{ secrets.AI_SAMBANOVA_KEY }}" \
+            --build-arg BFF_ADMIN_PASS_HASH="${BFF_ADMIN_PASS_HASH:-}" \
+            --build-arg MASTER_SALT="${MASTER_SALT:-}" \
+            --build-arg FINNHUB_API_KEY="${FINNHUB_API_KEY:-}" \
+            --build-arg NEWS_API_KEY="${NEWS_API_KEY:-}" \
+            --build-arg AI_GEMINI_PRO_KEY="${AI_GEMINI_PRO_KEY:-}" \
+            --build-arg AI_GROQ_TURBO_KEY="${AI_GROQ_TURBO_KEY:-}" \
+            --build-arg AI_OPENROUTER_MIND_ALPHA="${AI_OPENROUTER_MIND_ALPHA:-}" \
+            --build-arg AI_OPENROUTER_MIND_BETA="${AI_OPENROUTER_MIND_BETA:-}" \
+            --build-arg AI_CEREBRAS_KEY="${AI_CEREBRAS_KEY:-}" \
+            --build-arg AI_DEEPSEEK_KEY="${AI_DEEPSEEK_KEY:-}" \
+            --build-arg AI_SAMBANOVA_KEY="${AI_SAMBANOVA_KEY:-}" \
             -t "${IMAGE_SHA}" \
             -t "${IMAGE_LATEST}" \
             --file bff/Dockerfile \
