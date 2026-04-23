@@ -451,7 +451,10 @@ class SQLiteBackend(DatabaseBackend):
                  holding_minutes, exit_type, source_uid, source_role,
                  days_used, source_days_used, is_training_eligible)
                 VALUES
-                (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                 ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                 ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                 ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     row.get("entry_time"),
@@ -1225,7 +1228,10 @@ class PostgresBackend(DatabaseBackend):
                      holding_minutes, exit_type, source_uid, source_role,
                      days_used, source_days_used, is_training_eligible)
                     VALUES
-                    (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                     %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                     %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                     %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT (entry_time, symbol) DO UPDATE SET
                         exit_time = EXCLUDED.exit_time,
                         exit_price = EXCLUDED.exit_price,
