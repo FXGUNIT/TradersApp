@@ -75,6 +75,16 @@ export async function bffFetch(path, options = {}) {
     headers["Authorization"] = `Bearer ${adminToken}`;
   }
 
+  // Strip browser-extension-injected headers that cause CORS preflight failures.
+  // Extensions like 'Meta Pixel' or ad blockers inject custom headers (e.g.
+  // x-tradersapp-install-id) which are not in the BFF CORS allowlist, causing
+  // the preflight OPTIONS to be rejected and the request to be blocked.
+  for (const key of Object.keys(headers)) {
+    if (key.toLowerCase().startsWith("x-tradersapp-")) {
+      delete headers[key];
+    }
+  }
+
   try {
     const response = await fetch(buildUrl(path), { ...options, headers });
     clearBffUnavailable();
