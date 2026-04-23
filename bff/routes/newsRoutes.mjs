@@ -88,7 +88,9 @@ export function createNewsRouteHandler({
         const data = await fetchBreakingNews({ fresh, maxItems, minImpact });
 
         // Fire-and-forget ML retrain on HIGH impact items
-        const highImpact = data.items.filter(i => i.impact === 'HIGH' && !i.reactionLogged);
+        const highImpact = data.items.filter(
+          (item) => item.impact === 'HIGH' && !item.reactionLogged && item.source !== 'forexfactory',
+        );
         for (const item of highImpact.slice(0, 2)) {
           triggerMLRetrainOnNews(item).catch(() => {});
         }

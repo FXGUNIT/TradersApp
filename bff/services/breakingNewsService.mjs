@@ -149,7 +149,9 @@ class NewsReactionLog {
     // Resolve any pending reactions
     for (const [newsId, pending] of this.pendingReactions) {
       if (pending.resolved) continue;
-      const elapsed = Date.now() - pending.news.publishedAt;
+      const publishedAtMs = new Date(pending.news.publishedAt).getTime();
+      if (!Number.isFinite(publishedAtMs)) continue;
+      const elapsed = Date.now() - publishedAtMs;
       if (elapsed >= 5 * 60_000) {
         this._recordReaction(newsId, 5);
         pending.resolved5m = true;
