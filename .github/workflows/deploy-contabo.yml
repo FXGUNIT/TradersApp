@@ -190,7 +190,7 @@ jobs:
           CONTABO_SSH_KEY: ${{ secrets.CONTABO_SSH_KEY }}
           CONTABO_APP_ENV: ${{ secrets.CONTABO_APP_ENV }}
           INFISICAL_TOKEN: ${{ secrets.INFISICAL_TOKEN }}
-          INFISICAL_PROJECT_ID: ${{ secrets.INFISICAL_PROJECT_ID }}
+          INFISICAL_PROJECT_ID: ${{ secrets.INFISICAL_PROJECT_ID || vars.INFISICAL_PROJECT_ID }}
 
       - name: Checkout deploy commit
         uses: actions/checkout@v4
@@ -211,7 +211,7 @@ jobs:
             sudo apt-get install -y infisical
             export INFISICAL_TOKEN
             infisical secrets pull \
-              --env=production \
+              --env="${INFISICAL_ENV}" \
               --projectId="${INFISICAL_PROJECT_ID}" \
               --format=env > .artifacts/contabo/base.env
           fi
@@ -228,7 +228,8 @@ jobs:
         env:
           CONTABO_APP_ENV: ${{ secrets.CONTABO_APP_ENV }}
           INFISICAL_TOKEN: ${{ secrets.INFISICAL_TOKEN }}
-          INFISICAL_PROJECT_ID: ${{ secrets.INFISICAL_PROJECT_ID }}
+          INFISICAL_PROJECT_ID: ${{ secrets.INFISICAL_PROJECT_ID || vars.INFISICAL_PROJECT_ID }}
+          INFISICAL_ENV: ${{ vars.INFISICAL_ENV || 'dev' }}
 
       - name: Export build args from prepared runtime env
         shell: bash
@@ -633,5 +634,6 @@ jobs:
             echo "- API health: \`https://${{ steps.context.outputs.api_host }}/health\`"
             echo "- Compose profiles: \`${{ steps.context.outputs.compose_profiles }}\`"
             echo "- Public verification skipped: \`${{ steps.context.outputs.skip_public_verify }}\`"
+            echo "- Infisical fallback env: \`${{ vars.INFISICAL_ENV || 'dev' }}\`"
             echo "- Evidence artifact: \`contabo-deploy-evidence-${{ github.run_id }}\`"
           } >> "${GITHUB_STEP_SUMMARY}"
