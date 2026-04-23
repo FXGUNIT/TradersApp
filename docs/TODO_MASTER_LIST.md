@@ -7,11 +7,11 @@
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-24 01:46`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-24 01:52`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Master Backlog  97.2%  [#######################-]
-Tasks          done 171 | in progress 000 | blocked 000 | todo 005 | total 176
+Master Backlog  94.5%  [#######################-]
+Tasks          done 171 | in progress 000 | blocked 000 | todo 010 | total 181
 ```
 
 How to read this:
@@ -22,7 +22,7 @@ How to read this:
 
 | Area | Tasks | Progress | Status |
 |---|---|---:|---|
-| Stage P | [116/121] |  95.9% | PENDING |
+| Stage P | [116/126] |  92.1% | IN PROGRESS |
 | Stage S | [47/47] | 100.0% | DONE |
 | ML Research | [8/8] | 100.0% | DONE |
 
@@ -30,9 +30,9 @@ How to read this:
 
 | Tier | Scope | Progress | Status |
 |---|---|---:|---|
-| TIER 1 | Stage P overall |  95.9% | PENDING |
+| TIER 1 | Stage P overall |  92.1% | IN PROGRESS |
 | TIER 2 | Active Contabo production path | 100.0% | DONE |
-| TIER 3 | Archived OCI fallback / evidence |   0.0% | DONE |
+| TIER 3 | Archived OCI fallback / evidence |   0.0% | IN PROGRESS |
 | TIER 4 | Stage S + ML backlog | 100.0% | DONE |
 
 ### By Phase
@@ -57,6 +57,7 @@ How to read this:
 | P22 - Desktop Security and IP Hardening | [5/5] | 100.0% | DONE |
 | P23 - 4 GB Performance and Compatibility Certification | [0/5] |   0.0% | PENDING |
 | P24 - Windows Release Readiness and Docs Alignment ✅ DONE | [5/5] | 100.0% | DONE |
+| P25 - NY Lunch Trading Block ✅ IN PROGRESS | [0/5] |   0.0% | IN PROGRESS |
 | P26 - Contabo VPS Docker Compose Production Path 🔴 ACTIVE | [32/32] | 100.0% | DONE |
 | S1 - Trading Session Config Foundation | [11/11] | 100.0% | DONE |
 | S2 - BFF Multi-Instrument Routing | [7/7] | 100.0% | DONE |
@@ -319,6 +320,19 @@ Fallback-host note: `sslip.io` hosts (`173.249.18.14.sslip.io`) remain the activ
 - [ ] Validate degraded-network handling, reconnect flow, and forced logout behavior on desktop
 - [ ] Confirm the desktop release never starts local BFF or ML sidecar services
 
+### P25 - NY Lunch Trading Block ✅ IN PROGRESS
+- Implementation plan at `docs/superpowers/plans/2026-04-24-ny-lunch-trading-block.md`
+- Block all trading signals during NY lunch (12:00–1:00 PM ET, 9:30–10:30 PM IST during DST / 10:30–11:30 PM IST outside DST)
+- `isNyLunchBreakActive(istHour, istMinute)` gates `getMlConsensus` in BFF consensusEngine.mjs — returns NEUTRAL with lunch block reason
+- `checkNyLunchVeto()` added to BFF boardRoomService.mjs — RiskOfficer fires veto during lunch
+- `tradingHoursService.mjs` created as new BFF service with DST-aware time conversion
+- DOMAIN-RULES.md and EDGE-CASES.md updated with lunch block as hard trading rule
+- [ ] Task 1: Create `bff/services/tradingHoursService.mjs` + tests
+- [ ] Task 2: Update `bff/services/consensusEngine.mjs` — block ML call during lunch
+- [ ] Task 3: Update `bff/services/boardRoomService.mjs` — RiskOfficer lunch veto
+- [ ] Task 4: Document in DOMAIN-RULES.md and EDGE-CASES.md
+- [ ] Task 5: Verify end-to-end with BFF health check
+
 ### P24 - Windows Release Readiness and Docs Alignment ✅ DONE
 - [x] Add a Windows release workflow for building, signing, hashing, and publishing desktop artifacts
 - [x] Add install, update, rollback, and uninstall runbooks for the Windows desktop client
@@ -445,12 +459,12 @@ Fallback-host note: `sslip.io` hosts (`173.249.18.14.sslip.io`) remain the activ
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-24 01:46`  -  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-24 01:52`  -  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Stage P Backlog  95.9%  [#######################-]
-Sections        done 020 | active 000 | blocked 000 | archived 000 | pending 001 | total 022
-Checklist       done 116 | open 005 | total 121
+Stage P Backlog  92.1%  [######################--]
+Sections        done 020 | active 001 | blocked 000 | archived 000 | pending 001 | total 023
+Checklist       done 116 | open 010 | total 126
 ```
 
 | Section | Tasks | Progress | Status |
@@ -475,6 +489,7 @@ Checklist       done 116 | open 005 | total 121
 | P21 - Self-Update System | [5/5] | 100.0% | DONE |
 | P22 - Desktop Security and IP Hardening | [5/5] | 100.0% | DONE |
 | P23 - 4 GB Performance and Compatibility Certification | [0/5] |   0.0% | PENDING |
+| P25 - NY Lunch Trading Block ✅ IN PROGRESS | [0/5] |   0.0% | IN PROGRESS |
 | P24 - Windows Release Readiness and Docs Alignment ✅ DONE | [5/5] | 100.0% | DONE |
 
 <!-- live-status:end -->
