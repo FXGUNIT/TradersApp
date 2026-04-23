@@ -113,6 +113,19 @@ jobs:
             --output ".artifacts/pages-root/verification-${{ github.run_id }}.json" \
             --step-summary "${GITHUB_STEP_SUMMARY}"
 
+      - name: Summarize Pages verification report
+        if: always()
+        id: pages_summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/pages/summarize_pages_root_report.py \
+            --input ".artifacts/pages-root/verification-${{ github.run_id }}.json" \
+            --browser-input ".artifacts/pages-root/browser-${{ github.run_id }}.json" \
+            --markdown-out ".artifacts/pages-root/summary-${{ github.run_id }}.md" \
+            --step-summary "${GITHUB_STEP_SUMMARY}" \
+            --github-output "${GITHUB_OUTPUT}"
+
       - name: Upload Pages verification artifact
         if: always()
         uses: actions/upload-artifact@v4
@@ -122,6 +135,35 @@ jobs:
           if-no-files-found: ignore
           include-hidden-files: true
           retention-days: 14
+
+      - name: Send Pages verification alert
+        if: always()
+        shell: bash
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          set -euo pipefail
+          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          STATUS="success"
+          TITLE="Pages root deploy verification passed"
+          BODY="Root: https://tradergunit.pages.dev | Frontend: https://${{ vars.TRADERSAPP_DOMAIN }}/ | BFF: https://${{ vars.BFF_PUBLIC_HOST }}/health | API: https://${{ vars.API_PUBLIC_HOST }}/health"
+
+          if [ "${{ job.status }}" != "success" ]; then
+            STATUS="error"
+            TITLE="Pages root deploy or verification failed"
+            BODY="Failed checks: ${{ steps.pages_summary.outputs.failed_checks || 'unknown' }} | Artifact: pages-root-verification-${{ github.run_id }}"
+          elif [ "${{ steps.pages_summary.outputs.overall_status || 'success' }}" = "warning" ]; then
+            STATUS="warning"
+            TITLE="Pages root deploy verification passed with fallback hosts"
+            BODY="Artifact: pages-root-verification-${{ github.run_id }} | Fallback used: ${{ steps.pages_summary.outputs.fallback_used || 'false' }} | Runtime fallback hosts: ${{ steps.pages_summary.outputs.runtime_fallback_hosts || 'false' }}"
+          fi
+
+          python scripts/ci/send_webhook_alert.py \
+            --status "${STATUS}" \
+            --title "${TITLE}" \
+            --body "${BODY}" \
+            --run-url "${RUN_URL}"
 
       - name: Publish summary
         shell: bash
@@ -135,5 +177,6 @@ jobs:
             echo "- Build command: \`npm ci && npm run build\`"
             echo "- Deploy mode: \`wrangler pages deploy dist --project-name tradergunit\`"
             echo "- Browser contract: \`browser-${{ github.run_id }}.json\`"
+            echo "- Overall verification state: \`${{ steps.pages_summary.outputs.overall_status || 'unknown' }}\`"
             echo "- Verification artifact: \`pages-root-verification-${{ github.run_id }}\`"
           } >> "${GITHUB_STEP_SUMMARY}"

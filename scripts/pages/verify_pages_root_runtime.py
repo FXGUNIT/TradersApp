@@ -21,9 +21,12 @@ from urllib.request import Request, urlopen
 
 
 DEFAULT_ROOT_URL = "https://tradergunit.pages.dev"
-DEFAULT_BFF_BASE_URL = "https://bff.173.249.18.14.sslip.io"
-DEFAULT_API_BASE_URL = "https://api.173.249.18.14.sslip.io"
-DEFAULT_PROJECT_PREVIEW_URL = "https://173.249.18.14.sslip.io/"
+DEFAULT_BFF_BASE_URL = "https://bff.traders.app"
+DEFAULT_API_BASE_URL = "https://api.traders.app"
+DEFAULT_PROJECT_PREVIEW_URL = "https://traders.app/"
+DEFAULT_FALLBACK_BFF_BASE_URL = "https://bff.173.249.18.14.sslip.io"
+DEFAULT_FALLBACK_API_BASE_URL = "https://api.173.249.18.14.sslip.io"
+DEFAULT_FALLBACK_PROJECT_PREVIEW_URL = "https://173.249.18.14.sslip.io/"
 DEFAULT_TIMEOUT_SECONDS = 15.0
 EXPECTED_SECURITY_HEADERS = (
     "content-security-policy",
@@ -100,6 +103,50 @@ def parse_json_body(text: str) -> Any:
     return json.loads(text or "{}")
 
 
+def join_url(base_url: str, suffix: str) -> str:
+    base = normalize_url(base_url)
+    if not suffix:
+        return base
+    if suffix.startswith("/"):
+        return f"{base}{suffix}"
+    return f"{base}/{suffix}"
+
+
+def resolve_effective_url(
+    *,
+    requested_url: str,
+    fallback_url: str,
+    probe_suffix: str,
+    timeout: float,
+) -> dict[str, Any]:
+    requested = normalize_url(requested_url)
+    fallback = normalize_url(fallback_url)
+    requested_probe = join_url(requested, probe_suffix)
+
+    try:
+        read_text_response(requested_probe, timeout=timeout)
+        return {
+            "requested_url": requested,
+            "effective_url": requested,
+            "probe_url": requested_probe,
+            "used_fallback": False,
+            "fallback_reason": "",
+        }
+    except RuntimeError as requested_error:
+        if not fallback or fallback == requested:
+            raise
+
+        fallback_probe = join_url(fallback, probe_suffix)
+        read_text_response(fallback_probe, timeout=timeout)
+        return {
+            "requested_url": requested,
+            "effective_url": fallback,
+            "probe_url": fallback_probe,
+            "used_fallback": True,
+            "fallback_reason": str(requested_error),
+        }
+
+
 def root_page_check(root_url: str, timeout: float) -> CheckResult:
     status, headers, body = read_text_response(root_url, timeout=timeout)
     missing_headers = [
@@ -172,7 +219,7 @@ def bff_get_check(
     allow_origin = headers.get("access-control-allow-origin")
     ok = status == 200 and allow_origin == origin
     if require_ok and isinstance(json_body, dict):
-      ok = ok and json_body.get("ok") is True
+        ok = ok and json_body.get("ok") is True
     detail = f"HTTP {status}; allow-origin={allow_origin!r}"
     if isinstance(json_body, dict) and json_body.get("ok") is False:
         detail += "; payload ok=false"
@@ -299,6 +346,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--bff-base-url", default=DEFAULT_BFF_BASE_URL)
     parser.add_argument("--api-base-url", default=DEFAULT_API_BASE_URL)
     parser.add_argument("--project-preview-url", default=DEFAULT_PROJECT_PREVIEW_URL)
+    parser.add_argument("--fallback-bff-base-url", default=DEFAULT_FALLBACK_BFF_BASE_URL)
+    parser.add_argument("--fallback-api-base-url", default=DEFAULT_FALLBACK_API_BASE_URL)
+    parser.add_argument(
+        "--fallback-project-preview-url",
+        default=DEFAULT_FALLBACK_PROJECT_PREVIEW_URL,
+    )
     parser.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT_SECONDS)
     parser.add_argument("--output", required=True)
     parser.add_argument("--step-summary", default="")
@@ -314,51 +367,80 @@ def main() -> int:
     normalized_bff_base_url = normalize_url(args.bff_base_url)
     normalized_api_base_url = normalize_url(args.api_base_url)
     normalized_project_preview_url = normalize_url(args.project_preview_url) + "/"
+    normalized_fallback_bff_base_url = normalize_url(args.fallback_bff_base_url)
+    normalized_fallback_api_base_url = normalize_url(args.fallback_api_base_url)
+    normalized_fallback_project_preview_url = (
+        normalize_url(args.fallback_project_preview_url) + "/"
+    )
     origin = root_origin(normalized_root_url)
+
+    project_preview_target = resolve_effective_url(
+        requested_url=normalized_project_preview_url,
+        fallback_url=normalized_fallback_project_preview_url,
+        probe_suffix="",
+        timeout=args.timeout,
+    )
+    api_target = resolve_effective_url(
+        requested_url=normalized_api_base_url,
+        fallback_url=normalized_fallback_api_base_url,
+        probe_suffix="/health",
+        timeout=args.timeout,
+    )
+    bff_target = resolve_effective_url(
+        requested_url=normalized_bff_base_url,
+        fallback_url=normalized_fallback_bff_base_url,
+        probe_suffix="/health",
+        timeout=args.timeout,
+    )
 
     checks = [
         root_page_check(normalized_root_url, args.timeout),
-        project_preview_check(normalized_project_preview_url, args.timeout),
-        api_health_check(normalized_api_base_url, args.timeout),
+        project_preview_check(project_preview_target["effective_url"], args.timeout),
+        api_health_check(api_target["effective_url"], args.timeout),
         bff_get_check(
             "bff_health",
             "/health",
-            bff_base_url=normalized_bff_base_url,
+            bff_base_url=bff_target["effective_url"],
             origin=origin,
             timeout=args.timeout,
         ),
         bff_get_check(
             "bff_ai_status",
             "/ai/status",
-            bff_base_url=normalized_bff_base_url,
+            bff_base_url=bff_target["effective_url"],
             origin=origin,
             timeout=args.timeout,
         ),
         bff_get_check(
             "bff_news_breaking",
             "/news/breaking?fresh=true&max=5",
-            bff_base_url=normalized_bff_base_url,
+            bff_base_url=bff_target["effective_url"],
             origin=origin,
             timeout=args.timeout,
         ),
         bff_get_check(
             "bff_support_threads",
             "/support/threads",
-            bff_base_url=normalized_bff_base_url,
+            bff_base_url=bff_target["effective_url"],
             origin=origin,
             timeout=args.timeout,
         ),
-        trade_calc_check(normalized_bff_base_url, origin, args.timeout),
-        admin_verify_negative_check(normalized_bff_base_url, origin, args.timeout),
+        trade_calc_check(bff_target["effective_url"], origin, args.timeout),
+        admin_verify_negative_check(bff_target["effective_url"], origin, args.timeout),
     ]
 
     report = {
         "generated_at": now_utc_iso(),
         "ok": all(check.ok for check in checks),
         "root_url": normalized_root_url,
-        "bff_base_url": normalized_bff_base_url,
-        "api_base_url": normalized_api_base_url,
-        "project_preview_url": normalized_project_preview_url,
+        "bff_base_url": bff_target["effective_url"],
+        "api_base_url": api_target["effective_url"],
+        "project_preview_url": project_preview_target["effective_url"],
+        "target_resolution": {
+            "project_preview": project_preview_target,
+            "api": api_target,
+            "bff": bff_target,
+        },
         "checks": [asdict(check) for check in checks],
     }
 

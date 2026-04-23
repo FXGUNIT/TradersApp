@@ -3,22 +3,18 @@ name: Verify Pages Root Runtime
 on:
   workflow_dispatch:
     inputs:
-      root_url:
-        description: "Cloudflare Pages root URL"
+      frontend_host:
+        description: "Frontend project preview host"
         required: false
-        default: "https://tradergunit.pages.dev"
-      bff_base_url:
-        description: "Public BFF base URL"
+        default: "traders.app"
+      bff_host:
+        description: "Public BFF host"
         required: false
-        default: ""
-      api_base_url:
-        description: "Public API base URL"
+        default: "bff.traders.app"
+      api_host:
+        description: "Public API host"
         required: false
-        default: ""
-      project_preview_url:
-        description: "Current project preview URL"
-        required: false
-        default: ""
+        default: "api.traders.app"
       timeout_seconds:
         description: "Probe timeout in seconds"
         required: false
@@ -57,38 +53,13 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Resolve runtime URLs
-        id: runtime
-        shell: bash
-        run: |
-          set -euo pipefail
-          BFF_BASE_URL="${{ inputs.bff_base_url }}"
-          API_BASE_URL="${{ inputs.api_base_url }}"
-          PROJECT_PREVIEW_URL="${{ inputs.project_preview_url }}"
-
-          if [ -z "${BFF_BASE_URL}" ]; then
-            BFF_BASE_URL="https://${{ vars.BFF_PUBLIC_HOST }}"
-          fi
-          if [ -z "${API_BASE_URL}" ]; then
-            API_BASE_URL="https://${{ vars.API_PUBLIC_HOST }}"
-          fi
-          if [ -z "${PROJECT_PREVIEW_URL}" ]; then
-            PROJECT_PREVIEW_URL="https://${{ vars.TRADERSAPP_DOMAIN }}/"
-          fi
-
-          {
-            echo "bff_base_url=${BFF_BASE_URL}"
-            echo "api_base_url=${API_BASE_URL}"
-            echo "project_preview_url=${PROJECT_PREVIEW_URL}"
-          } >> "${GITHUB_OUTPUT}"
-
       - name: Verify browser-rendered landing page
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p .artifacts/pages-root
           node scripts/pages/verify_pages_root_browser.mjs \
-            --url "${{ inputs.root_url }}" \
+            --url "https://tradergunit.pages.dev" \
             --output ".artifacts/pages-root/browser-${{ github.run_id }}.json"
 
       - name: Verify Pages root runtime
@@ -97,13 +68,26 @@ jobs:
           set -euo pipefail
           mkdir -p .artifacts/pages-root
           python scripts/pages/verify_pages_root_runtime.py \
-            --root-url "${{ inputs.root_url }}" \
-            --bff-base-url "${{ steps.runtime.outputs.bff_base_url }}" \
-            --api-base-url "${{ steps.runtime.outputs.api_base_url }}" \
-            --project-preview-url "${{ steps.runtime.outputs.project_preview_url }}" \
+            --root-url "https://tradergunit.pages.dev" \
+            --bff-base-url "https://${{ inputs.bff_host }}" \
+            --api-base-url "https://${{ inputs.api_host }}" \
+            --project-preview-url "https://${{ inputs.frontend_host }}/" \
             --timeout "${{ inputs.timeout_seconds }}" \
             --output ".artifacts/pages-root/verification-${{ github.run_id }}.json" \
             --step-summary "${GITHUB_STEP_SUMMARY}"
+
+      - name: Summarize Pages verification report
+        if: always()
+        id: pages_summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/pages/summarize_pages_root_report.py \
+            --input ".artifacts/pages-root/verification-${{ github.run_id }}.json" \
+            --browser-input ".artifacts/pages-root/browser-${{ github.run_id }}.json" \
+            --markdown-out ".artifacts/pages-root/summary-${{ github.run_id }}.md" \
+            --step-summary "${GITHUB_STEP_SUMMARY}" \
+            --github-output "${GITHUB_OUTPUT}"
 
       - name: Upload verification artifact
         if: always()
@@ -114,3 +98,32 @@ jobs:
           if-no-files-found: ignore
           include-hidden-files: true
           retention-days: 14
+
+      - name: Send verification alert
+        if: always()
+        shell: bash
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          set -euo pipefail
+          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          STATUS="success"
+          TITLE="Pages root verification passed"
+          BODY="Root: https://tradergunit.pages.dev | Frontend: https://${{ inputs.frontend_host }}/ | BFF: https://${{ inputs.bff_host }}/health | API: https://${{ inputs.api_host }}/health"
+
+          if [ "${{ job.status }}" != "success" ]; then
+            STATUS="error"
+            TITLE="Pages root verification failed"
+            BODY="Failed checks: ${{ steps.pages_summary.outputs.failed_checks || 'unknown' }} | Artifact: pages-root-verification-${{ github.run_id }}"
+          elif [ "${{ steps.pages_summary.outputs.overall_status || 'success' }}" = "warning" ]; then
+            STATUS="warning"
+            TITLE="Pages root verification passed with fallback hosts"
+            BODY="Artifact: pages-root-verification-${{ github.run_id }} | Fallback used: ${{ steps.pages_summary.outputs.fallback_used || 'false' }} | Runtime fallback hosts: ${{ steps.pages_summary.outputs.runtime_fallback_hosts || 'false' }}"
+          fi
+
+          python scripts/ci/send_webhook_alert.py \
+            --status "${STATUS}" \
+            --title "${TITLE}" \
+            --body "${BODY}" \
+            --run-url "${RUN_URL}"
