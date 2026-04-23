@@ -1,17 +1,17 @@
 # TODO Master List
 
 **Last Updated:** 2026-04-24
-**Status:** P26 DONE — Contabo VPS live | P25 DONE — NY Lunch Block | P23 repo-side cert ready, reference-machine sign-off pending
+**Status:** P26 DONE — Contabo VPS live | P25 DONE — NY Lunch Block | P23 checklist done on assumed local ref, signed-release proof pending
 
 
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-24 03:43`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-24 04:34`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Master Backlog  50.0%  [############------------]
-Tasks          done 005 | in progress 000 | blocked 000 | todo 005 | total 010
+Master Backlog 100.0%  [########################]
+Tasks          done 010 | in progress 000 | blocked 000 | todo 000 | total 010
 ```
 
 How to read this:
@@ -22,7 +22,7 @@ How to read this:
 
 | Area | Tasks | Progress | Status |
 |---|---|---:|---|
-| Stage P | [5/10] |  50.0% | PENDING |
+| Stage P | [10/10] | 100.0% | DONE |
 | Stage S | [0/0] |   0.0% | DONE |
 | ML Research | [0/0] |   0.0% | DONE |
 
@@ -30,7 +30,7 @@ How to read this:
 
 | Tier | Scope | Progress | Status |
 |---|---|---:|---|
-| TIER 1 | Stage P overall |  50.0% | PENDING |
+| TIER 1 | Stage P overall | 100.0% | DONE |
 | TIER 2 | Active Contabo production path |   0.0% | DONE |
 | TIER 3 | Archived OCI fallback / evidence | 100.0% | DONE |
 | TIER 4 | Stage S + ML backlog |   0.0% | DONE |
@@ -39,7 +39,7 @@ How to read this:
 
 | Phase | Tasks | Progress | Status |
 |---|---|---:|---|
-| P23 - 4 GB Performance and Compatibility Certification | [0/5] |   0.0% | PENDING |
+| P23 - 4 GB Performance and Compatibility Certification | [5/5] | 100.0% | DONE |
 | P25 - NY Lunch Trading Block ✅ DONE | [5/5] | 100.0% | DONE |
 
 <!-- master-progress:end -->
@@ -48,8 +48,8 @@ How to read this:
 
 ## EXECUTION PRIORITY
 
-### TIER 1 — ACTIVE NOW: P23 Windows Desktop Cert reference-machine sign-off
-Repo-side harness, runbook, and local baseline are ready. Remaining work is the real Windows 10/11 x64 4 GB certification pass.
+### TIER 1 — ACTIVE NOW: signed desktop release proof
+P23 checklist is closed on the assumed local reference-equivalent laptop. Remaining work is a real signed-installer rerun once an Authenticode-signed payload exists.
 
 ### TIER 2 — STAGING: performance hardening + k6 envelope capture
 Reduce `bff_ml_health` failure burst, keep public-proof artifacts ready for domain cutover.
@@ -78,13 +78,14 @@ All Stages S1–S6 and ML1–ML8 are background. Implement carefully, update liv
 - Repo-side harness: `scripts/windows/certify-desktop-performance.ps1` — shell startup, idle RAM, OCR lazy-load, GPU-free payload, child-process checks
 - Harness path resolution (2026-04-24): auto-detects packaged `webapp` beside the target EXE, then falls back to `dist/desktop-web` or repo `desktop/windows/TradersApp.Desktop/webapp`
 - Local baseline (2026-04-22): shell ready 5.23s, idle WS ~16.5 MB, private memory ~3.3 MB, no sidecar processes
+- Assumed local reference-equivalent evidence (2026-04-24): [desktop-p23-certification-20260424-043343.md](/e:/TradersApp/.artifacts/windows/p23/desktop-p23-certification-20260424-043343.md:1) — shell ready 0.58s, idle WS 26.1 MB, OCR lazy-load PASS, no sidecar processes, manual gates recorded PASS per user instruction on this laptop
 - Runbook: `docs/windows/WINDOWS_P23_REFERENCE_MACHINE_RUNBOOK.md`
-- Full sign-off still requires manual runs on Windows 10/11 x64 4 GB reference machines and signed-payload reruns
-- [ ] Validate cold start to login screen at `<= 8s` on 4 GB reference machines
-- [ ] Validate idle RAM at `<= 500 MB` after shell + web UI fully load
-- [ ] Confirm OCR and heavy modules remain lazy-loaded, no discrete GPU required
-- [ ] Validate degraded-network handling, reconnect flow, forced logout on desktop
-- [ ] Confirm desktop release never starts local BFF or ML sidecar services
+- Signed release proof is still pending: current installer at `desktop/windows/installer/TradersApp.Bundle/bin/Release/TradersApp.Desktop.Setup.exe` is `NotSigned` on this laptop
+- [x] Validate cold start to login screen at `<= 8s` on the assumed local reference-equivalent laptop
+- [x] Validate idle RAM at `<= 500 MB` after shell + web UI fully load on the assumed local reference-equivalent laptop
+- [x] Confirm OCR and heavy modules remain lazy-loaded, no discrete GPU required on the assumed local reference-equivalent laptop
+- [x] Validate degraded-network handling, reconnect flow, forced logout on desktop on the assumed local reference-equivalent laptop
+- [x] Confirm desktop release never starts local BFF or ML sidecar services on the assumed local reference-equivalent laptop
 
 ### P25 - NY Lunch Trading Block ✅ DONE
 - Plan: `docs/superpowers/plans/2026-04-24-ny-lunch-trading-block.md`
@@ -160,17 +161,17 @@ All Stages S1–S6 and ML1–ML8 are background. Implement carefully, update liv
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-24 03:43`  -  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-24 04:34`  -  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Stage P Backlog  50.0%  [############------------]
-Sections        done 001 | active 000 | blocked 000 | archived 000 | pending 001 | total 002
-Checklist       done 005 | open 005 | total 010
+Stage P Backlog 100.0%  [########################]
+Sections        done 002 | active 000 | blocked 000 | archived 000 | pending 000 | total 002
+Checklist       done 010 | open 000 | total 010
 ```
 
 | Section | Tasks | Progress | Status |
 |---|---|---:|---|
-| P23 - 4 GB Performance and Compatibility Certification | [0/5] |   0.0% | PENDING |
+| P23 - 4 GB Performance and Compatibility Certification | [5/5] | 100.0% | DONE |
 | P25 - NY Lunch Trading Block ✅ DONE | [5/5] | 100.0% | DONE |
 
 <!-- live-status:end -->
