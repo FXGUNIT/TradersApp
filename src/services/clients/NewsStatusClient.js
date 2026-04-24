@@ -1,5 +1,25 @@
 import { bffFetch, hasBff } from "../gateways/base.js";
 
+// Direct fetch for fallback chain — bypasses hasBff() cooldown gate so news never
+// shows offline just because one consensus call triggered a cooldown window.
+const directFetch = async (path) => {
+  try {
+    const url = buildFallbackUrl(path);
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+};
+
+function buildFallbackUrl(path) {
+  // Mirror bffFetch's URL building: use VITE_BFF_URL if set, else relative
+  const base = String(import.meta.env.VITE_BFF_URL || "").trim();
+  if (!base) return path;
+  return path.startsWith("/") ? `${base}${path}` : `${base}/${path}`;
+}
+
 export const NEWS_STATUS_REFRESH_MS = 5 * 60 * 1000;
 const SCHEDULED_NEWS_ACTIVE_WINDOW_MIN = 60;
 const SCHEDULED_NEWS_RECENT_WINDOW_MIN = -15;
@@ -132,9 +152,11 @@ export async function fetchNewsSystemStatus() {
   }
 
   // Fallback: call news endpoints directly (ML consensus may fail if no candles loaded)
+  // Use directFetch to bypass hasBff() cooldown gate — news should never show "offline"
+  // just because one unrelated consensus call triggered the 2-minute cooldown window.
   const [breaking, upcoming] = await Promise.all([
-    bffFetch("/news/breaking?fresh=true"),
-    bffFetch("/news/upcoming"),
+    directFetch("/news/breaking?fresh=true"),
+    directFetch("/news/upcoming"),
   ]);
 
   console.debug("[NewsStatus] fallback — breaking:", breaking ? "ok" : "null", "upcoming:", upcoming ? "ok" : "null");
