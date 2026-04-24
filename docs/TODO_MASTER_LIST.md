@@ -7,11 +7,11 @@
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-24 06:34`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-24 06:48`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Master Backlog 100.0%  [########################]
-Tasks          done 010 | in progress 000 | blocked 000 | todo 000 | total 010
+Master Backlog  94.7%  [#######################-]
+Tasks          done 018 | in progress 000 | blocked 000 | todo 001 | total 019
 ```
 
 How to read this:
@@ -22,7 +22,7 @@ How to read this:
 
 | Area | Tasks | Progress | Status |
 |---|---|---:|---|
-| Stage P | [10/10] | 100.0% | DONE |
+| Stage P | [18/19] |  94.7% | IN PROGRESS |
 | Stage S | [0/0] |   0.0% | DONE |
 | ML Research | [0/0] |   0.0% | DONE |
 
@@ -30,7 +30,8 @@ How to read this:
 
 | Tier | Scope | Progress | Status |
 |---|---|---:|---|
-| TIER 1 | Stage P overall | 100.0% | DONE |
+| TIER 1 | Stage P overall |  94.7% | IN PROGRESS |
+| TIER 2 | Active Contabo production path |  88.9% | IN PROGRESS |
 
 ### By Phase
 
@@ -38,6 +39,7 @@ How to read this:
 |---|---|---:|---|
 | P23 - 4 GB Performance and Compatibility Certification | [5/5] | 100.0% | DONE |
 | P25 - NY Lunch Trading Block ✅ DONE | [5/5] | 100.0% | DONE |
+| P26 - Pages Root Live + Critical Bug Fixes ✅ DONE | [8/9] |  88.9% | IN PROGRESS |
 
 <!-- master-progress:end -->
 
@@ -110,6 +112,37 @@ All Stages S1–S6 and ML1–ML8 are background. Implement carefully, update liv
 - [x] Task 4: Document in `DOMAIN-RULES.md` and `EDGE-CASES.md` ✅ DONE
 - [x] Task 5: Verify end-to-end — BFF /health verified ✅ DONE
 
+### P26 - Pages Root Live + Critical Bug Fixes ✅ DONE
+- Plan: `C:\Users\Asus\.claude\plans\partitioned-coalescing-snowglobe.md`
+- Canonical app now serves at `https://tradergunit.pages.dev` (full trading app, not developer landing)
+- `tradergunit.pages.dev` removed from `DEV_ROOT_HOSTS` in `src/App.jsx`
+- Cloudflare Pages direct upload with `_headers` CSP + `connect-src` allowlist for all BFF/AI hosts
+
+**Bug 1 — DNS/CERT error on other devices (NOT YET RESOLVED — human action required):**
+- Symptom: `NET::ERR_CERT_COMMON_NAME_INVALID` on devices whose DNS resolves `tradergunit.pages.dev` to Contabo IP instead of Cloudflare
+- Root cause: Device DNS cache resolves directly to Contabo VPS (173.249.18.14), which has a cert for `*.sslip.io`, not for `*.pages.dev`
+- Fix: Flush DNS on affected devices — `ipconfig /flushdns` (Windows) or equivalent. Cloudflare DNS (1.1.1.1) resolves correctly to 172.66.45.30/172.66.46.226
+- Cloudflare DNS is working correctly — confirmed via `nslookup tradergunit.pages.dev 1.1.1.1` → Cloudflare IPs
+- DNS propagation is a client-side issue, not a server or code issue
+
+**Bug 2 — LIVE NEWS + SCHEDULED NEWS showing OFFLINE (FIXED):**
+- Root cause: Browser extension injects `x-tradersapp-install-id` header into all cross-origin XHR/fetch requests
+- Extension header not in BFF CORS `Access-Control-Allow-Headers` whitelist → preflight fails → request blocked
+- Fix A (frontend): Strip all `x-tradersapp-*` headers before fetch in `src/services/gateways/base.js`
+- Fix B (BFF): Add `x-tradersapp-install-id` to CORS allowlist in `bff/server.mjs`
+- NewsStatusClient fallback: Added `/news/breaking?fresh=true` + `/news/upcoming` direct fallback when `/ml/consensus` returns null (no candle data yet)
+- NewsStatusClient shape fix: Handle `/news/upcoming` direct response shape (`trade_allowed`, `next_event`) vs ML consensus shape (`news.trade_allowed`)
+
+- [x] Task 1: Remove `tradergunit.pages.dev` from `DEV_ROOT_HOSTS` → full app renders on Pages ✅ DONE
+- [x] Task 2: Fix edge healthcheck HTTP/80 (was probing HTTPS/443) in `deploy/contabo/docker-compose.yml` ✅ DONE
+- [x] Task 3: Remove dead `is-a.dev` Caddyfile blocks in `deploy/contabo/Caddyfile` ✅ DONE
+- [x] Task 4: Update workflow input defaults to sslip.io hosts (domain-free strategy) ✅ DONE
+- [x] Task 5: Deploy Contabo — BFF image baked with all 9 API keys from GitHub Secrets/Infisical ✅ DONE
+- [x] Task 6: Fix NewsStatusClient fallback chain — direct `/news/breaking` + `/news/upcoming` when ML consensus fails ✅ DONE
+- [x] Task 7: Strip `x-tradersapp-*` extension headers in `bffFetch` (`src/services/gateways/base.js`) ✅ DONE
+- [x] Task 8: Add `x-tradersapp-install-id` to BFF CORS allowlist (`bff/server.mjs`) ✅ DONE
+- [ ] Task 9: Bug 1 — Human flushes DNS on affected devices (`ipconfig /flushdns`) to resolve CERT errors — no code fix available
+
 > **Archived OCI / A1 fallback scope:** If that path reopens, see `docs/OCI-DEPLOYMENT-RUNBOOK.md`, `docs/SETUP.md`, `docs/STAGE_P_DNS_SETUP.md`, `docs/STAGE_P_24X7_EXECUTION_CHECKLIST.md`
 
 ---
@@ -170,17 +203,18 @@ All Stages S1–S6 and ML1–ML8 are background. Implement carefully, update liv
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-24 06:34`  -  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-24 06:48`  -  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Stage P Backlog 100.0%  [########################]
-Sections        done 002 | active 000 | blocked 000 | archived 000 | pending 000 | total 002
-Checklist       done 010 | open 000 | total 010
+Stage P Backlog  94.7%  [#######################-]
+Sections        done 002 | active 000 | blocked 000 | archived 000 | pending 001 | total 003
+Checklist       done 018 | open 001 | total 019
 ```
 
 | Section | Tasks | Progress | Status |
 |---|---|---:|---|
 | P23 - 4 GB Performance and Compatibility Certification | [5/5] | 100.0% | DONE |
 | P25 - NY Lunch Trading Block ✅ DONE | [5/5] | 100.0% | DONE |
+| P26 - Pages Root Live + Critical Bug Fixes ✅ DONE | [8/9] |  88.9% | PENDING |
 
 <!-- live-status:end -->
