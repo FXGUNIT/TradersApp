@@ -7,7 +7,7 @@
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-24 05:59`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-24 06:34`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Master Backlog 100.0%  [########################]
@@ -67,6 +67,15 @@ All Stages S1–S6 and ML1–ML8 are background. Implement carefully, update liv
 - `sslip.io` hosts are the Contabo runtime proof surface (bff, api, frontend)
 - Do not treat `traders.app` or `tradergunit.is-a.dev` as active targets unless explicitly reopened
 - `isNyLunchBreakActive` gates all trading signals (12:00–1:00 PM ET, DST-aware IST conversion)
+
+## LAUNCH READINESS AUDIT - 2026-04-24
+
+- Web production build: `npm.cmd run build` PASS.
+- Lint gate: `npm.cmd run lint` PASS at error level; 11 non-blocking warnings remain for later cleanup.
+- Cross-browser Playwright suite: `npm.cmd run test:e2e:playwright` PASS, 54 passed / 42 skipped by existing test gates.
+- Desktop UI audit sweep: [report-2026-04-24T00-57-25-676Z.json](/e:/TradersApp/artifacts/ui-audit/report-2026-04-24T00-57-25-676Z.json:1) PASS, 10/10 scenarios, 0 issues, 0 page errors, 0 request failures.
+- Mobile UI audit sweep: [report-2026-04-24T01-00-06-171Z.json](/e:/TradersApp/artifacts/ui-audit/report-2026-04-24T01-00-06-171Z.json:1) PASS, 10/10 scenarios, 0 issues, 0 page errors, 0 request failures.
+- Audit runner hardening: navigation timeout is now configurable via `UI_AUDIT_NAVIGATION_TIMEOUT_MS` and defaults to 90 seconds to avoid false failures on cold Vite starts.
 
 ---
 
@@ -161,7 +170,7 @@ All Stages S1–S6 and ML1–ML8 are background. Implement carefully, update liv
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-24 05:59`  -  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-24 06:34`  -  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Stage P Backlog 100.0%  [########################]
