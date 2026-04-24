@@ -10,6 +10,9 @@ const BASE_URL_CANDIDATES = process.env.UI_AUDIT_URL
   ? [process.env.UI_AUDIT_URL]
   : ["http://localhost", "http://localhost:5173"];
 const HEADLESS = process.env.UI_AUDIT_HEADLESS !== "false";
+const NAVIGATION_TIMEOUT_MS = Number(
+  process.env.UI_AUDIT_NAVIGATION_TIMEOUT_MS || 90000,
+);
 const OUTPUT_DIR = path.join(ROOT, "artifacts", "ui-audit");
 const SCREENSHOT_DIR = path.join(OUTPUT_DIR, "screens");
 const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
@@ -195,7 +198,10 @@ async function resolveBaseUrl() {
 }
 
 async function gotoApp(page, baseUrl) {
-  await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
+  await page.goto(baseUrl, {
+    waitUntil: "domcontentloaded",
+    timeout: NAVIGATION_TIMEOUT_MS,
+  });
   await page.waitForLoadState("networkidle").catch(() => {});
   await waitForHarness(page);
 }
