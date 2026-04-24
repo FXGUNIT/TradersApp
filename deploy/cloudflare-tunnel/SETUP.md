@@ -26,7 +26,6 @@ No paid domain is required.
 ```bash
 npx wrangler login
 ```
-
 3. Verify authentication:
 
 ```bash
@@ -63,4 +62,3 @@ deploy/cloudflare-tunnel/
     wrangler.toml  # Free workers.dev deployment config
   SETUP.md
 ```
-
