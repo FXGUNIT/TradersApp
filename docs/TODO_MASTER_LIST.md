@@ -7,7 +7,7 @@
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-24 05:26`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-24 05:48`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Master Backlog 100.0%  [########################]
@@ -31,9 +31,6 @@ How to read this:
 | Tier | Scope | Progress | Status |
 |---|---|---:|---|
 | TIER 1 | Stage P overall | 100.0% | DONE |
-| TIER 2 | Active Contabo production path |   0.0% | DONE |
-| TIER 3 | Archived OCI fallback / evidence | 100.0% | DONE |
-| TIER 4 | Stage S + ML backlog |   0.0% | DONE |
 
 ### By Phase
 
@@ -162,7 +159,7 @@ All Stages S1–S6 and ML1–ML8 are background. Implement carefully, update liv
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-24 05:26`  -  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-24 05:48`  -  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Stage P Backlog 100.0%  [########################]
