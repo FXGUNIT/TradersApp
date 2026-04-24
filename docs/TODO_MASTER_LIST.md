@@ -7,7 +7,7 @@
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-25 03:43`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-25 03:52`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Master Backlog  90.0%  [######################--]
@@ -129,6 +129,7 @@ All Stages S1–S6 and ML1–ML8 are background. Implement carefully, update liv
 - We do not own or pay for `traders.app`; do not use `api.traders.app`, `bff.traders.app`, or any other `traders.app` hostname as an active target.
 - Keep Pages pointed at the working free backend host: `https://bff.173.249.18.14.sslip.io`
 - If a Cloudflare Worker proxy is needed later without buying a domain, use a free `workers.dev` hostname after Cloudflare/Wrangler authentication is available. Do not switch `VITE_BFF_URL` until the new free Worker URL returns `/health` successfully.
+- Cleanup note (2026-04-25): active build defaults, CSP, runtime examples, k6 public-edge defaults, Vercel CSP, and optional Worker docs/config now point at the free `pages.dev` + `sslip.io` path instead of unpaid `traders.app` hostnames.
 
 **Bug 2 — LIVE NEWS + SCHEDULED NEWS showing OFFLINE (FIXED):**
 - Root cause: Browser extension injects `x-tradersapp-install-id` header into all cross-origin XHR/fetch requests
@@ -211,7 +212,7 @@ All Stages S1–S6 and ML1–ML8 are background. Implement carefully, update liv
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-25 03:43`  -  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-25 03:52`  -  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Stage P Backlog  90.0%  [######################--]

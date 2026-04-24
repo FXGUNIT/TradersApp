@@ -8,8 +8,6 @@ workers_dev = true
 # workers.dev hostname after Wrangler/Cloudflare authentication is available.
 # Do not configure api.traders.app or any traders.app route; that domain is not owned.
 
-vars = {
-  PREVIEW_MODE = "false",
-  UPSTREAM_BFF_URL = "https://bff.173.249.18.14.sslip.io"
-}
-
+[vars]
+PREVIEW_MODE = "false"
+UPSTREAM_BFF_URL = "https://bff.173.249.18.14.sslip.io"

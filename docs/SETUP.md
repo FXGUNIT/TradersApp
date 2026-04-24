@@ -1,6 +1,6 @@
 # TradersApp — Production Deployment Guide (OCI k3s)
 
-> **Archived reference only.** The active production path is `Contabo VPS + Docker Compose`, not OCI k3s. Use [P26_Contabo_Deployment_Plan.md](/e:/TradersApp/docs/P26_Contabo_Deployment_Plan.md:1) and [TODO_MASTER_LIST.md](/e:/TradersApp/docs/TODO_MASTER_LIST.md:1) for the current deployment path.
+> **Archived reference only.** The active production path is `Contabo VPS + Docker Compose`, not OCI k3s. We do not own or pay for `traders.app`; ignore the DNS/domain instructions below unless a future paid-domain plan is explicitly reopened. Use [P26_Contabo_Deployment_Plan.md](/e:/TradersApp/docs/P26_Contabo_Deployment_Plan.md:1) and [TODO_MASTER_LIST.md](/e:/TradersApp/docs/TODO_MASTER_LIST.md:1) for the current no-owned-domain deployment path.
 
 **Time to complete: ~30 minutes.** This document is retained only as historical OCI/k3s evidence.
 

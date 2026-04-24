@@ -20,7 +20,7 @@
         { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=()" },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.gstatic.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https: blob:; connect-src 'self' https://*.traders.app wss://*.traders.app https://identitytoolkit.googleapis.com https://firestore.googleapis.com https://*.firebaseio.com https://*.googleapis.com https://generativelanguage.googleapis.com https://api.groq.com https://openrouter.ai https://api.cerebras.ai https://api.deepseek.com https://api.sambanova.cloud; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.gstatic.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https: blob:; connect-src 'self' https://173.249.18.14.sslip.io https://bff.173.249.18.14.sslip.io https://api.173.249.18.14.sslip.io https://identitytoolkit.googleapis.com https://firestore.googleapis.com https://*.firebaseio.com https://*.googleapis.com https://generativelanguage.googleapis.com https://api.groq.com https://openrouter.ai https://api.cerebras.ai https://api.deepseek.com https://api.sambanova.cloud; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
         }
       ]
     },

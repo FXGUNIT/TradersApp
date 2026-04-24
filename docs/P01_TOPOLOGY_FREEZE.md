@@ -1,7 +1,9 @@
 # P01 Topology Freeze
 
 **Date:** 2026-04-15 IST  
-**Status:** Accepted (Stage P baseline)
+**Status:** Archived (superseded Stage P baseline)
+
+> This file is historical only. We do not own or pay for `traders.app`, and the active production path is now `https://tradergunit.pages.dev` plus the free `sslip.io` Contabo hosts. Do not use the Vercel/Railway `traders.app` topology below unless a future paid-domain plan is explicitly reopened.
 
 ## Decision
 
@@ -36,4 +38,3 @@ Freeze Stage P production topology to **Option A: Vercel + Railway + Infisical +
 - `.github/workflows/ci.yml` defines `deploy-production` with Railway + Vercel production steps.
 - `.github/workflows/infisical-sync.yml` defines Infisical -> Railway/Vercel secret propagation.
 - `.github/workflows/monitor.yml` defines 5-minute public health checks and alert hooks.
-

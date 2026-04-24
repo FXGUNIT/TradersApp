@@ -1,30 +1,28 @@
-# Cloudflare Wrangler Config — traders.app
-# Used for managing DNS, WAF rules, and Workers via CLI.
-# Copy to wrangler.toml (without .example) and add your CLOUDFLARE_API_TOKEN.
+# Cloudflare Wrangler Config - optional free workers.dev experiments.
+# Do not configure traders.app routes here; that domain is not owned.
+# Used for managing Workers via CLI after Cloudflare auth is available.
 #
 # Install: npm install -g wrangler
-# Auth:    wrangler auth
-# Deploy:  wrangler deploy
+# Auth:    npx wrangler login
+# Deploy:  npx wrangler deploy
 #
-# NOTE: This config manages Cloudflare Workers/routes for the app.
-# DNS records and WAF rules are managed via the Cloudflare Dashboard.
-# See docs/DEPLOYMENT.md for the full WAF setup guide.
+# DNS records and WAF rules are not part of the active no-owned-domain path.
+# See deploy/cloudflare-tunnel/SETUP.md for the optional workers.dev proxy.
 
 name = "traders-app"
 main = "src/index.ts"
-compatibility_date = "2024-01-01"
+compatibility_date = "2026-04-24"
 compatibility_flags = ["nodejs_compat"]
+workers_dev = true
 
-# Environment variables (set via `wrangler secret put` or Cloudflare dashboard)
 [vars]
 ENVIRONMENT = "production"
 
-# Secrets — set via:
+# Secrets - set via:
 # wrangler secret put BFF_URL
 # wrangler secret put ML_ENGINE_URL
-# DO NOT commit actual values here
+# DO NOT commit actual values here.
 
-# Workers KV for caching
 [[kv_namespaces]]
 binding = "MODEL_CACHE"
 id = "<KV_NAMESPACE_ID>"
@@ -33,20 +31,16 @@ id = "<KV_NAMESPACE_ID>"
 binding = "SESSION_CACHE"
 id = "<KV_NAMESPACE_ID>"
 
-# D1 Database (SQLite on Cloudflare edge — optional upgrade path)
 # [[d1_databases]]
 # binding = "TRADING_DB"
 # database_name = "traders-app"
 # database_id = "<D1_DATABASE_ID>"
 
-# Custom build for Workers
-# Workers don't run Node.js natively — use edge-compatible code
-# This is for future Cloudflare Workers features (rate limiting, edge auth)
 [build]
 command = "npm run build:worker"
 cwd = "."
 
-# Dev settings
 [dev]
 port = 8787
 local_protocol = "http"
+

@@ -24,10 +24,10 @@
   - [scripts/contabo/deploy.sh](/e:/TradersApp/scripts/contabo/deploy.sh:1)
   - [docs/P26_Contabo_Deployment_Plan.md](/e:/TradersApp/docs/P26_Contabo_Deployment_Plan.md:1)
 
-`traders.app` is not currently under repo-controlled DNS. Treat older
+`traders.app` is not owned or paid for in the active project. Treat older
 `traders.app` references in archived OCI sections below as historical context,
-not as the live Contabo target. The user-facing frontend entry point is
-`https://tradergunit.pages.dev/`.
+not as the live Contabo target and not as a task to pursue. The user-facing
+frontend entry point is `https://tradergunit.pages.dev/`.
 
 ## Archived OCI Reference
 

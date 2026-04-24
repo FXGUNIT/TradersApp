@@ -2,18 +2,18 @@
  * Contabo public-edge k6 suite.
  *
  * This suite intentionally targets the active public host layout:
- *   - traders.app         -> Caddy edge
- *   - bff.traders.app     -> BFF direct host
- *   - api.traders.app     -> ML Engine direct host
+ *   - 173.249.18.14.sslip.io         -> Caddy edge
+ *   - bff.173.249.18.14.sslip.io     -> BFF direct host
+ *   - api.173.249.18.14.sslip.io     -> ML Engine direct host
  *
  * It avoids stale /api/consensus assumptions and instead exercises
  * low-blast-radius public routes plus direct ML inference.
  *
  * Usage:
  *   k6 run tests/load/k6/contabo-public-edge.js
- *   TRADERSAPP_BASE_URL=https://traders.app \
- *   BFF_BASE_URL=https://bff.traders.app \
- *   ML_BASE_URL=https://api.traders.app \
+ *   TRADERSAPP_BASE_URL=https://173.249.18.14.sslip.io \
+ *   BFF_BASE_URL=https://bff.173.249.18.14.sslip.io \
+ *   ML_BASE_URL=https://api.173.249.18.14.sslip.io \
  *   k6 run tests/load/k6/contabo-public-edge.js
  */
 
@@ -21,9 +21,9 @@ import http from 'k6/http';
 import { check, sleep } from 'k6';
 import { Rate, Trend } from 'k6/metrics';
 
-const TRADERSAPP_BASE_URL = (__ENV.TRADERSAPP_BASE_URL || 'https://traders.app').replace(/\/$/, '');
-const BFF_BASE_URL = (__ENV.BFF_BASE_URL || 'https://bff.traders.app').replace(/\/$/, '');
-const ML_BASE_URL = (__ENV.ML_BASE_URL || 'https://api.traders.app').replace(/\/$/, '');
+const TRADERSAPP_BASE_URL = (__ENV.TRADERSAPP_BASE_URL || 'https://173.249.18.14.sslip.io').replace(/\/$/, '');
+const BFF_BASE_URL = (__ENV.BFF_BASE_URL || 'https://bff.173.249.18.14.sslip.io').replace(/\/$/, '');
+const ML_BASE_URL = (__ENV.ML_BASE_URL || 'https://api.173.249.18.14.sslip.io').replace(/\/$/, '');
 
 const EDGE_TARGET_VUS = Number(__ENV.EDGE_TARGET_VUS || 10);
 const BFF_TARGET_VUS = Number(__ENV.BFF_TARGET_VUS || 5);
