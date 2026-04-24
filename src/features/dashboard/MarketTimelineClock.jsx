@@ -40,14 +40,18 @@ function formatCountdown(ms) {
 }
 
 export function MarketTimelineClock({ marketNow, observedAtMs }) {
-  const [nowMs, setNowMs] = useState(Date.now());
+  const [nowMs, setNowMs] = useState(0);
 
   useEffect(() => {
-    const interval = setInterval(() => setNowMs(Date.now()), 1000);
+    const updateClock = () => setNowMs(Date.now());
+    updateClock();
+
+    const interval = setInterval(updateClock, 1000);
     return () => clearInterval(interval);
   }, []);
 
-  const elapsedSinceFetch = Math.max(nowMs - (observedAtMs || nowMs), 0);
+  const effectiveNowMs = nowMs || observedAtMs || 0;
+  const elapsedSinceFetch = Math.max(effectiveNowMs - (observedAtMs || effectiveNowMs), 0);
   const remainingMs = Math.max((marketNow?.timeToNextEventMs || 0) - elapsedSinceFetch, 0);
 
   return (

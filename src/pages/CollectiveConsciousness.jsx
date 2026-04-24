@@ -66,6 +66,8 @@ const COLLECTIVE_CONSCIOUSNESS_WINDOW_MS = 24 * 60 * 60 * 1000;
 const COLLECTIVE_CONSCIOUSNESS_STANDARD_LIMIT = 10;
 const COLLECTIVE_CONSCIOUSNESS_PREMIUM_LIMIT = 50;
 const BFF_API_BASE = resolveBffBaseUrl();
+const SHOW_LEGACY_COLLECTIVE_CHAT_LAYOUT =
+  import.meta.env.VITE_SHOW_LEGACY_COLLECTIVE_CHAT_LAYOUT === 'true';
 
 function getPhaseStatus(index, activeIndex, isProcessing, hasConversation) {
   if (!isProcessing) {
@@ -178,7 +180,7 @@ export default function CollectiveConsciousness({
     status: 'idle',
     message: '',
   });
-  const [, setClockNow] = useState(Date.now());
+  const [, setClockNow] = useState(0);
   const engineMode = (() => {
     const h = getISTState().h;
     return (h >= 8 && h < 17) ? 'fast' : 'full';
@@ -542,7 +544,7 @@ User Question: ${trimmed}`;
         handleKeyDown={handleKeyDown}
         auraColors={AURA_COLORS}
       />
-      {false && (
+      {SHOW_LEGACY_COLLECTIVE_CHAT_LAYOUT && (
       <div style={{
         flex: 1,
         overflowY: 'auto',
@@ -836,7 +838,7 @@ User Question: ${trimmed}`;
       )}
       </>)}  {/* closes ternary: : ( <div>...chat...</div> ) */}
       {/* Input bar */}
-      {false && (
+      {SHOW_LEGACY_COLLECTIVE_CHAT_LAYOUT && (
       <div style={{
         padding: '16px 20px',
         borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
