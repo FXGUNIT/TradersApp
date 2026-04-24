@@ -8,10 +8,10 @@ COPY package*.json ./
 RUN npm ci
 COPY . .
 
-# Build arg for Contabo (Caddy handles routing, nginx serves static files only)
-# Override at build time: --build-arg VITE_BFF_URL=https://bff.traders.app
-ARG VITE_BFF_URL=https://bff.traders.app
-ARG VITE_API_URL=https://api.traders.app
+# Build arg for the no-owned-domain Contabo path.
+# Do not default to traders.app hostnames; that domain is not owned.
+ARG VITE_BFF_URL=https://bff.173.249.18.14.sslip.io
+ARG VITE_API_URL=https://api.173.249.18.14.sslip.io
 ENV VITE_BFF_URL=${VITE_BFF_URL}
 ENV VITE_API_URL=${VITE_API_URL}
 

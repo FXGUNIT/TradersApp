@@ -1,76 +1,68 @@
 /**
- * TradersApp BFF Proxy — Cloudflare Worker
- * Proxies all /ml/*, /news/*, /identity/* etc. requests from the browser
- * to the Contabo BFF via an encrypted Cloudflare Tunnel.
+ * Optional TradersApp BFF proxy for Cloudflare's free workers.dev hostname.
  *
- * Why: Contabo VPS has a self-signed cert for *.sslip.io but NOT for *.pages.dev.
- * Devices whose DNS bypasses Cloudflare resolve tradergunit.pages.dev → Contabo IP
- * directly → browser rejects the cert → all BFF calls fail silently.
+ * Current production already works with:
+ *   https://bff.173.249.18.14.sslip.io
  *
- * Solution: Browser connects to this Worker at api.traders.app (Cloudflare-issued cert).
- * Worker forwards via Cloudflare Tunnel to Contabo BFF on the private network.
- * Browser sees Cloudflare's valid cert. Cert mismatch eliminated at the routing layer.
- *
- * Setup:
- *   1. Create Cloudflare Tunnel: dashboard.zero-trust.com → Networks → Tunnels
- *   2. Note the tunnel TOKEN (keep secret — goes in CONTABO_APP_ENV)
- *   3. Add DNS CNAME: api.traders.app → <tunnel-id>.cfargotunnel.com (Cloudflare Proxy enabled)
- *   4. Deploy this Worker to api.traders.app route
- *   5. Update VITE_BFF_URL in Pages deploy to: https://api.traders.app
- *   6. Add api.traders.app to BFF CORS ALLOWED_ORIGINS on Contabo
- *
- * Cloudflare Tunnel runs on Contabo (cloudflared daemon) and creates an encrypted
- * Wireguard-style path to Cloudflare's edge. No ports exposed to the public internet.
+ * Do not use api.traders.app or bff.traders.app here; traders.app is not owned.
+ * This Worker simply forwards selected BFF paths to the active free sslip.io BFF.
  */
 
-const CONTABO_BFF_HOST = "localhost"; // Tunneled — cloudflared routes to this internally
-const CONTABO_BFF_PORT = "8788";
-const TUNNEL_HOST_HEADER = "bff-internal"; // Host header sent to Contabo Caddy
+const DEFAULT_UPSTREAM_BFF_URL = "https://bff.173.249.18.14.sslip.io";
+
+const PROXY_PATH_PREFIXES = [
+  "/admin",
+  "/ai-status",
+  "/board-room",
+  "/calendar",
+  "/content",
+  "/health",
+  "/identity",
+  "/ml",
+  "/news",
+  "/onboarding",
+  "/support",
+  "/telegram",
+  "/terminal",
+  "/terminal-analytics",
+  "/trade-calc",
+];
+
+function corsHeaders(origin = "*") {
+  return {
+    "Access-Control-Allow-Origin": origin || "*",
+    "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
+    "Access-Control-Allow-Headers":
+      "Content-Type, Authorization, Idempotency-Key, X-Request-ID, x-tradersapp-install-id",
+  };
+}
 
 export default {
-  async fetch(request, env, ctx) {
+  async fetch(request, env) {
     const url = new URL(request.url);
+    const origin = request.headers.get("origin") || "*";
 
-    // Only proxy BFF API paths — don't touch static assets or other routes
-    if (!url.pathname.startsWith("/ml") &&
-        !url.pathname.startsWith("/news") &&
-        !url.pathname.startsWith("/identity") &&
-        !url.pathname.startsWith("/terminal") &&
-        !url.pathname.startsWith("/onboarding") &&
-        !url.pathname.startsWith("/support") &&
-        !url.pathname.startsWith("/content") &&
-        !url.pathname.startsWith("/board-room") &&
-        !url.pathname.startsWith("/calendar") &&
-        !url.pathname.startsWith("/trade-calc") &&
-        !url.pathname.startsWith("/telegram") &&
-        !url.pathname.startsWith("/health") &&
-        !url.pathname.startsWith("/ai-status") &&
-        !url.pathname.startsWith("/terminal-analytics") &&
-        !url.pathname.startsWith("/admin")) {
-      return fetch(request);
+    if (request.method === "OPTIONS") {
+      return new Response(null, { status: 204, headers: corsHeaders(origin) });
     }
 
-    // Build the upstream URL — preserve path and query
-    const upstreamUrl = `http://${CONTABO_BFF_HOST}:${CONTABO_BFF_PORT}${url.pathname}${url.search}`;
+    if (!PROXY_PATH_PREFIXES.some((prefix) => url.pathname.startsWith(prefix))) {
+      return new Response("Not found", {
+        status: 404,
+        headers: { "Content-Type": "text/plain", ...corsHeaders(origin) },
+      });
+    }
 
+    const base = String(env.UPSTREAM_BFF_URL || DEFAULT_UPSTREAM_BFF_URL).replace(/\/+$/, "");
+    const upstreamUrl = `${base}${url.pathname}${url.search}`;
     const headers = new Headers(request.headers);
 
-    // Normalize Host so Contabo Caddy routes correctly
-    headers.set("Host", TUNNEL_HOST_HEADER);
-
-    // Remove headers that cloudflared or CF edge might add — let BFF control everything
-    headers.delete("cf-connecting-ip"); // CF-specific, not needed by BFF
+    headers.delete("cf-connecting-ip");
     headers.delete("cf-ray");
     headers.delete("cf-request-id");
     headers.delete("cf-visitor");
     headers.delete("cf-warp-tier");
-
-    // Set correct origin for BFF CORS evaluation
-    const origin = headers.get("origin") || "";
-    if (origin) {
-      // The upstream BFF on Contabo evaluates this origin against ALLOWED_ORIGINS
-      headers.set("origin", origin);
-    }
+    headers.set("host", new URL(base).host);
 
     try {
       const response = await fetch(upstreamUrl, {
@@ -78,18 +70,20 @@ export default {
         headers,
         body: request.body,
         redirect: "follow",
-        // Short timeout — don't let the browser hang on tunnel issues
         signal: AbortSignal.timeout(15_000),
       });
 
-      // Stream the response back — preserve all BFF headers (CORS, content-type, etc.)
+      const responseHeaders = new Headers(response.headers);
+      for (const [key, value] of Object.entries(corsHeaders(origin))) {
+        responseHeaders.set(key, value);
+      }
+
       return new Response(response.body, {
         status: response.status,
         statusText: response.statusText,
-        headers: response.headers,
+        headers: responseHeaders,
       });
     } catch (err) {
-      // Tunnel unreachable or BFF down — return a JSON error so callers can handle it
       const isTimeout = err instanceof Error && err.name === "TimeoutError";
       return new Response(
         JSON.stringify({
@@ -99,14 +93,10 @@ export default {
         }),
         {
           status: 502,
-          headers: {
-            "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": origin || "*",
-            "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
-            "Access-Control-Allow-Headers": "Content-Type, Authorization, Idempotency-Key, X-Request-ID, x-tradersapp-install-id",
-          },
+          headers: { "Content-Type": "application/json", ...corsHeaders(origin) },
         }
       );
     }
   },
 };
+
