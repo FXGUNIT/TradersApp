@@ -1,13 +1,13 @@
 # TODO Master List
 
 **Last Updated:** 2026-04-24
-**Status:** P26 DONE — Contabo VPS live | P25 DONE — NY Lunch Block | P23 DONE | local signed-release proof DONE
+**Status:** P26 DONE — Contabo VPS live | P25 DONE — NY Lunch Block | web app is canonical | desktop proof archived/optional
 
 
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-24 05:48`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-24 05:59`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Master Backlog 100.0%  [########################]
@@ -45,8 +45,8 @@ How to read this:
 
 ## EXECUTION PRIORITY
 
-### TIER 1 — ACTIVE NOW: no open Stage P checklist items
-P23 and the local signed-release proof are closed on this laptop. Public production signing still belongs to the GitHub Actions release workflow when a CA-backed certificate is required.
+### TIER 1 — ACTIVE NOW: web app remains the only canonical product path
+Desktop proof is closed and retained only as optional local evidence. Resume Windows release/signing work only if public desktop distribution becomes a real requirement.
 
 ### TIER 2 — STAGING: performance hardening + k6 envelope capture
 Reduce `bff_ml_health` failure burst, keep public-proof artifacts ready for domain cutover.
@@ -62,6 +62,7 @@ All Stages S1–S6 and ML1–ML8 are background. Implement carefully, update liv
 ## PRODUCTION CONSTRAINTS
 
 - Canonical public frontend: `https://tradergunit.pages.dev/`
+- Canonical product path: web app first; Windows desktop packaging is optional and non-blocking
 - Backend runtime edge: single Contabo VPS (`173.249.18.14`) via Docker Compose + GitHub Actions
 - `sslip.io` hosts are the Contabo runtime proof surface (bff, api, frontend)
 - Do not treat `traders.app` or `tradergunit.is-a.dev` as active targets unless explicitly reopened
@@ -69,9 +70,10 @@ All Stages S1–S6 and ML1–ML8 are background. Implement carefully, update liv
 
 ---
 
-## STAGE P — Live Backlog
+## STAGE P — Completed Record
 
 ### P23 - 4 GB Performance and Compatibility Certification
+- Non-blocking for the current product direction: retained as optional desktop evidence, not as active web-app work
 - Repo-side harness: `scripts/windows/certify-desktop-performance.ps1` — shell startup, idle RAM, OCR lazy-load, GPU-free payload, child-process checks
 - Harness path resolution (2026-04-24): auto-detects packaged `webapp` beside the target EXE, then falls back to `dist/desktop-web` or repo `desktop/windows/TradersApp.Desktop/webapp`
 - Local baseline (2026-04-22): shell ready 5.23s, idle WS ~16.5 MB, private memory ~3.3 MB, no sidecar processes
@@ -159,7 +161,7 @@ All Stages S1–S6 and ML1–ML8 are background. Implement carefully, update liv
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-24 05:48`  -  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-24 05:59`  -  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Stage P Backlog 100.0%  [########################]
