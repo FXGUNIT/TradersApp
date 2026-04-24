@@ -7,11 +7,11 @@
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-25 03:29`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-25 03:33`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Master Backlog  94.7%  [#######################-]
-Tasks          done 018 | in progress 000 | blocked 000 | todo 001 | total 019
+Master Backlog  90.0%  [######################--]
+Tasks          done 018 | in progress 000 | blocked 000 | todo 002 | total 020
 ```
 
 How to read this:
@@ -22,7 +22,7 @@ How to read this:
 
 | Area | Tasks | Progress | Status |
 |---|---|---:|---|
-| Stage P | [18/19] |  94.7% | IN PROGRESS |
+| Stage P | [18/20] |  90.0% | IN PROGRESS |
 | Stage S | [0/0] |   0.0% | DONE |
 | ML Research | [0/0] |   0.0% | DONE |
 
@@ -30,8 +30,8 @@ How to read this:
 
 | Tier | Scope | Progress | Status |
 |---|---|---:|---|
-| TIER 1 | Stage P overall |  94.7% | IN PROGRESS |
-| TIER 2 | Active Contabo production path |  88.9% | IN PROGRESS |
+| TIER 1 | Stage P overall |  90.0% | IN PROGRESS |
+| TIER 2 | Active Contabo production path |  80.0% | IN PROGRESS |
 
 ### By Phase
 
@@ -39,7 +39,7 @@ How to read this:
 |---|---|---:|---|
 | P23 - 4 GB Performance and Compatibility Certification | [5/5] | 100.0% | DONE |
 | P25 - NY Lunch Trading Block ✅ DONE | [5/5] | 100.0% | DONE |
-| P26 - Pages Root Live + Critical Bug Fixes ✅ DONE | [8/9] |  88.9% | IN PROGRESS |
+| P26 - Pages Root Live + Critical Bug Fixes ✅ DONE | [8/10] |  80.0% | IN PROGRESS |
 
 <!-- master-progress:end -->
 
@@ -125,6 +125,11 @@ All Stages S1–S6 and ML1–ML8 are background. Implement carefully, update liv
 - Cloudflare DNS is working correctly — confirmed via `nslookup tradergunit.pages.dev 1.1.1.1` → Cloudflare IPs
 - DNS propagation is a client-side issue, not a server or code issue
 
+**Cloudflare Worker path - api.traders.app (HUMAN ACTION REQUIRED):**
+- Status: Not deployed in this session; keep Pages pointed at `https://bff.173.249.18.14.sslip.io` until the Cloudflare zone, tunnel connector, proxied DNS record, Worker route, and Contabo CORS are verified together.
+- Runbook: `deploy/cloudflare-tunnel/SETUP.md` and Worker source `deploy/cloudflare-tunnel/bff-worker/`
+- Required human/dashboard steps: confirm `traders.app` is managed in Cloudflare, create or verify the `tradersapp-contabo` tunnel token, add the proxied `api.traders.app` route/CNAME, deploy the Worker with a Cloudflare-authenticated account, then switch `VITE_BFF_URL` to `https://api.traders.app` only after `curl -sI https://api.traders.app/health` returns HTTP 200 with a valid Cloudflare certificate.
+
 **Bug 2 — LIVE NEWS + SCHEDULED NEWS showing OFFLINE (FIXED):**
 - Root cause: Browser extension injects `x-tradersapp-install-id` header into all cross-origin XHR/fetch requests
 - Extension header not in BFF CORS `Access-Control-Allow-Headers` whitelist → preflight fails → request blocked
@@ -143,6 +148,8 @@ All Stages S1–S6 and ML1–ML8 are background. Implement carefully, update liv
 - [x] Task 7: Strip `x-tradersapp-*` extension headers in `bffFetch` (`src/services/gateways/base.js`) ✅ DONE
 - [x] Task 8: Add `x-tradersapp-install-id` to BFF CORS allowlist (`bff/server.mjs`) ✅ DONE
 - [ ] Task 9: Bug 1 — Human flushes DNS on affected devices (`ipconfig /flushdns`) to resolve CERT errors — no code fix available
+
+- [ ] Task 10: Deploy Cloudflare Worker to `api.traders.app` after the Cloudflare tunnel/DNS route is confirmed by a human in the Cloudflare dashboard
 
 > **Archived OCI / A1 fallback scope:** If that path reopens, see `docs/OCI-DEPLOYMENT-RUNBOOK.md`, `docs/SETUP.md`, `docs/STAGE_P_DNS_SETUP.md`, `docs/STAGE_P_24X7_EXECUTION_CHECKLIST.md`
 
@@ -204,18 +211,18 @@ All Stages S1–S6 and ML1–ML8 are background. Implement carefully, update liv
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-25 03:29`  -  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-25 03:33`  -  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Stage P Backlog  94.7%  [#######################-]
+Stage P Backlog  90.0%  [######################--]
 Sections        done 002 | active 000 | blocked 000 | archived 000 | pending 001 | total 003
-Checklist       done 018 | open 001 | total 019
+Checklist       done 018 | open 002 | total 020
 ```
 
 | Section | Tasks | Progress | Status |
 |---|---|---:|---|
 | P23 - 4 GB Performance and Compatibility Certification | [5/5] | 100.0% | DONE |
 | P25 - NY Lunch Trading Block ✅ DONE | [5/5] | 100.0% | DONE |
-| P26 - Pages Root Live + Critical Bug Fixes ✅ DONE | [8/9] |  88.9% | PENDING |
+| P26 - Pages Root Live + Critical Bug Fixes ✅ DONE | [8/10] |  80.0% | PENDING |
 
 <!-- live-status:end -->
