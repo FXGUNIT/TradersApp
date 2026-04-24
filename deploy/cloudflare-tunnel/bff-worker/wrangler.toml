@@ -1,0 +1,20 @@
+name = "tradersapp-bff-proxy"
+main = "index.js"
+compatibility_date = "2026-04-24"
+compatibility_flags = ["nodejs_compat"]
+
+# Route: api.traders.app
+# Create zone for traders.app in Cloudflare dashboard first, then:
+# wrangler routes add --pattern api.traders.app --bucket tradersapp-pages-deploy/dist
+
+# Secrets needed (set via `wrangler secret`):
+# TUNNEL_TOKEN — from Cloudflare Zero Trust dashboard → Networks → Tunnels
+# CONTABO_BFF_HOST — internal hostname cloudflared connects to (usually localhost or container name)
+
+# Environment bindings
+vars = { PREVIEW_MODE = "false" }
+
+# Durable Object for optional connection pooling (future optimization)
+# [[durable_objects.bindings]]
+# name = "BFF_SESSION"
+# class_name = "BffSessionPool"
