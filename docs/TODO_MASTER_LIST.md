@@ -7,7 +7,7 @@
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-25 01:53`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-25 03:29`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Master Backlog  94.7%  [#######################-]
@@ -132,6 +132,7 @@ All Stages S1–S6 and ML1–ML8 are background. Implement carefully, update liv
 - Fix B (BFF): Add `x-tradersapp-install-id` to CORS allowlist in `bff/server.mjs`
 - NewsStatusClient fallback: Added `/news/breaking?fresh=true` + `/news/upcoming` direct fallback when `/ml/consensus` returns null (no candle data yet)
 - NewsStatusClient shape fix: Handle `/news/upcoming` direct response shape (`trade_allowed`, `next_event`) vs ML consensus shape (`news.trade_allowed`)
+- Live verification (2026-04-24T21:59Z): `https://tradergunit.pages.dev` serves `index-RY75e0Pd.js`; the bundle contains `https://bff.173.249.18.14.sslip.io` and the news direct fetch fallback marker; BFF `/news/breaking?fresh=true`, `/news/upcoming`, and `/ml/consensus?session=1` all return usable JSON for the NewsStatusClient path.
 
 - [x] Task 1: Remove `tradergunit.pages.dev` from `DEV_ROOT_HOSTS` → full app renders on Pages ✅ DONE
 - [x] Task 2: Fix edge healthcheck HTTP/80 (was probing HTTPS/443) in `deploy/contabo/docker-compose.yml` ✅ DONE
@@ -203,7 +204,7 @@ All Stages S1–S6 and ML1–ML8 are background. Implement carefully, update liv
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-25 01:53`  -  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-25 03:29`  -  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Stage P Backlog  94.7%  [#######################-]
