@@ -154,7 +154,7 @@ export async function fetchNewsSystemStatus() {
   // Fallback: call news endpoints directly (ML consensus may fail if no candles loaded)
   // Use directFetch to bypass hasBff() cooldown gate — news should never show "offline"
   // just because one unrelated consensus call triggered the 2-minute cooldown window.
-  console.debug("[NewsStatus] entering fallback chain — ML consensus unavailable");
+  console.debug("[NewsStatus] ML consensus unavailable — entering news direct fetch fallback");
   const [breaking, upcoming] = await Promise.all([
     bffDirectFetchMarker_v2("/news/breaking?fresh=true"),
     bffDirectFetchMarker_v2("/news/upcoming"),
