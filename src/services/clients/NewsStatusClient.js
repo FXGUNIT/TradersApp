@@ -2,7 +2,7 @@ import { bffFetch, hasBff } from "../gateways/base.js";
 
 // Direct fetch for fallback chain — bypasses hasBff() cooldown gate so news never
 // shows offline just because one consensus call triggered a cooldown window.
-const directFetch = async (path) => {
+const bffDirectFetchMarker_v2 = async (path) => {
   try {
     const url = buildFallbackUrl(path);
     const res = await fetch(url);
@@ -155,8 +155,8 @@ export async function fetchNewsSystemStatus() {
   // Use directFetch to bypass hasBff() cooldown gate — news should never show "offline"
   // just because one unrelated consensus call triggered the 2-minute cooldown window.
   const [breaking, upcoming] = await Promise.all([
-    directFetch("/news/breaking?fresh=true"),
-    directFetch("/news/upcoming"),
+    bffDirectFetchMarker_v2("/news/breaking?fresh=true"),
+    bffDirectFetchMarker_v2("/news/upcoming"),
   ]);
 
   console.debug("[NewsStatus] fallback — breaking:", breaking ? "ok" : "null", "upcoming:", upcoming ? "ok" : "null");
