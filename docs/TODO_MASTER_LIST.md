@@ -7,7 +7,7 @@
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-25 03:33`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-25 03:43`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Master Backlog  90.0%  [######################--]
@@ -125,10 +125,10 @@ All Stages S1–S6 and ML1–ML8 are background. Implement carefully, update liv
 - Cloudflare DNS is working correctly — confirmed via `nslookup tradergunit.pages.dev 1.1.1.1` → Cloudflare IPs
 - DNS propagation is a client-side issue, not a server or code issue
 
-**Cloudflare Worker path - api.traders.app (HUMAN ACTION REQUIRED):**
-- Status: Not deployed in this session; keep Pages pointed at `https://bff.173.249.18.14.sslip.io` until the Cloudflare zone, tunnel connector, proxied DNS record, Worker route, and Contabo CORS are verified together.
-- Runbook: `deploy/cloudflare-tunnel/SETUP.md` and Worker source `deploy/cloudflare-tunnel/bff-worker/`
-- Required human/dashboard steps: confirm `traders.app` is managed in Cloudflare, create or verify the `tradersapp-contabo` tunnel token, add the proxied `api.traders.app` route/CNAME, deploy the Worker with a Cloudflare-authenticated account, then switch `VITE_BFF_URL` to `https://api.traders.app` only after `curl -sI https://api.traders.app/health` returns HTTP 200 with a valid Cloudflare certificate.
+**No-owned-domain backend path (CORRECTED):**
+- We do not own or pay for `traders.app`; do not use `api.traders.app`, `bff.traders.app`, or any other `traders.app` hostname as an active target.
+- Keep Pages pointed at the working free backend host: `https://bff.173.249.18.14.sslip.io`
+- If a Cloudflare Worker proxy is needed later without buying a domain, use a free `workers.dev` hostname after Cloudflare/Wrangler authentication is available. Do not switch `VITE_BFF_URL` until the new free Worker URL returns `/health` successfully.
 
 **Bug 2 — LIVE NEWS + SCHEDULED NEWS showing OFFLINE (FIXED):**
 - Root cause: Browser extension injects `x-tradersapp-install-id` header into all cross-origin XHR/fetch requests
@@ -149,7 +149,7 @@ All Stages S1–S6 and ML1–ML8 are background. Implement carefully, update liv
 - [x] Task 8: Add `x-tradersapp-install-id` to BFF CORS allowlist (`bff/server.mjs`) ✅ DONE
 - [ ] Task 9: Bug 1 — Human flushes DNS on affected devices (`ipconfig /flushdns`) to resolve CERT errors — no code fix available
 
-- [ ] Task 10: Deploy Cloudflare Worker to `api.traders.app` after the Cloudflare tunnel/DNS route is confirmed by a human in the Cloudflare dashboard
+- [ ] Task 10: Optional no-owned-domain Worker proxy: use a free `workers.dev` URL only after Wrangler/Cloudflare auth is available and `/health` verifies end to end
 
 > **Archived OCI / A1 fallback scope:** If that path reopens, see `docs/OCI-DEPLOYMENT-RUNBOOK.md`, `docs/SETUP.md`, `docs/STAGE_P_DNS_SETUP.md`, `docs/STAGE_P_24X7_EXECUTION_CHECKLIST.md`
 
@@ -211,7 +211,7 @@ All Stages S1–S6 and ML1–ML8 are background. Implement carefully, update liv
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-25 03:33`  -  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-25 03:43`  -  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Stage P Backlog  90.0%  [######################--]
