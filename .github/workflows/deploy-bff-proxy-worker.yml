@@ -20,91 +20,23 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Test token and discover account
-        id: discover
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Deploy Worker via Wrangler v3
         run: |
           set -euo pipefail
-
-          echo "=== Testing cfat token against Cloudflare API ==="
-
-          # Step 1: Check if token is set (not the placeholder)
-          if [ "$CLOUDFLARE_API_TOKEN" = "${{ secrets.CLOUDFLARE_API_TOKEN }}" ] || [ -z "$CLOUDFLARE_API_TOKEN" ]; then
-            echo "ERROR: CLOUDFLARE_API_TOKEN is not set or is still the template variable"
-            echo "Token value: $CLOUDFLARE_API_TOKEN"
-            exit 1
-          fi
-
-          echo "Token prefix: ${CLOUDFLARE_API_TOKEN:0:5}"
-          echo "Token length: ${#CLOUDFLARE_API_TOKEN}"
-
-          # Step 2: Test against /accounts (no X-Auth-Email needed)
-          echo ""
-          echo "=== Test 1: GET /accounts with Bearer token only ==="
-          RESP1=$(curl -s "https://api.cloudflare.com/client/v4/accounts" \
-            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-            -H "Content-Type: application/json")
-          echo "$RESP1" | python3 -c "import json,sys; d=json.load(sys.stdin); print('success:', d.get('success'), '| errors:', d.get('errors', []))"
-
-          # Step 3: Test against /accounts with X-Auth-Email too
-          echo ""
-          echo "=== Test 2: GET /accounts with Bearer + X-Auth-Email ==="
-          RESP2=$(curl -s "https://api.cloudflare.com/client/v4/accounts" \
-            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-            -H "X-Auth-Email: $CLOUDFLARE_EMAIL")
-          echo "$RESP2" | python3 -c "import json,sys; d=json.load(sys.stdin); print('success:', d.get('success'), '| errors:', d.get('errors', []))"
-
-          # Step 4: Try Workers Scripts API
-          ACCOUNT_ID="0f779fe4981d424548a48856cc9139db"
-          echo ""
-          echo "=== Test 3: GET Workers Scripts with Bearer + X-Auth-Email ==="
-          RESP3=$(curl -s "https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/workers/scripts/tradersapp-bff-proxy" \
-            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-            -H "X-Auth-Email: $CLOUDFLARE_EMAIL")
-          echo "$RESP3" | python3 -c "import json,sys; d=json.load(sys.stdin); print('success:', d.get('success'), '| errors:', d.get('errors', []))"
-
-          # Get account ID from /accounts response
-          ACCOUNTS=$(curl -s "https://api.cloudflare.com/client/v4/accounts" \
-            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN")
-          ACCOUNT_ID=$(echo "$ACCOUNTS" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('result', [{}])[0].get('id',''))" 2>/dev/null)
-          echo ""
-          echo "Discovered account_id=$ACCOUNT_ID"
-          echo "account_id=$ACCOUNT_ID" >> $GITHUB_OUTPUT
-
-      - name: Deploy Worker via Workers Scripts API
-        run: |
-          set -euo pipefail
-          ACCOUNT_ID="${{ steps.discover.outputs.account_id }}"
-          WORKER_NAME="tradersapp-bff-proxy"
-          DIST_FILE="deploy/cloudflare-tunnel/bff-worker/index.js"
+          cd deploy/cloudflare-tunnel/bff-worker
 
           echo "=== Deploying BFF Proxy Worker ==="
-          echo "Account: $ACCOUNT_ID"
-          echo "Worker: $WORKER_NAME"
+          echo "Worker URL: https://tradersapp-bff-proxy.\${CLOUDFLARE_WORKERS_SUBDOMAIN}.workers.dev"
 
-          if [ ! -f "$DIST_FILE" ]; then
-            echo "ERROR: $DIST_FILE not found"
-            exit 1
-          fi
+          # Wrangler v3 doesn't call /user/tokens/verify — works with cfat_ tokens
+          # Use --nodejs flag to explicitly bundle without ES module validation
+          npx wrangler@3.103.0 deploy \
+            --name tradersapp-bff-proxy \
+            --no-bundle
 
-          echo ""
-          echo "=== Uploading script (PUT /workers/scripts/{name}/content) ==="
-          # Use application/javascript as required by Workers runtime
-          RESP=$(curl -s -w "\nHTTP_CODE:%{http_code}" -X PUT "https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/workers/scripts/${WORKER_NAME}/content" \
-            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-            -H "X-Auth-Email: $CLOUDFLARE_EMAIL" \
-            -H "Content-Type: application/javascript" \
-            --data-binary "@$DIST_FILE")
-          HTTP_CODE=$(echo "$RESP" | tail -1 | cut -d: -f2)
-          BODY=$(echo "$RESP" | sed '$d')
-          echo "HTTP_CODE: $HTTP_CODE"
-          echo "BODY: $BODY"
-
-          if [ "$HTTP_CODE" = "200" ]; then
-            echo ""
-            echo "=== Worker deployed successfully ==="
-          else
-            echo ""
-            echo "=== Deploy failed ==="
-            echo "$BODY" | python3 -c "import json,sys; d=json.load(sys.stdin); [print('ERROR:', e.get('message', str(e))) for e in d.get('errors', [])]"
-            exit 1
-          fi
+          echo "=== Worker deployed successfully ==="
