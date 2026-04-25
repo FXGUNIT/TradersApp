@@ -46,18 +46,17 @@ if (!ACCOUNT_ID || !PROJECT_NAME) {
 const API_BASE = "https://api.cloudflare.com/client/v4/accounts";
 
 async function cfFetch(path, options = {}) {
-  const token   = process.env.CLOUDFLARE_API_TOKEN;
-  const email   = process.env.CLOUDFLARE_EMAIL;
-  if (!token || !email) throw new Error("CLOUDFLARE_API_TOKEN + CLOUDFLARE_EMAIL env vars required");
+  const token = process.env.CLOUDFLARE_API_TOKEN;
+  const email = process.env.CLOUDFLARE_EMAIL;
+  if (!token) throw new Error("CLOUDFLARE_API_TOKEN env var required");
+
+  const headers = { Authorization: `Bearer ${token}` };
+  if (email) headers["X-Auth-Email"] = email;
 
   const url = `${API_BASE}/${ACCOUNT_ID}${path}`;
   const res = await fetch(url, {
     ...options,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "X-Auth-Email": email,
-      ...(options.headers || {}),
-    },
+    headers: { ...headers, ...(options.headers || {}) },
   });
 
   const json = await res.json();
