@@ -78,13 +78,62 @@ import pandas as pd
 import sys, os
 from typing import Optional, Tuple
 from dataclasses import dataclass, field
-from scipy.special import gamma as gamma_func
-from scipy.optimize import brentq
-from scipy.ndimage import gaussian_filter
+from math import gamma as gamma_func
 import warnings
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 import config
+
+
+def _brentq(func, a: float, b: float, xtol: float = 1e-4, maxiter: int = 100) -> float:
+    """Small bisection root finder to avoid importing SciPy at service startup."""
+    fa = func(a)
+    fb = func(b)
+    if fa == 0:
+        return a
+    if fb == 0:
+        return b
+    if fa * fb > 0:
+        raise ValueError("Root is not bracketed.")
+
+    lo, hi = a, b
+    flo = fa
+    for _ in range(maxiter):
+        mid = (lo + hi) / 2.0
+        fmid = func(mid)
+        if abs(fmid) <= xtol or abs(hi - lo) <= xtol:
+            return mid
+        if flo * fmid <= 0:
+            hi = mid
+        else:
+            lo = mid
+            flo = fmid
+    return (lo + hi) / 2.0
+
+
+def _gaussian_filter(values: np.ndarray, sigma: float = 1.0) -> np.ndarray:
+    """Lightweight Gaussian smoothing used for wave-front localization."""
+    arr = np.asarray(values, dtype=float)
+    if sigma <= 0 or arr.size == 0:
+        return arr
+
+    radius = max(1, int(round(3 * sigma)))
+    x = np.arange(-radius, radius + 1, dtype=float)
+    kernel = np.exp(-(x * x) / (2 * sigma * sigma))
+    kernel /= np.sum(kernel)
+
+    out = arr
+    for axis in range(out.ndim):
+        out = np.apply_along_axis(
+            lambda row: np.convolve(
+                np.pad(row, (radius, radius), mode="edge"),
+                kernel,
+                mode="valid",
+            ),
+            axis,
+            out,
+        )
+    return out
 
 
 # =============================================================================
@@ -245,7 +294,7 @@ def estimate_q_from_returns(log_returns: np.ndarray,
                 best_q = q_try
 
         try:
-            result = brentq(
+            result = _brentq(
                 lambda q: neg_log_likelihood(q) - best_ll - 0.5,
                 0.6, 2.8, xtol=1e-4
             )
@@ -388,7 +437,7 @@ def find_wave_front_position(f: np.ndarray, axis: int = 0) -> float:
     grad = np.gradient(f, axis=axis)
     # Find inflection point (zero crossing of second derivative)
     grad2 = np.gradient(grad, axis=axis)
-    grad2_smooth = gaussian_filter(grad2, sigma=1)
+    grad2_smooth = _gaussian_filter(grad2, sigma=1)
 
     # Find peak of |second derivative| (inflection point)
     abs_grad2 = np.abs(grad2_smooth)

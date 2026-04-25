@@ -8,6 +8,7 @@ working even though Stage S5 reserves ``ml-engine/calendar/`` for seed data.
 from __future__ import annotations
 
 import importlib.util
+import sys
 import sysconfig
 from pathlib import Path
 
@@ -17,6 +18,7 @@ if _SPEC is None or _SPEC.loader is None:
     raise RuntimeError(f"Unable to load stdlib calendar from {_STDLIB_CALENDAR_PATH}")
 
 _STDLIB_CALENDAR = importlib.util.module_from_spec(_SPEC)
+sys.modules[_SPEC.name] = _STDLIB_CALENDAR
 _SPEC.loader.exec_module(_STDLIB_CALENDAR)
 
 for _name in dir(_STDLIB_CALENDAR):

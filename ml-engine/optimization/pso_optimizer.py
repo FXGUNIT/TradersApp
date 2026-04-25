@@ -28,7 +28,6 @@ from typing import Callable, Optional, Literal
 from datetime import datetime, timezone
 import json
 import os
-from scipy.special import expit  # sigmoid
 
 # ─── Constants ────────────────────────────────────────────────────────────────
 
