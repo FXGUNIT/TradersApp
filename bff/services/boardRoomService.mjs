@@ -8,9 +8,11 @@ import {
   appendFileSync,
   existsSync,
   mkdirSync,
+  readFileSync,
   readdirSync,
   renameSync,
   unlinkSync,
+  writeFileSync,
 } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -27,6 +29,10 @@ function getArchiveDir() {
   return process.env.BOARD_ROOM_LOG_ARCHIVE_DIR || join(__dirname, '../../board-room/archive/dvc');
 }
 
+function getFallbackStoreFile() {
+  return process.env.BOARD_ROOM_FALLBACK_STORE || join(getLogDir(), '..', 'fallback-store.json');
+}
+
 // ─── Redis Client ───────────────────────────────────────────────────────────
 let _redis = null;
 let _redisConnectPromise = null;
@@ -36,25 +42,80 @@ let _lastRedisNotice = null;
 const _memoryStore = new Map();
 const _memoryZsets = new Map();
 const _memoryCounters = new Map();
+let _memoryFallbackLoaded = false;
+let _memoryFallbackPersisting = false;
 
 function cloneValue(value) {
   if (value === undefined || value === null) return null;
   return JSON.parse(JSON.stringify(value));
 }
 
+function loadMemoryFallback() {
+  if (_memoryFallbackLoaded) return;
+  _memoryFallbackLoaded = true;
+  const filePath = getFallbackStoreFile();
+  if (!existsSync(filePath)) return;
+
+  try {
+    const parsed = JSON.parse(readFileSync(filePath, 'utf8'));
+    for (const [key, value] of Object.entries(parsed.store || {})) {
+      _memoryStore.set(key, value);
+    }
+    for (const [key, value] of Object.entries(parsed.zsets || {})) {
+      _memoryZsets.set(key, Array.isArray(value) ? value : []);
+    }
+    for (const [key, value] of Object.entries(parsed.counters || {})) {
+      _memoryCounters.set(key, Number(value) || 0);
+    }
+  } catch (err) {
+    console.warn(`[boardRoom] fallback store load failed: ${err.message}`);
+  }
+}
+
+function persistMemoryFallback() {
+  if (_memoryFallbackPersisting) return;
+  _memoryFallbackPersisting = true;
+  try {
+    const filePath = getFallbackStoreFile();
+    const dir = dirname(filePath);
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+    const tmpPath = `${filePath}.${process.pid}.tmp`;
+    const payload = JSON.stringify({
+      writtenAt: new Date().toISOString(),
+      store: Object.fromEntries(_memoryStore.entries()),
+      zsets: Object.fromEntries(_memoryZsets.entries()),
+      counters: Object.fromEntries(_memoryCounters.entries()),
+    });
+    writeFileSync(tmpPath, payload);
+    if (existsSync(filePath)) {
+      unlinkSync(filePath);
+    }
+    renameSync(tmpPath, filePath);
+  } catch (err) {
+    console.warn(`[boardRoom] fallback store persist failed: ${err.message}`);
+  } finally {
+    _memoryFallbackPersisting = false;
+  }
+}
+
 function memoryKeys(prefix) {
+  loadMemoryFallback();
   return Array.from(_memoryStore.keys()).filter((key) => key.startsWith(prefix));
 }
 
 function memoryGet(key) {
+  loadMemoryFallback();
   return cloneValue(_memoryStore.get(key));
 }
 
 function memorySet(key, value) {
+  loadMemoryFallback();
   _memoryStore.set(key, cloneValue(value));
+  persistMemoryFallback();
 }
 
 function memoryZadd(key, score, member) {
+  loadMemoryFallback();
   const zset = _memoryZsets.get(key) || [];
   const existing = zset.find((entry) => entry.value === member);
   if (existing) {
@@ -64,9 +125,11 @@ function memoryZadd(key, score, member) {
   }
   zset.sort((left, right) => left.score - right.score);
   _memoryZsets.set(key, zset);
+  persistMemoryFallback();
 }
 
 function memoryZrange(key, min, max) {
+  loadMemoryFallback();
   const zset = _memoryZsets.get(key) || [];
   const start = Math.max(0, Number(min) || 0);
   const end = Number(max) < 0 ? undefined : Number(max) + 1;
@@ -74,8 +137,10 @@ function memoryZrange(key, min, max) {
 }
 
 function memoryIncr(key) {
+  loadMemoryFallback();
   const next = Number(_memoryCounters.get(key) || 0) + 1;
   _memoryCounters.set(key, next);
+  persistMemoryFallback();
   return next;
 }
 
@@ -808,6 +873,8 @@ async function getStorageHealth() {
       keys: _memoryStore.size,
       zsets: _memoryZsets.size,
       counters: _memoryCounters.size,
+      file: getFallbackStoreFile(),
+      persisted: existsSync(getFallbackStoreFile()),
     },
     logDir: getLogDir(),
   };
