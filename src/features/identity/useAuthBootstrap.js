@@ -60,16 +60,17 @@ export function useAuthBootstrap({
     // Handle Google sign-in redirect result on page return from OAuth redirect
     if (auth && pendingRedirectResultHandler) {
       getRedirectResult(auth)
-        .then((result) => {
+        .then(async (result) => {
           if (result?.user) {
             const pendingFormData = readPendingGoogleFormData();
-            pendingRedirectResultHandler(result.user, pendingFormData);
+            await pendingRedirectResultHandler(result.user, pendingFormData);
           }
         })
         .catch((err) => {
           console.warn("[AuthBootstrap] getRedirectResult failed:", err?.message);
         })
         .finally(() => {
+          clearPendingGoogleFormData();
           clearRedirectInProgress();
         });
     }

@@ -635,6 +635,19 @@ export const executeStructuredSignup = async ({
   void sendWelcomeEmail(cleanEmail, fullName);
 };
 
+const hasCompleteGoogleApplicationData = (applicationData) => {
+  if (!applicationData || typeof applicationData !== "object") {
+    return false;
+  }
+
+  return Boolean(
+    String(applicationData.fullName || "").trim() &&
+      String(applicationData.country || "").trim() &&
+      String(applicationData.city || "").trim() &&
+      applicationData.agreedToTerms,
+  );
+};
+
 export const executeStructuredGoogleAuth = async ({
   applicationData,
   authenticatedUser,
@@ -689,7 +702,7 @@ export const executeStructuredGoogleAuth = async ({
     };
     const authData = await syncAuthSessionFromUser(simulatedUser, true);
 
-    if (applicationData) {
+    if (hasCompleteGoogleApplicationData(applicationData)) {
       await handleStructuredSignup({
         ...applicationData,
         email: fallbackEmail,
@@ -726,9 +739,12 @@ export const executeStructuredGoogleAuth = async ({
     throw new Error("Google sign-in is unavailable right now.");
   }
 
-  const user =
-    authenticatedUser ||
-    (await signInWithRedirect(firebaseAuth, googleProvider));  // Redirect-based auth — avoids ISP-popup SSL interception
+  if (!authenticatedUser) {
+    await signInWithRedirect(firebaseAuth, googleProvider);
+    return;
+  }
+
+  const user = authenticatedUser;
   const email = String(user.email || "").toLowerCase();
 
   if (!isValidGmailAddress(email)) {
@@ -747,7 +763,7 @@ export const executeStructuredGoogleAuth = async ({
     return;
   }
 
-  if (applicationData) {
+  if (hasCompleteGoogleApplicationData(applicationData)) {
     await handleStructuredSignup({
       ...applicationData,
       email,

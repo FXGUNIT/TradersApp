@@ -9,6 +9,11 @@ import {
 import { CSS_VARS } from "../styles/cssVars.js";
 import { OnboardingProgress } from "./OnboardingProgress.jsx";
 import {
+  markRedirectInProgress,
+  persistPendingGoogleFormData,
+  clearPendingGoogleFormData,
+} from "../features/identity/authFlowStorage.js";
+import {
   StepWelcome,
   StepOne,
   StepTwo,
@@ -140,18 +145,21 @@ export default function CleanOnboarding({
   };
 
   const handleGoogle = async () => {
-    const err = validateStepOne(true);
-    if (err) { setError(err); return; }
     setLoading(true); setError("");
     try {
+      persistPendingGoogleFormData({
+        ...form,
+        fullName: form.fullName.trim(),
+        email: String(form.email || "").trim().toLowerCase(),
+      });
+      markRedirectInProgress();
       await onGoogleSuccess({
         ...form,
         fullName: form.fullName.trim(),
         email: String(form.email || "").trim().toLowerCase(),
       });
-      clearDraftSync(SIGNUP_DRAFT_KEY);
-      setForm(DEFAULT_FORM); setStep(1);
     } catch (err) {
+      clearPendingGoogleFormData();
       setError(err.message || "Google signup failed. Please try again.");
     } finally {
       setLoading(false);

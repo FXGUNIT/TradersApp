@@ -5,7 +5,7 @@ import {
   writeDraftSync,
 } from "../../services/draftVault.js";
 import {
-  persistPendingGoogleFormData,
+  clearPendingGoogleFormData,
   markRedirectInProgress,
 } from "../identity/authFlowStorage.js";
 import { CSS_VARS } from "../../styles/cssVars.js";
@@ -139,8 +139,9 @@ export default function CleanLoginScreen({
     setMessage("");
 
     try {
-      // Persist form data before redirect so it survives the page reload
-      persistPendingGoogleFormData({ email: cleanEmail.trim().toLowerCase() });
+      // Login-page Google auth is not a completed application. Let the
+      // redirect result route new users to the signup form instead.
+      clearPendingGoogleFormData();
       markRedirectInProgress();
       await onGoogleAuth();
       // signInWithRedirect has already navigated away — this won't run
