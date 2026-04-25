@@ -46,6 +46,9 @@ jobs:
       - name: Deploy Worker
         run: |
           echo "=== Deploying BFF Proxy Worker ==="
+          echo "Account ID: 0f779fe4981d424548a48856cc9139db"
+          echo "Worker: tradersapp-bff-proxy"
+          echo "Token scopes: Workers Scripts Write"
           cd deploy/cloudflare-tunnel/bff-worker
           CLOUDFLARE_ACCOUNT_ID="0f779fe4981d424548a48856cc9139db" \
-          npx wrangler deploy --name tradersapp-bff-proxy --env production 2>&1
+          npx wrangler deploy --name tradersapp-bff-proxy 2>&1
