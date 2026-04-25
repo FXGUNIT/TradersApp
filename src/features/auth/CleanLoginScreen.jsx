@@ -4,6 +4,10 @@ import {
   readDraftSync,
   writeDraftSync,
 } from "../../services/draftVault.js";
+import {
+  persistPendingGoogleFormData,
+  markRedirectInProgress,
+} from "../identity/authFlowStorage.js";
 import { CSS_VARS } from "../../styles/cssVars.js";
 
 // Google "G" SVG logo — official brand mark

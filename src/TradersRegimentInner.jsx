@@ -233,7 +233,7 @@ function TradersRegimentInner() {
   // ── Auth handlers ───────────────────────────────────────────────────────────
   const {
     checkUserStatus, handleLoginPasswordReset, handleLogin, handleStructuredSignup,
-    handleStructuredGoogleAuth, handleBackToLoginFromSignup,
+    handleStructuredGoogleAuth, handleGoogleRedirectResult, handleBackToLoginFromSignup,
     handlePasswordReset, handleResendVerificationEmail,
     checkApprovalStatus, handleLogout,
   } = useAuthSessionHandlers({
@@ -256,7 +256,7 @@ function TradersRegimentInner() {
     setAdminPassInput, setAdminPassErr, setAdminOtpErr,
   });
 
-  useAuthBootstrap({ checkUserStatus, isAdminAuthenticated, setAuth, setProfile, setGoogleUser, setScreen, setIsInitialLoading, authBootstrapCompleteRef });
+  useAuthBootstrap({ checkUserStatus, isAdminAuthenticated, setAuth, setProfile, setGoogleUser, setScreen, setIsInitialLoading, authBootstrapCompleteRef, pendingRedirectResultHandler: handleGoogleRedirectResult });
   useDesktopClientPolicy({
     auth,
     currentSessionId,
