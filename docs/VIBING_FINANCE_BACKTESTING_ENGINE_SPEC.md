@@ -8,6 +8,116 @@
 
 ---
 
+## 0. Implementation Control Panel
+
+This section is the build-control summary. If any later section conflicts with this panel, this panel wins until it is explicitly updated.
+
+### 0.1 Build Now / Build Later / Do Not Build Yet
+
+| Bucket | Items | Rule |
+|---|---|---|
+| Build Now | M1 hidden admin shell, M2 CSV intake, M3 session/features, M4 setup detection, M5 execution simulator, M6 report builder, M7 local proof chain only if report exists | This is the only MVP implementation path. |
+| Build Later | M8 agent export, M9 built-in CLI, M10 local runner service, M11 Python parity, M12 browser automation, optional local LLM, BYOK provider support | Blocked until deterministic browser report and proof pass golden tests. |
+| Do Not Build Yet | Multi-agent role team, autonomous watch mode, cross-user learning, shared model training, public blockchain anchoring, public launch, live trading, broker execution | Blocked until private alpha readiness and governance. |
+
+### 0.2 MVP Scope Lock
+
+MVP means:
+
+- Hidden admin-only browser page.
+- Uploaded CSV only.
+- MNQ and NIFTY only.
+- 5-minute OHLCV only.
+- One strategy family: post-initial-balance session VWAP plus caught buyer/seller inventory, structure change, pullback, and strict risk.
+- Browser Web Worker computes the first backtest.
+- Report is generated from deterministic facts.
+- Local proof block is generated from hashed artifacts.
+- No paid API, no remote LLM, no hosted compute, no public chain, no live trading.
+
+MVP does not include:
+
+- BYOK provider calls.
+- CLI automation.
+- Local runner service.
+- Python parity engine.
+- Browser automation.
+- Multi-agent team.
+- Autonomous watch/background lab.
+- Cross-user memory or model training.
+- Public launch.
+
+### 0.3 Stable Milestone IDs
+
+Use these IDs in tasks, tests, commits, and future agent prompts to avoid heading-number drift.
+
+| ID | Name | Status |
+|---|---|---|
+| `MVP-M1-HIDDEN-SHELL` | Hidden admin shell | Build now |
+| `MVP-M2-CSV-INTAKE` | CSV intake and quality report | Build now |
+| `MVP-M3-FEATURES` | Session, IB, VWAP, swings | Build now |
+| `MVP-M4-SETUP-DETECTOR` | Caught inventory, structure change, pullback | Build now |
+| `MVP-M5-SIMULATOR` | Execution simulator and trade ledger | Build now |
+| `MVP-M6-REPORT` | Strict risk report and verdict | Build now |
+| `MVP-M7-PROOF` | Local proof chain | Build now only after report artifacts exist |
+| `POST-M8-AGENT-EXPORT` | Compact agent export | Build later |
+| `POST-M9-CLI` | Built-in `vibing` CLI | Build later |
+| `POST-M10-RUNNER` | Local runner service | Build later |
+| `POST-M11-PYTHON-PARITY` | Python parity engine | Build later |
+| `POST-M12-BROWSER-AUTOMATION` | Playwright-backed browser automation | Build later |
+
+### 0.4 P0 Action Checklist
+
+| ID | Action | Status |
+|---|---|---|
+| `P0-SCOPE` | Scope locked to M1-M7 only | Resolved in this section |
+| `P0-STRATEGY-FIXTURES` | Golden setup and fill fixtures exist | Resolved in section 15.9 |
+| `P0-INSTRUMENTS` | Instrument metadata and importer profiles exist | Resolved in sections 15.8.1-15.8.2 |
+| `P0-METRICS` | Metric formulas and rounding rules exist | Resolved in section 23.5 |
+| `P0-PROOF-HASH` | Canonical hash/proof rules exist | Resolved in section 25.7 |
+| `P0-REPORT-GUARDRAILS` | Verdict rules and forbidden claims exist | Resolved in section 24.1 |
+| `P0-PACKAGE` | `run-package.v1` manifest exists | Resolved in section 25.8 |
+| `P0-TEST-MAP` | P0 test traceability exists | Resolved in section 36.5 |
+| `P0-REPO-SEQUENCE` | First PR sequence exists | Resolved in section 31.16 |
+
+### 0.5 Naming Glossary
+
+| Term | Meaning |
+|---|---|
+| Vibing Finance | Product/workbench name inside TradersApp |
+| Vibing Finance Workbench | Hidden admin browser screen |
+| `vibing` | Future built-in CLI command |
+| Strategy DSL | Versioned deterministic JSON strategy spec |
+| Vibing Proof Chain | Local hash-chain proof ledger |
+| Run package | Export/import bundle described by `run-package.v1` |
+| Memory capsule | Typed adaptive memory object; not numerical truth |
+| Per-user adaptive memory | Safe early "learning" layer; not shared model training |
+| Model candidate | Offline trained helper model pending registry approval |
+
+### 0.6 User Promise
+
+Allowed promise:
+
+- "Vibing Finance helps you test and critique a trading idea against uploaded historical data using deterministic backtesting, conservative assumptions, and strict caveats."
+
+Forbidden promises:
+
+- Guaranteed profit.
+- Guaranteed alpha.
+- Financial advice.
+- Trade recommendations as certainty.
+- Live-trading readiness from a backtest alone.
+- Model-discovered edge without deterministic evidence.
+
+First report leads with:
+
+1. Verdict.
+2. Why the result is or is not trustworthy.
+3. Core metrics.
+4. Caveats.
+5. Next experiment.
+
+---
+
 ## 1. Product Vision
 
 Build a hidden page inside TradersApp where a trader can describe a strategy in plain language and receive an institutional-grade backtest and risk report.
@@ -894,6 +1004,122 @@ Timestamp rules:
 - If timezone is missing, use `Asia/Kolkata` for NIFTY and `America/New_York` for MNQ.
 - Rows must be sorted or sortable by timestamp.
 - Duplicate timestamps are rejected unless the user explicitly chooses aggregation later.
+
+### 15.8.1 Instrument Metadata v1
+
+These defaults make the first implementation deterministic. User CSV metadata can override them only when validated and shown in the report.
+
+| Instrument | Default symbol match | Session | Currency | Tick size | Point value | Lot/contract rule | Default fee/slippage caveat |
+|---|---|---|---|---:|---:|---|---|
+| MNQ | `MNQ`, `MNQ*`, `Micro NQ` | New York RTH-style `09:30-16:00 America/New_York` | USD | 0.25 index point | 2 USD per index point | Integer contracts only | Use configurable per-side commission and 1 tick slippage until broker fee is supplied |
+| NIFTY index CSV | `NIFTY`, `NIFTY50`, `NSE:NIFTY` | NSE cash `09:15-15:30 Asia/Kolkata` | INR | 0.05 index point for display only | 1 INR per index point for synthetic/index backtest | Theoretical sizing only unless lot size supplied | Report must say index CSV is not directly tradable |
+| NIFTY futures CSV | `NIFTY_F`, `NIFTY FUT`, user-selected futures | NSE derivatives `09:15-15:30 Asia/Kolkata` | INR | 0.05 index point unless supplied | `lot_size * 1 INR` per index point | Integer lots only | User must confirm lot size, fees, and expiry/roll treatment |
+
+Default account currency:
+
+- MNQ reports default to USD.
+- NIFTY reports default to INR.
+- Cross-currency aggregation is not in MVP.
+
+If instrument metadata is missing:
+
+- Show theoretical fractional sizing.
+- Skip strict integer sizing.
+- Mark report as lower confidence.
+- Do not label the result paper-trade candidate.
+
+### 15.8.2 CSV Import Profiles v1
+
+| Profile | Required headers accepted | Timestamp handling | Default timezone | Decision |
+|---|---|---|---|---|
+| `canonical_ohlcv_v1` | `timestamp,open,high,low,close,volume` | ISO preferred | Asset default if missing | MVP baseline |
+| `tradingview_export_v1` | `time,open,high,low,close,volume` or `Time,Open,High,Low,Close,Volume` | Parse exchange/local string; require user confirmation if timezone missing | Asset default | Allowed with confirmation |
+| `ninjatrader_export_v1` | `Date,Time,Open,High,Low,Close,Volume` or combined timestamp | Combine Date+Time before parse | User must confirm if asset cannot infer | Allowed with confirmation |
+| `broker_generic_v1` | Any case-insensitive OHLCV synonyms | Infer by normalized names | User must confirm | Research-only until profile saved |
+| `malformed_csv_v1` | Missing OHLC, duplicate timestamp, nonnumeric OHLC, impossible high/low | Reject with row-level errors | N/A | Block normal report |
+
+Column synonyms:
+
+| Canonical | Accepted synonyms |
+|---|---|
+| `timestamp` | `time`, `datetime`, `date_time`, `date time`, `Date+Time` |
+| `open` | `Open`, `open_price`, `o` |
+| `high` | `High`, `high_price`, `h` |
+| `low` | `Low`, `low_price`, `l` |
+| `close` | `Close`, `last`, `close_price`, `c` |
+| `volume` | `Volume`, `vol`, `contracts`, `qty` |
+
+Import confidence:
+
+| Condition | Confidence impact |
+|---|---|
+| Exact canonical headers and ISO timezone timestamps | High |
+| Header synonyms only | Medium-high |
+| Missing timezone but known asset/session | Medium |
+| Separate date/time fields | Medium |
+| Missing volume | Low confidence but allowed with VWAP caveat |
+| Duplicate timestamps | Block unless future explicit aggregation mode exists |
+| Invalid OHLC relation | Block |
+
+### 15.9 Setup Detector State Machine And Golden Fixtures
+
+Setup detector state machine:
+
+```text
+WAIT_FOR_IB
+  -> SCAN_FOR_SWEEP
+  -> CAUGHT_SELLERS_ACTIVE or CAUGHT_BUYERS_ACTIVE
+  -> WAIT_FOR_CHOCH
+  -> WAIT_FOR_PULLBACK
+  -> WAIT_FOR_ENTRY_TRIGGER
+  -> TRADE_ACTIVE
+  -> SESSION_DONE
+  -> NO_TRADE
+```
+
+State rules:
+
+- `WAIT_FOR_IB`: no trade logic runs until the IB window is complete.
+- `SCAN_FOR_SWEEP`: long path requires sweep below `IB_low`; short path requires sweep above `IB_high`.
+- `CAUGHT_SELLERS_ACTIVE`: price must close back above `IB_low` within the sweep candle or next 2 candles.
+- `CAUGHT_BUYERS_ACTIVE`: price must close back below `IB_high` within the sweep candle or next 2 candles.
+- `WAIT_FOR_CHOCH`: bullish CHoCH closes above the 3-candle pre-sweep high and at/above VWAP; bearish CHoCH closes below the 3-candle pre-sweep low and at/below VWAP.
+- `WAIT_FOR_PULLBACK`: pullback must touch VWAP zone or 33%-66% retracement of sweep extreme to CHoCH close within 6 candles.
+- `WAIT_FOR_ENTRY_TRIGGER`: long entry is first bullish candle after pullback closing above prior candle high; short entry is first bearish candle after pullback closing below prior candle low.
+- If a second opposite sweep occurs before entry, invalidate the current setup and return to `SCAN_FOR_SWEEP`.
+- Long and short setups cannot both be active at the same time in MVP.
+
+Execution fill state machine:
+
+```text
+NO_POSITION
+  -> ENTRY_PENDING
+  -> POSITION_OPEN
+  -> TP1_FILLED
+  -> BREAKEVEN_ARMED
+  -> EXITED_TP2 or EXITED_STOP or EXITED_BREAKEVEN or EXITED_SESSION_CLOSE
+```
+
+Golden fixtures:
+
+| Fixture ID | Scenario | Minimal candle sequence after IB | Expected result |
+|---|---|---|---|
+| `GF-LONG-001` | Valid caught-sellers long | sweep below IB low, close back above IB low within 2 candles, bullish CHoCH above pre-sweep 3-candle high and VWAP, pullback to VWAP/33%-66%, bullish entry trigger | One long trade candidate |
+| `GF-SHORT-001` | Valid caught-buyers short | sweep above IB high, close back below IB high within 2 candles, bearish CHoCH below pre-sweep 3-candle low and VWAP, pullback to VWAP/33%-66%, bearish entry trigger | One short trade candidate |
+| `GF-NO-001` | Sweep without reclaim | price trades below IB low but does not close back above within 2 candles | No caught sellers, no trade |
+| `GF-NO-002` | Caught sellers but no CHoCH | reclaim occurs but no later close above pre-sweep high and VWAP | No trade, reason `NO_CHOCH` |
+| `GF-NO-003` | CHoCH but no pullback | CHoCH occurs, then price runs away for 6 candles without VWAP/retrace pullback | No trade, reason `NO_PULLBACK` |
+| `GF-NO-004` | Pullback invalidates sweep | long pullback closes below original sweep low | No trade, reason `PULLBACK_INVALIDATED` |
+| `GF-FILL-001` | Entry and stop same candle | long entry trigger candle also touches stop | Stop fill wins, result `stopped` |
+| `GF-FILL-002` | TP1 and stop same candle before TP1 confirmation | candle touches both TP1 and stop | Worst case, stop fill wins unless prior candle already confirmed TP1 |
+| `GF-FILL-003` | TP1 then TP2 same directional candle | long candle opens near entry, low stays above entry, high touches TP2 | Allow TP1 then TP2 |
+| `GF-FILL-004` | TP1 then breakeven ambiguity | after TP1, same/next ambiguous candle touches breakeven and TP2 | If sequence unclear, breakeven fill wins |
+| `GF-DATA-001` | Low-quality missing bars | valid setup shape but more than 2 consecutive active-session bars missing | Block normal report or mark research-only |
+
+Golden fixture acceptance:
+
+- Each fixture must become a unit test before M5 is considered complete.
+- Fixture expected outputs include setup state path, trade/no-trade reason, entry/exit prices, and caveats.
 
 ---
 
@@ -2063,6 +2289,80 @@ Reject logic:
 - High sensitivity to 1-point trap threshold: weak.
 - Good gross but bad net after costs: reject or revise.
 
+### 23.5 Metric Formula Appendix v1
+
+Rounding rule:
+
+- Store raw metric values at full JavaScript/Python double precision.
+- Display percentages to 2 decimals.
+- Display R multiples to 2 decimals.
+- Display currency to 2 decimals unless instrument tick/point precision requires otherwise.
+
+Trade-level formulas:
+
+```text
+initial_risk_points = abs(entry_price - initial_stop)
+initial_risk_currency = initial_risk_points * point_value * position_size
+gross_pnl = sum(exit_qty_i * (exit_price_i - entry_price) * side_sign * point_value)
+fees = per_side_fee * (entry_qty + sum(exit_qty_i))
+slippage = configured_slippage_points * point_value * (entry_qty + sum(exit_qty_i))
+net_pnl = gross_pnl - fees - slippage
+r_multiple = net_pnl / initial_risk_currency
+mfe_points = max_favorable_price_move_from_entry
+mae_points = max_adverse_price_move_from_entry
+```
+
+Portfolio/run formulas:
+
+```text
+total_trades = count(trades)
+winning_trades = count(net_pnl > 0)
+losing_trades = count(net_pnl < 0)
+breakeven_trades = count(net_pnl == 0)
+win_rate = winning_trades / total_trades
+average_r = mean(r_multiple)
+expectancy_r = mean(r_multiple)
+gross_profit = sum(net_pnl where net_pnl > 0)
+gross_loss_abs = abs(sum(net_pnl where net_pnl < 0))
+profit_factor = gross_profit / gross_loss_abs
+net_pnl_total = sum(net_pnl)
+equity_t = starting_equity + cumulative_net_pnl_t
+drawdown_t = equity_t - max(equity_0..equity_t)
+drawdown_pct_t = drawdown_t / max(equity_0..equity_t)
+max_drawdown = min(drawdown_t)
+max_drawdown_pct = min(drawdown_pct_t)
+tp1_hit_rate = count(trades where tp1_filled) / total_trades
+tp2_hit_rate = count(trades where tp2_filled) / total_trades
+breakeven_after_tp1_rate = count(trades where exit_reason == "breakeven_after_tp1") / count(trades where tp1_filled)
+average_hold_minutes = mean(exit_time - entry_time)
+```
+
+Edge-case formulas:
+
+- If `total_trades == 0`, all performance ratios are `null`, not `0`.
+- If `gross_loss_abs == 0` and `gross_profit > 0`, profit factor is `"infinite_sample_warning"`, not trusted.
+- If `gross_loss_abs == 0` and `gross_profit == 0`, profit factor is `null`.
+- If point value is unknown, currency PnL is `null` and R metrics still display.
+- If volume is missing, VWAP fallback is lower confidence and report must flag it.
+
+Sharpe-like metric:
+
+```text
+session_return_t = net_pnl_session_t / starting_equity_at_session_start
+sharpe_like = mean(session_return) / stddev(session_return)
+```
+
+Do not annualize Sharpe in MVP unless the session count, calendar, and sampling assumptions are explicit.
+
+Formula test vectors:
+
+| Test ID | Inputs | Expected |
+|---|---|---|
+| `MF-001` | 4 trades R: `2, -1, 0.5, -0.5` | `win_rate=0.5`, `expectancy_r=0.25`, `profit_factor=2.5` |
+| `MF-002` | Starting equity `10000`, PnL `100,-50,200,-25` | `net_pnl_total=225`, max closed-trade drawdown after second trade `-50` |
+| `MF-003` | No trades | Ratios `null`, verdict cannot be positive |
+| `MF-004` | All winners | Profit factor warning, not deployable evidence |
+
 ---
 
 ## 24. Report Architecture
@@ -2097,6 +2397,69 @@ DEPLOY-CANDIDATE
 ```
 
 The MVP should be biased toward rejecting weak evidence.
+
+### 24.1 Verdict Rules And Claim Guardrails v1
+
+MVP verdict labels:
+
+| Verdict | Meaning | Minimum conditions |
+|---|---|---|
+| `REJECT` | Evidence is bad, invalid, too costly, or unsafe to trust | Data block, negative expectancy, severe caveat, or failed proof |
+| `REVISE` | Idea may be testable but current rules/data are weak | Some evidence, but fails sample, robustness, cost, or drawdown checks |
+| `RESEARCH-WORTHY` | Worth further research only | At least 30 trades, positive expectancy, PF >= 1.2, no fatal data-quality issue |
+| `PAPER-TRADE-CANDIDATE` | Post-MVP label only | At least 100 trades, out-of-sample/walk-forward evidence, costs included, robustness acceptable |
+| `DEPLOY-CANDIDATE` | Not allowed in MVP | Requires separate live/paper evidence, legal review, risk controls, and human approval |
+
+MVP cannot output:
+
+- `DEPLOY-CANDIDATE`.
+- "Guaranteed".
+- "Proven alpha".
+- "Safe to trade".
+- "Will be profitable".
+- "Financial advice".
+- "You should trade this".
+
+Required caveat templates:
+
+| Condition | Required report wording |
+|---|---|
+| Fewer than 30 trades | "Insufficient sample: this result is not enough to infer edge." |
+| 30-99 trades | "Research sample only: this needs more data and out-of-sample testing." |
+| Missing volume | "VWAP used a lower-confidence fallback because volume was missing." |
+| Conservative OHLC ambiguity | "5-minute OHLC bars do not reveal true intrabar order; ambiguous fills were resolved conservatively." |
+| Low data quality | "Data quality issues may dominate the result; treat this as research-only." |
+| No news calendar | "News filtering was not applied because event timestamps were not supplied." |
+| No costs supplied | "Default cost assumptions were used; broker-specific costs may change the verdict." |
+| One outlier dominates | "A large part of the result comes from a small number of trades; robustness is weak." |
+
+Positive-language gate:
+
+- `RESEARCH-WORTHY` may say "shows preliminary evidence worth further testing."
+- `REVISE` may say "the idea is not yet supported in its current form."
+- `REJECT` must say "do not trust this strategy from this test."
+- No MVP report may say "ready for live trading."
+
+Report schema v1:
+
+```json
+{
+  "schema_version": "vibing.report.v1",
+  "report_id": "uuid",
+  "run_id": "uuid",
+  "verdict": "REJECT|REVISE|RESEARCH-WORTHY|PAPER-TRADE-CANDIDATE",
+  "verdict_reasons": [],
+  "required_caveats": [],
+  "strategy_summary": {},
+  "dataset_quality": {},
+  "execution_assumptions": {},
+  "metrics": {},
+  "trade_summary": {},
+  "risk_notes": [],
+  "next_experiments": [],
+  "proof_refs": []
+}
+```
 
 ---
 
@@ -2203,6 +2566,97 @@ If public proof becomes necessary:
 3. Prefer a free non-chain proof first: signed Git commit, GitHub release artifact, or public gist.
 4. If a true public feeless network is still required, evaluate Nano only as an experimental anchor, because Nano documentation describes feeless transactions, but it is not designed as a general-purpose data ledger.
 5. Never make public anchoring required for the core backtest.
+
+### 25.7 Canonical Hash And Serialization Rules v1
+
+All proof hashes must be reproducible across browser, Node CLI, and Python.
+
+Canonical JSON rules:
+
+- Encoding: UTF-8.
+- Object keys sorted lexicographically by Unicode code point.
+- No insignificant whitespace.
+- Arrays preserve order.
+- Numbers use the shortest round-trip decimal representation available from the runtime; do not hash displayed rounded strings.
+- Timestamps normalized to ISO 8601 UTC with `Z`.
+- `undefined`, functions, symbols, and `NaN` are forbidden.
+- `Infinity` and `-Infinity` are forbidden; use explicit string sentinel values such as `"infinite_sample_warning"` only where schema permits.
+- Binary artifacts hash raw bytes directly, not base64 strings.
+- Text artifacts normalize line endings to `\n` before hashing.
+
+Hash format:
+
+```text
+sha256:<lowercase_hex_digest>
+```
+
+Canonical artifact hash inputs:
+
+| Artifact | Hash input |
+|---|---|
+| Raw CSV | Original file bytes |
+| Normalized dataset | Canonical JSON rows plus dataset metadata excluding local file path |
+| Strategy spec | Canonical JSON strategy spec |
+| Trade ledger | Canonical JSON trade records in execution order |
+| Metrics | Canonical JSON metrics object |
+| Report JSON | Canonical JSON report schema |
+| Report Markdown | UTF-8 text with `\n` line endings |
+| Proof block | Canonical JSON excluding `signature` and `block_hash` |
+
+Canonicalization test vectors:
+
+| ID | Input | Expected behavior |
+|---|---|---|
+| `HASH-001` | `{ "b": 2, "a": 1 }` and `{ "a": 1, "b": 2 }` | Same hash |
+| `HASH-002` | Report text with CRLF vs LF | Same hash after line-ending normalization |
+| `HASH-003` | Timestamp `2026-04-25T12:00:00+05:30` | Hashes normalized UTC timestamp `2026-04-25T06:30:00Z` |
+| `HASH-004` | Metrics with displayed rounded `1.23` but raw `1.23456` | Hash raw canonical metric value, not display text |
+
+### 25.8 Run Package Manifest v1
+
+`run-package.v1.json` is the interchange format between browser, CLI, local runner, debug export, and future Python parity.
+
+```json
+{
+  "schema_version": "vibing.run_package.v1",
+  "package_id": "uuid",
+  "created_at": "2026-04-25T00:00:00Z",
+  "created_by_surface": "browser|cli|runner|python",
+  "redaction_level": "metadata_only|safe_debug|full_private",
+  "workspace_id": "local",
+  "run_id": "uuid",
+  "engine": {
+    "name": "vibing-backtest-js",
+    "version": "0.1.0",
+    "code_version": "git:..."
+  },
+  "artifacts": [
+    {
+      "ref": "artifact:metrics:sha256:...",
+      "kind": "metrics",
+      "path": "runs/run_001/metrics.json",
+      "hash": "sha256:...",
+      "bytes": 1234,
+      "contains_private_data": false
+    }
+  ],
+  "proof_blocks": ["sha256:..."],
+  "event_log": "runs/run_001/events.ndjson",
+  "excluded": [
+    "raw_csv_rows",
+    "api_keys",
+    "provider_prompts"
+  ]
+}
+```
+
+Manifest rules:
+
+- `metadata_only` excludes raw rows, full transcript, screenshots, and provider prompts.
+- `safe_debug` may include sanitized tool outputs and screenshots only after explicit user selection.
+- `full_private` may include raw local artifacts and must never be shared publicly by default.
+- Import must verify every listed hash before trusting the package.
+- Missing optional artifacts produce warnings; missing required report/proof artifacts block import.
 
 ---
 
@@ -3921,6 +4375,40 @@ Before implementation starts, the spec must satisfy this gate:
 
 After implementation starts, each weakness resolution must be treated like a requirement change: update this section with status, date, and evidence link before marking it resolved.
 
+### 31.16 Implementation PR Sequence
+
+Use this sequence when moving from spec to code. Do not combine unrelated milestones.
+
+| PR | Stable ID | Goal | Main files | Required verification |
+|---|---|---|---|---|
+| PR1 | `MVP-M1-HIDDEN-SHELL` | Hidden admin workbench shell behind feature flag | `src/config/features.js`, `src/features/shell/AppScreenRegistry.jsx`, `src/features/vibing-finance/ui/*` | Feature hidden when flag/admin false; empty workbench renders when true |
+| PR2 | `MVP-M2-CSV-INTAKE` | CSV parser, importer profiles, data-quality report | `core/csvIngestion.js`, `core/dataQuality.js`, `storage/*` | Canonical/TradingView/NinjaTrader/malformed fixture tests |
+| PR3 | `MVP-M3-FEATURES` | Session tagging, IB, VWAP, swings | `core/sessionCalendar.js`, `core/vwap.js`, `core/swings.js` | MNQ/NIFTY timezone/session/IB tests |
+| PR4 | `MVP-M4-SETUP-DETECTOR` | Setup state machine and golden setup fixtures | `core/inventoryDetector.js`, `core/structureDetector.js`, `core/setupStateMachine.js` | `GF-*` setup fixtures pass |
+| PR5 | `MVP-M5-SIMULATOR` | Conservative execution simulator and trade ledger | `core/backtestEngine.js`, `core/fillPolicy.js`, `core/riskMetrics.js` | Fill ambiguity and metric formula tests pass |
+| PR6 | `MVP-M6-REPORT` | Report schema, verdict rules, claim guardrails | `core/reportBuilder.js`, `ui/report/*` | Report forbidden-claim and verdict tests pass |
+| PR7 | `MVP-M7-PROOF` | Canonical hashing, proof block, run package export | `core/canonicalJson.js`, `core/proofChain.js`, `core/runPackage.js` | Hash vectors and export/import hash checks pass |
+| PR8 | `POST-M8-AGENT-EXPORT` | Compact agent export without raw rows | `core/agentExport.js` | Redaction tests pass |
+
+Repo integration map:
+
+| Concern | Existing repo location | Decision |
+|---|---|---|
+| Feature flag | `src/config/features.js` | Add `VITE_ENABLE_VIBING_FINANCE`; default false |
+| Screen registry | `src/features/shell/AppScreenRegistry.jsx` | Register `screen === "vibingFinance"` lazily |
+| Hub/nav visibility | `src/features/hub-content/RegimentHubScreen.jsx` | Keep hidden unless flag/admin true |
+| Existing terminal UX | `src/features/terminal/` | Style inspiration only for MVP; do not couple implementation |
+| Tests | existing JS test runners plus Playwright | Add focused unit tests near `src/features/vibing-finance/__tests__` |
+| CLI package scripts | `package.json` | Do not add until PR7 is stable; CLI is post-MVP |
+
+Module import rules:
+
+- `core/*` imports no React.
+- `workers/*` may import `core/*`.
+- `ui/*` may import storage/adapters and render artifacts.
+- `core/*` does not read provider keys, environment variables, or browser globals.
+- CLI later imports `core/*`; therefore `core/*` must remain Node-compatible.
+
 ### 31.14 Plan / Target / Goal Completeness Audit
 
 This section audits what is still missing from the plan, target, and goal. It exists because the spec has many architecture details, but a complete plan also needs exact product intent, user promise, operational boundaries, evidence standards, and success/failure definitions.
@@ -5057,6 +5545,33 @@ Scenarios:
 - Does the app avoid uploading CSV?
 - Are all defaults visible?
 - Can Codex/Claude understand the agent export?
+
+### 35.5 P0 Test Traceability Matrix
+
+Every P0 planning item must have a test or manual gate before private MVP can be called trustworthy.
+
+| Requirement | Test category | Required fixture/test |
+|---|---|---|
+| Hidden admin-only access | UI/access smoke | Flag off hidden, non-admin blocked, admin allowed |
+| CSV local-only upload | Privacy/integration | No network request during upload/parse/backtest |
+| Canonical CSV import | Unit | `canonical_ohlcv_v1` parses valid file |
+| TradingView/NinjaTrader import | Unit | Header/date profile fixtures parse after confirmation |
+| Malformed CSV rejection | Unit | Missing OHLC, duplicate timestamp, invalid high/low rejected |
+| Timezone/session inference | Unit | MNQ ET and NIFTY IST session/IB windows correct |
+| Instrument metadata | Unit | MNQ point value/tick, NIFTY synthetic/futures behavior |
+| VWAP formula | Unit | Known rows produce expected session VWAP |
+| Setup detector | Unit | `GF-LONG-001`, `GF-SHORT-001`, `GF-NO-*` fixtures |
+| Conservative fills | Unit | `GF-FILL-001` through `GF-FILL-004` |
+| Position sizing | Unit | 0.2% risk, integer contract skip, unknown point-value caveat |
+| Metric formulas | Unit | `MF-001` through `MF-004` |
+| Report verdict rules | Unit | Reject/revise/research-worthy thresholds and caveats |
+| Forbidden claims | Unit/static | Report builder cannot emit guaranteed/proven/safe-to-trade wording |
+| Proof canonicalization | Unit | `HASH-001` through `HASH-004` |
+| Run package manifest | Unit | Export/import verifies artifact hashes and redaction level |
+| Worker cancellation/failure | Worker/unit | Cancel and recoverable failure event emitted |
+| Browser smoke | Playwright/manual | Workbench renders first viewport without layout overlap |
+| Data deletion/export | Manual until storage implemented | Export proof before delete; local data removal works |
+| Secret/source-map hygiene | Build/manual | No secrets or private source maps in public artifact |
 
 ---
 
