@@ -8,7 +8,9 @@
  * This Worker simply forwards selected BFF paths to the active free sslip.io BFF.
  */
 
-const DEFAULT_UPSTREAM_BFF_URL = "https://bff.173.249.18.14.sslip.io";
+// Use HTTP to Contabo IP — Caddy terminates TLS at Cloudflare edge.
+// HTTPS to the sslip.io hostname fails SSL handshake (wrong cert).
+const DEFAULT_UPSTREAM_BFF_URL = env.UPSTREAM_BFF_URL || "http://173.249.18.14";
 
 const PROXY_PATH_PREFIXES = [
   "/admin",
