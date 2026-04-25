@@ -1,8 +1,9 @@
-# TradersApp SEO Visibility Plan — Get on Google
+# Traders Regiment SEO Visibility Plan — Get on Google
 
 > **Goal:** Make `tradergunit.pages.dev` appear in Google search results for relevant trading/finance keywords.
-> **Target:** Top 10 for niche quantitative trading / algo trading product keywords within 90 days.
-> **What it is:** "The World's Most Advanced Financial Toolkit" — multi-model AI consensus engine, session probability, market regime detection for professional futures traders.
+> **Target:** Top 10 for niche quant / institutional trading AI keywords within 90 days.
+> **Brand:** Traders Regiment — World's Most Advanced Trading AI. A self-improving machine learning quant system that delivers institutional hedge fund-level alpha and trading desk intelligence to retail traders.
+> **Keywords:** edge, quant, alpha, institutional, trading system, trading desk, hedge fund, quantitative analysis, machine learning, self-improving AI, data analyst, personal trading partner, trading universe
 
 ---
 
