@@ -3921,6 +3921,333 @@ Before implementation starts, the spec must satisfy this gate:
 
 After implementation starts, each weakness resolution must be treated like a requirement change: update this section with status, date, and evidence link before marking it resolved.
 
+### 31.14 Plan / Target / Goal Completeness Audit
+
+This section audits what is still missing from the plan, target, and goal. It exists because the spec has many architecture details, but a complete plan also needs exact product intent, user promise, operational boundaries, evidence standards, and success/failure definitions.
+
+Completeness standard:
+
+- A builder should know exactly what to build first.
+- A tester should know exactly what proves it works.
+- A user should know exactly what the product promises and refuses to promise.
+- A future agent should know which features are blocked and why.
+- A risk reviewer should know where false confidence, privacy loss, or unsafe automation can enter.
+
+#### 31.14.1 Canonical Target Statement
+
+Current target:
+
+> Build a hidden, admin-only Vibing Finance workbench inside TradersApp that lets a trader upload local CSV data, describe the first approved post-initial-balance strategy for MNQ or NIFTY, convert that description into a deterministic strategy spec, run a local browser-first backtest with strict data/fill/risk assumptions, and produce an institutional-style report plus local proof block that protects the user from false confidence.
+
+Still missing from target:
+
+| Missing target detail | Why it matters | Required decision |
+|---|---|---|
+| First user's identity | "Admin" is not enough to design UX and defaults | Is first user founder only, internal trader, prop trader, beginner retail trader, or invited beta user? |
+| First user pain ranked 1-3 | The product can optimize for edge discovery, avoiding bad strategies, position sizing, prop rules, or learning | Rank the first pain before UI copy and report priority are finalized |
+| First benchmark task | Needed to judge if MVP is useful | Define one exact upload + strategy + expected report workflow that proves value |
+| First success metric | Needed to know if private MVP succeeded | Choose: time to first report, correctness vs fixture, user trust rating, or number of rejected bad strategies |
+| First "wow" moment | Needed to shape UX | Decide whether the wow is setup detection, brutal caveats, visual proof, agent-like work loop, or next-experiment plan |
+| First unacceptable failure | Needed for launch gate | Define what failure blocks even private use: wrong trades, bad timezone, hidden data upload, overconfident verdict, etc. |
+
+#### 31.14.2 Canonical Goal Ladder
+
+The goal must be layered so future work does not dilute the first build.
+
+| Layer | Goal | Status | Missing detail |
+|---|---|---|---|
+| Immediate build goal | Deterministic hidden browser MVP for one strategy family | Mostly defined | Golden fixtures, metric formulas, hash canonicalization |
+| Private alpha goal | Trustworthy reports, export/import, CLI parity, stronger tests | Partly defined | Alpha user workflow, support process, bug triage rules |
+| Automation goal | CLI/local runner can run unattended scoped jobs | Partly defined | Runner security handshake, budgets, workspace locks |
+| Intelligence goal | Agent-like planning and critique around deterministic tools | Partly defined | Which role agents are built first, and which are explicitly deferred |
+| Learning goal | Per-user adaptive memory improves suggestions safely | Partly defined | Memory UX, feedback controls, promotion gates |
+| Model-training goal | Optional governed offline candidate models | Not MVP | Consent, registry, eval protocol, rollback, drift monitoring |
+| Launch goal | Public user feature with legal, security, performance, support readiness | Not defined enough | Pricing, support, legal review, data retention, abuse response |
+
+#### 31.14.3 Product Promise Gaps
+
+The exact promise to the user is not fully locked.
+
+Must decide:
+
+- Does the product promise "backtest this strategy" or "help you reject weak strategies"?
+- Does the product position itself as a research assistant, risk desk, strategy debugger, or learning coach?
+- Does the report lead with verdict, risk, metrics, or explanation?
+- Is the first user expected to already have CSV data, or should the product teach CSV preparation?
+- Is the MVP only for one uploaded file, or can it compare multiple files/time periods?
+- Is the first report allowed to say "paper-trade candidate", or only "research-worthy / revise / reject"?
+- What exact language is forbidden because it sounds like financial advice?
+- What minimum evidence is required before the product says anything positive?
+
+Required output:
+
+- Add a "User Promise" section with allowed and forbidden wording.
+- Add a "First Report Verdict Vocabulary" table.
+- Add a "Minimum Evidence Before Positive Language" table.
+
+#### 31.14.4 Strategy Plan Gaps
+
+The strategy is directionally defined, but implementation still needs exact state-machine behavior.
+
+Missing details:
+
+- Exact state names for setup detection.
+- Whether caught inventory can occur before/after VWAP crossing, or only relative to IB sweep.
+- Whether the structure-change candle itself can be the entry trigger.
+- How long the system waits for a pullback after CHoCH before invalidating the setup.
+- Whether wick touch of VWAP is enough for pullback, or close/body must interact.
+- Whether "33%-66% retrace" is measured from sweep extreme to CHoCH close, CHoCH high/low, or impulse high/low.
+- Whether long and short setups can both be active in the same session.
+- How to handle a second sweep before entry.
+- How to handle gaps through entry, stop, or targets.
+- Whether entries use next candle open, trigger price, close price, or conservative fill price.
+- Whether partial exits use exact target price or OHLC conservative assumptions.
+- How breakeven stop is applied when TP1 and stop are both touched in the same candle.
+- Whether commissions/slippage are per side, round trip, per contract, or percentage.
+
+Required output:
+
+- Add a setup detector finite-state machine.
+- Add an execution/fill finite-state machine.
+- Add at least 10 golden candle-sequence examples.
+
+#### 31.14.5 Data And Instrument Plan Gaps
+
+The plan cannot be correct unless instrument metadata is exact.
+
+Missing details:
+
+- MNQ tick size.
+- MNQ point value.
+- NIFTY instrument type: spot index, futures, options, or synthetic index CSV.
+- NIFTY lot size if futures/options.
+- NIFTY tick size and point value by instrument type.
+- Currency and conversion handling.
+- Whether account equity is USD, INR, or user-configured.
+- Default commissions for MNQ and NIFTY.
+- Default spread/slippage assumptions.
+- How to detect RTH-only vs full-session MNQ data.
+- How to treat half days, exchange holidays, and daylight saving time.
+- How to handle CSVs with split sessions or overnight sessions.
+
+Required output:
+
+- Add `instrument_metadata.v1` table.
+- Add `session_calendar.v1` table.
+- Add default fee/slippage table.
+- Add user override rules and report caveats.
+
+#### 31.14.6 UX / Workflow Plan Gaps
+
+The workbench shape is described, but exact user journeys still need locking.
+
+Missing user journeys:
+
+- First empty page.
+- First CSV upload.
+- CSV validation failure.
+- Missing timezone confirmation.
+- Strategy prompt with missing details.
+- Normalized strategy confirmation.
+- Backtest running.
+- Run cancelled.
+- Run failed.
+- No trades found.
+- Low-quality report generated.
+- Normal report generated.
+- Report exported.
+- Proof verified.
+- Memory candidate created.
+- User deletes all local data.
+
+Required output:
+
+- Add a user-journey table with screen state, user action, system response, and acceptance check.
+- Add exact UI copy for the first-run path.
+- Add "danger/caution" copy for low confidence and bad data.
+
+#### 31.14.7 Report And Verdict Gaps
+
+The report standard is broad but not yet executable.
+
+Missing details:
+
+- Exact report section order for MVP.
+- Which sections are mandatory vs optional in M6.
+- Exact verdict labels.
+- Exact thresholds for reject / revise / research-worthy / paper-trade candidate.
+- Minimum trades threshold behavior.
+- Low data-quality verdict behavior.
+- No-trade verdict behavior.
+- How to present positive metrics with caveats.
+- How to cite evidence refs in report prose.
+- How to show "not applied" sections like news filtering.
+- Whether charts are required in MVP or post-MVP.
+
+Required output:
+
+- Add `report_schema.v1`.
+- Add `verdict_rules.v1`.
+- Add report copy templates for each verdict.
+- Add forbidden/required language list.
+
+#### 31.14.8 Architecture / Implementation Plan Gaps
+
+The architecture is detailed, but implementation sequencing still has gaps.
+
+Missing details:
+
+- Exact first PR/file-change sequence.
+- Which existing auth/admin helper is used.
+- Where feature flags live now.
+- How the new route is registered.
+- Whether `src/features/terminal` is reused or only stylistically referenced.
+- How core modules are extracted before CLI.
+- What worker bundling pattern Vite will use.
+- How tests run in this repo for worker modules.
+- Whether Node CLI can import browser-safe ES modules without bundling issues.
+- Whether `package.json` scripts should be added immediately or after CLI exists.
+
+Required output:
+
+- Add "Implementation PR sequence" with PR1-PRN.
+- Add repo integration map with exact existing files and expected edits.
+- Add module import boundary rules.
+
+#### 31.14.9 Security / Privacy / Compliance Plan Gaps
+
+The high-level guardrails are good, but exact controls are missing.
+
+Missing details:
+
+- Admin identity source and session check.
+- Local-only data guarantee test.
+- IndexedDB encryption decision.
+- Proof signing key storage and recovery.
+- Debug export redaction.
+- Source-map policy for private builds.
+- Secret scanning command in CI.
+- BYOK key storage mode by surface.
+- Runner pairing token and origin policy.
+- Data deletion flow.
+- Compliance copy in reports.
+- Audit log retention.
+
+Required output:
+
+- Add `privacy_controls.v1`.
+- Add `secret_handling.v1`.
+- Add `runner_security.v1` before `vibing serve`.
+- Add report compliance copy templates.
+
+#### 31.14.10 Testing / Verification Plan Gaps
+
+The test plan must become the enforcement layer for the spec.
+
+Missing tests:
+
+- Golden setup-detection fixtures.
+- Golden execution/fill fixtures.
+- Metric formula fixtures.
+- Hash canonicalization fixtures.
+- CSV importer profile fixtures.
+- Timezone/DST/session fixtures.
+- No-trade report fixture.
+- Low-quality data fixture.
+- Report forbidden-claim tests.
+- IndexedDB migration tests.
+- Export/import round-trip tests.
+- Worker crash/cancel tests.
+- UI smoke tests.
+- No-network/no-upload tests.
+- Secret redaction tests.
+- CLI contract tests.
+- Runner security tests later.
+
+Required output:
+
+- Add a test traceability matrix linking every P0 requirement to tests.
+
+#### 31.14.11 Business / Launch Plan Gaps
+
+The spec says hidden until useful, but the launch/business target is still underdefined.
+
+Missing details:
+
+- Whether this is founder-only forever, paid feature, beta feature, or public product.
+- Who supports users when CSVs fail.
+- Data retention promise in public terms.
+- Pricing and BYOK positioning.
+- Whether "free-for-lifetime" applies to all users or only MVP/local mode.
+- What telemetry is allowed, if any.
+- What public claims marketing can make.
+- What must be manually reviewed before launch.
+
+Required output:
+
+- Add launch/business appendix before public beta.
+- Keep business details out of MVP implementation unless they affect privacy, architecture, or report wording.
+
+#### 31.14.12 Completeness Gate For The Plan
+
+The plan is not complete until these exact artifacts exist in this document:
+
+- Canonical target statement.
+- User promise and forbidden claims.
+- Build Now / Build Later / Do Not Build Yet table.
+- MVP scope lock.
+- Golden strategy fixtures.
+- CSV importer profiles.
+- Instrument metadata table.
+- Metric formula appendix.
+- Fill/execution state machine.
+- Report schema and verdict rules.
+- Proof canonicalization spec.
+- Export/import package manifest.
+- Storage migration and recovery plan.
+- Failure/recovery matrix.
+- Test traceability matrix.
+- Repo integration map.
+- Implementation PR sequence.
+- Memory capsule schema.
+- Feedback/memory UX contract.
+- Compliance and privacy control templates.
+
+If any item above is missing, the plan is still incomplete.
+
+### 31.15 Absolute Non-Loss Checklist
+
+This checklist protects the target and goal from being diluted during implementation.
+
+Never lose these requirements:
+
+- Hidden/admin-only until launch gates pass.
+- Browser-first deterministic MVP.
+- Uploaded CSV stays local by default.
+- MNQ and NIFTY are the first assets.
+- First strategy is post-IB, session VWAP, caught buyers/sellers, structure change, pullback, strict risk.
+- No trade before IB completes.
+- Risk per trade defaults to 0.2%.
+- Stop defaults to 12 points.
+- TP1 defaults to 15 points and exits 50%.
+- TP2 defaults to 45 points and exits the rest.
+- Move remaining stop to breakeven after TP1.
+- Conservative OHLC intrabar fills.
+- No LLM-generated metrics.
+- No paid API requirement.
+- No mandatory hosted compute.
+- No public blockchain dependency for MVP.
+- Report must protect users from false confidence.
+- Weak evidence must be labeled weak.
+- Every final report needs reproducibility metadata.
+- Proof blocks are local and free by default.
+- Agent/LLM layers are advisory only.
+- Self-learning starts as per-user adaptive memory, not silent production training.
+- Cross-user/shared training is opt-in, governed, and post-MVP.
+- BYOK is optional and user-controlled.
+- CLI/local runner/browser automation are post-browser-MVP automation surfaces.
+- Do not clone or implement from leaked proprietary repos.
+
 ---
 
 ## 33. Work Package Breakdown
