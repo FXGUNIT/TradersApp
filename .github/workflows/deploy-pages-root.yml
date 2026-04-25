@@ -45,13 +45,13 @@ jobs:
       - name: Validate Cloudflare secrets
         shell: bash
         env:
-          CLOUDFLARE_GLOBAL_KEY:  ${{ secrets.CLOUDFLARE_GLOBAL_KEY }}
+          CLOUDFLARE_API_TOKEN:  ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_EMAIL:       ${{ secrets.CLOUDFLARE_EMAIL }}
           CLOUDFLARE_ACCOUNT_ID:  ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
           missing=0
-          for key in CLOUDFLARE_GLOBAL_KEY CLOUDFLARE_EMAIL CLOUDFLARE_ACCOUNT_ID; do
+          for key in CLOUDFLARE_API_TOKEN CLOUDFLARE_EMAIL CLOUDFLARE_ACCOUNT_ID; do
             if [ -z "${!key:-}" ]; then
               echo "::error::Missing required GitHub secret: ${key}"
               missing=1
@@ -81,7 +81,7 @@ jobs:
 
       - name: Deploy to Cloudflare Pages via REST API
         env:
-          CLOUDFLARE_GLOBAL_KEY:  ${{ secrets.CLOUDFLARE_GLOBAL_KEY }}
+          CLOUDFLARE_API_TOKEN:  ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_EMAIL:       ${{ secrets.CLOUDFLARE_EMAIL }}
           CLOUDFLARE_ACCOUNT_ID:  ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
