@@ -1656,7 +1656,243 @@ If added later:
 
 ---
 
-## 28. Local Python Runner Architecture
+## 28. Clean-Room Agent System Lessons
+
+This section captures high-level architectural lessons from public/user-provided descriptions of modern coding-agent systems. It must remain clean-room.
+
+Source boundary:
+
+- Do not download, inspect, mirror, or run leaked proprietary repositories.
+- Do not copy private source code, private prompts, private tool schemas, or private implementation details.
+- Treat online leak summaries as unverified product folklore unless backed by official docs or clean-room observation.
+- Use only the broad system ideas that are common in agent architecture and implement original TradersApp code.
+
+### 28.1 Core Lesson
+
+The engine should not be "one chatbot response." It should be a structured agent workspace around deterministic tools.
+
+For Vibing Finance, that means:
+
+```text
+User / Founder
+  -> Planner
+  -> Context Manager
+  -> Tool Router
+  -> Backtest Executor
+  -> Risk Analyst
+  -> Report Writer
+  -> Proof Manager
+  -> Memory Manager
+  -> Agent Export
+```
+
+The LLM/agent helps decide, explain, and iterate. The tools produce the facts.
+
+### 28.2 Agent Roles
+
+Planner:
+
+- Converts the user request into a run plan.
+- Selects dataset, strategy spec, and validation steps.
+- Updates the visible checklist.
+- Does not compute metrics.
+
+Context Manager:
+
+- Chooses what context the agent sees.
+- Summarizes old runs into compact memory capsules.
+- Keeps raw CSV private unless explicitly exported.
+- Prevents context bloat.
+
+Tool Router:
+
+- Calls deterministic local tools.
+- Validates tool inputs.
+- Captures tool outputs as structured events.
+- Emits transcript tool-call rows.
+
+Backtest Executor:
+
+- Runs CSV validation, IB/VWAP, setup detection, simulation, and metrics.
+- Runs in browser worker or local Python runner.
+- Is deterministic and test-covered.
+
+Risk Analyst:
+
+- Reads the trade ledger and metrics.
+- Applies rejection rules.
+- Produces caveats, stress notes, and next experiments.
+
+Report Writer:
+
+- Turns structured facts into readable report sections.
+- Must cite metrics and reason codes.
+- Must not invent performance.
+
+Proof Manager:
+
+- Hashes dataset metadata, strategy spec, trade ledger, metrics, and report.
+- Appends local proof block.
+- Exports verification data.
+
+Memory Manager:
+
+- Stores useful summaries, not raw unbounded transcripts.
+- Tracks strategy versions and lessons learned.
+- Promotes only validated lessons into reusable defaults.
+
+### 28.3 Continuous Work Loop
+
+The product can feel autonomous by running a local job loop:
+
+```text
+plan
+  -> run tool
+  -> inspect output
+  -> update plan
+  -> run next tool
+  -> build report
+  -> generate proof
+  -> propose next experiment
+```
+
+Rules:
+
+- The loop must be visible in the UI.
+- The user can stop it.
+- Every action has a transcript event.
+- Failed steps retry only if retry is safe.
+- A retry must preserve the original failure for audit.
+- Completed reports are immutable; improvements create a new report version and proof block.
+
+### 28.4 Background Refinement
+
+The app may support "background refinement" later, but it must not silently alter finalized evidence.
+
+Allowed:
+
+- Recompute a report with a newer engine version and mark it as a new run.
+- Suggest better filters.
+- Detect a data-quality problem after a report.
+- Generate a follow-up experiment plan.
+- Compare two runs and summarize differences.
+
+Not allowed:
+
+- Mutate an old report without a new proof block.
+- Change trade results silently.
+- Promote a strategy verdict without rerunning deterministic tools.
+- Hide failed runs.
+
+### 28.5 Memory Architecture
+
+Memory layers:
+
+| Layer | Stores | Purpose |
+|---|---|---|
+| Session transcript | User messages, tool events, summaries | Current work context |
+| Run memory | Dataset hash, strategy hash, metrics, verdict | Compare runs |
+| Strategy memory | Versioned strategy specs and changes | Research evolution |
+| Lesson memory | Validated findings only | Improve defaults |
+| Proof memory | Hash chain blocks | Reproducibility |
+
+Memory capsule example:
+
+```json
+{
+  "memory_type": "strategy_lesson",
+  "created_at": "...",
+  "strategy_id": "post_ib_vwap_inventory_v1",
+  "dataset_scope": "MNQ 5m 2024 RTH",
+  "finding": "Caught-seller long setups improved when entry distance from VWAP was <= 1.5R.",
+  "evidence": {
+    "runs": ["run_001", "run_007"],
+    "min_trades": 40,
+    "metric_delta": {
+      "profit_factor": "+0.22",
+      "max_drawdown": "-8.5%"
+    }
+  },
+  "status": "candidate_not_default"
+}
+```
+
+Promotion rule:
+
+- A lesson can become a default only after multiple runs and explicit admin approval.
+
+### 28.6 Context Engineering
+
+For Codex/Claude/GPT/Opus review, export compact context:
+
+- Current strategy spec.
+- Dataset metadata and quality score.
+- Run metrics.
+- Trade ledger summary.
+- Reason-code counts.
+- Proof hashes.
+- Open questions.
+- Recent lessons.
+
+Do not include by default:
+
+- Raw CSV rows.
+- Private account details beyond needed risk settings.
+- API keys.
+- Full transcript if not needed.
+
+Context budget rule:
+
+- Agent notes export should fit in a normal prompt.
+- For large runs, include summaries plus hashes, not raw artifacts.
+
+### 28.7 Tool Integration Principle
+
+Every powerful action must be a typed tool event:
+
+```json
+{
+  "tool": "run_backtest",
+  "input_hash": "sha256:...",
+  "started_at": "...",
+  "completed_at": "...",
+  "status": "pass",
+  "output_hash": "sha256:...",
+  "summary": "42 trades, PF 1.41, max DD 3.8%, verdict RESEARCH-WORTHY"
+}
+```
+
+Benefits:
+
+- UI can show progress.
+- Proof chain can hash outputs.
+- Agents can inspect actions.
+- Failed steps are debuggable.
+- Reports are reproducible.
+
+### 28.8 Defensive Design
+
+The system should protect private strategy IP and training data, but it must not poison its own outputs.
+
+Allowed defensive controls:
+
+- Keep raw data local.
+- Redact agent exports.
+- Watermark exported reports later.
+- Hash artifacts.
+- Require admin approval before sharing.
+- Avoid sending strategy text to external APIs by default.
+
+Not allowed:
+
+- Fake tool outputs.
+- Misleading reports.
+- Poisoned data in user-visible results.
+- Any anti-copy trick that reduces trust in our own research output.
+
+---
+
+## 29. Local Python Runner Architecture
 
 Browser mode is the MVP. Local runner is the escape hatch for large files.
 
@@ -1678,9 +1914,9 @@ This keeps hosting free because the user's machine performs heavy work.
 
 ---
 
-## 29. Integration With Existing TradersApp
+## 30. Integration With Existing TradersApp
 
-### 29.1 Frontend Integration
+### 30.1 Frontend Integration
 
 Add a lazy-loaded screen:
 
@@ -1695,7 +1931,7 @@ VITE_ENABLE_VIBING_FINANCE === "true"
 isAdminAuthenticated === true
 ```
 
-### 29.2 BFF Integration
+### 30.2 BFF Integration
 
 MVP should not require BFF for backtest compute.
 
@@ -1706,7 +1942,7 @@ Possible BFF use later:
 - Return feature flag/config.
 - Proxy optional local/remote ML engine status.
 
-### 29.3 ML Engine Integration
+### 30.3 ML Engine Integration
 
 MVP can run without ML engine.
 
@@ -1719,7 +1955,7 @@ Later use ML engine for:
 - Model-based regime classification.
 - Report comparison across runs.
 
-### 29.4 Existing Backtest Rig
+### 30.4 Existing Backtest Rig
 
 The current `ml-engine/backtesting/rig.py` remains useful for Python parity, but browser MVP should define its own narrow JS engine first for zero-hosting cost and immediate UI feedback.
 
@@ -1729,7 +1965,7 @@ Parity requirement:
 
 ---
 
-## 30. Implementation Roadmap For This Architecture
+## 31. Implementation Roadmap For This Architecture
 
 ### A0 - Spec Hardening
 
@@ -1805,7 +2041,7 @@ Parity requirement:
 
 ---
 
-## 31. Deep Execution Plan
+## 32. Deep Execution Plan
 
 This section turns the architecture into an executable build sequence. The rule is simple: do not build clever ML, public blockchain, or strategy expansion until the narrow deterministic MVP can ingest CSV, detect setups, simulate trades, and generate a strict report.
 
@@ -1871,7 +2107,7 @@ Anything not on this path is postponed.
 
 ---
 
-## 32. Work Package Breakdown
+## 33. Work Package Breakdown
 
 ### 32.1 M1 - Hidden Admin Shell
 
@@ -2120,7 +2356,7 @@ Acceptance:
 
 ---
 
-## 33. Runtime State Machines
+## 34. Runtime State Machines
 
 ### 33.1 Dataset State
 
@@ -2184,7 +2420,7 @@ none
 
 ---
 
-## 34. UI Planning Details
+## 35. UI Planning Details
 
 ### 34.1 Screen Zones
 
@@ -2443,7 +2679,7 @@ Data quality is too low for a decision-grade report.
 
 ---
 
-## 35. Test Plan
+## 36. Test Plan
 
 ### 35.1 Unit Test Matrix
 
@@ -2505,7 +2741,7 @@ Scenarios:
 
 ---
 
-## 36. Agent Operating Procedure
+## 37. Agent Operating Procedure
 
 Every Codex/Claude planning or implementation loop should follow this:
 
@@ -2532,7 +2768,7 @@ Add focused tests for the changed logic.
 
 ---
 
-## 37. Definition Of Done
+## 38. Definition Of Done
 
 ### 37.1 MVP Done
 
@@ -2572,7 +2808,7 @@ Private alpha is done when:
 
 ---
 
-## 38. Free-Lifetime Risk Register
+## 39. Free-Lifetime Risk Register
 
 | Risk | Impact | Mitigation |
 |---|---|---|
@@ -2589,7 +2825,7 @@ Private alpha is done when:
 
 ---
 
-## 39. External Reference Notes
+## 40. External Reference Notes
 
 These references informed the free architecture and timing defaults as of 2026-04-25:
 
