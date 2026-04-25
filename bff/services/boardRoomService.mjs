@@ -20,6 +20,7 @@ import { fileURLToPath } from 'url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REDIS_CONNECT_TIMEOUT_MS = Number.parseInt(process.env.REDIS_CONNECT_TIMEOUT_MS || '1000', 10);
 const REDIS_RETRY_COOLDOWN_MS = Number.parseInt(process.env.REDIS_RETRY_COOLDOWN_MS || '30000', 10);
+const BOARD_ROOM_STORAGE_MODE = String(process.env.BOARD_ROOM_STORAGE_MODE || 'auto').trim().toLowerCase();
 
 function getLogDir() {
   return process.env.BOARD_ROOM_LOG_DIR || join(__dirname, '../../board-room/logs');
@@ -31,6 +32,21 @@ function getArchiveDir() {
 
 function getFallbackStoreFile() {
   return process.env.BOARD_ROOM_FALLBACK_STORE || join(getLogDir(), '..', 'fallback-store.json');
+}
+
+function hasExplicitRedisConfig() {
+  return Boolean(process.env.REDIS_URL || process.env.REDIS_HOST || process.env.REDIS_PORT);
+}
+
+function shouldUseRedis() {
+  if (BOARD_ROOM_STORAGE_MODE === 'file') return false;
+  if (BOARD_ROOM_STORAGE_MODE === 'redis') return true;
+  return hasExplicitRedisConfig();
+}
+
+function isRedisRequired() {
+  return BOARD_ROOM_STORAGE_MODE === 'redis' ||
+    (BOARD_ROOM_STORAGE_MODE === 'auto' && hasExplicitRedisConfig());
 }
 
 // ─── Redis Client ───────────────────────────────────────────────────────────
@@ -144,6 +160,21 @@ function memoryIncr(key) {
   return next;
 }
 
+function isFileStoreHealthy() {
+  loadMemoryFallback();
+  const filePath = getFallbackStoreFile();
+  try {
+    const dir = dirname(filePath);
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+    if (!existsSync(filePath)) {
+      persistMemoryFallback();
+    }
+    return existsSync(filePath);
+  } catch {
+    return false;
+  }
+}
+
 function resolveRedisUrl() {
   if (process.env.REDIS_URL) {
     return process.env.REDIS_URL;
@@ -166,6 +197,10 @@ function logRedisUnavailable(message) {
 }
 
 async function getRedis() {
+  if (!shouldUseRedis()) {
+    return null;
+  }
+
   if (_redis?.isOpen) {
     return _redis;
   }
@@ -861,20 +896,32 @@ async function getTemplates() {
 async function getStorageHealth() {
   const client = await getRedis();
   const redisConnected = Boolean(client?.isOpen);
+  const redisEnabled = shouldUseRedis();
+  const redisRequired = isRedisRequired();
+  const fileHealthy = isFileStoreHealthy();
+  const degraded = redisRequired ? !redisConnected : !fileHealthy;
   return {
-    ok: true,
-    mode: redisConnected ? 'redis' : 'memory-fallback',
-    degraded: !redisConnected,
+    ok: !degraded,
+    mode: redisConnected ? 'redis' : 'file',
+    configuredMode: BOARD_ROOM_STORAGE_MODE,
+    primary: redisEnabled ? 'redis' : 'file',
+    degraded,
+    durable: redisConnected || fileHealthy,
     redisConnected,
-    redisUrl: resolveRedisUrl().replace(/:\/\/([^:@]+):([^@]+)@/, '://$1:***@'),
+    redisEnabled,
+    redisRequired,
+    redisExplicitlyConfigured: hasExplicitRedisConfig(),
+    redisUrl: redisEnabled
+      ? resolveRedisUrl().replace(/:\/\/([^:@]+):([^@]+)@/, '://$1:***@')
+      : null,
     retryAfterMs: _redisDisabledUntil > Date.now() ? _redisDisabledUntil - Date.now() : 0,
     lastRedisNotice: _lastRedisNotice,
-    memoryFallback: {
+    fileStore: {
       keys: _memoryStore.size,
       zsets: _memoryZsets.size,
       counters: _memoryCounters.size,
       file: getFallbackStoreFile(),
-      persisted: existsSync(getFallbackStoreFile()),
+      persisted: fileHealthy,
     },
     logDir: getLogDir(),
   };
