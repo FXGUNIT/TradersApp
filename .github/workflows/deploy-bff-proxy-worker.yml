@@ -51,5 +51,6 @@ jobs:
           echo "=== Attempting Worker deploy ==="
           cd deploy/cloudflare-tunnel/bff-worker
           CLOUDFLARE_ACCOUNT_ID="0f779fe4981d424548a48856cc9139db" \
-          CLOUDFLARE_API_TOKEN="$CLOUDFLARE_API_TOKEN" \
+          CF_EMAIL="$CLOUDFLARE_EMAIL" \
+          CF_API_KEY="$CLOUDFLARE_GLOBAL_KEY" \
           npx wrangler deploy --name tradersapp-bff-proxy --env production 2>&1
