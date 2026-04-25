@@ -1,0 +1,121 @@
+name: Deploy Optional BFF Worker
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  WORKER_DIR: deploy/cloudflare-tunnel/bff-worker
+
+jobs:
+  deploy:
+    name: Deploy free workers.dev BFF proxy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Validate Cloudflare secrets
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          missing=0
+          for key in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID; do
+            if [ -z "${!key:-}" ]; then
+              echo "::error::Missing required GitHub secret: ${key}"
+              missing=1
+            fi
+          done
+          if [ "${missing}" -ne 0 ]; then
+            exit 1
+          fi
+
+      - name: Deploy Worker
+        id: deploy_worker
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          mkdir -p .artifacts/cloudflare-worker
+          cd "${WORKER_DIR}"
+          npx wrangler@4.84.1 deploy 2>&1 | tee "${GITHUB_WORKSPACE}/.artifacts/cloudflare-worker/deploy.log"
+          WORKER_URL="$(grep -Eo 'https://[^[:space:]]+workers.dev' "${GITHUB_WORKSPACE}/.artifacts/cloudflare-worker/deploy.log" | head -n 1 || true)"
+          if [ -z "${WORKER_URL}" ]; then
+            echo "::error::Could not find workers.dev URL in Wrangler deploy output"
+            exit 1
+          fi
+          echo "worker_url=${WORKER_URL}" >> "${GITHUB_OUTPUT}"
+          echo "Deployed Worker: ${WORKER_URL}" >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Verify Worker
+        shell: bash
+        env:
+          WORKER_URL: ${{ steps.deploy_worker.outputs.worker_url }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import os
+          import sys
+          import urllib.request
+
+          base = os.environ["WORKER_URL"].rstrip("/")
+          origin = "https://tradergunit.pages.dev"
+          checks = [
+              ("health", "/health"),
+              ("news_upcoming", "/news/upcoming"),
+              ("news_breaking", "/news/breaking?fresh=true&max=5"),
+          ]
+
+          report = {"worker_url": base, "checks": []}
+          for name, path in checks:
+              req = urllib.request.Request(
+                  f"{base}{path}",
+                  headers={"Origin": origin, "Accept": "application/json"},
+              )
+              with urllib.request.urlopen(req, timeout=20) as resp:
+                  status = resp.getcode()
+                  body = resp.read().decode("utf-8", errors="replace")
+                  data = json.loads(body or "{}")
+                  allow_origin = resp.headers.get("access-control-allow-origin")
+              ok = status == 200 and isinstance(data, dict) and data.get("ok") is True
+              if allow_origin not in (origin, "*"):
+                  ok = False
+              report["checks"].append(
+                  {
+                      "name": name,
+                      "url": f"{base}{path}",
+                      "status": status,
+                      "allow_origin": allow_origin,
+                      "ok": ok,
+                      "body_preview": data,
+                  }
+              )
+
+          print(json.dumps(report, indent=2))
+          if not all(check["ok"] for check in report["checks"]):
+              sys.exit(1)
+          PY
+
+      - name: Upload Worker verification artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bff-worker-deploy-${{ github.run_id }}
+          path: .artifacts/cloudflare-worker/
+          if-no-files-found: ignore
+          include-hidden-files: true
+          retention-days: 14
