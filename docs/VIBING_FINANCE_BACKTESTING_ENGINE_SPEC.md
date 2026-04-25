@@ -2090,6 +2090,7 @@ Source boundary:
 - Do not copy private source code, private prompts, private tool schemas, or private implementation details.
 - Treat online leak summaries as unverified product folklore unless backed by official docs or clean-room observation.
 - Use only the broad system ideas that are common in agent architecture and implement original TradersApp code.
+- Public MIT-licensed projects can be studied for design patterns, but TradersApp should still write original code unless a deliberate dependency decision is made.
 
 ### 28.1 Core Lesson
 
@@ -2137,6 +2138,35 @@ Tool Router:
 - Emits transcript tool-call rows.
 - Routes powerful tools through typed adapters, including browser worker, Python runner, PowerShell, Bash, terminal commands, filesystem reads/writes, MCP tools, and local services.
 - Enforces task scope: tools may be used only when they directly or indirectly advance the user's research/backtesting agenda, setup, verification, reporting, or recovery from failures.
+
+Task Queue:
+
+- Stores the run plan as a directed acyclic graph of tasks.
+- Runs independent tasks in parallel when their inputs do not conflict.
+- Unblocks dependent tasks only after required artifacts exist.
+- Cascades failure only to tasks that truly depend on the failed task.
+- Supports explicit task assignment to planner, data, backtest, risk, report, proof, memory, or reviewer agents.
+
+Message Bus:
+
+- Carries typed messages between coordinator, role agents, tools, memory, and UI.
+- Keeps all messages scoped to the active workspace/run.
+- Persists important messages as transcript/tool events.
+- Avoids direct hidden mutation between agents.
+
+Shared Memory:
+
+- Provides a namespaced key-value store for agent findings.
+- Separates scratch notes, run facts, user preferences, validated lessons, and proof refs.
+- Can start in-process/IndexedDB and later use durable local or hosted stores.
+- Must not be treated as numerical truth unless backed by artifacts and proof refs.
+
+Agent Runner:
+
+- Owns the model -> tool -> model turn cycle for any LLM-backed agent.
+- Enforces max turns, timeout, token budget, tool budget, and loop detection.
+- Compresses or summarizes large consumed tool outputs to protect context budget.
+- Preserves error outputs and failed tool events for audit.
 
 Terminal / Shell Executor:
 
