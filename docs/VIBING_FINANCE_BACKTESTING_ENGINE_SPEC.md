@@ -948,7 +948,8 @@ Therefore the default architecture is:
 - Optional local Python/FastAPI runner for heavier jobs on the user's own machine.
 - Optional Cloudflare Pages static hosting because it currently has a $0/free plan, but the app must still work from a local build if a vendor changes terms.
 - No paid public blockchain in the critical path.
-- No paid LLM API in the mandatory path.
+- No embedded paid LLM API in the mandatory app runtime.
+- Codex/Claude/GPT/Opus Code can be used as an always-available operator/research layer when the founder is actively working, but the app must not require storing a paid API key or running server-side LLM calls to complete an MVP backtest.
 - No server-side storage required for MVP.
 
 Free does not mean unlimited. The system must degrade safely:
@@ -975,6 +976,7 @@ Free does not mean unlimited. The system must degrade safely:
 | Report generation | Local deterministic report engine | $0 | No server or API call |
 | Audit proof | Local Merkle/hash-chain ledger | $0 | No gas, no paid chain |
 | Heavy research | Optional local Python runner | $0 hosting | Uses existing repo/ML engine locally |
+| Agent assistance | Codex/Claude/GPT/Opus Code as operator | Existing user access | Used to build, inspect, critique, and improve; not required by app runtime |
 
 ### 19.2 Optional Runtime
 
@@ -984,6 +986,7 @@ Free does not mean unlimited. The system must degrade safely:
 | Existing BFF | Existing product APIs | The feature needs account/admin verification from backend |
 | Existing ML engine | Local or current deployment | Heavy backtest/ML job exceeds browser limits |
 | Local Ollama/WebLLM | Local natural-language enhancement | User wants LLM-like interaction without paid APIs |
+| Codex/Claude/GPT/Opus Code | Human-supervised agent workflow | Founder wants agent to implement, audit, or interpret results |
 | GitHub repo proof | Optional exported proof commit | Public timestamping is wanted without blockchain fees |
 | Public blockchain proof | Optional later | A real business need exists and free/feeless constraints still hold |
 
@@ -1565,9 +1568,9 @@ Even admin-only tools need safety:
 
 ---
 
-## 27. Free AI / Analyst Architecture
+## 27. AI / Analyst Architecture
 
-The user wants the feel of talking to a seasoned research team. For free-for-lifetime constraints, split this into layers:
+The user wants the feel of talking to a seasoned research team and expects Codex, Claude, GPT, or Opus Code to be available as an operator layer. For free-for-lifetime runtime constraints, split this into layers:
 
 ### 27.1 Free Deterministic Analyst
 
@@ -1583,7 +1586,47 @@ Always available:
 
 This can feel intelligent without a paid LLM because the strategy family is narrow and rules are explicit.
 
-### 27.2 Optional Local LLM
+### 27.2 Agent-Assisted Operator Layer
+
+Assumption:
+
+- Codex, Claude, GPT, or Opus Code will usually be available to the founder while building and operating this feature.
+
+Role of the coding/research agent:
+
+- Convert founder notes into updates to this canonical spec.
+- Implement and refactor code.
+- Inspect failed backtests.
+- Generate test cases.
+- Audit lookahead bias, fill assumptions, and data-quality issues.
+- Explain reports in plain English.
+- Suggest next experiments.
+- Compare browser results against the Python runner.
+- Help create new strategy templates after the MVP is stable.
+
+Hard boundary:
+
+- The agent is not the source of numerical truth.
+- The deterministic backtest engine is the source of numerical truth.
+- The strategy DSL is the source of executable strategy truth.
+- The proof chain is the source of reproducibility truth.
+- Any agent-written strategy change must become a versioned strategy spec before it is backtested.
+- Any agent interpretation must cite the report metrics it is based on.
+
+Agent workflow:
+
+```text
+Founder idea
+  -> Codex/Claude helps refine spec
+  -> deterministic strategy JSON is produced
+  -> browser/Python engine runs backtest
+  -> report and proof block are generated
+  -> Codex/Claude critiques the result and proposes next test
+```
+
+This gives the product the "senior research desk" feeling while keeping the engine auditable and reproducible.
+
+### 27.3 Optional Local LLM
 
 Optional later:
 
@@ -1598,9 +1641,9 @@ Rules:
 - Deterministic strategy spec remains source of truth.
 - Report metrics must come from engine, not model text.
 
-### 27.3 Paid LLM Policy
+### 27.4 Embedded Paid LLM Policy
 
-Paid APIs are not part of the free MVP.
+Embedded paid APIs are not part of the free MVP.
 
 If added later:
 
@@ -1608,6 +1651,8 @@ If added later:
 - Must support user-provided key.
 - Must redact private data where possible.
 - Must show cost-risk warning.
+- Must never be required for backtest execution.
+- Must never replace deterministic metrics.
 
 ---
 
@@ -1751,6 +1796,13 @@ Parity requirement:
 
 - Add optional summarizer only after deterministic report works.
 
+### A10 - Agent Operating Loop
+
+- Add an "Agent Notes" export section to each report so Codex/Claude can inspect the strategy spec, dataset metadata, metrics, and proof hashes without needing private raw CSV rows.
+- Add a compact JSON report format designed for coding agents.
+- Keep this as export/import text, not a mandatory hosted API.
+- Use agents for critique, improvement ideas, and implementation work, while keeping all final strategy runs deterministic.
+
 ---
 
 ## 31. Free-Lifetime Risk Register
@@ -1761,7 +1813,7 @@ Parity requirement:
 | Worker free CPU too small | Server backtests fail | Do not require Worker compute |
 | Browser memory insufficient | Large CSV fails | Chunking plus local Python runner |
 | Paid data needed | Cannot stay free | Uploaded CSV only in MVP |
-| Paid LLM needed | Ongoing cost | Deterministic analyst first, local LLM optional |
+| Embedded paid LLM needed | Ongoing cost | Deterministic analyst first, Codex/Claude as operator layer, local LLM optional |
 | Public blockchain fees | Ongoing cost | Local proof chain first |
 | Free public chain changes | Proof anchoring breaks | Public anchoring optional |
 | Admin browser data loss | Reports vanish | Export/import artifacts and proof chain |
