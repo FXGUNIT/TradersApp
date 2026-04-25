@@ -2,6 +2,8 @@ import { SCREEN_IDS } from "../shell/screenIds.js";
 
 const LOGIN_RATE_LIMIT_STORAGE_KEY = "traders-login-rate-limit-v1";
 const PENDING_GOOGLE_SIGNUP_STORAGE_KEY = "traders-pending-google-signup-v1";
+const PENDING_GOOGLE_FORM_DATA_KEY = "traders-pending-google-form-data-v1";
+const GOOGLE_REDIRECT_IN_PROGRESS_KEY = "traders-google-redirect-in-progress-v1";
 const LOGIN_RATE_LIMIT_MAX_ATTEMPTS = 3;
 const LOGIN_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 
@@ -179,4 +181,31 @@ export const persistPendingGoogleSignup = (draft) => {
 
 export const clearPendingGoogleSignup = () => {
   safeStorageRemove(PENDING_GOOGLE_SIGNUP_STORAGE_KEY);
+};
+
+export const readPendingGoogleFormData = () =>
+  safeStorageGet(PENDING_GOOGLE_FORM_DATA_KEY, null);
+
+export const persistPendingGoogleFormData = (formData) => {
+  safeStorageSet(PENDING_GOOGLE_FORM_DATA_KEY, formData);
+};
+
+export const clearPendingGoogleFormData = () => {
+  safeStorageRemove(PENDING_GOOGLE_FORM_DATA_KEY);
+};
+
+export const markRedirectInProgress = () => {
+  safeStorageSet(GOOGLE_REDIRECT_IN_PROGRESS_KEY, true);
+};
+
+export const clearRedirectInProgress = () => {
+  safeStorageRemove(GOOGLE_REDIRECT_IN_PROGRESS_KEY);
+};
+
+export const isRedirectInProgress = () => {
+  try {
+    return localStorage.getItem(GOOGLE_REDIRECT_IN_PROGRESS_KEY) === "true";
+  } catch {
+    return false;
+  }
 };

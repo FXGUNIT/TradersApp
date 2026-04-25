@@ -1,8 +1,11 @@
 import { useEffect, useRef } from "react";
-import { onAuthStateChanged } from "firebase/auth";
+import { getRedirectResult, onAuthStateChanged } from "firebase/auth";
 import { auth } from "../../services/firebase.js";
 import {
   clearPendingGoogleSignup,
+  clearPendingGoogleFormData,
+  clearRedirectInProgress,
+  readPendingGoogleFormData,
 } from "./authFlowStorage.js";
 const AUDIT_MODE_KEY = "TradersApp_AuditMode";
 
@@ -47,6 +50,7 @@ export function useAuthBootstrap({
   setScreen,
   setIsInitialLoading,
   authBootstrapCompleteRef: externalAuthBootstrapCompleteRef,
+  pendingRedirectResultHandler,
 }) {
   const internalAuthBootstrapCompleteRef = useRef(false);
   const authBootstrapCompleteRef =
