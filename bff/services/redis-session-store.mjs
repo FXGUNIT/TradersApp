@@ -1,11 +1,15 @@
 /**
- * Redis-backed session and rate-limit store.
+ * Session and rate-limit store.
  *
- * No in-process session fallback is used. When Redis is unavailable:
- * - session operations fail closed
- * - rate limiting fails open
+ * Sessions use durable local file storage by default so admin access remains
+ * available when Redis is down. Redis can still be forced with
+ * SESSION_STORAGE_MODE=redis, while rate limiting continues to use Redis and
+ * fails open if Redis is unavailable.
  */
 
+import { randomUUID } from "node:crypto";
+import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
 import { createClient } from "redis";
 
 const REDIS_URL = process.env.REDIS_URL || "redis://redis:6379";
@@ -21,6 +25,15 @@ const SESSION_TTL_SECONDS = Number.parseInt(
   process.env.SESSION_TTL_SECONDS || "28800",
   10,
 );
+const SESSION_STORAGE_MODE = String(process.env.SESSION_STORAGE_MODE || "file")
+  .trim()
+  .toLowerCase();
+const SESSION_FALLBACK_STORE = String(
+  process.env.SESSION_FALLBACK_STORE ||
+    process.env.SESSION_FILE_STORE ||
+    "runtime/session-store.json",
+);
+const FILE_SESSION_STORE_PATH = resolve(process.cwd(), SESSION_FALLBACK_STORE);
 const RATE_LIMIT_PREFIX = "ratelimit:";
 const DEFAULT_SESSION_PREFIX = "session:";
 export const ADMIN_SESSION_PREFIX = "admin-session:";
@@ -32,6 +45,7 @@ let isConnected = false;
 let nextConnectAttemptAt = 0;
 let lastUnavailableLogAt = 0;
 let lastUnavailableMessage = null;
+let fileStoreWriteChain = Promise.resolve();
 
 function buildKey(prefix, id) {
   return `${prefix}${id}`;
@@ -63,6 +77,213 @@ function logRedisUnavailable(message) {
   console.warn(
     `[Redis] Unavailable; using degraded mode until retry window: ${message}`,
   );
+}
+
+function shouldUseRedisSessions() {
+  return SESSION_STORAGE_MODE === "redis" || SESSION_STORAGE_MODE === "auto";
+}
+
+function shouldUseFileSessions() {
+  return SESSION_STORAGE_MODE === "file" || SESSION_STORAGE_MODE === "auto";
+}
+
+function buildEmptyFileStore() {
+  return {
+    version: 1,
+    sessions: {},
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function pruneExpiredFileSessions(store, now = Date.now()) {
+  let removed = 0;
+  for (const [key, record] of Object.entries(store.sessions || {})) {
+    if (!record || Number(record.expiresAt || 0) <= now) {
+      delete store.sessions[key];
+      removed += 1;
+    }
+  }
+  return removed;
+}
+
+async function readFileSessionStore() {
+  try {
+    const raw = await readFile(FILE_SESSION_STORE_PATH, "utf8");
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") {
+      return buildEmptyFileStore();
+    }
+    return {
+      version: parsed.version || 1,
+      sessions:
+        parsed.sessions && typeof parsed.sessions === "object"
+          ? parsed.sessions
+          : {},
+      updatedAt: parsed.updatedAt || null,
+    };
+  } catch {
+    return buildEmptyFileStore();
+  }
+}
+
+async function writeFileSessionStore(store) {
+  await mkdir(dirname(FILE_SESSION_STORE_PATH), { recursive: true });
+  const tmpPath = `${FILE_SESSION_STORE_PATH}.tmp-${process.pid}`;
+  const nextStore = {
+    ...store,
+    version: 1,
+    updatedAt: new Date().toISOString(),
+  };
+  await writeFile(tmpPath, `${JSON.stringify(nextStore, null, 2)}\n`, {
+    mode: 0o600,
+  });
+  await rename(tmpPath, FILE_SESSION_STORE_PATH);
+}
+
+async function mutateFileSessionStore(mutator) {
+  fileStoreWriteChain = fileStoreWriteChain
+    .catch(() => {})
+    .then(async () => {
+      const store = await readFileSessionStore();
+      pruneExpiredFileSessions(store);
+      const result = await mutator(store);
+      await writeFileSessionStore(store);
+      return result;
+    });
+  return fileStoreWriteChain;
+}
+
+async function createFileSession(sessionData, { prefix, ttlSeconds }) {
+  const sessionId = randomUUID();
+  const now = Date.now();
+  const expiresAt = now + Math.max(1, ttlSeconds) * 1000;
+  const session = {
+    id: sessionId,
+    ...sessionData,
+    createdAt: sessionData?.createdAt || now,
+    lastActiveAt: sessionData?.lastActiveAt || now,
+  };
+
+  await mutateFileSessionStore((store) => {
+    store.sessions[buildKey(prefix, sessionId)] = {
+      value: session,
+      expiresAt,
+      createdAt: now,
+      updatedAt: now,
+    };
+  });
+  return sessionId;
+}
+
+async function getFileSession(sessionId, { prefix, ttlSeconds, touch }) {
+  if (!sessionId) return null;
+  const key = buildKey(prefix, sessionId);
+
+  if (touch) {
+    return mutateFileSessionStore((store) => {
+      const record = store.sessions[key];
+      if (!record || Number(record.expiresAt || 0) <= Date.now()) {
+        delete store.sessions[key];
+        return null;
+      }
+      const updatedSession = {
+        ...record.value,
+        lastActiveAt: Date.now(),
+      };
+      store.sessions[key] = {
+        ...record,
+        value: updatedSession,
+        expiresAt: Date.now() + Math.max(1, ttlSeconds) * 1000,
+        updatedAt: Date.now(),
+      };
+      return updatedSession;
+    });
+  }
+
+  const store = await readFileSessionStore();
+  const record = store.sessions[key];
+  if (!record || Number(record.expiresAt || 0) <= Date.now()) {
+    if (record) {
+      await mutateFileSessionStore((nextStore) => {
+        delete nextStore.sessions[key];
+      });
+    }
+    return null;
+  }
+  return record.value || null;
+}
+
+async function updateFileSession(sessionId, updates, options) {
+  const { prefix, ttlSeconds } = options;
+  if (!sessionId) return false;
+  const key = buildKey(prefix, sessionId);
+  return mutateFileSessionStore((store) => {
+    const record = store.sessions[key];
+    if (!record || Number(record.expiresAt || 0) <= Date.now()) {
+      delete store.sessions[key];
+      return false;
+    }
+    const updatedSession = {
+      ...record.value,
+      ...updates,
+      lastActiveAt: Date.now(),
+    };
+    store.sessions[key] = {
+      ...record,
+      value: updatedSession,
+      expiresAt: Date.now() + Math.max(1, ttlSeconds) * 1000,
+      updatedAt: Date.now(),
+    };
+    return true;
+  });
+}
+
+async function deleteFileSession(sessionId, { prefix }) {
+  if (!sessionId) return false;
+  const key = buildKey(prefix, sessionId);
+  return mutateFileSessionStore((store) => {
+    const existed = Boolean(store.sessions[key]);
+    delete store.sessions[key];
+    return existed;
+  });
+}
+
+async function listFileSessions({ prefix }) {
+  const store = await readFileSessionStore();
+  const now = Date.now();
+  const expiredKeys = [];
+  const sessions = [];
+  for (const [key, record] of Object.entries(store.sessions || {})) {
+    if (!key.startsWith(prefix)) continue;
+    if (!record || Number(record.expiresAt || 0) <= now) {
+      expiredKeys.push(key);
+      continue;
+    }
+    if (record.value) sessions.push(record.value);
+  }
+  if (expiredKeys.length) {
+    await mutateFileSessionStore((nextStore) => {
+      for (const key of expiredKeys) delete nextStore.sessions[key];
+    });
+  }
+  return sessions;
+}
+
+async function deleteFileUserSessions(userId, { prefix, userIdField }) {
+  if (!userId) return 0;
+  return mutateFileSessionStore((store) => {
+    let deleted = 0;
+    for (const [key, record] of Object.entries(store.sessions || {})) {
+      if (
+        key.startsWith(prefix) &&
+        record?.value?.[userIdField] === userId
+      ) {
+        delete store.sessions[key];
+        deleted += 1;
+      }
+    }
+    return deleted;
+  });
 }
 
 export async function getRedisClient() {
@@ -129,7 +350,11 @@ export async function getRedisClient() {
 
 export async function createSession(sessionData, options = {}) {
   const { prefix, ttlSeconds } = resolveOptions(options);
-  const sessionId = crypto.randomUUID();
+  if (!shouldUseRedisSessions()) {
+    return createFileSession(sessionData, { prefix, ttlSeconds });
+  }
+
+  const sessionId = randomUUID();
   const now = Date.now();
   const session = {
     id: sessionId,
@@ -140,7 +365,9 @@ export async function createSession(sessionData, options = {}) {
 
   const client = await getRedisClient();
   if (!client) {
-    return null;
+    return shouldUseFileSessions()
+      ? createFileSession(sessionData, { prefix, ttlSeconds })
+      : null;
   }
 
   try {
@@ -162,9 +389,15 @@ export async function getSession(sessionId, options = {}) {
   }
 
   const { prefix, ttlSeconds, touch } = resolveOptions(options);
+  if (!shouldUseRedisSessions()) {
+    return getFileSession(sessionId, { prefix, ttlSeconds, touch });
+  }
+
   const client = await getRedisClient();
   if (!client) {
-    return null;
+    return shouldUseFileSessions()
+      ? getFileSession(sessionId, { prefix, ttlSeconds, touch })
+      : null;
   }
 
   try {
@@ -193,6 +426,10 @@ export async function getSession(sessionId, options = {}) {
 
 export async function updateSession(sessionId, updates, options = {}) {
   const { prefix, ttlSeconds } = resolveOptions(options);
+  if (!shouldUseRedisSessions()) {
+    return updateFileSession(sessionId, updates, { prefix, ttlSeconds });
+  }
+
   const existing = await getSession(sessionId, { ...options, touch: false });
   if (!existing) {
     return false;
@@ -200,7 +437,9 @@ export async function updateSession(sessionId, updates, options = {}) {
 
   const client = await getRedisClient();
   if (!client) {
-    return false;
+    return shouldUseFileSessions()
+      ? updateFileSession(sessionId, updates, { prefix, ttlSeconds })
+      : false;
   }
 
   const updatedSession = {
@@ -228,9 +467,15 @@ export async function deleteSession(sessionId, options = {}) {
   }
 
   const { prefix } = resolveOptions(options);
+  if (!shouldUseRedisSessions()) {
+    return deleteFileSession(sessionId, { prefix });
+  }
+
   const client = await getRedisClient();
   if (!client) {
-    return false;
+    return shouldUseFileSessions()
+      ? deleteFileSession(sessionId, { prefix })
+      : false;
   }
 
   try {
@@ -243,9 +488,13 @@ export async function deleteSession(sessionId, options = {}) {
 
 export async function listSessions(options = {}) {
   const { prefix } = resolveOptions(options);
+  if (!shouldUseRedisSessions()) {
+    return listFileSessions({ prefix });
+  }
+
   const client = await getRedisClient();
   if (!client) {
-    return [];
+    return shouldUseFileSessions() ? listFileSessions({ prefix }) : [];
   }
 
   try {
@@ -277,9 +526,15 @@ export async function deleteUserSessions(userId, options = {}) {
   }
 
   const { prefix, userIdField } = resolveOptions(options);
+  if (!shouldUseRedisSessions()) {
+    return deleteFileUserSessions(userId, { prefix, userIdField });
+  }
+
   const client = await getRedisClient();
   if (!client) {
-    return 0;
+    return shouldUseFileSessions()
+      ? deleteFileUserSessions(userId, { prefix, userIdField })
+      : 0;
   }
 
   try {
