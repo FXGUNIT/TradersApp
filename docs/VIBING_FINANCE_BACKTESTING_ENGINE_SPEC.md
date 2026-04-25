@@ -4268,7 +4268,7 @@ This section turns the architecture into an executable build sequence. The rule 
 
 ### 31.1 Planning Objective
 
-Build the first usable private version in this order:
+Build the product in this order. The first usable MVP stops after step 6; steps 7+ are post-MVP/private-alpha expansion.
 
 1. Hidden admin page.
 2. CSV upload and data-quality check.
@@ -4276,7 +4276,7 @@ Build the first usable private version in this order:
 4. Deterministic backtest worker.
 5. Risk report.
 6. Local proof chain.
-7. Agent export.
+7. Agent export after M7 passes.
 8. Built-in `vibing` CLI using the same core engine.
 9. Local runner service for unattended browser-to-machine execution.
 10. Python parity runner later.
@@ -4285,6 +4285,8 @@ Build the first usable private version in this order:
 ### 31.2 Critical Path
 
 ```text
+MVP path:
+
 Feature flag/admin gate
   -> hidden screen shell
   -> CSV parser
@@ -4296,6 +4298,10 @@ Feature flag/admin gate
   -> risk metrics
   -> report builder
   -> proof chain
+
+Post-MVP/private-alpha path:
+
+proof chain
   -> agent notes export
   -> run package export
   -> vibing CLI parity
@@ -6140,9 +6146,10 @@ The private MVP is done when:
 - At least 4 fixture strategies pass expected outcomes.
 - Report renders.
 - Proof chain block is generated.
-- Agent notes export exists.
+- Run artifacts can be exported or inspected locally.
 - No paid API is required.
 - No raw CSV is uploaded.
+- Section 41 milestone quality gates pass for M1-M7.
 
 ### 37.2 Private Alpha Done
 
@@ -6154,6 +6161,7 @@ Private alpha is done when:
 - No browser freeze on reasonable CSV size.
 - Report identifies no-trade/weak-edge cases correctly.
 - Agent export is useful for Codex/Claude critique.
+- Section 41 scorecard averages at least 4/5 with no dimension below 3.
 
 ### 37.3 Public Launch Still Blocked Until
 
@@ -6194,3 +6202,201 @@ These references informed the free architecture and timing defaults as of 2026-0
 - CME material confirms Micro E-mini futures trade nearly around the clock; the MVP still intentionally uses 09:30 ET as the New York/RTH-style session open for this strategy: https://www.cmegroup.com/education/frequently-asked-questions-micro-e-mini-equity-index-futures.html
 - `open-multi-agent` public README describes an MIT-licensed TypeScript multi-agent orchestration engine with `runTeam()`, task DAG orchestration, multi-model teams, MessageBus, TaskQueue, SharedMemory, AgentRunner, ToolRegistry, schema-validated custom tools, MCP integration, local model support, and in-process runtime patterns. This spec uses it only as a public clean-room architecture reference, not copied code: https://github.com/JackChen-me/open-multi-agent
 - `yasasbanukaofficial/claude-code` publicly describes itself as a mirror/backup of leaked proprietary Claude Code source exposed through npm source maps. This spec treats it as a prohibited implementation source and uses only README-level cautionary lessons about agent-terminal UX, service separation, background memory, proactive modes, deep planning, and release/source-map hygiene: https://github.com/yasasbanukaofficial/claude-code
+
+---
+
+## 41. Best-In-Class Governance And Evidence Standard
+
+This section prevents the spec from becoming impressive but unenforceable. It defines how decisions stay locked, how future changes are judged, and what evidence is required before anyone can claim the engine is actually excellent.
+
+### 41.1 Gold-Standard Planning Tests
+
+The document must pass these tests before each implementation milestone starts:
+
+| Test | Pass condition |
+|---|---|
+| Two-minute builder test | A new builder can read section 0 and know exactly what to build now |
+| Fixture test | The milestone has at least one fixture, test vector, or manual acceptance check |
+| Boundary test | Inputs, outputs, side effects, and artifact refs are explicit |
+| Failure test | At least one expected failure path and recovery action is documented |
+| Privacy test | The milestone does not upload raw CSV, secrets, or private prompts by default |
+| Proof test | Durable outputs can be hashed, versioned, exported, or referenced |
+| Agent test | An AI coding agent can work on the milestone without broad interpretation |
+| User trust test | The feature cannot create a more confident but less truthful report |
+
+If a milestone fails any test, the spec must be patched before code work continues.
+
+### 41.2 Architecture Decision Records
+
+These are the locked architecture decisions. New decisions must be added here instead of being hidden in prose.
+
+| ADR | Decision | Status | Rationale | Reversal trigger |
+|---|---|---|---|---|
+| ADR-001 | MVP is browser-first and local-first | Locked | Fastest private value, no hosted compute, strong privacy | Browser cannot handle fixture-scale data after optimization |
+| ADR-002 | Uploaded CSV is the only MVP data source | Locked | Avoid licensing, vendor, and timing complexity | Private alpha needs a verified licensed source |
+| ADR-003 | MNQ and NIFTY 5-minute data are first assets | Locked | Narrow enough to test sessions, timezone, and execution assumptions | First user changes target market before implementation |
+| ADR-004 | Deterministic core owns numerical truth | Locked | Prevents LLM hallucinated metrics and hidden logic drift | Never, unless product stops being a backtester |
+| ADR-005 | Conservative OHLC fill policy wins ambiguity | Locked | Avoids optimistic false confidence | Tick-level replay becomes available and verified |
+| ADR-006 | Report Builder cannot invent facts | Locked | Report must be evidence-bound | Never |
+| ADR-007 | Local proof chain before public chain | Locked | Free, fast, private, reproducible | Legal or customer requirement for public anchoring |
+| ADR-008 | CLI comes after browser proof passes | Locked | Prevents premature surface expansion | Browser MVP is abandoned |
+| ADR-009 | Local runner is localhost-only by default | Locked | Enables power tools while limiting exposure | Desktop packaging replaces localhost bridge |
+| ADR-010 | BYOK/provider calls are optional and post-MVP | Locked | Avoids cost, privacy, and prompt-dependency in first build | User explicitly prioritizes provider-assisted workflow after M7 |
+| ADR-011 | Per-user adaptive memory is not model training | Locked | Keeps learning auditable and reversible | Formal consent, registry, evals, rollback, and governance exist |
+| ADR-012 | Microservices are boundaries first, deployments later | Locked | Best fit for a vibe-dev builder and single-repo velocity | Operational load proves a separate service is needed |
+
+ADR change template:
+
+```text
+ADR:
+Date:
+Decision changed:
+Why:
+Evidence:
+Risks:
+Rollback:
+Affected sections:
+Tests added:
+```
+
+### 41.3 Non-Negotiable Backtesting Invariants
+
+These invariants must become automated tests as implementation starts.
+
+| Invariant | Failure means |
+|---|---|
+| Signals never use future bars | Lookahead bias |
+| Session labels are timezone-explicit | Session bug or silent data drift |
+| Initial balance uses only its defined window | Strategy contamination |
+| VWAP uses only available bars up to the decision point | Lookahead bias |
+| Setup detection emits reason codes | Unexplainable trade logic |
+| Entry, stop, target, fees, and slippage are recorded per trade | Non-auditable PnL |
+| If stop and target are both touched in one OHLC bar, conservative resolution applies | Optimistic fill bias |
+| Metrics derive from ledger, not summary text | Non-reproducible report |
+| Report verdict is computed from structured facts | LLM or prose overreach |
+| Proof hash changes when any input artifact changes | Broken audit trail |
+| Export/import preserves hashes | Broken reproducibility |
+| Memory suggestions cannot alter historical runs | Evidence tampering |
+
+### 41.4 Evidence Ladder
+
+The project must not jump from idea to launch. Evidence must climb this ladder:
+
+| Level | Evidence | Allowed claim |
+|---|---|---|
+| L0 | Spec only | "The plan is defined" |
+| L1 | Unit tests and fixtures | "The implementation matches controlled examples" |
+| L2 | Real uploaded CSV private runs | "The workflow works on real user files" |
+| L3 | Cross-window and sensitivity checks | "The idea is less likely to be a single-period artifact" |
+| L4 | Out-of-sample or walk-forward checks | "The idea has preliminary robustness evidence" |
+| L5 | Paper-trading/live shadow comparison | "The backtest assumptions are being compared to execution reality" |
+| L6 | Independent review and monitoring | "The system is launch-candidate" |
+
+Current evidence level:
+
+- Planning: L0 complete.
+- Product: L0 only until code and fixtures exist.
+
+### 41.5 Quality Gates By Milestone
+
+| Milestone | Must pass before merge |
+|---|---|
+| M1 Hidden Shell | Feature flag off by default, admin gate, empty workbench renders, no public nav exposure |
+| M2 CSV Intake | Header profiles, timestamp handling, invalid row report, timezone warning, local-only proof |
+| M3 Features | IB, VWAP, swings, session labels, no future-bar access |
+| M4 Setup Detector | Golden fixtures for long, short, no-trade, ambiguous, and low-quality cases |
+| M5 Simulator | Conservative fills, fees/slippage, risk sizing, ledger-to-metrics consistency |
+| M6 Report | Verdict rules, caveats, forbidden claim tests, low-sample warnings |
+| M7 Proof | Canonical JSON, hash vectors, export/import verification, proof mismatch failure path |
+| M8 Agent Export | Redaction, compact artifact refs, no raw rows by default |
+| M9 CLI | Contract tests against browser artifacts, workspace lock, machine-readable exit codes |
+| M10 Runner | Pairing, capabilities, budget, cancellation, origin/workspace checks |
+| M11 Python | Parity tolerance table and mismatch report |
+| M12 Browser Automation | Allowed-origin policy, screenshots as sensitive artifacts |
+
+### 41.6 Spec Change Control
+
+Change rules:
+
+- Any change to MVP scope must update section 0 first.
+- Any new service must update sections 20.20, 20.21, 20.25, and 20.27.
+- Any new metric must update formulas, report rules, proof artifacts, and tests.
+- Any new data source must update importer profiles, licensing, timezone rules, and data-quality tests.
+- Any new provider call must update BYOK policy, redaction, budget, failure handling, and logs.
+- Any new autonomous loop must update budget, stop reasons, proof, memory, and user visibility.
+- Any new launch claim must update compliance language and forbidden claim tests.
+
+Review rule:
+
+- If a change makes the engine more powerful, it must also make observability, limits, and recovery stronger.
+
+### 41.7 Best-In-Class Review Scorecard
+
+Use this scorecard before implementation, private alpha, and launch.
+
+| Dimension | 1 | 3 | 5 |
+|---|---|---|---|
+| Bias detection | Lookahead/survivorship/timing ignored | Main timing risks documented | Automated leakage tests and review checklist |
+| Execution realism | Naive fills | Conservative OHLC fills and cost model | Sensitivity, tick/parity checks, live shadow comparison |
+| Validation quality | One profitable run | Fixtures plus real private run | Walk-forward, stress, parameter stability, out-of-sample |
+| Report honesty | Profit-first report | Caveats and verdict rules | Claim tests, legal review, evidence ladder labels |
+| Reproducibility | Screenshots or summaries only | Exportable artifacts | Cross-runtime hash and metric verification |
+| Privacy | Implicit upload or logs | Local-first defaults | Redaction tests, secret scanning, explicit upload controls |
+| Autonomy safety | Hidden background jobs | Visible plans and stop button | Budgets, kill switch, event logs, recovery proofs |
+| Vibe-dev maintainability | Large unclear files | Stable modules and PR sequence | Contract tests, fixtures, doctor command, agent prompts |
+
+Best-in-class threshold:
+
+- Planning baseline: average score 4+ with no dimension below 3.
+- Private MVP: average score 4+ with all M1-M7 tests passing.
+- Public launch: average score 4.5+ with no critical open risks.
+
+### 41.8 Red-Team Questions
+
+Before each milestone is marked done, answer:
+
+1. How could this produce a profitable-looking but false result?
+2. What timestamp, session, or timezone assumption could be wrong?
+3. What hidden data upload or secret exposure could happen?
+4. What would an LLM be tempted to invent here?
+5. What happens if the browser tab closes mid-run?
+6. What happens if IndexedDB quota is exceeded?
+7. What happens if the artifact hash mismatches?
+8. What proof would convince a skeptical trader this result is reproducible?
+9. What should the report refuse to say?
+10. What test will fail if this breaks later?
+
+### 41.9 Implementation Evidence Ledger
+
+When code work begins, append evidence rows here.
+
+| Date | Milestone | Evidence | Command / artifact | Result |
+|---|---|---|---|---|
+| TBD | M1 | Hidden shell verification | TBD | Pending |
+| TBD | M2 | CSV fixture tests | TBD | Pending |
+| TBD | M3 | Feature computation tests | TBD | Pending |
+| TBD | M4 | Setup fixture tests | TBD | Pending |
+| TBD | M5 | Simulator and metrics tests | TBD | Pending |
+| TBD | M6 | Report guardrail tests | TBD | Pending |
+| TBD | M7 | Proof hash vectors | TBD | Pending |
+
+### 41.10 Final Truth
+
+This document can now be treated as a best-in-class planning baseline because it defines:
+
+- The product target.
+- The first user.
+- The MVP scope.
+- The architecture.
+- The service boundaries.
+- The data contracts.
+- The fixtures and metrics that must exist.
+- The proof model.
+- The report guardrails.
+- The autonomy limits.
+- The self-learning limits.
+- The implementation sequence.
+- The launch blockers.
+- The governance rules that prevent future drift.
+
+The engine itself is not best-in-class until the implementation evidence ledger is filled with passing tests, artifacts, and private-run verification.
