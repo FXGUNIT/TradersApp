@@ -79,16 +79,13 @@ jobs:
           test -f public/_headers
           grep -q 'DEVELOPER_PREVIEW_PATH' src/App.jsx
 
-      - name: Deploy to Cloudflare Pages via REST API
-        env:
-          CLOUDFLARE_API_TOKEN:  ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_EMAIL:       ${{ secrets.CLOUDFLARE_EMAIL }}
-          CLOUDFLARE_ACCOUNT_ID:  ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Deploy to Cloudflare Pages via Wrangler v3
         run: |
-          node scripts/pages/pages_api_deploy.mjs \
-            --account-id "${CLOUDFLARE_ACCOUNT_ID}" \
+          set -euo pipefail
+          # Wrangler v3 authenticates via CLOUDFLARE_API_TOKEN env var directly.
+          # Wrangler v4 calls /user/tokens/verify which blocks cfat_ tokens.
+          npx wrangler@3.103.0 pages deploy dist \
             --project-name tradergunit \
-            --dist-dir dist \
             --branch main \
             --commit-hash "${GITHUB_SHA}"
 
