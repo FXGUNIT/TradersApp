@@ -1,7 +1,6 @@
 name = "tradersapp-bff-proxy"
 main = "index.js"
 compatibility_date = "2026-04-24"
-compatibility_flags = ["nodejs_compat"]
 workers_dev = true
 
 # No owned domain is required. Deploy this optional proxy to Cloudflare's free
