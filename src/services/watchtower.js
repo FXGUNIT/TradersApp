@@ -143,12 +143,14 @@ export async function runWatchtowerScan() {
 
   let aiResult = null;
   let mlResult = null;
+  let consensusResult = null;
   let newsStatus = getInitialNewsSystemStatus();
 
   if (health.ok && hasBff()) {
-    [aiResult, mlResult, newsStatus] = await Promise.all([
+    [aiResult, mlResult, consensusResult, newsStatus] = await Promise.all([
       fetchJson("/ai/status", { timeoutMs: 5000 }),
       fetchJson("/ml/health", { timeoutMs: 6000 }),
+      fetchJson("/ml/consensus?session=1&symbol=MNQ", { timeoutMs: 15000 }),
       fetchNewsSystemStatus(),
     ]);
   } else if (!gatewayAfter.auditRuntime && gatewayAfter.baseUrl) {
@@ -205,6 +207,19 @@ export async function runWatchtowerScan() {
     );
   }
 
+  if (health.ok && consensusResult && !consensusResult.ok) {
+    faults.push(
+      createFault(
+        "ML_CONSENSUS_DEGRADED",
+        "ML consensus degraded",
+        consensusResult?.data?.error ||
+          consensusResult?.error ||
+          "BFF /ml/consensus returned a fallback response.",
+        "medium",
+      ),
+    );
+  }
+
   faults.push(...summarizeNewsFaults(newsStatus));
 
   const status = buildStatus(faults);
@@ -230,6 +245,11 @@ export async function runWatchtowerScan() {
         ok: Boolean(mlResult?.ok),
         status: mlResult?.status || 0,
         data: mlResult?.data || null,
+      },
+      consensus: {
+        ok: Boolean(consensusResult?.ok),
+        status: consensusResult?.status || 0,
+        data: consensusResult?.data || null,
       },
     },
     news: newsStatus,

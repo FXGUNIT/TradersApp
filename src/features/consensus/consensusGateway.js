@@ -40,8 +40,12 @@ export async function fetchConsensus({
   const res = await fetch(`${BFF_BASE}/ml/consensus?${searchParams.toString()}`, {
     signal: AbortSignal.timeout(15_000),
   });
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) {
+    if (data && data.source === "ml_engine_fallback") {
+      return data;
+    }
     throw new Error(`ML consensus fetch failed: ${res.status}`);
   }
-  return res.json();
+  return data;
 }
