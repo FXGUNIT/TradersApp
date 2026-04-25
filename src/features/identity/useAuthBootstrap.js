@@ -57,6 +57,23 @@ export function useAuthBootstrap({
     externalAuthBootstrapCompleteRef || internalAuthBootstrapCompleteRef;
 
   useEffect(() => {
+    // Handle Google sign-in redirect result on page return from OAuth redirect
+    if (auth && pendingRedirectResultHandler) {
+      getRedirectResult(auth)
+        .then((result) => {
+          if (result?.user) {
+            const pendingFormData = readPendingGoogleFormData();
+            pendingRedirectResultHandler(result.user, pendingFormData);
+          }
+        })
+        .catch((err) => {
+          console.warn("[AuthBootstrap] getRedirectResult failed:", err?.message);
+        })
+        .finally(() => {
+          clearRedirectInProgress();
+        });
+    }
+
     if (!auth) {
       // Firebase not configured — proceed to login screen after a brief moment
       const timer = setTimeout(() => {
@@ -148,6 +165,7 @@ export function useAuthBootstrap({
     setGoogleUser,
     setScreen,
     setIsInitialLoading,
+    pendingRedirectResultHandler,
   ]);
 }
 
