@@ -78,6 +78,7 @@ Use these IDs in tasks, tests, commits, and future agent prompts to avoid headin
 | `P0-PACKAGE` | `run-package.v1` manifest exists | Resolved in section 25.8 |
 | `P0-TEST-MAP` | P0 test traceability exists | Resolved in section 36.5 |
 | `P0-REPO-SEQUENCE` | First PR sequence exists | Resolved in section 31.16 |
+| `ARCH-SERVICE-PLAN` | Whole-engine and microservice boundary plan exists | Resolved in sections 20.19-20.28 |
 
 ### 0.5 Naming Glossary
 
@@ -2164,6 +2165,357 @@ Desktop later must:
 - Reuse `vibing serve` protocol.
 - Store artifacts in the same workspace layout.
 - Provide native file access only through the same tool registry and policy guard.
+
+### 20.19 Whole-Engine Microservices Architecture Plan
+
+Final architecture decision:
+
+- Start as a modular local-first engine, not a distributed platform.
+- Design microservice boundaries now, but split them only when a contract, test fixture, and operational reason exists.
+- Keep numerical truth in shared deterministic core modules.
+- Let services orchestrate, store, explain, and verify; do not let them reinterpret fills, trades, metrics, or proof hashes.
+
+Why this is most suitable for a vibe-dev builder:
+
+- A single developer with AI agents can run one local app, one worker, and one CLI without debugging many deployed services.
+- Each future service has a clear contract, so an agent can implement or test it without reading the whole system.
+- The architecture can grow into local runner, Python workers, and hosted provider gateways without rewriting the browser MVP.
+- Failures stay visible as typed events and artifacts instead of disappearing into background jobs.
+
+Service boundary rule:
+
+```text
+If a component cannot be tested with fixtures, replayed from artifacts, and explained through events,
+it is not ready to become a microservice.
+```
+
+### 20.20 Service Map
+
+The word "service" below includes in-process modules, Web Workers, CLI commands, localhost services, and hosted services. Early services can live in one repo and one process; the boundary is the contract, not the deployment unit.
+
+| Service / module | First form | Later form | Owns | Must not own |
+|---|---|---|---|---|
+| Workbench UI | React hidden page | Same | User workflow, transcript, visual state, artifact inspection | Trading math, secret storage, hidden shell execution |
+| Core Engine | `core/*` JS modules | Shared package | Strategy schema, indicators, setup detection, fills, metrics, report facts, proof hashing | React state, provider calls, network, filesystem |
+| Backtest Worker | Browser Web Worker | Worker pool | CPU-heavy parsing/backtest execution in browser | UI rendering, secrets, arbitrary terminal commands |
+| Local Artifact Store | IndexedDB + export JSON | File workspace + optional encrypted sync | Datasets metadata, run artifacts, reports, proof blocks, memory capsules | Unversioned mutable report truth |
+| Agent Control Plane | Browser state + event log | In-process agent kernel | Plans, task DAG, visible tool loop, context packets | Final numerical claims |
+| Tool Router | In-process registry | CLI/runner tool registry | Tool permissions, schemas, event emission, budgets | Undeclared side effects |
+| Built-in CLI | `scripts/vibing-finance/cli.mjs` | Package binary | Scriptable validation, runs, reports, proof, export/import | Separate metric rules |
+| Local Runner Service | Not MVP | `vibing serve` on `127.0.0.1` | Long jobs, filesystem workspace, terminal tools, SSE progress | Hosted public access, unrestricted commands |
+| Python Research Worker | Not MVP | Optional CLI engine | Large datasets, vectorized backtests, walk-forward, Monte Carlo | Product state, final report wording without core facts |
+| Provider Gateway | Not MVP | Optional BFF service | BYOK routing, redaction, budget checks, provider error normalization | Raw CSV storage, mandatory model calls, deterministic truth |
+| Memory Manager | IndexedDB module | Optional local/sync service | Per-user adaptive memory, lessons, preferences, evidence refs | Cross-user training without consent, proof mutation |
+| Proof Manager | Core module | Optional local/Git/public anchor service | Canonical hashes, proof blocks, verification | Strategy quality decisions |
+| Browser Automation Worker | Not MVP | Playwright through CLI | Smoke tests, screenshots, UI inspection | Trading decisions, private-site automation |
+| BFF Config/Auth | Existing app service later | Hosted service | Admin check, feature flags, settings sync | User CSV compute by default |
+| Job Orchestrator | Not MVP | Local queue first, hosted queue later | Dependency graph, retry policy, budgets, long-running research jobs | Silent background experiments |
+| Observability/Audit | Event log + debug export | Local/hosted log collector | Tool events, run traces, debug packages | Secrets, raw private rows by default |
+
+### 20.21 Canonical Service Contracts
+
+Every service boundary must use versioned JSON contracts.
+
+Request envelope:
+
+```json
+{
+  "schemaVersion": "vibing.request.v1",
+  "requestId": "req_...",
+  "idempotencyKey": "idem_...",
+  "workspaceId": "workspace_...",
+  "actor": {
+    "type": "user|agent|system",
+    "id": "actor_..."
+  },
+  "capability": "backtest.run",
+  "budget": {
+    "maxRuntimeSeconds": 300,
+    "maxCostUsd": 0,
+    "maxRows": 250000,
+    "networkAllowed": false
+  },
+  "inputRefs": [],
+  "options": {}
+}
+```
+
+Event envelope:
+
+```json
+{
+  "schemaVersion": "vibing.event.v1",
+  "eventId": "evt_...",
+  "requestId": "req_...",
+  "runId": "run_...",
+  "parentEventId": null,
+  "type": "tool_started",
+  "phase": "parse|validate|plan|execute|report|proof|memory",
+  "status": "started|progress|completed|failed|blocked|cancelled",
+  "timestamp": "2026-04-25T00:00:00.000Z",
+  "message": "short user-visible status",
+  "artifactRefs": [],
+  "redactionLevel": "none|metadata_only|private"
+}
+```
+
+Artifact ref:
+
+```json
+{
+  "schemaVersion": "vibing.artifact_ref.v1",
+  "artifactId": "artifact_...",
+  "kind": "dataset_profile|strategy_spec|trade_ledger|metrics|report|proof_block|memory_capsule",
+  "uri": "indexeddb://... or file://workspace-relative-path",
+  "sha256": "sha256:...",
+  "createdAt": "2026-04-25T00:00:00.000Z",
+  "redactionLevel": "metadata_only"
+}
+```
+
+Contract rules:
+
+- Every request has `requestId`, `idempotencyKey`, `workspaceId`, `actor`, `budget`, and `capability`.
+- Every service emits `started`, `progress`, `completed` or `failed` events.
+- Every durable output is an artifact ref with a hash.
+- Every service validates schema version before running.
+- Every service supports a dry-run or validation path before destructive or expensive work.
+- Every service failure returns a typed failure code, user-visible message, and recovery suggestion.
+- No service logs raw provider keys.
+- No service assumes network access unless the budget explicitly allows it.
+
+### 20.22 Engine Data Flows
+
+Browser MVP flow:
+
+```text
+CSV upload
+  -> CSV parser
+  -> data-quality profile
+  -> strategy DSL validator
+  -> Web Worker backtest
+  -> trade ledger + metrics artifacts
+  -> report builder
+  -> local proof block
+  -> workbench artifact inspector
+```
+
+CLI flow:
+
+```text
+run-package or CSV + strategy
+  -> vibing validate-data
+  -> vibing run
+  -> vibing report
+  -> vibing proof append
+  -> export package
+```
+
+Local runner flow:
+
+```text
+Workbench
+  -> localhost pairing check
+  -> capabilities manifest
+  -> run package request
+  -> runner task
+  -> SSE event stream
+  -> artifact refs
+  -> browser import/verify
+```
+
+Python research flow:
+
+```text
+CLI request
+  -> core contract validation
+  -> Python engine adapter
+  -> parity/mismatch report
+  -> artifacts in same package format
+  -> proof verification
+```
+
+Provider/BYOK flow:
+
+```text
+User enables provider profile
+  -> redaction policy
+  -> provider request packet
+  -> provider response
+  -> deterministic validator
+  -> accepted suggestion or rejected suggestion event
+```
+
+No flow is allowed to bypass artifact hashing, typed events, or deterministic validation.
+
+### 20.23 Vibe-Dev-Friendly Repository Shape
+
+Target shape when implementation starts:
+
+```text
+src/features/vibing-finance/
+  ui/
+  core/
+  agent/
+  storage/
+  workers/
+  adapters/
+  schemas/
+  __tests__/
+scripts/vibing-finance/
+  cli.mjs
+  doctor.mjs
+  serve.mjs
+  fixtures/
+artifacts/vibing-finance/
+  datasets/
+  runs/
+  reports/
+  proof/
+  debug/
+```
+
+Folder rules:
+
+- `core/` is pure and test-heavy.
+- `ui/` renders state and never owns calculations.
+- `workers/` runs CPU-heavy deterministic jobs.
+- `adapters/` converts between browser, CLI, runner, Python, and provider surfaces.
+- `schemas/` owns shared Zod/JSON-schema contracts.
+- `scripts/vibing-finance/` owns local automation only after browser MVP passes.
+- `fixtures/` is the builder's safety net; every risky change must run against it.
+
+Every service-like component should have:
+
+- A fixture test.
+- A contract schema.
+- A `doctor` or health check path.
+- A debug export.
+- Clear input and output artifact refs.
+- A failure code table.
+- A local-only development command before any hosted deployment.
+
+### 20.24 Deployment Topologies
+
+| Topology | Components | User value | When allowed |
+|---|---|---|---|
+| `LOCAL_BROWSER_MVP` | React workbench, Web Worker, IndexedDB, local proof | First useful private backtest | Now |
+| `LOCAL_CLI_AUTOMATION` | Shared core, `vibing` CLI, file artifacts | Repeatable runs and CI checks | After M7 |
+| `LOCAL_RUNNER_PRO` | Workbench, CLI, `vibing serve`, local filesystem, optional terminal tools | Overnight jobs and unattended scoped work | After CLI contract tests |
+| `LOCAL_RESEARCH_LAB` | CLI, Python worker, fixture parity, local queue | Large datasets and advanced validation | After JS engine is trusted |
+| `HOSTED_PRIVATE_ALPHA` | Workbench, BFF auth/config, optional provider gateway | Safer private alpha distribution | After privacy/security review |
+| `SELF_HOSTED_ENTERPRISE` | App, BFF, runner, artifact storage, policy service | Organization-controlled deployment | Not MVP |
+
+Deployment rules:
+
+- Hosted mode cannot be required for a backtest to complete.
+- Hosted mode must not receive raw CSV unless the user explicitly imports/uploads to that hosted mode.
+- Local runner is bound to localhost by default.
+- Provider gateway is optional and must support BYOK without storing raw keys in logs.
+- Enterprise/self-hosted comes after the local contracts are stable.
+
+### 20.25 Microservice Split Criteria
+
+A component may be split into a true service only after all criteria pass:
+
+| Criterion | Required evidence |
+|---|---|
+| Stable contract | JSON schema exists and has contract tests |
+| Fixture replay | Inputs can be replayed without UI state |
+| Artifact lineage | Outputs are hashed and referenced by `run-package.v1` |
+| Operational need | Split solves scale, isolation, security, or deployment pain |
+| Local command | Service runs locally with one documented command |
+| Health check | `/health`, `doctor`, or equivalent exists |
+| Failure behavior | Typed errors and recovery messages exist |
+| Budget control | Runtime, cost, disk, network, and retry limits exist where relevant |
+| Security review | Secrets, paths, origins, and redaction rules are documented |
+| Rollback path | Old in-process path remains available or migration is reversible |
+
+Anti-split rules:
+
+- Do not split because it sounds scalable.
+- Do not split before the browser worker and CLI agree on fixtures.
+- Do not split a service whose output cannot be hashed.
+- Do not split provider calls into the required path.
+- Do not split memory/training into cross-user infrastructure before explicit consent and governance exist.
+
+### 20.26 Microservice Implementation Sequence
+
+Use this exact sequence if the architecture grows beyond the browser MVP:
+
+1. Extract `core/*` so browser worker imports pure deterministic modules.
+2. Add schema contracts under `schemas/*` and test them with fixtures.
+3. Add `artifactSchemas.js`, `eventSchemas.js`, and `runPackage.js`.
+4. Add CLI commands that call the same core modules.
+5. Add file workspace locking for CLI artifacts.
+6. Add `vibing doctor` and `vibing proof verify`.
+7. Add `vibing serve` as a localhost wrapper over CLI/core.
+8. Add local runner pairing, capability manifest, SSE events, and cancellation.
+9. Add Python engine adapter behind CLI only after parity tests exist.
+10. Add provider gateway/BYOK only after redaction, budget, and fallback tests exist.
+11. Add local queue for unattended watch mode only after runner budgets and stop rules exist.
+12. Add hosted services only after local proof, privacy, and support gates pass.
+
+The implementation sequence must never invert deterministic proof and AI assistance. Backtest correctness comes first; agent autonomy comes after.
+
+### 20.27 Service Capability Manifest
+
+Every CLI, runner, or hosted service exposes capabilities before the workbench uses it.
+
+Example:
+
+```json
+{
+  "schemaVersion": "vibing.capabilities.v1",
+  "serviceId": "local-runner",
+  "serviceVersion": "0.1.0",
+  "workspaceRoot": ".",
+  "capabilities": [
+    "data.validate",
+    "backtest.run",
+    "report.build",
+    "proof.verify"
+  ],
+  "limits": {
+    "maxRows": 1000000,
+    "maxRuntimeSeconds": 3600,
+    "networkDefault": false,
+    "shellDefault": false
+  },
+  "providers": [],
+  "security": {
+    "localhostOnly": true,
+    "pairingRequired": true,
+    "secretsRedacted": true
+  }
+}
+```
+
+Capability rules:
+
+- The workbench may only call advertised capabilities.
+- Capabilities can be narrower than the service implementation.
+- Missing capability means disabled UI, not hidden fallback.
+- Capability changes are logged as events.
+- Dangerous capabilities require explicit budgets and visible scope.
+
+### 20.28 Robustness Requirements For The Whole Engine
+
+The whole engine is robust only if these guarantees hold:
+
+| Area | Guarantee |
+|---|---|
+| Correctness | Golden fixtures catch wrong setup detection, fills, metrics, and proof hashes |
+| Reproducibility | Same run package produces same artifacts across browser/CLI/Python within documented tolerance |
+| Privacy | Raw CSV stays local unless the user explicitly exports/uploads it |
+| Autonomy | Background work has budgets, stop reasons, and resumable checkpoints |
+| Observability | Every important action emits an event and can be included in a debug package |
+| Security | Shell, browser automation, provider calls, and filesystem access are scoped by capability and workspace |
+| Recovery | Tab close, worker crash, quota error, runner disconnect, and hash mismatch have recovery paths |
+| Extensibility | New providers, engines, reports, and storage backends are adapters, not forks |
+| Vibe-dev usability | A builder can run doctor, fixtures, one command, and inspect artifacts without external infrastructure |
+
+If any guarantee fails, the feature must stay private and hidden.
 
 ---
 
