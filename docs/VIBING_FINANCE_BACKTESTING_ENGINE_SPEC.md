@@ -1007,6 +1007,108 @@ Free does not mean unlimited. The system must degrade safely:
 
 ## 20. Detailed Component Architecture
 
+Architecture rule:
+
+- Browser-first for MVP so private CSVs, reports, proof blocks, and strategy specs can stay local.
+- Local runner second for large files, overnight jobs, and shell-level autonomy.
+- Hosted services only for auth, feature flags, optional settings sync, and optional remote/provider integrations.
+- The deterministic engine, not the agent or LLM, owns all numerical truth.
+
+### 20.0 Runtime Topology
+
+MVP topology:
+
+```text
+React hidden page
+  -> IndexedDB artifact store
+  -> Web Worker backtest engine
+  -> local proof chain
+  -> report renderer
+  -> agent export
+```
+
+Autonomous local topology:
+
+```text
+React hidden page
+  -> Agent control plane
+  -> Local runner bridge
+  -> PowerShell/Bash/Python/Node tools
+  -> filesystem artifact workspace
+  -> IndexedDB summary store
+  -> proof chain + report versions
+```
+
+Optional hosted topology later:
+
+```text
+React hidden page
+  -> BFF auth/settings/feature flags
+  -> provider gateway for opt-in BYOK calls
+  -> ML engine for heavy research if user/admin enables it
+  -> no mandatory upload of private CSVs
+```
+
+The product should be able to run a useful backtest without any hosted compute, paid model call, paid storage, or public blockchain write.
+
+### 20.0.1 Architecture Planes
+
+| Plane | Owns | MVP location | Later expansion |
+|---|---|---|---|
+| UI plane | Workspace layout, transcript, artifact inspector, controls | React | Same |
+| Agent control plane | Plan, task state, tool routing, context budget, autonomous loop | Browser state first | Local runner service for long jobs |
+| Data plane | CSV parsing, validation, feature-ready bars | Browser worker + IndexedDB | Python runner, ML engine, DVC |
+| Execution plane | Setup detection, simulation, metrics | Browser worker | Python/vectorized engines |
+| Evidence plane | Reports, ledgers, proof blocks, hashes | IndexedDB + export files | Git proof, optional public anchor |
+| Memory plane | Per-user lessons, preferences, tool skills | IndexedDB | Encrypted sync if user opts in |
+| Provider plane | Local LLM, BYOK remote LLM, platform-funded LLM off by default | Local config only | Provider gateway with encrypted key refs |
+| Safety plane | Scope limits, kill switch, audit log, risk stops | Browser + local runner | BFF policy service |
+
+### 20.0.2 Core Domain Objects
+
+The architecture should revolve around stable domain objects rather than UI component state.
+
+| Object | Purpose | Immutable after finalization? |
+|---|---|---|
+| `workspace` | User/account scoped research area | No |
+| `dataset` | Uploaded or referenced market data with hash and quality score | Yes after hash |
+| `strategy_spec` | Deterministic versioned strategy DSL | Yes per version |
+| `run_plan` | Ordered steps the agent intends to execute | No until run starts |
+| `tool_event` | Append-only record of every important action | Yes |
+| `backtest_run` | Execution attempt with status, inputs, outputs, metrics | Yes after completion |
+| `artifact` | Content-addressed output such as ledger, report JSON, equity curve | Yes after hash |
+| `report_version` | Human-readable report tied to exact run artifacts | Yes |
+| `proof_block` | Hash-chain block proving artifact lineage | Yes |
+| `memory_capsule` | User-specific summary or validated lesson | Mutable only through new versions |
+| `provider_profile` | User-selected LLM/local provider config without raw secrets in logs | No |
+
+Minimal object graph:
+
+```text
+workspace
+  -> datasets
+  -> strategy_specs
+  -> run_plans
+  -> backtest_runs
+      -> tool_events
+      -> artifacts
+      -> report_versions
+      -> proof_blocks
+  -> memory_capsules
+  -> provider_profiles
+```
+
+### 20.0.3 Boundary Rules
+
+- UI components render state; they do not compute trading metrics.
+- Strategy parsing can suggest DSL, but the DSL validator decides whether a strategy is executable.
+- The worker or Python runner computes features, trades, metrics, and equity curves.
+- Report Builder converts structured facts into prose; it does not invent missing facts.
+- Proof Chain hashes artifacts; it does not decide strategy quality.
+- Memory Manager can personalize suggestions; it cannot alter historical evidence.
+- LLMs can propose, explain, and summarize; they cannot replace deterministic validation.
+- Terminal commands are allowed only through scoped tool events tied to the active agenda.
+
 ### 20.1 Frontend Components
 
 Proposed files:
