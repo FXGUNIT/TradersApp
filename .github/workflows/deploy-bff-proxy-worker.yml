@@ -19,41 +19,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Get Account ID from Pages API
+      - name: Set Account ID
         id: account
         run: |
-          echo "=== Extracting Account ID from Pages API ==="
-          # Try account ID from secret first
-          for ACCT in "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}" ""; do
-            if [ -z "$ACCT" ] || [ "$ACCT" = "CLOUDFLARE_ACCOUNT_ID" ]; then
-              continue
-            fi
-            RESP=$(curl -s "https://api.cloudflare.com/client/v4/accounts/$ACCT/pages/projects" \
-              -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-              -H "Content-Type: application/json")
-            if echo "$RESP" | python3 -c "import json,sys; d=json.load(sys.stdin); sys.exit(0 if d.get('success') else 1)" 2>/dev/null; then
-              echo "Found valid Account ID from secret: $ACCT"
-              echo "account_id=$ACCT" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
-          done
-
-          # If secret didn't work, try the Workers API zone listing as fallback
-          echo "Trying Workers zones API as fallback..."
-          ZONE_RESP=$(curl -s "https://api.cloudflare.com/client/v4/zones" \
-            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-            -H "Content-Type: application/json")
-          if echo "$ZONE_RESP" | python3 -c "import json,sys; d=json.load(sys.stdin); sys.exit(0 if d.get('success') else 1)" 2>/dev/null; then
-            ZONE_ID=$(echo "$ZONE_RESP" | python3 -c "import json,sys; d=json.load(sys.stdin); r=d.get('result',[]); print(r[0].get('account',{}).get('id','') if r else '')" 2>/dev/null)
-            if [ -n "$ZONE_ID" ]; then
-              echo "Found Account ID from zones API: $ZONE_ID"
-              echo "account_id=$ZONE_ID" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
-          fi
-
-          echo "ERROR: Could not determine Cloudflare Account ID from any API"
-          exit 1
+          echo "=== Using known Account ID for traders.app zone ==="
+          echo "account_id=0f779fe4981d424548a48856cc9139db" >> "$GITHUB_OUTPUT"
 
       - name: Save Account ID as GitHub Actions variable
         run: |
