@@ -8,8 +8,8 @@ permissions:
   actions: write
 
 env:
-  CLOUDFLARE_API_TOKEN:  ${{ secrets.CLOUDFLARE_API_TOKEN }}
-  CLOUDFLARE_EMAIL:      ${{ secrets.CLOUDFLARE_EMAIL }}
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_EMAIL:     ${{ secrets.CLOUDFLARE_EMAIL }}
 
 jobs:
   deploy-worker:
@@ -37,12 +37,12 @@ jobs:
             -H "Content-Type: application/octet-stream" \
             --data-binary "@deploy/cloudflare-tunnel/bff-worker/index.js")
           HTTP_CODE=$(echo "$RESP" | tail -1 | cut -d: -f2)
-          BODY=$(echo "$RESP" | head -n -1)
+          BODY=$(echo "$RESP" | sed '$d')
           echo "HTTP_CODE: $HTTP_CODE"
           echo "BODY: $BODY"
           echo "$BODY" | python3 -c "import json,sys; d=json.load(sys.stdin); print('Deploy success:', d.get('success')); [print('ERROR:', e) for e in d.get('errors', [])]"
 
-          if [ "$(echo '$RESP' | python3 -c 'import json,sys; print(json.load(sys.stdin).get(\"success\"))')" = "True" ]; then
+          if [ "$HTTP_CODE" = "200" ] || [ "$(echo "$BODY" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("success"))' 2>/dev/null)" = "True" ]; then
             echo "=== Worker deployed successfully ==="
           else
             echo "=== Deploy failed ==="
