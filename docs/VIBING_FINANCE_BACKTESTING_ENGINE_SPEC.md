@@ -742,18 +742,27 @@ Answered by founder on 2026-04-25:
 
 - First assets: MNQ and NIFTY.
 - First strategy family: post-initial-balance strategy using VWAP plus inventory context.
-- MNQ session context: New York session.
-- NIFTY session context: Indian market session.
+- MNQ session context: New York session; initial balance is the first 1 hour from New York session open.
+- NIFTY session context: Indian market session; initial balance is the first 1 hour from Indian market open.
 - First data source: uploaded CSV.
 - First access rule: only the admin account.
+- VWAP reset: session VWAP.
+- Risk per trade: 0.2% of account size.
+- Stop loss: 12 pips/price units.
+- Take profit 1: 15 pips/price units.
+- Take profit 2: 45 pips/price units.
+- Stop management: shift stop to breakeven after TP1 is achieved.
+- Entry direction: either long or short after pullback and confirmed structure change.
+- Inventory context: caught buyers and caught sellers.
 
 Initial interpretation:
 
 - "IB" means initial balance. The engine should wait until the relevant session's initial balance has formed, then evaluate trade logic after that window is complete.
-- For NIFTY, initial balance should be defined in Indian market time.
-- For MNQ, initial balance should be defined in New York session time.
+- For NIFTY, initial balance is measured in Indian market time from market open to 1 hour after open.
+- For MNQ, initial balance is measured in New York session time from session open to 1 hour after open.
 - VWAP should be part of the trade filter and/or trigger logic.
-- Inventory should act as a market-context filter, but the exact definition still needs to be specified.
+- Inventory should act as a market-context filter. In this MVP, "inventory" means trapped/caught buyers above a failed bullish move or trapped/caught sellers below a failed bearish move.
+- The phrase "pips/price units" must be normalized per instrument before implementation, because MNQ and NIFTY usually trade in points/ticks rather than forex pips.
 
 ---
 
@@ -771,16 +780,16 @@ These are temporary assumptions until the remaining details are answered.
 
 ## 15. Immediate Next Decisions
 
-Before code starts, define these strategy mechanics:
+Before code starts, define these remaining deterministic mechanics:
 
-1. Exact NIFTY initial balance window in IST.
-2. Exact MNQ initial balance window in New York time.
-3. Whether VWAP resets by session, day, or custom window.
-4. What "inventory" means in this system.
-5. Long entry rule after IB formation.
-6. Short entry rule after IB formation.
-7. Stop-loss rule.
-8. Take-profit rule.
+1. Exact market-open timestamp for NIFTY in IST.
+2. Exact New York session-open timestamp for MNQ in ET.
+3. Operational definition of "pullback" in candles/price units.
+4. Operational definition of "confirmed structure change" in candles/swings.
+5. Operational definition of caught buyers and caught sellers.
+6. Whether TP1 exits partial size and what percentage closes at TP1.
+7. Whether TP2 exits all remaining size.
+8. Whether 12/15/45 "pips" should mean points, ticks, or another unit for MNQ and NIFTY.
 9. No-trade filters.
 10. CSV column format.
 
@@ -788,9 +797,12 @@ Current MVP decision summary:
 
 ```text
 First assets: MNQ and NIFTY
-First strategy: post-IB strategy using VWAP + inventory context
+First strategy: post-IB strategy using session VWAP + caught buyer/seller inventory context
 First data: uploaded CSV
 First access: admin account only
+IB windows: first 1 hour from relevant market/session open
+Risk: 0.2% account risk per trade
+SL/TP: 12 stop, TP1 15, TP2 45, breakeven after TP1
 ```
 
 ---
@@ -799,6 +811,6 @@ First access: admin account only
 
 Proposed MVP:
 
-> A hidden admin-only page where the trader describes a post-initial-balance MNQ or NIFTY strategy in plain English, the app converts it into a validated strategy spec using VWAP and inventory context, runs a realistic net backtest on uploaded CSV data, and returns a strict risk report with a reject/revise/paper-trade verdict.
+> A hidden admin-only page where the trader describes a post-initial-balance MNQ or NIFTY strategy in plain English, the app converts it into a validated strategy spec using session VWAP, caught buyer/seller inventory context, pullback confirmation, and structure-change confirmation, runs a realistic net backtest on uploaded CSV data with 0.2% account risk per trade, 12-unit stop, TP1 at 15 units, TP2 at 45 units, and breakeven after TP1, then returns a strict risk report with a reject/revise/paper-trade verdict.
 
 This MVP is intentionally narrow. Once it is trustworthy, expand asset coverage, data sources, strategy families, ML optimization, research-paper retrieval, and audit proofs.
