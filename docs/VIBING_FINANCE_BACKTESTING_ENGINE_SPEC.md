@@ -754,6 +754,11 @@ Answered by founder on 2026-04-25:
 - Stop management: shift stop to breakeven after TP1 is achieved.
 - Entry direction: either long or short after pullback and confirmed structure change.
 - Inventory context: caught buyers and caught sellers.
+- NIFTY market-open default: 09:15 IST; IB window 09:15-10:15 IST.
+- MNQ New York session-open default: 09:30 ET; IB window 09:30-10:30 ET. This means the US cash/RTH-style New York session, not the Globex evening open.
+- TP1 exit default: close 50% of position at TP1.
+- TP2 exit default: close all remaining position at TP2.
+- Unit default: treat 12/15/45 as index points for MNQ and NIFTY unless the uploaded CSV or strategy settings explicitly define ticks/pips.
 
 Initial interpretation:
 
@@ -763,6 +768,7 @@ Initial interpretation:
 - VWAP should be part of the trade filter and/or trigger logic.
 - Inventory should act as a market-context filter. In this MVP, "inventory" means trapped/caught buyers above a failed bullish move or trapped/caught sellers below a failed bearish move.
 - The phrase "pips/price units" must be normalized per instrument before implementation, because MNQ and NIFTY usually trade in points/ticks rather than forex pips.
+- Implementation should start strict and deterministic. If a setup cannot be detected from uploaded OHLCV without guessing, the engine should mark the trade as "not eligible" instead of inventing confidence.
 
 ---
 
@@ -778,20 +784,128 @@ These are temporary assumptions until the remaining details are answered.
 
 ---
 
-## 15. Immediate Next Decisions
+## 15. Strategy Implementation Defaults
 
-Before code starts, define these remaining deterministic mechanics:
+These defaults are chosen for the first implementation so the engine can backtest without repeatedly asking for strategy details.
 
-1. Exact market-open timestamp for NIFTY in IST.
-2. Exact New York session-open timestamp for MNQ in ET.
-3. Operational definition of "pullback" in candles/price units.
-4. Operational definition of "confirmed structure change" in candles/swings.
-5. Operational definition of caught buyers and caught sellers.
-6. Whether TP1 exits partial size and what percentage closes at TP1.
-7. Whether TP2 exits all remaining size.
-8. Whether 12/15/45 "pips" should mean points, ticks, or another unit for MNQ and NIFTY.
-9. No-trade filters.
-10. CSV column format.
+### 15.1 Session and IB Defaults
+
+| Asset | Session Open | IB Window | Timezone | Notes |
+|---|---:|---:|---|---|
+| NIFTY | 09:15 | 09:15-10:15 | Asia/Kolkata | Indian regular market open |
+| MNQ | 09:30 | 09:30-10:30 | America/New_York | New York/RTH-style session, not Globex 18:00 ET open |
+
+IB high = highest high inside the first-hour IB window.
+
+IB low = lowest low inside the first-hour IB window.
+
+No entry is allowed before the IB window closes.
+
+### 15.2 VWAP Default
+
+- Use session VWAP.
+- Reset VWAP at the configured session open.
+- VWAP formula: cumulative `(typical_price * volume) / cumulative volume`, where `typical_price = (high + low + close) / 3`.
+- If uploaded CSV has no volume, use a fallback equal-weighted session average and mark the report as lower confidence.
+
+### 15.3 Caught Inventory Defaults
+
+Caught sellers:
+
+- After IB completes, price trades below `IB_low` by at least 1 point.
+- Price then closes back above `IB_low` within the same candle or the next 2 candles.
+- That failed downside continuation marks sellers as caught.
+
+Caught buyers:
+
+- After IB completes, price trades above `IB_high` by at least 1 point.
+- Price then closes back below `IB_high` within the same candle or the next 2 candles.
+- That failed upside continuation marks buyers as caught.
+
+### 15.4 Structure Change Defaults
+
+Bullish structure change after caught sellers:
+
+- Find the highest high of the 3 candles immediately before the sweep below IB low.
+- A bullish structure change is confirmed when a later candle closes above that level and closes at or above session VWAP.
+
+Bearish structure change after caught buyers:
+
+- Find the lowest low of the 3 candles immediately before the sweep above IB high.
+- A bearish structure change is confirmed when a later candle closes below that level and closes at or below session VWAP.
+
+### 15.5 Pullback Defaults
+
+Long pullback:
+
+- After bullish structure change, wait for price to retrace toward session VWAP or into 33%-66% of the impulse from sweep low to structure-change close.
+- Pullback must not close below the original sweep low.
+- Entry trigger: first bullish candle after pullback that closes above the prior candle high.
+
+Short pullback:
+
+- After bearish structure change, wait for price to retrace toward session VWAP or into 33%-66% of the impulse from sweep high to structure-change close.
+- Pullback must not close above the original sweep high.
+- Entry trigger: first bearish candle after pullback that closes below the prior candle low.
+
+### 15.6 Risk, Exits, and Sizing Defaults
+
+- Account risk per trade: 0.2% of current account equity.
+- Stop loss: 12 points.
+- TP1: 15 points.
+- TP2: 45 points.
+- TP1 closes 50% of position.
+- After TP1 fills, move stop on remaining size to breakeven.
+- TP2 closes all remaining size.
+- Position size = `floor((account_equity * 0.002) / (stop_points * point_value))`.
+- If the calculated integer position size is less than 1 contract/lot, skip the trade rather than exceeding 0.2% risk.
+- For MVP reporting, show both theoretical fractional sizing and strict integer sizing if instrument metadata is available.
+
+### 15.7 No-Trade Filters
+
+- No trade before IB completes.
+- No trade if CSV has missing OHLC columns.
+- No trade if timestamp ordering is invalid.
+- No trade if more than 2 consecutive expected bars are missing inside the active session.
+- No trade if entry is more than 2R away from session VWAP after pullback.
+- No trade if the setup appears in the final 30 minutes of the configured session.
+- Maximum 1 long and 1 short attempt per asset per session for MVP.
+- Do not take a second trade after a full stop-loss on the same side in the same session.
+- If high-impact news timestamps are not supplied, news filtering is marked "not applied" instead of assumed.
+
+### 15.8 Uploaded CSV Defaults
+
+Required CSV columns:
+
+```text
+timestamp,open,high,low,close,volume
+```
+
+Optional CSV columns:
+
+```text
+symbol,timezone,session,contract,point_value,tick_size
+```
+
+Timestamp rules:
+
+- ISO timestamps with timezone are preferred.
+- If timezone is missing, use `Asia/Kolkata` for NIFTY and `America/New_York` for MNQ.
+- Rows must be sorted or sortable by timestamp.
+- Duplicate timestamps are rejected unless the user explicitly chooses aggregation later.
+
+---
+
+## 16. Remaining Open Decisions
+
+These can be implemented with defaults now, then improved after first backtest evidence:
+
+1. Exact point value and lot/contract metadata for NIFTY futures/options data.
+2. Whether NIFTY means spot index, futures, or options in each uploaded CSV.
+3. Whether MNQ data is RTH-only or includes full Globex data.
+4. Whether to allow more than one setup per side per session after MVP.
+5. Whether to add explicit high-impact news calendars to uploaded CSV or fetch them later.
+6. Whether to optimize the 1-point trap threshold after enough data exists.
 
 Current MVP decision summary:
 
@@ -801,13 +915,17 @@ First strategy: post-IB strategy using session VWAP + caught buyer/seller invent
 First data: uploaded CSV
 First access: admin account only
 IB windows: first 1 hour from relevant market/session open
+NIFTY IB: 09:15-10:15 IST
+MNQ IB: 09:30-10:30 ET
 Risk: 0.2% account risk per trade
 SL/TP: 12 stop, TP1 15, TP2 45, breakeven after TP1
+TP1/TP2 sizing: 50% off at TP1, remainder off at TP2
+Units: points by default
 ```
 
 ---
 
-## 16. Working MVP Definition
+## 17. Working MVP Definition
 
 Proposed MVP:
 
