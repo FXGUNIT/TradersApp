@@ -1,17 +1,17 @@
 # TODO Master List
 
-**Last Updated:** 2026-04-25
-**Status:** P26 LIVE — Contabo VPS live | P25 DONE — NY Lunch Block | web app is canonical | desktop proof archived/optional
+**Last Updated:** 2026-04-26
+**Status:** P26 LIVE - Contabo VPS live | P27 TODO - Vibing Finance hidden backtesting engine added to master backlog | web app is canonical | desktop proof archived/optional
 
 
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-25 15:48`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-26 04:15`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Master Backlog  90.0%  [######################--]
-Tasks          done 018 | in progress 000 | blocked 002 | todo 000 | total 020
+Master Backlog  49.0%  [############------------]
+Tasks          done 024 | in progress 000 | blocked 009 | todo 016 | total 049
 ```
 
 How to read this:
@@ -22,7 +22,7 @@ How to read this:
 
 | Area | Tasks | Progress | Status |
 |---|---|---:|---|
-| Stage P | [18/20] |  90.0% | IN PROGRESS |
+| Stage P | [24/49] |  49.0% | IN PROGRESS |
 | Stage S | [0/0] |   0.0% | DONE |
 | ML Research | [0/0] |   0.0% | DONE |
 
@@ -30,7 +30,7 @@ How to read this:
 
 | Tier | Scope | Progress | Status |
 |---|---|---:|---|
-| TIER 1 | Stage P overall |  90.0% | IN PROGRESS |
+| TIER 1 | Stage P overall |  49.0% | IN PROGRESS |
 | TIER 2 | Active Contabo production path |  80.0% | IN PROGRESS |
 
 ### By Phase
@@ -40,6 +40,7 @@ How to read this:
 | P23 - 4 GB Performance and Compatibility Certification | [5/5] | 100.0% | DONE |
 | P25 - NY Lunch Trading Block ✅ DONE | [5/5] | 100.0% | DONE |
 | P26 - Pages Root Live + Critical Bug Fixes — LIVE, 2 BLOCKED FOLLOW-UPS | [8/10] |  80.0% | IN PROGRESS |
+| P27 - Vibing Finance Backtesting Engine - Hidden MVP + Post-MVP Automation | [6/29] |  20.7% | IN PROGRESS |
 
 <!-- master-progress:end -->
 
@@ -81,7 +82,7 @@ All Stages S1–S6 and ML1–ML8 are background. Implement carefully, update liv
 
 ---
 
-## STAGE P — Completed Record
+## STAGE P - Production Record + Active Backlog
 
 ### P23 - 4 GB Performance and Compatibility Certification
 - Non-blocking for the current product direction: retained as optional desktop evidence, not as active web-app work
@@ -154,6 +155,51 @@ All Stages S1–S6 and ML1–ML8 are background. Implement carefully, update liv
 
 - [!] Task 10: Optional no-owned-domain Worker proxy: BLOCKED on Cloudflare token permission. Workflow exists, dry-run passes, deploy failed until `CLOUDFLARE_API_TOKEN` can deploy Workers.
 
+### P27 - Vibing Finance Backtesting Engine - Hidden MVP + Post-MVP Automation
+- Canonical spec: `docs/VIBING_FINANCE_BACKTESTING_ENGINE_SPEC.md`
+- Rule: preserve the spec's Build Now / Build Later / Do Not Build Yet split.
+- MVP stops at M7 local proof. M8+ stays post-MVP until M1-M7 pass fixtures, reports, and proof checks.
+- No paid API, hosted compute, public chain, raw CSV upload, live trading, or LLM-generated numerical truth is allowed in the MVP.
+
+**Spec and governance tasks already merged:**
+- [x] Task 1: Lock the single canonical Vibing Finance spec and keep all product, architecture, security, data, ML, blockchain, UX, launch, and open-question details in it.
+- [x] Task 2: Add the Build Now / Build Later / Do Not Build Yet control panel with M1-M7 as MVP and M8+ as post-MVP.
+- [x] Task 3: Lock first user, first benchmark, user promise, forbidden promises, unacceptable MVP failures, and non-regression rules.
+- [x] Task 4: Lock instrument metadata, CSV import profiles, setup detector state machine, and golden fixture definitions.
+- [x] Task 5: Lock metric formulas, verdict rules, claim guardrails, compliance wording, proof canonicalization, and `run-package.v1`.
+- [x] Task 6: Lock whole-engine architecture, microservice-ready boundaries, service contracts, capability manifests, ADRs, evidence ladder, and best-in-class scorecard.
+
+**Build-now MVP tasks:**
+- [ ] Task 7: PR1 / `MVP-M1-HIDDEN-SHELL` - add hidden admin Vibing Finance workbench behind `VITE_ENABLE_VIBING_FINANCE`, register `screen === "vibingFinance"`, enforce admin-only access, and render the agent-style empty workspace.
+- [ ] Task 8: PR2 / `MVP-M2-CSV-INTAKE` - implement local CSV parser, importer profiles, data-quality report, row-level validation, timeframe/timezone inference, IndexedDB metadata, and no-server-upload guarantee.
+- [ ] Task 9: PR3 / `MVP-M3-FEATURES` - implement session tagging, MNQ/NIFTY session rules, IB high/low, incremental VWAP, swing levels, and no-future-bar feature tests.
+- [ ] Task 10: PR4 / `MVP-M4-SETUP-DETECTOR` - implement caught buyer/seller inventory detection, structure change, pullback detection, long/short setup state machine, reason codes, and `GF-*` golden fixture tests.
+- [ ] Task 11: PR5 / `MVP-M5-SIMULATOR` - implement Web Worker backtest execution, conservative OHLC fill policy, fees/slippage hooks, 0.2% risk sizing, trade ledger, equity curve, cancellation, and metric formula tests.
+- [ ] Task 12: PR6 / `MVP-M6-REPORT` - implement report schema, verdict engine, caveats, "what would break live" section, next experiments, low-sample warnings, and forbidden-claim tests.
+- [ ] Task 13: PR7 / `MVP-M7-PROOF` - implement canonical JSON, artifact hashes, local proof block, Merkle report root, proof mismatch failure path, export/import verification, and offline verification.
+
+**Cross-cutting MVP quality tasks:**
+- [ ] Task 14: Add P0/P1 test traceability so fixtures, metrics, proof, storage, report claims, CLI contracts, runner security, memory, and provider redaction have matching test categories.
+- [ ] Task 15: Implement IndexedDB schema versioning, migrations, quota handling, corruption recovery, export-before-delete, and failure/recovery events.
+- [ ] Task 16: Keep an implementation evidence ledger for each milestone with commands, artifacts, results, and remaining risk.
+- [ ] Task 17: Run the full launch-readiness red-team questions before marking each milestone complete.
+
+**Build-later automation tasks:**
+- [ ] Task 18: PR8 / `POST-M8-AGENT-EXPORT` - create compact Codex/Claude review export with strategy spec, dataset metadata only, metrics, reason-code counts, proof hashes, open questions, and no raw rows.
+- [ ] Task 19: PR9 / `POST-M9-CLI` - extract deterministic `core/*`, implement `vibing doctor`, `validate-data`, `run`, `report`, `proof verify`, `export`, typed events, machine-readable exit codes, and browser/CLI contract tests.
+- [ ] Task 20: PR10 / `POST-M10-RUNNER` - implement `vibing serve`, localhost pairing, `/health`, `/capabilities`, `/runs`, SSE events, cancellation, workspace scope checks, and visible runner status.
+- [ ] Task 21: PR11 / `POST-M11-PYTHON-PARITY` - add optional Python engine behind the CLI with parity tolerances, mismatch report, fixture replay, and no separate product surface.
+- [ ] Task 22: PR12 / `POST-M12-BROWSER-AUTOMATION` - add Playwright-backed `vibing browser smoke`, screenshot, and inspect commands with allowed-origin policy and screenshot redaction rules.
+
+**Blocked / do-not-build-yet tasks:**
+- [!] Task 23: BYOK provider gateway and embedded paid LLM routing are BLOCKED until deterministic M1-M7 pass and redaction, budget, provider error, and secret-storage tests exist.
+- [!] Task 24: Multi-agent role team, autonomous watch mode, and unattended experiment queue are BLOCKED until CLI/local runner budgets, stop reasons, proof, memory controls, and recovery paths exist.
+- [!] Task 25: Per-user adaptive memory and self-learning loops are BLOCKED until memory UX, evidence refs, delete/export/reset controls, and "why suggested" explanations are implemented.
+- [!] Task 26: Cross-user/shared model training is BLOCKED until explicit user consent, model registry, eval protocol, rollback, drift monitoring, and governance are implemented.
+- [!] Task 27: Public blockchain anchoring is BLOCKED until local proof chain is stable, public anchoring has a clear legal/product reason, and no raw strategy/report data is placed on chain.
+- [!] Task 28: Public launch is BLOCKED until legal/compliance review, security review, data licensing, abuse controls, support process, independent methodology review, and launch gates pass.
+- [!] Task 29: Live trading or broker execution is BLOCKED and explicitly out of scope until a separate regulated, risk-reviewed product plan exists.
+
 > **Archived OCI / A1 fallback scope:** If that path reopens, see `docs/OCI-DEPLOYMENT-RUNBOOK.md`, `docs/SETUP.md`, `docs/STAGE_P_DNS_SETUP.md`, `docs/STAGE_P_24X7_EXECUTION_CHECKLIST.md`
 
 ---
@@ -214,12 +260,12 @@ All Stages S1–S6 and ML1–ML8 are background. Implement carefully, update liv
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-25 15:48`  -  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-26 04:15`  -  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Stage P Backlog 100.0%  [########################]
-Sections        done 003 | active 000 | blocked 000 | archived 000 | pending 000 | total 003
-Checklist       done 018 | open 000 | total 018
+Stage P Backlog  60.0%  [##############----------]
+Sections        done 003 | active 000 | blocked 000 | archived 000 | pending 001 | total 004
+Checklist       done 024 | open 016 | total 040
 ```
 
 | Section | Tasks | Progress | Status |
@@ -227,5 +273,6 @@ Checklist       done 018 | open 000 | total 018
 | P23 - 4 GB Performance and Compatibility Certification | [5/5] | 100.0% | DONE |
 | P25 - NY Lunch Trading Block ✅ DONE | [5/5] | 100.0% | DONE |
 | P26 - Pages Root Live + Critical Bug Fixes — LIVE, 2 BLOCKED FOLLOW-UPS | [8/8] | 100.0% | DONE |
+| P27 - Vibing Finance Backtesting Engine - Hidden MVP + Post-MVP Automation | [6/22] |  27.3% | PENDING |
 
 <!-- live-status:end -->

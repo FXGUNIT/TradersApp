@@ -19,7 +19,10 @@ function requireAuth(req, res) {
 export function createBoardRoomRouteHandler() {
   async function handle(req, res, pathname, origin) {
     const method = req.method;
-    const requestUrl = new URL(req.url, origin || 'http://localhost');
+    const requestUrl = new URL(
+      req.url,
+      origin && origin !== '*' ? origin : 'http://localhost',
+    );
 
     if (method === 'POST' && pathname === '/board-room/git-webhook') {
       const rawBody = await readRawBody(req);
