@@ -1,6 +1,6 @@
 # Vibing Finance Backtesting Engine - Single Canonical Spec
 
-**Status:** Brainstorm draft v0.1  
+**Status:** Best-in-class planning baseline v0.2; implementation evidence still required  
 **Last updated:** 2026-04-25  
 **Owner:** TradersApp  
 **Visibility:** Secret/internal only until the launch gates in this document are met  
@@ -79,6 +79,7 @@ Use these IDs in tasks, tests, commits, and future agent prompts to avoid headin
 | `P0-TEST-MAP` | P0 test traceability exists | Resolved in section 36.5 |
 | `P0-REPO-SEQUENCE` | First PR sequence exists | Resolved in section 31.16 |
 | `ARCH-SERVICE-PLAN` | Whole-engine and microservice boundary plan exists | Resolved in sections 20.19-20.28 |
+| `BIC-STANDARD` | Best-in-class planning standard, governance, and scorecard exist | Resolved in sections 0.9-0.11 and 41 |
 
 ### 0.5 Naming Glossary
 
@@ -184,6 +185,62 @@ Hosted later: BFF/provider/settings services only where they add clear value
 ```
 
 The best architecture for this product is not "microservices everywhere." It is a modular core with microservice-ready boundaries, because that gives a vibe-dev builder fast iteration, fewer deployment failures, and clean future scaling.
+
+### 0.9 Best-In-Class Standard
+
+This document is considered best-in-class as a planning artifact only when it satisfies all of these standards:
+
+| Standard | Meaning | Current status |
+|---|---|---|
+| Clear target | A builder knows exactly what the product is, who it serves first, and what it refuses to promise | Satisfied |
+| Scope discipline | MVP, post-MVP, and prohibited features are separated | Satisfied |
+| Deterministic truth | Trading math, fills, metrics, reports, and proof are not delegated to LLM text | Satisfied |
+| Testability | Every core claim maps to fixtures, formulas, contracts, or acceptance checks | Satisfied for plan; code pending |
+| Reproducibility | Same run package can be replayed and verified across surfaces | Satisfied for plan; code pending |
+| Privacy by default | Private CSV and secrets stay local unless the user explicitly opts in | Satisfied |
+| Vibe-dev usability | AI-assisted builders have stable IDs, PR sequence, module boundaries, and agent instructions | Satisfied |
+| Security and safety | Shell, runner, provider, memory, and watch-mode powers are scoped and budgeted | Satisfied for plan; implementation pending |
+| Honest reporting | Reports reject weak evidence and disclose assumptions, ambiguity, and limits | Satisfied for plan; report tests pending |
+| Governance | Major decisions, drift controls, and change rules are explicit | Satisfied in section 41 |
+
+Best-in-class does not mean finished product. It means the plan is now strict enough that implementation can be judged objectively.
+
+### 0.10 Best-In-Class Scorecard
+
+| Dimension | Score now | Why not 5 yet | Required evidence for 5 |
+|---|---:|---|---|
+| Product clarity | 5/5 | N/A | Keep scope panel updated |
+| Architecture clarity | 5/5 | N/A | Keep service contracts versioned |
+| Backtesting integrity | 4/5 | Fixtures and code not implemented yet | Golden fixture suite passes |
+| Data integrity | 4/5 | Importer tests not implemented yet | CSV profile tests pass |
+| Metric/proof reproducibility | 4/5 | Hash and metric vectors not implemented yet | Browser/Node/Python vectors match |
+| Security/privacy plan | 4/5 | Runner/BYOK not implemented or reviewed yet | Threat tests and redaction tests pass |
+| Vibe-dev execution readiness | 5/5 | N/A | PR sequence remains followed |
+| Operations/recovery | 4/5 | Recovery flows not implemented yet | Failure injection tests pass |
+| Legal/report guardrails | 4/5 | Templates/tests not implemented yet | Forbidden-claim tests pass |
+| Launch readiness | 2/5 | Public launch is intentionally blocked | Private alpha evidence, security review, legal review |
+
+Current conclusion:
+
+- Planning quality target: best-in-class baseline reached.
+- Product quality target: not reached until M1-M7 are implemented and verified.
+
+### 0.11 Non-Regression Rule For This Spec
+
+Future edits must not weaken any of these without adding a dated decision note:
+
+- Browser-first local MVP.
+- No required paid API.
+- No required hosted compute.
+- No raw CSV upload by default.
+- No live trading.
+- No public launch before launch gates pass.
+- No LLM-generated numerical truth.
+- No optimistic OHLC ambiguity resolution.
+- No cross-user learning without consent and governance.
+- No shell/local-runner powers without capability, budget, event log, and workspace scope.
+
+If a future change violates any item above, the implementation must stop until section 41 records the decision, rationale, risks, and rollback path.
 
 ---
 
