@@ -31,13 +31,16 @@ jobs:
           echo ""
 
           echo "=== Uploading script (PUT /workers/scripts/{name}/content) ==="
-          RESP=$(curl -s -X PUT "https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/workers/scripts/${WORKER_NAME}/content" \
+          RESP=$(curl -s -w "\nHTTP_CODE:%{http_code}" -X PUT "https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/workers/scripts/${WORKER_NAME}/content" \
             -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
             -H "X-Auth-Email: ${CLOUDFLARE_EMAIL}" \
             -H "Content-Type: application/octet-stream" \
             --data-binary "@deploy/cloudflare-tunnel/bff-worker/index.js")
-          echo "$RESP" | python3 -c "import json,sys; d=json.load(sys.stdin); print('Deploy success:', d.get('success')); [print('ERROR:', e.get('message', e)) for e in (d.get('errors') or [])]; [print('OK:', w.get('message', w)) for w in (d.get('messages') or [])]"
-          echo ""
+          HTTP_CODE=$(echo "$RESP" | tail -1 | cut -d: -f2)
+          BODY=$(echo "$RESP" | head -n -1)
+          echo "HTTP_CODE: $HTTP_CODE"
+          echo "BODY: $BODY"
+          echo "$BODY" | python3 -c "import json,sys; d=json.load(sys.stdin); print('Deploy success:', d.get('success')); [print('ERROR:', e) for e in d.get('errors', [])]"
 
           if [ "$(echo '$RESP' | python3 -c 'import json,sys; print(json.load(sys.stdin).get(\"success\"))')" = "True" ]; then
             echo "=== Worker deployed successfully ==="
