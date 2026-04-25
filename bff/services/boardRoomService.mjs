@@ -33,6 +33,51 @@ let _redisConnectPromise = null;
 let _redisDisabledUntil = 0;
 let _lastRedisNoticeAt = 0;
 let _lastRedisNotice = null;
+const _memoryStore = new Map();
+const _memoryZsets = new Map();
+const _memoryCounters = new Map();
+
+function cloneValue(value) {
+  if (value === undefined || value === null) return null;
+  return JSON.parse(JSON.stringify(value));
+}
+
+function memoryKeys(prefix) {
+  return Array.from(_memoryStore.keys()).filter((key) => key.startsWith(prefix));
+}
+
+function memoryGet(key) {
+  return cloneValue(_memoryStore.get(key));
+}
+
+function memorySet(key, value) {
+  _memoryStore.set(key, cloneValue(value));
+}
+
+function memoryZadd(key, score, member) {
+  const zset = _memoryZsets.get(key) || [];
+  const existing = zset.find((entry) => entry.value === member);
+  if (existing) {
+    existing.score = score;
+  } else {
+    zset.push({ score, value: member });
+  }
+  zset.sort((left, right) => left.score - right.score);
+  _memoryZsets.set(key, zset);
+}
+
+function memoryZrange(key, min, max) {
+  const zset = _memoryZsets.get(key) || [];
+  const start = Math.max(0, Number(min) || 0);
+  const end = Number(max) < 0 ? undefined : Number(max) + 1;
+  return zset.slice(start, end).map((entry) => entry.value);
+}
+
+function memoryIncr(key) {
+  const next = Number(_memoryCounters.get(key) || 0) + 1;
+  _memoryCounters.set(key, next);
+  return next;
+}
 
 function resolveRedisUrl() {
   if (process.env.REDIS_URL) {
@@ -103,43 +148,53 @@ async function getRedis() {
 async function redisGet(key) {
   try {
     const client = await getRedis();
-    if (!client) return null;
+    if (!client) return memoryGet(key);
     const val = await client.get(key);
     return val ? JSON.parse(val) : null;
-  } catch { return null; }
+  } catch { return memoryGet(key); }
 }
 
 async function redisSet(key, value, ttl = null) {
   try {
     const client = await getRedis();
-    if (!client) return;
+    if (!client) {
+      memorySet(key, value);
+      return;
+    }
     if (ttl) await client.setEx(key, ttl, JSON.stringify(value));
     else await client.set(key, JSON.stringify(value));
-  } catch { /* fail silent */ }
+  } catch {
+    memorySet(key, value);
+  }
 }
 
 async function redisZadd(key, score, member) {
   try {
     const client = await getRedis();
-    if (!client) return;
+    if (!client) {
+      memoryZadd(key, score, member);
+      return;
+    }
     await client.zAdd(key, { score, value: member });
-  } catch { /* fail silent */ }
+  } catch {
+    memoryZadd(key, score, member);
+  }
 }
 
 async function redisZrange(key, min, max) {
   try {
     const client = await getRedis();
-    if (!client) return [];
+    if (!client) return memoryZrange(key, min, max);
     return await client.zRange(key, min, max);
-  } catch { return []; }
+  } catch { return memoryZrange(key, min, max); }
 }
 
 async function redisIncr(key) {
   try {
     const client = await getRedis();
-    if (!client) return 1;
+    if (!client) return memoryIncr(key);
     return await client.incr(key);
-  } catch { return 1; }
+  } catch { return memoryIncr(key); }
 }
 
 // ─── ID Generation ───────────────────────────────────────────────────────────
@@ -244,11 +299,13 @@ function sortThreadsByActivity(threads = []) {
 
 async function loadAllThreads() {
   const client = await getRedis();
-  if (!client) return [];
-  const keys = (await client.keys('board-room:threads/T*')) || [];
+  const keys = client
+    ? ((await client.keys('board-room:threads/T*')) || [])
+    : memoryKeys('board-room:threads/T');
   const threads = [];
 
   for (const key of keys) {
+    if (!/^board-room:threads\/T\d+$/i.test(key)) continue;
     const thread = await redisGet(key);
     if (!thread || typeof thread !== 'object' || !thread.threadId) continue;
     threads.push(thread);
@@ -700,8 +757,9 @@ async function linkCommitToThread({
 // ─── Pending Acknowledgments ──────────────────────────────────────────────────
 async function getPendingAcknowledgments() {
   const client = await getRedis();
-  if (!client) return [];
-  const keys = (await client.keys('board-room:posts/*')) || [];
+  const keys = client
+    ? ((await client.keys('board-room:posts/*')) || [])
+    : memoryKeys('board-room:posts/');
   const pending = [];
   for (const key of keys) {
     const post = await redisGet(key);
