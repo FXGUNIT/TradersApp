@@ -3791,6 +3791,59 @@ Self-learning is not done until these exist:
 - Drift monitoring plan.
 - Tests proving memory cannot change historical reports, metrics, ledgers, or proof blocks.
 
+### 31.10 Biggest Weaknesses Of This Document
+
+This section is a self-audit of the spec itself. These are not product bugs yet; they are weaknesses in the planning document that can cause implementation mistakes, delays, or false confidence.
+
+| Severity | Weakness | Why it is dangerous | Required fix |
+|---|---|---|---|
+| Critical | The spec is too broad for the first implementation pass | It mixes MVP, private alpha, future local runner, BYOK, multi-agent orchestration, self-learning, browser automation, proof chains, ML governance, and launch planning in one continuous build story | Add a strict "Build Now / Build Later / Do Not Build Yet" cutline and keep M1-M6 tiny |
+| Critical | Section numbering is inconsistent after later insertions | `## 32` contains `### 31.x`, `## 33` contains `### 32.x`, and later sections repeat this drift. This makes references brittle and confusing for agents and humans | Renumber all headings after the architecture freeze or use stable IDs like `MVP-CSV-001` instead of relying only on section numbers |
+| Critical | The MVP is at risk of scope creep | The doc says browser-first deterministic MVP, but it also deeply specifies CLI, local runner, browser automation, BYOK, multi-agent team, watch mode, self-learning, and Python parity | Lock M1-M6 as the only MVP path; mark M7+ as blocked until deterministic report/proof works |
+| Critical | "Self-learning" can be misunderstood as automatic model training | The guardrails are present, but the phrase can still lead builders to create unsafe auto-promotion or train on private user data too early | Rename early behavior to "per-user adaptive memory"; reserve "training" for governed offline candidate models only |
+| Critical | The first exact strategy is not specified enough for implementation | The doc describes post-IB/VWAP/caught inventory behavior, but still lacks enough fixture examples, exact candle sequences, and expected trades for test-first development | Add 5-10 golden examples with bars, expected setup detection, entry/exit, and report result |
+| Critical | Numerical formulas are not fully locked | Metrics are listed, but formulas, annualization assumptions, session normalization, rounding, and edge-case handling are not fully defined | Add a metric formula appendix with exact equations and test vectors |
+| Critical | Data assumptions are still too optimistic | Real CSVs vary wildly by broker/export; current plan has general validation but not enough importer profiles or malformed-file examples | Add canonical import profiles and fixture files for TradingView, NinjaTrader, broker CSV, and malformed CSV |
+| High | The doc over-specifies agent architecture before proving the backtest engine | Multi-agent orchestration is valuable later, but it can distract from the hard part: deterministic data, fills, metrics, and reports | Build deterministic core first; agent layers can wrap it only after core has golden tests |
+| High | There are multiple roadmap layers that overlap | Phase plan, implementation roadmap, deep execution plan, work packages, milestone gates, missing inventory, and loop catalog repeat similar concepts | Consolidate into one authoritative roadmap table plus one backlog/gap table |
+| High | Acceptance criteria are uneven | Some sections have strong acceptance tests; others are aspirational requirements without pass/fail checks | Every P0 item needs explicit acceptance criteria and at least one test or manual verification step |
+| High | Clean-room reference handling is still a risk | The doc now references a leaked-source mirror as prohibited, but repeatedly mentioning it can still pull attention toward unsafe implementation sources | Keep only the warning/reference note; do not add any further implementation detail from that source |
+| High | BYOK and local runner security are not yet implementation-ready | The doc says keys must be safe and runner must be scoped, but it does not yet define encryption, local auth handshake, token exchange, or browser-to-runner trust model | Add exact credential storage and localhost runner pairing protocol before implementing `vibing serve` |
+| High | Proof-chain design needs canonicalization details | Hashing is central, but canonical JSON serialization, timestamp normalization, binary artifact hashing, and cross-runtime consistency are not fully specified | Add canonical hash spec and cross-browser/Node/Python hash fixtures |
+| High | Browser storage migration is underdefined | IndexedDB is chosen, but schema migrations, corruption recovery, backup/export, and quota handling are not detailed enough | Add IndexedDB versioning, migration, quota, and recovery rules |
+| High | Report claims can still become too confident | The doc has caveats, but report generation requirements need stricter language templates and blocked-claim rules | Add "forbidden report claims" and required caveat templates for low data quality, low trade count, and OHLC ambiguity |
+| High | Legal/compliance requirements are too thin | The product generates trading reports that users may treat as advice; disclaimers and jurisdictional concerns are only lightly covered | Add a compliance checklist for financial advice, performance claims, testimonials, and user suitability language |
+| Medium | The CLI is specified before the core module extraction plan is detailed | Commands are listed, but there is not yet a concrete refactor sequence from current React code to reusable `core/*` modules | Add a core extraction work package before CLI implementation |
+| Medium | Python parity is vague | The doc says browser and Python should match within assumptions, but tolerance and divergence reporting are not defined | Add parity tolerance, fixture set, and mismatch report schema |
+| Medium | Watch/background mode could create runaway work | Budgets and stops are mentioned, but exact default limits are missing | Add default max runtime, max experiments, max provider spend, max disk usage, and max retries |
+| Medium | Memory UX is underspecified | The doc says inspect/export/delete memory, but not how the user sees learned preferences and candidate lessons | Add memory panel UX states, labels, delete confirmations, and "why did you suggest this?" explanation |
+| Medium | Model/provider routing is too abstract | Provider adapters are listed, but payload redaction, prompt templates, response validation, and fallback behavior are not specified | Add provider request/response schema and redaction tests |
+| Medium | The artifact package format is not finalized | Export/import is central to browser/CLI/runner interop, but package manifest and directory layout are still conceptual | Add `run-package.v1.json` manifest schema |
+| Medium | Test plan is not aligned with the new missing-items list | The test plan predates the expanded CLI, runner, browser automation, memory, and learning loops | Update the test plan so every P0/P1 gap has a matching test category |
+| Medium | Existing repo integration is shallow | The doc names existing files, but not exact integration points, current constraints, or likely conflicts in `src/features/shell`, auth, and terminal modules | Add a repo integration map before implementation |
+| Medium | Performance limits are not quantified | Browser-first depends on knowing row limits, memory caps, worker chunk sizes, and acceptable runtime | Add benchmark targets for 10k, 100k, 1M rows and fallback thresholds |
+| Medium | Failure modes are incomplete | State machines exist, but many real failures lack recovery paths: quota exceeded, worker crash, tab close mid-write, corrupted IndexedDB, partial export, runner disconnect | Add a failure/recovery matrix |
+| Medium | The "single-doc rule" is becoming a liability | The doc is now large enough that agents may miss important details or contradict earlier sections | Keep this as canonical, but add a short generated implementation checklist at the top after spec freeze |
+| Low | Naming is not fully stable | "Vibing Finance", "vibing", "Backtesting Engine", "Research Coordinator", and "Workbench" are all used, but brand/runtime names need final consistency | Add a naming glossary |
+| Low | Some future ideas are repeated in multiple sections | BYOK, local runner, memory, CLI, proof, and clean-room rules appear in several places | After decisions stabilize, deduplicate and cross-reference |
+| Low | Tables are dense and may hide priority | Long tables are useful but easy to skim past; P0 actions need a separate execution checklist | Add a top-level P0 action checklist |
+
+Immediate cleanup order:
+
+1. Freeze M1-M6 as the only MVP implementation path.
+2. Renumber headings or add stable IDs.
+3. Add golden strategy/data fixtures.
+4. Add exact metric formulas and canonical hash rules.
+5. Add report claim guardrails.
+6. Add import/export package schema.
+7. Add memory capsule schema and feedback UI contract.
+8. Add local runner/BYOK security protocol only after browser MVP is proven.
+9. Collapse duplicate roadmap sections after the above decisions are locked.
+
+Non-negotiable warning:
+
+- Do not start implementing self-learning, multi-agent teams, BYOK remote calls, or autonomous watch mode until deterministic browser backtest, report, proof, and golden tests are working.
+
 ---
 
 ## 33. Work Package Breakdown
