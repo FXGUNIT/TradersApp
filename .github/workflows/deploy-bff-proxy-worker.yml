@@ -63,11 +63,10 @@ jobs:
           echo "Worker: $WORKER_NAME"
 
           echo "=== Uploading script (PUT /workers/scripts/{name}/content) ==="
-          BEARER_TOKEN="${CLOUDFLARE_API_TOKEN}"
           RESP=$(curl -s -w "\nHTTP_CODE:%{http_code}" -X PUT "https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/workers/scripts/${WORKER_NAME}/content" \
-            -H "Authorization: Bearer ${BEARER_TOKEN}" \
+            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
             -H "X-Auth-Email: ${CLOUDFLARE_EMAIL}" \
-            -H "Content-Type: application/octet-stream" \
+            -H "Content-Type: application/javascript" \
             --data-binary "@deploy/cloudflare-tunnel/bff-worker/index.js")
           HTTP_CODE=$(echo "$RESP" | tail -1 | cut -d: -f2)
           BODY=$(echo "$RESP" | sed '$d')
