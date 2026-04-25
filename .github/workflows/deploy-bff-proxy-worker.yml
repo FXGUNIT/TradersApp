@@ -32,10 +32,10 @@ jobs:
         with:
           node-version: "24"
 
-      - name: Check Workers API access with discovered Account ID
+      - name: Check Workers API access
         run: |
-          echo "=== Testing Workers API access with Account ID ${{ steps.account.outputs.account_id }} ==="
-          RESP=$(curl -s "https://api.cloudflare.com/client/v4/accounts/${{ steps.account.outputs.account_id }}/workers/scripts" \
+          echo "=== Testing Workers API access with Account ID 0f779fe4981d424548a48856cc9139db ==="
+          RESP=$(curl -s "https://api.cloudflare.com/client/v4/accounts/0f779fe4981d424548a48856cc9139db/workers/scripts" \
             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
             -H "Content-Type: application/json")
           echo "$RESP" | python3 -c "import json,sys; d=json.load(sys.stdin); print('Workers API success:', d.get('success')); print('Errors:', d.get('errors') or [])"
@@ -48,6 +48,6 @@ jobs:
         run: |
           echo "=== Attempting Worker deploy ==="
           cd deploy/cloudflare-tunnel/bff-worker
-          CLOUDFLARE_ACCOUNT_ID="${{ steps.account.outputs.account_id }}" \
+          CLOUDFLARE_ACCOUNT_ID="0f779fe4981d424548a48856cc9139db" \
           CLOUDFLARE_API_TOKEN="$CLOUDFLARE_API_TOKEN" \
           npx wrangler deploy --name tradersapp-bff-proxy --env production 2>&1
