@@ -932,3 +932,850 @@ Proposed MVP:
 > A hidden admin-only page where the trader describes a post-initial-balance MNQ or NIFTY strategy in plain English, the app converts it into a validated strategy spec using session VWAP, caught buyer/seller inventory context, pullback confirmation, and structure-change confirmation, runs a realistic net backtest on uploaded CSV data with 0.2% account risk per trade, 12-unit stop, TP1 at 15 units, TP2 at 45 units, and breakeven after TP1, then returns a strict risk report with a reject/revise/paper-trade verdict.
 
 This MVP is intentionally narrow. Once it is trustworthy, expand asset coverage, data sources, strategy families, ML optimization, research-paper retrieval, and audit proofs.
+
+---
+
+## 18. Free-For-Lifetime Architecture Principle
+
+The only reliable way to make this feature "free for lifetime" is to avoid mandatory rented compute, paid APIs, paid data, paid databases, paid LLM calls, paid blockchain gas, paid storage, and paid background workers.
+
+Therefore the default architecture is:
+
+- Static frontend hosted on the existing web app path.
+- Browser-first computation for MVP backtests.
+- Uploaded CSV data processed locally in the admin browser.
+- IndexedDB/local file export for private state.
+- Optional local Python/FastAPI runner for heavier jobs on the user's own machine.
+- Optional Cloudflare Pages static hosting because it currently has a $0/free plan, but the app must still work from a local build if a vendor changes terms.
+- No paid public blockchain in the critical path.
+- No paid LLM API in the mandatory path.
+- No server-side storage required for MVP.
+
+Free does not mean unlimited. The system must degrade safely:
+
+- Small/medium CSV: run in browser.
+- Large CSV: chunk in browser worker.
+- Very large/tick data: run local Python CLI/ML engine.
+- Hosted free-tier quota hit: use local build.
+- No LLM available: use deterministic parser and guided forms.
+- No public chain available: use local hash-chain proof ledger.
+
+---
+
+## 19. Free Infrastructure Decision
+
+### 19.1 Mandatory Runtime
+
+| Layer | Choice | Cost Target | Reason |
+|---|---|---:|---|
+| UI hosting | Cloudflare Pages or local static build | $0 | Static frontend is the only hosted part needed for MVP |
+| Compute | Browser Web Workers | $0 | User machine pays compute cost, not a server |
+| Data storage | Uploaded CSV + IndexedDB + export files | $0 | No mandatory hosted database |
+| Strategy parsing | Deterministic parser + templates | $0 | Avoid paid LLM dependency |
+| Report generation | Local deterministic report engine | $0 | No server or API call |
+| Audit proof | Local Merkle/hash-chain ledger | $0 | No gas, no paid chain |
+| Heavy research | Optional local Python runner | $0 hosting | Uses existing repo/ML engine locally |
+
+### 19.2 Optional Runtime
+
+| Layer | Choice | Use Only If |
+|---|---|---|
+| Cloudflare Workers | Thin auth/config proxy only | Needed later and below free limits |
+| Existing BFF | Existing product APIs | The feature needs account/admin verification from backend |
+| Existing ML engine | Local or current deployment | Heavy backtest/ML job exceeds browser limits |
+| Local Ollama/WebLLM | Local natural-language enhancement | User wants LLM-like interaction without paid APIs |
+| GitHub repo proof | Optional exported proof commit | Public timestamping is wanted without blockchain fees |
+| Public blockchain proof | Optional later | A real business need exists and free/feeless constraints still hold |
+
+### 19.3 Explicit Non-Goals For Free MVP
+
+- No server-side batch compute for user CSVs.
+- No paid OpenAI/Anthropic/Gemini calls as a requirement.
+- No paid market-data vendor.
+- No hosted database requirement.
+- No R2/S3 storage requirement.
+- No on-chain raw data.
+- No on-chain strategy text.
+- No on-chain reports.
+- No public chain write required for a backtest to complete.
+
+---
+
+## 20. Detailed Component Architecture
+
+### 20.1 Frontend Components
+
+Proposed files:
+
+```text
+src/features/vibing-finance/VibingFinanceScreen.jsx
+src/features/vibing-finance/vibingFinance.css
+src/features/vibing-finance/vibingFinanceFlags.js
+src/features/vibing-finance/strategyParser.js
+src/features/vibing-finance/strategySchema.js
+src/features/vibing-finance/csvIngestion.js
+src/features/vibing-finance/sessionCalendar.js
+src/features/vibing-finance/vwap.js
+src/features/vibing-finance/inventoryDetector.js
+src/features/vibing-finance/structureDetector.js
+src/features/vibing-finance/backtestEngine.js
+src/features/vibing-finance/riskMetrics.js
+src/features/vibing-finance/reportBuilder.js
+src/features/vibing-finance/proofChain.js
+src/features/vibing-finance/storage.js
+src/features/vibing-finance/workers/backtest.worker.js
+src/features/vibing-finance/__tests__/*
+```
+
+Screen responsibilities:
+
+- Verify feature flag.
+- Verify admin access.
+- Accept CSV upload.
+- Parse and validate data.
+- Show strategy conversation.
+- Show normalized strategy spec.
+- Run backtest in worker.
+- Show progress.
+- Render institutional report.
+- Store local artifacts.
+- Export report JSON/CSV if needed.
+- Append audit event to local proof chain.
+
+### 20.2 Local Storage Components
+
+Use browser IndexedDB, not localStorage, for structured artifacts.
+
+Object stores:
+
+```text
+datasets
+strategy_specs
+backtest_runs
+reports
+proof_blocks
+settings
+```
+
+Dataset record:
+
+```json
+{
+  "dataset_id": "sha256:...",
+  "symbol": "MNQ",
+  "source": "uploaded_csv",
+  "filename": "mnq_5m_2024.csv",
+  "row_count": 123456,
+  "start_time": "2024-01-02T09:30:00-05:00",
+  "end_time": "2024-12-31T16:00:00-05:00",
+  "timeframe_inferred": "5m",
+  "timezone": "America/New_York",
+  "columns": ["timestamp", "open", "high", "low", "close", "volume"],
+  "quality_score": 0.97,
+  "created_at": "..."
+}
+```
+
+Backtest run record:
+
+```json
+{
+  "run_id": "uuid",
+  "dataset_id": "sha256:...",
+  "strategy_hash": "sha256:...",
+  "engine_version": "vibing-backtest-js-0.1",
+  "started_at": "...",
+  "completed_at": "...",
+  "status": "completed",
+  "metrics": {},
+  "report_hash": "sha256:..."
+}
+```
+
+### 20.3 Worker Architecture
+
+The backtest must not block the UI thread.
+
+Main thread sends:
+
+```json
+{
+  "type": "RUN_BACKTEST",
+  "payload": {
+    "dataset": [],
+    "strategySpec": {},
+    "account": {
+      "starting_equity": 25000,
+      "risk_fraction": 0.002
+    }
+  }
+}
+```
+
+Worker streams progress:
+
+```json
+{ "type": "PROGRESS", "stage": "validating", "pct": 10 }
+{ "type": "PROGRESS", "stage": "computing_vwap", "pct": 25 }
+{ "type": "PROGRESS", "stage": "detecting_setups", "pct": 45 }
+{ "type": "PROGRESS", "stage": "simulating", "pct": 70 }
+{ "type": "PROGRESS", "stage": "building_report", "pct": 90 }
+{ "type": "COMPLETE", "result": {} }
+```
+
+Failure handling:
+
+- Parse error: return row number and column.
+- Data quality failure: return failed checks.
+- No trades: return "no eligible setups" report, not an app error.
+- Memory pressure: recommend local Python runner.
+
+---
+
+## 21. Data Pipeline Architecture
+
+### 21.1 Local Data Flow
+
+```text
+CSV Upload
+  -> byte hash
+  -> schema validation
+  -> timestamp normalization
+  -> duplicate/missing-bar checks
+  -> session tagging
+  -> IB high/low computation
+  -> session VWAP computation
+  -> setup detection
+  -> execution simulation
+  -> metrics
+  -> report
+  -> proof block
+```
+
+### 21.2 Data Validation Checks
+
+Required checks:
+
+- Required columns exist.
+- OHLC values are numeric.
+- `high >= max(open, close)`.
+- `low <= min(open, close)`.
+- `volume >= 0`.
+- Timestamps parse.
+- Timestamps are unique.
+- Timestamps are monotonic after sorting.
+- Timezone is known or inferred.
+- Expected bar interval is inferred.
+- Missing bars are counted by session.
+- Sessions with too many gaps are excluded.
+- Rows outside configured session are either ignored or marked out-of-session.
+
+Quality score:
+
+```text
+quality_score =
+  1.00
+  - missing_bar_penalty
+  - duplicate_penalty
+  - invalid_ohlc_penalty
+  - timezone_inference_penalty
+  - no_volume_penalty
+```
+
+Minimum run threshold:
+
+- `quality_score >= 0.85` for a normal report.
+- `0.70 <= quality_score < 0.85` allowed but report must be marked low confidence.
+- `< 0.70` blocked unless admin explicitly chooses research-only mode later.
+
+### 21.3 Data Layers
+
+Even in browser, keep data layered:
+
+| Layer | Meaning | Persist? |
+|---|---|---|
+| Raw | Original CSV bytes/hash/filename | Optional, admin choice |
+| Parsed | Normalized rows | Yes, IndexedDB |
+| Validated | Rows plus quality flags | Yes |
+| Feature-ready | Session, IB, VWAP, swing labels | Yes |
+| Results | Trades, equity curve, metrics | Yes |
+| Proof | Hashes and signatures | Yes |
+
+---
+
+## 22. Strategy DSL
+
+The natural-language interface should produce a versioned deterministic object.
+
+MVP strategy spec:
+
+```json
+{
+  "schema_version": "vibing.strategy.v1",
+  "strategy_id": "post_ib_vwap_inventory_v1",
+  "assets": ["MNQ", "NIFTY"],
+  "timeframe": "5m",
+  "session": {
+    "type": "rth",
+    "timezone_by_asset": {
+      "MNQ": "America/New_York",
+      "NIFTY": "Asia/Kolkata"
+    },
+    "open_by_asset": {
+      "MNQ": "09:30",
+      "NIFTY": "09:15"
+    },
+    "initial_balance_minutes": 60
+  },
+  "features": {
+    "vwap": {
+      "reset": "session",
+      "price": "typical_price"
+    },
+    "inventory": {
+      "trap_threshold_points": 1,
+      "reclaim_window_candles": 2
+    },
+    "structure_change": {
+      "lookback_candles": 3,
+      "requires_vwap_confirmation": true
+    },
+    "pullback": {
+      "impulse_retrace_min": 0.33,
+      "impulse_retrace_max": 0.66,
+      "vwap_touch_or_zone": true
+    }
+  },
+  "risk": {
+    "account_risk_fraction": 0.002,
+    "stop_points": 12,
+    "tp1_points": 15,
+    "tp2_points": 45,
+    "tp1_exit_fraction": 0.5,
+    "move_stop_to_breakeven_after_tp1": true
+  },
+  "filters": {
+    "no_entry_before_ib_complete": true,
+    "max_one_trade_per_side_per_session": true,
+    "no_entry_final_session_minutes": 30,
+    "max_entry_distance_from_vwap_r": 2
+  }
+}
+```
+
+The parser may accept beginner wording, but it must always show the normalized JSON-like spec before running the test.
+
+---
+
+## 23. Backtest Engine Details
+
+### 23.1 Event Loop
+
+For each session:
+
+1. Load validated bars.
+2. Compute IB high and low from the first 60 minutes.
+3. Compute session VWAP incrementally.
+4. After IB closes, scan for caught seller or caught buyer events.
+5. After caught inventory appears, wait for structure change.
+6. After structure change, wait for pullback.
+7. After pullback, wait for entry trigger.
+8. Size position using 0.2% account risk.
+9. Simulate entry, stop, TP1, TP2.
+10. Apply breakeven rule after TP1.
+11. Record trade, MFE, MAE, R multiple, and reason codes.
+12. Stop scanning that side after a full stop-loss.
+
+### 23.2 Conservative Intrabar Fill Policy
+
+Because 5-minute candles do not reveal the true order of high/low inside the candle:
+
+- If entry and stop are both touched in the same candle, assume stop happened first.
+- If TP1 and stop are both touched before breakeven can be confirmed, assume worst case.
+- If TP1 and TP2 are both touched in the same candle after entry, allow TP1 then TP2 only if candle direction supports it; otherwise allow TP1 only.
+- If breakeven and TP2 are both touched after TP1, use candle direction to decide; if ambiguous, assume breakeven.
+- The report must label this as "conservative OHLC simulation".
+
+### 23.3 Trade Record
+
+```json
+{
+  "trade_id": "uuid",
+  "asset": "MNQ",
+  "session_date": "2026-04-24",
+  "side": "long",
+  "entry_time": "...",
+  "entry_price": 18125.25,
+  "initial_stop": 18113.25,
+  "tp1": 18140.25,
+  "tp2": 18170.25,
+  "position_size": 4,
+  "risk_dollars": 100,
+  "result": "tp2",
+  "net_pnl": 230,
+  "r_multiple": 2.3,
+  "setup_reason": "caught_sellers_bullish_choch_pullback",
+  "quality_flags": []
+}
+```
+
+### 23.4 Metrics
+
+Mandatory:
+
+- Total trades.
+- Win rate.
+- Average R.
+- Expectancy in R.
+- Net PnL.
+- Max drawdown.
+- Profit factor.
+- Sharpe-like bar/session metric where appropriate.
+- Best trade.
+- Worst trade.
+- Average hold time.
+- TP1 hit rate.
+- TP2 hit rate.
+- Breakeven-after-TP1 frequency.
+- Session/day distribution.
+- Long vs short breakdown.
+- NIFTY vs MNQ breakdown.
+- Data quality score.
+
+Reject logic:
+
+- Fewer than 30 trades: insufficient sample.
+- Profit factor below 1.2: weak.
+- Max drawdown too high relative to expected return: weak/reject.
+- Edge only from one outlier day: weak.
+- High sensitivity to 1-point trap threshold: weak.
+- Good gross but bad net after costs: reject or revise.
+
+---
+
+## 24. Report Architecture
+
+Report sections:
+
+1. Executive verdict.
+2. Strategy spec summary.
+3. Dataset quality.
+4. Session definitions.
+5. Setup examples.
+6. Trade metrics.
+7. Risk metrics.
+8. Equity curve.
+9. Drawdown path.
+10. Long/short breakdown.
+11. Asset breakdown.
+12. Sensitivity tests.
+13. Conservative-fill caveats.
+14. What would break live.
+15. Next research actions.
+16. Proof block.
+
+Verdict labels:
+
+```text
+REJECT
+WEAK
+RESEARCH-WORTHY
+PAPER-TRADE
+DEPLOY-CANDIDATE
+```
+
+The MVP should be biased toward rejecting weak evidence.
+
+---
+
+## 25. Blockchain / Proof Architecture
+
+### 25.1 Decision
+
+For strict free-for-lifetime operation, the MVP blockchain is a private local hash-chain ledger called **Vibing Proof Chain**.
+
+This is not a public cryptocurrency network. It is a tamper-evident chain of hashes stored with the reports. It costs nothing, has no gas, exposes no private strategy data, and works offline forever.
+
+Public-chain anchoring is optional later. It must not block the product.
+
+### 25.2 Why Not A Paid Public Chain First
+
+Public chains are bad for the MVP because:
+
+- Most require gas.
+- Fees can change.
+- Free testnets are not production evidence.
+- Raw strategy data must not be public.
+- Even cheap chains create wallet/key/ops complexity.
+- Backtests do not need global consensus to run.
+- Hosted RPC providers have free-tier limits.
+
+### 25.3 Chain Choice Matrix
+
+| Option | Cost | Pros | Problems | Decision |
+|---|---:|---|---|---|
+| Local hash-chain | $0 | Offline, private, deterministic, no gas | Not decentralized | Use for MVP |
+| Git commit proof | $0 if using existing GitHub | Public timestamp-ish, easy export | Not blockchain, depends on GitHub | Optional |
+| Nano | Feeless transfers per Nano docs | Public, fast, no transaction fees | Poor fit for arbitrary report-data anchoring | Optional research only |
+| IOTA | Historically promoted feeless DLT | Data/provenance fit is conceptually better | Current/rebased fee/storage model is not simple "free forever" | Do not use for MVP |
+| Polygon/Solana/Base/Arbitrum | Low fees | Mature tooling | Not free; RPC/wallet costs possible | No |
+| Ethereum mainnet | High trust | Strong ecosystem | Not free | No |
+| Private EVM chain | No gas if local | Familiar tooling | Running validators is ops cost | No for MVP |
+
+### 25.4 Vibing Proof Chain Block
+
+Each important event appends one block:
+
+```json
+{
+  "chain": "vibing-proof-chain",
+  "version": 1,
+  "height": 42,
+  "previous_hash": "sha256:...",
+  "event_type": "BACKTEST_REPORT_CREATED",
+  "created_at": "2026-04-25T12:00:00Z",
+  "payload_hash": "sha256:...",
+  "payload_kind": "report",
+  "dataset_hash": "sha256:...",
+  "strategy_hash": "sha256:...",
+  "engine_version": "vibing-backtest-js-0.1",
+  "code_version": "git:...",
+  "block_hash": "sha256:...",
+  "signature": "ecdsa-p256:..."
+}
+```
+
+Hash rule:
+
+```text
+block_hash = SHA256(canonical_json_without_signature_and_block_hash)
+```
+
+Signature rule:
+
+```text
+signature = admin_private_key.sign(block_hash)
+```
+
+Key storage:
+
+- Generate a browser signing key with WebCrypto.
+- Store private key in IndexedDB as non-extractable where supported.
+- Export public key with reports.
+- If non-extractable storage is not reliable in a browser, allow admin to export/import a key file manually.
+
+### 25.5 Merkle Report Root
+
+Each report gets a Merkle root:
+
+```text
+root = merkle(
+  dataset_hash,
+  strategy_hash,
+  trade_ledger_hash,
+  equity_curve_hash,
+  metrics_hash,
+  report_text_hash,
+  engine_version_hash
+)
+```
+
+The report can be verified later without revealing raw data if only hashes are shared.
+
+### 25.6 Optional Public Anchor Later
+
+If public proof becomes necessary:
+
+1. Keep private data local.
+2. Publish only the Merkle root.
+3. Prefer a free non-chain proof first: signed Git commit, GitHub release artifact, or public gist.
+4. If a true public feeless network is still required, evaluate Nano only as an experimental anchor, because Nano documentation describes feeless transactions, but it is not designed as a general-purpose data ledger.
+5. Never make public anchoring required for the core backtest.
+
+---
+
+## 26. Security Architecture
+
+### 26.1 Admin Access
+
+The page must require:
+
+- Feature flag enabled.
+- Authenticated user.
+- Admin role.
+- Optional admin email/UID allowlist.
+
+Failure mode:
+
+- If not admin, route should not appear.
+- If opened directly, show not found or redirect.
+- Do not reveal feature name to normal users.
+
+### 26.2 Upload Security
+
+CSV upload risks:
+
+- Huge files causing browser freeze.
+- Malformed CSV parser edge cases.
+- Formula injection in exported CSV.
+- Timestamp poison.
+- Memory exhaustion.
+
+Controls:
+
+- File size warning and hard cap for browser mode.
+- Stream/chunk parse where possible.
+- Escape values on export that start with `=`, `+`, `-`, or `@`.
+- Reject invalid timestamps.
+- Worker isolation for parsing/backtesting.
+- No upload to server in MVP.
+
+### 26.3 Privacy
+
+Private by default:
+
+- Uploaded CSV stays local.
+- Strategy prompt stays local.
+- Report stays local.
+- Proof chain stays local.
+- No analytics event includes strategy text or market data.
+- No prompt is sent to an external LLM unless a later explicit setting enables it.
+
+### 26.4 Secrets
+
+MVP should need no secrets.
+
+Forbidden in MVP:
+
+- Market-data API keys.
+- LLM API keys.
+- Blockchain private keys stored on server.
+- Admin strategy data in logs.
+
+### 26.5 Abuse Controls
+
+Even admin-only tools need safety:
+
+- Backtest cancellation button.
+- Worker timeout.
+- Memory threshold warning.
+- Max rows for browser mode.
+- Local artifact delete button.
+- Proof chain export before deletion if needed.
+
+---
+
+## 27. Free AI / Analyst Architecture
+
+The user wants the feel of talking to a seasoned research team. For free-for-lifetime constraints, split this into layers:
+
+### 27.1 Free Deterministic Analyst
+
+Always available:
+
+- Strategy parser.
+- Clarifying-question generator.
+- Backtest integrity checklist.
+- Risk report template.
+- Rejection logic.
+- Explanation generator from metrics.
+- Next-experiment suggester.
+
+This can feel intelligent without a paid LLM because the strategy family is narrow and rules are explicit.
+
+### 27.2 Optional Local LLM
+
+Optional later:
+
+- Ollama local model.
+- Browser WebLLM model if bundle size and hardware allow it.
+- User-provided local endpoint.
+
+Rules:
+
+- Local LLM can explain and summarize.
+- Local LLM cannot silently change strategy logic.
+- Deterministic strategy spec remains source of truth.
+- Report metrics must come from engine, not model text.
+
+### 27.3 Paid LLM Policy
+
+Paid APIs are not part of the free MVP.
+
+If added later:
+
+- Must be optional.
+- Must support user-provided key.
+- Must redact private data where possible.
+- Must show cost-risk warning.
+
+---
+
+## 28. Local Python Runner Architecture
+
+Browser mode is the MVP. Local runner is the escape hatch for large files.
+
+Proposed local command later:
+
+```text
+python scripts/vibing_finance/run_backtest.py --csv path/to/file.csv --asset MNQ --out artifacts/vibing-finance/run.json
+```
+
+Local runner responsibilities:
+
+- Reuse the same strategy spec.
+- Use pandas/NumPy for larger datasets.
+- Optionally integrate with existing `ml-engine/backtesting/rig.py`.
+- Produce the same report JSON schema as browser mode.
+- Produce the same proof block format.
+
+This keeps hosting free because the user's machine performs heavy work.
+
+---
+
+## 29. Integration With Existing TradersApp
+
+### 29.1 Frontend Integration
+
+Add a lazy-loaded screen:
+
+```text
+screen === "vibingFinance"
+```
+
+The hub should not show it unless:
+
+```text
+VITE_ENABLE_VIBING_FINANCE === "true"
+isAdminAuthenticated === true
+```
+
+### 29.2 BFF Integration
+
+MVP should not require BFF for backtest compute.
+
+Possible BFF use later:
+
+- Verify admin role.
+- Store only settings, not strategy data.
+- Return feature flag/config.
+- Proxy optional local/remote ML engine status.
+
+### 29.3 ML Engine Integration
+
+MVP can run without ML engine.
+
+Later use ML engine for:
+
+- Larger Python backtests.
+- Walk-forward validation.
+- Monte Carlo.
+- PSO parameter search.
+- Model-based regime classification.
+- Report comparison across runs.
+
+### 29.4 Existing Backtest Rig
+
+The current `ml-engine/backtesting/rig.py` remains useful for Python parity, but browser MVP should define its own narrow JS engine first for zero-hosting cost and immediate UI feedback.
+
+Parity requirement:
+
+- Given the same CSV and strategy spec, browser engine and Python runner should agree within documented fill-policy assumptions.
+
+---
+
+## 30. Implementation Roadmap For This Architecture
+
+### A0 - Spec Hardening
+
+- Keep this document canonical.
+- Do not add extra planning docs.
+- Add architecture defaults, proof model, and free constraints here.
+
+### A1 - Hidden Page
+
+- Create `src/features/vibing-finance/`.
+- Add feature flag.
+- Add admin-only route.
+- Add placeholder UI.
+
+### A2 - CSV Intake
+
+- Parse uploaded CSV in browser.
+- Validate schema.
+- Infer symbol/timezone/timeframe.
+- Show data quality report.
+
+### A3 - Strategy Spec
+
+- Implement fixed MVP strategy spec.
+- Show editable advanced settings later, but defaults should work.
+
+### A4 - Backtest Worker
+
+- Compute IB.
+- Compute VWAP.
+- Detect caught buyers/sellers.
+- Detect structure change.
+- Detect pullback.
+- Simulate trades.
+- Return trade ledger.
+
+### A5 - Risk Report
+
+- Build report sections.
+- Add verdict logic.
+- Add conservative-fill warnings.
+
+### A6 - Proof Chain
+
+- Hash dataset/spec/result.
+- Generate local proof block.
+- Sign proof block.
+- Render proof in report.
+
+### A7 - Testing
+
+- Unit tests for parser, VWAP, IB, inventory detector, structure detector, fill policy, risk sizing.
+- Fixture CSV for MNQ.
+- Fixture CSV for NIFTY.
+- Browser UI smoke test.
+- Cross-check with Python runner later.
+
+### A8 - Local Runner
+
+- Add optional Python CLI after browser MVP works.
+- Match report schema.
+
+### A9 - Optional Local LLM
+
+- Add optional summarizer only after deterministic report works.
+
+---
+
+## 31. Free-Lifetime Risk Register
+
+| Risk | Impact | Mitigation |
+|---|---|---|
+| Cloudflare free plan changes | Hosted app may need migration | Keep app static and locally buildable |
+| Worker free CPU too small | Server backtests fail | Do not require Worker compute |
+| Browser memory insufficient | Large CSV fails | Chunking plus local Python runner |
+| Paid data needed | Cannot stay free | Uploaded CSV only in MVP |
+| Paid LLM needed | Ongoing cost | Deterministic analyst first, local LLM optional |
+| Public blockchain fees | Ongoing cost | Local proof chain first |
+| Free public chain changes | Proof anchoring breaks | Public anchoring optional |
+| Admin browser data loss | Reports vanish | Export/import artifacts and proof chain |
+| Uploaded CSV has wrong timezone | Bad backtest | Explicit timezone inference and warnings |
+| OHLC intrabar ambiguity | False confidence | Conservative fill policy and report caveat |
+
+---
+
+## 32. External Reference Notes
+
+These references informed the free architecture and timing defaults as of 2026-04-25:
+
+- Cloudflare Pages currently presents a Free plan at `$0 forever`, with unlimited sites/seats/requests/bandwidth and 500 builds/month on the compared table: https://www.cloudflare.com/developer-platform/products/pages/
+- Cloudflare Workers Free currently has limits such as 100,000 requests/day, 10 ms CPU time, and 128 MB memory, which makes it unsuitable for mandatory heavy backtest compute: https://developers.cloudflare.com/workers/platform/limits/
+- Nano documentation describes Nano as a feeless block-lattice cryptocurrency, but it is a currency network rather than a general-purpose report-data ledger: https://docs.nano.org/protocol-design/introduction/
+- NSE market timings list normal/equity derivatives open at 09:15 and close at 15:30: https://www.nseindia.com/static/market-data/market-timings
+- CME material confirms Micro E-mini futures trade nearly around the clock; the MVP still intentionally uses 09:30 ET as the New York/RTH-style session open for this strategy: https://www.cmegroup.com/education/frequently-asked-questions-micro-e-mini-equity-index-futures.html
