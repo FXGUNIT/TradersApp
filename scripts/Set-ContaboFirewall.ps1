@@ -148,6 +148,57 @@ function Test-RuleExists {
     return $false
 }
 
+function Test-DropAnyRule {
+    param([object]$Rule)
+
+    if ($Rule.action -ne "drop") {
+        return $false
+    }
+
+    $ports = @(Get-PortList -DestPorts $Rule.destPorts)
+    $ipv4 = @()
+    $ipv6 = @()
+
+    if ($Rule.srcCidr) {
+        if ($Rule.srcCidr.ipv4) { $ipv4 = @($Rule.srcCidr.ipv4) }
+        if ($Rule.srcCidr.ipv6) { $ipv6 = @($Rule.srcCidr.ipv6) }
+    }
+
+    $isAnySource = (
+        $ipv4 -contains "AnyIPv4" -or
+        $ipv4 -contains "0.0.0.0/0" -or
+        $ipv6 -contains "AnyIPv6" -or
+        $ipv6 -contains "::/0"
+    )
+
+    $isAnyPort = (
+        $ports.Count -eq 0 -or
+        $ports -contains "Any" -or
+        $ports -contains "any" -or
+        $ports -contains "1-65535"
+    )
+
+    return ($isAnySource -and $isAnyPort)
+}
+
+function Move-DropAnyRulesToEnd {
+    param([object[]]$Rules)
+
+    $allowAndSpecificRules = @()
+    $dropAnyRules = @()
+
+    foreach ($rule in $Rules) {
+        if (Test-DropAnyRule -Rule $rule) {
+            $dropAnyRules += $rule
+        }
+        else {
+            $allowAndSpecificRules += $rule
+        }
+    }
+
+    return @($allowAndSpecificRules + $dropAnyRules)
+}
+
 Write-Host ""
 Write-Host "Contabo firewall setup"
 Write-Host "This adds SSH first, then assigns the firewall only after the SSH rule exists."
@@ -253,6 +304,8 @@ try {
             Write-Host "Prepared HTTPS allow rule for TCP 443 from Any."
         }
     }
+
+    $rules = Move-DropAnyRulesToEnd -Rules $rules
 
     $updateBody = @{
         rules = @{
