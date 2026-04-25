@@ -1,0 +1,79 @@
+name: Deploy BFF Proxy Worker
+
+on:
+  workflow_dispatch:
+
+env:
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+jobs:
+  deploy-worker:
+    name: Deploy tradersapp-bff-proxy Worker
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Get Account ID
+        id: account
+        run: |
+          ACCOUNT_ID="$CLOUDFLARE_ACCOUNT_ID"
+          echo "Account ID: $ACCOUNT_ID"
+          echo "account_id=$ACCOUNT_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Install Wrangler
+        run: npm install -g wrangler@latest
+
+      - name: Verify token against Workers API
+        run: |
+          echo "=== Checking Workers scripts list ==="
+          RESPONSE=$(curl -s "https://api.cloudflare.com/client/v4/accounts/${{ steps.account.outputs.account_id }}/workers/scripts" \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            -H "Content-Type: application/json")
+          echo "Response: $RESPONSE"
+          echo "$RESPONSE" | python3 -c "import json,sys; d=json.load(sys.stdin); print('Workers access:', d.get('success'), d.get('errors') or '')"
+          echo ""
+
+      - name: Set TUNNEL_TOKEN secret
+        run: |
+          echo "Checking if TUNNEL_TOKEN is available..."
+          if [ -n "${{ secrets.TUNNEL_TOKEN }}" ]; then
+            echo "TUNNEL_TOKEN is set in secrets"
+          else
+            echo "TUNNEL_TOKEN is not set — Worker will be deployed without tunnel config (can be updated via wrangler secret)"
+          fi
+
+      - name: Save Account ID to GitHub Actions variable
+        run: |
+          echo "=== Saving Account ID as GitHub Actions variable ==="
+          gh api repos/FXGUNIT/TradersApp/actions/variables/CLOUDFLARE_ACCOUNT_ID -X PATCH \
+            -H "Content-Type: application/json" \
+            --field value="${{ steps.account.outputs.account_id }}" 2>&1 || \
+          gh api repos/FXGUNIT/TradersApp/actions/variables -X POST \
+            -H "Content-Type: application/json" \
+            --field name=CLOUDFLARE_ACCOUNT_ID \
+            --field value="${{ steps.account.outputs.account_id }}" 2>&1
+          echo "Done."
+
+      - name: Deploy Worker
+        env:
+          TUNNEL_TOKEN: ${{ secrets.TUNNEL_TOKEN }}
+        run: |
+          echo "=== Attempting Worker deploy ==="
+          cd deploy/cloudflare-tunnel/bff-worker
+
+          if [ -n "$TUNNEL_TOKEN" ]; then
+            echo "Setting TUNNEL_TOKEN secret..."
+            echo "$TUNNEL_TOKEN" | npx wrangler secret put TUNNEL_TOKEN --name tradersapp-bff-proxy --env production 2>&1 || echo "Secret set failed (continuing)"
+          fi
+
+          echo "Deploying Worker..."
+          npx wrangler deploy --name tradersapp-bff-proxy --env production 2>&1
