@@ -16,7 +16,7 @@ EOF
 
 KUBECONFIG_PATH=""
 NODE_IP=""
-CERT_MANAGER_EMAIL="${CERT_MANAGER_EMAIL:-admin@traders.app}"
+CERT_MANAGER_EMAIL="${CERT_MANAGER_EMAIL:-admin@example.com}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in

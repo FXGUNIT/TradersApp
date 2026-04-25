@@ -214,7 +214,7 @@ Write-Host ""
 Write-Host "Next steps:" -ForegroundColor White
 Write-Host "  1. Push to main: git push origin main" -ForegroundColor White
 Write-Host "  2. Watch: https://github.com/$Repo/actions" -ForegroundColor White
-Write-Host "  3. Verify: curl https://api.traders.app/health" -ForegroundColor White
+Write-Host "  3. Verify: curl https://api.173.249.18.14.sslip.io/health" -ForegroundColor White
 Write-Host "  4. Verify contract: python scripts/stage_p_ci_contract_probe.py --output .artifacts/stage-p/ci-contract-live-latest.json" -ForegroundColor White
 Write-Host ""
 Write-Host "To trigger first deploy manually:" -ForegroundColor White

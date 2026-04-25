@@ -738,7 +738,7 @@ jobs:
     if: github.ref == 'refs/heads/staging' && github.event_name == 'push'
     environment:
       name: staging
-      url: https://staging.traders.app
+      url: https://tradergunit.pages.dev
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -839,7 +839,7 @@ jobs:
       cancel-in-progress: false
     environment:
       name: production
-      url: https://traders.app
+      url: https://tradergunit.pages.dev
     permissions:
       contents: read
       packages: write
@@ -1367,7 +1367,7 @@ jobs:
       - name: Bootstrap ingress-nginx + cert-manager (post-core, manual opt-in)
         if: steps.edge_mode.outputs.enabled == 'true'
         env:
-          CERT_MANAGER_EMAIL: ${{ vars.CERT_MANAGER_EMAIL || 'admin@traders.app' }}
+          CERT_MANAGER_EMAIL: ${{ vars.CERT_MANAGER_EMAIL || 'admin@example.com' }}
         run: |
           bash ./scripts/k8s/bootstrap-oci-edge.sh \
             --kubeconfig /tmp/kubeconfig \

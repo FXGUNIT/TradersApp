@@ -8,9 +8,9 @@
 #
 # Usage:
 #   ./scripts/stage_p_validate_observability.sh [--alert-test]
-#   ML_ENGINE_URL=https://api.traders.app BFF_URL=https://bff.traders.app \
-#     MLFLOW_TRACKING_URI=https://mlflow.traders.app \
-#     PROMETHEUS_URL=https://prometheus.traders.app \
+#   ML_ENGINE_URL=https://api.173.249.18.14.sslip.io BFF_URL=https://bff.173.249.18.14.sslip.io \
+#     MLFLOW_TRACKING_URI=http://localhost:5000 \
+#     PROMETHEUS_URL=http://localhost:9090 \
 #     ./scripts/stage_p_validate_observability.sh
 #
 # Exit codes:
@@ -46,8 +46,8 @@ while [[ $# -gt 0 ]]; do
       echo "  --alert-test   Also fire synthetic Discord/Slack/PagerDuty test alerts"
       echo ""
       echo "Environment variables (all optional if GitHub Actions vars are set):"
-      echo "  ML_ENGINE_URL        ML Engine base URL (default: from env or https://api.traders.app)"
-      echo "  BFF_URL              BFF base URL       (default: from env or https://bff.traders.app)"
+      echo "  ML_ENGINE_URL        ML Engine base URL (default: from env or https://api.173.249.18.14.sslip.io)"
+      echo "  BFF_URL              BFF base URL       (default: from env or https://bff.173.249.18.14.sslip.io)"
       echo "  MLFLOW_TRACKING_URI  MLflow server URI (default: http://localhost:5000)"
       echo "  PROMETHEUS_URL       Prometheus URI     (default: http://localhost:9090)"
       echo "  DISCORD_WEBHOOK_URL  Discord webhook    (required for alert test)"

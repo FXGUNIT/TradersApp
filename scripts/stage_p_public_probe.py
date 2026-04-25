@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Legacy Stage P public endpoint probe for archived traders.app / OCI flows.
+"""Legacy Stage P public endpoint probe for free sslip.io / OCI flows.
 
 This script performs deterministic checks for:
 1) DNS resolution
@@ -25,10 +25,10 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 
-FRONTEND_HOST = "traders.app"
-BFF_HOST = "bff.traders.app"
-ML_HOST = "api.traders.app"
-STAGING_HOST = "staging.traders.app"
+FRONTEND_HOST = "173.249.18.14.sslip.io"
+BFF_HOST = "bff.173.249.18.14.sslip.io"
+ML_HOST = "api.173.249.18.14.sslip.io"
+STAGING_HOST = "tradergunit.pages.dev"
 REQUIRED_HOSTS = [FRONTEND_HOST, BFF_HOST, ML_HOST, STAGING_HOST]
 
 

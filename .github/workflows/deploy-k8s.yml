@@ -113,7 +113,7 @@ jobs:
     needs: [gate]
     environment:
       name: ${{ needs.gate.outputs.environment }}
-      url: https://${{ needs.gate.outputs.environment == 'production' && 'traders.app' || 'staging.traders.app' }}
+      url: https://${{ needs.gate.outputs.environment == 'production' && '173.249.18.14.sslip.io' || 'tradergunit.pages.dev' }}
     permissions:
       contents: read
       packages: read
@@ -419,7 +419,7 @@ jobs:
       - name: Smoke test — ingress / external reachability
         run: |
           NS="${{ vars.K8S_NAMESPACE || 'tradersapp' }}"
-          HOST="${{ needs.gate.outputs.environment == 'production' && 'traders.app' || 'staging.traders.app' }}"
+          HOST="${{ needs.gate.outputs.environment == 'production' && '173.249.18.14.sslip.io' || 'tradergunit.pages.dev' }}"
 
           # Basic TCP reachability check (no DNS required)
           INGRESS_POD=$(kubectl get pod -n ingress-nginx -l app.kubernetes.io/component=controller -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")

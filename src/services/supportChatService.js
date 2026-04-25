@@ -142,7 +142,7 @@ export async function sendAdminReply(userId, userEmail, userName, adminName, tex
     await set(newMsgRef, {
       sender: 'admin',
       senderName: adminName || 'Support Team',
-      senderEmail: 'admin@traders.app',
+      senderEmail: 'support@tradersapp.local',
       text: text.trim(),
       timestamp: Date.now(),
       read: false,

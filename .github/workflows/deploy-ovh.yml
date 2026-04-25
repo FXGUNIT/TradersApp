@@ -43,7 +43,7 @@ jobs:
       )
     environment:
       name: production
-      url: https://traders.app
+      url: https://173.249.18.14.sslip.io
     permissions:
       contents: read
       packages: write
@@ -81,7 +81,7 @@ jobs:
           OWNER_LC="${GITHUB_REPOSITORY_OWNER,,}"
           DOMAIN="${{ vars.TRADERSAPP_DOMAIN }}"
           if [ -z "${DOMAIN}" ]; then
-            DOMAIN="traders.app"
+            DOMAIN="173.249.18.14.sslip.io"
           fi
 
           BFF_HOST="${{ vars.BFF_PUBLIC_HOST }}"

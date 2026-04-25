@@ -178,8 +178,8 @@ foreach ($env in $environments) {
     if ($env -eq 'staging') {
         # Staging overrides: different URLs
         $envSecrets = @{
-            'VITE_BFF_URL' = 'https://staging-bff.traders.app'
-            'ML_ENGINE_URL' = 'https://staging-api.traders.app'
+            'VITE_BFF_URL' = 'https://bff.173.249.18.14.sslip.io'
+            'ML_ENGINE_URL' = 'https://api.173.249.18.14.sslip.io'
         }
     }
     foreach ($entry in $envSecrets.GetEnumerator()) {

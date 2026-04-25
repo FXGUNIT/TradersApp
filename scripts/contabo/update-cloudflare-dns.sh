@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Legacy traders.app DNS helper kept for archived Cloudflare-managed host flows.
+# Legacy DNS helper kept for archived Cloudflare-managed host flows.
 # The current canonical public frontend is https://tradergunit.pages.dev/.
 # Updates Cloudflare DNS A records for TradersApp after Contabo deployment.
 # Requires CLOUDFLARE_API_EMAIL and CLOUDFLARE_API_KEY env vars.
@@ -11,7 +11,7 @@ set -euo pipefail
 CF_EMAIL="${CLOUDFLARE_API_EMAIL:?Missing CLOUDFLARE_API_EMAIL}"
 CF_KEY="${CLOUDFLARE_API_KEY:?Missing CLOUDFLARE_API_KEY}"
 CF_ZONE_ID="${CLOUDFLARE_ZONE_ID:-2e37170e38f507ea989a79ca587a85e1}"
-CF_DOMAIN="${CLOUDFLARE_DOMAIN:-traders.app}"
+CF_DOMAIN="${CLOUDFLARE_DOMAIN:?Missing CLOUDFLARE_DOMAIN; no paid domain is configured by default}"
 TARGET_IP="${1:-}"
 
 if [ -z "${TARGET_IP}" ]; then
