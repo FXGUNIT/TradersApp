@@ -7,7 +7,7 @@
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-25 15:47`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-25 15:48`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Master Backlog  90.0%  [######################--]
@@ -122,6 +122,7 @@ All Stages S1–S6 and ML1–ML8 are background. Implement carefully, update liv
 - Symptom: `NET::ERR_CERT_COMMON_NAME_INVALID` on devices whose DNS resolves `tradergunit.pages.dev` to Contabo IP instead of Cloudflare
 - Root cause: Device DNS cache resolves directly to Contabo VPS (173.249.18.14), which has a cert for `*.sslip.io`, not for `*.pages.dev`
 - Fix: Flush DNS on affected devices — `ipconfig /flushdns` (Windows) or equivalent. Cloudflare DNS (1.1.1.1) resolves correctly to 172.66.45.30/172.66.46.226
+- Local laptop DNS flush completed on 2026-04-25 with `ipconfig /flushdns`; any remaining cert error is on that specific device's DNS/cache path.
 - Cloudflare DNS is working correctly — confirmed via `nslookup tradergunit.pages.dev 1.1.1.1` → Cloudflare IPs
 - DNS propagation is a client-side issue, not a server or code issue
 
@@ -149,7 +150,7 @@ All Stages S1–S6 and ML1–ML8 are background. Implement carefully, update liv
 - [x] Task 6: Fix NewsStatusClient fallback chain — direct `/news/breaking` + `/news/upcoming` when ML consensus fails ✅ DONE
 - [x] Task 7: Strip `x-tradersapp-*` extension headers in `bffFetch` (`src/services/gateways/base.js`) ✅ DONE
 - [x] Task 8: Add `x-tradersapp-install-id` to BFF CORS allowlist (`bff/server.mjs`) ✅ DONE
-- [!] Task 9: Bug 1 — BLOCKED on human/device action: flush DNS on affected devices (`ipconfig /flushdns`) to resolve CERT errors — no repo code fix available
+- [!] Task 9: Bug 1 — BLOCKED on other affected devices only. This laptop DNS cache was flushed on 2026-04-25; phone/browser cert errors still require flushing or changing DNS on that device.
 
 - [!] Task 10: Optional no-owned-domain Worker proxy: BLOCKED on Cloudflare token permission. Workflow exists, dry-run passes, deploy failed until `CLOUDFLARE_API_TOKEN` can deploy Workers.
 
@@ -213,7 +214,7 @@ All Stages S1–S6 and ML1–ML8 are background. Implement carefully, update liv
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-25 15:47`  -  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-25 15:48`  -  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Stage P Backlog 100.0%  [########################]
