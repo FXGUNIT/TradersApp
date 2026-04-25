@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import { recordWatchtowerUserError } from "../../services/watchtower.js";
 
 // ─── Audio singleton (created lazily on first sound) ─────────────────────────────────
 let _audioCtx = null;
@@ -70,6 +71,15 @@ export function useToastNotifications() {
     };
 
     setToasts((prev) => [...prev, nextToast]);
+
+    if (type === "error") {
+      recordWatchtowerUserError(message, {
+        code: "USER_FACING_ERROR",
+        title: "Error toast shown to user",
+        source: "toast",
+        severity: "high",
+      });
+    }
 
     // ── Play luxury tone (respects system volume, no external files) ──────────────
     if (!mutedRef.current) {

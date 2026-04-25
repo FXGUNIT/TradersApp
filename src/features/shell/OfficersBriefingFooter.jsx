@@ -153,8 +153,12 @@ function WatchtowerStatusChip({ status }) {
   const appearance = resolveWatchtowerColor(status?.status);
   const faults = Array.isArray(status?.faults) ? status.faults : [];
   const corrections = Array.isArray(status?.corrections) ? status.corrections : [];
+  const boardRoom = status?.systems?.boardRoom;
   const title = [
     status?.label || "WATCHTOWER CHECKING",
+    boardRoom?.connected
+      ? `Board Room connected: ${boardRoom.lastHeartbeatAt || "heartbeat active"}`
+      : `Board Room sync: ${boardRoom?.lastSyncError || "checking"}`,
     ...faults.map((fault) => `${fault.title}: ${fault.detail}`),
     ...corrections.map((correction) => `${correction.title}: ${correction.detail}`),
   ].join("\n");
@@ -289,9 +293,9 @@ export default function OfficersBriefingFooter({
             fontWeight: 600,
             color: CSS_VARS.textSecondary,
           }}
-          title="Watchtower refreshes BFF, AI, ML, and news status every 30 seconds."
+          title="Watchtower refreshes BFF, AI, ML, consensus, news, user errors, and Board Room sync every 15 minutes."
         >
-          30 SEC REFRESH
+          15 MIN REFRESH
         </span>
         {allUnconfigured && (
           <span

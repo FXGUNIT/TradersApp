@@ -203,8 +203,13 @@ export function registerDispatchRoutes({
     // ── Admin route handler ─────────────────────────────────────────────────
     if (await adminHandler(req, res, url, origin)) return true;
 
-    // ── Board Room RBAC gate ─ CEO-level: require ADMIN role via authorizeRequest
-    if (pathname.startsWith("/board-room")) {
+    const isBoardRoomAgentReport =
+      method === "POST" &&
+      (pathname === "/board-room/heartbeat" || pathname === "/board-room/error");
+
+    // Board Room management stays admin-only. Agent heartbeat/error reporters
+    // are the telemetry lane used by Watchtower and the AI services.
+    if (pathname.startsWith("/board-room") && !isBoardRoomAgentReport) {
       const auth = await authorizeRequest(req);
       if (!auth.authorized) {
         json(res, 403, { ok: false, error: auth.error }, origin);
