@@ -2098,6 +2098,7 @@ Source boundary:
 - Treat online leak summaries as unverified product folklore unless backed by official docs or clean-room observation.
 - Use only the broad system ideas that are common in agent architecture and implement original TradersApp code.
 - Public MIT-licensed projects can be studied for design patterns, but TradersApp should still write original code unless a deliberate dependency decision is made.
+- Repositories that describe themselves as leaked proprietary source must not be cloned, executed, imported, or used as implementation references. Only public README-level product-pattern observations may be captured as cautionary clean-room notes.
 
 ### 28.1 Core Lesson
 
@@ -2425,6 +2426,12 @@ Additional event types:
 - `autonomous_run_heartbeat`
 - `autonomous_run_stopped`
 - `memory_capsule_created`
+- `memory_consolidation_started`
+- `memory_consolidation_completed`
+- `memory_consolidation_failed`
+- `watch_mode_started`
+- `watch_mode_stopped`
+- `deep_plan_created`
 - `lesson_promoted`
 
 ### 28.8 Defensive Design
@@ -2630,6 +2637,147 @@ Rules:
 - Lesson memory must cite evidence thresholds.
 - Tool skill memory cannot store secrets.
 - Cross-user memory is disabled until privacy and training governance are implemented.
+
+### 28.14 Leaked Claude Code Mirror - Safe Lessons Only
+
+The `yasasbanukaofficial/claude-code` repository publicly describes itself as a mirror/backup of leaked proprietary Claude Code source from an npm source-map exposure and includes a disclaimer that the original source belongs to Anthropic. Treat it as a prohibited implementation source.
+
+Hard boundary:
+
+- Do not clone the repository.
+- Do not inspect files under `src/`.
+- Do not copy prompts, tool definitions, schemas, names, source layout, terminal UI code, orchestration code, memory code, or service code.
+- Do not use leaked internals to claim compatibility with Claude Code.
+- Do not replicate private branding, hidden features, internal modes, or proprietary naming.
+- Do not depend on it as a package, submodule, reference implementation, or test oracle.
+
+Safe high-level lessons from the public README only:
+
+| README-level observation | Clean-room Vibing Finance lesson |
+|---|---|
+| Terminal-first coding-agent UX | Build a dense agent research terminal with transcript, plan, tool events, artifacts, and composer |
+| Large tool surface | Use a typed tool registry with strict capability presets, not ad hoc direct function calls |
+| LLM query engine + tool loop | Keep AgentRunner explicit: model request, tool call, result inspection, next turn |
+| Services layer | Separate provider, MCP, auth/settings, memory, observability, and runner services from UI components |
+| Multi-agent coordinator | Keep ResearchCoordinator and TaskQueue as first-class architecture, not hidden inside one chat component |
+| IDE bridge | Later support VS Code/Codex/desktop runner integration through an adapter, not by coupling UI to an IDE |
+| Background memory consolidation | Use a controlled memory refinement job that summarizes run logs into candidate memory capsules |
+| Proactive assistant/watch mode | Allow background lab mode under user-defined agenda, budgets, and stop conditions |
+| Long deep-planning lane | Add an optional "deep plan" workflow for complex research agendas before execution |
+| Source-map leak story | Treat build artifacts, source maps, prompts, schemas, and debug bundles as release-security risks |
+
+### 28.15 Terminal Workbench Requirements
+
+The first screen should feel like an agentic workbench for trading research, not a dashboard with a chatbot bolted on.
+
+Required regions:
+
+```text
+left rail: workspace, runs, datasets, strategies, reports
+main pane: transcript with user messages, agent turns, tool events, warnings
+right pane: selected artifact inspector
+bottom pane: composer, mode selector, budget/scope controls
+status strip: active model/provider, runner, cost/time budget, proof state
+```
+
+Workbench rules:
+
+- The plan is visible and updates as tasks start, block, complete, retry, or fail.
+- Tool events are compact but expandable.
+- Artifacts can be inspected without leaving the run.
+- The user can pause, stop, resume, export, or fork a run.
+- Every model/provider call shows which provider was used.
+- Shell commands show cwd, exit code, timeout, and summarized output.
+- No UI element implies the agent is the source of numerical truth.
+
+### 28.16 Background Memory Consolidation Job
+
+Memory refinement must be explicit and auditable.
+
+Job stages:
+
+```text
+orient
+  -> gather run events and artifacts
+  -> summarize candidate lessons
+  -> link evidence refs
+  -> prune scratch notes
+  -> write memory capsule
+  -> mark status as candidate
+```
+
+Rules:
+
+- Runs after a completed report, not during metric computation.
+- Reads transcript/tool events and artifact summaries, not raw CSV by default.
+- Produces candidate memory only.
+- Requires validation before becoming a default.
+- Never edits historical reports, trade ledgers, metrics, or proof blocks.
+- Emits `memory_consolidation_started`, `memory_consolidation_completed`, or `memory_consolidation_failed`.
+
+### 28.17 Proactive Watch Mode
+
+The product may later support a watch mode that keeps working while the user is away.
+
+Allowed watch actions:
+
+- Monitor queued experiments.
+- Detect failed runs and safe retry opportunities.
+- Compare completed runs.
+- Draft next-experiment plans.
+- Consolidate memory.
+- Prepare debug packages.
+- Notify the user when blocked or complete.
+
+Not allowed:
+
+- Spend BYOK/provider quota beyond user budget.
+- Change strategy defaults without validation and approval.
+- Delete artifacts.
+- Access unrelated folders.
+- Run unrelated shell commands.
+- Upload private datasets by default.
+
+### 28.18 Deep Planning Lane
+
+Complex research agendas should have a dedicated planning lane before execution.
+
+Deep planning input:
+
+- User agenda.
+- Dataset inventory.
+- Strategy DSL options.
+- Risk constraints.
+- Existing run history.
+- Budget limits.
+- Allowed tools/providers.
+
+Deep planning output:
+
+- Task DAG.
+- Required datasets/artifacts.
+- Tool allowlist.
+- Runtime/cost budget.
+- Stop conditions.
+- Expected report sections.
+- Proof plan.
+- Risk assumptions and caveats.
+
+The deep plan is not evidence. It is a proposed execution map that must be validated by deterministic tools.
+
+### 28.19 Release Security Lessons
+
+The source-map leak story is directly relevant to TradersApp release hygiene.
+
+Release rules:
+
+- Do not publish source maps for private/admin-only builds unless access-controlled.
+- Never include private prompts, proprietary strategy templates, API keys, tool schemas, or raw source in public static assets.
+- Scan built assets for secrets and private paths before deployment.
+- Keep debug bundles private and time-limited.
+- Ensure `.npmignore`, build config, Vite config, Docker context, and CI artifacts exclude private internals.
+- Add a release checklist item for "no source maps / no private source in public artifact."
+- Treat exported agent debug packages with the same caution as production build artifacts.
 
 ---
 
@@ -3576,3 +3724,4 @@ These references informed the free architecture and timing defaults as of 2026-0
 - NSE market timings list normal/equity derivatives open at 09:15 and close at 15:30: https://www.nseindia.com/static/market-data/market-timings
 - CME material confirms Micro E-mini futures trade nearly around the clock; the MVP still intentionally uses 09:30 ET as the New York/RTH-style session open for this strategy: https://www.cmegroup.com/education/frequently-asked-questions-micro-e-mini-equity-index-futures.html
 - `open-multi-agent` public README describes an MIT-licensed TypeScript multi-agent orchestration engine with `runTeam()`, task DAG orchestration, multi-model teams, MessageBus, TaskQueue, SharedMemory, AgentRunner, ToolRegistry, schema-validated custom tools, MCP integration, local model support, and in-process runtime patterns. This spec uses it only as a public clean-room architecture reference, not copied code: https://github.com/JackChen-me/open-multi-agent
+- `yasasbanukaofficial/claude-code` publicly describes itself as a mirror/backup of leaked proprietary Claude Code source exposed through npm source maps. This spec treats it as a prohibited implementation source and uses only README-level cautionary lessons about agent-terminal UX, service separation, background memory, proactive modes, deep planning, and release/source-map hygiene: https://github.com/yasasbanukaofficial/claude-code
