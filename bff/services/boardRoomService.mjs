@@ -793,6 +793,26 @@ async function getTemplates() {
   } catch { return []; }
 }
 
+async function getStorageHealth() {
+  const client = await getRedis();
+  const redisConnected = Boolean(client?.isOpen);
+  return {
+    ok: true,
+    mode: redisConnected ? 'redis' : 'memory-fallback',
+    degraded: !redisConnected,
+    redisConnected,
+    redisUrl: resolveRedisUrl().replace(/:\/\/([^:@]+):([^@]+)@/, '://$1:***@'),
+    retryAfterMs: _redisDisabledUntil > Date.now() ? _redisDisabledUntil - Date.now() : 0,
+    lastRedisNotice: _lastRedisNotice,
+    memoryFallback: {
+      keys: _memoryStore.size,
+      zsets: _memoryZsets.size,
+      counters: _memoryCounters.size,
+    },
+    logDir: getLogDir(),
+  };
+}
+
 // ─── Public API ──────────────────────────────────────────────────────────────
 export const boardRoomService = {
   createThread, getThread, getThreads, getAllOpenThreads, updateThread, closeThread,
@@ -802,6 +822,7 @@ export const boardRoomService = {
   getAgentMemory, updateAgentMemory, recordHeartbeat, reportError, linkCommitToThread,
   getPendingAcknowledgments,
   archiveOldLogs,
+  getStorageHealth,
   getTemplates,
   validateContent,
 };

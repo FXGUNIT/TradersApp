@@ -166,6 +166,97 @@ export async function reportAgentError({
   });
 }
 
+export async function reportGovernanceIncident({
+  agent,
+  subsystem = null,
+  ruleId,
+  title = null,
+  expected = "",
+  evidence = "",
+  correctiveAction = "",
+  severity = "MEDIUM",
+  tags = [],
+  stack = null,
+  source = "Watchtower",
+} = {}) {
+  if (!isEnabled() || !agent || !ruleId || !evidence) {
+    return null;
+  }
+
+  const lunchVeto = checkNyLunchVeto();
+  if (lunchVeto.veto) {
+    return null;
+  }
+
+  const message = `${ruleId}:${agent}:${normalizeError(evidence)}`;
+  if (shouldThrottle(agent, message)) {
+    return null;
+  }
+
+  const normalizedSeverity = String(severity || "MEDIUM").toUpperCase();
+  const content = JSON.stringify({
+    type: "governance_violation",
+    source,
+    ownerAgent: agent,
+    subsystem,
+    ruleId,
+    severity: normalizedSeverity,
+    expected,
+    evidence,
+    correctiveAction,
+    respectProtocol:
+      "Correct firmly without abuse: acknowledge the miss, isolate the cause, fix it, add a guard, and report proof before closure.",
+  });
+
+  const thread = await boardRoomService.createThread({
+    title: title || `[${agent}] ${ruleId} violation`,
+    description: content,
+    priority: normalizedSeverity,
+    tags: [
+      "governance",
+      "watchtower",
+      String(normalizedSeverity).toLowerCase(),
+      String(agent).toLowerCase(),
+      String(ruleId).toLowerCase(),
+      ...(subsystem ? [String(subsystem).toLowerCase()] : []),
+      ...tags,
+    ],
+    ownerAgent: agent,
+    createdBy: source,
+    tasks: [
+      { description: "Acknowledge the violated rule in Board Room." },
+      { description: "Identify the exact failing route, service, or dependency." },
+      { description: "Ship or document the corrective action." },
+      { description: "Add a regression guard, health probe, or test before closure." },
+    ],
+  });
+
+  if (!thread?.threadId) {
+    return null;
+  }
+
+  const post = await boardRoomService.createPost({
+    threadId: thread.threadId,
+    author: source,
+    authorType: "agent",
+    content,
+    type: "error",
+    mentions: [agent],
+    acknowledgmentRequired: true,
+    acknowledgmentDeadline: Date.now() + 3 * 60 * 60 * 1000,
+    response: stack ? normalizeStack(null, stack) : null,
+  });
+
+  refreshAgentHeartbeat({
+    agent,
+    status: "remediation_required",
+    currentThreadId: thread.threadId,
+    focus: `${ruleId}: ${String(evidence).slice(0, 160)}`,
+  });
+
+  return { thread, post, threadId: thread.threadId };
+}
+
 export async function openAgentThread({
   agent,
   title,
@@ -237,4 +328,5 @@ export default {
   postAgentMilestone,
   refreshAgentHeartbeat,
   reportAgentError,
+  reportGovernanceIncident,
 };
