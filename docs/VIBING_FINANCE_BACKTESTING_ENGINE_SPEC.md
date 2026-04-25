@@ -1893,7 +1893,8 @@ Tasks:
 - Add lazy-loaded screen.
 - Add admin-only access check.
 - Hide route from non-admin users.
-- Add first layout: upload zone, strategy panel, run panel, report panel.
+- Add first Claude Code-style agent workspace layout: left rail, main transcript, right artifact inspector, bottom composer.
+- Add initial transcript message types and run-plan checklist.
 
 Acceptance:
 
@@ -1901,6 +1902,7 @@ Acceptance:
 - Flag on but non-admin: feature remains inaccessible.
 - Flag on and admin: screen loads.
 - No network request is required to render the empty page.
+- First viewport reads as an agent terminal workspace, not a marketing page or normal trading dashboard.
 
 ### 32.2 M2 - CSV Intake
 
@@ -2186,6 +2188,30 @@ none
 
 ### 34.1 Screen Zones
 
+The target UX is a **Claude Code-style agent workspace** adapted for trading research. It should feel like an agent is working through a strategy with tools, artifacts, plans, and results, not like a normal dashboard.
+
+Important boundary:
+
+- Use the interaction pattern of an agent coding terminal.
+- Do not copy Claude branding, logos, proprietary names, exact colors, or exact UI assets.
+- The product name remains Vibing Finance inside TradersApp.
+- The interface should read as "terminal research agent" rather than "Claude clone".
+
+Claude Code-style qualities to preserve:
+
+- Full-screen working surface.
+- Dense but calm terminal/editor layout.
+- Conversation transcript as the main interaction.
+- Explicit tool/run events.
+- Visible plan/checklist state.
+- Artifact files and reports in side panes.
+- Bottom command composer.
+- Keyboard-first operation.
+- Minimal decoration.
+- Monospace-heavy technical typography.
+- Clear distinction between user text, agent reasoning summaries, tool output, errors, and final reports.
+- Local/autonomous execution feel.
+
 Top bar:
 
 - Feature name.
@@ -2223,6 +2249,150 @@ Bottom/full-width pane:
 - Equity curve.
 - Drawdown curve.
 - Setup reason-code table.
+
+### 34.1.1 Claude Code-Style Layout Contract
+
+Desktop layout:
+
+```text
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ Top Status Bar: Vibing Finance | local-only | admin | dataset | run status   │
+├───────────────┬──────────────────────────────────────────────┬───────────────┤
+│ Left Rail     │ Main Agent Transcript                         │ Right Pane    │
+│               │                                              │               │
+│ Datasets      │ user: "Backtest post-IB..."                  │ Strategy Spec │
+│ Runs          │ agent: parsed assumptions                     │ Report        │
+│ Reports       │ tool: validate_csv                            │ Trades        │
+│ Proof Chain   │ tool: compute_vwap                            │ Proof         │
+│ Agent Exports │ tool: run_backtest                            │ Agent Notes   │
+│               │ agent: verdict + caveats                      │ JSON          │
+├───────────────┴──────────────────────────────────────────────┴───────────────┤
+│ Bottom Composer: type strategy/change/request | Run | Stop | Export          │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+Mobile layout:
+
+- Single-column transcript first.
+- Collapsible left rail as drawer.
+- Right pane becomes tabs below transcript.
+- Composer remains sticky at bottom.
+
+### 34.1.2 Transcript Message Types
+
+```text
+user_message
+agent_summary
+tool_call
+tool_result
+warning
+error
+report_verdict
+proof_block
+agent_notes
+```
+
+Tool-call examples:
+
+```text
+validate_csv        PASS  124,882 rows | quality 0.96
+compute_ib         PASS  241 sessions
+compute_vwap       PASS  session reset
+detect_inventory   PASS  86 caught-seller events | 74 caught-buyer events
+run_backtest       PASS  42 trades
+build_report       PASS  verdict: RESEARCH-WORTHY
+append_proof       PASS  block #18
+```
+
+### 34.1.3 Plan Pane
+
+The UI should show the current execution plan like an agent checklist:
+
+```text
+[x] Parse uploaded CSV
+[x] Validate timestamps and OHLC
+[x] Compute session IB/VWAP
+[x] Detect caught inventory
+[ ] Run conservative execution simulation
+[ ] Build risk report
+[ ] Append proof block
+```
+
+Plan state must update during execution. It should not be static decoration.
+
+### 34.1.4 Composer Behavior
+
+The composer accepts natural language commands:
+
+```text
+Run the default post-IB strategy on this MNQ CSV.
+Change TP1 to 20 points and rerun.
+Show only losing trades.
+Export agent notes.
+Explain why this was rejected.
+```
+
+Composer actions:
+
+- `Enter`: new line or submit depending mode.
+- `Ctrl+Enter`: run/submit.
+- `Esc`: cancel current run.
+- `Ctrl+K`: command palette later.
+- `Ctrl+L`: clear current transcript view, not stored runs.
+
+### 34.1.5 Visual Style
+
+Use a restrained technical palette:
+
+- Background: near-black or deep neutral.
+- Surface: slightly raised neutral panels.
+- Text: high-contrast off-white.
+- Muted text: gray.
+- Success: restrained green.
+- Warning: amber.
+- Error: red.
+- Accent: one TradersApp-compatible blue or cyan.
+
+Typography:
+
+- Monospace for transcript, tool output, JSON, hashes, and run status.
+- Existing app sans-serif for labels and report prose if needed.
+- No oversized marketing headings.
+
+Component geometry:
+
+- Tight panels.
+- 6-8px radius max.
+- Thin borders.
+- No decorative glow/orbs.
+- No nested card stacks.
+- Stable fixed rails on desktop.
+
+### 34.1.6 Interaction States
+
+Required states:
+
+- Empty: no CSV uploaded.
+- CSV selected.
+- CSV validation failed.
+- CSV validated.
+- Backtest running.
+- Backtest cancelled.
+- Backtest completed with trades.
+- Backtest completed with no setups.
+- Report rejected/weak/research-worthy.
+- Proof generated.
+- Agent notes exported.
+
+### 34.1.7 UI Acceptance Criteria
+
+- The first viewport looks like an agent terminal workspace, not a trading dashboard.
+- The main action is obvious: upload CSV, then run strategy through the composer.
+- A user can understand what the engine is doing from the tool-call stream.
+- A user can inspect strategy spec, trades, report, proof, and agent notes without leaving the page.
+- The UI stays usable with no network connection after the app is loaded.
+- The UI is responsive without overlapping text or controls.
+- The app does not show Claude branding or imply it is Claude Code.
 
 ### 34.2 First MVP UI Copy
 
