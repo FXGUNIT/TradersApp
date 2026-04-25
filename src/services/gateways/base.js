@@ -1,7 +1,7 @@
 import { getDesktopRequestHeaders } from "../desktopBridge.js";
+import { resolveBffBaseUrl } from "../runtimeConfig.js";
 import { getAdminToken } from "../sessionStore.js";
 
-const BFF_BASE_URL = String(import.meta.env.VITE_BFF_URL || "").trim();
 const BFF_FAILURE_COOLDOWN_MS = 2 * 60 * 1000;
 
 let bffUnavailableUntil = 0;
@@ -32,12 +32,33 @@ function clearBffUnavailable() {
   bffUnavailableUntil = 0;
 }
 
+function getBffBaseUrl() {
+  return resolveBffBaseUrl();
+}
+
 export function hasBff() {
+  const baseUrl = getBffBaseUrl();
   return (
-    Boolean(BFF_BASE_URL) &&
+    Boolean(baseUrl) &&
     !isAuditRuntime() &&
     Date.now() >= bffUnavailableUntil
   );
+}
+
+export function getBffGatewayState() {
+  const now = Date.now();
+  return {
+    baseUrl: getBffBaseUrl(),
+    auditRuntime: isAuditRuntime(),
+    inCooldown: now < bffUnavailableUntil,
+    unavailableUntil: bffUnavailableUntil || null,
+    cooldownRemainingMs: Math.max(0, bffUnavailableUntil - now),
+  };
+}
+
+export function resetBffCooldown() {
+  clearBffUnavailable();
+  return getBffGatewayState();
 }
 
 export function createBffUnavailableResult(operation, extra = {}) {
@@ -49,15 +70,57 @@ export function createBffUnavailableResult(operation, extra = {}) {
 }
 
 function buildUrl(path) {
-  if (!BFF_BASE_URL) {
+  const baseUrl = getBffBaseUrl();
+  if (!baseUrl) {
     return path;
   }
 
   if (path.startsWith("/")) {
-    return `${BFF_BASE_URL}${path}`;
+    return `${baseUrl}${path}`;
   }
 
-  return `${BFF_BASE_URL}/${path}`;
+  return `${baseUrl}/${path}`;
+}
+
+export async function probeBffHealth({ timeoutMs = 4000 } = {}) {
+  const state = getBffGatewayState();
+  if (!state.baseUrl || state.auditRuntime) {
+    return {
+      ok: false,
+      status: 0,
+      state,
+      error: state.auditRuntime
+        ? "BFF suppressed in audit runtime."
+        : "BFF base URL is not configured.",
+    };
+  }
+
+  try {
+    const response = await fetch(buildUrl("/health"), {
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (response.ok) {
+      clearBffUnavailable();
+    }
+    return {
+      ok: response.ok,
+      status: response.status,
+      data,
+      state: getBffGatewayState(),
+      error: response.ok
+        ? null
+        : data?.error || data?.message || `BFF health failed (${response.status})`,
+    };
+  } catch (error) {
+    markBffUnavailable();
+    return {
+      ok: false,
+      status: 0,
+      state: getBffGatewayState(),
+      error: error?.message || "BFF health probe failed.",
+    };
+  }
 }
 
 export async function bffFetch(path, options = {}) {
@@ -114,5 +177,8 @@ export async function bffFetch(path, options = {}) {
 export default {
   bffFetch,
   createBffUnavailableResult,
+  getBffGatewayState,
   hasBff,
+  probeBffHealth,
+  resetBffCooldown,
 };

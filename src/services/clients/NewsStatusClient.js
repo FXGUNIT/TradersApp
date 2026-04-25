@@ -1,11 +1,12 @@
-import { bffFetch, hasBff } from "../gateways/base.js";
+import { bffFetch, getBffGatewayState, hasBff } from "../gateways/base.js";
+import { resolveBffBaseUrl } from "../runtimeConfig.js";
 
 // Direct fetch for fallback chain — bypasses hasBff() cooldown gate so news never
 // shows offline just because one consensus call triggered a cooldown window.
 const bffDirectFetchMarker_v2 = async (path) => {
   try {
     const url = buildFallbackUrl(path);
-    const res = await fetch(url);
+    const res = await fetch(url, { signal: AbortSignal.timeout(6000) });
     if (!res.ok) return null;
     return res.json();
   } catch {
@@ -14,13 +15,13 @@ const bffDirectFetchMarker_v2 = async (path) => {
 };
 
 function buildFallbackUrl(path) {
-  // Mirror bffFetch's URL building: use VITE_BFF_URL if set, else relative
-  const base = String(import.meta.env.VITE_BFF_URL || "").trim();
+  // Mirror bffFetch's URL building: use configured, public, or local proxy base.
+  const base = resolveBffBaseUrl();
   if (!base) return path;
   return path.startsWith("/") ? `${base}${path}` : `${base}/${path}`;
 }
 
-export const NEWS_STATUS_REFRESH_MS = 5 * 60 * 1000;
+export const NEWS_STATUS_REFRESH_MS = 30 * 1000;
 const SCHEDULED_NEWS_ACTIVE_WINDOW_MIN = 60;
 const SCHEDULED_NEWS_RECENT_WINDOW_MIN = -15;
 
@@ -117,22 +118,27 @@ function buildScheduledNewsSignal(consensus = null) {
 
 export async function fetchNewsSystemStatus() {
   const refreshedAt = new Date().toISOString();
-  console.debug("[NewsStatus] hasBff:", hasBff(), "| VITE_BFF_URL:", import.meta.env.VITE_BFF_URL);
+  const gatewayState = getBffGatewayState();
+  console.debug("[NewsStatus] hasBff:", hasBff(), "| BFF base:", gatewayState.baseUrl);
 
-  if (!hasBff()) {
+  if (gatewayState.auditRuntime || !gatewayState.baseUrl) {
     return {
       liveNews: createSignal("Live News", "offline", {
-        detail: "News source is offline.",
+        detail: gatewayState.auditRuntime
+          ? "News checks are disabled in audit mode."
+          : "BFF base URL is not available.",
       }),
       scheduledNews: createSignal("Scheduled News", "offline", {
-        detail: "Economic-calendar source is offline.",
+        detail: gatewayState.auditRuntime
+          ? "Calendar checks are disabled in audit mode."
+          : "BFF base URL is not available.",
       }),
       refreshedAt,
     };
   }
 
   // Try /ml/consensus first — has both live + scheduled in one call
-  const consensus = await bffFetch("/ml/consensus?session=1");
+  const consensus = hasBff() ? await bffFetch("/ml/consensus?session=1") : null;
   if (consensus) {
     const news = consensus?.news || {};
     const hasScheduled = Boolean(news?.next_event);
@@ -156,7 +162,7 @@ export async function fetchNewsSystemStatus() {
   // just because one unrelated consensus call triggered the 2-minute cooldown window.
   console.debug("[NewsStatus] ML consensus unavailable — entering news direct fetch fallback");
   const [breaking, upcoming] = await Promise.all([
-    bffDirectFetchMarker_v2("/news/breaking?fresh=true"),
+    bffDirectFetchMarker_v2("/news/breaking?max=15"),
     bffDirectFetchMarker_v2("/news/upcoming"),
   ]);
 
