@@ -2741,9 +2741,20 @@ Additional event types:
 - `autonomous_run_heartbeat`
 - `autonomous_run_stopped`
 - `memory_capsule_created`
+- `memory_event_created`
 - `memory_consolidation_started`
 - `memory_consolidation_completed`
 - `memory_consolidation_failed`
+- `user_feedback_recorded`
+- `data_import_profile_created`
+- `experiment_queued`
+- `experiment_started`
+- `experiment_completed`
+- `model_candidate_registered`
+- `model_candidate_evaluated`
+- `promotion_requested`
+- `promotion_completed`
+- `safety_policy_updated`
 - `watch_mode_started`
 - `watch_mode_stopped`
 - `deep_plan_created`
@@ -3345,6 +3356,440 @@ Anything not on this path is postponed.
 - No LLM-generated metrics.
 - No strategy expansion until M6 is working.
 - No "deploy candidate" verdict until at least 100 trades or explicit research override.
+
+### 31.5 Detailed Missing Plan Inventory
+
+The architecture is directionally strong, but the plan still needs these concrete pieces before implementation can move without ambiguity.
+
+| Area | Missing item | Why it matters | Priority |
+|---|---|---|---|
+| Product scope | Exact first strategy wording and examples | Parser/tests need real beginner prompts and expected normalized specs | P0 |
+| Product scope | Final MVP asset set | All session, tick value, fee, and timezone rules depend on this | P0 |
+| Product scope | Admin/founder identity rule | Hidden page must know who can open it | P0 |
+| UX | Wireframe-level layout contract for workbench | Prevents drifting into generic dashboard/chat UI | P0 |
+| UX | Empty, loading, failed, cancelled, completed states | Long-running jobs need predictable visual behavior | P0 |
+| UX | Run fork/compare flow | Research value depends on comparing variants, not one report | P1 |
+| UX | Memory visibility controls | Users need to inspect, delete, export, or disable learned memory | P1 |
+| Data | Canonical CSV column mapper | Real users will upload TradingView, NinjaTrader, broker, and custom CSV formats | P0 |
+| Data | Timezone/session inference confidence model | Wrong timezone produces invalid backtests | P0 |
+| Data | Futures metadata table | MNQ/NQ/ES/NIFTY need point value, tick size, fees, sessions | P0 |
+| Data | Contract roll and holiday rules | Required before serious futures results | P1 |
+| Data | Data-quality issue taxonomy | Reports and retry logic need stable reason codes | P0 |
+| Strategy DSL | Formal JSON schema file | Parser, UI editor, CLI, tests, and agent export need one contract | P0 |
+| Strategy DSL | Strategy version migration plan | Old reports must stay reproducible after DSL evolves | P1 |
+| Strategy DSL | Validation error taxonomy | Beginner UX needs precise fixes, not generic invalid spec errors | P0 |
+| Backtest engine | Intrabar ambiguity implementation tests | Conservative fill policy is central to trust | P0 |
+| Backtest engine | Fee/slippage/cost model defaults | Metrics are meaningless without explicit costs | P0 |
+| Backtest engine | Position sizing edge cases | Fractional contracts, min tick, prop-firm risk rules, account size | P0 |
+| Backtest engine | No-trade and sparse-trade report rules | Must avoid false conclusions from too few trades | P0 |
+| Backtest engine | Parameter sensitivity runner | Strategy robustness needs controlled variation | P1 |
+| Metrics | Exact formulas for every metric | Browser, CLI, Python, and reports must agree | P0 |
+| Metrics | Minimum evidence thresholds | Verdict rules need trade count, regimes, drawdown, and quality gates | P0 |
+| Report | Report JSON schema | Markdown/report UI should be rendered from stable facts | P0 |
+| Report | Caveat/rejection reason catalog | Risk Analyst needs consistent language and codes | P0 |
+| Proof | Canonical JSON hashing method | Browser/CLI/Python proof hashes must match | P0 |
+| Proof | Signing key lifecycle | Need create/export/import/reset and loss recovery rules | P1 |
+| Storage | IndexedDB schema migrations | Browser state will evolve over time | P1 |
+| Storage | Export/import package schema | Needed before CLI/browser/local-runner interop works | P0 |
+| CLI | Actual command contract tests | CLI is promised as canonical automation surface | P1 |
+| CLI | Workspace lock rules | Prevent two jobs corrupting same artifacts | P1 |
+| Local runner | Auth handshake between browser and localhost runner | Prevent random local pages from using runner | P1 |
+| Local runner | Capability manifest schema | Browser needs to know allowed tools and limits | P1 |
+| Browser automation | Allowed-origin policy | Avoid unsafe scraping or private-site automation | P1 |
+| BYOK | Provider profile schema | Local/BYOK/platform modes need one config shape | P1 |
+| BYOK | Secret storage decision per surface | Browser, CLI, and runner have different secret risks | P1 |
+| Agent kernel | Task DAG schema | Coordinator, workbench, CLI, and watch mode need shared task state | P1 |
+| Agent kernel | Role-agent presets | Prevent every agent from having full tools and full memory | P1 |
+| Agent kernel | Loop detection and max-turn rules | Prevent runaway agent loops and cost leaks | P1 |
+| Memory | Memory capsule schema | Learning cannot work safely without typed memory | P0 |
+| Memory | Promotion workflow | Candidate lessons must not become defaults silently | P0 |
+| Memory | Reset/export/delete UX | Required for user trust and privacy | P1 |
+| Self-learning | Feedback capture UI | The engine needs explicit accepted/rejected/helpful/not-helpful signals | P1 |
+| Self-learning | Training data consent model | Cross-user/shared training must be opt-in and governed | P1 |
+| Self-learning | Offline model candidate registry | Actual ML training needs model versions, metrics, rollback | P2 |
+| Testing | Golden fixture datasets | Browser/CLI/Python parity depends on stable fixtures | P0 |
+| Testing | Numerical integrity test suite | Prevent metric drift after refactors | P0 |
+| Testing | Leakage/lookahead test suite | Core trust requirement | P0 |
+| Testing | UI smoke tests for workbench | Ensure hidden page remains usable | P1 |
+| Security | Build artifact/source-map release gate | Prevent private internals leaking in public assets | P0 |
+| Security | Secret scanner in CI | BYOK and provider work raises secret risk | P0 |
+| Security | Debug export redaction tests | Debug packages can leak raw data if not tested | P1 |
+| Compliance | Financial advice disclaimer placement | Reports must avoid certainty/advice claims | P0 |
+| Compliance | Data retention policy | Users need to know where CSVs/reports/memory live | P1 |
+| Docs | Beginner upload guide | First users need CSV preparation help | P1 |
+| Docs | Reproducibility guide | Explains proof hashes, exports, and report versions | P1 |
+
+P0 definition:
+
+- Must be decided or implemented before a trustworthy private MVP report.
+
+P1 definition:
+
+- Needed before serious private alpha or unattended/autonomous operation.
+
+P2 definition:
+
+- Needed before broad productization, shared learning, or model training at scale.
+
+### 31.6 Missing Implementation Loops
+
+The engine needs built-in loops, not one-shot commands. Each loop must produce typed events, write artifacts/memory when appropriate, and stop on budget, policy, or quality limits.
+
+| Loop | Purpose | Trigger | Output | Safety gate |
+|---|---|---|---|---|
+| Visible work loop | Make progress inspectable | User starts run | Plan/tool/report/proof events | User can stop |
+| Data-quality repair loop | Improve ingestion from messy CSVs | CSV validation fails/warns | Mapping suggestions and quality report | Never mutates raw CSV silently |
+| Strategy clarification loop | Turn beginner wording into executable DSL | Ambiguous prompt/spec | Clarifying questions or normalized spec | User confirms spec before run |
+| Backtest execution loop | Run deterministic simulation | Valid dataset + spec | Trade ledger, metrics, report facts | Worker timeout and cancellation |
+| Sensitivity loop | Test robustness of parameters | Base run passes | Variant runs and comparison report | Fixed parameter bounds |
+| Walk-forward loop | Test stability over time | Enough data exists | Train/test split reports | No leakage from future periods |
+| Regime comparison loop | Compare market regimes | Regime labels or time buckets exist | Regime metrics and caveats | Minimum trade thresholds |
+| Report critique loop | Find weak claims and missing caveats | Report draft exists | Revised report version | Cannot change metrics |
+| Proof verification loop | Keep evidence reproducible | Report/proof/export created | Verification result | Hash mismatch blocks promotion |
+| Agent export loop | Prepare compact review context | Report complete | Agent notes JSON | No raw rows/secrets by default |
+| Memory consolidation loop | Convert run history into candidate lessons | Run complete | Memory capsule | Candidate status only |
+| User feedback loop | Learn preferences and usefulness | User accepts/rejects suggestions | Preference memory | User can reset/delete |
+| Tool-skill loop | Learn reliable command/runner patterns | Tool failure/success | Tool skill memory | No secrets or destructive commands |
+| Provider routing loop | Learn which LLM/local mode works best | Provider call result | Provider preference/cost notes | User budget and opt-in |
+| Regression-test synthesis loop | Convert bugs into tests | Failure fixed | New fixture/test candidate | Human review before merge |
+| Watch/background lab loop | Continue queued research unattended | User starts autonomous agenda | New runs, comparisons, summaries | Budget, scope, stop conditions |
+| Drift/model monitoring loop | Track whether trained components degrade | Model candidate exists | Drift/quality report | No auto-production promotion |
+| Offline training candidate loop | Train candidate models safely | Consented data + approved objective | Candidate model + eval report | Registry, rollback, approval |
+| Promotion loop | Move candidate lessons/models into defaults | Enough evidence + approval | Versioned default update | Admin approval and proof |
+| Release hygiene loop | Catch leaks before deploy | Build/release | Secret/source-map scan report | Blocks release on leak |
+
+### 31.7 Self-Learning Loop Architecture
+
+"Self-learning" means the system gets better through memory, feedback, experiments, and candidate models. It does not mean silently changing production logic.
+
+Safe learning layers:
+
+| Layer | Can update automatically? | Example | Can affect final metrics? |
+|---|---|---|---|
+| Session scratch | Yes, within run | Notes about current dataset quirks | No |
+| User preference memory | Yes, with reset/export/delete | Preferred report depth, provider, risk threshold | No |
+| Tool skill memory | Yes, scoped and redacted | "Use Python runner for CSVs > X rows" | Indirect only |
+| Candidate strategy lesson | Yes, labeled candidate | "VWAP distance filter looked useful on MNQ 2024" | No until rerun |
+| User-specific defaults | Only after user approval | Default risk display/report sections | No metric changes |
+| Cross-user defaults | No, requires governance | Better clarification templates | No direct metric changes |
+| Model candidate | No production use without approval | Trained classifier for regime labels | Only after registry approval |
+| Production model/default | No silent changes | Promoted model/default strategy rule | Yes, with version/proof |
+
+Required event flow:
+
+```text
+observe
+  -> validate event schema
+  -> redact secrets/raw rows
+  -> write event
+  -> summarize into memory candidate
+  -> link artifact/proof refs
+  -> score usefulness/confidence
+  -> apply only to suggestions/preferences
+  -> request approval for default/model promotion
+  -> write promoted version with rollback pointer
+```
+
+### 31.8 Required Self-Learning Loops In Detail
+
+#### 31.8.1 User Preference Learning Loop
+
+Goal:
+
+- Make the engine feel more personal each session without changing evidence.
+
+Signals:
+
+- Report sections expanded/collapsed.
+- Suggestions accepted/rejected.
+- Provider chosen.
+- Risk thresholds edited.
+- Repeated export formats.
+- User labels: useful, not useful, wrong, too risky.
+
+Memory written:
+
+```json
+{
+  "memory_type": "user_preference",
+  "scope": "workspace",
+  "signal": "accepted_report_style",
+  "value": "detailed_risk_first",
+  "confidence": 0.72,
+  "source_events": ["evt_..."],
+  "status": "active_user_preference"
+}
+```
+
+Guardrails:
+
+- User can inspect, edit, disable, export, and delete this memory.
+- Preference memory must not change historical reports.
+- Preference memory must not override deterministic risk rules.
+
+#### 31.8.2 Strategy Lesson Learning Loop
+
+Goal:
+
+- Learn which filters, setups, sessions, and assets deserve more experiments.
+
+Signals:
+
+- Multiple completed runs.
+- Parameter sensitivity results.
+- Walk-forward results.
+- Regime comparisons.
+- User feedback.
+
+Memory written:
+
+```json
+{
+  "memory_type": "strategy_lesson",
+  "scope": "user",
+  "strategy_id": "post_ib_vwap_inventory_v1",
+  "finding": "Candidate: limiting entries to <= 1.5R from VWAP improved expectancy on this dataset.",
+  "evidence_refs": ["artifact:metrics:sha256:...", "artifact:report_json:sha256:..."],
+  "min_trades": 40,
+  "confidence": "candidate",
+  "status": "not_default"
+}
+```
+
+Guardrails:
+
+- Needs multiple datasets or time slices before becoming a default.
+- Must state sample size and data scope.
+- Must never be presented as guaranteed edge.
+- Must create a new strategy spec version before testing learned changes.
+
+#### 31.8.3 Data-Quality Learning Loop
+
+Goal:
+
+- Get better at recognizing user CSV formats and recurring data problems.
+
+Signals:
+
+- Column mapping fixes.
+- Timezone corrections.
+- Rejected rows.
+- Session mismatch fixes.
+- User-confirmed import profiles.
+
+Memory written:
+
+```json
+{
+  "memory_type": "data_import_profile",
+  "source_hint": "ninjatrader_mnq_export",
+  "column_map": {
+    "Date": "timestamp",
+    "Open": "open",
+    "High": "high",
+    "Low": "low",
+    "Close": "close",
+    "Volume": "volume"
+  },
+  "timezone": "America/New_York",
+  "status": "user_confirmed"
+}
+```
+
+Guardrails:
+
+- Import profile suggestions require confirmation on first use.
+- Raw CSV is not uploaded for shared training by default.
+- Bad inferred profiles must not silently corrupt data.
+
+#### 31.8.4 Tool Skill Learning Loop
+
+Goal:
+
+- Make local automation more reliable over time.
+
+Signals:
+
+- CLI command success/failure.
+- Runner capability checks.
+- Environment repairs.
+- File path conventions.
+- Browser smoke failures and fixes.
+
+Memory written:
+
+```json
+{
+  "memory_type": "tool_skill",
+  "tool": "vibing.run",
+  "lesson": "Use Python engine for MNQ files above 1,000,000 rows on this machine.",
+  "machine_scope": "local-windows-001",
+  "source_events": ["evt_..."],
+  "status": "active_local_hint"
+}
+```
+
+Guardrails:
+
+- Never store API keys, tokens, `.env` contents, or private shell output.
+- Never learn destructive commands as automatic fixes.
+- Tool skill memory is machine/workspace scoped.
+
+#### 31.8.5 Report Quality Learning Loop
+
+Goal:
+
+- Make reports clearer and more useful without changing numbers.
+
+Signals:
+
+- User edits report wording.
+- User asks follow-up questions.
+- User marks caveats as helpful/not helpful.
+- Report sections repeatedly ignored.
+
+Memory written:
+
+- Preferred report order.
+- Preferred detail level.
+- Common caveats to emphasize.
+- User's risk tolerance display preferences.
+
+Guardrails:
+
+- Report wording can adapt.
+- Report metrics, ledgers, proof hashes, and verdict thresholds cannot be rewritten by this loop.
+
+#### 31.8.6 Experiment Queue Learning Loop
+
+Goal:
+
+- Keep proposing better next experiments from evidence.
+
+Signals:
+
+- Failed/rejected strategies.
+- Regime-specific weakness.
+- Low trade count.
+- High drawdown clusters.
+- Parameter instability.
+
+Output:
+
+- Prioritized next-experiment queue.
+- Estimated runtime and data needs.
+- Stop criteria for each experiment.
+
+Guardrails:
+
+- Queued experiments are suggestions until user starts or authorizes background lab mode.
+- Background lab mode obeys budget, scope, and stop rules.
+
+#### 31.8.7 Provider Routing Learning Loop
+
+Goal:
+
+- Use the best available local/BYOK/provider path for advisory tasks.
+
+Signals:
+
+- Latency.
+- Cost.
+- Failure rate.
+- User satisfaction.
+- Task type.
+
+Output:
+
+- Provider preference hints by task type.
+- Cost warnings.
+- Deterministic fallback recommendations.
+
+Guardrails:
+
+- Provider selection never sends data to remote LLM unless opt-in allows it.
+- BYOK budgets are hard stops.
+- Provider memory stores credential IDs, never raw keys.
+
+#### 31.8.8 Offline Model Candidate Training Loop
+
+Goal:
+
+- Train optional helper models only under governance.
+
+Allowed candidate targets:
+
+- Regime classifier.
+- Data-quality classifier.
+- Clarifying-question ranker.
+- Setup-quality scorer.
+- Report-caveat ranker.
+
+Training loop:
+
+```text
+collect consented examples
+  -> build versioned dataset
+  -> run leakage checks
+  -> train candidate offline
+  -> evaluate out-of-sample
+  -> compare to deterministic baseline
+  -> register model candidate
+  -> require approval
+  -> deploy as optional versioned helper
+  -> monitor drift and rollback
+```
+
+Guardrails:
+
+- No public-user data without opt-in consent.
+- No private strategies in shared training by default.
+- No production promotion without model registry, eval report, rollback, and audit log.
+- Candidate model output is advisory unless deterministic backtest validates it.
+
+#### 31.8.9 Safety And Policy Learning Loop
+
+Goal:
+
+- Improve safety stops and scope checks over time.
+
+Signals:
+
+- Blocked commands.
+- User cancellations.
+- Budget stops.
+- Repeated failed retries.
+- Secret-scan findings.
+
+Output:
+
+- Better policy rules.
+- Safer default budgets.
+- Improved warning text.
+
+Guardrails:
+
+- Safety rules can become stricter automatically.
+- Safety rules cannot become looser without explicit admin approval.
+
+### 31.9 Self-Learning Definition Of Done
+
+Self-learning is not done until these exist:
+
+- `memory_capsule` schema.
+- `memory_event` schema.
+- Memory inspect/export/delete UI.
+- Memory consolidation job.
+- User feedback controls.
+- Candidate lesson status labels.
+- Evidence refs on every lesson.
+- Promotion workflow.
+- Rollback pointer for promoted defaults/models.
+- Privacy boundary for per-user vs shared learning.
+- Training consent setting.
+- Offline model registry plan.
+- Drift monitoring plan.
+- Tests proving memory cannot change historical reports, metrics, ledgers, or proof blocks.
 
 ---
 
