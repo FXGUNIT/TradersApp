@@ -31,12 +31,13 @@ jobs:
           cd deploy/cloudflare-tunnel/bff-worker
 
           echo "=== Deploying BFF Proxy Worker ==="
-          echo "Worker URL: https://tradersapp-bff-proxy.\${CLOUDFLARE_WORKERS_SUBDOMAIN}.workers.dev"
+          echo "Worker URL: https://tradersapp-bff-proxy.gunitsingh1994.workers.dev"
 
-          # Wrangler v3 doesn't call /user/tokens/verify — works with cfat_ tokens
-          # Use --nodejs flag to explicitly bundle without ES module validation
+          # Wrangler v3 authenticates via CLOUDFLARE_API_TOKEN env var directly.
+          # It does NOT call /user/tokens/verify (Wrangler v4 does, which blocks cfat_ tokens).
           npx wrangler@3.103.0 deploy \
-            --name tradersapp-bff-proxy \
-            --no-bundle
+            --name tradersapp-bff-proxy
 
+          echo ""
           echo "=== Worker deployed successfully ==="
+          echo "URL: https://tradersapp-bff-proxy.gunitsingh1994.workers.dev"
