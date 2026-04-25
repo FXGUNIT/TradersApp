@@ -9,66 +9,37 @@ permissions:
 
 env:
   CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-  GH_TOKEN: ${{ github.token }}
 
 jobs:
-  setup-and-deploy:
-    name: Setup CF Account ID + Deploy Worker
+  deploy-worker:
+    name: Deploy BFF Proxy Worker
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Deploy Worker
+      - name: Deploy Worker via Workers Scripts API
         run: |
-          echo "=== Deploying BFF Proxy Worker ==="
-          echo "Account ID: 0f779fe4981d424548a48856cc9139db"
-          echo "Worker: tradersapp-bff-proxy"
-          echo "Token scopes: Workers Scripts Write"
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "24"
-
-      - name: Check Workers API access
-        run: |
-          echo "=== Testing Workers API ==="
-          RESP=$(curl -s "https://api.cloudflare.com/client/v4/accounts/0f779fe4981d424548a48856cc9139db/workers/scripts" \
-            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN")
-          echo "$RESP" | python3 -c "import json,sys; d=json.load(sys.stdin); print('Workers API success:', d.get('success')); print('Errors:', d.get('errors') or [])"
-          echo ""
-
-      - name: Install Wrangler
-        run: npm install -g wrangler@latest
-
-      - name: Deploy Worker via Workers Scripts API (bypasses user token verify)
-        run: |
-          echo "=== Deploying BFF Proxy Worker via REST API ==="
           ACCOUNT_ID="0f779fe4981d424548a48856cc9139db"
           WORKER_NAME="tradersapp-bff-proxy"
 
-          echo "=== Checking existing script ==="
-          EXISTING=$(curl -s "https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/workers/scripts/${WORKER_NAME}" \
-            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
-            -H "Content-Type: application/json")
-          echo "$EXISTING" | python3 -c "import json,sys; d=json.load(sys.stdin); print('Script exists:', d.get('success'), d.get('errors') or [])"
-
+          echo "=== Deploying BFF Proxy Worker ==="
+          echo "Account: $ACCOUNT_ID"
+          echo "Worker: $WORKER_NAME"
           echo ""
-          echo "=== Deploying script via PUT /workers/scripts/{name}/content ==="
+
+          echo "=== Uploading script (PUT /workers/scripts/{name}/content) ==="
           RESP=$(curl -s -X PUT "https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/workers/scripts/${WORKER_NAME}/content" \
             -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
             -H "Content-Type: application/octet-stream" \
             --data-binary "@deploy/cloudflare-tunnel/bff-worker/index.js")
-          echo "$RESP" | python3 -c "import json,sys; d=json.load(sys.stdin); print('Deploy success:', d.get('success')); print('Errors:', d.get('errors') or []); print('Warnings:', d.get('warnings') or [])"
-
+          echo "$RESP" | python3 -c "import json,sys; d=json.load(sys.stdin); print('Deploy success:', d.get('success')); [print('ERROR:', e.get('message', e)) for e in (d.get('errors') or [])]; [print('OK:', w.get('message', w)) for w in (d.get('messages') or [])]"
           echo ""
-          echo "=== Setting script metadata (vars) ==="
-          curl -s -X PATCH "https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/workers/scripts/${WORKER_NAME}" \
-            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
-            -H "Content-Type: application/json" \
-            -d '{"compatibility_date": "2026-04-24"}' | python3 -c "import json,sys; d=json.load(sys.stdin); print('Metadata set:', d.get('success'), d.get('errors') or [])"
 
-          echo ""
-          echo "=== Deployment complete ==="
+          if [ "$(echo '$RESP' | python3 -c 'import json,sys; print(json.load(sys.stdin).get(\"success\"))')" = "True" ]; then
+            echo "=== Worker deployed successfully ==="
+          else
+            echo "=== Deploy failed ==="
+            exit 1
+          fi
