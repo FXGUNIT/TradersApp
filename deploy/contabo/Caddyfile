@@ -11,6 +11,13 @@
   }
 }
 
+http://{$TRADERSAPP_DOMAIN} {
+  @edge_health path /edge-health
+  handle @edge_health {
+    respond "ok" 200
+  }
+}
+
 {$TRADERSAPP_DOMAIN} {
   import security_headers
   encode zstd gzip
