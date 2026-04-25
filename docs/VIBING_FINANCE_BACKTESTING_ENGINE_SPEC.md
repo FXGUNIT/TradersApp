@@ -1118,7 +1118,14 @@ src/features/vibing-finance/VibingFinanceScreen.jsx
 src/features/vibing-finance/vibingFinance.css
 src/features/vibing-finance/vibingFinanceFlags.js
 src/features/vibing-finance/agentControlPlane.js
+src/features/vibing-finance/researchCoordinator.js
+src/features/vibing-finance/agentTeam.js
+src/features/vibing-finance/agentRunner.js
+src/features/vibing-finance/messageBus.js
+src/features/vibing-finance/sharedMemory.js
+src/features/vibing-finance/taskQueue.js
 src/features/vibing-finance/toolRouter.js
+src/features/vibing-finance/toolRegistry.js
 src/features/vibing-finance/artifactStore.js
 src/features/vibing-finance/strategyParser.js
 src/features/vibing-finance/strategySchema.js
@@ -2403,6 +2410,15 @@ Additional event types:
 - `llm_provider_configured`
 - `llm_call_started`
 - `llm_call_completed`
+- `agent_turn_started`
+- `agent_turn_completed`
+- `task_created`
+- `task_unblocked`
+- `task_started`
+- `task_completed`
+- `task_failed`
+- `message_published`
+- `shared_memory_written`
 - `terminal_command_started`
 - `terminal_command_completed`
 - `autonomous_run_started`
@@ -2430,6 +2446,190 @@ Not allowed:
 - Misleading reports.
 - Poisoned data in user-visible results.
 - Any anti-copy trick that reduces trust in our own research output.
+
+### 28.9 Public Multi-Agent Framework Lessons
+
+Public reference: `open-multi-agent` by JackChen-me is an MIT-licensed TypeScript multi-agent orchestration project. The public README describes a model-agnostic, in-process orchestration engine with a coordinator, team abstraction, task queue, message bus, shared memory, agent runner loop, provider adapters, and schema-validated tools.
+
+Clean-room boundary:
+
+- Use only public architecture concepts and API-level ideas.
+- Do not copy source files, examples, prompts, tests, naming internals, or exact implementation.
+- Keep TradersApp domain-specific: deterministic backtesting, proof lineage, privacy, and per-user learning are stricter than a general multi-agent framework.
+- Dependency decision remains open; the default plan is original TradersApp code inspired by common patterns.
+
+Pattern mapping:
+
+| Public pattern | Vibing Finance adaptation |
+|---|---|
+| Coordinator decomposes a goal | Research Coordinator turns a user agenda into a task DAG |
+| Team/sub-agent model | Role agents: Planner, Data Auditor, Strategy Engineer, Backtest Executor, Risk Reviewer, Report Writer, Proof Auditor, Memory Curator |
+| MessageBus | Typed workspace/run-scoped event bus feeding transcript and artifact inspector |
+| SharedMemory | Namespaced per-user/run memory capsules backed by IndexedDB/local store |
+| TaskQueue with dependency graph | Topological scheduler for parse -> validate -> features -> simulate -> metrics -> report -> proof -> critique |
+| AgentRunner loop | Bounded model -> tool -> model turns with max-turn, timeout, loop detection, and transcript events |
+| ToolRegistry / defineTool-style API | `defineVibingTool()` with schema validation, capability tags, output schema, redaction policy, and artifact hashing |
+| Multi-model provider adapters | Same team can mix local LLM, Claude, OpenAI-compatible BYOK, Gemini, Copilot, or deterministic-only agents |
+| In-process TypeScript runtime | Browser/Node-first orchestration without spawning one CLI process per agent |
+| Built-in bash/file/grep tools | Scope-limited shell, filesystem, search, runner, and MCP adapters for the active agenda only |
+| Tool output controls | Per-tool output caps, head/tail excerpts, consumed-output compression, and artifact refs for large outputs |
+| Observability hooks | Progress, trace, span, and task events rendered in the visible work loop |
+
+### 28.10 In-Process Multi-Agent Architecture Target
+
+The long-term target is an in-process TypeScript agent kernel, not a pile of separate CLI sessions.
+
+Kernel modules:
+
+```text
+ResearchCoordinator
+  -> AgentTeam
+      -> RoleAgent[]
+      -> MessageBus
+      -> SharedMemory
+      -> TaskQueue
+  -> AgentRunner
+  -> ToolRegistry
+  -> ProviderRegistry
+  -> ArtifactStore
+  -> PolicyGuard
+```
+
+Why in-process first:
+
+- Easier to deploy in browser, Node, Docker, CI/CD, and local desktop runner.
+- Easier to keep one event stream, one artifact store, and one proof chain.
+- Easier to mix providers in one team.
+- Avoids process-per-agent overhead for normal orchestration.
+- Shell/terminal execution remains available as a tool, not as the core agent runtime.
+
+Task DAG example:
+
+```text
+clarify_strategy
+  -> normalize_strategy_spec
+  -> validate_dataset
+      -> compute_features
+          -> detect_setups
+              -> simulate_trades
+                  -> compute_metrics
+                      -> write_report
+                          -> append_proof
+                              -> generate_next_experiments
+```
+
+Parallelizable branches:
+
+- `validate_dataset` and `validate_strategy_spec` can run independently.
+- `risk_review`, `report_outline`, and `proof_precheck` can prepare after metrics exist.
+- Multiple parameter sensitivity runs can fan out after the base case passes.
+- Report writing and agent export can run after the structured report JSON is fixed.
+
+Scheduler rules:
+
+- A task starts only when all required artifact refs exist.
+- A failed task blocks only descendants that require its output.
+- A task can retry only when retry policy allows it and inputs are unchanged.
+- Parallel tasks must declare read/write sets to avoid artifact conflicts.
+- A final report cannot be marked complete until all required proof refs exist.
+
+### 28.11 Tool Definition Contract
+
+Every tool should be defined through a schema-first contract.
+
+Proposed shape:
+
+```ts
+defineVibingTool({
+  name: 'run_backtest',
+  description: 'Run deterministic backtest from validated dataset and strategy spec.',
+  capability: 'backtest.execute',
+  inputSchema: BacktestInputSchema,
+  outputSchema: BacktestOutputSchema,
+  redactionPolicy: 'no_raw_rows_no_secrets',
+  timeoutMs: 300000,
+  maxOutputChars: 20000,
+  execute: async (input, context) => {
+    // Original TradersApp implementation only.
+  },
+})
+```
+
+Contract rules:
+
+- Input validation before execution.
+- Output validation before the result reaches any agent context.
+- Capability tags for role-agent allowlists.
+- Denylist override for dangerous actions.
+- Timeout and cancellation support.
+- Output truncation plus artifact refs for large data.
+- Redaction policy declared at tool definition time.
+- Tool execution always emits typed events.
+
+Role tool presets:
+
+| Preset | Allowed tools |
+|---|---|
+| `readonly` | Read report, read strategy spec, search artifacts, inspect proof |
+| `research` | Read artifacts, generate hypotheses, compare runs, write memory candidates |
+| `backtest` | Validate data, compute features, simulate, compute metrics |
+| `report` | Read metrics, write report, write agent export |
+| `proof` | Hash artifacts, verify proof chain, export proof |
+| `full_local_runner` | Scoped shell/filesystem/local runner tools for active agenda |
+
+### 28.12 Multi-Model Team Policy
+
+The team should be model-agnostic.
+
+Allowed team composition examples:
+
+- Planner on Claude or GPT.
+- Backtest Executor deterministic-only.
+- Risk Reviewer on local LLM or BYOK remote LLM.
+- Report Writer on user-selected provider.
+- Proof Auditor deterministic-only.
+- Reviewer on a second model/provider for critique.
+
+Rules:
+
+- A role agent must declare provider, model, tool preset, budgets, and memory access.
+- Deterministic-only agents are first-class members of the team.
+- BYOK/provider failure degrades to deterministic-only mode where possible.
+- A provider cannot access raw CSV, API keys, or full transcripts unless the user explicitly enables that export.
+- No model can directly write final strategy verdicts without deterministic metrics and proof refs.
+
+### 28.13 Shared Memory And Message Bus Rules
+
+Message bus channels:
+
+| Channel | Purpose |
+|---|---|
+| `plan` | Task creation, assignment, dependency changes |
+| `tool` | Tool start/progress/complete/fail events |
+| `artifact` | Artifact created, linked, verified |
+| `memory` | Memory candidate created/promoted/rejected |
+| `provider` | LLM call lifecycle without secrets |
+| `ui` | Visible progress and user-facing summaries |
+| `policy` | Scope denials, budget stops, safety stops |
+
+Shared memory namespaces:
+
+```text
+workspace/<workspace_id>/preference/*
+run/<run_id>/scratch/*
+run/<run_id>/facts/*
+strategy/<strategy_id>/lessons/*
+proof/<run_id>/*
+tool_skill/<tool_name>/*
+```
+
+Rules:
+
+- Scratch memory expires or is summarized after the run.
+- Facts memory must cite artifact refs.
+- Lesson memory must cite evidence thresholds.
+- Tool skill memory cannot store secrets.
+- Cross-user memory is disabled until privacy and training governance are implemented.
 
 ---
 
@@ -3375,3 +3575,4 @@ These references informed the free architecture and timing defaults as of 2026-0
 - Nano documentation describes Nano as a feeless block-lattice cryptocurrency, but it is a currency network rather than a general-purpose report-data ledger: https://docs.nano.org/protocol-design/introduction/
 - NSE market timings list normal/equity derivatives open at 09:15 and close at 15:30: https://www.nseindia.com/static/market-data/market-timings
 - CME material confirms Micro E-mini futures trade nearly around the clock; the MVP still intentionally uses 09:30 ET as the New York/RTH-style session open for this strategy: https://www.cmegroup.com/education/frequently-asked-questions-micro-e-mini-equity-index-futures.html
+- `open-multi-agent` public README describes an MIT-licensed TypeScript multi-agent orchestration engine with `runTeam()`, task DAG orchestration, multi-model teams, MessageBus, TaskQueue, SharedMemory, AgentRunner, ToolRegistry, schema-validated custom tools, MCP integration, local model support, and in-process runtime patterns. This spec uses it only as a public clean-room architecture reference, not copied code: https://github.com/JackChen-me/open-multi-agent
