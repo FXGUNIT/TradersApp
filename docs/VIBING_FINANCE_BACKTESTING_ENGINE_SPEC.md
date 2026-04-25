@@ -1618,6 +1618,18 @@ Initial implementation path:
 scripts/vibing-finance/cli.mjs
 ```
 
+Package scripts during MVP:
+
+```json
+{
+  "scripts": {
+    "vibing": "node scripts/vibing-finance/cli.mjs",
+    "vibing:doctor": "node scripts/vibing-finance/cli.mjs doctor",
+    "vibing:serve": "node scripts/vibing-finance/cli.mjs serve"
+  }
+}
+```
+
 Later package entry:
 
 ```json
@@ -2711,8 +2723,20 @@ Additional event types:
 - `task_failed`
 - `message_published`
 - `shared_memory_written`
+- `cli_command_started`
+- `cli_command_completed`
+- `cli_command_failed`
+- `runner_service_started`
+- `runner_service_connected`
+- `runner_service_disconnected`
+- `runner_job_started`
+- `runner_job_completed`
+- `runner_job_failed`
 - `terminal_command_started`
 - `terminal_command_completed`
+- `browser_automation_started`
+- `browser_automation_completed`
+- `browser_automation_failed`
 - `autonomous_run_started`
 - `autonomous_run_heartbeat`
 - `autonomous_run_stopped`
@@ -3267,6 +3291,7 @@ Build the first usable private version in this order:
 8. Built-in `vibing` CLI using the same core engine.
 9. Local runner service for unattended browser-to-machine execution.
 10. Python parity runner later.
+11. Browser automation tool for screenshots and UI smoke checks.
 
 ### 31.2 Critical Path
 
@@ -3306,6 +3331,7 @@ Anything not on this path is postponed.
 | M9 | Built-in CLI | `vibing run/report/proof/export` uses same schemas as browser | Local automation |
 | M10 | Local runner service | `vibing serve` connects browser to local jobs | Unattended work |
 | M11 | Python parity | Optional Python engine matching browser/CLI output | Scale |
+| M12 | Browser automation | `vibing browser smoke/screenshot/inspect` using Playwright | UI verification |
 
 ### 31.4 Non-Negotiable MVP Constraints
 
@@ -3644,6 +3670,32 @@ Acceptance:
 - Large CSVs can run without browser memory pressure.
 - Python output imports into the browser workbench.
 
+### 32.12 M12 - Browser Automation Tool
+
+Files:
+
+```text
+scripts/vibing-finance/browser-tool.mjs
+src/features/vibing-finance/__tests__/browserToolContract.test.js
+playwright.config.js
+```
+
+Tasks:
+
+- Implement `vibing browser smoke`.
+- Implement `vibing browser screenshot`.
+- Implement `vibing browser inspect`.
+- Restrict default origins to localhost and explicit allowlists.
+- Store screenshots and traces as artifacts.
+- Emit typed browser tool events.
+
+Acceptance:
+
+- CLI can verify the hidden workbench renders locally.
+- CLI can capture a screenshot artifact for debug packages.
+- Browser automation refuses disallowed origins by default.
+- Screenshots are excluded from public exports unless explicitly included.
+
 ---
 
 ## 34. Runtime State Machines
@@ -3694,6 +3746,81 @@ Failure must include:
   "stage": "detecting_setups",
   "code": "NO_IB_WINDOW",
   "message": "No complete 60-minute IB window found for MNQ on 2026-04-24.",
+  "recoverable": true
+}
+```
+
+### 33.2.1 CLI Command State
+
+```text
+parsed
+  -> validated
+  -> workspace_locked
+  -> running
+  -> writing_artifacts
+  -> verifying_outputs
+  -> completed
+  -> failed
+  -> cancelled
+```
+
+CLI failure must include:
+
+```json
+{
+  "command": "run",
+  "exit_code": 4,
+  "stage": "running",
+  "message": "Backtest worker failed before metrics were produced.",
+  "event_log": "artifacts/vibing-finance/logs/run_001.events.ndjson"
+}
+```
+
+### 33.2.2 Local Runner Service State
+
+```text
+stopped
+  -> starting
+  -> ready
+  -> running_job
+  -> draining
+  -> stopped
+  -> failed
+```
+
+Runner health response must include:
+
+```json
+{
+  "status": "ready",
+  "runner_id": "local-windows-001",
+  "workspace_root": "E:/TradersApp",
+  "active_jobs": 0,
+  "capabilities_hash": "sha256:..."
+}
+```
+
+### 33.2.3 Browser Automation State
+
+```text
+idle
+  -> launching
+  -> navigating
+  -> inspecting
+  -> capturing
+  -> writing_artifact
+  -> completed
+  -> failed
+```
+
+Browser automation failure must include:
+
+```json
+{
+  "url": "http://localhost:5173",
+  "stage": "navigating",
+  "code": "NAVIGATION_TIMEOUT",
+  "screenshot_ref": null,
   "recoverable": true
 }
 ```
