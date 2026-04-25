@@ -728,7 +728,7 @@ export const executeStructuredGoogleAuth = async ({
 
   const user =
     authenticatedUser ||
-    (await signInWithPopup(firebaseAuth, googleProvider)).user;
+    (await signInWithRedirect(firebaseAuth, googleProvider));  // Redirect-based auth — avoids ISP-popup SSL interception
   const email = String(user.email || "").toLowerCase();
 
   if (!isValidGmailAddress(email)) {

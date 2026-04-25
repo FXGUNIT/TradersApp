@@ -139,7 +139,11 @@ export default function CleanLoginScreen({
     setMessage("");
 
     try {
+      // Persist form data before redirect so it survives the page reload
+      persistPendingGoogleFormData({ email: cleanEmail.trim().toLowerCase() });
+      markRedirectInProgress();
       await onGoogleAuth();
+      // signInWithRedirect has already navigated away — this won't run
     } catch (err) {
       setError(err.message || "Google sign-in failed.");
     } finally {
