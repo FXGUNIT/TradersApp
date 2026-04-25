@@ -652,6 +652,422 @@ export default function RegimentHub({
         })}
       </div>
 
+      {/* ── Blog Insights Section ── */}
+      <div
+        style={{
+          width: "100%",
+          maxWidth: 960,
+          marginTop: 72,
+          position: "relative",
+        }}
+      >
+        {/* Decorative top separator */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 20,
+            marginBottom: 48,
+          }}
+        >
+          <div style={{ flex: 1, height: 1, background: "linear-gradient(to right, transparent, rgba(212,165,32,0.3))" }} />
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+              <circle cx="9" cy="9" r="8" stroke="#d4a520" strokeWidth="1.5" opacity="0.6" />
+              <circle cx="9" cy="9" r="4" fill="#d4a520" opacity="0.4" />
+              <circle cx="9" cy="9" r="1.5" fill="#d4a520" />
+            </svg>
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: 4,
+                color: "#d4a520",
+                textTransform: "uppercase",
+              }}
+            >
+              From the Trading Desk
+            </span>
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+              <circle cx="9" cy="9" r="8" stroke="#d4a520" strokeWidth="1.5" opacity="0.6" />
+              <circle cx="9" cy="9" r="4" fill="#d4a520" opacity="0.4" />
+              <circle cx="9" cy="9" r="1.5" fill="#d4a520" />
+            </svg>
+          </div>
+          <div style={{ flex: 1, height: 1, background: "linear-gradient(to left, transparent, rgba(212,165,32,0.3))" }} />
+        </div>
+
+        {/* Section headline */}
+        <div style={{ textAlign: "center", marginBottom: 36 }}>
+          <h2
+            style={{
+              fontSize: "clamp(18px, 3vw, 26px)",
+              fontWeight: 800,
+              color: textColor,
+              letterSpacing: -0.5,
+              marginBottom: 8,
+              lineHeight: 1.2,
+            }}
+          >
+            Intelligence. Research. Vision.
+          </h2>
+          <p style={{ fontSize: 13, color: mutedColor, margin: 0 }}>
+            Deep thinking on quant systems, alpha generation, and institutional edge.
+          </p>
+        </div>
+
+        {/* Blog cards grid */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+            gap: 20,
+            marginBottom: 36,
+          }}
+        >
+          {BLOG_POSTS.map((post, index) => (
+            <a
+              key={post.id}
+              href={post.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ textDecoration: "none" }}
+            >
+              <div
+                style={{
+                  height: "100%",
+                  background: isDark
+                    ? "rgba(15,23,42,0.7)"
+                    : "rgba(255,255,255,0.85)",
+                  backdropFilter: "blur(20px)",
+                  WebkitBackdropFilter: "blur(20px)",
+                  border: isDark
+                    ? "1px solid rgba(212,165,32,0.15)"
+                    : "1px solid rgba(212,165,32,0.2)",
+                  borderRadius: 20,
+                  padding: "28px 24px",
+                  cursor: "pointer",
+                  transition: "all 0.35s cubic-bezier(0.4, 0, 0.2, 1)",
+                  position: "relative",
+                  overflow: "hidden",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 12,
+                  animationDelay: `${index * 0.12}s`,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = "rgba(212,165,32,0.5)";
+                  e.currentTarget.style.transform = "translateY(-4px)";
+                  e.currentTarget.style.boxShadow = "0 16px 48px rgba(212,165,32,0.12)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = isDark
+                    ? "rgba(212,165,32,0.15)"
+                    : "rgba(212,165,32,0.2)";
+                  e.currentTarget.style.transform = "translateY(0)";
+                  e.currentTarget.style.boxShadow = "none";
+                }}
+              >
+                {/* Glow accent top */}
+                <div
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    left: "10%",
+                    right: "10%",
+                    height: 2,
+                    background: "linear-gradient(to right, transparent, #d4a520, transparent)",
+                    borderRadius: "0 0 4px 4px",
+                    opacity: 0.6,
+                  }}
+                />
+
+                {/* Top row: eyebrow + chart */}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "flex-start",
+                    justifyContent: "space-between",
+                    gap: 12,
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 6,
+                      flex: 1,
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: 9,
+                        fontWeight: 700,
+                        letterSpacing: 2.5,
+                        color: "#d4a520",
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      {post.eyebrow}
+                    </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: 5,
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      {post.tags.map((tag) => (
+                        <span
+                          key={tag}
+                          style={{
+                            fontSize: 9,
+                            fontWeight: 700,
+                            padding: "2px 7px",
+                            borderRadius: 20,
+                            background: "rgba(212,165,32,0.08)",
+                            color: "#d4a520",
+                            border: "1px solid rgba(212,165,32,0.2)",
+                            letterSpacing: 0.5,
+                          }}
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      flexShrink: 0,
+                      opacity: 0.85,
+                    }}
+                  >
+                    {post.chart}
+                  </div>
+                </div>
+
+                {/* Title */}
+                <h3
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 700,
+                    color: isDark ? "#f1f5f9" : "#0f172a",
+                    lineHeight: 1.4,
+                    letterSpacing: -0.2,
+                    margin: 0,
+                    flex: 1,
+                  }}
+                >
+                  {post.title}
+                </h3>
+
+                {/* Excerpt */}
+                <p
+                  style={{
+                    fontSize: 12,
+                    color: mutedColor,
+                    lineHeight: 1.6,
+                    margin: 0,
+                    flex: 1,
+                  }}
+                >
+                  {post.excerpt}
+                </p>
+
+                {/* Stat + CTA */}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 8,
+                    marginTop: 4,
+                    paddingTop: 12,
+                    borderTop: isDark
+                      ? "1px solid rgba(255,255,255,0.06)"
+                      : "1px solid rgba(0,0,0,0.06)",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 10,
+                      color: "#d4a520",
+                      fontWeight: 600,
+                      letterSpacing: 0.3,
+                      lineHeight: 1.4,
+                      maxWidth: "70%",
+                    }}
+                  >
+                    {post.stat}
+                  </span>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 4,
+                      fontSize: 10,
+                      fontWeight: 700,
+                      color: "#d4a520",
+                      letterSpacing: 1.5,
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    Read
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                      <path d="M2.5 6H9.5M6.5 3L9.5 6L6.5 9" stroke="#d4a520" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+            </a>
+          ))}
+
+          {/* Decorative stats card */}
+          <div
+            style={{
+              background: "linear-gradient(135deg, rgba(212,165,32,0.08) 0%, rgba(212,165,32,0.03) 100%)",
+              border: "1px solid rgba(212,165,32,0.2)",
+              borderRadius: 20,
+              padding: "28px 24px",
+              display: "flex",
+              flexDirection: "column",
+              gap: 16,
+              justifyContent: "center",
+              position: "relative",
+              overflow: "hidden",
+            }}
+          >
+            {/* Background radar chart */}
+            <div style={{ position: "absolute", right: -10, bottom: -10, opacity: 0.2 }}>
+              <MiniRadarChart />
+            </div>
+            <div style={{ position: "absolute", right: 16, top: 16, opacity: 0.08 }}>
+              <AnimatedLineChart />
+            </div>
+
+            <div>
+              <div
+                style={{
+                  fontSize: 9,
+                  fontWeight: 700,
+                  letterSpacing: 2.5,
+                  color: "#d4a520",
+                  textTransform: "uppercase",
+                  marginBottom: 8,
+                }}
+              >
+                Traders Regiment
+              </div>
+              <div
+                style={{
+                  fontSize: 15,
+                  fontWeight: 800,
+                  color: isDark ? "#fff" : "#0f172a",
+                  letterSpacing: -0.3,
+                  lineHeight: 1.3,
+                }}
+              >
+                World's Most Advanced Trading AI
+              </div>
+            </div>
+
+            {/* Inline stat bars */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {[
+                { label: "Institutional Intelligence", pct: 95 },
+                { label: "Quant Alpha Detection", pct: 88 },
+                { label: "Self-Improving AI", pct: 92 },
+                { label: "Board Room Governance", pct: 100 },
+              ].map((item) => (
+                <div key={item.label}>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      marginBottom: 4,
+                    }}
+                  >
+                    <span style={{ fontSize: 10, color: mutedColor, fontWeight: 500 }}>
+                      {item.label}
+                    </span>
+                    <span style={{ fontSize: 10, color: "#d4a520", fontWeight: 700 }}>
+                      {item.pct}%
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      height: 4,
+                      background: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)",
+                      borderRadius: 4,
+                      overflow: "hidden",
+                    }}
+                  >
+                    <div
+                      style={{
+                        height: "100%",
+                        width: `${item.pct}%`,
+                        background: "linear-gradient(to right, rgba(212,165,32,0.6), #d4a520)",
+                        borderRadius: 4,
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <a
+              href="/blog/"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 6,
+                padding: "10px 16px",
+                border: "1px solid rgba(212,165,32,0.35)",
+                borderRadius: 10,
+                fontSize: 11,
+                fontWeight: 700,
+                color: "#d4a520",
+                letterSpacing: 1,
+                textTransform: "uppercase",
+                textDecoration: "none",
+                transition: "all 0.2s",
+                background: "rgba(212,165,32,0.05)",
+              }}
+            >
+              View All Articles
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M2.5 6H9.5M6.5 3L9.5 6L6.5 9" stroke="#d4a520" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </a>
+          </div>
+        </div>
+
+        {/* Bottom decorative separator */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 12,
+            marginTop: 8,
+          }}
+        >
+          {[1, 2, 3].map((i) => (
+            <div
+              key={i}
+              style={{
+                width: i === 2 ? 24 : 6,
+                height: 2,
+                borderRadius: 2,
+                background: i === 2 ? "#d4a520" : "rgba(212,165,32,0.3)",
+              }}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* ── Footer Strip ── */}
       <div
         style={{
           marginTop: 56,
