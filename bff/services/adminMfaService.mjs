@@ -1,4 +1,9 @@
-import { createHmac, randomInt, timingSafeEqual } from "node:crypto";
+import {
+  createHmac,
+  randomInt,
+  randomUUID,
+  timingSafeEqual,
+} from "node:crypto";
 
 const DEFAULT_ADMIN_EMAILS = [
   "gunitsingh1994@gmail.com",
@@ -158,7 +163,7 @@ export async function startAdminEmailOtp({ masterEmail, clientKey }) {
   }
 
   const recipients = getAdminEmailRecipients();
-  const challengeId = crypto.randomUUID();
+  const challengeId = randomUUID();
   const codes = recipients.map(() => generateOtp());
   const now = Date.now();
   const emailDeliveryConfigured = isEmailDeliveryConfigured();

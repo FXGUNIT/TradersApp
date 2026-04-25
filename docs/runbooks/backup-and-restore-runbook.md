@@ -2,7 +2,56 @@
 
 **Scope:** Redis, ML Engine SQLite, PostgreSQL (MLflow metadata)  
 **Owner:** Platform + Data Engineering  
-**Last Updated:** 2026-04-15
+**Last Updated:** 2026-04-26
+
+## Active Contabo Backup Contract
+
+The active Contabo deploy installs scheduled backups on the VPS during every deploy.
+
+Installed paths:
+
+| Item | Path |
+|---|---|
+| Backup tools | `/opt/tradersapp/backup-tools` |
+| Cron file | `/etc/cron.d/tradersapp-backups` |
+| Backup root | `/var/backups/tradersapp` |
+| Redis backups | `/var/backups/tradersapp/redis` |
+| SQLite backups | `/var/backups/tradersapp/sqlite` |
+| PostgreSQL backups | `/var/backups/tradersapp/postgres` |
+| Deployed source snapshots | `/var/backups/tradersapp/source` |
+| Backup logs | `/var/backups/tradersapp/logs` |
+
+Contabo schedule:
+
+| Time | Job |
+|---|---|
+| 02:00 daily | `run-backups.sh all` with `flock` to prevent overlap |
+| 02:45 daily | `verify-backups.sh` |
+
+The source snapshot is a `git archive` of the exact deployed GitHub commit. It is copied to:
+
+```text
+/var/backups/tradersapp/source/source-<sha>.tgz
+/var/backups/tradersapp/source/source_latest.tgz
+```
+
+Manual Contabo verification:
+
+```bash
+sudo APP_ROOT=/opt/tradersapp BACKUP_ROOT=/var/backups/tradersapp \
+  /opt/tradersapp/backup-tools/scripts/contabo/verify-backups.sh
+```
+
+Manual Contabo backup:
+
+```bash
+sudo APP_ROOT=/opt/tradersapp BACKUP_ROOT=/var/backups/tradersapp \
+  /opt/tradersapp/backup-tools/scripts/contabo/run-backups.sh all
+```
+
+Important rule:
+
+- Uncommitted local files are only on the local machine. To make files exist on GitHub and Contabo, commit and push to GitHub, then deploy that commit to Contabo.
 
 ## Backup Schedule (Cron)
 

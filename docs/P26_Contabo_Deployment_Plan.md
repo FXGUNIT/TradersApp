@@ -210,8 +210,54 @@ layout and low-blast-radius routes:
 - App root: `/opt/tradersapp`
 - Compose bundle: `/opt/tradersapp/deploy/contabo`
 - Runtime env: `/opt/tradersapp/runtime/.env.contabo`
+- Backup tools: `/opt/tradersapp/backup-tools`
+- VPS backup root: `/var/backups/tradersapp`
+- Deployed source snapshots: `/var/backups/tradersapp/source/source-<sha>.tgz`
+- Latest deployed source snapshot: `/var/backups/tradersapp/source/source_latest.tgz`
 - Systemd unit: `/etc/systemd/system/tradersapp.service`
 - Release staging dir during deploy: `/tmp/tradersapp-contabo-release`
+
+## Backup And Source Redundancy Contract
+
+Every successful Contabo deploy must preserve three copies of the application state:
+
+1. Local machine: the working tree at `E:\TradersApp`.
+2. GitHub: the pushed commit and GHCR images for that commit.
+3. Contabo VPS: running Docker images plus a source snapshot archive under `/var/backups/tradersapp/source`.
+
+The deploy workflow now uploads:
+
+- `contabo-bundle.tgz`: deploy scripts, Contabo compose files, and backup tools.
+- `source-snapshot.tgz`: `git archive` of the exact deployed GitHub commit.
+
+The remote deploy installs:
+
+- `/etc/cron.d/tradersapp-backups`
+- `/opt/tradersapp/backup-tools`
+- `/var/backups/tradersapp/{redis,sqlite,postgres,source,logs}`
+
+Scheduled backups:
+
+| Time | Command | Output |
+|---|---|---|
+| 02:00 daily | `run-backups.sh all` | Redis, SQLite if DB exists, PostgreSQL if profile/container exists |
+| 02:45 daily | `verify-backups.sh` | Verifies cron, source snapshot, and latest available backup files |
+
+Manual VPS verification:
+
+```bash
+sudo APP_ROOT=/opt/tradersapp BACKUP_ROOT=/var/backups/tradersapp \
+  /opt/tradersapp/backup-tools/scripts/contabo/verify-backups.sh
+```
+
+Manual VPS backup:
+
+```bash
+sudo APP_ROOT=/opt/tradersapp BACKUP_ROOT=/var/backups/tradersapp \
+  /opt/tradersapp/backup-tools/scripts/contabo/run-backups.sh all
+```
+
+The source snapshot represents the latest deployed GitHub commit, not uncommitted local files. To make local changes exist on GitHub and Contabo, commit and push them to GitHub, then run the normal Contabo deploy.
 
 ## Manual Recovery
 

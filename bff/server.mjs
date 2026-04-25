@@ -95,6 +95,12 @@ import { startBoardRoomCron } from "./board-room/cron/index.mjs";
 import { startWatchtowerDaemon } from "./services/watchtowerService.mjs";
 import { boardRoomService } from "./services/boardRoomService.mjs";
 import boardRoomTelegram from "./services/boardRoomTelegram.mjs";
+import {
+  getAdminMfaStatus,
+  startAdminEmailOtp,
+  verifyAdminEmailOtp,
+  verifyAdminTotp,
+} from "./services/adminMfaService.mjs";
 // Telegram proxy — J01: token removed from browser bundles
 import {
   handleTelegramSendMessage,
@@ -149,6 +155,10 @@ const ADMIN_PASS_HASH =
   process.env.BFF_ADMIN_PASS_HASH ||
   process.env.ADMIN_PASS_HASH ||
   "";
+const ADMIN_PASSWORD_LOGIN_ENABLED =
+  String(process.env.ADMIN_PASSWORD_LOGIN_ENABLED || "false")
+    .trim()
+    .toLowerCase() === "true";
 const CONFIGURED_ALLOWED_ORIGINS = String(process.env.BFF_ALLOWED_ORIGINS || "")
   .split(",")
   .map((v) => v.trim())
@@ -427,6 +437,7 @@ const dispatcher = createDispatcher({
   HOST,
   PORT,
   ADMIN_PASS_HASH,
+  ADMIN_PASSWORD_LOGIN_ENABLED,
   ALLOWED_ORIGINS,
   ADMIN_ATTEMPT_LIMIT,
   ADMIN_LOCKOUT_WINDOW_MS,
@@ -447,6 +458,10 @@ const dispatcher = createDispatcher({
   authorizeRequest,
   validateAdminToken,
   createAdminSession,
+  getAdminMfaStatus,
+  startAdminEmailOtp,
+  verifyAdminEmailOtp,
+  verifyAdminTotp,
   revokeAdminSession,
   listAdminSessions,
   revokeSessionById,
@@ -517,7 +532,7 @@ server.listen(PORT, HOST, () => {
     (e) => e.configured,
   ).length;
   console.log(
-    `[tradersapp-bff] listening on http://${HOST}:${PORT} (adminPasswordConfigured=${Boolean(ADMIN_PASS_HASH)}, aiProvidersConfigured=${aiConfigured})`,
+    `[tradersapp-bff] listening on http://${HOST}:${PORT} (adminPasswordLoginEnabled=${ADMIN_PASSWORD_LOGIN_ENABLED}, aiProvidersConfigured=${aiConfigured})`,
   );
 
   // Start Board Room cron jobs after server is listening

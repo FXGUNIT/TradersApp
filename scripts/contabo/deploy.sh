@@ -78,6 +78,8 @@ fi
 APP_USER="tradersapp"
 DEPLOY_ROOT="${APP_ROOT}/deploy/contabo"
 RUNTIME_ENV="${APP_ROOT}/runtime/.env.contabo"
+BACKUP_TOOLS="${APP_ROOT}/backup-tools"
+BACKUP_ROOT="/var/backups/tradersapp"
 GHCR_TOKEN=""
 
 if [ "${GHCR_TOKEN_STDIN}" = "1" ]; then
@@ -174,6 +176,27 @@ rsync -a --delete "${BUNDLE_ROOT}/deploy/contabo/" "${DEPLOY_ROOT}/"
 chown -R "${APP_USER}:${APP_USER}" "${DEPLOY_ROOT}"
 install -m 0600 -o "${APP_USER}" -g "${APP_USER}" "${ENV_FILE}" "${RUNTIME_ENV}"
 
+echo "[deploy] Installing backup tools..."
+install -d -m 0755 "${BACKUP_TOOLS}" "${BACKUP_TOOLS}/scripts" "${BACKUP_TOOLS}/ml-engine"
+if [ -d "${BUNDLE_ROOT}/scripts" ]; then
+  rsync -a --delete "${BUNDLE_ROOT}/scripts/" "${BACKUP_TOOLS}/scripts/"
+fi
+if [ -d "${BUNDLE_ROOT}/ml-engine/scripts" ]; then
+  install -d -m 0755 "${BACKUP_TOOLS}/ml-engine/scripts"
+  rsync -a --delete "${BUNDLE_ROOT}/ml-engine/scripts/" "${BACKUP_TOOLS}/ml-engine/scripts/"
+fi
+find "${BACKUP_TOOLS}" -type f -name "*.sh" -exec chmod 0755 {} \; 2>/dev/null || true
+
+if [ -f "${BUNDLE_ROOT}/source-snapshot.tgz" ]; then
+  echo "[deploy] Saving deployed source snapshot on VPS..."
+  install -d -m 0750 "${BACKUP_ROOT}/source"
+  SNAPSHOT_TAG="${IMAGE_TAG:-$(date -u +%Y%m%d%H%M%S)}"
+  SNAPSHOT_PATH="${BACKUP_ROOT}/source/source-${SNAPSHOT_TAG}.tgz"
+  install -m 0640 "${BUNDLE_ROOT}/source-snapshot.tgz" "${SNAPSHOT_PATH}"
+  ln -sfn "$(basename "${SNAPSHOT_PATH}")" "${BACKUP_ROOT}/source/source_latest.tgz"
+  ls -lh "${SNAPSHOT_PATH}" >&2
+fi
+
 if [ -n "${GHCR_USERNAME}" ] && [ -n "${GHCR_TOKEN}" ]; then
   echo "[deploy] Logging in to ghcr.io..."
   printf '%s' "${GHCR_TOKEN}" | run_as_app "docker login ghcr.io -u '${GHCR_USERNAME}' --password-stdin"
@@ -256,5 +279,18 @@ wait_for_https_host "edge route ${API_PUBLIC_HOST}" "${API_PUBLIC_HOST}" "/healt
 
 echo "[deploy] Capturing compose status..."
 run_as_app "${COMPOSE_CMD} ps" | tee "${APP_ROOT}/logs/compose-ps.log"
+
+if [ -x "${BACKUP_TOOLS}/scripts/contabo/install-backups.sh" ]; then
+  echo "[deploy] Enabling Contabo backup schedule..."
+  bash "${BACKUP_TOOLS}/scripts/contabo/install-backups.sh" \
+    --app-root "${APP_ROOT}" \
+    --backup-root "${BACKUP_ROOT}" \
+    --image-tag "${IMAGE_TAG:-}" \
+    --run-once || {
+      echo "[deploy] WARNING: backup schedule install or first backup reported warnings." >&2
+    }
+else
+  echo "[deploy] WARNING: backup installer not found; scheduled backups were not changed." >&2
+fi
 
 echo "[deploy] Complete."

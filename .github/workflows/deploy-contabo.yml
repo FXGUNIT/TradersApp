@@ -396,11 +396,19 @@ jobs:
           }
 
           mkdir -p .artifacts/contabo
-          tar -czf .artifacts/contabo/contabo-bundle.tgz deploy/contabo scripts/contabo
+          tar -czf .artifacts/contabo/contabo-bundle.tgz \
+            deploy/contabo \
+            scripts/contabo \
+            scripts/cron \
+            scripts/backup_redis.py \
+            scripts/backup_postgres.py \
+            ml-engine/scripts/backup_sqlite.py
+          git archive --format=tar.gz --output .artifacts/contabo/source-snapshot.tgz HEAD
 
           retry 3 ssh contabo-vps "rm -rf /tmp/tradersapp-contabo-release && mkdir -p /tmp/tradersapp-contabo-release"
           retry 3 scp .artifacts/contabo/contabo-bundle.tgz contabo-vps:/tmp/tradersapp-contabo-release/contabo-bundle.tgz
           retry 3 scp .artifacts/contabo/.env.contabo contabo-vps:/tmp/tradersapp-contabo-release/.env.contabo
+          retry 3 scp .artifacts/contabo/source-snapshot.tgz contabo-vps:/tmp/tradersapp-contabo-release/source-snapshot.tgz
 
       - name: Bootstrap and deploy on Contabo
         shell: bash
