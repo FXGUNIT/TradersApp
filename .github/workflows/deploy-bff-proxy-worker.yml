@@ -9,6 +9,7 @@ permissions:
 
 env:
   CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  GH_TOKEN: ${{ github.token }}
 
 jobs:
   setup-and-deploy:
