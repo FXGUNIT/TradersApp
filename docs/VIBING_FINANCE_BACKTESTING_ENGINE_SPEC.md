@@ -1539,6 +1539,297 @@ Adapter rule:
 
 - Adapters can add capability, but they cannot weaken deterministic validation, proof lineage, or privacy defaults.
 
+### 20.12 Runtime Surfaces - Final Decision
+
+The product has four runtime surfaces. They are not interchangeable; each has a clear job.
+
+| Surface | Name | Purpose | MVP status |
+|---|---|---|---|
+| Browser workbench | Vibing Finance Workbench | Primary user experience, local CSV upload, visible agent loop, reports, proof, memory | Required |
+| Built-in CLI | `vibing` | Repeatable runs, batch jobs, artifact verification, local automation, CI/CD, unattended execution | Required after browser MVP |
+| Local runner service | `vibing serve` | Long-running bridge between browser workbench and local machine tools | Phase 2 |
+| Browser automation tool | `vibing browser ...` | Playwright-backed smoke tests, screenshots, local UI verification, optional web inspection | Phase 2 |
+
+Decisions:
+
+- The browser workbench is the first product surface.
+- The CLI is the canonical automation surface.
+- The local runner service is a thin bridge over the same CLI/tool registry.
+- Browser automation is a tool exposed through the CLI/runner, not a separate agent brain.
+- There is no mandatory hosted compute path.
+- There is no shell access directly inside a normal web browser tab.
+- Shell, filesystem, MCP, and Playwright powers require the CLI/local runner/desktop environment.
+- All surfaces write the same artifact schema, tool event schema, report schema, and proof block schema.
+
+### 20.13 Browser Workbench Decision
+
+The browser workbench is the private, hidden, admin-gated page inside TradersApp.
+
+Route/screen decision:
+
+```text
+screen === "vibingFinance"
+feature flag === VITE_ENABLE_VIBING_FINANCE
+default production visibility === hidden
+```
+
+Browser responsibilities:
+
+- Upload CSV through user file picker.
+- Hash raw file bytes locally.
+- Parse, validate, and backtest small/medium datasets in Web Workers.
+- Store structured artifacts in IndexedDB.
+- Render transcript, run plan, tool events, report, proof, and memory.
+- Configure BYOK/local provider profiles.
+- Export/import run packages.
+- Start local runner jobs when `vibing serve` is connected.
+- Show every action in the visible work loop.
+
+Browser non-responsibilities:
+
+- No direct PowerShell/Bash execution.
+- No unrestricted filesystem access.
+- No hidden server upload of CSV.
+- No required paid LLM call.
+- No production training or shared model promotion.
+- No final numerical claims from model text.
+
+Browser storage decision:
+
+- IndexedDB is the local source of browser state.
+- Raw CSV storage is optional; metadata/hash storage is required.
+- Reports, proof blocks, run plans, tool events, and memory capsules are stored by default.
+- Export packages are ZIP/JSON bundles later; MVP can use JSON files.
+
+Browser worker decision:
+
+- Use one dedicated worker for CSV parse/validation/backtest in MVP.
+- Move to worker pool only after the single-worker path is stable.
+- Worker messages use typed command/event envelopes.
+- Worker outputs are artifact refs plus compact summaries.
+
+### 20.14 Built-In CLI Decision
+
+The built-in CLI is named `vibing`.
+
+Initial implementation path:
+
+```text
+scripts/vibing-finance/cli.mjs
+```
+
+Later package entry:
+
+```json
+{
+  "bin": {
+    "vibing": "scripts/vibing-finance/cli.mjs"
+  }
+}
+```
+
+CLI principles:
+
+- JSON-first.
+- Scriptable.
+- Deterministic by default.
+- Works without a browser.
+- Works without an LLM.
+- Writes the same artifacts as the browser.
+- Can run in local terminal, VS Code terminal, CI, Docker, or VPS.
+- Does not require global install during MVP; use `node scripts/vibing-finance/cli.mjs ...` first.
+
+Initial commands:
+
+```text
+vibing doctor
+vibing init --workspace .vibing
+vibing validate-data --csv data.csv --asset MNQ --out artifacts/vibing-finance/dataset.json
+vibing plan --goal "..." --dataset dataset.json --strategy strategy.json --out plan.json
+vibing run --csv data.csv --strategy strategy.json --asset MNQ --out artifacts/vibing-finance/run.json
+vibing report --run run.json --out report.md
+vibing proof append --run run.json --report report.md --out proof.json
+vibing proof verify --proof proof.json
+vibing export --run run.json --out run-package.json
+vibing import --package run-package.json
+vibing memory consolidate --run run.json --out memory-capsule.json
+vibing provider test --profile local-ollama
+vibing watch --plan plan.json --budget budget.json
+vibing serve --host 127.0.0.1 --port 8787
+```
+
+Output modes:
+
+```text
+--json              machine-readable command result
+--events events.ndjson
+--out path
+--workspace path
+--no-llm
+--provider profile_id
+--max-runtime-seconds N
+--max-cost-usd N
+--allow-tool tool_name
+--deny-tool tool_name
+```
+
+CLI exit codes:
+
+| Code | Meaning |
+|---|---|
+| 0 | Success |
+| 1 | Validation or usage error |
+| 2 | Data-quality block |
+| 3 | Strategy-spec block |
+| 4 | Tool/runtime failure |
+| 5 | Policy or budget stop |
+| 6 | User cancellation |
+| 7 | Proof verification failure |
+
+CLI artifact workspace:
+
+```text
+.vibing/
+  settings.json
+  providers.json
+  memory/
+  proof/
+artifacts/vibing-finance/
+  datasets/
+  runs/
+  reports/
+  exports/
+  logs/
+```
+
+CLI security:
+
+- Never print secrets.
+- Never include raw CSV rows in debug exports unless explicitly requested.
+- Default network access is off for deterministic backtest commands.
+- Shell execution requires an explicit command/tool invocation from `vibing watch`, `vibing serve`, or developer/operator mode.
+- Destructive filesystem actions are not part of the MVP CLI.
+
+### 20.15 Shared Core Layout Decision
+
+The deterministic engine must not be trapped inside React components.
+
+Final module split:
+
+```text
+src/features/vibing-finance/ui/*
+src/features/vibing-finance/core/*
+src/features/vibing-finance/agent/*
+src/features/vibing-finance/storage/*
+src/features/vibing-finance/workers/*
+scripts/vibing-finance/*
+```
+
+Pure core modules:
+
+```text
+core/strategySchema.js
+core/csvIngestion.js
+core/sessionCalendar.js
+core/vwap.js
+core/inventoryDetector.js
+core/structureDetector.js
+core/backtestEngine.js
+core/riskMetrics.js
+core/reportBuilder.js
+core/proofChain.js
+core/artifactSchemas.js
+core/eventSchemas.js
+```
+
+Rules:
+
+- Browser worker imports `core/*`.
+- CLI imports `core/*`.
+- Local runner imports `core/*`.
+- UI imports UI adapters, not engine internals directly where avoidable.
+- Core modules are pure or explicitly declare side effects.
+- Core modules never read environment variables or provider keys.
+
+### 20.16 Local Runner Service Decision
+
+`vibing serve` is a localhost-only service that lets the browser workbench use local power safely.
+
+Default binding:
+
+```text
+host: 127.0.0.1
+port: 8787
+protocol: HTTP + Server-Sent Events for progress
+```
+
+Endpoints:
+
+```text
+GET  /health
+GET  /capabilities
+POST /runs
+GET  /runs/:id/events
+POST /runs/:id/cancel
+GET  /artifacts/:ref
+POST /providers/test
+POST /memory/consolidate
+```
+
+Connection rules:
+
+- Browser must show when local runner is connected.
+- Runner must advertise capabilities before use.
+- Browser sends run packages, not hidden arbitrary commands.
+- Runner returns typed events and artifact refs.
+- Runner rejects requests outside workspace scope.
+- MVP can skip this service and use CLI export/import first.
+
+### 20.17 Built-In Browser Automation Decision
+
+The built-in browser automation layer uses Playwright because this repo already has Playwright test infrastructure.
+
+Purpose:
+
+- Verify the Vibing Finance workbench renders.
+- Capture screenshots for debug packages.
+- Run local smoke tests.
+- Inspect local report pages.
+- Later, optionally inspect public documentation pages when the user explicitly requests it.
+
+Commands:
+
+```text
+vibing browser smoke --url http://localhost:5173 --out artifacts/vibing-finance/browser-smoke.json
+vibing browser screenshot --url http://localhost:5173 --out artifacts/vibing-finance/screenshots/workbench.png
+vibing browser inspect --url http://localhost:5173 --selector "[data-testid=vibing-workbench]"
+```
+
+Rules:
+
+- Browser automation is disabled in hosted production.
+- Default allowed origins are `localhost`, `127.0.0.1`, and explicitly allowed docs/reference URLs.
+- It must not be used for scraping private sites or bypassing auth.
+- Screenshots are artifacts and may contain sensitive data; redact or exclude from exports by default.
+- Browser automation emits typed tool events.
+
+### 20.18 Desktop App Decision
+
+No custom desktop app in MVP.
+
+Rationale:
+
+- Browser workbench plus CLI covers the first useful product.
+- Desktop packaging adds update, signing, sandboxing, and support burden.
+- If needed later, wrap the browser workbench and local runner in Tauri or Electron only after the browser/CLI protocol is stable.
+
+Desktop later must:
+
+- Reuse the same `core/*` engine.
+- Reuse `vibing serve` protocol.
+- Store artifacts in the same workspace layout.
+- Provide native file access only through the same tool registry and policy guard.
+
 ---
 
 ## 21. Data Pipeline Architecture
@@ -2781,23 +3072,48 @@ Release rules:
 
 ---
 
-## 29. Local Python Runner Architecture
+## 29. CLI And Local Python Runner Architecture
 
-Browser mode is the MVP. Local runner is the escape hatch for large files.
+Browser mode is the MVP. The built-in `vibing` CLI is the automation surface. Python is an optional execution engine behind the CLI for larger datasets and parity checks.
 
-Proposed local command later:
+Primary local command:
+
+```text
+node scripts/vibing-finance/cli.mjs run --csv path/to/file.csv --asset MNQ --strategy strategy.json --out artifacts/vibing-finance/run.json
+```
+
+Later shorthand after adding a package `bin` entry:
+
+```text
+vibing run --csv path/to/file.csv --asset MNQ --strategy strategy.json --out artifacts/vibing-finance/run.json
+```
+
+Optional Python engine command behind the CLI:
 
 ```text
 python scripts/vibing_finance/run_backtest.py --csv path/to/file.csv --asset MNQ --out artifacts/vibing-finance/run.json
 ```
 
-Local runner responsibilities:
+CLI responsibilities:
+
+- Validate inputs.
+- Build run package.
+- Select JS worker-compatible engine or Python engine.
+- Run deterministic backtest.
+- Write event log.
+- Write content-addressed artifacts.
+- Generate report and proof block.
+- Return stable exit code.
+- Support CI and unattended local jobs.
+
+Python runner responsibilities:
 
 - Reuse the same strategy spec.
 - Use pandas/NumPy for larger datasets.
 - Optionally integrate with existing `ml-engine/backtesting/rig.py`.
 - Produce the same report JSON schema as browser mode.
 - Produce the same proof block format.
+- Never become a separate product surface with incompatible output.
 
 This keeps hosting free because the user's machine performs heavy work.
 
@@ -2912,10 +3228,13 @@ Parity requirement:
 - Browser UI smoke test.
 - Cross-check with Python runner later.
 
-### A8 - Local Runner
+### A8 - Built-In CLI And Local Runner
 
-- Add optional Python CLI after browser MVP works.
-- Match report schema.
+- Add `scripts/vibing-finance/cli.mjs`.
+- Implement `vibing doctor`, `validate-data`, `run`, `report`, `proof verify`, and `export`.
+- Use the same `core/*` deterministic modules as the browser worker.
+- Add optional Python engine only after JS/browser parity is stable.
+- Match report, artifact, event, and proof schemas across browser, CLI, and Python.
 
 ### A9 - Optional Local LLM
 
