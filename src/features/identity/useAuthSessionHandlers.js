@@ -260,6 +260,14 @@ export function useAuthSessionHandlers({
     ],
   );
 
+  // Handles the result of signInWithRedirect after OAuth redirect returns to the page
+  const handleGoogleRedirectResult = useCallback(
+    async (authenticatedUser, pendingFormData = null) => {
+      await handleStructuredGoogleAuth(pendingFormData, authenticatedUser);
+    },
+    [handleStructuredGoogleAuth],
+  );
+
   const handleBackToLoginFromSignup = useCallback(async () => {
     clearPendingGoogleSignup();
     setGoogleUser(null);
