@@ -2196,6 +2196,9 @@ Important boundary:
 - Do not copy Claude branding, logos, proprietary names, exact colors, or exact UI assets.
 - The product name remains Vibing Finance inside TradersApp.
 - The interface should read as "terminal research agent" rather than "Claude clone".
+- Do not download, copy, inspect, or depend on leaked/proprietary Claude, Codex, or other private backend/frontend source code.
+- Use a clean-room approach: observe public product behavior, use official documentation, study permissively licensed open-source projects, and implement original code inside TradersApp.
+- Any third-party reference used for implementation must have a clear license or be official public documentation.
 
 Claude Code-style qualities to preserve:
 
