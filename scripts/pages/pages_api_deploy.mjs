@@ -54,8 +54,8 @@ async function cfFetch(path, options = {}) {
   const res = await fetch(url, {
     ...options,
     headers: {
+      Authorization: `Bearer ${token}`,
       "X-Auth-Email": email,
-      "X-Auth-Key":   token,
       ...(options.headers || {}),
     },
   });
