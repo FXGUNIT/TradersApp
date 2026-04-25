@@ -7,7 +7,7 @@
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-26 04:15`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-26 04:18`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Master Backlog  49.0%  [############------------]
@@ -43,6 +43,22 @@ How to read this:
 | P27 - Vibing Finance Backtesting Engine - Hidden MVP + Post-MVP Automation | [6/29] |  20.7% | IN PROGRESS |
 
 <!-- master-progress:end -->
+
+---
+
+## MASTER TO-DO LIST RULES
+
+- This file is the single master backlog for active repo work.
+- The generated progress dashboard above is the source of truth for task counts, phase status, and progress bars.
+- Do not manually edit anything between `<!-- master-progress:start -->` and `<!-- master-progress:end -->`; run `python scripts/update_todo_progress.py --once` after changing checkbox tasks.
+- Use `[ ]` for todo, `[x]` for done, and `[!]` for blocked tasks.
+- Add new implementation work as a numbered Stage P phase unless it clearly belongs to Stage S or ML Research.
+- Keep completed production history in place; append new phases instead of replacing older records.
+- Every major planning/spec task must point to its canonical document.
+- Every implementation task must name the milestone, target files/modules, and required verification when known.
+- Blocked tasks must say exactly what unblocks them.
+- Vibing Finance work is tracked under `P27`; the canonical technical spec remains `docs/VIBING_FINANCE_BACKTESTING_ENGINE_SPEC.md`.
+- The active open spec will not show this dashboard unless this file is opened directly.
 
 ---
 
@@ -260,7 +276,7 @@ All Stages S1–S6 and ML1–ML8 are background. Implement carefully, update liv
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-26 04:15`  -  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-26 04:18`  -  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Stage P Backlog  60.0%  [##############----------]

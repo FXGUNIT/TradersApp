@@ -3,6 +3,191 @@ import ThemeSwitcher from "../components/ThemeSwitcher.jsx";
 import AiEnginesStatus from "../components/AiEnginesStatus.jsx";
 import { getHubContent } from "../services/clients/ContentClient.js";
 
+// ─── Inline SVG Chart Components ─────────────────────────────────────────────
+
+function FounderStoryChart() {
+  const bars = [30, 55, 45, 70, 60, 85, 75];
+  const max = Math.max(...bars);
+  const W = 120, H = 52;
+  const barW = W / bars.length - 4;
+  return (
+    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ overflow: "visible" }}>
+      {bars.map((h, i) => {
+        const bh = (h / max) * H * 0.9;
+        const x = i * (W / bars.length) + 2;
+        const y = H - bh;
+        return (
+          <rect
+            key={i} x={x} y={y} width={barW} height={bh}
+            rx={3}
+            fill={i === bars.length - 1 ? "#d4a520" : "rgba(212,165,32,0.35)"}
+          >
+            <animate attributeName="height" from="0" to={bh} dur="0.6s" begin={`${i * 0.07}s`} fill="freeze" />
+            <animate attributeName="y" from={H} to={y} dur="0.6s" begin={`${i * 0.07}s`} fill="freeze" />
+          </rect>
+        );
+      })}
+      <line x1={0} y1={H + 2} x2={W} y2={H + 2} stroke="rgba(212,165,32,0.2)" strokeWidth={1} />
+    </svg>
+  );
+}
+
+function ProductVisionChart() {
+  const data = [
+    { label: "Signals", value: 22, color: "rgba(239,68,68,0.5)" },
+    { label: "Consensus", value: 78, color: "#4ade80" },
+    { label: "Governance", value: 91, color: "#60a5fa" },
+    { label: "Self-Improve", value: 85, color: "#d4a520" },
+  ];
+  const W = 120, H = 52;
+  return (
+    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
+      {data.map((d, i) => {
+        const bx = 4, by = i * (H / data.length) + 4;
+        const bw = (d.value / 100) * (W - 8);
+        const bh = H / data.length - 6;
+        return (
+          <g key={i}>
+            <rect x={bx} y={by} width={bw} height={bh} rx={3} fill={d.color}>
+              <animate attributeName="width" from="0" to={bw} dur="0.7s" begin={`${i * 0.1}s`} fill="freeze" />
+            </rect>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+function ArchitectureChart() {
+  const nodes = [
+    { x: 60, y: 18, r: 8, label: "BFF" },
+    { x: 18, y: 44, r: 6, label: "ML" },
+    { x: 60, y: 44, r: 6, label: "Telegram" },
+    { x: 102, y: 44, r: 6, label: "Firebase" },
+  ];
+  const W = 120, H = 60;
+  const cx = 60, cy = 30;
+  return (
+    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
+      {nodes.filter(n => n.label !== "BFF").map((n, i) => (
+        <line
+          key={i} x1={cx} y1={cy} x2={n.x} y2={n.y}
+          stroke="rgba(212,165,32,0.3)" strokeWidth={1.5}
+          strokeDasharray="3,3"
+        >
+          <animate attributeName="stroke-dashoffset" from="100" to="0" dur="0.8s" fill="freeze" />
+        </line>
+      ))}
+      {nodes.map((n, i) => (
+        <g key={i}>
+          <circle cx={n.x} cy={n.y} r={n.r + 3} fill="none" stroke="rgba(212,165,32,0.2)" strokeWidth={1} />
+          <circle cx={n.x} cy={n.y} r={n.r} fill={n.label === "BFF" ? "#d4a520" : "rgba(212,165,32,0.2)"} stroke="#d4a520" strokeWidth={1.5} />
+          <animate attributeName="opacity" from="0" to="1" dur="0.4s" begin={`${i * 0.12}s`} fill="freeze" />
+        </g>
+      ))}
+    </svg>
+  );
+}
+
+function AnimatedLineChart() {
+  const points = [
+    [0, 42], [15, 38], [30, 45], [45, 28], [60, 35], [75, 18], [90, 22], [105, 12], [120, 8]
+  ];
+  const maxY = 50, H = 36, W = 120;
+  const pathD = points.map(([x, y], i) => `${i === 0 ? "M" : "L"} ${x} ${H - (y / maxY) * H}`).join(" ");
+  const fillD = pathD + ` L ${W} ${H} L 0 ${H} Z`;
+  return (
+    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
+      <defs>
+        <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#d4a520" stopOpacity={0.4} />
+          <stop offset="100%" stopColor="#d4a520" stopOpacity={0} />
+        </linearGradient>
+      </defs>
+      <path d={fillD} fill="url(#areaGrad)" />
+      <path d={pathD} fill="none" stroke="#d4a520" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"
+        strokeDasharray="300" strokeDashoffset="300">
+        <animate attributeName="stroke-dashoffset" from="300" to="0" dur="1.2s" fill="freeze" />
+      </path>
+      {points.filter((_, i) => i % 3 === 0).map(([x, y], i) => (
+        <circle key={i} cx={x} cy={H - (y / maxY) * H} r={2.5} fill="#d4a520">
+          <animate attributeName="opacity" from="0" to="1" dur="0.3s" begin={`${0.8 + i * 0.15}s`} fill="freeze" />
+        </circle>
+      ))}
+    </svg>
+  );
+}
+
+function MiniRadarChart() {
+  const arms = 5;
+  const R = 22;
+  const cx = 30, cy = 26;
+  const values = [0.9, 0.6, 0.75, 0.85, 0.7];
+  const angles = values.map((_, i) => (i * 2 * Math.PI) / arms - Math.PI / 2);
+  const pts = values.map((v, i) => ({
+    x: cx + R * v * Math.cos(angles[i]),
+    y: cy + R * v * Math.sin(angles[i]),
+  }));
+  const poly = pts.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ") + " Z";
+  const polyFill = poly.replace("M", "M") + ` L ${cx} ${cy} Z`;
+  return (
+    <svg width={60} height={52} viewBox="0 0 60 52">
+      {values.map((_, i) => {
+        const ax = cx + R * Math.cos(angles[i]);
+        const ay = cy + R * Math.sin(angles[i]);
+        return <line key={i} x1={cx} y1={cy} x2={ax} y2={ay} stroke="rgba(212,165,32,0.2)" strokeWidth={1} />;
+      })}
+      {[0.33, 0.66, 1].map((r, i) => (
+        <polygon
+          key={i}
+          points={angles.map(a => `${cx + R * r * Math.cos(a)},${cy + R * r * Math.sin(a)}`).join(" ")}
+          fill="none" stroke="rgba(212,165,32,0.15)" strokeWidth={1}
+        />
+      ))}
+      <polygon
+        points={pts.map(p => `${p.x},${p.y}`).join(" ")}
+        fill="rgba(212,165,32,0.2)" stroke="#d4a520" strokeWidth={1.5}
+      />
+      <circle cx={cx} cy={cy} r={3} fill="#d4a520" />
+    </svg>
+  );
+}
+
+// ─── Blog Post Data ────────────────────────────────────────────────────────────
+
+const BLOG_POSTS = [
+  {
+    id: "founder-story",
+    url: "/blog/founder-story/",
+    eyebrow: "Founder's Story",
+    title: "From BCCI Dugouts to Building the World's Most Advanced Trading AI",
+    excerpt: "I played cricket at BCCI and UPCA level. I've been a retail trader staring at MNQ and Nifty charts alone. I know exactly what institutional traders have that retail traders don't. So I built it.",
+    tags: ["EDGE", "INSTITUTIONAL", "RETAIL"],
+    chart: <FounderStoryChart />,
+    stat: "15 Years of Cricket + 7 Years of Sales = This",
+  },
+  {
+    id: "product-vision",
+    url: "/blog/product-vision/",
+    eyebrow: "Product Vision",
+    title: "Why 'Signals' Was Never the Point — And What We Actually Built Instead",
+    excerpt: "A signals service tells you what to trade. Traders Regiment tells you what the institutional quant desk thinks — and why. Here's the complete product vision.",
+    tags: ["QUANT", "ALPHA", "HEDGE FUND"],
+    chart: <ProductVisionChart />,
+    stat: "78/100 Consensus Score vs 22/100 Signal Service",
+  },
+  {
+    id: "architecture",
+    url: "/blog/architecture/",
+    eyebrow: "Technical Deep Dive",
+    title: "How We Built a Self-Improving AI That Thinks Like a Quant Team",
+    excerpt: "12 AI models voting on every decision. A Watchtower that self-corrects. A Board Room that governs every signal. Here's the complete architecture.",
+    tags: ["MACHINE LEARNING", "SYSTEM", "SELF-IMPROVING"],
+    chart: <ArchitectureChart />,
+    stat: "12 Models · Board Room · Watchtower · Self-Improving",
+  },
+];
+
 export default function RegimentHub({
   onNavigate,
   profile,
