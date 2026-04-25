@@ -1805,7 +1805,601 @@ Parity requirement:
 
 ---
 
-## 31. Free-Lifetime Risk Register
+## 31. Deep Execution Plan
+
+This section turns the architecture into an executable build sequence. The rule is simple: do not build clever ML, public blockchain, or strategy expansion until the narrow deterministic MVP can ingest CSV, detect setups, simulate trades, and generate a strict report.
+
+### 31.1 Planning Objective
+
+Build the first usable private version in this order:
+
+1. Hidden admin page.
+2. CSV upload and data-quality check.
+3. Fixed strategy spec.
+4. Deterministic backtest worker.
+5. Risk report.
+6. Local proof chain.
+7. Agent export.
+8. Python parity runner later.
+
+### 31.2 Critical Path
+
+```text
+Feature flag/admin gate
+  -> hidden screen shell
+  -> CSV parser
+  -> data validation
+  -> session calendar
+  -> IB/VWAP feature computation
+  -> inventory + structure + pullback detectors
+  -> execution simulator
+  -> risk metrics
+  -> report builder
+  -> proof chain
+  -> agent notes export
+```
+
+Anything not on this path is postponed.
+
+### 31.3 Milestone Gates
+
+| Milestone | Name | Deliverable | Blocks |
+|---|---|---|---|
+| M0 | Spec frozen for MVP | This document has all MVP defaults | All code |
+| M1 | Hidden shell | Admin-only screen loads behind flag | CSV work |
+| M2 | CSV intake | Validated rows + quality score | Strategy engine |
+| M3 | Feature computation | Session, IB, VWAP, swings | Setup detection |
+| M4 | Setup detector | Caught buyers/sellers + CHoCH + pullback | Simulation |
+| M5 | Execution simulator | Trade ledger and equity curve | Report |
+| M6 | Report | Institutional report and verdict | Proof |
+| M7 | Proof chain | Signed local proof block | Agent export |
+| M8 | Agent export | Compact JSON for Codex/Claude review | Private alpha |
+| M9 | Python parity | Optional local runner matching browser output | Scale |
+
+### 31.4 Non-Negotiable MVP Constraints
+
+- Admin-only.
+- CSV-only.
+- Browser-first.
+- No paid API requirement.
+- No server upload of private CSV.
+- No public launch.
+- No public blockchain dependency.
+- No LLM-generated metrics.
+- No strategy expansion until M6 is working.
+- No "deploy candidate" verdict until at least 100 trades or explicit research override.
+
+---
+
+## 32. Work Package Breakdown
+
+### 32.1 M1 - Hidden Admin Shell
+
+Files:
+
+```text
+src/features/vibing-finance/VibingFinanceScreen.jsx
+src/features/vibing-finance/vibingFinance.css
+src/features/vibing-finance/vibingFinanceFlags.js
+src/features/shell/AppScreenRegistry.jsx
+src/features/hub-content/RegimentHubScreen.jsx
+src/config/features.js
+```
+
+Tasks:
+
+- Add `VITE_ENABLE_VIBING_FINANCE`.
+- Add `isVibingFinanceEnabled()` helper.
+- Add lazy-loaded screen.
+- Add admin-only access check.
+- Hide route from non-admin users.
+- Add first layout: upload zone, strategy panel, run panel, report panel.
+
+Acceptance:
+
+- Flag off: feature is invisible.
+- Flag on but non-admin: feature remains inaccessible.
+- Flag on and admin: screen loads.
+- No network request is required to render the empty page.
+
+### 32.2 M2 - CSV Intake
+
+Files:
+
+```text
+src/features/vibing-finance/csvIngestion.js
+src/features/vibing-finance/dataQuality.js
+src/features/vibing-finance/storage.js
+src/features/vibing-finance/__tests__/csvIngestion.test.js
+```
+
+Tasks:
+
+- Parse required columns: `timestamp,open,high,low,close,volume`.
+- Accept optional columns: `symbol,timezone,session,contract,point_value,tick_size`.
+- Normalize headers case-insensitively.
+- Infer symbol from file name or user selection if missing.
+- Infer timezone by asset if missing.
+- Infer timeframe from timestamp deltas.
+- Reject invalid OHLC rows.
+- Count missing bars.
+- Compute data quality score.
+- Store parsed dataset metadata in IndexedDB.
+
+Acceptance:
+
+- Good CSV produces normalized rows.
+- Missing column produces clear error.
+- Duplicate timestamp produces clear error.
+- Invalid OHLC produces row-level error.
+- Missing volume produces warning, not crash.
+- No CSV row is sent to server.
+
+### 32.3 M3 - Session and Feature Computation
+
+Files:
+
+```text
+src/features/vibing-finance/sessionCalendar.js
+src/features/vibing-finance/vwap.js
+src/features/vibing-finance/swings.js
+src/features/vibing-finance/__tests__/sessionCalendar.test.js
+src/features/vibing-finance/__tests__/vwap.test.js
+```
+
+Tasks:
+
+- Tag each row by session date.
+- Apply NIFTY session open `09:15 Asia/Kolkata`.
+- Apply MNQ New York session open `09:30 America/New_York`.
+- Compute IB high/low for first 60 minutes.
+- Reject pre-IB entries.
+- Compute session VWAP incrementally.
+- Compute 3-candle swing levels.
+
+Acceptance:
+
+- NIFTY 09:15-10:15 rows produce correct IB.
+- MNQ 09:30-10:30 rows produce correct IB.
+- VWAP resets at session open.
+- Multi-day CSV produces separate session features per day.
+
+### 32.4 M4 - Setup Detection
+
+Files:
+
+```text
+src/features/vibing-finance/inventoryDetector.js
+src/features/vibing-finance/structureDetector.js
+src/features/vibing-finance/pullbackDetector.js
+src/features/vibing-finance/setupDetector.js
+src/features/vibing-finance/__tests__/inventoryDetector.test.js
+src/features/vibing-finance/__tests__/structureDetector.test.js
+src/features/vibing-finance/__tests__/pullbackDetector.test.js
+```
+
+Tasks:
+
+- Detect caught sellers after sweep below IB low and reclaim within 2 candles.
+- Detect caught buyers after sweep above IB high and reclaim within 2 candles.
+- Confirm bullish structure change above prior 3-candle high and VWAP.
+- Confirm bearish structure change below prior 3-candle low and VWAP.
+- Detect valid pullback toward VWAP or 33%-66% impulse retrace.
+- Trigger long/short entry after pullback confirmation.
+- Emit reason codes for every accepted or rejected setup.
+
+Acceptance:
+
+- Fixture with caught sellers emits one long setup.
+- Fixture with caught buyers emits one short setup.
+- Failed reclaim emits no setup.
+- Missing pullback emits no setup.
+- Ambiguous setup is skipped, not guessed.
+
+### 32.5 M5 - Execution Simulator
+
+Files:
+
+```text
+src/features/vibing-finance/backtestEngine.js
+src/features/vibing-finance/fillPolicy.js
+src/features/vibing-finance/positionSizing.js
+src/features/vibing-finance/workers/backtest.worker.js
+src/features/vibing-finance/__tests__/fillPolicy.test.js
+src/features/vibing-finance/__tests__/positionSizing.test.js
+src/features/vibing-finance/__tests__/backtestEngine.test.js
+```
+
+Tasks:
+
+- Run simulation in Web Worker.
+- Size risk at 0.2% account equity.
+- Use 12-point stop, 15-point TP1, 45-point TP2.
+- Close 50% at TP1.
+- Move remaining stop to breakeven after TP1.
+- Close remainder at TP2.
+- Apply conservative intrabar fill policy.
+- Track cash/equity.
+- Emit trade ledger and equity curve.
+
+Acceptance:
+
+- Position size never exceeds 0.2% defined risk.
+- If calculated size is below 1, trade is skipped.
+- Same-candle stop/target ambiguity resolves conservatively.
+- TP1 moves stop to breakeven.
+- Worker can be cancelled.
+
+### 32.6 M6 - Report Builder
+
+Files:
+
+```text
+src/features/vibing-finance/riskMetrics.js
+src/features/vibing-finance/reportBuilder.js
+src/features/vibing-finance/verdictEngine.js
+src/features/vibing-finance/__tests__/riskMetrics.test.js
+src/features/vibing-finance/__tests__/verdictEngine.test.js
+```
+
+Tasks:
+
+- Calculate trade count, win rate, expectancy R, net PnL, drawdown, profit factor.
+- Calculate TP1/TP2 hit rates.
+- Separate long/short and asset breakdown.
+- Include data-quality caveats.
+- Include conservative-fill caveats.
+- Generate verdict.
+- Generate "what would break live" section.
+- Generate next experiment suggestions.
+
+Acceptance:
+
+- Report is useful when there are trades.
+- Report is useful when there are no trades.
+- Weak evidence is not overpromoted.
+- Metrics match trade ledger.
+
+### 32.7 M7 - Local Proof Chain
+
+Files:
+
+```text
+src/features/vibing-finance/proofChain.js
+src/features/vibing-finance/canonicalJson.js
+src/features/vibing-finance/hashUtils.js
+src/features/vibing-finance/__tests__/proofChain.test.js
+```
+
+Tasks:
+
+- Canonicalize JSON.
+- Hash dataset metadata.
+- Hash strategy spec.
+- Hash trade ledger.
+- Hash equity curve.
+- Hash metrics/report.
+- Build Merkle root.
+- Append proof block.
+- Sign proof block with browser key if available.
+- Export proof block with report.
+
+Acceptance:
+
+- Same input produces same hash.
+- Modified report changes proof root.
+- Proof chain links previous block hash.
+- Report can be verified offline.
+
+### 32.8 M8 - Agent Notes Export
+
+Files:
+
+```text
+src/features/vibing-finance/agentExport.js
+src/features/vibing-finance/__tests__/agentExport.test.js
+```
+
+Tasks:
+
+- Create compact JSON for Codex/Claude.
+- Include strategy spec.
+- Include dataset metadata only, not raw rows.
+- Include metrics.
+- Include setup counts and reason-code counts.
+- Include proof hashes.
+- Include open questions and next experiments.
+
+Acceptance:
+
+- Export is small enough to paste into an agent.
+- Export contains no raw CSV rows.
+- Export lets agent review the run without guessing.
+
+---
+
+## 33. Runtime State Machines
+
+### 33.1 Dataset State
+
+```text
+empty
+  -> selected
+  -> parsing
+  -> parsed
+  -> validating
+  -> valid
+  -> feature_ready
+  -> rejected
+```
+
+Dataset rejected reasons:
+
+- Missing required column.
+- Invalid OHLC.
+- Invalid timestamp.
+- Duplicate timestamp.
+- Quality score too low.
+- Unsupported asset.
+
+### 33.2 Backtest Job State
+
+```text
+idle
+  -> queued
+  -> validating_inputs
+  -> computing_features
+  -> detecting_setups
+  -> simulating
+  -> computing_metrics
+  -> building_report
+  -> proving
+  -> completed
+  -> failed
+  -> cancelled
+```
+
+Failure must include:
+
+```json
+{
+  "stage": "detecting_setups",
+  "code": "NO_IB_WINDOW",
+  "message": "No complete 60-minute IB window found for MNQ on 2026-04-24.",
+  "recoverable": true
+}
+```
+
+### 33.3 Report State
+
+```text
+none
+  -> draft
+  -> complete
+  -> proof_attached
+  -> exported
+```
+
+---
+
+## 34. UI Planning Details
+
+### 34.1 Screen Zones
+
+Top bar:
+
+- Feature name.
+- Admin-only badge.
+- Local-only privacy badge.
+- Data status.
+- Run status.
+
+Left pane:
+
+- CSV upload.
+- Dataset quality.
+- Asset selector.
+- Account size.
+- Strategy defaults.
+
+Center pane:
+
+- Chat/spec conversation.
+- Strategy spec preview.
+- Run button.
+- Progress timeline.
+
+Right pane:
+
+- Key metrics.
+- Verdict.
+- Proof block.
+- Agent notes export.
+
+Bottom/full-width pane:
+
+- Detailed report.
+- Trade ledger.
+- Equity curve.
+- Drawdown curve.
+- Setup reason-code table.
+
+### 34.2 First MVP UI Copy
+
+Use concise in-app labels:
+
+```text
+Upload CSV
+Validate Data
+Run Backtest
+Export Report
+Agent Notes
+Proof Block
+```
+
+Avoid marketing copy. This is a tool, not a landing page.
+
+### 34.3 Empty States
+
+No CSV:
+
+```text
+Upload a 5-minute MNQ or NIFTY CSV to start.
+```
+
+No setups:
+
+```text
+No eligible post-IB inventory setups were found under the current rules.
+```
+
+Low quality:
+
+```text
+Data quality is too low for a decision-grade report.
+```
+
+### 34.4 Admin Safety Controls
+
+- Cancel run.
+- Clear local data.
+- Export proof chain.
+- Reset proof key.
+- Toggle conservative fill explanation.
+- Show raw strategy JSON.
+
+---
+
+## 35. Test Plan
+
+### 35.1 Unit Test Matrix
+
+| Module | Must Test |
+|---|---|
+| CSV parser | required columns, optional columns, bad rows, duplicate timestamps |
+| Data quality | missing bars, invalid OHLC, no volume, timezone inference |
+| Session calendar | NIFTY IB, MNQ IB, multi-day sessions |
+| VWAP | reset, cumulative formula, no-volume fallback |
+| Inventory detector | caught buyers, caught sellers, failed sweeps |
+| Structure detector | bullish CHoCH, bearish CHoCH, VWAP confirmation |
+| Pullback detector | valid retrace, invalid retrace, no pullback |
+| Fill policy | same-candle ambiguity, TP1 then BE, TP2 |
+| Position sizing | 0.2% cap, integer skip, point value |
+| Metrics | win rate, drawdown, profit factor, expectancy R |
+| Verdict | insufficient sample, weak edge, research-worthy |
+| Proof chain | deterministic hash, changed payload, linked blocks |
+| Agent export | no raw rows, compact schema |
+
+### 35.2 Fixture Plan
+
+Create small hand-built fixtures:
+
+```text
+tests/fixtures/vibing-finance/mnq_caught_sellers_long.csv
+tests/fixtures/vibing-finance/mnq_caught_buyers_short.csv
+tests/fixtures/vibing-finance/nifty_caught_sellers_long.csv
+tests/fixtures/vibing-finance/nifty_caught_buyers_short.csv
+tests/fixtures/vibing-finance/no_setup.csv
+tests/fixtures/vibing-finance/bad_ohlc.csv
+tests/fixtures/vibing-finance/missing_bars.csv
+```
+
+Each fixture should be tiny and deterministic, not real private market data.
+
+### 35.3 UI Smoke Tests
+
+Scenarios:
+
+- Feature flag off hides page.
+- Non-admin cannot access page.
+- Admin can access page.
+- Upload valid CSV.
+- Upload invalid CSV.
+- Run fixture backtest.
+- Report renders.
+- Agent notes export works.
+- Proof block renders.
+
+### 35.4 Manual Review Checklist
+
+- Does UI feel like a serious tool?
+- Does report avoid exaggerated claims?
+- Are weak/no-trade results still useful?
+- Is local-only privacy clear?
+- Does the app avoid uploading CSV?
+- Are all defaults visible?
+- Can Codex/Claude understand the agent export?
+
+---
+
+## 36. Agent Operating Procedure
+
+Every Codex/Claude planning or implementation loop should follow this:
+
+1. Read this canonical spec.
+2. Identify the current milestone.
+3. Work only on files for that milestone.
+4. Keep strategy logic deterministic.
+5. Add or update tests with each logic module.
+6. Do not introduce paid services.
+7. Do not introduce server upload of private CSV.
+8. Do not add public blockchain writes.
+9. Update this spec if a decision changes.
+10. Summarize changed files and verification.
+
+Agent prompt template:
+
+```text
+Read docs/VIBING_FINANCE_BACKTESTING_ENGINE_SPEC.md.
+Implement milestone <M#> only.
+Do not add paid APIs, hosted storage, public blockchain writes, or raw CSV uploads.
+Keep backtest metrics deterministic.
+Add focused tests for the changed logic.
+```
+
+---
+
+## 37. Definition Of Done
+
+### 37.1 MVP Done
+
+The private MVP is done when:
+
+- Admin-only screen exists.
+- CSV upload works locally.
+- Data quality report works.
+- Strategy defaults are visible.
+- Backtest worker runs.
+- At least 4 fixture strategies pass expected outcomes.
+- Report renders.
+- Proof chain block is generated.
+- Agent notes export exists.
+- No paid API is required.
+- No raw CSV is uploaded.
+
+### 37.2 Private Alpha Done
+
+Private alpha is done when:
+
+- Real uploaded MNQ CSV can run.
+- Real uploaded NIFTY CSV can run.
+- At least 30-session sample is handled.
+- No browser freeze on reasonable CSV size.
+- Report identifies no-trade/weak-edge cases correctly.
+- Agent export is useful for Codex/Claude critique.
+
+### 37.3 Public Launch Still Blocked Until
+
+- Legal/compliance disclaimers are final.
+- Data licensing is solved.
+- Multi-user privacy is solved.
+- Abuse and quota controls are solved.
+- Security review is complete.
+- Backtest methodology has been independently reviewed.
+
+---
+
+## 38. Free-Lifetime Risk Register
 
 | Risk | Impact | Mitigation |
 |---|---|---|
@@ -1822,7 +2416,7 @@ Parity requirement:
 
 ---
 
-## 32. External Reference Notes
+## 39. External Reference Notes
 
 These references informed the free architecture and timing defaults as of 2026-04-25:
 
