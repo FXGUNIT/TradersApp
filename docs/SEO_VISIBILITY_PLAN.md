@@ -1,7 +1,8 @@
 # TradersApp SEO Visibility Plan — Get on Google
 
 > **Goal:** Make `tradergunit.pages.dev` appear in Google search results for relevant trading/finance keywords.
-> **Target:** Top 10 for niche trading signal / algo trading product keywords within 90 days.
+> **Target:** Top 10 for niche quantitative trading / algo trading product keywords within 90 days.
+> **What it is:** A quantitative trading intelligence platform — not a signals service.
 
 ---
 
