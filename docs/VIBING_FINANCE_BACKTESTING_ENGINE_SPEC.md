@@ -3844,6 +3844,83 @@ Non-negotiable warning:
 
 - Do not start implementing self-learning, multi-agent teams, BYOK remote calls, or autonomous watch mode until deterministic browser backtest, report, proof, and golden tests are working.
 
+### 31.11 Weakness Resolution Plan
+
+This is the careful remediation plan for every weakness listed in section 31.10. Resolve these in order. Do not skip ahead to exciting agent/automation features while unresolved P0 documentation defects still affect the deterministic MVP.
+
+Resolution principles:
+
+- Fix planning ambiguity before writing large code.
+- Convert broad promises into schemas, fixtures, tests, and acceptance criteria.
+- Prefer deleting or postponing future scope over expanding MVP.
+- Every resolved weakness must leave a durable artifact inside this spec: table, schema, checklist, fixture definition, or acceptance test.
+- A weakness is not resolved just because it is acknowledged.
+
+| ID | Weakness | Dependency | Resolution steps | Acceptance check |
+|---|---|---|---|---|
+| W01 | Spec is too broad for first implementation | None | Add a top-level "Build Now / Build Later / Do Not Build Yet" table. Move M1-M6 into Build Now. Mark CLI, runner, BYOK, multi-agent, watch mode, Python parity, browser automation, and self-learning as blocked until Build Now passes. | A new reader can identify the exact first implementation scope in under 2 minutes. |
+| W02 | Section numbering is inconsistent | W01 | Freeze the content order, then renumber headings from section 31 onward. If renumbering is risky, add stable IDs beside milestone headings, e.g. `MVP-M1-HIDDEN-SHELL`. Update internal references. | `rg "^##|^###"` shows no obvious mismatched parent/child numbering. |
+| W03 | MVP scope creep | W01 | Add a "MVP Scope Lock" subsection. Define M1-M6 as the only MVP path. Add a rule that M7+ cannot begin until M6 has passing tests and proof output. | Every roadmap table says M1-M6 is MVP and M7+ is post-MVP/private-alpha. |
+| W04 | "Self-learning" can be misunderstood | W01 | Rename early behavior in the spec to "per-user adaptive memory". Keep "training" only in offline model candidate sections. Add a glossary entry explaining the difference. | Searching `self-learning` shows only governed architecture/definition sections, not MVP promises. |
+| W05 | First exact strategy is under-specified | W03 | Add a "Golden Strategy Fixtures" appendix with 5-10 scenarios: valid long, valid short, no caught inventory, no CHoCH, no pullback, stop-first ambiguity, TP-first case, low-quality data case. Include expected setup and trade outputs. | A developer can implement detector tests directly from the fixture table. |
+| W06 | Numerical formulas are not locked | W05 | Add a "Metric Formula Appendix" defining win rate, expectancy R, profit factor, max drawdown, drawdown duration, average R, TP rates, MFE/MAE, fees, slippage, and rounding. Include small numeric test vectors. | Browser/CLI/Python can use the same formulas without interpretation. |
+| W07 | Data assumptions are optimistic | W05 | Add importer profiles for canonical CSV, TradingView-like, NinjaTrader-like, broker-like, and malformed CSV. Define header maps, timestamp formats, timezone behavior, and rejection examples. | CSV intake tests can be generated from the profile table. |
+| W08 | Agent architecture is over-specified before engine proof | W03 | Add a "Postpone Agent Kernel" block that explicitly freezes multi-agent team implementation until deterministic core, report, proof, and fixtures pass. Keep only visible plan/tool transcript in MVP. | Work packages for multi-agent kernel are labeled post-MVP and blocked by M6. |
+| W09 | Roadmap layers overlap | W01, W03 | Choose one authoritative roadmap: milestone gates plus work packages. Mark older phase plan as historical/brainstorm or collapse it into the milestone table. | There is one roadmap marked authoritative; duplicate sections cross-reference it instead of redefining scope. |
+| W10 | Acceptance criteria are uneven | W03 | Add acceptance criteria to every P0 row in section 31.5. Convert "should" statements into pass/fail checks where possible. | Each P0 item has at least one test, fixture, or manual verification criterion. |
+| W11 | Clean-room reference handling risk | None | Reduce leaked-source references to one warning section and one external reference note. Add a "Do not use as implementation source" tag. Avoid adding further details from prohibited sources. | The doc contains no implementation claims copied from or dependent on leaked internals. |
+| W12 | BYOK/local runner security underdefined | W03 | Add a post-MVP "Runner and BYOK Security Protocol" section: localhost pairing token, origin checks, credential storage modes, key redaction, budget enforcement, and revocation. | `vibing serve` remains blocked until this protocol exists. |
+| W13 | Proof canonicalization missing | W06 | Add canonical JSON rules: UTF-8, stable key order, no insignificant whitespace, normalized timestamps, binary hash handling, and hash prefixes. Add cross-runtime test vectors. | The same artifact hashes match in browser, Node, and Python test vectors. |
+| W14 | IndexedDB migration underdefined | W03 | Add IndexedDB schema version table, store definitions, migration rules, corruption recovery, quota handling, export-before-delete flow. | A browser storage migration test plan exists before implementing storage. |
+| W15 | Report claims can be too confident | W06 | Add forbidden claim list and required caveat templates for low trade count, low data quality, OHLC ambiguity, overfit risk, and no out-of-sample data. | Report builder tests reject or flag forbidden certainty language. |
+| W16 | Legal/compliance too thin | W15 | Add compliance checklist: no investment advice, educational/research wording, hypothetical performance disclosure, no guarantees, jurisdiction note, user responsibility language. | Every report template includes required disclaimers and avoids prohibited claims. |
+| W17 | CLI specified before core extraction | W03 | Add a "Core Extraction Before CLI" work package. Define exact `core/*` modules and prove browser worker uses them before CLI work starts. | CLI M9 is blocked until core modules are imported by the browser worker and tested. |
+| W18 | Python parity vague | W06, W13 | Add parity tolerance table by metric and artifact type. Define mismatch report schema and fixture set. Clarify Python is optional engine behind CLI, not separate product. | Python parity has objective pass/fail tolerances. |
+| W19 | Watch/background runaway risk | W12 | Add default limits: runtime, experiments, retries, disk, provider spend, network, and idle timeout. Define stop reasons and summary output. | Watch mode cannot run without explicit budget config and stop defaults. |
+| W20 | Memory UX underspecified | W04 | Add Memory Panel UX: learned preferences, candidate lessons, evidence refs, disable/delete/export, "why suggested" explanation, and reset controls. | User can inspect and remove every memory type described in self-learning sections. |
+| W21 | Model/provider routing abstract | W12 | Add provider request/response schema, redaction policy, prompt payload classes, validation/fallback behavior, and provider error taxonomy. | Provider calls cannot be implemented until schemas and redaction tests exist. |
+| W22 | Artifact package format missing | W13 | Add `run-package.v1.json` manifest: schema version, artifact refs, file paths, hashes, engine versions, report refs, proof refs, redaction level. | Browser export, CLI import, and debug package all target the same manifest. |
+| W23 | Test plan not aligned with gaps | W05-W22 | Update section 36 with categories for every P0/P1 gap: fixtures, metrics, proof, storage, report claims, CLI contract, runner security, memory, provider redaction. | Every P0 and P1 weakness maps to at least one test category. |
+| W24 | Existing repo integration shallow | W03 | Add repo integration map: shell registry, feature flags, admin auth, terminal feature, storage utilities, tests, build config, Playwright config, package scripts. | Implementation tasks reference exact existing files and likely conflict points. |
+| W25 | Performance limits unquantified | W07 | Add benchmark targets for 10k, 100k, and 1M rows: parse time, worker runtime, memory cap, UI responsiveness, fallback threshold. | Browser/Python fallback rules are numeric, not subjective. |
+| W26 | Failure modes incomplete | W14, W22 | Add failure/recovery matrix: worker crash, tab close, quota exceeded, corrupt IndexedDB, partial export, hash mismatch, runner disconnect, provider failure. | Every listed failure has user message, recovery action, and event code. |
+| W27 | Single-doc rule is becoming a liability | W01 | Add a short "Implementation Control Panel" near top after spec freeze: Build Now checklist, P0 blockers, current milestone, blocked future features. Keep details below. | A builder can start from the top without reading the whole document every time. |
+| W28 | Naming not stable | W01 | Add naming glossary: product, route, CLI, workbench, coordinator, runner, artifact package, proof chain, memory capsule. | New sections use glossary names consistently. |
+| W29 | Future ideas repeated | W09 | After W01-W28, deduplicate repeated BYOK, runner, memory, CLI, proof, and clean-room text. Keep one canonical section per topic and replace duplicates with references. | Repeated requirements no longer contradict or re-state scope differently. |
+| W30 | Dense tables hide priority | W01 | Add a compact P0 action checklist with owner/status fields before the long tables. Keep long tables as reference. | P0 work is visible without scanning large tables. |
+
+### 31.12 Weakness Resolution Sequence
+
+Resolve in this order:
+
+1. Scope control: W01, W03, W08, W09, W27, W30.
+2. Navigation and naming: W02, W28, W29.
+3. Deterministic core detail: W05, W06, W07, W13, W15, W16.
+4. MVP implementation contracts: W10, W14, W17, W22, W24, W25, W26.
+5. Test alignment: W23.
+6. Post-MVP automation security: W12, W18, W19, W21.
+7. Adaptive memory and learning UX: W04, W20.
+8. Clean-room maintenance: W11 throughout all phases.
+
+Do not start any item in sequence 6 or 7 until sequences 1-5 are complete enough to produce a deterministic browser report with proof.
+
+### 31.13 Weakness Resolution Acceptance Gate
+
+Before implementation starts, the spec must satisfy this gate:
+
+- Build Now / Build Later / Do Not Build Yet table exists.
+- M1-M6 are the only MVP implementation scope.
+- Heading references are stable enough for agents to cite.
+- Golden fixtures exist for the first strategy.
+- Metric formulas and proof canonicalization are specified.
+- Report claim guardrails and compliance wording are specified.
+- Import/export package manifest exists.
+- Storage migration and failure recovery rules exist.
+- P0 tests are mapped to the test plan.
+- Future-agent, BYOK, local runner, watch mode, and self-learning work are explicitly blocked until deterministic MVP passes.
+
+After implementation starts, each weakness resolution must be treated like a requirement change: update this section with status, date, and evidence link before marking it resolved.
+
 ---
 
 ## 33. Work Package Breakdown
