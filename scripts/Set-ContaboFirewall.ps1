@@ -87,7 +87,7 @@ function ConvertTo-ContaboRule {
 
     [ordered]@{
         protocol = $Rule.protocol
-        destPorts = (Get-PortList -DestPorts $Rule.destPorts | ConvertTo-Json -Compress)
+        destPorts = @(Get-PortList -DestPorts $Rule.destPorts | ForEach-Object { [string]$_ })
         srcCidr = [ordered]@{
             ipv4 = $ipv4
             ipv6 = $ipv6
@@ -109,7 +109,7 @@ function New-AcceptRule {
 
     [ordered]@{
         protocol = $Protocol
-        destPorts = ($Ports | ConvertTo-Json -Compress)
+        destPorts = @($Ports | ForEach-Object { [string]$_ })
         srcCidr = [ordered]@{
             ipv4 = @($Ipv4Sources)
             ipv6 = @($Ipv6Sources)
