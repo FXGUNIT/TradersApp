@@ -1,0 +1,50 @@
+name: Contabo Balance Reminder
+
+on:
+  schedule:
+    # 28th, 29th, 30th each month at 16:00 UTC = 21:30 IST
+    # Sends TG + email reminder if balance < $15
+    - cron: "0 16 28,29,30 * *"
+  workflow_dispatch:
+    # Manual trigger: send reminder now
+    inputs:
+      mode:
+        description: "Mode"
+        required: true
+        default: "check"
+        type: choice
+        options:
+          - check
+          - manual
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run balance reminder
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_ADMIN_CHAT_IDS: ${{ secrets.TELEGRAM_ADMIN_CHAT_IDS }}
+          EMAILJS_SERVICE_ID: ${{ secrets.EMAILJS_SERVICE_ID }}
+          EMAILJS_TEMPLATE_ID: ${{ secrets.EMAILJS_TEMPLATE_ID }}
+          EMAILJS_PUBLIC_KEY: ${{ secrets.EMAILJS_PUBLIC_KEY }}
+          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+          CONTABO_CUSTOMER_ID: ${{ secrets.CONTABO_CUSTOMER_ID }}
+          CONTABO_API_PASSWORD: ${{ secrets.CONTABO_API_PASSWORD }}
+          MINIMUM_BALANCE: "15"
+        run: |
+          mode="${{ inputs.mode || 'check' }}"
+          if [ "$mode" = "manual" ]; then
+            python scripts/contabo_balance_reminder.py --manual
+          else
+            python scripts/contabo_balance_reminder.py --check
+          fi
