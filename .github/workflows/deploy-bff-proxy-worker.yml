@@ -24,9 +24,9 @@ jobs:
         id: discover
         run: |
           echo "=== Discovering Cloudflare account ID ==="
-          # Verify token and get account info
-          # cfat_ tokens use Authorization: Bearer <token_id> (strip the cfat_ prefix)
-          BEARER_TOKEN="${CLOUDFLARE_API_TOKEN#cfat_}"
+          # cfat_ tokens: use the full raw token value (including cfat_ prefix)
+          # in Authorization: Bearer header — Cloudflare's gateway decodes it
+          BEARER_TOKEN="${CLOUDFLARE_API_TOKEN}"
           RESP=$(curl -s "https://api.cloudflare.com/client/v4/user/tokens/verify" \
             -H "Authorization: Bearer ${BEARER_TOKEN}" \
             -H "X-Auth-Email: ${CLOUDFLARE_EMAIL}")
@@ -63,7 +63,7 @@ jobs:
           echo "Worker: $WORKER_NAME"
 
           echo "=== Uploading script (PUT /workers/scripts/{name}/content) ==="
-          BEARER_TOKEN="${CLOUDFLARE_API_TOKEN#cfat_}"
+          BEARER_TOKEN="${CLOUDFLARE_API_TOKEN}"
           RESP=$(curl -s -w "\nHTTP_CODE:%{http_code}" -X PUT "https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/workers/scripts/${WORKER_NAME}/content" \
             -H "Authorization: Bearer ${BEARER_TOKEN}" \
             -H "X-Auth-Email: ${CLOUDFLARE_EMAIL}" \
