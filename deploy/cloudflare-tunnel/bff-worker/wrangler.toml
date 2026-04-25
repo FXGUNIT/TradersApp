@@ -10,4 +10,4 @@ workers_dev = true
 
 [vars]
 PREVIEW_MODE = "false"
-UPSTREAM_BFF_URL = "https://bff.173.249.18.14.sslip.io"
+UPSTREAM_BFF_URL = "http://173.249.18.14"

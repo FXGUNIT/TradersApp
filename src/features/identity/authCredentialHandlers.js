@@ -5,7 +5,7 @@ import {
   signInWithEmailAndPassword,
   signOut,
   createUserWithEmailAndPassword,
-  signInWithPopup,
+  signInWithRedirect,
   GoogleAuthProvider,
 } from "firebase/auth";
 import { auth as firebaseAuth, googleProvider, FB_KEY } from "../../services/firebase.js";
