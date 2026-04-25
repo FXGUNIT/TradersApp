@@ -154,8 +154,12 @@ function WatchtowerStatusChip({ status }) {
   const faults = Array.isArray(status?.faults) ? status.faults : [];
   const corrections = Array.isArray(status?.corrections) ? status.corrections : [];
   const boardRoom = status?.systems?.boardRoom;
+  const backendWatchtower = status?.systems?.backendWatchtower;
   const title = [
     status?.label || "WATCHTOWER CHECKING",
+    backendWatchtower
+      ? `Backend daemon: ${backendWatchtower.label || backendWatchtower.status}`
+      : "Backend daemon: checking",
     boardRoom?.connected
       ? `Board Room connected: ${boardRoom.lastHeartbeatAt || "heartbeat active"}`
       : `Board Room sync: ${boardRoom?.lastSyncError || "checking"}`,

@@ -182,6 +182,7 @@ export const ROUTE_PERMISSIONS = {
   "/news/countdown": null,
   "/ml/health": null,
   "/ml/status": null,
+  "/watchtower/status": null,
 
   // ML endpoints — open (ML engine handles its own auth)
   "/ml/consensus": null,
@@ -203,6 +204,7 @@ export const ROUTE_PERMISSIONS = {
   "/admin/verify-password": ROLES.ADMIN,
   "/admin/": ROLES.ADMIN,
   "/terminal/admin": ROLES.ADMIN,
+  "/watchtower/scan": ROLES.ADMIN,
   "/admin": ROLES.ADMIN,
 
   // Board Room — CEO oversight layer, requires ADMIN role
