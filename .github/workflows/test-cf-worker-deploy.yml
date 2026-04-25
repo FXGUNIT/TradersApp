@@ -1,53 +1,38 @@
-name: Test Cloudflare Worker Deploy
+name: Test Cloudflare Token Scopes
 
 on:
   workflow_dispatch:
 
-permissions:
-  contents: write
-  actions: write
-
 env:
   CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
 jobs:
-  test-worker-deploy:
-    name: Test Workers Deploy Permission
+  diagnose-token:
+    name: Diagnose Token Scopes
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "24"
-          cache: "npm"
-
-      - name: Check Workers API access
+      - name: Test token against multiple CF endpoints
         run: |
-          echo "=== Checking Cloudflare token permissions ==="
+          echo "=== Token /user/tokens/verify ==="
           curl -s "https://api.cloudflare.com/client/v4/user/tokens/verify" \
             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-            -H "Content-Type: application/json" | python3 -c "import json,sys; d=json.load(sys.stdin); print('Token valid:', d.get('success')); print('Result:', json.dumps(d.get('result',{}), indent=2))"
+            -H "Content-Type: application/json" | python3 -c "import json,sys; d=json.load(sys.stdin); print(json.dumps(d, indent=2))"
 
-      - name: Check Workers scripts (list)
-        run: |
-          echo "=== Checking Workers scripts list ==="
-          ACCOUNT_ID="${{ secrets.CLOUDFLARE_ACCOUNT_ID }}"
-          RESPONSE=$(curl -s "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/workers/scripts" \
+          echo ""
+          echo "=== Token /accounts/$CLOUDFLARE_ACCOUNT_ID ==="
+          curl -s "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID" \
             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-            -H "Content-Type: application/json")
-          echo "$RESPONSE" | python3 -c "import json,sys; d=json.load(sys.stdin); print('List workers success:', d.get('success')); [print('Worker:', w.get('id'), w.get('etag')) for w in d.get('result',[])]"
+            -H "Content-Type: application/json" | python3 -c "import json,sys; d=json.load(sys.stdin); print('success:', d.get('success')); print('account name:', d.get('result',{}).get('name') if d.get('result') else 'N/A'); print('errors:', d.get('errors'))"
 
-      - name: Install Wrangler
-        run: |
-          npm install -g wrangler@latest
+          echo ""
+          echo "=== Token /accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts ==="
+          curl -s "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts" \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            -H "Content-Type: application/json" | python3 -c "import json,sys; d=json.load(sys.stdin); print('success:', d.get('success')); print('errors:', d.get('errors')); print('result count:', len(d.get('result',[]) or []))"
 
-      - name: Try Workers deploy dry-run
-        run: |
-          echo "=== Testing Workers deploy dry-run ==="
-          ACCOUNT_ID="${{ secrets.CLOUDFLARE_ACCOUNT_ID }}"
-          CLOUDFLARE_ACCOUNT_ID="$ACCOUNT_ID" npx wrangler@latest worker deploy --dry-run --name tradersapp-bff-proxy 2>&1 || echo "Dry run failed (may need --project flag)"
-          echo "---"
-          CLOUDFLARE_ACCOUNT_ID="$ACCOUNT_ID" npx wrangler@latest deployments list --env production 2>&1 | head -20 || echo "deployments list failed"
+          echo ""
+          echo "=== Token /accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects ==="
+          curl -s "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects" \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            -H "Content-Type: application/json" | python3 -c "import json,sys; d=json.load(sys.stdin); print('success:', d.get('success')); print('errors:', d.get('errors')); print('result count:', len(d.get('result',[]) or []))"
