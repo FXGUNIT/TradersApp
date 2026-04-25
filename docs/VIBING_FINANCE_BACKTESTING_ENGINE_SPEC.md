@@ -34,6 +34,7 @@ This product must be ambitious, but not magical.
 - The app must not claim to find guaranteed alpha.
 - The app must not produce financial advice as certainty.
 - The ML system must not "self learn" directly into production without approval gates, model registry, rollback, and audit logs.
+- Continuous learning is allowed only as auditable per-user memory, candidate lessons, preference adaptation, and offline model candidates until explicit promotion gates approve broader defaults.
 - The system can use LLMs to translate, explain, critique, generate hypotheses, and orchestrate research, but deterministic validation must be done by backtest, statistics, risk, and data-quality engines.
 - Blockchain should not be placed in the latency-critical backtest or inference path. Even fast chains are slower than local compute, memory, Redis, Kafka, and database writes. Blockchain can be used later for tamper-evident audit proofs, research provenance, model hash anchoring, or licensed strategy ownership records.
 
@@ -1641,7 +1642,31 @@ Rules:
 - Deterministic strategy spec remains source of truth.
 - Report metrics must come from engine, not model text.
 
-### 27.4 Embedded Paid LLM Policy
+### 27.4 Bring-Your-Own LLM Key Policy
+
+The product must support a user-controlled LLM path before any platform-funded paid LLM dependency becomes mandatory.
+
+Required provider modes:
+
+| Mode | Description | Default |
+|---|---|---|
+| No LLM | Deterministic analyst only | Yes for MVP |
+| Local LLM | Ollama, WebLLM, or user local endpoint | Optional |
+| BYOK remote LLM | User provides their own OpenAI/Anthropic/Gemini/OpenRouter-compatible key | Optional |
+| Platform-funded LLM | TradersApp pays for the model call | Off unless explicitly enabled later |
+
+BYOK requirements:
+
+- Every user can add, test, disable, rotate, and delete their own LLM provider key.
+- The app must clearly show which provider is active before any remote model call.
+- User keys must be encrypted at rest if stored, or held only in local/session storage when the user chooses local-only mode.
+- User keys must never be logged, exported, placed in reports, sent to proof blocks, or included in agent context.
+- Remote LLM use must be opt-in per workspace/account.
+- BYOK calls must support cost caps, token caps, timeout caps, and provider-level disable switches.
+- If no user key is configured, the app must still run deterministic backtests and reports.
+- Platform-funded keys must never be silently substituted when the user selected BYOK-only mode.
+
+### 27.5 Embedded Paid LLM Policy
 
 Embedded paid APIs are not part of the free MVP.
 
@@ -1649,6 +1674,7 @@ If added later:
 
 - Must be optional.
 - Must support user-provided key.
+- Must prefer BYOK or local LLM modes for users who do not want TradersApp-funded inference.
 - Must redact private data where possible.
 - Must show cost-risk warning.
 - Must never be required for backtest execution.
@@ -1678,6 +1704,7 @@ User / Founder
   -> Planner
   -> Context Manager
   -> Tool Router
+  -> Terminal / Shell Executor
   -> Backtest Executor
   -> Risk Analyst
   -> Report Writer
@@ -1710,6 +1737,17 @@ Tool Router:
 - Validates tool inputs.
 - Captures tool outputs as structured events.
 - Emits transcript tool-call rows.
+- Routes powerful tools through typed adapters, including browser worker, Python runner, PowerShell, Bash, terminal commands, filesystem reads/writes, MCP tools, and local services.
+- Enforces task scope: tools may be used only when they directly or indirectly advance the user's research/backtesting agenda, setup, verification, reporting, or recovery from failures.
+
+Terminal / Shell Executor:
+
+- Provides Claude Code-style local command authority for PowerShell, Bash, package scripts, Python, Node, git inspection, test runners, local services, and artifact generation.
+- Runs commands as typed, logged tool events with command text, working directory, start/end time, exit code, stdout/stderr summary, and artifact hashes where relevant.
+- Can run unattended after the user starts a task, including long backtests, batch experiments, report generation, comparison jobs, and verification loops.
+- Must expose cancel, pause, resume, and emergency-stop controls.
+- Must not run unrelated commands outside the active agenda.
+- Must not access secrets, exfiltrate data, delete projects, wipe drives, modify unrelated repos, or perform irreversible infrastructure changes without a stronger approval gate.
 
 Backtest Executor:
 
@@ -1764,6 +1802,29 @@ Rules:
 - Failed steps retry only if retry is safe.
 - A retry must preserve the original failure for audit.
 - Completed reports are immutable; improvements create a new report version and proof block.
+- The loop may continue while the user is away from the screen after the user explicitly starts an autonomous run.
+- If the local machine sleeps or loses power, the run must persist enough state to resume or mark the run as interrupted on restart.
+- For true overnight execution, support a user-controlled desktop runner, local service, or VPS runner rather than depending on an active browser tab.
+
+### 28.3.1 Autonomous Operating Modes
+
+The agent workspace should support clear operating modes:
+
+| Mode | Behavior | Use case |
+|---|---|---|
+| Manual | User approves each major step | Sensitive setup or debugging |
+| Assisted | Agent proposes, user approves run batches | Early trust-building |
+| Autonomous run | Agent executes the current task plan until done, blocked, cancelled, or risk stop | Long backtests and report generation |
+| Background lab | Agent keeps refining queued experiments under fixed budgets and scope | Overnight research |
+
+Autonomous run requirements:
+
+- Requires an explicit user start for the agenda, budget, dataset scope, and allowed tool scope.
+- Does not require the user to remain at the screen once started.
+- Can use PowerShell, terminals, local runners, MCP tools, and filesystem operations that are in scope.
+- Emits heartbeat events so the UI can show that work is still active.
+- Stops on configured limits: max runtime, max cost, max experiments, max disk use, repeated failures, or policy violation.
+- Writes an end-of-run summary with completed steps, failures, artifacts, report versions, proof hashes, and recommended next agenda.
 
 ### 28.4 Background Refinement
 
@@ -1795,6 +1856,8 @@ Memory layers:
 | Strategy memory | Versioned strategy specs and changes | Research evolution |
 | Lesson memory | Validated findings only | Improve defaults |
 | Proof memory | Hash chain blocks | Reproducibility |
+| User preference memory | Provider choice, risk preferences, formatting preferences, accepted/rejected suggestions | Personalization |
+| Tool skill memory | Successful command patterns, environment fixes, runner settings | Faster future runs |
 
 Memory capsule example:
 
@@ -1820,6 +1883,43 @@ Memory capsule example:
 Promotion rule:
 
 - A lesson can become a default only after multiple runs and explicit admin approval.
+- User-specific lessons may improve that user's suggestions immediately, but they must be labeled as personal/candidate guidance until validated.
+- Cross-user defaults require aggregation, privacy review, bias/leakage review, rollback support, and explicit promotion.
+
+### 28.5.1 Per-User Self-Learning Mechanism
+
+The engine should improve for every user over time without corrupting deterministic truth.
+
+Learning signals:
+
+- Accepted and rejected strategy edits.
+- User-selected LLM provider and mode.
+- Preferred report style and risk thresholds.
+- Failed commands and successful repairs.
+- Data-quality issues found in the user's datasets.
+- Backtest outcomes tied to versioned strategy specs.
+- User feedback on whether a suggested experiment was useful.
+
+Learning loop:
+
+```text
+observe event
+  -> write typed memory
+  -> summarize into user memory capsule
+  -> apply only to future suggestions/default UI choices
+  -> validate with deterministic tools before any strategy verdict
+  -> promote only through approval and proof gates
+```
+
+Rules:
+
+- The engine may get more helpful "each minute" by updating per-user memory, queues, summaries, and candidate recommendations.
+- It must not silently retrain a shared production model on private user data.
+- It must not claim learned lessons are proven until enough deterministic evidence exists.
+- It must keep each user's private data and strategy memory isolated by account/workspace.
+- It must support reset, export, and delete for user memory.
+- It must keep immutable audit logs for memory promotions and model/version changes.
+- Online adaptation can change recommendations, defaults, and prioritization; it cannot change historical reports or proof blocks.
 
 ### 28.6 Context Engineering
 
@@ -1869,6 +1969,19 @@ Benefits:
 - Agents can inspect actions.
 - Failed steps are debuggable.
 - Reports are reproducible.
+
+Additional event types:
+
+- `llm_provider_configured`
+- `llm_call_started`
+- `llm_call_completed`
+- `terminal_command_started`
+- `terminal_command_completed`
+- `autonomous_run_started`
+- `autonomous_run_heartbeat`
+- `autonomous_run_stopped`
+- `memory_capsule_created`
+- `lesson_promoted`
 
 ### 28.8 Defensive Design
 
