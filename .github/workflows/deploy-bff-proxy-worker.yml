@@ -29,7 +29,6 @@ jobs:
       - name: Save Account ID as GitHub Actions variable
         run: |
           echo "=== Saving Account ID as GitHub Actions variable ==="
-          echo "CLOUDFLARE_ACCOUNT_ID=0f779fe4981d424548a48856cc9139db" >> "$GITHUB_OUTPUT"
           if gh api repos/FXGUNIT/TradersApp/actions/variables/CLOUDFLARE_ACCOUNT_ID -X GET 2>/dev/null | python3 -c "import json,sys; d=json.load(sys.stdin); sys.exit(0 if d.get('name') else 1)"; then
             gh api repos/FXGUNIT/TradersApp/actions/variables/CLOUDFLARE_ACCOUNT_ID -X PATCH \
               -H "Content-Type: application/json" \
