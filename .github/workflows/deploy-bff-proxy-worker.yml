@@ -9,6 +9,7 @@ permissions:
 
 env:
   CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_EMAIL:     ${{ secrets.CLOUDFLARE_EMAIL }}
 
 jobs:
   deploy-worker:
@@ -31,7 +32,8 @@ jobs:
 
           echo "=== Uploading script (PUT /workers/scripts/{name}/content) ==="
           RESP=$(curl -s -X PUT "https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/workers/scripts/${WORKER_NAME}/content" \
-            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            -H "X-Auth-Email: ${CLOUDFLARE_EMAIL}" \
+            -H "X-Auth-Key: ${CLOUDFLARE_API_TOKEN}" \
             -H "Content-Type: application/octet-stream" \
             --data-binary "@deploy/cloudflare-tunnel/bff-worker/index.js")
           echo "$RESP" | python3 -c "import json,sys; d=json.load(sys.stdin); print('Deploy success:', d.get('success')); [print('ERROR:', e.get('message', e)) for e in (d.get('errors') or [])]; [print('OK:', w.get('message', w)) for w in (d.get('messages') or [])]"

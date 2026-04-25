@@ -5,6 +5,9 @@
  * bypassing Wrangler (which calls GET /user/tokens/verify — incompatible with
  * cfut_ / Agent tokens that cannot pass that endpoint).
  *
+ * Auth: uses X-Auth-Key / X-Auth-Email headers (Global API Key + email),
+ * not bearer token — works with any cfut_/Agent/bound token.
+ *
  * Usage:
  *   node scripts/pages/pages_api_deploy.mjs \
  *     --account-id <ACCOUNT_ID> \
@@ -14,14 +17,9 @@
  *     --commit-hash <GITHUB_SHA>
  */
 
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join, relative } from "node:path";
-import { createReadStream, createWriteStream } from "node:fs";
-import { pipeline } from "node:stream";
-import { promisify } from "node:util";
 import { parseArgs } from "node:util";
-
-const pipe = promisify(pipeline);
 
 const { values: args } = parseArgs({
   options: {
@@ -48,14 +46,16 @@ if (!ACCOUNT_ID || !PROJECT_NAME) {
 const API_BASE = "https://api.cloudflare.com/client/v4/accounts";
 
 async function cfFetch(path, options = {}) {
-  const token = process.env.CLOUDFLARE_API_TOKEN;
-  if (!token) throw new Error("CLOUDFLARE_API_TOKEN env var not set");
+  const token   = process.env.CLOUDFLARE_API_TOKEN;
+  const email   = process.env.CLOUDFLARE_EMAIL;
+  if (!token || !email) throw new Error("CLOUDFLARE_API_TOKEN + CLOUDFLARE_EMAIL env vars required");
 
   const url = `${API_BASE}/${ACCOUNT_ID}${path}`;
   const res = await fetch(url, {
     ...options,
     headers: {
-      Authorization: `Bearer ${token}`,
+      "X-Auth-Email": email,
+      "X-Auth-Key":   token,
       ...(options.headers || {}),
     },
   });
@@ -64,16 +64,15 @@ async function cfFetch(path, options = {}) {
   if (!res.ok || !json.success) {
     const err = new Error(`Cloudflare API error ${res.status}: ${JSON.stringify(json)}`);
     err.status = res.status;
-    err.json = json;
+    err.json   = json;
     throw err;
   }
   return json;
 }
 
-/** Collect all files under dir recursively, returning [{path, content}] */
+/** Collect all files under dir recursively. */
 async function collectFiles(dir) {
   const files = [];
-
   async function walk(dirPath, basePath) {
     const entries = readdirSync(dirPath, { withFileTypes: true });
     for (const entry of entries) {
@@ -82,130 +81,100 @@ async function collectFiles(dir) {
       if (entry.isDirectory()) {
         await walk(full, basePath);
       } else if (entry.isFile()) {
-        files.push({ path: rel, full });
+        files.push({ path: rel.replace(/\\/g, "/"), full });
       }
     }
   }
-
   await walk(dir, dir);
   return files;
 }
 
-/** Build multipart form-data body manually (no external deps) */
-async function buildMultipartFormData(fields, files) {
-  const boundary = `cf-deployment-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  const parts = [];
+/** Build multipart/form-data body manually. */
+function buildMultipart(fields, files) {
+  const boundary = `cf-deploy-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const parts    = [];
 
   for (const [key, value] of Object.entries(fields)) {
-    parts.push(
-      Buffer.from(
-        `--${boundary}\r\nContent-Disposition: form-data; name="${key}"\r\n\r\n${value}\r\n`
-      )
-    );
+    parts.push(Buffer.from(
+      `--${boundary}\r\nContent-Disposition: form-data; name="${key}"\r\n\r\n${value}\r\n`
+    ));
   }
 
   for (const { path, full } of files) {
     const content = readFileSync(full);
-    const filename = path.replace(/\\/g, "/"); // normalize Windows slashes
-    parts.push(
-      Buffer.from([
-        `--${boundary}\r\n`,
-        `Content-Disposition: form-data; name="file\"; filename=\"${filename}\"\r\n`,
-        `Content-Type: application/octet-stream\r\n\r\n`,
-      ].join(""))
-    );
+    parts.push(Buffer.from([
+      `--${boundary}\r\n`,
+      `Content-Disposition: form-data; name="file"; filename="${path}"\r\n`,
+      `Content-Type: application/octet-stream\r\n\r\n`,
+    ].join("")));
     parts.push(content);
     parts.push(Buffer.from("\r\n"));
   }
 
   parts.push(Buffer.from(`--${boundary}--\r\n`));
-
-  return {
-    boundary,
-    body: Buffer.concat(parts),
-  };
+  return { boundary, body: Buffer.concat(parts) };
 }
 
 async function main() {
-  console.log(`[pages-deploy] Starting Pages API deploy`);
   console.log(`[pages-deploy] Project : ${PROJECT_NAME}`);
   console.log(`[pages-deploy] Account  : ${ACCOUNT_ID}`);
   console.log(`[pages-deploy] Dist dir : ${DIST_DIR}`);
   console.log(`[pages-deploy] Branch   : ${BRANCH}`);
   console.log(`[pages-deploy] Commit   : ${COMMIT_HASH}`);
 
-  // 1. Create deployment (returns upload URL + JWT)
+  // 1. Create deployment
   console.log("\n[1/3] Creating deployment...");
   const createRes = await cfFetch(`/pages/projects/${PROJECT_NAME}/deployments`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      branch: BRANCH,
-      commit_hash: COMMIT_HASH,
-    }),
+    body: JSON.stringify({ branch: BRANCH, commit_hash: COMMIT_HASH }),
   });
 
   const { id: deploymentId, upload_url: uploadUrl } = createRes.result;
-  console.log(`[pages-deploy] Deployment created: ${deploymentId}`);
+  console.log(`[pages-deploy] Deployment: ${deploymentId}`);
   console.log(`[pages-deploy] Upload URL: ${uploadUrl}`);
 
-  // 2. Collect + upload files
+  // 2. Upload files
   console.log("\n[2/3] Uploading files...");
   const files = await collectFiles(DIST_DIR);
-  console.log(`[pages-deploy] Found ${files.length} files`);
+  console.log(`[pages-deploy] Files: ${files.length}`);
 
-  // The Pages API upload endpoint accepts multipart form-data directly at the upload_url
-  const { boundary, body } = await buildMultipartFormData(
+  const { boundary, body } = buildMultipart(
     { manifest: JSON.stringify(Object.fromEntries(files.map(f => [f.path, f.path]))) },
     files
   );
 
   const uploadRes = await fetch(uploadUrl, {
     method: "POST",
-    headers: {
-      "Content-Type": `multipart/form-data; boundary=${boundary}`,
-    },
+    headers: { "Content-Type": `multipart/form-data; boundary=${boundary}` },
     body,
   });
 
   if (!uploadRes.ok) {
     const text = await uploadRes.text();
-    throw new Error(`File upload failed (${uploadRes.status}): ${text}`);
+    throw new Error(`Upload failed (${uploadRes.status}): ${text}`);
   }
+  console.log(`[pages-deploy] Upload complete`);
 
-  const uploadJson = await uploadRes.json();
-  console.log(`[pages-deploy] Upload complete: ${JSON.stringify(uploadJson)}`);
-
-  // 3. Poll until deployment is complete
-  console.log("\n[3/3] Waiting for deployment to activate...");
-  const maxAttempts = 30;
-  let attempt = 0;
-
-  while (attempt < maxAttempts) {
-    attempt++;
+  // 3. Poll until active
+  console.log("\n[3/3] Activating deployment...");
+  for (let attempt = 0; attempt < 30; attempt++) {
     const status = await cfFetch(`/pages/projects/${PROJECT_NAME}/deployments/${deploymentId}`);
-    const { status: depStatus, url, id } = status.result;
-    console.log(`[pages-deploy] Attempt ${attempt}/${maxAttempts}: status=${depStatus}`);
-
+    const { status: depStatus, url } = status.result;
+    console.log(`[pages-deploy] poll ${attempt + 1}/30: ${depStatus}`);
     if (depStatus === "success") {
-      console.log(`\n✓ Deployment successful!`);
-      console.log(`  URL: ${url}`);
-      console.log(`  Deployment ID: ${id}`);
+      console.log(`\n✓ Live at ${url}`);
       return;
     }
-
     if (depStatus === "failure") {
-      throw new Error(`Deployment failed: ${JSON.stringify(status.result)}`);
+      throw new Error(`Deployment failed: ${JSON.stringify(status.result.errors)}`);
     }
-
-    // Wait 5 seconds before next poll
     await new Promise(r => setTimeout(r, 5000));
   }
-
-  throw new Error(`Deployment timed out after ${maxAttempts} polls`);
+  throw new Error("Deployment timed out after 30 polls");
 }
 
 main().catch(err => {
-  console.error(`\n✗ Deploy failed: ${err.message}`);
+  console.error(`\n✗ ${err.message}`);
   process.exit(1);
 });
