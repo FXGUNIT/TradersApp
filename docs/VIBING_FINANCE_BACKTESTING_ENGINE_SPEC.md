@@ -3264,7 +3264,9 @@ Build the first usable private version in this order:
 5. Risk report.
 6. Local proof chain.
 7. Agent export.
-8. Python parity runner later.
+8. Built-in `vibing` CLI using the same core engine.
+9. Local runner service for unattended browser-to-machine execution.
+10. Python parity runner later.
 
 ### 31.2 Critical Path
 
@@ -3281,6 +3283,9 @@ Feature flag/admin gate
   -> report builder
   -> proof chain
   -> agent notes export
+  -> run package export
+  -> vibing CLI parity
+  -> local runner bridge
 ```
 
 Anything not on this path is postponed.
@@ -3298,7 +3303,9 @@ Anything not on this path is postponed.
 | M6 | Report | Institutional report and verdict | Proof |
 | M7 | Proof chain | Signed local proof block | Agent export |
 | M8 | Agent export | Compact JSON for Codex/Claude review | Private alpha |
-| M9 | Python parity | Optional local runner matching browser output | Scale |
+| M9 | Built-in CLI | `vibing run/report/proof/export` uses same schemas as browser | Local automation |
+| M10 | Local runner service | `vibing serve` connects browser to local jobs | Unattended work |
+| M11 | Python parity | Optional Python engine matching browser/CLI output | Scale |
 
 ### 31.4 Non-Negotiable MVP Constraints
 
@@ -3561,6 +3568,81 @@ Acceptance:
 - Export is small enough to paste into an agent.
 - Export contains no raw CSV rows.
 - Export lets agent review the run without guessing.
+
+### 32.9 M9 - Built-In CLI
+
+Files:
+
+```text
+scripts/vibing-finance/cli.mjs
+src/features/vibing-finance/core/*
+src/features/vibing-finance/__tests__/cli-contract.test.js
+```
+
+Tasks:
+
+- Extract deterministic browser-worker logic into `core/*`.
+- Implement `doctor`, `validate-data`, `run`, `report`, `proof verify`, and `export`.
+- Add `--json`, `--events`, `--workspace`, `--out`, `--no-llm`, and budget flags.
+- Emit the same typed events as the browser workbench.
+- Write the same artifact/report/proof schemas.
+- Return documented exit codes.
+
+Acceptance:
+
+- A backtest can complete from terminal without opening the browser.
+- CLI output can be imported into the browser workbench.
+- CLI and browser produce matching metrics for the same fixture within documented fill assumptions.
+- CLI runs without paid APIs or provider keys.
+
+### 32.10 M10 - Local Runner Service
+
+Files:
+
+```text
+scripts/vibing-finance/runner-server.mjs
+src/features/vibing-finance/runnerBridge.js
+src/features/vibing-finance/__tests__/runnerBridge.test.js
+```
+
+Tasks:
+
+- Implement `vibing serve`.
+- Expose `/health`, `/capabilities`, `/runs`, `/runs/:id/events`, `/runs/:id/cancel`, and artifact endpoints.
+- Stream progress with Server-Sent Events.
+- Reject requests outside the workspace scope.
+- Surface connected/disconnected runner state in the browser workbench.
+
+Acceptance:
+
+- Browser can start a local CLI-backed run through `vibing serve`.
+- Browser receives progress and completion events.
+- Cancel stops the local job cleanly.
+- Runner refuses out-of-scope paths and commands.
+
+### 32.11 M11 - Python Parity Engine
+
+Files:
+
+```text
+scripts/vibing_finance/run_backtest.py
+ml-engine/backtesting/rig.py
+tests/vibing_finance/test_python_parity.py
+```
+
+Tasks:
+
+- Add Python engine adapter behind the CLI.
+- Reuse the same strategy spec JSON.
+- Emit the same report and proof schema.
+- Compare Python output against JS/browser fixtures.
+- Document any accepted numerical tolerance.
+
+Acceptance:
+
+- Python runner matches browser/CLI metrics on fixture data within tolerance.
+- Large CSVs can run without browser memory pressure.
+- Python output imports into the browser workbench.
 
 ---
 
