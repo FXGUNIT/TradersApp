@@ -95,6 +95,13 @@ const WATCHTOWER_RULES = {
     remediation:
       "Restore the calendar source or keep the scheduled-news bar offline with the failing endpoint named.",
   },
+  BACKEND_WATCHTOWER_DEGRADED: {
+    ownerAgent: "Watchtower",
+    ruleId: "watchtower.backend-daemon-required",
+    expected: "The BFF Watchtower daemon must keep scanning even when the browser is closed.",
+    remediation:
+      "Inspect /watchtower/status, repair the failing backend probe, and keep the daemon active before treating the app as healthy.",
+  },
   USER_FACING_ERROR: {
     ownerAgent: "UserExperience.Watchtower",
     ruleId: "watchtower.user-error-capture",
@@ -486,13 +493,21 @@ export async function runWatchtowerScan() {
   let aiResult = null;
   let mlResult = null;
   let consensusResult = null;
+  let backendWatchtowerResult = null;
   let newsStatus = getInitialNewsSystemStatus();
 
   if (health.ok && hasBff()) {
-    [aiResult, mlResult, consensusResult, newsStatus] = await Promise.all([
+    [
+      aiResult,
+      mlResult,
+      consensusResult,
+      backendWatchtowerResult,
+      newsStatus,
+    ] = await Promise.all([
       fetchJson("/ai/status", { timeoutMs: 5000 }),
       fetchJson("/ml/health", { timeoutMs: 6000 }),
       fetchJson("/ml/consensus?session=1&symbol=MNQ", { timeoutMs: 15000 }),
+      fetchJson("/watchtower/status", { timeoutMs: 5000 }),
       fetchNewsSystemStatus(),
     ]);
   } else if (!gatewayAfter.auditRuntime && gatewayAfter.baseUrl) {
@@ -563,6 +578,43 @@ export async function runWatchtowerScan() {
   }
 
   faults.push(...summarizeNewsFaults(newsStatus));
+
+  const backendWatchtower = backendWatchtowerResult?.data?.watchtower || null;
+  if (health.ok && !backendWatchtowerResult?.ok) {
+    faults.push(
+      createFault(
+        "BACKEND_WATCHTOWER_DEGRADED",
+        "Backend Watchtower unreachable",
+        backendWatchtowerResult?.error ||
+          "BFF /watchtower/status did not return usable daemon status.",
+        "high",
+        { reportToBoardRoom: false },
+      ),
+    );
+  } else if (
+    backendWatchtower &&
+    backendWatchtower.status &&
+    backendWatchtower.status !== "healthy"
+  ) {
+    const backendFaults = Array.isArray(backendWatchtower.faults)
+      ? backendWatchtower.faults
+      : [];
+    faults.push(
+      createFault(
+        "BACKEND_WATCHTOWER_DEGRADED",
+        "Backend Watchtower has active faults",
+        backendFaults.length > 0
+          ? backendFaults
+              .slice(0, 3)
+              .map((fault) => `${fault.title}: ${fault.detail}`)
+              .join(" | ")
+          : backendWatchtower.label || "Backend Watchtower is degraded.",
+        backendWatchtower.status === "fault" ? "critical" : "high",
+        { reportToBoardRoom: false },
+      ),
+    );
+  }
+
   pruneUserFacingErrors();
   faults.push(...userFacingErrors);
 
@@ -589,6 +641,7 @@ export async function runWatchtowerScan() {
         status: consensusResult?.status || 0,
         data: consensusResult?.data || null,
       },
+      backendWatchtower,
       boardRoom: getBoardRoomSyncSnapshot(),
       userErrors: userFacingErrors,
     },

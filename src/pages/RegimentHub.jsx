@@ -454,41 +454,196 @@ export default function RegimentHub({
             />
           )}
         </div>
+        {/* ── Stunning Brand Hero ── */}
         <div
           style={{
-            fontSize: 11,
-            fontWeight: 700,
-            letterSpacing: 6,
-            color: mutedColor,
-            textTransform: "uppercase",
-            marginBottom: 16,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 0,
           }}
         >
-          {hubContent.eyebrow}
+          {/* Eyebrow with animated pulse dot */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              marginBottom: 20,
+            }}
+          >
+            <div
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: "50%",
+                background: "#d4a520",
+                boxShadow: "0 0 8px #d4a520, 0 0 16px rgba(212,165,32,0.4)",
+                animation: "hero-pulse 2.4s ease-in-out infinite",
+              }}
+            />
+            <div
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: 5,
+                color: mutedColor,
+                textTransform: "uppercase",
+              }}
+            >
+              {hubContent.eyebrow}
+            </div>
+            <div
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: "50%",
+                background: "#d4a520",
+                boxShadow: "0 0 8px #d4a520, 0 0 16px rgba(212,165,32,0.4)",
+                animation: "hero-pulse 2.4s ease-in-out infinite 0.6s",
+              }}
+            />
+          </div>
+
+          {/* Brand name — large */}
+          <h1
+            style={{
+              fontSize: "clamp(36px, 7vw, 72px)",
+              fontWeight: 900,
+              color: textColor,
+              margin: 0,
+              letterSpacing: -2,
+              lineHeight: 0.95,
+              textAlign: "center",
+              fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
+            }}
+          >
+            TRADERS
+          </h1>
+          <h1
+            style={{
+              fontSize: "clamp(36px, 7vw, 72px)",
+              fontWeight: 900,
+              color: "#d4a520",
+              margin: "0 0 4px 0",
+              letterSpacing: -2,
+              lineHeight: 0.95,
+              textAlign: "center",
+              fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
+              textShadow: "0 0 40px rgba(212,165,32,0.35), 0 0 80px rgba(212,165,32,0.15)",
+            }}
+          >
+            REGIMENT
+          </h1>
+
+          {/* Decorative divider */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              margin: "16px 0 16px 0",
+            }}
+          >
+            <div
+              style={{
+                width: 40,
+                height: 1,
+                background: "linear-gradient(to right, transparent, rgba(212,165,32,0.5))",
+              }}
+            />
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+              <rect x="1" y="1" width="8" height="8" rx="1.5" stroke="#d4a520" strokeWidth="1.5" />
+              <rect x="3.5" y="3.5" width="3" height="3" rx="0.5" fill="#d4a520" />
+            </svg>
+            <div
+              style={{
+                width: 40,
+                height: 1,
+                background: "linear-gradient(to left, transparent, rgba(212,165,32,0.5))",
+              }}
+            />
+          </div>
+
+          {/* Tagline */}
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 6,
+            }}
+          >
+            <div
+              style={{
+                fontSize: "clamp(13px, 2.5vw, 18px)",
+                fontWeight: 700,
+                color: textColor,
+                letterSpacing: 1.5,
+                textAlign: "center",
+                textTransform: "uppercase",
+                lineHeight: 1.3,
+              }}
+            >
+              World's Most Advanced
+            </div>
+            <div
+              style={{
+                fontSize: "clamp(15px, 3vw, 22px)",
+                fontWeight: 900,
+                color: "#d4a520",
+                letterSpacing: 2,
+                textAlign: "center",
+                textTransform: "uppercase",
+                lineHeight: 1,
+                textShadow: "0 0 30px rgba(212,165,32,0.3)",
+              }}
+            >
+              Trading AI
+            </div>
+          </div>
+
+          {/* Sub-description */}
+          <p
+            style={{
+              fontSize: 13,
+              color: mutedColor,
+              marginTop: 20,
+              maxWidth: 380,
+              lineHeight: 1.7,
+              textAlign: "center",
+              letterSpacing: 0.2,
+            }}
+          >
+            {hubContent.description}
+          </p>
+
+          {/* Animated border bottom */}
+          <div
+            style={{
+              marginTop: 24,
+              height: 2,
+              width: "100%",
+              maxWidth: 480,
+              borderRadius: 2,
+              background: "linear-gradient(to right, transparent, rgba(212,165,32,0.6), transparent)",
+              position: "relative",
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                position: "absolute",
+                top: 0,
+                left: "-100%",
+                width: "60%",
+                height: "100%",
+                background: "linear-gradient(to right, transparent, #d4a520, transparent)",
+                animation: "hero-sweep 3s ease-in-out infinite",
+              }}
+            />
+          </div>
         </div>
-        <h1
-          style={{
-            fontSize: "clamp(28px, 5vw, 44px)",
-            fontWeight: 800,
-            color: textColor,
-            margin: 0,
-            letterSpacing: -1,
-            lineHeight: 1.1,
-          }}
-        >
-          {hubContent.title}
-        </h1>
-        <p
-          style={{
-            fontSize: 14,
-            color: mutedColor,
-            marginTop: 12,
-            maxWidth: 400,
-            lineHeight: 1.6,
-          }}
-        >
-          {hubContent.description}
-        </p>
         {eligibilityMessage ? (
           <div
             style={{
@@ -1084,8 +1239,16 @@ export default function RegimentHub({
 
       <style>{`
         @keyframes hub-pulse {
-          0%, 100% { opacity: 0.6; }
-          50% { opacity: 1; }
+          0%, 100% { opacity: 0.6; transform: scale(1); }
+          50% { opacity: 1; transform: scale(1.3); }
+        }
+        @keyframes hero-pulse {
+          0%, 100% { opacity: 0.7; box-shadow: 0 0 6px #d4a520; }
+          50% { opacity: 1; box-shadow: 0 0 14px #d4a520, 0 0 28px rgba(212,165,32,0.4); }
+        }
+        @keyframes hero-sweep {
+          0% { left: -100%; }
+          100% { left: 200%; }
         }
       `}</style>
     </div>

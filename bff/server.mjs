@@ -81,6 +81,7 @@ import {
 import { createAdminRouteHandler } from "./routes/adminRoutes.mjs";
 import { createContentRouteHandler } from "./routes/contentRoutes.mjs";
 import { createConsensusRouteHandler } from "./routes/consensusRoutes.mjs";
+import { createWatchtowerRouteHandler } from "./routes/watchtowerRoutes.mjs";
 import { createNewsRouteHandler } from "./routes/newsRoutes.mjs";
 import { createTradeCalcRouteHandler } from "./routes/tradeCalcRoutes.mjs";
 import { createIdentityRouteHandler } from "./routes/identityRoutes.mjs";
@@ -91,6 +92,7 @@ import { createSupportRouteHandler } from "./routes/supportRoutes.mjs";
 import { createBoardRoomRouteHandler } from "./routes/boardRoomRoutes.mjs";
 import { createCalendarRouteHandler } from "./routes/calendarRoutes.mjs";
 import { startBoardRoomCron } from "./board-room/cron/index.mjs";
+import { startWatchtowerDaemon } from "./services/watchtowerService.mjs";
 import { boardRoomService } from "./services/boardRoomService.mjs";
 import boardRoomTelegram from "./services/boardRoomTelegram.mjs";
 // Telegram proxy — J01: token removed from browser bundles
@@ -491,6 +493,7 @@ const dispatcher = createDispatcher({
   createAdminRouteHandler,
   createContentRouteHandler,
   createConsensusRouteHandler,
+  createWatchtowerRouteHandler,
   createNewsRouteHandler,
   createIdentityRouteHandler,
   createTerminalAnalyticsRouteHandler,
@@ -519,6 +522,7 @@ server.listen(PORT, HOST, () => {
 
   // Start Board Room cron jobs after server is listening
   startBoardRoomCron(boardRoomService, boardRoomTelegram);
+  startWatchtowerDaemon({ host: "127.0.0.1", port: PORT });
 });
 
 server.on("error", (err) => {

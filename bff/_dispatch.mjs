@@ -84,6 +84,7 @@ export function createDispatcher({
   createAdminRouteHandler,
   createContentRouteHandler,
   createConsensusRouteHandler,
+  createWatchtowerRouteHandler,
   createNewsRouteHandler,
   createTradeCalcRouteHandler,
   createIdentityRouteHandler,
@@ -158,6 +159,10 @@ export function createDispatcher({
     readJsonBody,
   });
   const consensusHandler = createConsensusRouteHandler({ json, readJsonBody });
+  const watchtowerHandler =
+    typeof createWatchtowerRouteHandler === "function"
+      ? createWatchtowerRouteHandler({ authorizeRequest, json })
+      : async () => false;
   const newsHandler = createNewsRouteHandler({ json });
   const tradeCalcHandler = createTradeCalcRouteHandler({ json, readJsonBody });
   const adminHandler = createAdminRouteHandler({
@@ -205,6 +210,7 @@ export function createDispatcher({
     onboardingHandler,
     supportHandler,
     consensusHandler,
+    watchtowerHandler,
     newsHandler,
     tradeCalcHandler,
     adminHandler,

@@ -36,6 +36,7 @@ export function registerDispatchRoutes({
   onboardingHandler,
   supportHandler,
   consensusHandler,
+  watchtowerHandler,
   newsHandler,
   tradeCalcHandler,
   adminHandler,
@@ -143,6 +144,7 @@ export function registerDispatchRoutes({
     if (await onboardingHandler(req, res, url, origin)) return true;
     if (await supportHandler(req, res, url, origin)) return true;
     if (await consensusHandler(req, res, url, origin)) return true;
+    if (await watchtowerHandler(req, res, url, origin)) return true;
     if (await newsHandler(req, res, url, origin)) return true;
     if (await tradeCalcHandler(req, res, url, origin)) return true;
 
