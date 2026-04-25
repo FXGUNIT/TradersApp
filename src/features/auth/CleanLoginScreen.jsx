@@ -33,6 +33,205 @@ const readDraft = () =>
 const isValidGmail = (email) =>
   /^[a-z0-9._%+-]+@gmail\.com$/i.test(String(email || "").trim());
 
+// ─── Brand Hero ────────────────────────────────────────────────────────────────
+function BrandHero() {
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        marginBottom: 36,
+        userSelect: "none",
+      }}
+    >
+      {/* Eyebrow with pulsing gold dots */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          marginBottom: 14,
+        }}
+      >
+        <div
+          style={{
+            width: 6,
+            height: 6,
+            borderRadius: "50%",
+            background: "#d4a520",
+            boxShadow: "0 0 8px #d4a520, 0 0 16px rgba(212,165,32,0.4)",
+            animation: "login-hero-pulse 2.4s ease-in-out infinite",
+          }}
+        />
+        <div
+          style={{
+            fontSize: 10,
+            fontWeight: 700,
+            letterSpacing: 5,
+            color: "#d4a520",
+            textTransform: "uppercase",
+            opacity: 0.8,
+          }}
+        >
+          Traders Regiment
+        </div>
+        <div
+          style={{
+            width: 6,
+            height: 6,
+            borderRadius: "50%",
+            background: "#d4a520",
+            boxShadow: "0 0 8px #d4a520, 0 0 16px rgba(212,165,32,0.4)",
+            animation: "login-hero-pulse 2.4s ease-in-out infinite 0.6s",
+          }}
+        />
+      </div>
+
+      {/* Brand name */}
+      <h1
+        style={{
+          fontSize: "clamp(28px, 6vw, 52px)",
+          fontWeight: 900,
+          color: "#0f172a",
+          margin: 0,
+          letterSpacing: -2,
+          lineHeight: 0.92,
+          textAlign: "center",
+          fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
+        }}
+      >
+        TRADERS
+      </h1>
+      <h1
+        style={{
+          fontSize: "clamp(28px, 6vw, 52px)",
+          fontWeight: 900,
+          color: "#d4a520",
+          margin: "0 0 8px 0",
+          letterSpacing: -2,
+          lineHeight: 0.92,
+          textAlign: "center",
+          fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
+          textShadow: "0 0 30px rgba(212,165,32,0.35), 0 0 60px rgba(212,165,32,0.15)",
+        }}
+      >
+        REGIMENT
+      </h1>
+
+      {/* Gold divider */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "14px 0 14px 0" }}>
+        <div style={{ width: 36, height: 1, background: "linear-gradient(to right, transparent, #d4a520)" }} />
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+          <rect x="1" y="1" width="8" height="8" rx="1.5" stroke="#d4a520" strokeWidth="1.5" />
+          <rect x="3.5" y="3.5" width="3" height="3" rx="0.5" fill="#d4a520" />
+        </svg>
+        <div style={{ width: 36, height: 1, background: "linear-gradient(to left, transparent, #d4a520)" }} />
+      </div>
+
+      {/* Tagline */}
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+        <div
+          style={{
+            fontSize: "clamp(12px, 2.2vw, 16px)",
+            fontWeight: 700,
+            color: "#334155",
+            letterSpacing: 1.5,
+            textAlign: "center",
+            textTransform: "uppercase",
+            lineHeight: 1.2,
+          }}
+        >
+          World's Most Advanced
+        </div>
+        <div
+          style={{
+            fontSize: "clamp(14px, 2.8vw, 20px)",
+            fontWeight: 900,
+            color: "#d4a520",
+            letterSpacing: 2,
+            textAlign: "center",
+            textTransform: "uppercase",
+            lineHeight: 1,
+            textShadow: "0 0 24px rgba(212,165,32,0.3)",
+          }}
+        >
+          Trading AI
+        </div>
+      </div>
+
+      {/* Sweeping animated line */}
+      <div
+        style={{
+          marginTop: 16,
+          height: 2,
+          width: "100%",
+          maxWidth: 380,
+          borderRadius: 2,
+          background: "linear-gradient(to right, transparent, rgba(212,165,32,0.5), transparent)",
+          position: "relative",
+          overflow: "hidden",
+        }}
+      >
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            left: "-60%",
+            width: "50%",
+            height: "100%",
+            background: "linear-gradient(to right, transparent, #d4a520, transparent)",
+            animation: "login-hero-sweep 3s ease-in-out infinite",
+          }}
+        />
+      </div>
+
+      {/* Blog link strip */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          marginTop: 18,
+        }}
+      >
+        <a
+          href="/blog/"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            fontSize: 11,
+            fontWeight: 700,
+            color: "#d4a520",
+            textDecoration: "none",
+            letterSpacing: 0.5,
+            padding: "5px 14px",
+            border: "1px solid rgba(212,165,32,0.35)",
+            borderRadius: 999,
+            background: "rgba(212,165,32,0.06)",
+            transition: "all 0.2s ease",
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = "rgba(212,165,32,0.12)"; e.currentTarget.style.borderColor = "rgba(212,165,32,0.6)"; }}
+          onMouseLeave={e => { e.currentTarget.style.background = "rgba(212,165,32,0.06)"; e.currentTarget.style.borderColor = "rgba(212,165,32,0.35)"; }}
+        >
+          Read the Blog
+        </a>
+      </div>
+
+      <style>{`
+        @keyframes login-hero-pulse {
+          0%, 100% { opacity: 0.7; box-shadow: 0 0 6px #d4a520; transform: scale(1); }
+          50% { opacity: 1; box-shadow: 0 0 14px #d4a520, 0 0 28px rgba(212,165,32,0.4); transform: scale(1.3); }
+        }
+        @keyframes login-hero-sweep {
+          0% { left: -60%; }
+          100% { left: 200%; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
 export default function CleanLoginScreen({
   onLogin,
   onSignup,
@@ -114,16 +313,13 @@ export default function CleanLoginScreen({
       setError("Email and password are required.");
       return;
     }
-
     if (!isValidGmail(cleanEmail)) {
       setError("Only Gmail addresses are allowed.");
       return;
     }
-
     setLoading(true);
     setError("");
     setMessage("");
-
     try {
       await onLogin(cleanEmail, password, stayLoggedIn);
     } catch (err) {
@@ -137,14 +333,10 @@ export default function CleanLoginScreen({
     setLoading(true);
     setError("");
     setMessage("");
-
     try {
-      // Login-page Google auth is not a completed application. Let the
-      // redirect result route new users to the signup form instead.
       clearPendingGoogleFormData();
       markRedirectInProgress();
       await onGoogleAuth();
-      // signInWithRedirect has already navigated away — this won't run
     } catch (err) {
       setError(err.message || "Google sign-in failed.");
     } finally {
@@ -153,25 +345,14 @@ export default function CleanLoginScreen({
   };
 
   const handleReset = async () => {
-    if (!cleanEmail) {
-      setError("Please enter your Gmail address.");
-      return;
-    }
-
-    if (!isValidGmail(cleanEmail)) {
-      setError("Only Gmail addresses are allowed.");
-      return;
-    }
-
+    if (!cleanEmail) { setError("Please enter your Gmail address."); return; }
+    if (!isValidGmail(cleanEmail)) { setError("Only Gmail addresses are allowed."); return; }
     setLoading(true);
     setError("");
     setMessage("");
-
     try {
       const nextMessage = await onForgotPassword(cleanEmail);
-      setMessage(
-        nextMessage || "Password reset email sent. Check your Gmail inbox.",
-      );
+      setMessage(nextMessage || "Password reset email sent. Check your Gmail inbox.");
     } catch (err) {
       setError(err.message || "Failed to send reset email.");
     } finally {
@@ -210,9 +391,22 @@ export default function CleanLoginScreen({
           borderRadius: 28,
           boxShadow: "0 30px 80px rgba(15,23,42,0.12)",
           backdropFilter: "blur(18px)",
-          padding: "32px 28px",
+          padding: "36px 28px",
         }}
       >
+        {/* Brand Hero */}
+        <BrandHero />
+
+        {/* Separator */}
+        <div
+          style={{
+            height: 1,
+            background: "linear-gradient(to right, transparent, rgba(212,165,32,0.25), transparent)",
+            marginBottom: 28,
+          }}
+        />
+
+        {/* Modal header */}
         <div style={{ marginBottom: 28 }}>
           <div
             style={{
@@ -230,22 +424,23 @@ export default function CleanLoginScreen({
           >
             Gmail Only
           </div>
-          <h1
+          <h2
             style={{
               margin: 0,
               color: CSS_VARS.textPrimary,
-              fontSize: 30,
+              fontSize: 28,
               fontWeight: 800,
               lineHeight: 1.1,
+              letterSpacing: -0.5,
             }}
           >
             {resetMode ? "Reset your password" : "Welcome back"}
-          </h1>
+          </h2>
           <p
             style={{
-              margin: "12px 0 0",
+              margin: "10px 0 0",
               color: CSS_VARS.textSecondary,
-              fontSize: 14,
+              fontSize: 13,
               lineHeight: 1.65,
             }}
           >
