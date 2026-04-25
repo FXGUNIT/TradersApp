@@ -34,15 +34,42 @@ const isValidGmail = (email) =>
   /^[a-z0-9._%+-]+@gmail\.com$/i.test(String(email || "").trim());
 
 // ─── Brand Hero ────────────────────────────────────────────────────────────────
+// Detects dark mode by reading CSS variable --base-layer
+function useIsDarkMode() {
+  const [isDark, setIsDark] = useState(false);
+  useEffect(() => {
+    const el = document.documentElement;
+    const bg = getComputedStyle(el).getPropertyValue("--base-layer").trim();
+    setIsDark(bg.includes("0,0,0") || bg.includes("#0") || bg.includes("0 0 0") || bg.includes("05070A") || bg.includes("0, 0, 0") || !bg || bg === "#000" || bg === "#000000");
+  }, []);
+  return isDark;
+}
+
 function BrandHero() {
+  const isDark = useIsDarkMode();
+  const textCol = isDark ? "#f1f5f9" : "#0f172a";
+  const mutedCol = isDark ? "#94a3b8" : "#64748b";
+  const dividerCol = isDark ? "rgba(212,165,32,0.25)" : "rgba(212,165,32,0.25)";
+  const bgGrad = isDark
+    ? "radial-gradient(ellipse at 50% 0%, rgba(212,165,32,0.08) 0%, transparent 60%)"
+    : "radial-gradient(ellipse at 50% 0%, rgba(212,165,32,0.06) 0%, transparent 60%)";
+
   return (
     <div
       style={{
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        marginBottom: 36,
+        marginBottom: 32,
         userSelect: "none",
+        padding: "28px 16px 0",
+        background: bgGrad,
+        borderRadius: "20px 20px 0 0",
+        marginLeft: "-28px",
+        marginRight: "-28px",
+        paddingLeft: 28,
+        paddingRight: 28,
+        paddingTop: 28,
       }}
     >
       {/* Eyebrow with pulsing gold dots */}
@@ -56,12 +83,13 @@ function BrandHero() {
       >
         <div
           style={{
-            width: 6,
-            height: 6,
+            width: 7,
+            height: 7,
             borderRadius: "50%",
             background: "#d4a520",
-            boxShadow: "0 0 8px #d4a520, 0 0 16px rgba(212,165,32,0.4)",
+            boxShadow: "0 0 10px #d4a520, 0 0 24px rgba(212,165,32,0.45)",
             animation: "login-hero-pulse 2.4s ease-in-out infinite",
+            flexShrink: 0,
           }}
         />
         <div
@@ -71,19 +99,20 @@ function BrandHero() {
             letterSpacing: 5,
             color: "#d4a520",
             textTransform: "uppercase",
-            opacity: 0.8,
+            opacity: 0.9,
           }}
         >
           Traders Regiment
         </div>
         <div
           style={{
-            width: 6,
-            height: 6,
+            width: 7,
+            height: 7,
             borderRadius: "50%",
             background: "#d4a520",
-            boxShadow: "0 0 8px #d4a520, 0 0 16px rgba(212,165,32,0.4)",
+            boxShadow: "0 0 10px #d4a520, 0 0 24px rgba(212,165,32,0.45)",
             animation: "login-hero-pulse 2.4s ease-in-out infinite 0.6s",
+            flexShrink: 0,
           }}
         />
       </div>
@@ -91,12 +120,12 @@ function BrandHero() {
       {/* Brand name */}
       <h1
         style={{
-          fontSize: "clamp(28px, 6vw, 52px)",
+          fontSize: "clamp(32px, 8vw, 60px)",
           fontWeight: 900,
-          color: "#0f172a",
+          color: textCol,
           margin: 0,
-          letterSpacing: -2,
-          lineHeight: 0.92,
+          letterSpacing: -3,
+          lineHeight: 0.9,
           textAlign: "center",
           fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
         }}
@@ -105,38 +134,38 @@ function BrandHero() {
       </h1>
       <h1
         style={{
-          fontSize: "clamp(28px, 6vw, 52px)",
+          fontSize: "clamp(32px, 8vw, 60px)",
           fontWeight: 900,
           color: "#d4a520",
-          margin: "0 0 8px 0",
-          letterSpacing: -2,
-          lineHeight: 0.92,
+          margin: "0 0 16px 0",
+          letterSpacing: -3,
+          lineHeight: 0.9,
           textAlign: "center",
           fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
-          textShadow: "0 0 30px rgba(212,165,32,0.35), 0 0 60px rgba(212,165,32,0.15)",
+          textShadow: "0 0 40px rgba(212,165,32,0.45), 0 0 80px rgba(212,165,32,0.18)",
         }}
       >
         REGIMENT
       </h1>
 
       {/* Gold divider */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "14px 0 14px 0" }}>
-        <div style={{ width: 36, height: 1, background: "linear-gradient(to right, transparent, #d4a520)" }} />
-        <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-          <rect x="1" y="1" width="8" height="8" rx="1.5" stroke="#d4a520" strokeWidth="1.5" />
-          <rect x="3.5" y="3.5" width="3" height="3" rx="0.5" fill="#d4a520" />
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+        <div style={{ flex: 1, height: 1, background: `linear-gradient(to right, transparent, ${dividerCol})`, maxWidth: 48 }} />
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+          <rect x="1.5" y="1.5" width="9" height="9" rx="2" stroke="#d4a520" strokeWidth="1.5" />
+          <rect x="4" y="4" width="4" height="4" rx="1" fill="#d4a520" />
         </svg>
-        <div style={{ width: 36, height: 1, background: "linear-gradient(to left, transparent, #d4a520)" }} />
+        <div style={{ flex: 1, height: 1, background: `linear-gradient(to left, transparent, ${dividerCol})`, maxWidth: 48 }} />
       </div>
 
       {/* Tagline */}
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
         <div
           style={{
-            fontSize: "clamp(12px, 2.2vw, 16px)",
+            fontSize: "clamp(11px, 2vw, 15px)",
             fontWeight: 700,
-            color: "#334155",
-            letterSpacing: 1.5,
+            color: mutedCol,
+            letterSpacing: 2,
             textAlign: "center",
             textTransform: "uppercase",
             lineHeight: 1.2,
@@ -146,14 +175,14 @@ function BrandHero() {
         </div>
         <div
           style={{
-            fontSize: "clamp(14px, 2.8vw, 20px)",
+            fontSize: "clamp(15px, 3vw, 22px)",
             fontWeight: 900,
             color: "#d4a520",
-            letterSpacing: 2,
+            letterSpacing: 3,
             textAlign: "center",
             textTransform: "uppercase",
             lineHeight: 1,
-            textShadow: "0 0 24px rgba(212,165,32,0.3)",
+            textShadow: "0 0 28px rgba(212,165,32,0.4)",
           }}
         >
           Trading AI
@@ -163,12 +192,12 @@ function BrandHero() {
       {/* Sweeping animated line */}
       <div
         style={{
-          marginTop: 16,
+          marginTop: 18,
           height: 2,
           width: "100%",
-          maxWidth: 380,
+          maxWidth: 360,
           borderRadius: 2,
-          background: "linear-gradient(to right, transparent, rgba(212,165,32,0.5), transparent)",
+          background: "rgba(212,165,32,0.18)",
           position: "relative",
           overflow: "hidden",
         }}
@@ -186,15 +215,8 @@ function BrandHero() {
         />
       </div>
 
-      {/* Blog link strip */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-          marginTop: 18,
-        }}
-      >
+      {/* Blog link */}
+      <div style={{ display: "flex", gap: 8, marginTop: 16, marginBottom: 4 }}>
         <a
           href="/blog/"
           target="_blank"
@@ -204,24 +226,25 @@ function BrandHero() {
             fontWeight: 700,
             color: "#d4a520",
             textDecoration: "none",
-            letterSpacing: 0.5,
-            padding: "5px 14px",
-            border: "1px solid rgba(212,165,32,0.35)",
+            letterSpacing: 1,
+            padding: "6px 18px",
+            border: "1px solid rgba(212,165,32,0.4)",
             borderRadius: 999,
-            background: "rgba(212,165,32,0.06)",
+            background: "rgba(212,165,32,0.07)",
             transition: "all 0.2s ease",
+            textTransform: "uppercase",
           }}
-          onMouseEnter={e => { e.currentTarget.style.background = "rgba(212,165,32,0.12)"; e.currentTarget.style.borderColor = "rgba(212,165,32,0.6)"; }}
-          onMouseLeave={e => { e.currentTarget.style.background = "rgba(212,165,32,0.06)"; e.currentTarget.style.borderColor = "rgba(212,165,32,0.35)"; }}
+          onMouseEnter={e => { e.currentTarget.style.background = "rgba(212,165,32,0.15)"; e.currentTarget.style.borderColor = "rgba(212,165,32,0.7)"; }}
+          onMouseLeave={e => { e.currentTarget.style.background = "rgba(212,165,32,0.07)"; e.currentTarget.style.borderColor = "rgba(212,165,32,0.4)"; }}
         >
-          Read the Blog
+          Read the Blog →
         </a>
       </div>
 
       <style>{`
         @keyframes login-hero-pulse {
-          0%, 100% { opacity: 0.7; box-shadow: 0 0 6px #d4a520; transform: scale(1); }
-          50% { opacity: 1; box-shadow: 0 0 14px #d4a520, 0 0 28px rgba(212,165,32,0.4); transform: scale(1.3); }
+          0%, 100% { opacity: 0.6; box-shadow: 0 0 6px #d4a520; }
+          50% { opacity: 1; box-shadow: 0 0 16px #d4a520, 0 0 32px rgba(212,165,32,0.4); }
         }
         @keyframes login-hero-sweep {
           0% { left: -60%; }
