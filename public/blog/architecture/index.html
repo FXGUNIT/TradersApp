@@ -1,0 +1,428 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>How We Built a Self-Improving Trading AI That Thinks Like a Quant Team — Architecture Deep Dive</title>
+  <meta name="description" content="12 AI models voting on every decision. A Watchtower that self-corrects. A Board Room that governs every signal. Complete architecture of Traders Regiment — the world's most advanced Trading AI — and why every technical decision was made the way it was." />
+  <meta name="keywords" content="trading AI architecture, self-improving AI system, multi-model consensus engine, quant trading system design, machine learning trading platform, Watchtower self-correction, Board Room governance AI, deliberative AI trading, regime detection HMM, self-training quant system, python trading AI, React trading UI" />
+  <meta name="robots" content="index, follow" />
+  <meta property="og:title" content="How We Built a Self-Improving Trading AI That Thinks Like a Quant Team" />
+  <meta property="og:description" content="12 AI models voting on every decision. A Watchtower that self-corrects. A Board Room that governs every signal. Complete architecture of Traders Regiment." />
+  <meta property="og:type" content="article" />
+  <meta property="og:url" content="https://tradergunit.pages.dev/blog/architecture/" />
+  <link rel="canonical" href="https://tradergunit.pages.dev/blog/architecture/" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: #0A0A0F; color: #E2E8F0; line-height: 1.8; }
+    .container { max-width: 720px; margin: 0 auto; padding: 60px 24px 80px; }
+    a { color: #d4a520; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .back { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: #64748b; margin-bottom: 40px; }
+    .back:hover { color: #d4a520; text-decoration: none; }
+    .eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 2.5px; text-transform: uppercase; color: #d4a520; margin-bottom: 16px; }
+    h1 { font-size: 38px; font-weight: 900; color: #fff; letter-spacing: -1px; margin-bottom: 24px; line-height: 1.15; }
+    .subtitle { font-size: 19px; color: #94a3b8; margin-bottom: 32px; border-left: 3px solid #d4a520; padding-left: 20px; line-height: 1.6; font-style: italic; }
+    .meta { font-size: 13px; color: #475569; margin-bottom: 48px; padding-bottom: 32px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+    h2 { font-size: 24px; font-weight: 800; color: #fff; margin: 48px 0 16px; letter-spacing: -0.3px; }
+    h3 { font-size: 18px; font-weight: 700; color: #d4a520; margin: 32px 0 12px; }
+    p { margin-bottom: 20px; color: #cbd5e1; font-size: 16px; }
+    ul, ol { margin: 0 0 20px 24px; color: #cbd5e1; font-size: 16px; }
+    li { margin-bottom: 8px; }
+    code { background: rgba(255,255,255,0.07); padding: 2px 7px; border-radius: 5px; font-size: 13px; color: #d4a520; font-family: 'Courier New', monospace; }
+    .highlight-box { background: rgba(212,165,32,0.08); border: 1px solid rgba(212,165,32,0.2); border-radius: 12px; padding: 24px; margin: 32px 0; }
+    .highlight-box p { color: #e2e8f0; font-size: 15px; margin: 0; }
+    .layer-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 24px; margin-bottom: 20px; }
+    .layer-card .layer-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .layer-card .layer-name { font-size: 16px; font-weight: 800; color: #fff; }
+    .layer-card .layer-badge { font-size: 10px; font-weight: 700; padding: 3px 10px; border-radius: 20px; letter-spacing: 1px; text-transform: uppercase; }
+    .layer-card .layer-badge.frontend { background: rgba(56,189,248,0.15); color: #38bdf8; border: 1px solid rgba(56,189,248,0.3); }
+    .layer-card .layer-badge.backend { background: rgba(74,222,128,0.15); color: #4ade80; border: 1px solid rgba(74,222,128,0.3); }
+    .layer-card .layer-badge.ml { background: rgba(212,165,32,0.15); color: #d4a520; border: 1px solid rgba(212,165,32,0.3); }
+    .layer-card .layer-badge.data { background: rgba(192,132,252,0.15); color: #c084fc; border: 1px solid rgba(192,132,252,0.3); }
+    .layer-card p { color: #94a3b8; font-size: 14px; margin: 0; }
+    .stack-table { width: 100%; border-collapse: collapse; margin: 24px 0; font-size: 14px; }
+    .stack-table th { text-align: left; padding: 12px 14px; background: rgba(255,255,255,0.04); border-bottom: 2px solid rgba(212,165,32,0.3); color: #d4a520; font-weight: 700; letter-spacing: 0.5px; font-size: 11px; text-transform: uppercase; }
+    .stack-table td { padding: 10px 14px; border-bottom: 1px solid rgba(255,255,255,0.05); color: #cbd5e1; }
+    .stack-table td:first-child { color: #e2e8f0; font-weight: 600; }
+    .stack-table tr:last-child td { border-bottom: none; }
+    .flow-diagram { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 24px; margin: 24px 0; font-family: 'Courier New', monospace; font-size: 13px; color: #94a3b8; line-height: 2; }
+    .flow-diagram .arrow { color: #d4a520; }
+    .flow-diagram .highlight { color: #4ade80; }
+    blockquote { border-left: 4px solid #d4a520; padding: 16px 24px; margin: 32px 0; background: rgba(212,165,32,0.06); border-radius: 0 12px 12px 0; font-size: 17px; color: #e2e8f0; font-style: italic; }
+    .keyword-tag { display: inline-block; background: rgba(212,165,32,0.1); border: 1px solid rgba(212,165,32,0.25); color: #d4a520; font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 20px; margin: 2px; letter-spacing: 0.5px; }
+    .tags { margin-top: 48px; }
+    .cta-box { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 32px; margin-top: 48px; text-align: center; }
+    .cta-box h3 { color: #fff; font-size: 20px; margin-bottom: 12px; }
+    .cta-box p { color: #94a3b8; font-size: 15px; margin-bottom: 20px; }
+    .cta-btn { display: inline-block; background: #d4a520; color: #0A0A0F; font-weight: 800; font-size: 14px; padding: 12px 28px; border-radius: 8px; letter-spacing: 0.5px; }
+    .cta-btn:hover { background: #f0c040; text-decoration: none; }
+    @media (max-width: 600px) { h1 { font-size: 26px; } .container { padding: 32px 16px 60px; } }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <a href="/blog/" class="back">&larr; Back to Blog</a>
+
+    <div class="eyebrow">Technical Deep Dive</div>
+    <h1>How We Built a Self-Improving Trading AI That Thinks Like a Quant Team</h1>
+    <div class="subtitle">
+      12 AI models voting on every decision. A Watchtower that self-corrects. A Board Room that governs every signal. Here's the complete architecture of Traders Regiment — and why every decision was made the way it was.
+    </div>
+    <div class="meta">By Gunit Singh — Founder & Lead Architect, Traders Regiment &nbsp;&bull;&nbsp; April 2026</div>
+
+    <p>When I set out to build Traders Regiment, I had one rule: <strong>no shortcuts</strong>. Every component had to be built the way an institutional quant team would build it — with the right tool for the right job, with explicit contracts between layers, and with failure modes that were designed for rather than discovered in production.</p>
+
+    <p>This is the architecture of that system. Every layer, every decision, every reason.</p>
+
+    <h2>The System at a Glance</h2>
+
+    <p>Traders Regiment is a monorepo with six independently deployable services:</p>
+
+    <div class="flow-diagram">
+      <span class="highlight">Frontend (React + Vite)</span> <span class="arrow">&larr;&rarr;</span> <span class="highlight">BFF (Node.js)</span> <span class="arrow">&larr;&rarr;</span> <span class="highlight">ML Engine (Python FastAPI)</span><br/>
+      <span class="highlight">Telegram Bridge (Node.js)</span> <span class="arrow">&larr;&rarr;</span> <span class="highlight">Firebase Auth + Realtime DB</span><br/>
+      <span class="highlight">SQLite Candle DB</span> <span class="arrow">&larr;&rarr;</span> <span class="highlight">DVC + MLflow (model versioning)</span>
+    </div>
+
+    <div class="layer-card">
+      <div class="layer-header">
+        <span class="layer-name">Frontend — React + Vite</span>
+        <span class="layer-badge frontend">UI Layer</span>
+      </div>
+      <p>React with Vite for fast hot-module replacement in development and optimized production builds. The frontend is purely presentational — it owns rendering and user interaction. All business logic lives in the BFF. Components are pure: props in, UI out. Heavy components lazy-loaded with <code>React.lazy()</code>.</p>
+    </div>
+
+    <div class="layer-card">
+      <div class="layer-header">
+        <span class="layer-name">BFF — Node.js (port 8788)</span>
+        <span class="layer-badge backend">Orchestration Layer</span>
+      </div>
+      <p>Express.js Backend-for-Frontend. All ML engine calls, news fetches, and Telegram messages are orchestrated here. This is where the async-first, concurrent-by-default rule lives: when a consensus call is made, all 12 models are queried simultaneously — not sequentially. Bottleneck is the slowest model, not the sum of all models.</p>
+    </div>
+
+    <div class="layer-card">
+      <div class="layer-header">
+        <span class="layer-name">ML Engine — Python FastAPI (port 8001)</span>
+        <span class="layer-badge ml">Intelligence Layer</span>
+      </div>
+      <p>Every model runs in its own isolated process. FastAPI handles routing. All responses follow a strict <code>BaseResponse</code> contract with <code>ok</code>, <code>error</code>, <code>latency_ms</code>, and <code>timestamp</code>. Every endpoint has a 5-second timeout and a circuit breaker.</p>
+    </div>
+
+    <div class="layer-card">
+      <div class="layer-header">
+        <span class="layer-name">Telegram Bridge — Node.js</span>
+        <span class="layer-badge backend">Alert Layer</span>
+      </div>
+      <p>Event-driven bot that delivers consensus signals, regime changes, and Watchtower alerts directly to the trader's phone. Low latency. Rate-limited. Never floods the chat.</p>
+    </div>
+
+    <h2>The Language Stack — The Right Tool for Every Task</h2>
+
+    <p>No single language is best for everything. We chose each language for what it does best:</p>
+
+    <table class="stack-table">
+      <thead>
+        <tr>
+          <th>Task</th>
+          <th>Language / Stack</th>
+          <th>Why</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Real-time signal orchestration</td>
+          <td><code>Node.js</code></td>
+          <td>Non-blocking async I/O — concurrent calls to 12 models at once</td>
+        </tr>
+        <tr>
+          <td>ML model inference</td>
+          <td><code>Python</code></td>
+          <td>scikit-learn, LightGBM, PyTorch — mature, best-in-class ML ecosystem</td>
+        </tr>
+        <tr>
+          <td>Sequence modeling</td>
+          <td><code>PyTorch Mamba</code></td>
+          <td>State-of-the-art long-range dependency modeling for market sequences</td>
+        </tr>
+        <tr>
+          <td>Regime detection</td>
+          <td><code>Python</code></td>
+          <td>HMM, fractal analysis, anomalous diffusion — statistical foundations</td>
+        </tr>
+        <tr>
+          <td>Frontend UI</td>
+          <td><code>React</code></td>
+          <td>Reactive component model — fast, declarative, easy to test</td>
+        </tr>
+        <tr>
+          <td>Data pipeline</td>
+          <td><code>Python (pandas, numpy)</code></td>
+          <td>Best for numerical, time-series, and financial computation</td>
+        </tr>
+        <tr>
+          <td>Telegram bridge</td>
+          <td><code>Node.js</code></td>
+          <td>Event-driven architecture matches Telegram's webhook model</td>
+        </tr>
+        <tr>
+          <td>Circuit breaking</td>
+          <td><code>Node.js</code></td>
+          <td>Built-in async error handling + promise race conditions for timeouts</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>The 5-Phase Recursive Consensus Engine</h2>
+
+    <p>This is the core of Traders Regiment. Every trading decision passes through five phases:</p>
+
+    <div class="flow-diagram">
+      <span class="highlight">[PHASE 1]</span> Raw Market Data &rarr; Feature Pipeline<br/>
+      <span class="arrow">&darr;</span><br/>
+      <span class="highlight">[PHASE 2]</span> 12 Models Analyze Concurrently<br/>
+      <span class="arrow">&darr;</span><br/>
+      <span class="highlight">[PHASE 3]</span> Recursive Deliberation &rarr; Ensemble Convergence<br/>
+      <span class="arrow">&darr;</span><br/>
+      <span class="highlight">[PHASE 4]</span> Board Room Governance &rarr; Veto Check<br/>
+      <span class="arrow">&darr;</span><br/>
+      <span class="highlight">[PHASE 5]</span> Risk-Adjusted Signal Output
+    </div>
+
+    <h3>The 12 Models</h3>
+
+    <p>Each model is an independent analytical agent with its own specialty. They don't know about each other — they just produce their output. The ensemble aggregator collects all votes and converges on a consensus:</p>
+
+    <ul>
+      <li><strong>DirectionModel</strong> — bull/bear/neutral classification with confidence scores</li>
+      <li><strong>MagnitudeModel</strong> — predicted size of move, not just direction</li>
+      <li><strong>RegimeModel_HMM</strong> — Hidden Markov Model for regime classification</li>
+      <li><strong>RegimeModel_FPFK</strong> — Fractal and power-law regime detection</li>
+      <li><strong>RegimeModel_Anomalous</strong> — Anomalous diffusion detection for crisis identification</li>
+      <li><strong>SessionModel</strong> — historical session probability distributions</li>
+      <li><strong>AlphaModel</strong> — non-obvious edge from cross-model disagreement</li>
+      <li><strong>OptionsModel</strong> — IV regime, gamma exposure, options flow analysis</li>
+      <li><strong>TechCandleModel</strong> — candle pattern recognition with wick noise filtering</li>
+      <li><strong>TechIBModel</strong> — trendline and horizontal structure analysis</li>
+      <li><strong>MambaSequenceModel</strong> — long-range sequence pattern recognition (PyTorch)</li>
+      <li><strong>ExitModel</strong> — stop-loss and target optimization per regime</li>
+    </ul>
+
+    <h3>Recursive Deliberation</h3>
+
+    <p>Phase 2 doesn't end with a simple vote. The ensemble aggregator runs a multi-round deliberation:</p>
+
+    <ol>
+      <li>Round 1: All 12 models vote. Ensemble aggregates.</li>
+      <li>Round 2: Models that were in the minority are asked to justify or revise. Regime conditions are injected as context.</li>
+      <li>Round 3: Final convergence. Confidence score is weighted by historical model accuracy in the current regime.</li>
+    </ol>
+
+    <p>The result is not just a majority vote — it's a <strong>deliberated consensus</strong> that has been stress-tested against dissenting views.</p>
+
+    <h2>The Deliberative Board Room</h2>
+
+    <p>The Board Room is our governance layer. It exists to prevent bad trades, not just to confirm good ones. It has veto power — and it uses it.</p>
+
+    <div class="highlight-box">
+      <p><strong>Consensus rule:</strong> 3 out of 5 Board Members must agree to proceed. Any single veto — from RiskOfficer, RegimeWatcher, or OptionsDesk — converts the signal to NEUTRAL. RiskOfficer always has the final word.</p>
+    </div>
+
+    <table class="stack-table">
+      <thead>
+        <tr>
+          <th>Board Member</th>
+          <th>Specialty</th>
+          <th>Veto?</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Tech_IB</td>
+          <td>Trendline + horizontal structure geometry</td>
+          <td>No</td>
+        </tr>
+        <tr>
+          <td>Tech_Candle</td>
+          <td>Candle patterns, wick noise filtering ("wick = noise, close = truth")</td>
+          <td>No</td>
+        </tr>
+        <tr>
+          <td>RegimeWatcher</td>
+          <td>CRISIS and CONTAGION regime detection</td>
+          <td><strong>YES</strong></td>
+        </tr>
+        <tr>
+          <td>OptionsDesk</td>
+          <td>Expiry day detection, LOW_IV regime</td>
+          <td><strong>YES</strong></td>
+        </tr>
+        <tr>
+          <td>RiskOfficer</td>
+          <td>Daily stop (2 losses), max positions (1 open)</td>
+          <td><strong>YES — ALWAYS FINAL</strong></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Veto Conditions (Codified)</h3>
+
+    <ul>
+      <li><code>regime == "CRISIS"</code> or <code>"CONTAGION"</code> → <strong>RegimeWatcher vetoes</strong></li>
+      <li><code>is_expiry_day == True</code> or <code>iv_regime == "LOW"</code> → <strong>OptionsDesk vetoes</strong></li>
+      <li><code>losses_today >= 2</code> or <code>positions_open >= 1</code> → <strong>RiskOfficer vetoes</strong></li>
+      <li><code>dead_chop == True</code> (ATR &lt; ATR_avg × 0.5) → <strong>Tech_IB vetoes</strong></li>
+      <li><code>wick_alone == True</code> (wick signal without close confirmation) → <strong>Tech_Candle vetoes</strong></li>
+    </ul>
+
+    <blockquote>
+      The Board Room cannot be overridden by any other component. RiskOfficer veto is absolute. No code, prompt, or agent may disable or bypass these conditions.
+    </blockquote>
+
+    <h2>Watchtower — The Self-Correcting Guardian</h2>
+
+    <p>Watchtower is our performance monitoring and self-correction layer. It runs continuously, not on-demand.</p>
+
+    <p>Watchtower monitors:</p>
+
+    <ul>
+      <li><strong>Model Drift</strong> — every 15 minutes, Watchtower compares each model's recent accuracy against its 30-day baseline. If accuracy drops more than 5%, the model is flagged.</li>
+      <li><strong>Regime Stability</strong> — if the regime classifier changes state more than 3 times in one hour, a regime instability alert fires and strategy weights are tightened.</li>
+      <li><strong>Signal Outcome Tracking</strong> — every signal's outcome is logged. Watchtower compares predicted vs. actual across regime, session, and instrument.</li>
+      <li><strong>Performance Decay</strong> — if the overall ensemble win rate drops below the paper-trade threshold, Watchtower sends a regime-specific alert to the trader.</li>
+    </ul>
+
+    <p>Watchtower is the reason Traders Regiment doesn't just work on day one. It works better on day 30, and even better on day 300. <strong>The system learns from its own performance.</strong></p>
+
+    <h3>Self-Correction Loop</h3>
+
+    <div class="flow-diagram">
+      Watchtower Detects Drift<br/>
+      <span class="arrow">&darr;</span><br/>
+      Flag model + weight down automatically<br/>
+      <span class="arrow">&darr;</span><br/>
+      Trigger EWC Recalibration Pipeline<br/>
+      <span class="arrow">&darr;</span><br/>
+      Paper Trade New Weights (1 trading week)<br/>
+      <span class="arrow">&darr;</span><br/>
+      Promote or Reject &rarr; Watchtower resumes monitoring
+    </div>
+
+    <h2>Self-Improving AI — The Continual Learning Pipeline</h2>
+
+    <p>Traders Regiment uses <strong>Elastic Weight Consolidation (EWC)</strong> — a technique that allows the AI to learn new market patterns without catastrophically forgetting the patterns it already knows. This is critical in trading, where old regimes return and old patterns resurface.</p>
+
+    <p>The continual learning pipeline:</p>
+
+    <ul>
+      <li><strong>Paper Trade First</strong> — every model change or new strategy is paper traded for a minimum 1 trading week before any consideration for live deployment.</li>
+      <li><strong>Replay Buffer</strong> — significant historical events (regime transitions, crisis events, high-volatility sessions) are stored and replayed periodically to reinforce old learning.</li>
+      <li><strong>Bayesian Hyperparameter Optimization</strong> — Optuna-based tuning that adapts learning rates and regularization to current market conditions.</li>
+      <li><strong>MLflow Tracking</strong> — every training run is logged with parameters, metrics, model artifacts, and DVC commit hash. Full data lineage from candle to signal.</li>
+    </ul>
+
+    <h2>Security Architecture</h2>
+
+    <p>Security is not a feature. It's architecture. Every layer has explicit security controls:</p>
+
+    <table class="stack-table">
+      <thead>
+        <tr>
+          <th>Security Measure</th>
+          <th>Layer</th>
+          <th>What It Prevents</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>No secrets in code</td>
+          <td>All layers</td>
+          <td>Credentials in git history</td>
+        </tr>
+        <tr>
+          <td>Parameterized SQL queries</td>
+          <td>ML Engine</td>
+          <td>SQL injection</td>
+        </tr>
+        <tr>
+          <td>Pydantic input validation</td>
+          <td>ML Engine</td>
+          <td>Malformed inputs</td>
+        </tr>
+        <tr>
+          <td>5s timeout + circuit breaker</td>
+          <td>BFF</td>
+          <td>Cascading ML failures</td>
+        </tr>
+        <tr>
+          <td>Rate limiting</td>
+          <td>BFF</td>
+          <td>API abuse / DoS</td>
+        </tr>
+        <tr>
+          <td>SSH key auth + fail2ban</td>
+          <td>VPS</td>
+          <td>Brute-force access</td>
+        </tr>
+        <tr>
+          <td>UFW firewall (SSH locked to known IPs)</td>
+          <td>VPS</td>
+          <td>Unauthorized network access</td>
+        </tr>
+        <tr>
+          <td>Zod validation on all BFF routes</td>
+          <td>BFF</td>
+          <td>Bad data entering the system</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>Data Infrastructure</h2>
+
+    <ul>
+      <li><strong>SQLite Candle Database</strong> — efficient, portable, ACID-compliant. Candle data, session aggregates, trade log. Loaded from NinjaTrader CSV exports.</li>
+      <li><strong>DVC (Data Version Control)</strong> — every dataset tracked alongside code. <code>dvc repro</code> recomputes the full pipeline. <code>dvc push/pull</code> syncs models and data to/from remote storage.</li>
+      <li><strong>MLflow</strong> — experiment tracking for every training run. Self-hosted via Docker. Parameters, metrics, SHAP values, and model artifacts logged automatically.</li>
+      <li><strong>MinIO (S3-compatible)</strong> — model artifact store. Production models promoted from Staging after paper trade review.</li>
+    </ul>
+
+    <h2>The Pipeline Ahead</h2>
+
+    <p>The current architecture is the foundation. Here's what's being built on top of it:</p>
+
+    <ul>
+      <li><strong>Watchtower Auto-Recalibration</strong> — Watchtower triggers EWC recalibration automatically when drift is detected, without human intervention.</li>
+      <li><strong>Redis Caching</strong> — adding Redis for sub-millisecond consensus caching. Regime cache TTL 300s. Consensus cache TTL 60s.</li>
+      <li><strong>Trading Calculator Hub</strong> — stateless API routes for every trading calculator, backed by Python numerical engines.</li>
+      <li><strong>Multi-Asset Data Pipeline</strong> — MCX, forex, crypto candle ingestion into the same DVC-tracked database.</li>
+      <li><strong>Institutional API</strong> — REST API with API key auth for white-labelling the consensus engine to prop firms.</li>
+    </ul>
+
+    <blockquote>
+      The architecture was designed for growth. Every layer has explicit contracts. Every service is independently deployable. Adding a new model family takes one new subdirectory and one new BFF route — nothing else needs to change.
+    </blockquote>
+
+    <div class="tags">
+      <span class="keyword-tag">EDGE</span>
+      <span class="keyword-tag">QUANT</span>
+      <span class="keyword-tag">SYSTEM</span>
+      <span class="keyword-tag">UNIVERSE</span>
+      <span class="keyword-tag">ALPHA</span>
+      <span class="keyword-tag">INSTITUTIONAL</span>
+      <span class="keyword-tag">TRADING DESK</span>
+      <span class="keyword-tag">HEDGE FUND</span>
+      <span class="keyword-tag">MACHINE LEARNING</span>
+      <span class="keyword-tag">PYTHON</span>
+      <span class="keyword-tag">SELF-IMPROVING</span>
+      <span class="keyword-tag">MOST INTELLIGENT AI SYSTEM</span>
+    </div>
+
+    <div class="cta-box">
+      <h3>See the Architecture in Action</h3>
+      <p>12 models. Board Room governance. Watchtower self-correction. This is what institutional quant intelligence looks like — in your browser.</p>
+      <a href="https://tradergunit.pages.dev/" class="cta-btn">Access Traders Regiment &rarr;</a>
+    </div>
+
+  </div>
+</body>
+</html>
