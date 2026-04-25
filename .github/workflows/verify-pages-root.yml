@@ -10,11 +10,11 @@ on:
       bff_host:
         description: "Public BFF host"
         required: false
-        default: "bff.173.249.18.14.sslip.io"
+        default: "bff.traders.app"
       api_host:
         description: "Public API host"
         required: false
-        default: "api.173.249.18.14.sslip.io"
+        default: "api.traders.app"
       timeout_seconds:
         description: "Probe timeout in seconds"
         required: false

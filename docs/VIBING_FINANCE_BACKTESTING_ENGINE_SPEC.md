@@ -736,15 +736,32 @@ Answer these over time. We will keep updating this same document.
 
 ---
 
-## 13. Default Assumptions Until User Answers
+## 13. Locked MVP Decisions
 
-These are temporary assumptions, not final decisions.
+Answered by founder on 2026-04-25:
 
-- First user: founder/admin only.
-- First asset: MNQ or NQ, because existing docs and app context already reference these heavily.
-- First strategy family: opening range breakout or ATR trend continuation.
+- First assets: MNQ and NIFTY.
+- First strategy family: post-initial-balance strategy using VWAP plus inventory context.
+- MNQ session context: New York session.
+- NIFTY session context: Indian market session.
+- First data source: uploaded CSV.
+- First access rule: only the admin account.
+
+Initial interpretation:
+
+- "IB" means initial balance. The engine should wait until the relevant session's initial balance has formed, then evaluate trade logic after that window is complete.
+- For NIFTY, initial balance should be defined in Indian market time.
+- For MNQ, initial balance should be defined in New York session time.
+- VWAP should be part of the trade filter and/or trigger logic.
+- Inventory should act as a market-context filter, but the exact definition still needs to be specified.
+
+---
+
+## 14. Remaining Default Assumptions
+
+These are temporary assumptions until the remaining details are answered.
+
 - First timeframe: 5-minute OHLCV.
-- First data source: existing uploaded candle/trade data path or CSV upload.
 - First report standard: net backtest plus drawdown, costs, walk-forward, Monte Carlo, and caveats.
 - First blockchain use: none in MVP; revisit as audit-proof layer only after the engine works.
 - First UX: one hidden chat page with structured strategy spec and report output.
@@ -752,31 +769,36 @@ These are temporary assumptions, not final decisions.
 
 ---
 
-## 14. Immediate Next Decision
+## 15. Immediate Next Decisions
 
-Before code starts, choose these four items:
+Before code starts, define these strategy mechanics:
 
-1. First asset.
-2. First strategy family.
-3. First available data source.
-4. First user/access rule.
+1. Exact NIFTY initial balance window in IST.
+2. Exact MNQ initial balance window in New York time.
+3. Whether VWAP resets by session, day, or custom window.
+4. What "inventory" means in this system.
+5. Long entry rule after IB formation.
+6. Short entry rule after IB formation.
+7. Stop-loss rule.
+8. Take-profit rule.
+9. No-trade filters.
+10. CSV column format.
 
-Recommended conservative answer:
+Current MVP decision summary:
 
 ```text
-First asset: MNQ or NQ
-First strategy: opening range breakout
-First data: user-uploaded 5m CSV first, then database-backed data
-First access: admin-only hidden page behind feature flag
+First assets: MNQ and NIFTY
+First strategy: post-IB strategy using VWAP + inventory context
+First data: uploaded CSV
+First access: admin account only
 ```
 
 ---
 
-## 15. Working MVP Definition
+## 16. Working MVP Definition
 
 Proposed MVP:
 
-> A hidden admin-only page where the trader describes one intraday futures strategy in plain English, the app converts it into a validated strategy spec, runs a realistic net backtest on uploaded 5-minute data, and returns a strict risk report with a reject/revise/paper-trade verdict.
+> A hidden admin-only page where the trader describes a post-initial-balance MNQ or NIFTY strategy in plain English, the app converts it into a validated strategy spec using VWAP and inventory context, runs a realistic net backtest on uploaded CSV data, and returns a strict risk report with a reject/revise/paper-trade verdict.
 
 This MVP is intentionally narrow. Once it is trustworthy, expand asset coverage, data sources, strategy families, ML optimization, research-paper retrieval, and audit proofs.
-
