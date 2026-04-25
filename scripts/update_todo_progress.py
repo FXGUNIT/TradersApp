@@ -300,7 +300,15 @@ def summarize_checklist_items(items: list[ChecklistItem]) -> dict[str, float]:
     }
 
 
-def infer_heading_status(heading: str, done: int, total: int) -> str:
+def infer_heading_status(
+    heading: str,
+    done: int,
+    total: int,
+    *,
+    partial: int = 0,
+    blocked: int = 0,
+    todo: int = 0,
+) -> str:
     normalized = heading.lower()
     if total > 0 and done == total:
         return "DONE"
@@ -320,13 +328,17 @@ def infer_heading_status(heading: str, done: int, total: int) -> str:
         return "CURRENT BLOCKER"
     if "blocked by" in normalized or normalized.endswith("blocked"):
         return "BLOCKED"
+    if blocked and not partial and not todo:
+        return "BLOCKED"
+    if blocked:
+        return "IN PROGRESS"
     if "known issue" in normalized:
         return "KNOWN ISSUE"
     if "in progress" in normalized:
         return "IN PROGRESS"
     if "pending" in normalized or "required" in normalized:
         return "PENDING"
-    if done > 0:
+    if done > 0 or partial > 0:
         return "IN PROGRESS"
     return "PENDING"
 
@@ -431,7 +443,19 @@ def build_master_progress_block(markdown: str) -> str:
             bucket_items = bucket["items"]
             if bucket_items and bucket_items[0].area == area_name:
                 done = sum(1 for item in bucket_items if item.status == "Done")
-                phase_statuses.append(infer_heading_status(str(bucket["title"]), done, len(bucket_items)))
+                partial = sum(1 for item in bucket_items if item.status == "Partial")
+                blocked = sum(1 for item in bucket_items if item.status == "Blocked")
+                todo = sum(1 for item in bucket_items if item.status == "Todo")
+                phase_statuses.append(
+                    infer_heading_status(
+                        str(bucket["title"]),
+                        done,
+                        len(bucket_items),
+                        partial=partial,
+                        blocked=blocked,
+                        todo=todo,
+                    )
+                )
         status_label = infer_aggregate_status(phase_statuses, int(area_summary["done"]), int(area_summary["total"]))
         lines.append(
             f"| {area_name} | [{int(area_summary['done'])}/{int(area_summary['total'])}] | {area_summary['completion_pct']:5.1f}% | {status_label} |"
@@ -460,7 +484,19 @@ def build_master_progress_block(markdown: str) -> str:
                 continue
             bucket_items = bucket["items"]
             done = sum(1 for item in bucket_items if item.status == "Done")
-            phase_statuses.append(infer_heading_status(str(bucket["title"]), done, len(bucket_items)))
+            partial = sum(1 for item in bucket_items if item.status == "Partial")
+            blocked = sum(1 for item in bucket_items if item.status == "Blocked")
+            todo = sum(1 for item in bucket_items if item.status == "Todo")
+            phase_statuses.append(
+                infer_heading_status(
+                    str(bucket["title"]),
+                    done,
+                    len(bucket_items),
+                    partial=partial,
+                    blocked=blocked,
+                    todo=todo,
+                )
+            )
         status_label = infer_aggregate_status(phase_statuses, int(tier_summary["done"]), int(tier_summary["total"]))
         lines.append(
             f"| {tier_name} | {scope_label} | {tier_summary['completion_pct']:5.1f}% | {status_label} |"
@@ -480,7 +516,14 @@ def build_master_progress_block(markdown: str) -> str:
         bucket = phase_buckets[phase_id]
         bucket_items: list[ChecklistItem] = bucket["items"]  # type: ignore[assignment]
         bucket_summary = summarize_checklist_items(bucket_items)
-        status_label = infer_heading_status(str(bucket["title"]), int(bucket_summary["done"]), int(bucket_summary["total"]))
+        status_label = infer_heading_status(
+            str(bucket["title"]),
+            int(bucket_summary["done"]),
+            int(bucket_summary["total"]),
+            partial=int(bucket_summary["partial"]),
+            blocked=int(bucket_summary["blocked"]),
+            todo=int(bucket_summary["todo"]),
+        )
         display_title = clean_phase_title(phase_id, str(bucket["title"]))
         lines.append(
             f"| {phase_id} - {display_title} | [{int(bucket_summary['done'])}/{int(bucket_summary['total'])}] | {bucket_summary['completion_pct']:5.1f}% | {status_label} |"
@@ -683,7 +726,7 @@ def _build_live_status_table(markdown: str) -> str:
     phase_titles_by_id: dict[str, str] = {}
     phase_heading_re = re.compile(r"^###\s+(P\d{2})\b.*$")
     subsection_heading_re = re.compile(r"^####\s+(P\d{2})\b.*$")
-    checkbox_re = re.compile(r"^-\s+\[(?P<mark>[ x])\]\s+(?P<title>.+)$")
+    checkbox_re = re.compile(r"^-\s+\[(?P<mark>[ x!\-])\]\s+(?P<title>.+)$")
 
     for line in stage_block.splitlines():
         stripped = line.strip()
@@ -699,6 +742,8 @@ def _build_live_status_table(markdown: str) -> str:
                 "id": phase_id,
                 "heading": heading,
                 "done": 0,
+                "partial": 0,
+                "blocked": 0,
                 "todo": 0,
             }
             continue
@@ -715,6 +760,8 @@ def _build_live_status_table(markdown: str) -> str:
                 "id": phase_id,
                 "heading": heading,
                 "done": 0,
+                "partial": 0,
+                "blocked": 0,
                 "todo": 0,
             }
             continue
@@ -724,8 +771,13 @@ def _build_live_status_table(markdown: str) -> str:
 
         checkbox_match = checkbox_re.match(line)
         if checkbox_match:
-            if checkbox_match.group("mark") == "x":
+            marker = checkbox_match.group("mark")
+            if marker == "x":
                 current["done"] += 1
+            elif marker == "!":
+                current["blocked"] += 1
+            elif marker == "-":
+                current["partial"] += 1
             else:
                 current["todo"] += 1
 
@@ -741,19 +793,30 @@ def _build_live_status_table(markdown: str) -> str:
     archived_sections = 0
     pending_sections = 0
     done_tasks = 0
-    open_tasks = 0
+    partial_tasks = 0
+    blocked_tasks = 0
+    todo_tasks = 0
     rows: list[str] = []
 
     for section in sections:
         section_id = str(section["id"])
         heading = str(section["heading"])
         done = int(section["done"])
+        partial = int(section.get("partial", 0))
+        blocked = int(section.get("blocked", 0))
         todo = int(section["todo"])
-        total = done + todo
+        total = done + partial + blocked + todo
         if total == 0:
             continue
         pct = (done / total * 100.0) if total else 0.0
-        status_label = _infer_stage_p_status(heading, done, total)
+        status_label = _infer_stage_p_status(
+            heading,
+            done,
+            total,
+            partial=partial,
+            blocked=blocked,
+            todo=todo,
+        )
 
         if status_label == "DONE":
             done_sections += 1
@@ -767,14 +830,16 @@ def _build_live_status_table(markdown: str) -> str:
             pending_sections += 1
 
         done_tasks += done
-        open_tasks += todo
+        partial_tasks += partial
+        blocked_tasks += blocked
+        todo_tasks += todo
 
         label = re.sub(r"^P\d{2}(?:-[A-Z])?\s*[-:—]*\s*", "", heading).strip()
         rows.append(f"| {section_id} - {label} | [{done}/{total}] | {pct:5.1f}% | {status_label} |")
 
     timestamp = datetime.now().astimezone().strftime("%Y-%m-%d %H:%M")
     section_total = len(sections)
-    task_total = done_tasks + open_tasks
+    task_total = done_tasks + partial_tasks + blocked_tasks + todo_tasks
     backlog_pct = (done_tasks / task_total * 100.0) if task_total else 0.0
 
     header = (
@@ -784,7 +849,7 @@ def _build_live_status_table(markdown: str) -> str:
         "```text\n"
         f"Stage P Backlog {backlog_pct:5.1f}%  {make_bar(backlog_pct, width=24)}\n"
         f"Sections        done {format_count(done_sections)} | active {format_count(active_sections)} | blocked {format_count(blocked_sections)} | archived {format_count(archived_sections)} | pending {format_count(pending_sections)} | total {format_count(section_total)}\n"
-        f"Checklist       done {format_count(done_tasks)} | open {format_count(open_tasks)} | total {format_count(task_total)}\n"
+        f"Checklist       done {format_count(done_tasks)} | in progress {format_count(partial_tasks)} | blocked {format_count(blocked_tasks)} | todo {format_count(todo_tasks)} | total {format_count(task_total)}\n"
         "```\n\n"
         "| Section | Tasks | Progress | Status |\n"
         "|---|---|---:|---|\n"
@@ -876,7 +941,15 @@ def _build_legacy_live_status_table(markdown: str) -> str:
     return header + "\n".join(rows) + f"\n\n{PROGRESS_END}\n"
 
 
-def _infer_stage_p_status(heading: str, done: int, total: int) -> str:
+def _infer_stage_p_status(
+    heading: str,
+    done: int,
+    total: int,
+    *,
+    partial: int = 0,
+    blocked: int = 0,
+    todo: int = 0,
+) -> str:
     normalized = heading.lower()
     if done == total and total > 0:
         return "DONE"
@@ -888,7 +961,13 @@ def _infer_stage_p_status(heading: str, done: int, total: int) -> str:
         return "CURRENT BLOCKER"
     if "blocked by" in normalized:
         return "BLOCKED"
+    if blocked and not partial and not todo:
+        return "BLOCKED"
+    if blocked:
+        return "IN PROGRESS"
     if "in progress" in normalized or " active" in normalized or normalized.endswith("active"):
+        return "IN PROGRESS"
+    if done > 0 or partial > 0:
         return "IN PROGRESS"
     if "known issue" in normalized:
         return "KNOWN ISSUE"

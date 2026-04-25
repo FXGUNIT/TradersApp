@@ -21,16 +21,33 @@ No paid domain is required.
 ## Deploy Prerequisites
 
 1. A free Cloudflare account.
-2. Local Wrangler authentication:
+2. A Cloudflare API token that can deploy Workers. The current GitHub secret is valid for the account but not for Worker deploys.
+3. Local Wrangler authentication, if deploying from your laptop:
 
 ```bash
 npx wrangler login
 ```
-3. Verify authentication:
+4. Verify authentication:
 
 ```bash
 npx wrangler whoami
 ```
+
+## GitHub Actions Deploy
+
+A workflow is available:
+
+```bash
+gh workflow run deploy-bff-worker.yml --repo FXGUNIT/TradersApp --ref main
+```
+
+Latest result, 2026-04-25: GitHub run `24928501312` reached Cloudflare but failed with:
+
+```text
+Authentication error [code: 10000]
+```
+
+That means the `CLOUDFLARE_API_TOKEN` secret must be replaced with a token that has Cloudflare Workers deploy permission before this optional proxy can go live.
 
 ## Deploy
 

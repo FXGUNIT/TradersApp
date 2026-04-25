@@ -1,17 +1,17 @@
 # TODO Master List
 
 **Last Updated:** 2026-04-25
-**Status:** P26 DONE — Contabo VPS live | P25 DONE — NY Lunch Block | web app is canonical | desktop proof archived/optional
+**Status:** P26 LIVE — Contabo VPS live | P25 DONE — NY Lunch Block | web app is canonical | desktop proof archived/optional
 
 
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-25 15:15`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-25 15:47`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Master Backlog  90.0%  [######################--]
-Tasks          done 018 | in progress 000 | blocked 000 | todo 002 | total 020
+Tasks          done 018 | in progress 000 | blocked 002 | todo 000 | total 020
 ```
 
 How to read this:
@@ -39,7 +39,7 @@ How to read this:
 |---|---|---:|---|
 | P23 - 4 GB Performance and Compatibility Certification | [5/5] | 100.0% | DONE |
 | P25 - NY Lunch Trading Block ✅ DONE | [5/5] | 100.0% | DONE |
-| P26 - Pages Root Live + Critical Bug Fixes ✅ DONE | [8/10] |  80.0% | IN PROGRESS |
+| P26 - Pages Root Live + Critical Bug Fixes — LIVE, 2 BLOCKED FOLLOW-UPS | [8/10] |  80.0% | IN PROGRESS |
 
 <!-- master-progress:end -->
 
@@ -112,7 +112,7 @@ All Stages S1–S6 and ML1–ML8 are background. Implement carefully, update liv
 - [x] Task 4: Document in `DOMAIN-RULES.md` and `EDGE-CASES.md` ✅ DONE
 - [x] Task 5: Verify end-to-end — BFF /health verified ✅ DONE
 
-### P26 - Pages Root Live + Critical Bug Fixes ✅ DONE
+### P26 - Pages Root Live + Critical Bug Fixes — LIVE, 2 BLOCKED FOLLOW-UPS
 - Plan: `C:\Users\Asus\.claude\plans\partitioned-coalescing-snowglobe.md`
 - Canonical app now serves at `https://tradergunit.pages.dev` (full trading app, not developer landing)
 - `tradergunit.pages.dev` removed from `DEV_ROOT_HOSTS` in `src/App.jsx`
@@ -130,6 +130,7 @@ All Stages S1–S6 and ML1–ML8 are background. Implement carefully, update liv
 - Keep Pages pointed at the working free backend host: `https://bff.173.249.18.14.sslip.io`
 - If a Cloudflare Worker proxy is needed later without buying a domain, use a free `workers.dev` hostname after Cloudflare/Wrangler authentication is available. Do not switch `VITE_BFF_URL` until the new free Worker URL returns `/health` successfully.
 - Cleanup note (2026-04-25): active build defaults, CSP, runtime examples, k6 public-edge defaults, Vercel CSP, GitHub workflow defaults, setup scripts, and optional Worker docs/config now point at the free `pages.dev` + `sslip.io` path instead of unpaid `traders.app` hostnames.
+- Worker proxy note (2026-04-25): `.github/workflows/deploy-bff-worker.yml` now exists and local `wrangler deploy --dry-run` passes. GitHub run `24928501312` failed because the stored `CLOUDFLARE_API_TOKEN` is authenticated but lacks Cloudflare Workers deploy permission (`Authentication error [code: 10000]`). Keep Pages on `https://bff.173.249.18.14.sslip.io` until that token is replaced with one that can deploy Workers and the workflow verifies `/health` + news endpoints.
 
 **Bug 2 — LIVE NEWS + SCHEDULED NEWS showing OFFLINE (FIXED):**
 - Root cause: Browser extension injects `x-tradersapp-install-id` header into all cross-origin XHR/fetch requests
@@ -148,9 +149,9 @@ All Stages S1–S6 and ML1–ML8 are background. Implement carefully, update liv
 - [x] Task 6: Fix NewsStatusClient fallback chain — direct `/news/breaking` + `/news/upcoming` when ML consensus fails ✅ DONE
 - [x] Task 7: Strip `x-tradersapp-*` extension headers in `bffFetch` (`src/services/gateways/base.js`) ✅ DONE
 - [x] Task 8: Add `x-tradersapp-install-id` to BFF CORS allowlist (`bff/server.mjs`) ✅ DONE
-- [ ] Task 9: Bug 1 — Human flushes DNS on affected devices (`ipconfig /flushdns`) to resolve CERT errors — no code fix available
+- [!] Task 9: Bug 1 — BLOCKED on human/device action: flush DNS on affected devices (`ipconfig /flushdns`) to resolve CERT errors — no repo code fix available
 
-- [ ] Task 10: Optional no-owned-domain Worker proxy: use a free `workers.dev` URL only after Wrangler/Cloudflare auth is available and `/health` verifies end to end
+- [!] Task 10: Optional no-owned-domain Worker proxy: BLOCKED on Cloudflare token permission. Workflow exists, dry-run passes, deploy failed until `CLOUDFLARE_API_TOKEN` can deploy Workers.
 
 > **Archived OCI / A1 fallback scope:** If that path reopens, see `docs/OCI-DEPLOYMENT-RUNBOOK.md`, `docs/SETUP.md`, `docs/STAGE_P_DNS_SETUP.md`, `docs/STAGE_P_24X7_EXECUTION_CHECKLIST.md`
 
@@ -212,18 +213,18 @@ All Stages S1–S6 and ML1–ML8 are background. Implement carefully, update liv
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-25 15:15`  -  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-25 15:47`  -  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Stage P Backlog  90.0%  [######################--]
-Sections        done 002 | active 000 | blocked 000 | archived 000 | pending 001 | total 003
-Checklist       done 018 | open 002 | total 020
+Stage P Backlog 100.0%  [########################]
+Sections        done 003 | active 000 | blocked 000 | archived 000 | pending 000 | total 003
+Checklist       done 018 | open 000 | total 018
 ```
 
 | Section | Tasks | Progress | Status |
 |---|---|---:|---|
 | P23 - 4 GB Performance and Compatibility Certification | [5/5] | 100.0% | DONE |
 | P25 - NY Lunch Trading Block ✅ DONE | [5/5] | 100.0% | DONE |
-| P26 - Pages Root Live + Critical Bug Fixes ✅ DONE | [8/10] |  80.0% | PENDING |
+| P26 - Pages Root Live + Critical Bug Fixes — LIVE, 2 BLOCKED FOLLOW-UPS | [8/8] | 100.0% | DONE |
 
 <!-- live-status:end -->
