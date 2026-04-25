@@ -1117,6 +1117,9 @@ Proposed files:
 src/features/vibing-finance/VibingFinanceScreen.jsx
 src/features/vibing-finance/vibingFinance.css
 src/features/vibing-finance/vibingFinanceFlags.js
+src/features/vibing-finance/agentControlPlane.js
+src/features/vibing-finance/toolRouter.js
+src/features/vibing-finance/artifactStore.js
 src/features/vibing-finance/strategyParser.js
 src/features/vibing-finance/strategySchema.js
 src/features/vibing-finance/csvIngestion.js
@@ -1128,6 +1131,9 @@ src/features/vibing-finance/backtestEngine.js
 src/features/vibing-finance/riskMetrics.js
 src/features/vibing-finance/reportBuilder.js
 src/features/vibing-finance/proofChain.js
+src/features/vibing-finance/memoryManager.js
+src/features/vibing-finance/providerAdapters.js
+src/features/vibing-finance/runnerBridge.js
 src/features/vibing-finance/storage.js
 src/features/vibing-finance/workers/backtest.worker.js
 src/features/vibing-finance/__tests__/*
@@ -1141,10 +1147,13 @@ Screen responsibilities:
 - Parse and validate data.
 - Show strategy conversation.
 - Show normalized strategy spec.
+- Show run plan, tool events, and current agenda scope.
 - Run backtest in worker.
+- Route optional local runner or BYOK provider calls through adapters.
 - Show progress.
 - Render institutional report.
 - Store local artifacts.
+- Manage per-user memory capsules and provider profiles.
 - Export report JSON/CSV if needed.
 - Append audit event to local proof chain.
 
@@ -1157,9 +1166,14 @@ Object stores:
 ```text
 datasets
 strategy_specs
+run_plans
 backtest_runs
+tool_events
+artifacts
 reports
 proof_blocks
+memory_capsules
+provider_profiles
 settings
 ```
 
@@ -1235,6 +1249,288 @@ Failure handling:
 - Data quality failure: return failed checks.
 - No trades: return "no eligible setups" report, not an app error.
 - Memory pressure: recommend local Python runner.
+
+### 20.4 Agent Control Plane Architecture
+
+The Agent Control Plane is the coordinator. It should be deterministic enough to debug, even when an LLM is involved.
+
+Control-plane modules:
+
+| Module | Responsibility | Writes |
+|---|---|---|
+| Plan Store | Current checklist, dependencies, status, run budget | `run_plan` |
+| Context Manager | Selects compact context for LLM/agent/tool calls | `context_snapshot` artifact |
+| Tool Router | Validates and dispatches typed tools | `tool_event` |
+| Job Scheduler | Runs queued steps, retries safe failures, respects budgets | `tool_event`, `backtest_run` |
+| Artifact Indexer | Registers content hashes and relationships | `artifact` |
+| Memory Manager | Writes per-user lessons and preferences | `memory_capsule` |
+| Policy Guard | Blocks out-of-scope, secret-risk, or destructive actions | `tool_event` with rejection reason |
+
+Control loop:
+
+```text
+read user agenda
+  -> create run_plan
+  -> select next runnable step
+  -> build tool input
+  -> policy check
+  -> execute tool
+  -> persist tool_event
+  -> inspect output
+  -> update run_plan
+  -> create/attach artifacts
+  -> continue until done, blocked, cancelled, or budget exhausted
+```
+
+The control plane must keep plan state and evidence state separate. A plan item can be edited while the run is still being planned; a completed tool event and hashed artifact cannot be edited.
+
+### 20.5 Command/Event Contract
+
+Use a command/event split:
+
+- Command: requested action before execution.
+- Event: immutable fact after execution.
+
+Command example:
+
+```json
+{
+  "command_id": "cmd_001",
+  "type": "RUN_BACKTEST",
+  "workspace_id": "local",
+  "run_plan_id": "plan_001",
+  "input_artifact_refs": ["dataset:sha256:...", "strategy:sha256:..."],
+  "requested_by": "user",
+  "allowed_tools": ["browser_worker"],
+  "budget": {
+    "max_runtime_seconds": 300,
+    "max_memory_mb": 1024
+  }
+}
+```
+
+Event example:
+
+```json
+{
+  "event_id": "evt_001",
+  "command_id": "cmd_001",
+  "type": "BACKTEST_COMPLETED",
+  "status": "pass",
+  "started_at": "...",
+  "completed_at": "...",
+  "input_hash": "sha256:...",
+  "output_hash": "sha256:...",
+  "summary": {
+    "trades": 42,
+    "profit_factor": 1.41,
+    "max_drawdown_pct": 3.8
+  }
+}
+```
+
+Rules:
+
+- Every command gets either a completion event, failure event, cancellation event, or policy-rejected event.
+- Event payloads must be serializable JSON.
+- Large outputs are artifact references, not inline blobs.
+- Events include enough metadata to replay the UI transcript.
+- Events are append-only; corrections are new events.
+- Idempotent commands must include an input hash so retries do not duplicate completed work.
+
+### 20.6 Artifact Store Architecture
+
+Artifacts should be content-addressed.
+
+Artifact reference format:
+
+```text
+artifact:<kind>:sha256:<hash>
+```
+
+Artifact kinds:
+
+| Kind | Examples | Storage |
+|---|---|---|
+| `dataset_raw` | Original uploaded CSV bytes | Optional IndexedDB/file |
+| `dataset_normalized` | Parsed bars with canonical timestamps | IndexedDB/file |
+| `strategy_spec` | Validated DSL JSON | IndexedDB |
+| `feature_table` | IB, VWAP, swings, labels | IndexedDB/file |
+| `trade_ledger` | Entries, exits, fees, slippage, reasons | IndexedDB/file |
+| `equity_curve` | Timestamped equity and drawdown | IndexedDB/file |
+| `metrics` | Risk and performance metrics JSON | IndexedDB |
+| `report_json` | Structured report facts | IndexedDB |
+| `report_markdown` | Human-readable report | IndexedDB/file |
+| `agent_export` | Compact context for Codex/Claude/GPT/Opus review | File/export |
+| `proof_block` | Hash-chain block | IndexedDB/file |
+
+Rules:
+
+- Hash raw bytes where possible.
+- Hash canonical JSON with stable key order for structured artifacts.
+- Never hash secrets into public proof exports.
+- Store artifact lineage: parent refs, engine version, schema version, and creation tool event.
+- If an artifact is regenerated, create a new artifact ref even when the human-readable name is the same.
+
+### 20.7 Local Runner Bridge Architecture
+
+The local runner bridge is the escape hatch for heavy jobs and unattended operation.
+
+Initial transport options:
+
+| Option | Description | When to use |
+|---|---|---|
+| Manual CLI export/import | User exports a run package and runs Python CLI | Lowest complexity |
+| Local HTTP bridge | Desktop/local service exposes localhost API | Best UX for unattended jobs |
+| VS Code/Codex terminal | Agent runs repo commands directly while developing | Founder/operator workflow |
+| VPS runner | User-controlled remote machine runs long research jobs | Overnight or large datasets |
+
+Bridge responsibilities:
+
+- Advertise a capability manifest.
+- Receive a run package with dataset/spec hashes.
+- Execute only allowed tools for the active agenda.
+- Stream heartbeats and progress.
+- Write artifacts to a declared workspace path.
+- Return output refs, logs, exit codes, and proof inputs.
+- Resume interrupted jobs when checkpoint data exists.
+
+Capability manifest example:
+
+```json
+{
+  "runner_id": "local-windows-001",
+  "os": "windows",
+  "shells": ["powershell"],
+  "languages": ["python", "node"],
+  "tools": ["pytest", "npm", "git"],
+  "max_parallel_jobs": 1,
+  "workspace_root": "E:/TradersApp",
+  "can_run_unattended": true,
+  "can_access_network": false
+}
+```
+
+Safety constraints:
+
+- The bridge executes from an allowlisted workspace root.
+- The bridge records every shell command as a typed event.
+- Destructive operations require a policy reason and stronger gate.
+- Secret files are excluded from agent exports and command summaries.
+- Network access defaults off for backtests unless a provider/data-source task explicitly needs it.
+
+### 20.8 BYOK Provider Gateway Architecture
+
+Provider config should be separate from strategy execution.
+
+Provider call flow:
+
+```text
+user selects provider mode
+  -> provider profile saved
+  -> context manager redacts payload
+  -> policy guard checks opt-in, token cap, cost cap
+  -> provider adapter sends request
+  -> response saved as explanation/suggestion artifact
+  -> deterministic validator accepts or rejects executable changes
+```
+
+Provider adapters:
+
+- `local_ollama`
+- `browser_webllm`
+- `openai_compatible_byok`
+- `anthropic_byok`
+- `gemini_byok`
+- `openrouter_byok`
+- `platform_funded_later`
+
+Rules:
+
+- Provider output is advisory until converted into validated DSL or report commentary tied to metrics.
+- Provider errors must degrade to deterministic mode.
+- BYOK secrets are referenced by credential ID, not copied into events.
+- Cost and token estimates are visible before autonomous remote calls.
+- Autonomous mode cannot spend user/provider quota beyond the configured budget.
+
+### 20.9 Resume, Checkpoint, And Heartbeat Architecture
+
+Long jobs need resumability.
+
+Checkpoint boundaries:
+
+- CSV parsed.
+- Dataset validated.
+- Feature table computed.
+- Setup detection complete.
+- Simulation complete.
+- Metrics computed.
+- Report generated.
+- Proof block appended.
+
+Heartbeat event:
+
+```json
+{
+  "type": "AUTONOMOUS_RUN_HEARTBEAT",
+  "run_id": "run_001",
+  "stage": "simulating",
+  "pct": 72,
+  "last_artifact_ref": "artifact:feature_table:sha256:...",
+  "updated_at": "..."
+}
+```
+
+Resume rules:
+
+- If the browser tab closes, reload plan/run state from IndexedDB.
+- If the local runner stops, mark the run interrupted unless a checkpoint can continue.
+- If input hashes changed, do not resume; start a new run.
+- If engine version changed, resume only from raw/validated data and mark the report as a new version.
+- Never overwrite a completed report during resume.
+
+### 20.10 Observability And Debug Package
+
+Every failed run should be debuggable without exposing private raw data by default.
+
+Debug package contents:
+
+- Run plan.
+- Tool event timeline.
+- Dataset metadata and quality report.
+- Strategy spec hash and sanitized DSL.
+- Engine version and feature flags.
+- Error stack or failure reason.
+- Artifact hash list.
+- Proof block refs.
+
+Excluded by default:
+
+- Raw CSV rows.
+- API keys.
+- Private account identifiers.
+- Full user transcript.
+- Provider prompts unless the user explicitly exports them.
+
+### 20.11 Extension Points
+
+Design stable adapter interfaces early:
+
+| Adapter | Purpose |
+|---|---|
+| `DataSourceAdapter` | CSV now, vendor APIs later |
+| `StrategyParserAdapter` | Deterministic parser now, LLM-assisted parser later |
+| `SimulationEngineAdapter` | Browser worker now, Python/vectorized engines later |
+| `CostModelAdapter` | Fixed costs now, broker/asset-specific costs later |
+| `ReportRendererAdapter` | Markdown/JSON now, PDF/slides later |
+| `ProofAnchorAdapter` | Local hash chain now, Git/public anchor later |
+| `ProviderAdapter` | Local/BYOK LLM modes |
+| `MemoryStoreAdapter` | IndexedDB now, encrypted sync later |
+| `RunnerAdapter` | Browser worker, local CLI, local HTTP bridge, VPS runner |
+
+Adapter rule:
+
+- Adapters can add capability, but they cannot weaken deterministic validation, proof lineage, or privacy defaults.
 
 ---
 
