@@ -13,8 +13,9 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { resolveBffBaseUrl } from '../services/runtimeConfig.js';
 
-const BFF_BASE = import.meta.env.VITE_BFF_URL || '';
+const BFF_BASE = resolveBffBaseUrl();
 const POLL_INTERVAL_MS = 5_000;
 const JSON_HEADERS = {
   'Content-Type': 'application/json',

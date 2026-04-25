@@ -1,8 +1,8 @@
 import { checkInputForPrivilegeEscalation } from "./leakagePreventionModule.js";
-import { hasBff } from "./gateways/base.js";
+import { getBffGatewayState, hasBff, probeBffHealth } from "./gateways/base.js";
 import { resolveBffBaseUrl } from "./runtimeConfig.js";
 
-export const AI_STATUS_REFRESH_MS = 5 * 60 * 1000;
+export const AI_STATUS_REFRESH_MS = 30 * 1000;
 const BOARD_ROOM_FRONTEND_AGENT = "FrontendAI.Router";
 const BOARD_ROOM_HEARTBEAT_MS = 90 * 60 * 1000;
 
@@ -321,10 +321,23 @@ let statusCheckInterval = null;
 export async function checkAllAIStatus() {
   ensureBoardRoomHeartbeatLoop();
   if (!hasBff()) {
-    AI_ENGINES.forEach((engine) =>
-      syncFailureState(engine, "BFF unavailable."),
-    );
-    return getAIStatusesDetailed();
+    const gatewayState = getBffGatewayState();
+    if (!gatewayState.auditRuntime && gatewayState.baseUrl) {
+      const probe = await probeBffHealth({ timeoutMs: 4000 });
+      if (!probe.ok) {
+        AI_ENGINES.forEach((engine) =>
+          syncFailureState(engine, probe.error || "BFF health failed."),
+        );
+        return getAIStatusesDetailed();
+      }
+    }
+
+    if (!hasBff()) {
+      AI_ENGINES.forEach((engine) =>
+        syncFailureState(engine, "BFF unavailable."),
+      );
+      return getAIStatusesDetailed();
+    }
   }
 
   const response = await fetch(apiUrl("/ai/status"), {
@@ -332,6 +345,7 @@ export async function checkAllAIStatus() {
     headers: {
       "Content-Type": "application/json",
     },
+    signal: AbortSignal.timeout(5000),
   });
 
   const data = await response.json().catch(() => ({}));

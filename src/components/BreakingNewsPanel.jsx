@@ -13,8 +13,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Radio, TrendingUp, TrendingDown, Minus, AlertTriangle, ChevronDown, ChevronUp, ExternalLink, Zap } from 'lucide-react';
 import { hasBff } from '../services/gateways/base.js';
+import { resolveBffBaseUrl } from '../services/runtimeConfig.js';
 
-const BFF_BASE = import.meta.env.VITE_BFF_URL || '';
+const BFF_BASE = resolveBffBaseUrl();
 
 const IMPACT_COLORS = {
   HIGH: { bg: 'rgba(255,69,58,0.08)', border: 'rgba(255,69,58,0.3)', text: '#FF453A', badge: '#FF453A' },
@@ -221,6 +222,7 @@ export default function BreakingNewsPanel({ mathEngine: _mathEngine, recentCandl
   const [loading, setLoading] = useState(false);
   const [lastFetch, setLastFetch] = useState(null);
   const [newsSentiment, setNewsSentiment] = useState(null);
+  const [failureDetail, setFailureDetail] = useState(null);
   const [panelOpen, setPanelOpen] = useState(true);
   const [newItems, setNewItems] = useState(new Set());
   const intervalRef = useRef(null);
@@ -234,6 +236,7 @@ export default function BreakingNewsPanel({ mathEngine: _mathEngine, recentCandl
         setBreakingCount(0);
         setHighImpactCount(0);
         setNewsSentiment(null);
+        setFailureDetail('BFF proxy is not reachable yet.');
         return;
       }
 
@@ -264,9 +267,10 @@ export default function BreakingNewsPanel({ mathEngine: _mathEngine, recentCandl
         setHighImpactCount(data.breaking_news?.highImpactCount || 0);
         setNewsSentiment(sentiment);
         setLastFetch(new Date());
+        setFailureDetail(null);
       } else {
         // Fallback to direct /news/breaking
-        res = await fetch(`${BFF_BASE}/news/breaking?fresh=true`, {
+        res = await fetch(`${BFF_BASE}/news/breaking?max=15`, {
           signal: AbortSignal.timeout(8000),
         });
         if (res.ok) {
@@ -297,10 +301,14 @@ export default function BreakingNewsPanel({ mathEngine: _mathEngine, recentCandl
             bias: bullish > bearish ? 'bullish' : bearish > bullish ? 'bearish' : 'neutral',
             highImpactCount: data.highImpactCount || 0,
           });
+          setFailureDetail(null);
+        } else {
+          setFailureDetail(`News endpoint failed: ${res.status}`);
         }
       }
     } catch (err) {
       console.error('[BreakingNewsPanel] fetch error:', err);
+      setFailureDetail(err?.message || 'News fetch failed.');
     } finally {
       setLoading(false);
     }
@@ -309,7 +317,7 @@ export default function BreakingNewsPanel({ mathEngine: _mathEngine, recentCandl
   // Poll every 30 seconds
   useEffect(() => {
     fetchNews();
-    intervalRef.current = setInterval(fetchNews, 10 * 60_000);
+    intervalRef.current = setInterval(fetchNews, 30_000);
     return () => clearInterval(intervalRef.current);
   }, [fetchNews]);
 
@@ -409,7 +417,7 @@ export default function BreakingNewsPanel({ mathEngine: _mathEngine, recentCandl
               textAlign: 'center', padding: '24px 0',
               fontSize: 11, color: 'var(--text-tertiary)',
             }}>
-              No breaking news — markets may be closed or sources unavailable.
+              {failureDetail || 'No breaking news - markets may be closed or sources unavailable.'}
               <div style={{ marginTop: 4, fontSize: 10 }}>
                 Sources: Finnhub · NewsData.io · Yahoo Finance · GDELT
               </div>

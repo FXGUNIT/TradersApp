@@ -119,7 +119,6 @@ function buildScheduledNewsSignal(consensus = null) {
 export async function fetchNewsSystemStatus() {
   const refreshedAt = new Date().toISOString();
   const gatewayState = getBffGatewayState();
-  console.debug("[NewsStatus] hasBff:", hasBff(), "| BFF base:", gatewayState.baseUrl);
 
   if (gatewayState.auditRuntime || !gatewayState.baseUrl) {
     return {
@@ -142,7 +141,6 @@ export async function fetchNewsSystemStatus() {
   if (consensus) {
     const news = consensus?.news || {};
     const hasScheduled = Boolean(news?.next_event);
-    const isRiskWindow = news?.trade_allowed === false || Boolean(news?.warning);
 
     return {
       liveNews: buildLiveNewsSignal(consensus, null),
@@ -160,13 +158,10 @@ export async function fetchNewsSystemStatus() {
   // Fallback: call news endpoints directly (ML consensus may fail if no candles loaded)
   // Use directFetch to bypass hasBff() cooldown gate — news should never show "offline"
   // just because one unrelated consensus call triggered the 2-minute cooldown window.
-  console.debug("[NewsStatus] ML consensus unavailable — entering news direct fetch fallback");
   const [breaking, upcoming] = await Promise.all([
     bffDirectFetchMarker_v2("/news/breaking?max=15"),
     bffDirectFetchMarker_v2("/news/upcoming"),
   ]);
-
-  console.debug("[NewsStatus] fallback — breaking:", breaking ? "ok" : "null", "upcoming:", upcoming ? "ok" : "null");
 
   if (breaking !== null || upcoming !== null) {
     const liveItems = Array.isArray(breaking?.items) ? breaking.items : [];

@@ -74,6 +74,16 @@ const AiEnginesStatus = ({ statuses = [] }) => {
   const normalizedStatuses = AI_ENGINE_NAMES.map((name, index) =>
     normalizeStatusEntry(statuses[index], index),
   );
+  const onlineCount = normalizedStatuses.filter(
+    (entry) => entry.status === "online",
+  ).length;
+  const configuredCount = normalizedStatuses.filter(
+    (entry) => entry.status !== "unconfigured",
+  ).length;
+  const watchtowerTitle =
+    configuredCount === 0
+      ? "AI Watchtower: provider keys missing."
+      : `${onlineCount}/${configuredCount} configured AI engines online.`;
 
   return (
     <div style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
@@ -90,7 +100,7 @@ const AiEnginesStatus = ({ statuses = [] }) => {
       </span>
 
       <span
-        title="AI Watchtower active"
+        title={watchtowerTitle}
         style={{
           width: 10,
           height: 10,

@@ -62,6 +62,7 @@ export function buildScreenContent({
   currentTheme,
   theme,
   aiStatuses,
+  watchtowerStatus,
   consciousnessReturnScreen,
   isAdminAuthenticated,
   isAudioMuted,
@@ -142,6 +143,7 @@ export function buildScreenContent({
       currentTheme={currentTheme}
       theme={theme}
       aiStatuses={aiStatuses}
+      watchtowerStatus={watchtowerStatus}
       consciousnessReturnScreen={consciousnessReturnScreen}
       isAdminAuthenticated={isAdminAuthenticated}
       isAudioMuted={isAudioMuted}
@@ -217,6 +219,7 @@ export function buildAppShell({
   debugOverlayOpen,
   setDebugOverlayOpen,
   aiQuadCoreStatus,
+  watchtowerStatus,
   dailyQuote,
   showToast,
 }) {
@@ -249,7 +252,7 @@ export function buildAppShell({
         <FeatureGuard feature="floatingSupportChat">
           <FloatingChatWidget auth={auth} profile={profile} />
         </FeatureGuard>
-        <OfficersBriefingFooter dailyQuote={dailyQuote} theme={theme} quadCoreStatus={aiQuadCoreStatus} />
+        <OfficersBriefingFooter dailyQuote={dailyQuote} theme={theme} quadCoreStatus={aiQuadCoreStatus} watchtowerStatus={watchtowerStatus} />
       </section>
     </AppShellProvider>
   );

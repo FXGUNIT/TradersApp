@@ -7,9 +7,67 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no, maximum-scale=1.0"
     />
-    <title>TradersApp</title>
 
-    <!-- RULE #308: PWA Manifest and Native App Configuration -->
+    <title>TradersApp — Algorithmic Trading Signals Platform</title>
+
+    <!-- Primary SEO Meta -->
+    <meta name="description" content="TradersApp provides real-time algorithmic trading signals, session probability analysis, and AI-powered market regime detection. Built for active intraday traders in India and global markets." />
+    <meta name="keywords" content="algorithmic trading, trading signals, intraday trading, market regime detection, session probability, AI trading, quantitative trading, Nifty trading, India trading platform" />
+    <meta name="author" content="TradersApp" />
+    <meta name="robots" content="index, follow" />
+
+    <!-- Open Graph / Social Sharing -->
+    <meta property="og:title" content="TradersApp — Algorithmic Trading Signals Platform" />
+    <meta property="og:description" content="Real-time algorithmic trading signals, session probability analysis, and AI market regime detection. Built for active intraday traders." />
+    <meta property="og:image" content="https://tradergunit.pages.dev/og-image.png" />
+    <meta property="og:url" content="https://tradergunit.pages.dev/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="TradersApp" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="TradersApp — Algorithmic Trading Signals Platform" />
+    <meta name="twitter:description" content="Real-time algorithmic trading signals, session probability analysis, and AI market regime detection." />
+    <meta name="twitter:image" content="https://tradergunit.pages.dev/og-image.png" />
+
+    <!-- Canonical URL -->
+    <link rel="canonical" href="https://tradergunit.pages.dev/" />
+
+    <!-- Structured Data — WebApplication Schema -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "TradersApp",
+      "description": "Algorithmic trading signals platform with AI-powered market regime detection and session probability analysis.",
+      "url": "https://tradergunit.pages.dev/",
+      "applicationCategory": "FinanceApplication",
+      "operatingSystem": "Web Browser",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "publisher": {
+        "@type": "Organization",
+        "name": "TradersApp",
+        "url": "https://tradergunit.pages.dev/"
+      }
+    }
+    </script>
+
+    <!-- Structured Data — Organization Schema -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "TradersApp",
+      "url": "https://tradergunit.pages.dev/",
+      "description": "Algorithmic trading signals platform for active intraday traders."
+    }
+    </script>
+
+    <!-- PWA Manifest and Native App Configuration -->
     <link rel="manifest" href="/manifest.json" />
 
     <!-- Theme & Branding Colors -->
@@ -18,10 +76,7 @@
 
     <!-- Apple Mobile Web App Support -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta
-      name="apple-mobile-web-app-status-bar-style"
-      content="black-translucent"
-    />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="TradersApp" />
     <link rel="apple-touch-icon" href="/favicon.svg" />
 
@@ -35,28 +90,13 @@
     <meta name="full-screen" content="yes" />
     <meta name="browsermode" content="application" />
 
-    <!-- Description for App Stores -->
-    <meta
-      name="description"
-      content="Professional trading platform with real-time user management, fraud detection, and institutional admin controls"
-    />
-    <meta name="keywords" content="trading,admin,dashboard,terminal" />
-    <meta name="author" content="TradersApp" />
-
-    <!-- RULE #165: DNS Prefetching for external API services -->
-    <!-- Resolves DNS for Firebase services (Auth, Database, Storage) -->
+    <!-- DNS Prefetch for external API services -->
     <link rel="dns-prefetch" href="//identitytoolkit.googleapis.com" />
     <link rel="dns-prefetch" href="//firebasedatabase.app" />
     <link rel="dns-prefetch" href="//firebaseio.com" />
     <link rel="dns-prefetch" href="//googleapis.com" />
-
-    <!-- Resolves DNS for Telegram Bot API -->
     <link rel="dns-prefetch" href="//api.telegram.org" />
-
-    <!-- Resolves DNS for EmailJS service -->
     <link rel="dns-prefetch" href="//api.emailjs.com" />
-
-    <!-- Resolves DNS for Anthropic Claude API -->
     <link rel="dns-prefetch" href="//api.anthropic.com" />
   </head>
   <body>

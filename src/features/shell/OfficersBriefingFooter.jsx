@@ -1,11 +1,6 @@
 import React from "react";
-import { useEffect, useState } from "react";
 import FounderCard from "../../components/FounderCard.jsx";
-import {
-  fetchNewsSystemStatus,
-  getInitialNewsSystemStatus,
-  NEWS_STATUS_REFRESH_MS,
-} from "../../services/clients/NewsStatusClient.js";
+import { getInitialNewsSystemStatus } from "../../services/clients/NewsStatusClient.js";
 import { CSS_VARS } from "../../styles/cssVars.js";
 
 function resolveEngineColor(mind, state) {
@@ -126,39 +121,94 @@ function FooterStatusChip({ signal }) {
   );
 }
 
+function resolveWatchtowerColor(status) {
+  if (status === "healthy") {
+    return {
+      dot: CSS_VARS.statusSuccess,
+      text: "var(--status-success, #166534)",
+      glow: "var(--status-success-soft, rgba(34,197,94,0.5))",
+      badge: "color-mix(in srgb, var(--status-success) 12%, transparent)",
+      border: "color-mix(in srgb, var(--status-success) 25%, transparent)",
+    };
+  }
+  if (status === "checking") {
+    return {
+      dot: CSS_VARS.statusInfo,
+      text: "var(--status-info, #0C4A6E)",
+      glow: "var(--status-info-soft, rgba(56,189,248,0.35))",
+      badge: "color-mix(in srgb, var(--status-info) 12%, transparent)",
+      border: "color-mix(in srgb, var(--status-info) 25%, transparent)",
+    };
+  }
+  return {
+    dot: CSS_VARS.statusDanger,
+    text: "var(--status-danger, #991B1B)",
+    glow: "var(--status-danger-soft, rgba(239,68,68,0.5))",
+    badge: "color-mix(in srgb, var(--status-danger) 12%, transparent)",
+    border: "color-mix(in srgb, var(--status-danger) 25%, transparent)",
+  };
+}
+
+function WatchtowerStatusChip({ status }) {
+  const appearance = resolveWatchtowerColor(status?.status);
+  const faults = Array.isArray(status?.faults) ? status.faults : [];
+  const corrections = Array.isArray(status?.corrections) ? status.corrections : [];
+  const title = [
+    status?.label || "WATCHTOWER CHECKING",
+    ...faults.map((fault) => `${fault.title}: ${fault.detail}`),
+    ...corrections.map((correction) => `${correction.title}: ${correction.detail}`),
+  ].join("\n");
+
+  return (
+    <div
+      title={title}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 8,
+        borderRadius: 999,
+        padding: "4px 10px",
+        background: appearance.badge,
+        border: `1px solid ${appearance.border}`,
+      }}
+    >
+      <div
+        style={{
+          width: 8,
+          height: 8,
+          borderRadius: "50%",
+          background: appearance.dot,
+          boxShadow: `0 0 6px ${appearance.glow}`,
+          animation: "led-pulse 2s ease-in-out infinite",
+        }}
+      />
+      <span
+        style={{
+          fontSize: "0.78rem",
+          fontWeight: 700,
+          color: appearance.text,
+          textTransform: "uppercase",
+          letterSpacing: "0.08em",
+        }}
+      >
+        {status?.label || "WATCHTOWER CHECKING"}
+      </span>
+    </div>
+  );
+}
+
 export default function OfficersBriefingFooter({
   dailyQuote,
   theme,
   quadCoreStatus,
+  watchtowerStatus,
 }) {
   const aiSystems = Object.entries(quadCoreStatus || {});
   const allUnconfigured = aiSystems.every(
     ([, mind]) => mind?.status === "unconfigured",
   );
-  const [newsSystemStatus, setNewsSystemStatus] = useState(
-    getInitialNewsSystemStatus,
-  );
-
-  useEffect(() => {
-    let active = true;
-
-    const refreshNewsStatus = async () => {
-      const nextStatus = await fetchNewsSystemStatus();
-      if (active) {
-        setNewsSystemStatus(nextStatus);
-      }
-    };
-
-    void refreshNewsStatus();
-    const intervalId = setInterval(() => {
-      void refreshNewsStatus();
-    }, NEWS_STATUS_REFRESH_MS);
-
-    return () => {
-      active = false;
-      clearInterval(intervalId);
-    };
-  }, []);
+  const newsSystemStatus =
+    watchtowerStatus?.news || getInitialNewsSystemStatus();
 
   return (
     <div
@@ -230,21 +280,7 @@ export default function OfficersBriefingFooter({
         >
           AI System Status
         </span>
-        <span
-          style={{
-            fontSize: "0.78rem",
-            fontWeight: 700,
-            color: "var(--status-info)",
-            background: "color-mix(in srgb, var(--status-info) 12%, transparent)",
-            border: "1px solid color-mix(in srgb, var(--status-info) 25%, transparent)",
-            borderRadius: 999,
-            padding: "4px 10px",
-            textTransform: "uppercase",
-            letterSpacing: "0.08em",
-          }}
-        >
-          Watchtower Active
-        </span>
+        <WatchtowerStatusChip status={watchtowerStatus} />
         <FooterStatusChip signal={newsSystemStatus.liveNews} />
         <FooterStatusChip signal={newsSystemStatus.scheduledNews} />
         <span
@@ -253,9 +289,9 @@ export default function OfficersBriefingFooter({
             fontWeight: 600,
             color: CSS_VARS.textSecondary,
           }}
-          title="Bottom-strip statuses refresh every 5 minutes."
+          title="Watchtower refreshes BFF, AI, ML, and news status every 30 seconds."
         >
-          5 MIN REFRESH
+          30 SEC REFRESH
         </span>
         {allUnconfigured && (
           <span

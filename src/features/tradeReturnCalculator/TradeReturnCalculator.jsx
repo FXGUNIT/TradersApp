@@ -13,9 +13,10 @@ import {
 } from "lucide-react";
 import { SectionCard } from "../consensus/SectionCard.jsx";
 import { hasBff } from "../../services/gateways/base.js";
+import { resolveBffBaseUrl } from "../../services/runtimeConfig.js";
 import { kelly, tradePnL, simulateEquityCurve } from "./calculatorUtils.js";
 
-const BFF_BASE = String(import.meta.env.VITE_BFF_URL || "").trim();
+const BFF_BASE = resolveBffBaseUrl();
 const MAX_CLIENT_TRADES = 10_000;
 
 function formatCurrency(v) {

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { onValue, push, ref, set } from "firebase/database";
+import { resolveBffBaseUrl } from "../../services/runtimeConfig.js";
 
-const BFF_BASE = import.meta.env.VITE_BFF_URL || "";
+const BFF_BASE = resolveBffBaseUrl();
 
 export default function SupportChatModal({
   isOpen,

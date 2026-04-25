@@ -49,6 +49,11 @@ import {
   stopAIStatusScheduler,
   quadCoreStatus as aiQuadCoreStatus,
 } from "./services/ai-router.js";
+import {
+  getInitialWatchtowerStatus,
+  startWatchtower,
+  stopWatchtower,
+} from "./services/watchtower.js";
 import { ADMIN_EMAIL, ADMIN_UID } from "./services/firebase.js";
 import {
   listUsers as _listAdminUsers,
@@ -185,9 +190,16 @@ function TradersRegimentInner() {
 
   // ── AI status scheduler ────────────────────────────────────────────────────
   const [aiStatuses, setAiStatuses] = useState(() => getAIStatusesDetailed());
+  const [watchtowerStatus, setWatchtowerStatus] = useState(() =>
+    getInitialWatchtowerStatus(),
+  );
   useEffect(() => {
     startAIStatusScheduler(setAiStatuses);
     return () => stopAIStatusScheduler();
+  }, []);
+  useEffect(() => {
+    startWatchtower(setWatchtowerStatus);
+    return () => stopWatchtower();
   }, []);
 
   // ── Screen persistence ─────────────────────────────────────────────────────
@@ -277,7 +289,7 @@ function TradersRegimentInner() {
   if (isInitialLoading) return <SplashScreen />;
 
   const screenContent = buildScreenContent({
-    screen, currentTheme, theme, aiStatuses, consciousnessReturnScreen,
+    screen, currentTheme, theme, aiStatuses, watchtowerStatus, consciousnessReturnScreen,
     isAdminAuthenticated, isAudioMuted, maintenanceModeActive,
     setIsAudioMuted,
     auth, profile, googleUser, currentSessionId,
@@ -304,7 +316,7 @@ function TradersRegimentInner() {
     currentTheme, screen, setScreen, auth, profile, maintenanceModeActive, _SCREEN_IDS,
     ADMIN_UID, screenContent, toasts, dismissToast, theme,
     handleThemeChange, debugLogs, debugLatencies, debugTTI,
-    debugComponentStatus, debugOverlayOpen, setDebugOverlayOpen, aiQuadCoreStatus, dailyQuote,
+    debugComponentStatus, debugOverlayOpen, setDebugOverlayOpen, aiQuadCoreStatus, watchtowerStatus, dailyQuote,
     showToast,
   });
 }

@@ -1,8 +1,9 @@
-const BFF_BASE_URL = String(import.meta.env.VITE_BFF_URL || "").trim();
+import { resolveBffBaseUrl } from "../runtimeConfig.js";
 
 function buildAnalyticsUrl(path) {
-  if (BFF_BASE_URL) {
-    return path.startsWith("/") ? `${BFF_BASE_URL}${path}` : `${BFF_BASE_URL}/${path}`;
+  const baseUrl = resolveBffBaseUrl();
+  if (baseUrl) {
+    return path.startsWith("/") ? `${baseUrl}${path}` : `${baseUrl}/${path}`;
   }
 
   return path.startsWith("/api") ? path : `/api${path.startsWith("/") ? path : `/${path}`}`;
