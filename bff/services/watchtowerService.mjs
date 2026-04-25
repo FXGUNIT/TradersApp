@@ -30,7 +30,7 @@ const WATCHTOWER_RULES = {
     ruleId: "board-room.durable-memory-required",
     expected: "Board Room incidents, tasks, and agent memory must be durable.",
     correctiveAction:
-      "Restore Redis or the configured durable store, keep JSONL logs intact, and verify incident IDs no longer repeat.",
+      "Restore the configured durable store. Use Redis only when intentionally required; otherwise keep the VPS/file store mounted and verify incident IDs survive restart.",
   },
   AI_KEYS_MISSING: {
     ownerAgent: "FrontendAI.Router",

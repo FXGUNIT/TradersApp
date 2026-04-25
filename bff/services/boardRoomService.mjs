@@ -20,7 +20,7 @@ import { fileURLToPath } from 'url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REDIS_CONNECT_TIMEOUT_MS = Number.parseInt(process.env.REDIS_CONNECT_TIMEOUT_MS || '1000', 10);
 const REDIS_RETRY_COOLDOWN_MS = Number.parseInt(process.env.REDIS_RETRY_COOLDOWN_MS || '30000', 10);
-const BOARD_ROOM_STORAGE_MODE = String(process.env.BOARD_ROOM_STORAGE_MODE || 'auto').trim().toLowerCase();
+const BOARD_ROOM_STORAGE_MODE = String(process.env.BOARD_ROOM_STORAGE_MODE || 'file').trim().toLowerCase();
 
 function getLogDir() {
   return process.env.BOARD_ROOM_LOG_DIR || join(__dirname, '../../board-room/logs');
