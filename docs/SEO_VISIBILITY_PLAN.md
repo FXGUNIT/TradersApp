@@ -2,7 +2,7 @@
 
 > **Goal:** Make `tradergunit.pages.dev` appear in Google search results for relevant trading/finance keywords.
 > **Target:** Top 10 for niche quantitative trading / algo trading product keywords within 90 days.
-> **What it is:** A quantitative trading intelligence platform — not a signals service.
+> **What it is:** "The World's Most Advanced Financial Toolkit" — multi-model AI consensus engine, session probability, market regime detection for professional futures traders.
 
 ---
 
