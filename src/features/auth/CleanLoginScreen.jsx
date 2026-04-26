@@ -351,14 +351,6 @@ export default function CleanLoginScreen({
     setMessage("");
   };
 
-  const [isDark, setIsDark] = useState(false);
-
-  useEffect(() => {
-    const el = document.documentElement;
-    const bg = getComputedStyle(el).getPropertyValue("--base-layer").trim();
-    setIsDark(bg.includes("0,0,0") || bg.includes("#0") || bg.includes("0 0 0") || bg.includes("05070A") || bg.includes("0, 0, 0") || !bg || bg === "#000" || bg === "#000000");
-  }, []);
-
   return (
     <div
       style={{
