@@ -73,27 +73,6 @@ function BrandHero({ themeMode }) {
         userSelect: "none",
       }}
     >
-      <div
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-          minHeight: 28,
-          padding: "0 12px",
-          borderRadius: 999,
-          border: "1px solid rgba(212,165,32,0.22)",
-          background: "rgba(212,165,32,0.06)",
-          fontSize: 9,
-          fontWeight: 800,
-          letterSpacing: 3,
-          color: "#D4A520",
-          textTransform: "uppercase",
-          marginBottom: 12,
-        }}
-      >
-        Traders Regiment
-      </div>
-
       <h1
         style={{
           fontSize: "clamp(30px, 6vw, 48px)",
