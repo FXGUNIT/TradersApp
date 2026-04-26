@@ -7,7 +7,7 @@
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-26 07:00`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-26 17:26`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Master Backlog  49.0%  [############------------]
@@ -276,7 +276,7 @@ All Stages S1–S6 and ML1–ML8 are background. Implement carefully, update liv
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-26 07:00`  -  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-26 17:26`  -  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Stage P Backlog  49.0%  [############------------]
