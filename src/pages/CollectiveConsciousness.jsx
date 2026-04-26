@@ -949,6 +949,27 @@ User Question: ${trimmed}`;
           {engineModeLabel}
         </div>
 
+        {/* Blog Insights */}
+        <div style={{
+          borderTop: "1px solid rgba(212,165,32,0.12)",
+          padding: "10px 20px 14px",
+          marginTop: 4,
+        }}>
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            marginBottom: 8,
+          }}>
+            <div style={{ flex: 1, height: 1, background: "rgba(212,165,32,0.15)" }} />
+            <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: 3, color: "rgba(212,165,32,0.6)", textTransform: "uppercase" }}>
+              From the Trading Desk
+            </span>
+            <div style={{ flex: 1, height: 1, background: "rgba(212,165,32,0.15)" }} />
+          </div>
+          <BlogSection />
+        </div>
+
         <style>{`
           @keyframes cc-fast-pulse {
             0%, 100% { box-shadow: 0 0 8px rgba(245,158,11,0.15); }
