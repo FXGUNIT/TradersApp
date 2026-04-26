@@ -34,103 +34,43 @@ const readDraft = () =>
 const isValidGmail = (email) =>
   /^[a-z0-9._%+-]+@gmail\.com$/i.test(String(email || "").trim());
 
-// ─── Brand Hero ────────────────────────────────────────────────────────────────
-// Detects dark mode by reading CSS variable --base-layer
-function readIsDarkMode() {
-  if (typeof document === "undefined") {
-    return false;
-  }
-
-  const el = document.documentElement;
-  const bg = getComputedStyle(el).getPropertyValue("--base-layer").trim();
-  return bg.includes("0,0,0") || bg.includes("#0") || bg.includes("0 0 0") || bg.includes("05070A") || bg.includes("0, 0, 0") || !bg || bg === "#000" || bg === "#000000";
-}
-
-function useIsDarkMode() {
-  const [isDark] = useState(readIsDarkMode);
-  return isDark;
-}
-
-function BrandHero() {
-  const isDark = useIsDarkMode();
+function BrandHero({ isDark }) {
   const textCol = isDark ? "#f1f5f9" : "#0f172a";
   const mutedCol = isDark ? "#94a3b8" : "#64748b";
-  const dividerCol = isDark ? "rgba(212,165,32,0.25)" : "rgba(212,165,32,0.25)";
-  const bgGrad = isDark
-    ? "radial-gradient(ellipse at 50% 0%, rgba(212,165,32,0.08) 0%, transparent 60%)"
-    : "radial-gradient(ellipse at 50% 0%, rgba(212,165,32,0.06) 0%, transparent 60%)";
 
   return (
     <div
       style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        marginBottom: 32,
+        textAlign: "center",
+        padding: "48px 24px 40px",
+        background: isDark
+          ? "linear-gradient(180deg, #0A0A0F 0%, transparent 100%)"
+          : "linear-gradient(180deg, #F8FAFC 0%, transparent 100%)",
         userSelect: "none",
-        padding: "28px 16px 0",
-        background: bgGrad,
-        borderRadius: "20px 20px 0 0",
-        marginLeft: "-28px",
-        marginRight: "-28px",
-        paddingLeft: 28,
-        paddingRight: 28,
-        paddingTop: 28,
       }}
     >
-      {/* Eyebrow with pulsing gold dots */}
+      {/* Eyebrow */}
       <div
         style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-          marginBottom: 14,
+          fontSize: 10,
+          fontWeight: 700,
+          letterSpacing: 5,
+          color: "#d4a520",
+          textTransform: "uppercase",
+          marginBottom: 16,
         }}
       >
-        <div
-          style={{
-            width: 7,
-            height: 7,
-            borderRadius: "50%",
-            background: "#d4a520",
-            boxShadow: "0 0 10px #d4a520, 0 0 24px rgba(212,165,32,0.45)",
-            animation: "login-hero-pulse 2.4s ease-in-out infinite",
-            flexShrink: 0,
-          }}
-        />
-        <div
-          style={{
-            fontSize: 10,
-            fontWeight: 700,
-            letterSpacing: 5,
-            color: "#d4a520",
-            textTransform: "uppercase",
-            opacity: 0.9,
-          }}
-        >
-          Traders Regiment
-        </div>
-        <div
-          style={{
-            width: 7,
-            height: 7,
-            borderRadius: "50%",
-            background: "#d4a520",
-            boxShadow: "0 0 10px #d4a520, 0 0 24px rgba(212,165,32,0.45)",
-            animation: "login-hero-pulse 2.4s ease-in-out infinite 0.6s",
-            flexShrink: 0,
-          }}
-        />
+        Traders Regiment
       </div>
 
       {/* Brand name */}
       <h1
         style={{
-          fontSize: "clamp(32px, 8vw, 60px)",
+          fontSize: "clamp(44px, 10vw, 80px)",
           fontWeight: 900,
           color: textCol,
           margin: 0,
-          letterSpacing: -3,
+          letterSpacing: -4,
           lineHeight: 0.9,
           textAlign: "center",
           fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
@@ -140,38 +80,58 @@ function BrandHero() {
       </h1>
       <h1
         style={{
-          fontSize: "clamp(32px, 8vw, 60px)",
+          fontSize: "clamp(44px, 10vw, 80px)",
           fontWeight: 900,
           color: "#d4a520",
-          margin: "0 0 16px 0",
-          letterSpacing: -3,
+          margin: "0 0 20px 0",
+          letterSpacing: -4,
           lineHeight: 0.9,
           textAlign: "center",
           fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
-          textShadow: "0 0 40px rgba(212,165,32,0.45), 0 0 80px rgba(212,165,32,0.18)",
+          textShadow: "0 0 60px rgba(212,165,32,0.35)",
         }}
       >
         REGIMENT
       </h1>
 
-      {/* Gold divider */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
-        <div style={{ flex: 1, height: 1, background: `linear-gradient(to right, transparent, ${dividerCol})`, maxWidth: 48 }} />
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-          <rect x="1.5" y="1.5" width="9" height="9" rx="2" stroke="#d4a520" strokeWidth="1.5" />
-          <rect x="4" y="4" width="4" height="4" rx="1" fill="#d4a520" />
+      {/* Gold separator line */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 12,
+          marginBottom: 16,
+        }}
+      >
+        <div
+          style={{
+            width: 48,
+            height: 1,
+            background: "rgba(212,165,32,0.4)",
+          }}
+        />
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+          <rect x="1" y="1" width="8" height="8" rx="2" stroke="#d4a520" strokeWidth="1.5" />
+          <rect x="3.5" y="3.5" width="3" height="3" rx="0.75" fill="#d4a520" />
         </svg>
-        <div style={{ flex: 1, height: 1, background: `linear-gradient(to left, transparent, ${dividerCol})`, maxWidth: 48 }} />
+        <div
+          style={{
+            width: 48,
+            height: 1,
+            background: "rgba(212,165,32,0.4)",
+          }}
+        />
       </div>
 
       {/* Tagline */}
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
         <div
           style={{
-            fontSize: "clamp(11px, 2vw, 15px)",
+            fontSize: "clamp(11px, 2vw, 14px)",
             fontWeight: 700,
             color: mutedCol,
-            letterSpacing: 2,
+            letterSpacing: 3,
             textAlign: "center",
             textTransform: "uppercase",
             lineHeight: 1.2,
@@ -181,51 +141,25 @@ function BrandHero() {
         </div>
         <div
           style={{
-            fontSize: "clamp(15px, 3vw, 22px)",
+            fontSize: "clamp(16px, 3vw, 22px)",
             fontWeight: 900,
             color: "#d4a520",
             letterSpacing: 3,
             textAlign: "center",
             textTransform: "uppercase",
             lineHeight: 1,
-            textShadow: "0 0 28px rgba(212,165,32,0.4)",
           }}
         >
           Trading AI
         </div>
       </div>
 
-      {/* Sweeping animated line */}
-      <div
-        style={{
-          marginTop: 18,
-          height: 2,
-          width: "100%",
-          maxWidth: 360,
-          borderRadius: 2,
-          background: "rgba(212,165,32,0.18)",
-          position: "relative",
-          overflow: "hidden",
-        }}
-      >
-        <div
-          style={{
-            position: "absolute",
-            top: 0,
-            left: "-60%",
-            width: "50%",
-            height: "100%",
-            background: "linear-gradient(to right, transparent, #d4a520, transparent)",
-            animation: "login-hero-sweep 3s ease-in-out infinite",
-          }}
-        />
-      </div>
-
+      {/* CTA links */}
       <div
         style={{
           display: "flex",
-          gap: 8,
-          marginTop: 16,
+          gap: 10,
+          marginTop: 24,
           flexWrap: "wrap",
           justifyContent: "center",
         }}
@@ -240,15 +174,12 @@ function BrandHero() {
             color: "#d4a520",
             textDecoration: "none",
             letterSpacing: 1,
-            padding: "6px 18px",
+            padding: "7px 20px",
             border: "1px solid rgba(212,165,32,0.4)",
             borderRadius: 999,
             background: "rgba(212,165,32,0.07)",
-            transition: "all 0.2s ease",
             textTransform: "uppercase",
           }}
-          onMouseEnter={e => { e.currentTarget.style.background = "rgba(212,165,32,0.15)"; e.currentTarget.style.borderColor = "rgba(212,165,32,0.7)"; }}
-          onMouseLeave={e => { e.currentTarget.style.background = "rgba(212,165,32,0.07)"; e.currentTarget.style.borderColor = "rgba(212,165,32,0.4)"; }}
         >
           Read the Blog →
         </a>
@@ -259,61 +190,19 @@ function BrandHero() {
           style={{
             fontSize: 11,
             fontWeight: 700,
-            color: isDark ? "#bfdbfe" : "#0369a1",
+            color: isDark ? "#93c5fd" : "#0369a1",
             textDecoration: "none",
             letterSpacing: 1,
-            padding: "6px 18px",
-            border: "1px solid rgba(14,116,144,0.28)",
+            padding: "7px 20px",
+            border: "1px solid rgba(14,116,144,0.3)",
             borderRadius: 999,
-            background: isDark ? "rgba(14,116,144,0.12)" : "rgba(14,116,144,0.08)",
-            transition: "all 0.2s ease",
+            background: isDark ? "rgba(14,116,144,0.08)" : "rgba(14,116,144,0.06)",
             textTransform: "uppercase",
           }}
         >
           LinkedIn
         </a>
       </div>
-
-      <div
-        style={{
-          width: "100%",
-          marginTop: 16,
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))",
-          gap: 8,
-        }}
-      >
-        {[
-          { label: "Brand", value: "Traders Regiment" },
-          { label: "Positioning", value: "Trading AI" },
-          { label: "Credibility", value: "Research + LinkedIn" },
-        ].map((item) => (
-          <div
-            key={item.label}
-            style={{
-              padding: "10px 12px",
-              borderRadius: 14,
-              border: `1px solid ${dividerCol}`,
-              background: isDark ? "rgba(255,255,255,0.03)" : "rgba(255,255,255,0.62)",
-              textAlign: "left",
-            }}
-          >
-            <div style={{ fontSize: 10, color: mutedCol, marginBottom: 4 }}>{item.label}</div>
-            <div style={{ fontSize: 11, fontWeight: 800, color: textCol, lineHeight: 1.4 }}>{item.value}</div>
-          </div>
-        ))}
-      </div>
-
-      <style>{`
-        @keyframes login-hero-pulse {
-          0%, 100% { opacity: 0.6; box-shadow: 0 0 6px #d4a520; }
-          50% { opacity: 1; box-shadow: 0 0 16px #d4a520, 0 0 32px rgba(212,165,32,0.4); }
-        }
-        @keyframes login-hero-sweep {
-          0% { left: -60%; }
-          100% { left: 200%; }
-        }
-      `}</style>
     </div>
   );
 }
