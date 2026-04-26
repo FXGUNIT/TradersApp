@@ -43,6 +43,7 @@ export function registerDispatchRoutes({
   adminMfaHandler = async () => false,
   adminHandler,
   boardRoomHandler,
+  ipSafeZone = async (req, res, json) => false,
   // Admin constants
   ADMIN_PASS_HASH,
   ADMIN_PASSWORD_LOGIN_ENABLED = false,
@@ -156,6 +157,10 @@ export function registerDispatchRoutes({
     if (await tradeCalcHandler(req, res, url, origin)) return true;
 
     if (await adminMfaHandler(req, res, url, origin)) return true;
+    // IP safe zone check — before any admin route
+    if (pathname.startsWith("/auth/admin") || pathname.startsWith("/admin")) {
+      if (await ipSafeZone(req, res, json)) return true;
+    }
 
     // ── Admin auth: password verify ──────────────────────────────────────────
     if (method === "POST" && pathname === "/auth/admin/verify") {
