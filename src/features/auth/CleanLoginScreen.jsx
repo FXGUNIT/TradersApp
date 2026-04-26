@@ -99,7 +99,6 @@ function BrandHero({ themeMode }) {
           textAlign: "center",
           fontFamily:
             '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
-          textShadow: "0 0 32px rgba(212,165,32,0.24)",
         }}
       >
         REGIMENT
@@ -198,15 +197,14 @@ function BrandHero({ themeMode }) {
             target="_blank"
             rel="noopener noreferrer"
             style={{
-              fontSize: 9,
-              fontWeight: 800,
-              color: "#D4A520",
+              fontSize: 8,
+              fontWeight: 700,
+              color: isDark ? "rgba(212,165,32,0.45)" : "rgba(139,92,24,0.55)",
               textDecoration: "none",
-              letterSpacing: 2,
-              padding: "6px 12px",
-              border: "1px solid rgba(212,165,32,0.35)",
-              borderRadius: 999,
-              background: "rgba(212,165,32,0.05)",
+              letterSpacing: 2.2,
+              padding: "3px 9px",
+              border: "1px solid rgba(212,165,32,0.18)",
+              borderRadius: 4,
               textTransform: "uppercase",
             }}
           >
@@ -218,17 +216,14 @@ function BrandHero({ themeMode }) {
           target="_blank"
           rel="noopener noreferrer"
           style={{
-            fontSize: 10,
-            fontWeight: 800,
-            color: isDark ? "#93C5FD" : "#0369A1",
+            fontSize: 8,
+            fontWeight: 700,
+            color: isDark ? "rgba(96,165,250,0.55)" : "rgba(2,132,199,0.55)",
             textDecoration: "none",
-            letterSpacing: 1.3,
-            padding: "8px 14px",
-            border: "1px solid rgba(14,116,144,0.3)",
-            borderRadius: 999,
-            background: isDark
-              ? "rgba(14,116,144,0.08)"
-              : "rgba(14,116,144,0.06)",
+            letterSpacing: 1.8,
+            padding: "3px 9px",
+            border: "1px solid rgba(96,165,250,0.18)",
+            borderRadius: 4,
             textTransform: "uppercase",
           }}
         >
