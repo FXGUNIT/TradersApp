@@ -1093,7 +1093,7 @@ select {
 
 ---
 
-## PART 8 — VISUAL IDENTITY RULES
+## PART 14 — VISUAL IDENTITY RULES
 
 ### What Makes Traders Regiment Distinctive
 
