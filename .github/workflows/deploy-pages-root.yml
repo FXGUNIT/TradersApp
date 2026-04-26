@@ -42,14 +42,17 @@ jobs:
           node-version: "24"
           cache: "npm"
 
-      - name: Validate Cloudflare token
+      - name: Validate Cloudflare credentials
         run: |
           set -euo pipefail
-          if [ -z "${CLOUDFLARE_API_TOKEN:-}" ]; then
-            echo "::error::Missing required GitHub secret: CLOUDFLARE_API_TOKEN"
+          if [ -n "${CLOUDFLARE_API_TOKEN:-}" ]; then
+            echo "Cloudflare API token found (${#CLOUDFLARE_API_TOKEN} chars)"
+          elif [ -n "${CLOUDFLARE_EMAIL:-}" ] && [ -n "${CLOUDFLARE_API_KEY:-}" ]; then
+            echo "Using Cloudflare global API key for authentication"
+          else
+            echo "::error::Missing Cloudflare credentials: need CLOUDFLARE_API_TOKEN or CLOUDFLARE_EMAIL + CLOUDFLARE_API_KEY"
             exit 1
           fi
-          echo "Cloudflare token found (${#CLOUDFLARE_API_TOKEN} chars)"
 
       - name: Install dependencies
         run: npm ci
@@ -70,10 +73,17 @@ jobs:
           grep -q 'DEVELOPER_PREVIEW_PATH' src/App.jsx
 
       - name: Deploy to Cloudflare Pages via Wrangler v3
+        env:
+          CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+          CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_GLOBAL_API_KEY }}
         run: |
           set -euo pipefail
           # Wrangler v3 authenticates via CLOUDFLARE_API_TOKEN env var directly.
           # Wrangler v4 calls /user/tokens/verify which blocks cfat_ tokens.
+          # Fall back to global API key if token not available.
+          if [ -z "${CLOUDFLARE_API_TOKEN:-}" ]; then
+            echo "Using Cloudflare global API key auth for wrangler"
+          fi
           npx wrangler@3.103.0 pages deploy dist \
             --project-name tradergunit \
             --branch main \
