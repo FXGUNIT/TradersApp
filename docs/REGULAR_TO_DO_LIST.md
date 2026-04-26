@@ -107,83 +107,66 @@ Watchtower footer on site shows 0 FAULTS
 3. Both paths work independently (either email OTP or TOTP)
 
 ### Current State (AdminUnlockModal.jsx)
-- Has: password field (for authenticator), email OTP panel, "UNLOCK WITH AUTHENTICATOR" button
-- Problem: password field label says "AUTHENTICATOR CODE" but visually confusing
-- Problem: "UNLOCK WITH AUTHENTICATOR" button triggers password path, email panel triggers email path
-- Problem: "SEND THREE EMAIL OTP CODES" also shows "Route not found" (same stale BFF issue)
+- Has: password field (labeled "AUTHENTICATOR CODE"), email OTP panel, "UNLOCK WITH AUTHENTICATOR" button
+- **CRITICAL SECURITY FLAW**: TOTP verification runs entirely in the browser using `ADMIN_TOTP_SECRET` from the browser bundle — anyone can extract the secret from the JS bundle
+- Email OTP: 3-code flow already implemented in frontend (`verifyAdminEmailOtp` accepts `codes: [otp1, otp2, otp3]`)
+- BFF routes missing on live server → "Route not found"
 
-### New UX Flow
+### CRITICAL FIX: Move TOTP to BFF (security non-negotiable)
+
+**Current (INSECURE):**
 ```
-ADMIN MFA LOGIN (modal)
-━━━━━━━━━━━━━━━━━━━━━━
-Restricted admin area. Access attempts are logged.
-
-[MASTER ADMIN EMAIL _______________]
-
---- OR (two columns side by side) ---
-
-[Column A: TOTP Authenticator]
-[AUTHENTICATOR CODE  ______]
-[Remember this device ☐]
-[UNLOCK WITH AUTHENTICATOR]
-
-[Column B: Email OTP]
-[SEND THREE EMAIL OTP CODES]
-  ↓ (after sending)
-[Enter 3 codes received via email]
-[OTP 1:___][OTP 2:___][OTP 3:___]
-[VERIFY EMAIL OTP CODES]
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━
-[CANCEL]
+Browser bundle contains ADMIN_TOTP_SECRET
+→ client-side TOTP verification in adminAuthService.js:300-331
+→ completeAdminUnlock() → localStorage
 ```
 
-### Implementation Steps
+**Fix (SECURE):**
+```
+Browser → POST /auth/admin/totp/verify { code }
+→ BFF verifies against server-side ADMIN_TOTP_SECRET
+→ returns { ok, token }
+→ completeAdminUnlock(token)
+```
 
-**Step 2.1 — Redesign AdminUnlockModal UI**
-- File: `src/features/admin-security/AdminUnlockModal.jsx`
-- Remove: password field + related error state
-- Add: two-column layout (TOTP left, Email OTP right)
-- TOTP column: input for 6-digit code + "Remember device" + "UNLOCK WITH AUTHENTICATOR"
-- Email OTP column: "SEND THREE EMAIL OTP CODES" button → shows 3 input fields → "VERIFY EMAIL OTP CODES"
-- Both columns styled cleanly, purple accent
-- IP restriction notice shown at top (from Task 3)
-
-**Step 2.2 — Frontend service: email OTP 3-code flow**
+**Step 2.1 — Move TOTP verification server-side (security fix)**
+- File: `src/features/admin-security/adminAccessHandlers.js:58`
+  - Replace `verifyAdminTotp(adminPassInput)` browser call with `fetch('/auth/admin/totp/verify', { method:'POST', body: JSON.stringify({ code: adminPassInput }), headers:{'Content-Type':'application/json'} })`
 - File: `src/services/adminAuthService.js`
-- Current: `requestAdminEmailOtp(masterEmail)` → sends one OTP
-- Change: add `requestAdminEmailOtpThreeCodes(masterEmail)` → sends 3 separate OTP codes
-- The BFF already has the capability — confirm endpoint accepts a `count: 3` param or create new endpoint
+  - Remove `ADMIN_TOTP_SECRET` import and browser-side `verifyAdminTotp` function entirely
+  - Replace with `verifyAdminTotpBff({ code })` → calls BFF `POST /auth/admin/totp/verify`
+- File: `src/features/admin-security/adminAccessHandlers.js`
+  - On BFF success: extract `payload.token` → pass to `completeAdminUnlock(payload.token)`
+- Verify: TOTP secret must NOT appear anywhere in the browser bundle (grep the built JS)
 
-**Step 2.3 — Frontend service: verify email OTP (3 codes)**
-- Add `verifyAdminEmailOtpThreeCodes({ challengeId, codes: [otp1, otp2, otp3] })` 
-- BFF `verifyAdminEmailOtp` at `bff/routes/adminMfaRoutes.mjs` already accepts array of codes
+**Step 2.2 — Redesign AdminUnlockModal UI**
+- File: `src/features/admin-security/AdminUnlockModal.jsx`
+- Remove: password field + `passwordError` prop entirely
+- Add: two-column layout (TOTP left, Email OTP right)
+- TOTP column: 6-digit input + "Remember device" checkbox + "UNLOCK WITH AUTHENTICATOR" button
+- Email OTP column: "SEND THREE EMAIL OTP CODES" → 3 input fields → "VERIFY EMAIL OTP CODES"
+- IP restriction notice at top (from Task 3)
+- Styling: clean, purple accent, minimalist
 
-**Step 2.4 — BFF: IP safe zone middleware**
-- File: `bff/middleware/ipSafeZone.mjs` (new) or add to `bff/_dispatch.mjs`
-- Check `X-Forwarded-For` against allowed CIDR ranges:
-  - `106.219.146.101/32` (office IP)
-  - `124.124.0.0/16` + `203.0.0.0/8` + filter to Meerut pin codes 250001, 250002
-  - Actually: use IP geolocation API to verify city = Meerut AND pin code in [250001, 250002]
-- Block admin routes with 403 if IP not in safe zone (with a clear error message)
-- **Note on Meerut:** Pin codes 250001, 250002 cover Meerut city, UP. Can't do simple CIDR — need IP-to-geolocation lookup. Use free API: `ip-api.com/json/<ip>?fields=city,postal` for verification OR maintain a static list of Airtel DSL/Corporate IP ranges for Meerut.
+**Step 2.3 — Email OTP already implemented (no code needed)**
+- `requestAdminEmailOtp(masterEmail)` → BFF already sends 3 codes (see `adminMfaService.mjs:171`)
+- `verifyAdminEmailOtp({ challengeId, codes: [otp1, otp2, otp3] })` → already accepts array format
+- BFF `POST /auth/admin/email-otp/verify` → already handles array codes
+- Only missing: BFF route on live server → Contabo redeploy unblocks this
 
-**Step 2.5 — BFF: email OTP sends 3 codes**
-- File: `bff/services/adminMfaService.mjs` — `startAdminEmailOtp()`
-- Add logic: if `body.count === 3` or `body.threeCodes === true`, send 3 separate emails with 3 different OTPs
-- Each OTP expires independently (3 separate challengeIds)
-
-**Step 2.6 — Admin panel route protection**
-- All `/auth/admin/*` routes: add IP safe zone check via middleware
-- If blocked: `403 { error: "Admin access restricted. Your IP is not in the allowed safe zone." }`
+**Step 2.4 — IP safe zone middleware**
+- File: `bff/middleware/ipSafeZone.mjs` (new)
+- File: `bff/_dispatchRoutes.mjs` — apply to all `/auth/admin/*` routes
+- Logic: extract `X-Forwarded-For` → check exact office IP → else use `ip-api.com/json/<ip>?fields=city,zip` → allow if city=Meerut AND zip in [250001, 250002]
+- Cache geolocation per IP for 24h to avoid hammering ip-api.com
+- On block: `403 { error: "Admin access restricted. Your IP is not in the allowed safe zone.", ipMasked: true }`
 
 ### Files Touched
-- `src/features/admin-security/AdminUnlockModal.jsx` (Step 2.1)
-- `src/services/adminAuthService.js` (Steps 2.2, 2.3)
+- `src/services/adminAuthService.js` (Step 2.1 — add BFF TOTP call, remove browser TOTP)
+- `src/features/admin-security/adminAccessHandlers.js` (Step 2.1 — use BFF TOTP)
+- `src/features/admin-security/AdminUnlockModal.jsx` (Step 2.2 — UI redesign)
 - `bff/middleware/ipSafeZone.mjs` (new — Step 2.4)
-- `bff/_dispatch.mjs` or `bff/_dispatchRoutes.mjs` (Step 2.4)
-- `bff/services/adminMfaService.mjs` (Steps 2.4, 2.5)
-- `bff/routes/adminMfaRoutes.mjs` (Step 2.5)
+- `bff/_dispatchRoutes.mjs` (Step 2.4)
 
 ### Verification
 - Load admin login → shows email field + two method columns
