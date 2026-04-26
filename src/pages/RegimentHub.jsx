@@ -925,8 +925,7 @@ export default function RegimentHub({
           </div>
         </a>
         <BlogSection
-          heading="Editorial Research"
-          description="Sharp, smaller blog buttons that can be opened one by one from the home screen."
+          isDark={isDark}
           style={{ minHeight: "100%" }}
         />
       </div>

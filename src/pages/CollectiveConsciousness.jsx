@@ -961,7 +961,7 @@ User Question: ${trimmed}`;
             gap: 10,
             marginBottom: 8,
           }}>
-            <div style={{ flex: 1, height: 1, background: "rgba(212,165,32,0.15)" }} />
+            <div style={{ flex: 1, height: 1, background: "rgba(212,165,32,0.12)" }} />
             {[
               { label: "Founder", href: "/blog/founder-story/" },
               { label: "Vision", href: "/blog/product-vision/" },
@@ -973,15 +973,15 @@ User Question: ${trimmed}`;
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{
-                  fontSize: 9,
-                  fontWeight: 800,
+                  fontSize: 8,
+                  fontWeight: 700,
                   letterSpacing: 2.2,
-                  color: "rgba(212,165,32,0.55)",
+                  color: "rgba(212,165,32,0.5)",
                   textDecoration: "none",
                   textTransform: "uppercase",
-                  padding: "4px 10px",
-                  border: "1px solid rgba(212,165,32,0.22)",
-                  borderRadius: 999,
+                  padding: "3px 8px",
+                  border: "1px solid rgba(212,165,32,0.18)",
+                  borderRadius: 4,
                 }}
               >
                 {label}
