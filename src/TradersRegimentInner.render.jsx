@@ -77,11 +77,10 @@ export function buildScreenContent({
   adminOtpStep,
   adminOtps,
   adminOtpsVerified,
-  adminPassErr,
-  adminPassInput,
+  totpCode,
+  totpErr,
   adminOtpErr,
   showAdminPrompt,
-  showAdminPwd,
   _SCREEN_IDS,
   ADMIN_UID,
   ADMIN_EMAIL,
@@ -94,12 +93,11 @@ export function buildScreenContent({
   resetAdminPromptState,
   setShowAdminPrompt,
   setAdminMasterEmail,
-  setAdminPassInput,
+  setTotpCode,
   setAdminOtps,
   setAdminOtpStep,
   handleAdminRequestNewCodes,
   sendAdminOTPs,
-  setShowAdminPwd,
   handleAdminAccess,
   handleAdminVerifyCodes,
   handleStructuredSignup,
@@ -157,14 +155,13 @@ export function buildScreenContent({
       EmptyStateCard={EmptyStateCard}
       SupportChatModal={SupportChatModal}
       showAdminPrompt={showAdminPrompt}
-      showAdminPwd={showAdminPwd}
+      totpCode={totpCode}
+      totpErr={totpErr}
       adminMasterEmail={adminMasterEmail}
       adminMasterEmailVerified={adminMasterEmailVerified}
       adminOtpStep={adminOtpStep}
       adminOtps={adminOtps}
       adminOtpsVerified={adminOtpsVerified}
-      adminPassErr={adminPassErr}
-      adminPassInput={adminPassInput}
       adminOtpErr={adminOtpErr}
       showToast={showToast}
       handleLogin={handleLogin}
@@ -173,12 +170,11 @@ export function buildScreenContent({
       resetAdminPromptState={resetAdminPromptState}
       setShowAdminPrompt={setShowAdminPrompt}
       setAdminMasterEmail={setAdminMasterEmail}
-      setAdminPassInput={setAdminPassInput}
+      setTotpCode={setTotpCode}
       setAdminOtps={setAdminOtps}
       setAdminOtpStep={setAdminOtpStep}
       handleAdminRequestNewCodes={handleAdminRequestNewCodes}
       sendAdminOTPs={sendAdminOTPs}
-      setShowAdminPwd={setShowAdminPwd}
       handleAdminAccess={handleAdminAccess}
       handleAdminVerifyCodes={handleAdminVerifyCodes}
       handleStructuredSignup={handleStructuredSignup}
