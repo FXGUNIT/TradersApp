@@ -8,6 +8,7 @@ import MessageRenderer from '../components/MessageRenderer.jsx';
 import ThemeSwitcher from '../components/ThemeSwitcher.jsx';
 import AiEnginesStatus from '../components/AiEnginesStatus.jsx';
 import BreakingNewsPanel from '../components/BreakingNewsPanel.jsx';
+import { BlogSection } from '../components/BlogSection.jsx';
 import { runDeliberation, councilStage, MASTER_INTELLIGENCE_SYSTEM_PROMPT } from '../services/ai-router.js';
 import { hasBff } from '../services/gateways/base.js';
 import { resolveBffBaseUrl } from '../services/runtimeConfig.js';
