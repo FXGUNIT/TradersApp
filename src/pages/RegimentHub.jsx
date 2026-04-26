@@ -494,37 +494,7 @@ export default function RegimentHub({
               marginBottom: 20,
             }}
           >
-            <div
-              style={{
-                width: 6,
-                height: 6,
-                borderRadius: "50%",
-                background: "#d4a520",
-                boxShadow: "0 0 8px #d4a520, 0 0 16px rgba(212,165,32,0.4)",
-                animation: "hero-pulse 2.4s ease-in-out infinite",
-              }}
-            />
-            <div
-              style={{
-                fontSize: 10,
-                fontWeight: 700,
-                letterSpacing: 5,
-                color: mutedColor,
-                textTransform: "uppercase",
-              }}
-            >
-              {hubContent.eyebrow}
-            </div>
-            <div
-              style={{
-                width: 6,
-                height: 6,
-                borderRadius: "50%",
-                background: "#d4a520",
-                boxShadow: "0 0 8px #d4a520, 0 0 16px rgba(212,165,32,0.4)",
-                animation: "hero-pulse 2.4s ease-in-out infinite 0.6s",
-              }}
-            />
+            {hubContent.eyebrow}
           </div>
 
           {/* Brand name — large */}
@@ -640,31 +610,17 @@ export default function RegimentHub({
             {hubContent.description}
           </p>
 
-          {/* Animated border bottom */}
+          {/* Thin gold separator line */}
           <div
             style={{
               marginTop: 24,
-              height: 2,
+              height: 1,
               width: "100%",
               maxWidth: 480,
-              borderRadius: 2,
-              background: "linear-gradient(to right, transparent, rgba(212,165,32,0.6), transparent)",
-              position: "relative",
-              overflow: "hidden",
+              background: "rgba(212,165,32,0.2)",
+              borderRadius: 1,
             }}
-          >
-            <div
-              style={{
-                position: "absolute",
-                top: 0,
-                left: "-100%",
-                width: "60%",
-                height: "100%",
-                background: "linear-gradient(to right, transparent, #d4a520, transparent)",
-                animation: "hero-sweep 3s ease-in-out infinite",
-              }}
-            />
-          </div>
+          />
         </div>
         {eligibilityMessage ? (
           <div
@@ -1495,14 +1451,6 @@ export default function RegimentHub({
         @keyframes hub-pulse {
           0%, 100% { opacity: 0.6; transform: scale(1); }
           50% { opacity: 1; transform: scale(1.3); }
-        }
-        @keyframes hero-pulse {
-          0%, 100% { opacity: 0.7; box-shadow: 0 0 6px #d4a520; }
-          50% { opacity: 1; box-shadow: 0 0 14px #d4a520, 0 0 28px rgba(212,165,32,0.4); }
-        }
-        @keyframes hero-sweep {
-          0% { left: -100%; }
-          100% { left: 200%; }
         }
       `}</style>
     </div>
