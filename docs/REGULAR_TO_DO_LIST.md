@@ -325,6 +325,81 @@ If button is greyed out instead of showing an error:
 
 ---
 
+## TASK 9 — PITCH DECK PAGE (ADMIN PANEL)
+
+### CRITICAL DIRECTIVE — VISION OVER NUMBERS
+- NO specific revenue, user count, or AUM figures
+- NO specific funding amounts or valuation numbers
+- Focus: **permanent earning** — institutional edge for everyone
+- Focus: **majority stake always mine** — founder controls the cap table
+- Focus: **everything on papers** — legally sound, transparent structure
+
+### Content
+- Vision: AI quant desk that thinks like a hedge fund
+- Founder control: majority stake always retained
+- Pipeline tools — proprietary self-improving engine
+- Market opportunity — described qualitatively, not with TAM/SAM numbers
+- Competitive landscape — named competitors, differentiation without metrics
+- Secret sauce: proprietary recipe (PRIVATE)
+
+### Slide Structure (NO NUMBERS)
+```
+Slide 1: Cover — "Traders Regiment" + tagline + logo
+Slide 2: Problem — retail traders lose. Institutions win.
+Slide 3: Solution — an AI quant desk that thinks like a hedge fund
+Slide 4: Product Demo — (screenshots only)
+Slide 5: How It Works — 12 AI models, Board Room, Watchtower
+Slide 6: The Secret Sauce — proprietary self-improving engine (PRIVATE)
+Slide 7: Market Opportunity — qualitatively described
+Slide 8: Business Model — subscription tiers, B2B enterprise
+Slide 9: Traction — growth described in words
+Slide 10: Team — Gunit Singh, ex-BCCI/UPCA cricketer, trader, builder
+Slide 11: Roadmap — vision for 12 months
+Slide 12: The Ask — partnership, founder control, everything on papers
+```
+
+### UX
+- Route: `/admin/pitch-deck` (authenticated admin only)
+- Slide-based UI with keyboard navigation (arrow keys, space)
+- Downloadable PDF, print-friendly layout
+
+### Implementation
+- New file: `src/pages/AdminPitchDeck.jsx`
+- Route: add to `App.jsx` → `/admin/pitch-deck`
+- Slides data: `src/data/pitchDeckSlides.js`
+- Design: minimalist luxury (white/black/brown)
+
+### Files Touched
+- `src/pages/AdminPitchDeck.jsx` (new)
+- `src/data/pitchDeckSlides.js` (new)
+- `src/App.jsx` (new route)
+
+---
+
+## TASK 10 — SECRET SAUCE PRIVACY
+
+### What to move to private (Pitch Deck only)
+- Full ML architecture details (algorithms, weights, voting mechanisms)
+- Self-improvement mechanism
+- Board Room veto logic specifics
+- Proprietary data sources
+
+### What to KEEP in public blogs
+- Founder story
+- High-level vision ("decision support not signals")
+- General architecture overview ("12 AI models voting")
+- Brand philosophy
+
+### Implementation
+- Audit all public blog files in `public/blog/*`
+- Remove overly revealing technical details
+- Add note: "For detailed information, see the admin pitch deck"
+- Create `docs/PRIVATE_PITCH_DECK_CONTENT.md` as private vault
+
+### Files Touched
+- `public/blog/*.html` (audit + edits)
+- `docs/PRIVATE_PITCH_DECK_CONTENT.md` (new)
+
 ---
 
 ## EXECUTION ORDER
