@@ -170,6 +170,13 @@ dump_failure_context() {
   exit "${exit_code}"
 }
 
+if [ -d "${APP_ROOT}" ] && [ -f "${BUNDLE_ROOT}/scripts/contabo/backup-app.sh" ]; then
+  echo "[deploy] Creating pre-deploy VPS backup..."
+  bash "${BUNDLE_ROOT}/scripts/contabo/backup-app.sh" \
+    --app-root "${APP_ROOT}" \
+    --label "${IMAGE_TAG:-manual}"
+fi
+
 echo "[deploy] Installing bundle into ${DEPLOY_ROOT}..."
 install -d -m 0755 -o "${APP_USER}" -g "${APP_USER}" "${APP_ROOT}" "${APP_ROOT}/deploy" "${DEPLOY_ROOT}" "${APP_ROOT}/runtime" "${APP_ROOT}/logs"
 rsync -a --delete "${BUNDLE_ROOT}/deploy/contabo/" "${DEPLOY_ROOT}/"
