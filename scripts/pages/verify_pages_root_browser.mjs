@@ -59,6 +59,7 @@ async function main() {
     const h1 = collapseWhitespace(await page.locator("h1").first().textContent());
     const title = collapseWhitespace(await page.title());
     const hostname = await page.evaluate(() => window.location.hostname);
+    const status = response?.status() ?? 0;
     const ok = status === 200 && title === EXPECTED_TITLE && h1 === EXPECTED_H1 && h1 !== REJECTED_H1;
 
     report = {
@@ -68,7 +69,6 @@ async function main() {
       h1,
       title,
       hostname,
-      ctaVisible,
       expectedTitle: EXPECTED_TITLE,
       expectedH1: EXPECTED_H1,
       rejectedH1: REJECTED_H1,
