@@ -1,7 +1,7 @@
 # Traders Regiment — Brand Guidelines: Colors, Fonts & Interactions
 
 **Scoped to: docs/ — Brand design system**
-**Version:** 2.0 | **Date:** 2026-04-27 | **Aesthetic:** Old Money Trading House
+**Version:** 3.0 | **Date:** 2026-04-27 | **Aesthetic:** Old Money Trading House
 
 ---
 
@@ -1683,6 +1683,498 @@ DESKTOP CRITICAL:
 3. GRID: explicit column counts in 768px–1200px range — auto-fit breaks here
 4. TOUCH: min-height 44px — WCAG compliance on all interactive elements
 5. TRUNCATE: text-overflow: ellipsis on labels, NEVER on data/numbers
+```
+
+---
+
+## PART 17 — ICONOGRAPHY
+
+### Icon Library
+
+**Primary:** Lucide Icons (https://lucide.dev) — MIT licensed, consistent 1.5px stroke weight, 24x24 grid.
+
+**Fallback for trading-specific icons:** Phosphor Icons (duotone style) for directional indicators and market-specific symbols.
+
+**Why Lucide over alternatives:**
+- Phosphor is thicker / more playful — too casual for old-money aesthetic
+- Heroicons is solid/outline only — too basic
+- Tabler Icons is good but less common in React ecosystems
+- Lucide: thin stroke, geometric, reads well at 16px and 20px — matches the restraint of the design
+
+### Stroke & Weight Rules
+
+```css
+:root {
+  --icon-stroke-width: 1.5px;   /* PRIMARY — all UI icons */
+  --icon-stroke-thin:   1px;    /* Small icons: 12-14px size */
+  --icon-stroke-thick:   2px;    /* Only for active/selected state indication */
+}
+```
+
+**Rule: All icons use `--icon-stroke-width: 1.5px`.** No icon may have a different stroke weight unless it's a decorative data indicator. Mixing stroke weights within the same component is forbidden.
+
+### Icon Sizes (Locked)
+
+```css
+:root {
+  /* ─── Icon Size Scale (LOCKED) ─── */
+  --icon-xs:  12px;   /* Inline metadata: timestamps, file sizes */
+  --icon-sm:  14px;   /* Badge icons, small indicators */
+  --icon-md:  16px;   /* Nav icons, button icons, list items */
+  --icon-lg:  20px;   /* Card headers, section indicators */
+  --icon-xl:  24px;   /* Hero sections, featured icons */
+  --icon-2xl: 32px;   /* Empty states, error states */
+}
+```
+
+**Size usage map:**
+
+| Icon | Size | Where |
+|---|---|---|
+| Timestamp clock | `--icon-xs` (12px) | Data row metadata |
+| Status dot indicator | `--icon-sm` (14px) | Signal badges |
+| Nav icon | `--icon-md` (16px) | Navigation bar |
+| Action button icon | `--icon-md` (16px) | Inside buttons |
+| Card section icon | `--icon-lg` (20px) | Card header prefix |
+| Direction arrow | `--icon-lg` (20px) | Signal cards |
+| Empty state illustration | `--icon-2xl` (32px) | Empty state page |
+| Error state illustration | `--icon-2xl` (32px) | Error page |
+
+### Icon Color Rules
+
+```css
+/* Icons inherit text color by default — never hardcode */
+.icon {
+  color: currentColor;  /* ← ALWAYS, never #hex */
+  width: var(--icon-md);
+  height: var(--icon-md);
+  flex-shrink: 0;
+}
+
+/* Specific color rules */
+.icon--success { color: #10B981; }   /* GREEN — up arrows, check marks */
+.icon--danger  { color: #EF4444; }   /* RED — down arrows, errors */
+.icon--warning { color: #F59E0B; }   /* AMBER — wait, caution */
+.icon--accent  { color: var(--accent-primary); }  /* Theme accent */
+.icon--muted   { color: var(--text-tertiary); }    /* Metadata, hints */
+```
+
+**Rule: Icons ALWAYS use `currentColor`.** The icon takes the color of its text container. Explicit `--icon-success` / `--icon-danger` classes override only where the icon is a standalone signal indicator (not inside text).
+
+### Directional Icons (Signal-Specific)
+
+These icons are **sacred** and map 1:1 to signal state. Never swap or redesign them:
+
+```
+LONG signal  → TrendingUp (Lucide) — pointing up-right at 45°
+SHORT signal → TrendingDown (Lucide) — pointing down-right at 45°
+NEUTRAL signal → Minus (Lucide) — horizontal line
+WAIT state    → Clock (Lucide) — idle clock
+ERROR state   → AlertCircle (Lucide) — error indicator
+```
+
+**Do not use:** ArrowUp, ArrowDown, ChevronUp, ChevronDown for signals. Use TrendingUp/TrendingDown — the diagonal angle is intentional (not purely vertical, signals are directional).
+
+### Icon Spacing With Text
+
+```css
+/* Icon + label in button */
+.btn .icon {
+  width: var(--icon-md);
+  height: var(--icon-md);
+}
+.btn .icon + .btn-label {
+  margin-left: var(--space-2); /* 8px gap */
+}
+
+/* Icon + text in card header */
+.card-header .icon {
+  width: var(--icon-lg);
+  height: var(--icon-lg);
+}
+.card-header .icon + .card-title {
+  margin-left: var(--space-3); /* 12px gap */
+}
+
+/* Icon in metadata (no extra space needed) */
+.metadata .icon {
+  width: var(--icon-xs);
+  height: var(--icon-xs);
+  vertical-align: middle;
+  margin-right: var(--space-1); /* 4px gap */
+}
+```
+
+### Icon Usage Table
+
+| Icon Name | Meaning | Where | Size |
+|---|---|---|---|
+| TrendingUp | LONG signal | Signal card, vote indicator | `--icon-lg` |
+| TrendingDown | SHORT signal | Signal card, vote indicator | `--icon-lg` |
+| Minus | NEUTRAL signal | Signal card | `--icon-lg` |
+| Clock | Waiting / countdown | Session timer, countdown | `--icon-md` |
+| CheckCircle | Confirmed / filled | Order filled, session saved | `--icon-md` |
+| AlertCircle | System error | Error banners | `--icon-md` |
+| AlertTriangle | Warning | Rate limit, API warning | `--icon-md` |
+| Info | Information | Info banners, tooltips | `--icon-md` |
+| Settings | Settings nav | Navigation | `--icon-md` |
+| LayoutDashboard | Dashboard | Navigation | `--icon-md` |
+| BarChart3 | Analytics | Navigation | `--icon-md` |
+| Bell | Notifications | Nav bar | `--icon-md` |
+| ChevronDown | Expand dropdown | Selects, collapsibles | `--icon-sm` |
+| X | Close / dismiss | Modals, drawers, badges | `--icon-sm` |
+| ExternalLink | External link | Links that open new tab | `--icon-xs` |
+
+### Animated Icons (Use Sparingly)
+
+```css
+/* Pulse animation for LIVE status indicator */
+.icon--live {
+  animation: hub-pulse 2s ease-in-out infinite;
+  color: var(--status-success);
+}
+
+/* Spin for loading state — ONLY on loading indicator */
+.icon--spin {
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Bounce for notification badge */
+.icon--bounce {
+  animation: bounce 0.4s var(--ease-bounce);
+}
+```
+
+**Rule: No more than 1 animated icon per viewport at a time.** Multiple pulsing/spinning icons create visual noise and distract from data. The live dot on the nav bar is the only perpetually animated icon.
+
+### Icons Not to Use
+
+```
+❌ Feather Icons — inconsistent stroke, looks dated
+❌ Font Awesome — filled icons clash with thin stroke aesthetic
+❌ Emoji as icons — no 🚀 or 📈 anywhere in the app
+❌ Custom SVG icons without stroke consistency check
+❌ Outlined icons mixed with filled icons in same component
+```
+
+---
+
+## PART 18 — EMPTY / ERROR / LOADING STATE SPECS
+
+### State Architecture
+
+Every feature component must implement these 5 states:
+
+```
+┌─────────────────────────────────────────────┐
+│ isLoading  →  SKELETON LOADER                │
+│ isError    →  ERROR STATE                   │
+│ isEmpty    →  EMPTY STATE                   │
+│ data = []  →  EMPTY STATE                   │
+│ data valid →  CONTENT STATE                 │
+└─────────────────────────────────────────────┘
+```
+
+**Priority rule:** Content state comes last. Skeleton, error, and empty states come first — they handle the 80% of cases where the user isn't looking at real data.
+
+---
+
+### 1. SKELETON LOADER
+
+**When:** Data is fetching. Show immediately, don't wait.
+
+**Design:** Pulse animation matching card shape. No spinners.
+
+```css
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--aura-border-subtle) 25%,
+    rgba(255,255,255,0.4) 50%,
+    var(--aura-border-subtle) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+  border-radius: var(--card-radius);
+  border: 1px solid var(--aura-border-subtle);
+}
+
+@keyframes skeleton-pulse {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Skeleton text lines */
+.skeleton-line {
+  height: 14px;
+  margin-bottom: var(--space-2);
+}
+.skeleton-line--title {
+  height: 20px;
+  width: 60%;
+  margin-bottom: var(--space-3);
+}
+.skeleton-line--sub {
+  height: 14px;
+  width: 80%;
+}
+
+/* Card skeleton layout */
+.card-skeleton {
+  padding: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+```
+
+**Skeleton per mode:**
+
+```
+LUMIERE:  shimmer gradient #e5e7eb → #f3f4f6 → #e5e7eb (gray pulse)
+AMBER:    shimmer gradient rgba(139,92,24,0.08) → rgba(139,92,24,0.04) → rgba(139,92,24,0.08) (warm pulse)
+MIDNIGHT: shimmer gradient rgba(255,255,255,0.04) → rgba(255,255,255,0.08) → rgba(255,255,255,0.04) (dark pulse)
+Duration:  1.5s ease-in-out, infinite
+```
+
+**Duration rule:** Skeleton animation `1.5s`. If it's faster, it looks frantic. If slower, it looks broken. `1.5s` is the sweet spot for perceived responsiveness.
+
+---
+
+### 2. ERROR STATE
+
+**When:** API call failed. Service unavailable.
+
+**Design:** Centered, no cards. Icon + headline + subtext + retry button.
+
+```
+LUMIERE:  AlertCircle icon in --icon-2xl (32px), text-primary headline, text-secondary subtext
+AMBER:    Same structure, warm color treatment
+MIDNIGHT: Same structure, gold accent icon
+```
+
+**Error state layout:**
+
+```css
+.error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-16) var(--space-6);
+  text-align: center;
+  min-height: 320px; /* gives breathing room */
+}
+
+.error-state .icon {
+  width: var(--icon-2xl);  /* 32px */
+  height: var(--icon-2xl);
+  color: var(--status-danger);
+  margin-bottom: var(--space-4);
+}
+
+.error-state__title {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: var(--text-title-sm);  /* 18px */
+  color: var(--text-primary);
+  margin-bottom: var(--space-2);
+}
+
+.error-state__description {
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: var(--text-body-sm);  /* 14px */
+  color: var(--text-secondary);
+  max-width: 360px;
+  line-height: var(--lh-body);
+  margin-bottom: var(--space-6);
+}
+
+.error-state__action {
+  margin-top: var(--space-4);
+}
+```
+
+**Error copy (copy these verbatim):**
+
+| Error Type | Title | Description |
+|---|---|---|
+| Service unavailable | `Service temporarily unavailable` | `Unable to reach the consensus engine. Please try again in a moment.` |
+| Network error | `Connection lost` | `Check your internet connection and try again.` |
+| Invalid symbol | `Symbol not found` | `The symbol you entered was not recognized. Check the symbol and try again.` |
+| Rate limit | `Slow down` | `Too many requests. Please wait a moment before trying again.` |
+| Auth expired | `Session expired` | `Your session has expired. Please log in again.` |
+
+**No error state should show technical details.** `Error: ECONNREFUSED at consensusRoutes.mjs:42` is for logs only, never for users.
+
+---
+
+### 3. EMPTY STATE
+
+**When:** No data available for the requested context. Not an error — just nothing to show.
+
+**Design:** Centered, icon + headline + subtext + optional action button.
+
+```
+LUMIERE:  Inbox/Clipboard icon, text-primary headline, text-secondary subtext
+AMBER:    Same structure, warm treatment
+MIDNIGHT: Same structure, muted gold icon
+```
+
+**Empty state layout:**
+
+```css
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-16) var(--space-6);
+  text-align: center;
+  min-height: 240px;
+}
+
+.empty-state .icon {
+  width: var(--icon-2xl);
+  height: var(--icon-2xl);
+  color: var(--text-tertiary);
+  margin-bottom: var(--space-4);
+}
+
+.empty-state__title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--text-title-md);  /* 20px Cormorant */
+  color: var(--text-primary);
+  margin-bottom: var(--space-2);
+}
+
+.empty-state__description {
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: var(--text-body-sm);
+  color: var(--text-secondary);
+  max-width: 320px;
+  line-height: var(--lh-body);
+  margin-bottom: var(--space-6);
+}
+```
+
+**Empty copy:**
+
+| Context | Title | Description |
+|---|---|---|
+| No sessions loaded | `No sessions yet` | `Sessions will appear here once data starts flowing from the trading engine.` |
+| No news | `No news available` | `Breaking news and market updates will appear here when available.` |
+| No paper trades | `No paper trades recorded` | `Start paper trading to see your trade history and performance here.` |
+| No consensus data | `Waiting for consensus` | `The consensus engine is initializing. Data will populate once the first analysis completes.` |
+| Search no results | `No results found` | `Try adjusting your search terms or filters.` |
+
+**Empty state CTA:** Where applicable, add a clear action: `[Load Sample Data]`, `[Configure Symbol]`, `[Start Paper Trade]`. Empty states with actions convert better than empty states without.
+
+---
+
+### 4. LOADING STATE (Progressive)
+
+**For long operations (paper trade generation, backtest running):**
+
+```css
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-12) var(--space-6);
+}
+
+.loading-state__spinner {
+  width: 32px;
+  height: 32px;
+  border: 2px solid var(--aura-border-subtle);
+  border-top-color: var(--accent-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.loading-state__label {
+  font-family: var(--font-ui);
+  font-weight: 500;
+  font-size: var(--text-ui-md);  /* 12px DM Sans */
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: var(--ls-label);
+}
+
+.loading-state__progress {
+  font-family: var(--font-data);
+  font-size: var(--text-data-xs);
+  color: var(--text-tertiary);
+}
+```
+
+**Rule: Never use a spinner for data loading.** Spinners are for user-initiated long operations (export, generate). Data fetching uses skeleton loaders only.
+
+---
+
+### 5. CONTENT STATE
+
+**The 10/10 rule for data displays:**
+
+```
+If data takes > 200ms to load → show skeleton immediately
+If skeleton shows > 3s with no data → show error state (not spinner)
+If error state shown → offer retry button, not auto-retry
+If data is [] (empty array) → show empty state, not skeleton
+If data is valid → show content with stagger animation
+```
+
+**Content state animation:**
+
+```css
+.content-state {
+  animation: fadeSlideUp var(--duration-slow) var(--ease-enter) both;
+}
+
+@keyframes fadeSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+```
+
+---
+
+### State Summary Card
+
+Every new component must implement and pass this checklist:
+
+```
+┌─────────────────────────────────────────────────────┐
+│  STATE CHECKLIST (mandatory for every data component)│
+├─────────────────────────────────────────────────────┤
+│  [ ] Skeleton state — matches card shape, pulses     │
+│  [ ] Error state — icon + title + description + CTA │
+│  [ ] Empty state — icon + title + description + CTA │
+│  [ ] Error copy — no technical jargon               │
+│  [ ] Empty copy — includes action where applicable  │
+│  [ ] Loading = skeleton, NOT spinner                │
+│  [ ] Error = retry button, NOT auto-retry           │
+│  [ ] Empty[] = empty state, NOT skeleton           │
+│  [ ] Content animates in with stagger               │
+│  [ ] All 3 modes tested (LUMIERE/AMBER/MIDNIGHT)   │
+│  [ ] All 4 breakpoints tested (320/768/1024/1280)  │
+│  [ ] Touch targets 44px minimum                     │
+└─────────────────────────────────────────────────────┘
 ```
 
 ---
