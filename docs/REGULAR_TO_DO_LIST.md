@@ -5,6 +5,20 @@
 
 ---
 
+## CORRECTIONS (after deep code trace)
+
+The initial plan had 4 errors discovered via code archaeology:
+
+1. **Task 2 (Admin login)**: Frontend `verifyAdminTotp()` does NOT call the BFF — it runs TOTP verification entirely in the browser using the `ADMIN_TOTP_SECRET` from the browser bundle. The BFF route `POST /auth/admin/totp/verify` is NOT used for TOTP unlock. The actual flow: AdminUnlockModal → `handleAdminAccess` → `executeHandleAdminAccess` → `verifyAdminTotp(browser-side)` → `completeAdminUnlock`. Fix: remove the `ADMIN_TOTP_SECRET` from browser bundles entirely and require TOTP verification to go through the BFF (move the secret server-side only).
+
+2. **Task 2 (Email OTP)**: Frontend already supports 3 OTP codes. `verifyAdminEmailOtp` in `adminAuthService.js:239-248` accepts `codes` as array OR `{otp1, otp2, otp3}` object, requires exactly 3 codes. BFF `POST /auth/admin/email-otp/start` already generates 3 codes. So the 3-code email OTP flow is already implemented in the frontend. The only missing piece is the BFF route handler on the live server (stale deploy). No code changes needed — just deploy.
+
+3. **Task 1 (Watchtower)**: The watchtower does NOT check `result.source` anywhere. The `ML_CONSENSUS_DEGRADED` fault fires on `!consensusResult.ok` with no `source === 'ny_lunch_block'` exception. This is not a design choice — it's an oversight. The fix is adding a `source` check before setting the fault.
+
+4. **Task 6 (Google Sign In)**: Google sign-in uses Firebase direct OAuth (`signInWithRedirect`) — the BFF is NOT involved. This is a Firebase configuration issue, not a BFF issue. The fix is in Firebase console: add `tradergunit.pages.dev` to the authorized OAuth redirect domains.
+
+---
+
 ## CONTEXT
 
 User (Gunit Singh, trader + founder) has identified 10 issues/errors on the live TradersApp at `tradergunit.pages.dev`. This doc is the canonical plan. Execution starts only when user says GO.
