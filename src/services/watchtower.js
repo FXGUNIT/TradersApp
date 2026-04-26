@@ -565,16 +565,20 @@ export async function runWatchtowerScan() {
   }
 
   if (health.ok && consensusResult && !consensusResult.ok) {
-    faults.push(
-      createFault(
-        "ML_CONSENSUS_DEGRADED",
-        "ML consensus degraded",
-        consensusResult?.data?.error ||
-          consensusResult?.error ||
-          "BFF /ml/consensus returned a fallback response.",
-        "medium",
-      ),
-    );
+    if (consensusResult?.source === "ny_lunch_block") {
+      // Known block window — not a fault, expected behavior
+    } else {
+      faults.push(
+        createFault(
+          "ML_CONSENSUS_DEGRADED",
+          "ML consensus degraded",
+          consensusResult?.data?.error ||
+            consensusResult?.error ||
+            "BFF /ml/consensus returned a fallback response.",
+          "medium",
+        ),
+      );
+    }
   }
 
   faults.push(...summarizeNewsFaults(newsStatus));

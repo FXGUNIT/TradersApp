@@ -713,8 +713,6 @@ export default function CleanLoginScreen({
         </div>
 
         <BlogSection
-          heading="Research Buttons"
-          description="Small, direct article buttons below the login panel, so the trust story continues immediately."
           style={{ maxWidth: 540, marginInline: "auto" }}
         />
       </div>
