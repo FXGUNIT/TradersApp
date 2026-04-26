@@ -23,7 +23,6 @@ The initial plan had 4 errors discovered via code archaeology:
 
 User (Gunit Singh, trader + founder) has identified 10 issues/errors on the live TradersApp at `tradergunit.pages.dev`. This doc is the canonical plan. Execution starts only when user says GO.
 
-
 ---
 
 ## BLOCKING ROOT CAUSE
@@ -342,29 +341,18 @@ Phase 2 (Manual — Gunit does SSH)
 Phase 3 (After Contabo redeploys)
 ├── Task 2 (all steps) — Admin login redesign
 ├── Task 3 (all steps) — IP safe zone
-├── Task 4 (all steps) — Telegram relink
-└── Task 1.2 verification — Watchtower 0 faults
+└── Task 4 (all steps) — Telegram relink
 
-Phase 4 (Gunit shares logo files)
-├── Task 7 — Logo/app icon everywhere
-├── Task 8 — Blog about logo
-└── Task 11 — Brand redesign (confirm brown hex first)
-
-Phase 5 (After logo + brand)
+Phase 4 (After admin login done)
 ├── Task 9 — Pitch deck page in admin panel
-├── Task 10 — Secret sauce privacy audit
-└── Task 12 — Blog section redesign with charts
+└── Task 10 — Secret sauce privacy audit
 ```
-
----
 
 ## CRITICAL DEPENDENCIES
 
 | Dependency | Blocks |
 |---|---|
 | Contabo SSH fix | Tasks 2, 3, 4, Watchtower fix |
-| Logo files from Gunit | Tasks 7, 8, 11, 12 |
-| Exact logo brown hex | Task 11 brand redesign |
 | Admin login redesign (Task 2) | Task 9 (pitch deck in admin panel) |
 
 ---
@@ -372,10 +360,8 @@ Phase 5 (After logo + brand)
 ## WHAT I CANNOT DO WITHOUT YOU
 
 1. **Contabo SSH host key** — run `ssh-keyscan -H <your-vps-ip>` and paste result into GitHub secret `CONTABO_SSH_KNOWN_HOSTS`
-2. **Logo files** — drag-and-drop into this chat or share the path
-3. **Exact logo brown hex** — tell me the hex (e.g. `#8B4513` or what it is)
-4. **Telegram bot token + chat ID** — provide if not already set on VPS
-5. **Google Sign In error details** — open browser console, click the button, report the exact error
+2. **Telegram bot token + chat ID** — provide if not already set on VPS
+3. **Google Sign In error details** — open browser console, click the button, report the exact error
 
 ---
 
