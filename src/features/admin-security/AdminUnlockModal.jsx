@@ -14,16 +14,13 @@ export default function AdminUnlockModal({
   onMasterEmailChange,
   onPasswordChange,
   onOtpChange,
-  onProceedToCodeEntry,
   onRequestNew,
   onSendVerificationCodes,
-  onTogglePasswordVisibility,
   onUnlockAdmin,
   onVerifyCodes,
   passwordError,
   passwordValue,
   show,
-  showPassword,
   theme,
   verificationError,
   verificationState,
@@ -37,20 +34,30 @@ export default function AdminUnlockModal({
     setRememberDevice(checked);
   };
 
-  if (!show) {
-    return null;
-  }
+  if (!show) return null;
 
   const {
     masterEmail,
     masterEmailVerified,
     otpStep,
     otps,
-    otpsVerified,
   } = verificationState;
   const { browser, os, device } = parseUserAgent();
   const fp = getDeviceFingerprint();
-  const deviceInfo = `${browser} on ${os}${device !== "desktop" ? ` (${device})` : ""} · ${fp.substring(0, 12)}...`;
+  const deviceInfo = `${browser} on ${os}${device !== "desktop" ? ` (${device})` : ""} - ${fp.substring(0, 12)}...`;
+
+  const inputStyle = {
+    width: "100%",
+    padding: 12,
+    background: theme.surface || "rgba(0,0,0,0.15)",
+    border: `1px solid ${theme.border || "#374151"}`,
+    color: theme.text || "#fff",
+    borderRadius: 8,
+    fontFamily: theme.font,
+    fontSize: 14,
+    boxSizing: "border-box",
+    outline: "none",
+  };
 
   return (
     <div
@@ -74,9 +81,7 @@ export default function AdminUnlockModal({
             marginBottom: 18,
           }}
         >
-          <div style={{ color: theme.purple, fontSize: 20 }}>
-            {"\u{1F6E1}\uFE0F"}
-          </div>
+          <div style={{ color: theme.purple, fontSize: 20 }}>ADM</div>
           <div
             style={{
               color: theme.purple,
@@ -85,57 +90,139 @@ export default function AdminUnlockModal({
               fontWeight: 800,
             }}
           >
-            ADMIN AUTHENTICATION
+            ADMIN MFA LOGIN
           </div>
         </div>
 
-        {!masterEmailVerified ? (
-          <div style={{ marginBottom: 20 }}>
+        <div
+          style={{
+            color: theme.red,
+            fontWeight: 700,
+            fontSize: 12,
+            marginBottom: 16,
+            padding: "12px 14px",
+            background: "rgba(255,69,58,0.1)",
+            border: "1px solid rgba(255,69,58,0.3)",
+            borderRadius: 8,
+            textAlign: "center",
+          }}
+        >
+          Restricted admin area. Access attempts are logged for security review.
+        </div>
+
+        <div style={{ marginBottom: 18 }}>
+          <label style={labelStyle}>AUTHENTICATOR CODE</label>
+          <input
+            type="text"
+            inputMode="numeric"
+            value={passwordValue}
+            onChange={(event) =>
+              onPasswordChange(event.target.value.replace(/\D/g, "").slice(0, 6))
+            }
+            style={{
+              ...inputStyle,
+              fontFamily: "monospace",
+              textAlign: "center",
+              letterSpacing: 2,
+            }}
+            placeholder="000000"
+            maxLength="6"
+            onKeyDown={(event) => {
+              if (event.key === "Enter") onUnlockAdmin();
+            }}
+          />
+          {passwordError && (
             <div
               style={{
                 color: theme.red,
-                fontWeight: 700,
-                fontSize: 12,
-                marginBottom: 16,
-                padding: "12px 14px",
-                background: "rgba(255,69,58,0.1)",
-                border: "1px solid rgba(255,69,58,0.3)",
-                borderRadius: 8,
-                textAlign: "center",
+                fontSize: 11,
+                marginTop: 8,
+                fontWeight: 600,
               }}
             >
-              WARNING: RESTRICTED AREA. Unauthorized entry attempts are actively
-              tracked. Any attempt to breach this panel will result in your IP
-              address, device footprint, and network data being permanently
-              logged and reported.
+              {passwordError}
             </div>
-            <div style={{ marginBottom: 16 }}>
-              <label style={labelStyle}>MASTER ADMIN EMAIL</label>
-              <input
-                type="email"
-                value={masterEmail}
-                onChange={(event) => onMasterEmailChange(event.target.value)}
+          )}
+
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              marginTop: 14,
+              marginBottom: 12,
+              cursor: "pointer",
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={rememberDevice}
+              onChange={(event) => handleRememberChange(event.target.checked)}
+              style={{
+                width: 16,
+                height: 16,
+                cursor: "pointer",
+                accentColor: theme.blue || "#3B82F6",
+              }}
+            />
+            <div>
+              <div
                 style={{
-                  width: "100%",
-                  padding: 12,
-                  background: theme.surface || "rgba(0,0,0,0.15)",
-                  border: `1px solid ${theme.border || "#374151"}`,
-                  color: theme.text || "#fff",
-                  borderRadius: 8,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: theme.blue || "#3B82F6",
                   fontFamily: theme.font,
-                  fontSize: 14,
-                  boxSizing: "border-box",
-                  outline: "none",
-                  transition: "border-color 0.2s ease",
+                  letterSpacing: 0.5,
                 }}
-                placeholder="Enter Master ID"
-              />
+              >
+                Remember this device
+              </div>
+              <div
+                style={{
+                  fontSize: 10,
+                  color: theme.muted || "#9CA3AF",
+                  fontFamily: theme.font,
+                  marginTop: 2,
+                }}
+              >
+                {deviceInfo}
+              </div>
             </div>
+          </label>
+
+          <button
+            onClick={onUnlockAdmin}
+            style={authButton(theme.purple, false)}
+            className="btn-glass"
+          >
+            UNLOCK WITH AUTHENTICATOR
+          </button>
+        </div>
+
+        <div
+          style={{
+            height: 1,
+            background: theme.border || "rgba(255,255,255,0.14)",
+            margin: "18px 0",
+          }}
+        />
+
+        {!masterEmailVerified || !otpStep ? (
+          <div style={{ marginBottom: 20 }}>
+            <label style={labelStyle}>MASTER ADMIN EMAIL</label>
+            <input
+              type="email"
+              value={masterEmail}
+              onChange={(event) => onMasterEmailChange(event.target.value)}
+              style={inputStyle}
+              placeholder="Enter master admin email"
+            />
             {verificationError && (
               <div
                 style={{
                   color: theme.red,
                   fontSize: 11,
+                  marginTop: 8,
                   marginBottom: 12,
                   fontWeight: 600,
                 }}
@@ -145,33 +232,13 @@ export default function AdminUnlockModal({
             )}
             <button
               onClick={onSendVerificationCodes}
-              style={authButton(theme.purple, false)}
-              className="btn-glass"
-            >
-              SEND VERIFICATION CODES
-            </button>
-          </div>
-        ) : !otpStep ? (
-          <div style={{ marginBottom: 20 }}>
-            <div
               style={{
-                color: theme.muted,
-                fontSize: 12,
-                marginBottom: 16,
-                textAlign: "center",
+                ...authButton(theme.green || theme.purple, false),
+                marginTop: 12,
               }}
-            >
-              Master identity verified. OTP codes are being sent to three secure
-              endpoints.
-              <br />
-              Click below to proceed to code entry.
-            </div>
-            <button
-              onClick={onProceedToCodeEntry}
-              style={authButton(theme.green, false)}
               className="btn-glass"
             >
-              PROCEED TO CODE ENTRY
+              SEND THREE EMAIL OTP CODES
             </button>
           </div>
         ) : (
@@ -184,7 +251,7 @@ export default function AdminUnlockModal({
                 textAlign: "center",
               }}
             >
-              Enter the 6-digit codes sent to the three verification endpoints:
+              Enter the 6-digit codes sent to the three admin email endpoints.
             </div>
 
             <div
@@ -204,18 +271,20 @@ export default function AdminUnlockModal({
                   <label style={{ ...labelStyle, fontSize: 11 }}>{email}</label>
                   <input
                     type="text"
+                    inputMode="numeric"
                     value={otps[field]}
-                    onChange={(event) => onOtpChange(field, event.target.value)}
+                    onChange={(event) =>
+                      onOtpChange(
+                        field,
+                        event.target.value.replace(/\D/g, "").slice(0, 6),
+                      )
+                    }
                     style={{
-                      width: "100%",
+                      ...inputStyle,
                       padding: 10,
-                      background: "rgba(0,0,0,0.5)",
-                      border: "1px solid #333",
-                      color: "#fff",
-                      borderRadius: 6,
                       fontFamily: "monospace",
                       textAlign: "center",
-                      letterSpacing: "2px",
+                      letterSpacing: 2,
                     }}
                     placeholder="000000"
                     maxLength="6"
@@ -237,13 +306,13 @@ export default function AdminUnlockModal({
               </div>
             )}
 
-            <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+            <div style={{ display: "flex", gap: 8 }}>
               <button
                 onClick={onVerifyCodes}
                 style={authButton(theme.green, false)}
                 className="btn-glass"
               >
-                VERIFY CODES
+                VERIFY THREE CODES
               </button>
               <button
                 onClick={onRequestNew}
@@ -259,152 +328,16 @@ export default function AdminUnlockModal({
           </div>
         )}
 
-        {otpsVerified && (
-          <div style={{ marginBottom: 20 }}>
-            <label style={labelStyle}>MASTER ADMIN PASSWORD</label>
-            <div style={{ position: "relative", width: "100%" }}>
-              <input
-                type={showPassword ? "text" : "password"}
-                value={passwordValue}
-                onChange={(event) => onPasswordChange(event.target.value)}
-                style={{
-                  width: "100%",
-                  padding: 12,
-                  paddingRight: 60,
-                  background: theme.surface || "rgba(0,0,0,0.5)",
-                  border: `1px solid ${theme.border || "#333"}`,
-                  color: theme.text || "#fff",
-                  borderRadius: 8,
-                  fontFamily: theme.font,
-                  fontSize: 14,
-                  boxSizing: "border-box",
-                }}
-                placeholder="Enter Master Admin Password"
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    onUnlockAdmin();
-                  }
-                }}
-              />
-              <button
-                type="button"
-                onClick={onTogglePasswordVisibility}
-                aria-label={showPassword ? "Hide password" : "Show password"}
-                style={{
-                  position: "absolute",
-                  right: 8,
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  background: "transparent",
-                  border: "none",
-                  color: theme.muted || "#9CA3AF",
-                  cursor: "pointer",
-                  fontSize: 11,
-                  fontWeight: 700,
-                  fontFamily: theme.font,
-                  letterSpacing: 1,
-                  padding: "6px 8px",
-                  borderRadius: 4,
-                  zIndex: 1,
-                  lineHeight: 1,
-                  minWidth: 40,
-                  textAlign: "center",
-                  transition: "color 0.15s ease",
-                }}
-                onMouseEnter={(event) => {
-                  event.currentTarget.style.color = theme.blue || "#3B82F6";
-                }}
-                onMouseLeave={(event) => {
-                  event.currentTarget.style.color = theme.muted || "#9CA3AF";
-                }}
-              >
-                {showPassword ? "HIDE" : "SHOW"}
-              </button>
-            </div>
-            {passwordError && (
-              <div
-                style={{
-                  color: theme.red,
-                  fontSize: 11,
-                  marginTop: 8,
-                  fontWeight: 600,
-                }}
-              >
-                {passwordError}
-              </div>
-            )}
-
-            <label
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                marginTop: 14,
-                marginBottom: 4,
-                cursor: "pointer",
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={rememberDevice}
-                onChange={(event) =>
-                  handleRememberChange(event.target.checked)
-                }
-                style={{
-                  width: 16,
-                  height: 16,
-                  cursor: "pointer",
-                  accentColor: theme.blue || "#3B82F6",
-                }}
-              />
-              <div>
-                <div
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color: theme.blue || "#3B82F6",
-                    fontFamily: theme.font,
-                    letterSpacing: 0.5,
-                  }}
-                >
-                  Remember this device
-                </div>
-                <div
-                  style={{
-                    fontSize: 10,
-                    color: theme.muted || "#9CA3AF",
-                    fontFamily: theme.font,
-                    marginTop: 2,
-                  }}
-                >
-                  {deviceInfo}
-                </div>
-              </div>
-            </label>
-          </div>
-        )}
-
-        <div style={{ display: "flex", gap: 12 }}>
-          {otpsVerified && (
-            <button
-              onClick={onUnlockAdmin}
-              style={authButton(theme.purple, false)}
-              className="btn-glass"
-            >
-              UNLOCK ADMIN
-            </button>
-          )}
-          <button
-            onClick={onCancel}
-            style={{
-              ...authButton(theme.muted, false),
-              background: "transparent",
-            }}
-            className="btn-glass"
-          >
-            CANCEL
-          </button>
-        </div>
+        <button
+          onClick={onCancel}
+          style={{
+            ...authButton(theme.muted, false),
+            background: "transparent",
+          }}
+          className="btn-glass"
+        >
+          CANCEL
+        </button>
       </div>
     </div>
   );
