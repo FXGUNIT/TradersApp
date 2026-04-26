@@ -962,12 +962,32 @@ User Question: ${trimmed}`;
             marginBottom: 8,
           }}>
             <div style={{ flex: 1, height: 1, background: "rgba(212,165,32,0.15)" }} />
-            <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: 3, color: "rgba(212,165,32,0.6)", textTransform: "uppercase" }}>
-              From the Trading Desk
-            </span>
-            <div style={{ flex: 1, height: 1, background: "rgba(212,165,32,0.15)" }} />
+            {[
+              { label: "Founder", href: "/blog/founder-story/" },
+              { label: "Vision", href: "/blog/product-vision/" },
+              { label: "Architecture", href: "/blog/architecture/" },
+            ].map(({ label, href }) => (
+              <a
+                key={label}
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  fontSize: 9,
+                  fontWeight: 800,
+                  letterSpacing: 2.2,
+                  color: "rgba(212,165,32,0.55)",
+                  textDecoration: "none",
+                  textTransform: "uppercase",
+                  padding: "4px 10px",
+                  border: "1px solid rgba(212,165,32,0.22)",
+                  borderRadius: 999,
+                }}
+              >
+                {label}
+              </a>
+            ))}
           </div>
-          <BlogSection />
         </div>
 
         <style>{`
