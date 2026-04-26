@@ -477,44 +477,15 @@ New route: `/admin/pitch-deck` (authenticated admin only)
 
 ## TASK 11 — BRAND REDESIGN (White/Black/Brown)
 
-### CONFIRMED BRAND COLORS (from `docs/brand-guidelines-colors-fonts-interactions.md`)
-User mandate: **old-school luxury — white + black + brown only**. The existing LUMIERE/AMBER/MIDNIGHT theme system already has an AMBER mode with warm cream + burnished amber palette that maps perfectly to the brand direction. Replace gold (`#D4A520`) with AMBER-mode accent.
-
-**AMBER MODE palette (the foundation for brand redesign):**
-```
-Background:        #f4ebd0 (warm cream) / #0A0A0A (dark) — no white/black extremes
-Surface:           #fdf6e3 (parchment)
-Text Primary:      #3d2b1f (deep espresso brown)
-Text Secondary:    #7c6a53 (warm medium brown)
-Text Tertiary:     #a89680 (light warm brown)
-Border Subtle:     rgba(139,92,24,0.1) — brown-tinted
-Border Strong:     rgba(139,92,24,0.2)
-Accent Primary:    #d97706 (burnished amber — replaces gold)
-Accent Glow:       rgba(217,119,6,0.1)
-Shadow:            0 4px 24px rgba(139,92,24,0.08)
-```
-
-**Dark mode equivalent:**
-```
-Background:        #0A0A0A
-Surface:           #1a1612 (dark warm brown tint)
-Text Primary:      #f4ebd0 (warm cream)
-Text Secondary:    #a89680 (light brown)
-Border:            rgba(217,119,6,0.1)
-Accent:            #d97706 (burnished amber — stays amber in dark too)
-```
-
-**Logo brown:** `#8B4513` (saddle brown, confirmed in plan — user to verify from actual logo file)
-
-### Implementation approach
-The AMBER mode in `index.css` already has the warm cream/brown palette. The brand redesign = apply AMBER-mode tokens everywhere, replacing blue (`#2563eb`) with burnished amber (`#d97706`), and gold (`#D4A520`) with sienna brown (`#8B4513`).
+**Colors, fonts, and interaction specs are in `docs/brand-guidelines-colors-fonts-interactions.md`.**
+This task covers execution of the design system tokens into code.
 
 ### What to change (files + changes)
 | File | Change |
 |---|---|
-| `src/index.css` | Set AMBER as default mode; replace all blue (`#2563eb`) with `#d97706`; replace gold (`#D4A520`) with `#8B4513` |
-| `src/utils/uiUtils.js` | Update accent to `#d97706` / `#8B4513` |
-| `ThemeSwitcher.jsx` | Keep L/A/M toggle — add OBSIDIAN option; set AMBER as default |
+| `src/index.css` | Replace all blue (`#2563eb`) with brand accent; replace gold (`#D4A520`) with logo brown |
+| `src/utils/uiUtils.js` | Update accent definitions |
+| `ThemeSwitcher.jsx` | Keep L/A/M toggle functional |
 | `src/features/auth/CleanLoginScreen.jsx` | Replace gold/brown hardcodes with CSS vars |
 | `src/pages/RegimentHub.jsx` | Same |
 | `src/pages/CollectiveConsciousness.jsx` | Same |
@@ -522,7 +493,7 @@ The AMBER mode in `index.css` already has the warm cream/brown palette. The bran
 | All component CSS | Same |
 
 ### Files Touched
-- `src/index.css` (theme tokens — extensive)
+- `src/index.css`
 - `src/utils/uiUtils.js`
 - All JSX component files using accent colors
 - `public/blog/*.html` files
