@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import ThemeSwitcher from "../components/ThemeSwitcher.jsx";
 import AiEnginesStatus from "../components/AiEnginesStatus.jsx";
+import { BlogSection } from "../components/BlogSection.jsx";
 import { getHubContent } from "../services/clients/ContentClient.js";
 
 // ─── Inline SVG Chart Components ─────────────────────────────────────────────
@@ -450,12 +451,12 @@ export default function RegimentHub({
       <div
         style={{
           textAlign: "center",
-          marginBottom: 56,
+          marginBottom: 40,
           width: "100%",
-          maxWidth: 900,
+          maxWidth: 860,
           display: "flex",
           flexDirection: "column",
-          gap: 32,
+          gap: 24,
         }}
       >
         <div
@@ -466,6 +467,12 @@ export default function RegimentHub({
             justifyContent: "space-between",
             gap: 16,
             flexWrap: "wrap",
+            padding: "10px 12px",
+            borderRadius: 18,
+            border: "1px solid rgba(212,165,32,0.12)",
+            background: isDark
+              ? "rgba(255,255,255,0.03)"
+              : "rgba(255,255,255,0.64)",
           }}
         >
           <AiEnginesStatus statuses={aiStatuses} />
@@ -490,21 +497,39 @@ export default function RegimentHub({
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 10,
-              marginBottom: 20,
+              justifyContent: "center",
+              marginBottom: 14,
             }}
           >
-            {hubContent.eyebrow}
+            <div
+              style={{
+                minHeight: 30,
+                padding: "0 14px",
+                borderRadius: 999,
+                border: "1px solid rgba(212,165,32,0.22)",
+                background: "rgba(212,165,32,0.06)",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 9,
+                fontWeight: 800,
+                letterSpacing: 3.2,
+                color: "#d4a520",
+                textTransform: "uppercase",
+              }}
+            >
+              {hubContent.eyebrow}
+            </div>
           </div>
 
           {/* Brand name — large */}
           <h1
             style={{
-              fontSize: "clamp(36px, 7vw, 72px)",
+              fontSize: "clamp(30px, 5vw, 54px)",
               fontWeight: 900,
               color: textColor,
               margin: 0,
-              letterSpacing: -2,
+              letterSpacing: -1.3,
               lineHeight: 0.95,
               textAlign: "center",
               fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
@@ -514,15 +539,15 @@ export default function RegimentHub({
           </h1>
           <h1
             style={{
-              fontSize: "clamp(36px, 7vw, 72px)",
+              fontSize: "clamp(30px, 5vw, 54px)",
               fontWeight: 900,
               color: "#d4a520",
-              margin: "0 0 4px 0",
-              letterSpacing: -2,
+              margin: "0 0 2px 0",
+              letterSpacing: -1.3,
               lineHeight: 0.95,
               textAlign: "center",
               fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
-              textShadow: "0 0 40px rgba(212,165,32,0.35), 0 0 80px rgba(212,165,32,0.15)",
+              textShadow: "0 0 28px rgba(212,165,32,0.24)",
             }}
           >
             REGIMENT
@@ -534,7 +559,7 @@ export default function RegimentHub({
               display: "flex",
               alignItems: "center",
               gap: 8,
-              margin: "16px 0 16px 0",
+              margin: "12px 0 12px 0",
             }}
           >
             <div
@@ -563,15 +588,15 @@ export default function RegimentHub({
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
-              gap: 6,
+              gap: 4,
             }}
           >
             <div
               style={{
-                fontSize: "clamp(13px, 2.5vw, 18px)",
+                fontSize: "clamp(11px, 1.8vw, 14px)",
                 fontWeight: 700,
                 color: textColor,
-                letterSpacing: 1.5,
+                letterSpacing: 1.6,
                 textAlign: "center",
                 textTransform: "uppercase",
                 lineHeight: 1.3,
@@ -581,14 +606,13 @@ export default function RegimentHub({
             </div>
             <div
               style={{
-                fontSize: "clamp(15px, 3vw, 22px)",
+                fontSize: "clamp(13px, 2.2vw, 17px)",
                 fontWeight: 900,
                 color: "#d4a520",
-                letterSpacing: 2,
+                letterSpacing: 2.1,
                 textAlign: "center",
                 textTransform: "uppercase",
                 lineHeight: 1,
-                textShadow: "0 0 30px rgba(212,165,32,0.3)",
               }}
             >
               Trading AI
@@ -598,13 +622,13 @@ export default function RegimentHub({
           {/* Sub-description */}
           <p
             style={{
-              fontSize: 13,
+              fontSize: 12,
               color: mutedColor,
-              marginTop: 20,
-              maxWidth: 380,
-              lineHeight: 1.7,
+              marginTop: 16,
+              maxWidth: 340,
+              lineHeight: 1.65,
               textAlign: "center",
-              letterSpacing: 0.2,
+              letterSpacing: 0,
             }}
           >
             {hubContent.description}
@@ -613,10 +637,10 @@ export default function RegimentHub({
           {/* Thin gold separator line */}
           <div
             style={{
-              marginTop: 24,
+              marginTop: 18,
               height: 1,
               width: "100%",
-              maxWidth: 480,
+              maxWidth: 360,
               background: "rgba(212,165,32,0.2)",
               borderRadius: 1,
             }}
