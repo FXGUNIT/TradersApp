@@ -8,6 +8,7 @@ import MessageRenderer from '../components/MessageRenderer.jsx';
 import ThemeSwitcher from '../components/ThemeSwitcher.jsx';
 import AiEnginesStatus from '../components/AiEnginesStatus.jsx';
 import BreakingNewsPanel from '../components/BreakingNewsPanel.jsx';
+import { BlogSection } from '../components/BlogSection.jsx';
 import { runDeliberation, councilStage, MASTER_INTELLIGENCE_SYSTEM_PROMPT } from '../services/ai-router.js';
 import { hasBff } from '../services/gateways/base.js';
 import { resolveBffBaseUrl } from '../services/runtimeConfig.js';
@@ -946,6 +947,27 @@ User Question: ${trimmed}`;
           animation: isFastMode ? 'cc-fast-pulse 2s ease-in-out infinite' : 'cc-full-glow 3s ease-in-out infinite',
         }}>
           {engineModeLabel}
+        </div>
+
+        {/* Blog Insights */}
+        <div style={{
+          borderTop: "1px solid rgba(212,165,32,0.12)",
+          padding: "10px 20px 14px",
+          marginTop: 4,
+        }}>
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            marginBottom: 8,
+          }}>
+            <div style={{ flex: 1, height: 1, background: "rgba(212,165,32,0.15)" }} />
+            <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: 3, color: "rgba(212,165,32,0.6)", textTransform: "uppercase" }}>
+              From the Trading Desk
+            </span>
+            <div style={{ flex: 1, height: 1, background: "rgba(212,165,32,0.15)" }} />
+          </div>
+          <BlogSection />
         </div>
 
         <style>{`
