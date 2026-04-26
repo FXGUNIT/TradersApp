@@ -112,40 +112,98 @@ export const ACCENT_COLORS = {
   PINK: { name: 'Pink', hex: '#FF375F', primary: '#FF375F', light: 'rgba(255,55,95,0.2)', glow: 'rgba(255,55,95,0.6)' }
 };
 
-export const createTheme = (isDark = true, accentKey = 'BLUE') => {
-  const accent = ACCENT_COLORS[accentKey] || ACCENT_COLORS.BLUE;
+const THEME_PALETTES = {
+  lumiere: {
+    bg: "#FBFBFC",
+    card: "rgba(255,255,255,0.88)",
+    cardGlass: "rgba(255,255,255,0.76)",
+    border: "rgba(15,23,42,0.08)",
+    border2: "rgba(15,23,42,0.05)",
+    muted: "#64748B",
+    dim: "#94A3B8",
+    text: "#111827",
+    textSecondary: "#64748B",
+    accent: {
+      primary: "#2563EB",
+      light: "rgba(37,99,235,0.14)",
+      glow: "rgba(37,99,235,0.3)",
+    },
+  },
+  amber: {
+    bg: "#F4EBD0",
+    card: "rgba(253,246,227,0.9)",
+    cardGlass: "rgba(253,246,227,0.8)",
+    border: "rgba(139,92,24,0.14)",
+    border2: "rgba(139,92,24,0.08)",
+    muted: "#7C6A53",
+    dim: "#A89680",
+    text: "#3D2B1F",
+    textSecondary: "#7C6A53",
+    accent: {
+      primary: "#D97706",
+      light: "rgba(217,119,6,0.16)",
+      glow: "rgba(217,119,6,0.3)",
+    },
+  },
+  midnight: {
+    bg: "#05070A",
+    card: "rgba(18,20,28,0.84)",
+    cardGlass: "rgba(18,20,28,0.72)",
+    border: "rgba(255,255,255,0.08)",
+    border2: "rgba(255,255,255,0.05)",
+    muted: "#94A3B8",
+    dim: "#64748B",
+    text: "#E2E8F0",
+    textSecondary: "#94A3B8",
+    accent: {
+      primary: "#B8860B",
+      light: "rgba(184,134,11,0.18)",
+      glow: "rgba(184,134,11,0.28)",
+    },
+  },
+};
+
+export const createTheme = (isDark = true, accentKey = 'BLUE', themeName = null) => {
+  const resolvedTheme = themeName || (isDark ? "midnight" : "lumiere");
+  const palette = THEME_PALETTES[resolvedTheme] || THEME_PALETTES.lumiere;
+  const requestedAccent = ACCENT_COLORS[accentKey] || ACCENT_COLORS.BLUE;
+  const accent =
+    resolvedTheme === "amber" || resolvedTheme === "midnight"
+      ? palette.accent
+      : requestedAccent;
+
   return {
-    bg: isDark ? "#0A0E27" : "#FFFFFF",
-    card: isDark ? "rgba(20,24,50,0.5)" : "rgba(255,255,255,0.6)",
-    cardGlass: isDark ? "rgba(20,24,50,0.4)" : "rgba(255,255,255,0.5)",
-    border: isDark ? `${accent.light}` : "rgba(0,0,0,0.1)",
-    border2: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)",
-    borderGlass: isDark ? `${accent.light}` : "rgba(0,0,0,0.1)",
+    bg: palette.bg,
+    card: palette.card,
+    cardGlass: palette.cardGlass,
+    border: palette.border,
+    border2: palette.border2,
+    borderGlass: accent.light,
     green: "#30D158",
     red: "#FF453A",
-    gold: "#FFD60A",
-    blue: "#0A84FF",
-    purple: "#BF5AF2",
-    orange: "#FF9F0A",
+    gold: resolvedTheme === "amber" ? "#D97706" : "#FFD60A",
+    blue: accent.primary,
+    purple: resolvedTheme === "amber" ? "#9D5FA5" : "#BF5AF2",
+    orange: resolvedTheme === "midnight" ? "#B8860B" : "#FF9F0A",
     cyan: "#64D2FF",
     pink: "#FF375F",
     accent: accent.primary,
     accentLight: accent.light,
     accentGlow: accent.glow,
-    muted: isDark ? "#8E8E93" : "#9CA3AF",
-    dim: isDark ? "#3A3A3C" : "#D1D1D6",
-    text: isDark ? "#F2F2F7" : "#111827",
-    textSecondary: isDark ? "#A1A1A6" : "#64748B",
+    muted: palette.muted,
+    dim: palette.dim,
+    text: palette.text,
+    textSecondary: palette.textSecondary,
     font: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
     mono: '"SF Mono", "ui-monospace", "Cascadia Mono", "Roboto Mono", "IBM Plex Mono", monospace',
-    amdA: "#0A84FF",
-    amdM: "#BF5AF2",
-    amdD: "#30D158",
+    amdA: accent.primary,
+    amdM: resolvedTheme === "amber" ? "#A855F7" : "#BF5AF2",
+    amdD: resolvedTheme === "amber" ? "#2F855A" : "#30D158",
     amdDB: "#FF453A",
-    amdT: "#8E8E93",
+    amdT: palette.dim,
     glassmorphism: {
       backdropFilter: 'blur(12px)',
-      backgroundColor: isDark ? 'rgba(20,24,50,0.4)' : 'rgba(255,255,255,0.5)',
+      backgroundColor: palette.cardGlass,
       border: `1px solid ${accent.light}`,
       borderRadius: '12px'
     }
