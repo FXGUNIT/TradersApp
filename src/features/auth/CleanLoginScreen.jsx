@@ -381,18 +381,6 @@ export default function CleanLoginScreen({
             padding: "36px 28px",
           }}
         >
-        {/* Brand Hero */}
-        <BrandHero />
-
-        {/* Separator */}
-        <div
-          style={{
-            height: 1,
-            background: "linear-gradient(to right, transparent, rgba(212,165,32,0.25), transparent)",
-            marginBottom: 28,
-          }}
-        />
-
         {/* Modal header */}
         <div style={{ marginBottom: 28 }}>
           <div
