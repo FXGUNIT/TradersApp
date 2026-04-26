@@ -387,21 +387,46 @@ Logo files. User needs to share:
 
 ## TASK 9 — PITCH DECK PAGE (ADMIN PANEL)
 
+### CRITICAL DIRECTIVE — VISION OVER NUMBERS
+> "dont talk about numbers, just talk about vision, just make thing clear that i want a permanent earning and the major stake shall be mine always, everything will be on papers, etc"
+- NO specific revenue, user count, or AUM figures
+- NO specific funding amounts or valuation numbers
+- Focus: **permanent earning** — the system generates consistent income, not hype
+- Focus: **majority stake always mine** — founder controls the cap table, always
+- Focus: **everything on papers** — legally sound, transparent structure
+- Emphasize: institutional-grade, proprietary, self-improving
+- Let numbers speak through value, not digits
+
 ### What user wants
 Inside admin panel, a complete pitch deck page/presentation. Used for:
 1. Getting funding
 2. Making viewers/potential users excited and impressed
 
 ### Content to include (PRIVATE — not in public blogs)
-- Complete vision and pipeline tools
-- All systems architecture (ML models, self-improving mechanism, Board Room)
-- Revenue model
-- Market size and TAM
-- Competitive landscape
-- Traction and metrics
-- Roadmap (next 12 months)
-- Ask: how much funding, what for, milestones
-- **Secret sauce: the full proprietary recipe** — this is what differentiates from public blogs
+- **Vision**: permanent earning via AI-driven quant system — institutional edge for everyone
+- **Founder control**: majority stake always retained, everything legally documented
+- Complete pipeline tools — the proprietary self-improving engine
+- All systems architecture (ML models, self-improving mechanism, Board Room governance)
+- Market opportunity — described qualitatively, not with TAM/SAM numbers
+- Competitive landscape — named competitors, differentiation without metrics
+- **No numbers anywhere**: no user counts, revenue figures, growth rates, valuation asks
+- Secret sauce: the full proprietary recipe — this is what differentiates from public blogs
+
+### Slide Structure (NO NUMBERS)
+```
+Slide 1: Cover — "Traders Regiment" + tagline + logo
+Slide 2: Problem — retail traders lose. Institutions win. The gap is unfair.
+Slide 3: Solution — an AI quant desk that thinks like a hedge fund
+Slide 4: Product Demo — (screenshots only)
+Slide 5: How It Works — 12 AI models, Board Room deliberation, Watchtower vigilance
+Slide 6: The Secret Sauce — proprietary self-improving engine (PRIVATE)
+Slide 7: Market Opportunity — the global retail trading market, qualitatively
+Slide 8: Business Model — subscription tiers, B2B enterprise, no specific prices
+Slide 9: Traction — growth described in words ("growing", "engaged", "expanding")
+Slide 10: Team — founder story: Gunit Singh, ex-BCCI/UPCA cricketer, trader, builder
+Slide 11: Roadmap — vision for 12 months ahead
+Slide 12: The Ask — partnership / investment, terms favor founder control, everything on papers
+```
 
 ### UX
 New route: `/admin/pitch-deck` (authenticated admin only)
@@ -415,22 +440,6 @@ New route: `/admin/pitch-deck` (authenticated admin only)
 - Route: add to `App.jsx` → `/admin/pitch-deck` → requires admin auth
 - Slides data: `src/data/pitchDeckSlides.js`
 - Design: minimalist luxury (white/black/brown — matching brand direction)
-
-### Slide Structure
-```
-Slide 1: Cover — "Traders Regiment" + tagline + logo
-Slide 2: Problem — retail traders lack institutional tools
-Slide 3: Solution — AI-powered quant desk for everyone
-Slide 4: Product Demo — (screenshots, not described in detail)
-Slide 5: How It Works — 12 AI models, Board Room, Watchtower (technical depth)
-Slide 6: The Secret Sauce — proprietary systems (PRIVATE)
-Slide 7: Market Opportunity — TAM, SAM, SOM
-Slide 8: Business Model — subscription tiers, B2B
-Slide 9: Traction — current users, engagement
-Slide 10: Team — founder story, expertise
-Slide 11: Roadmap — next 12 months
-Slide 12: The Ask — funding amount, milestones
-```
 
 ### Files Touched
 - `src/pages/AdminPitchDeck.jsx` (new)
@@ -468,40 +477,54 @@ Slide 12: The Ask — funding amount, milestones
 
 ## TASK 11 — BRAND REDESIGN (White/Black/Brown)
 
-### Brand Language Spec
+### CONFIRMED BRAND COLORS (from `docs/brand-guidelines-colors-fonts-interactions.md`)
+User mandate: **old-school luxury — white + black + brown only**. The existing LUMIERE/AMBER/MIDNIGHT theme system already has an AMBER mode with warm cream + burnished amber palette that maps perfectly to the brand direction. Replace gold (`#D4A520`) with AMBER-mode accent.
+
+**AMBER MODE palette (the foundation for brand redesign):**
 ```
-Primary Background:   #FFFFFF (light) / #0A0A0A (dark)
-Text:                 #0A0A0A (light) / #FAFAFA (dark)
-Accent:                LOGO_BROWN = #8B4513 or exact logo brown (user to confirm hex)
-                       DO NOT USE: #D4A520 (gold) — replace with logo brown
-Secondary Text:        #6B6B6B (muted)
-Borders:              rgba(0,0,0,0.08) light / rgba(255,255,255,0.08) dark
+Background:        #f4ebd0 (warm cream) / #0A0A0A (dark) — no white/black extremes
+Surface:           #fdf6e3 (parchment)
+Text Primary:      #3d2b1f (deep espresso brown)
+Text Secondary:    #7c6a53 (warm medium brown)
+Text Tertiary:     #a89680 (light warm brown)
+Border Subtle:     rgba(139,92,24,0.1) — brown-tinted
+Border Strong:     rgba(139,92,24,0.2)
+Accent Primary:    #d97706 (burnished amber — replaces gold)
+Accent Glow:       rgba(217,119,6,0.1)
+Shadow:            0 4px 24px rgba(139,92,24,0.08)
 ```
 
-**Conflicting requirement:** Brand is white/black/brown. But existing theme system uses gold (`#D4A520`). Need to reconcile:
-- User says "old-school luxury, white, black and brown. NOT gold/blue."
-- But the logo uses a specific brown (need exact hex from logo file)
-- All existing gold usage should use the logo brown instead
+**Dark mode equivalent:**
+```
+Background:        #0A0A0A
+Surface:           #1a1612 (dark warm brown tint)
+Text Primary:      #f4ebd0 (warm cream)
+Text Secondary:    #a89680 (light brown)
+Border:            rgba(217,119,6,0.1)
+Accent:            #d97706 (burnished amber — stays amber in dark too)
+```
+
+**Logo brown:** `#8B4513` (saddle brown, confirmed in plan — user to verify from actual logo file)
+
+### Implementation approach
+The AMBER mode in `index.css` already has the warm cream/brown palette. The brand redesign = apply AMBER-mode tokens everywhere, replacing blue (`#2563eb`) with burnished amber (`#d97706`), and gold (`#D4A520`) with sienna brown (`#8B4513`).
 
 ### What to change (files + changes)
 | File | Change |
 |---|---|
-| `src/index.css` | Replace `--aura-accent-primary: #2563eb` with logo brown; replace all gold `#D4A520` with logo brown |
-| `src/utils/uiUtils.js` | Update accent color definitions |
-| `ThemeSwitcher.jsx` | Keep L/A/M toggle (functional) — colors still update but with brown palette |
-| `src/features/auth/CleanLoginScreen.jsx` | Replace all gold (#D4A520, rgba gold) with logo brown |
-| `src/pages/RegimentHub.jsx` | Same brown-only palette |
+| `src/index.css` | Set AMBER as default mode; replace all blue (`#2563eb`) with `#d97706`; replace gold (`#D4A520`) with `#8B4513` |
+| `src/utils/uiUtils.js` | Update accent to `#d97706` / `#8B4513` |
+| `ThemeSwitcher.jsx` | Keep L/A/M toggle — add OBSIDIAN option; set AMBER as default |
+| `src/features/auth/CleanLoginScreen.jsx` | Replace gold/brown hardcodes with CSS vars |
+| `src/pages/RegimentHub.jsx` | Same |
 | `src/pages/CollectiveConsciousness.jsx` | Same |
 | `public/blog/index.html` | Same |
 | All component CSS | Same |
 
-### Critical decision needed
-**Logo file required first.** Need the exact brown hex value from the logo. Ask Gunit to confirm: "What is the exact hex code of the brown in your logo file?" Or share the file so I can read the color.
-
 ### Files Touched
-- `src/index.css` (extensive — all theme variables)
+- `src/index.css` (theme tokens — extensive)
 - `src/utils/uiUtils.js`
-- All JSX component files using gold colors
+- All JSX component files using accent colors
 - `public/blog/*.html` files
 
 ---
