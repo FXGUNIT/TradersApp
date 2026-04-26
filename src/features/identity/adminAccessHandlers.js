@@ -1,6 +1,6 @@
 function completeAdminUnlock({
   setShowAdminPrompt,
-  setAdminPassInput,
+  setTotpCode,
   setAdminOtpsVerified,
   setAdminOtpStep,
   setAdminOtps,
@@ -13,7 +13,7 @@ function completeAdminUnlock({
   localStorage.setItem("isAdminAuthenticated", "true");
 
   setShowAdminPrompt(false);
-  setAdminPassInput("");
+  setTotpCode("");
   setAdminOtpsVerified(false);
   setAdminOtpStep(false);
   setAdminOtps({ otp1: "", otp2: "", otp3: "" });
@@ -56,14 +56,14 @@ export const executeSendAdminOTPs = async ({
 };
 
 export const executeHandleAdminAccess = async ({
-  adminPassInput,
+  totpCode,
   verifyAdminTotp,
   logSecurityAlert,
   adminMasterEmail,
   showToast,
-  setAdminPassErr,
+  setTotpErr,
   setShowAdminPrompt,
-  setAdminPassInput,
+  setTotpCode,
   setAdminOtpsVerified,
   setAdminOtpStep,
   setAdminOtps,
@@ -74,22 +74,22 @@ export const executeHandleAdminAccess = async ({
   setScreen,
 }) => {
   try {
-    await verifyAdminTotp(adminPassInput);
+    await verifyAdminTotp(totpCode);
   } catch (error) {
     await logSecurityAlert(
       "Authenticator Verification Failed",
       adminMasterEmail,
       error.message || "Invalid authenticator code",
     );
-    setAdminPassErr(error.message || "Invalid authenticator code.");
+    setTotpErr(error.message || "Invalid authenticator code.");
     showToast("Authenticator code rejected.", "error");
     return false;
   }
 
-  setAdminPassErr("");
+  setTotpErr("");
   completeAdminUnlock({
     setShowAdminPrompt,
-    setAdminPassInput,
+    setTotpCode,
     setAdminOtpsVerified,
     setAdminOtpStep,
     setAdminOtps,
@@ -108,7 +108,7 @@ export const executeHandleAdminVerifyCodes = async ({
   verifyAdminEmailOtp,
   setAdminOtpErr,
   setShowAdminPrompt,
-  setAdminPassInput,
+  setTotpCode,
   setAdminOtpsVerified,
   setAdminOtpStep,
   setAdminOtps,
@@ -131,7 +131,7 @@ export const executeHandleAdminVerifyCodes = async ({
   setAdminOtpErr("");
   completeAdminUnlock({
     setShowAdminPrompt,
-    setAdminPassInput,
+    setTotpCode,
     setAdminOtpsVerified,
     setAdminOtpStep,
     setAdminOtps,

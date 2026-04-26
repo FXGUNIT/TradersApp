@@ -27,7 +27,7 @@ export function AdminAccessProvider({ children, setScreen }) {
   const { showToast } = useToastNotifications();
 
   // ── Admin access state ──────────────────────────────────────────────────
-  const [adminPassInput, setAdminPassInput] = useState("");
+  const [totpCode, setTotpCode] = useState("");
   const [showAdminPrompt, setShowAdminPrompt] = useState(false);
   const [adminMasterEmail, setAdminMasterEmail] = useState("");
   const [adminMasterEmailVerified, setAdminMasterEmailVerified] = useState(false);
@@ -36,8 +36,7 @@ export function AdminAccessProvider({ children, setScreen }) {
   const [adminOtps, setAdminOtps] = useState({ otp1: "", otp2: "", otp3: "" });
   const [adminOtpChallengeId, setAdminOtpChallengeId] = useState("");
   const [adminOtpErr, setAdminOtpErr] = useState("");
-  const [adminPassErr, setAdminPassErr] = useState("");
-  const [showAdminPwd, setShowAdminPwd] = useState(false);
+  const [totpErr, setTotpErr] = useState("");
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
 
   // ── Handler bridge ────────────────────────────────────────────────────────
@@ -51,7 +50,7 @@ export function AdminAccessProvider({ children, setScreen }) {
     adminMasterEmail,
     adminOtps,
     adminOtpChallengeId,
-    adminPassInput,
+    totpCode,
     requestAdminEmailOtp,
     verifyAdminEmailOtp,
     verifyAdminTotp,
@@ -60,7 +59,7 @@ export function AdminAccessProvider({ children, setScreen }) {
     serviceId: import.meta.env.VITE_EMAILJS_SERVICE_ID,
     templateId: import.meta.env.VITE_EMAILJS_TEMPLATE_ID,
     publicKey: import.meta.env.VITE_EMAILJS_PUBLIC_KEY,
-    sendForensicAlert: null, // wired via securityForensicsHandlers
+    sendForensicAlert: null,
     showToast,
     setShowAdminPrompt,
     setAdminMasterEmail,
@@ -69,17 +68,16 @@ export function AdminAccessProvider({ children, setScreen }) {
     setAdminOtpsVerified,
     setAdminOtps,
     setAdminOtpChallengeId,
-    setAdminPassInput,
-    setAdminPassErr,
+    setTotpCode,
+    setTotpErr,
     setAdminOtpErr,
     setIsAdminAuthenticated,
     setScreen,
-    setShowAdminPwd,
   });
 
   const value = {
     // State
-    adminPassInput,
+    totpCode,
     showAdminPrompt,
     adminMasterEmail,
     adminMasterEmailVerified,
@@ -88,11 +86,10 @@ export function AdminAccessProvider({ children, setScreen }) {
     adminOtps,
     adminOtpChallengeId,
     adminOtpErr,
-    adminPassErr,
-    showAdminPwd,
+    totpErr,
     isAdminAuthenticated,
     // Setters
-    setAdminPassInput,
+    setTotpCode,
     setShowAdminPrompt,
     setAdminMasterEmail,
     setAdminMasterEmailVerified,
@@ -101,8 +98,7 @@ export function AdminAccessProvider({ children, setScreen }) {
     setAdminOtps,
     setAdminOtpChallengeId,
     setAdminOtpErr,
-    setAdminPassErr,
-    setShowAdminPwd,
+    setTotpErr,
     setIsAdminAuthenticated,
     // Handlers
     sendAdminOTPs,

@@ -2694,6 +2694,82 @@ function NavBar() {
 
 ---
 
+## PART 22 — BLOG POST: "OUR NEW LOGO"
+
+Content brief for the public-facing blog post explaining the V2 logo identity.
+
+### Brief
+
+**Title:** "Our New Logo: Why Simplicity Is the Hardest Thing to Get Right"
+**URL slug:** `/blog/our-new-logo/`
+**Author:** Gunit Singh (founder)
+**Published:** Upon V2 launch
+
+### Audience
+
+- Existing users: traders who recognize the old brand, need to understand the evolution
+- Potential users: sophisticated retail / prop traders who judge credibility by aesthetics
+- Industry observers: fintech/crypto community who notice design decisions
+
+### Tone
+
+Old-money editorial. Like a private bank's annual letter, not a startup launch post. Authoritative, understated, personal. Short sentences. No marketing superlatives.
+
+### Structure
+
+**Opening (2 sentences):** State the change. No fanfare.
+
+> "The old logo is gone. This is the new one — and why it took us two years to get it right."
+
+**Section 1 — The Problem with Fancy (3–4 sentences):**
+Why most fintech/trading apps look the same: neon gradients, bold sans-serifs, rocket emojis. Why it feels dishonest when a serious tool does it. The dissonance between what the product does and how it looks.
+
+**Section 2 — The Constraint That Fixed Everything (3–4 sentences):**
+White, black, brown. No gold. No gradients. No playfulness. The three-color constraint forced every bad decision out of the room. "Every logo that couldn't work in those three colors was a logo that shouldn't exist."
+
+**Section 3 — What We Kept From the Old (2–3 sentences):**
+The old logo had one thing right: it was understated. We kept that. The wordmark stays. Everything else was rebuilt.
+
+**Section 4 — The Typography Was the Design (4–5 sentences):**
+Most logos are graphics. Ours is a font choice. Cormorant Garamond for the wordmark — why a serif from the 16th century looks right on a trading dashboard in 2026. The tension between old money and real-time data. Typography as identity, not decoration.
+
+**Section 5 — What It Means Going Forward (2 sentences):**
+The logo is a promise. Underneath it: the same engine, the same board room, the same trades. Just now it looks like what it is.
+
+### Word Count
+
+400–500 words. No subheadings. One sentence per line. Long paragraphs.
+
+### Image Guidance
+
+- Full new logo on white background (large)
+- Full new logo on black background
+- Full new logo on brown/parchment background (shows all three mode variants)
+- Optional: close-up of Cormorant Garamond letterform detail
+- NO mockups, stock photos, or team photos
+
+### Do / Don't
+
+```
+DO:  Short sentences. Old-money tone. Personal voice.
+DO:  Show all three color-mode logo variants
+DO:  Explain the typography decision (Cormorant Garamond)
+DO:  Acknowledge what the old logo got right
+DO:  Under 500 words
+
+DON'T: Rocket emojis or "excited to announce" language
+DON'T: Feature graphics, charts, or team photos
+DON'T: Explain the ML engine — this is about brand, not product
+DON'T: Use the word "revolutionary", "game-changing", or "cutting-edge"
+DON'T: Mention competitors
+```
+
+### CTA
+
+At the end: one line → `Start paper trading at tradersregiment.com`
+
+---
+
 ## PART 14 — VISUAL IDENTITY RULES
 
 ### What Makes Traders Regiment Distinctive

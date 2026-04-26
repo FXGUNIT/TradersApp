@@ -236,14 +236,13 @@ export default function AppScreenRegistry({
   EmptyStateCard,
   SupportChatModal,
   showAdminPrompt,
-  showAdminPwd,
+  totpCode,
+  totpErr,
   adminMasterEmail,
   adminMasterEmailVerified,
   adminOtpStep,
   adminOtps,
   adminOtpsVerified,
-  adminPassErr,
-  adminPassInput,
   adminOtpErr,
   showToast,
   handleLogin,
@@ -252,12 +251,11 @@ export default function AppScreenRegistry({
   resetAdminPromptState,
   setShowAdminPrompt,
   setAdminMasterEmail,
-  setAdminPassInput,
+  setTotpCode,
   setAdminOtps,
   setAdminOtpStep,
   handleAdminRequestNewCodes,
   sendAdminOTPs,
-  setShowAdminPwd,
   handleAdminAccess,
   handleAdminVerifyCodes,
   handleStructuredSignup,
@@ -303,23 +301,20 @@ export default function AppScreenRegistry({
             labelStyle={lbl}
             onCancel={() => resetAdminPromptState({ closePrompt: true })}
             onMasterEmailChange={setAdminMasterEmail}
-            onPasswordChange={setAdminPassInput}
+            onTotpCodeChange={setTotpCode}
             onOtpChange={(field, value) =>
               setAdminOtps((prev) => ({
                 ...prev,
                 [field]: value,
               }))
             }
-            onProceedToCodeEntry={() => setAdminOtpStep(true)}
             onRequestNew={handleAdminRequestNewCodes}
             onSendVerificationCodes={sendAdminOTPs}
-            onTogglePasswordVisibility={() => setShowAdminPwd((prev) => !prev)}
             onUnlockAdmin={handleAdminAccess}
             onVerifyCodes={handleAdminVerifyCodes}
-            passwordError={adminPassErr}
-            passwordValue={adminPassInput}
+            totpError={totpErr}
+            totpValue={totpCode}
             show={showAdminPrompt}
-            showPassword={showAdminPwd}
             theme={T}
             verificationError={adminOtpErr}
             verificationState={{

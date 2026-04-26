@@ -14,14 +14,14 @@ export default function AdminUnlockModal({
   labelStyle,
   onCancel,
   onMasterEmailChange,
-  onPasswordChange,
+  onTotpCodeChange,
   onOtpChange,
   onRequestNew,
   onSendVerificationCodes,
   onUnlockAdmin,
   onVerifyCodes,
-  passwordError,
-  passwordValue,
+  totpError,
+  totpValue,
   show,
   theme,
   verificationError,
@@ -140,9 +140,9 @@ export default function AdminUnlockModal({
           <input
             type="text"
             inputMode="numeric"
-            value={passwordValue}
+            value={totpValue}
             onChange={(event) =>
-              onPasswordChange(event.target.value.replace(/\D/g, "").slice(0, 6))
+              onTotpCodeChange(event.target.value.replace(/\D/g, "").slice(0, 6))
             }
             style={{
               ...inputStyle,
@@ -156,7 +156,7 @@ export default function AdminUnlockModal({
               if (event.key === "Enter") onUnlockAdmin();
             }}
           />
-          {passwordError && (
+          {totpError && (
             <div
               style={{
                 color: theme.red,
@@ -165,7 +165,7 @@ export default function AdminUnlockModal({
                 fontWeight: 600,
               }}
             >
-              {passwordError}
+              {totpError}
             </div>
           )}
 

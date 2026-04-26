@@ -10,7 +10,7 @@ export function useAdminAccessHandlers({
   adminMasterEmail,
   adminOtps,
   adminOtpChallengeId,
-  adminPassInput,
+  totpCode,
   requestAdminEmailOtp,
   verifyAdminEmailOtp,
   verifyAdminTotp,
@@ -27,12 +27,11 @@ export function useAdminAccessHandlers({
   setAdminOtpsVerified,
   setAdminOtps,
   setAdminOtpChallengeId,
-  setAdminPassInput,
-  setAdminPassErr,
+  setTotpCode,
+  setTotpErr,
   setAdminOtpErr,
   setIsAdminAuthenticated,
   setScreen,
-  setShowAdminPwd,
 }) {
   const logSecurityAlert = useCallback(
     async (attemptType, attemptedEmail, failureReason) => {
@@ -77,14 +76,14 @@ export function useAdminAccessHandlers({
   const handleAdminAccess = useCallback(
     async () =>
       executeHandleAdminAccess({
-        adminPassInput,
+        totpCode,
         verifyAdminTotp,
         logSecurityAlert,
         adminMasterEmail,
         showToast,
-        setAdminPassErr,
+        setTotpErr,
         setShowAdminPrompt,
-        setAdminPassInput,
+        setTotpCode,
         setAdminOtpsVerified,
         setAdminOtpStep,
         setAdminOtps,
@@ -96,7 +95,7 @@ export function useAdminAccessHandlers({
       }),
     [
       adminMasterEmail,
-      adminPassInput,
+      totpCode,
       logSecurityAlert,
       setAdminMasterEmail,
       setAdminMasterEmailVerified,
@@ -104,8 +103,8 @@ export function useAdminAccessHandlers({
       setAdminOtpStep,
       setAdminOtps,
       setAdminOtpsVerified,
-      setAdminPassErr,
-      setAdminPassInput,
+      setTotpErr,
+      setTotpCode,
       setIsAdminAuthenticated,
       setScreen,
       setShowAdminPrompt,
@@ -126,9 +125,8 @@ export function useAdminAccessHandlers({
       setAdminOtps({ otp1: "", otp2: "", otp3: "" });
       setAdminOtpChallengeId("");
       setAdminOtpErr("");
-      setAdminPassErr("");
-      setAdminPassInput("");
-      setShowAdminPwd(false);
+      setTotpErr("");
+      setTotpCode("");
     },
     [
       setAdminMasterEmail,
@@ -138,10 +136,9 @@ export function useAdminAccessHandlers({
       setAdminOtpStep,
       setAdminOtps,
       setAdminOtpsVerified,
-      setAdminPassErr,
-      setAdminPassInput,
+      setTotpErr,
+      setTotpCode,
       setShowAdminPrompt,
-      setShowAdminPwd,
     ],
   );
 
@@ -153,7 +150,7 @@ export function useAdminAccessHandlers({
         verifyAdminEmailOtp,
         setAdminOtpErr,
         setShowAdminPrompt,
-        setAdminPassInput,
+        setTotpCode,
         setAdminOtpsVerified,
         setAdminOtpStep,
         setAdminOtps,
@@ -173,7 +170,7 @@ export function useAdminAccessHandlers({
       setAdminOtpStep,
       setAdminOtps,
       setAdminOtpsVerified,
-      setAdminPassInput,
+      setTotpCode,
       setIsAdminAuthenticated,
       setScreen,
       setShowAdminPrompt,
