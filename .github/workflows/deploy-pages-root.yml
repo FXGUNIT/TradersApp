@@ -29,6 +29,9 @@ jobs:
   deploy:
     name: Deploy tradergunit.pages.dev
     runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+      CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_GLOBAL_KEY }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
