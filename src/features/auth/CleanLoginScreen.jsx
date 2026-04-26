@@ -187,25 +187,32 @@ function BrandHero({ themeMode }) {
           justifyContent: "center",
         }}
       >
-        <a
-          href="/blog/"
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{
-            fontSize: 10,
-            fontWeight: 800,
-            color: "#D4A520",
-            textDecoration: "none",
-            letterSpacing: 1.3,
-            padding: "8px 14px",
-            border: "1px solid rgba(212,165,32,0.4)",
-            borderRadius: 999,
-            background: "rgba(212,165,32,0.07)",
-            textTransform: "uppercase",
-          }}
-        >
-          Read the Blog
-        </a>
+        {[
+          { label: "Founder", href: "/blog/founder-story/" },
+          { label: "Vision", href: "/blog/product-vision/" },
+          { label: "Architecture", href: "/blog/architecture/" },
+        ].map(({ label, href }) => (
+          <a
+            key={label}
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              fontSize: 9,
+              fontWeight: 800,
+              color: "#D4A520",
+              textDecoration: "none",
+              letterSpacing: 2,
+              padding: "6px 12px",
+              border: "1px solid rgba(212,165,32,0.35)",
+              borderRadius: 999,
+              background: "rgba(212,165,32,0.05)",
+              textTransform: "uppercase",
+            }}
+          >
+            {label}
+          </a>
+        ))}
         <a
           href={LINKEDIN_URL}
           target="_blank"
