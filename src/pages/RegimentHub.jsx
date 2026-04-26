@@ -492,36 +492,6 @@ export default function RegimentHub({
             gap: 0,
           }}
         >
-          {/* Eyebrow with animated pulse dot */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              marginBottom: 14,
-            }}
-          >
-            <div
-              style={{
-                minHeight: 30,
-                padding: "0 14px",
-                borderRadius: 999,
-                border: "1px solid rgba(212,165,32,0.22)",
-                background: "rgba(212,165,32,0.06)",
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 9,
-                fontWeight: 800,
-                letterSpacing: 3.2,
-                color: "#d4a520",
-                textTransform: "uppercase",
-              }}
-            >
-              {hubContent.eyebrow}
-            </div>
-          </div>
-
           {/* Brand name — large */}
           <h1
             style={{
