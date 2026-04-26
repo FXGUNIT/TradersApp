@@ -6,6 +6,7 @@
  * Route dispatch delegated to _dispatchRoutes.mjs.
  */
 import { registerDispatchRoutes } from "./_dispatchRoutes.mjs";
+import { createIpSafeZoneMiddleware } from "./middleware/ipSafeZone.mjs";
 
 export function createDispatcher({
   // Constants
@@ -16,6 +17,9 @@ export function createDispatcher({
   ALLOWED_ORIGINS,
   ADMIN_ATTEMPT_LIMIT,
   ADMIN_LOCKOUT_WINDOW_MS,
+  SAFE_ZONE_IPV4 = "",
+  SAFE_ZONE_CITY = "",
+  SAFE_ZONE_PIN_CODES = "",
   // Utilities
   json,
   resolveOrigin,
@@ -242,6 +246,13 @@ export function createDispatcher({
     adminMfaHandler,
     adminHandler,
     boardRoomHandler,
+    ipSafeZone: createIpSafeZoneMiddleware({
+      allowedIps: SAFE_ZONE_IPV4 ? [SAFE_ZONE_IPV4] : [],
+      allowedCity: SAFE_ZONE_CITY,
+      allowedPinCodes: SAFE_ZONE_PIN_CODES
+        ? SAFE_ZONE_PIN_CODES.split(",").map((p) => p.trim())
+        : [],
+    }),
     ADMIN_PASS_HASH,
     ADMIN_PASSWORD_LOGIN_ENABLED,
     ALLOWED_ORIGINS,
