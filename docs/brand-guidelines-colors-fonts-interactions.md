@@ -1361,6 +1361,332 @@ DESKTOP (> 1024px) — load all tiers, no bandwidth pressure:
 
 ---
 
+## PART 16 — RESPONSIVE ANTI-BREAKAGE RULES
+
+### The Problem: In-Between Pixels
+
+Standard breakpoints miss the critical zones:
+
+```
+375px  480px  768px  900px  1024px  1280px  1536px
+  │      │      │      │       │        │        │
+  └─ MOBILE ──┴─ TABLET ┌─ LAPTOP DANGER ZONE ──┌─ DESKTOP ──┘
+                       ↑
+                  900px — buttons start overlapping
+                  1100px — nav items compress to 2 rows
+                  1200px — card grid goes from 5 → 4 cols suddenly
+```
+
+Media queries at fixed breakpoints miss these. **The fix: min-width constraints + container-aware layouts.**
+
+---
+
+### Button Group Anti-Overlap
+
+**Scenario:** Action buttons (`[Execute] [Cancel] [Clear]`) overlap at 900px when parent container shrinks.
+
+```css
+/* Never let button groups shrink below their content width */
+.btn-group {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: var(--space-2);
+  min-width: 0; /* allow flex shrink */
+}
+
+.btn-group .btn {
+  flex-shrink: 0;       /* ← CRITICAL: buttons never compress */
+  min-width: max-content; /* or fixed min-width below */
+}
+```
+
+**Minimum button widths:**
+
+```css
+:root {
+  --btn-min-width-sm:  72px;   /* icon-only + label: [✕ Save] */
+  --btn-min-width-md:  96px;   /* single action: [Cancel] */
+  --btn-min-width-lg:  120px;  /* primary CTA: [Execute Signal] */
+  --btn-min-width-icon: 36px; /* icon only: [?] */
+}
+```
+
+**If buttons DO need to wrap (mobile):**
+
+```css
+@media (max-width: 767px) {
+  .btn-group {
+    flex-wrap: wrap; /* wrap to 2 rows on mobile */
+  }
+  .btn-group .btn {
+    min-width: calc(50% - var(--space-1)); /* 2 buttons per row */
+    justify-content: center;
+  }
+}
+```
+
+---
+
+### Navigation Anti-Overlap
+
+**Scenario:** Nav items (`[Dashboard] [Signals] [Positions] [Settings] [?]`) compress at 1100px → text truncates or items stack.
+
+```css
+/* Nav bar: horizontal scroll on overflow, never wrap */
+.nav-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  overflow-x: auto;      /* ← horizontal scroll instead of wrap */
+  overflow-y: hidden;
+  scrollbar-width: none;  /* hide scrollbar, Firefox */
+  -webkit-overflow-scrolling: touch;
+  white-space: nowrap;
+  /* Never let nav wrap to 2 rows */
+  flex-wrap: nowrap;
+}
+
+.nav-bar::-webkit-scrollbar {
+  display: none; /* hide scrollbar, Chrome/Safari */
+}
+
+/* Nav items: never shrink text */
+.nav-label {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+```
+
+**Nav collapse threshold:**
+
+```css
+/* At 768px and below: hamburger */
+@media (max-width: 767px) {
+  .nav-bar {
+    display: none; /* replaced by mobile drawer */
+  }
+}
+
+/* 768px – 1024px: condensed horizontal scroll */
+@media (min-width: 768px) and (max-width: 1024px) {
+  .nav-bar {
+    overflow-x: auto;  /* scroll, don't wrap */
+    gap: var(--space-1);
+  }
+  .nav-label {
+    font-size: 0.625rem; /* shrink label slightly, not below 10px */
+    letter-spacing: 0.06em;
+  }
+}
+
+/* Above 1024px: full horizontal */
+@media (min-width: 1025px) {
+  .nav-bar {
+    overflow-x: visible;
+    gap: var(--space-2);
+  }
+}
+```
+
+---
+
+### Signal Card Grid Anti-Overlap
+
+**Scenario:** Cards in `auto-fit` grid collapse to 1 column at 280px minimum — but at 400px, 3 cards fit but grid jumps from 5 → 4 → 3 cols erratically.
+
+```css
+/* Grid: minmax prevents overlap, never auto-fit without floor */
+.cc-dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--space-6);
+}
+
+/* Force explicit column count at laptop danger zone (900px – 1024px) */
+@media (min-width: 900px) and (max-width: 1024px) {
+  .cc-dashboard-grid {
+    grid-template-columns: repeat(2, 1fr); /* 2 cols, no jumping */
+  }
+}
+
+@media (min-width: 1025px) and (max-width: 1279px) {
+  .cc-dashboard-grid {
+    grid-template-columns: repeat(3, 1fr); /* 3 cols */
+  }
+}
+
+@media (min-width: 1280px) {
+  .cc-dashboard-grid {
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  }
+}
+```
+
+**Rule: Use explicit column counts in the 768px–1200px range.** `auto-fit` only works predictably above 1200px where enough space exists.
+
+---
+
+### Text Truncation Rules
+
+**Scenario:** Long button labels (`[Generate Paper Trade Report]`) overflow at small breakpoints.
+
+```css
+/* Nav labels: truncate with ellipsis, never wrap */
+.nav-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
+}
+
+/* Data labels (prices, symbols): never truncate */
+.data-price,
+.symbol-label {
+  white-space: nowrap;
+  overflow: visible;
+}
+
+/* Badge text: never truncate, badges grow */
+.badge-text {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Card titles: truncate at 2 lines max */
+.card-title {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Long descriptions: truncate at 3 lines on mobile */
+.card-description {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+@media (min-width: 768px) {
+  .card-description {
+    -webkit-line-clamp: unset; /* full text on tablet+ */
+    overflow: visible;
+    display: block;
+  }
+}
+```
+
+---
+
+### Touch Target Minimums
+
+```css
+:root {
+  /* ─── Touch Target Minimums (WCAG 2.5.5) ─── */
+  /* Minimum 44x44px for all clickable/tappable elements */
+  --touch-target-min: 44px;
+
+  /* Practical button touch target */
+  --btn-touch-height: 44px; /* height, not width — width can be smaller */
+}
+```
+
+**Usage:**
+
+```css
+/* All buttons meet minimum touch height */
+.btn {
+  min-height: var(--btn-touch-height); /* 44px */
+  padding-block: 10px; /* ensures 44px total height on 24px font */
+}
+
+/* Nav items minimum touch height */
+.nav-item {
+  min-height: var(--touch-target-min); /* 44px */
+  padding-block: 12px;
+}
+
+/* Badges: no touch target needed (read-only display) */
+.badge {
+  padding-block: 4px; /* visual only, not interactive */
+}
+```
+
+---
+
+### Tested Viewport Checklist
+
+Every layout change must pass these specific viewport widths. Test at each before calling it done:
+
+```
+MOBILE CRITICAL:
+  320px  — iPhone SE (smallest mainstream)
+  375px  — iPhone standard
+  414px  — iPhone Pro Max
+  480px  — large Android
+
+TABLET CRITICAL:
+  768px  — iPad standard (breakpoint boundary)
+  800px  — small tablet/laptop half-screen
+  900px  — ★ LAPTOP DANGER ZONE ★ (button overlap risk)
+  1024px — iPad Pro / small laptop (breakpoint boundary)
+
+DESKTOP CRITICAL:
+  1100px — ★ LAPTOP DANGER ZONE 2 ★ (nav compress risk)
+  1200px — standard desktop
+  1280px — 13" laptop full screen (breakpoint boundary)
+  1366px — common laptop resolution
+  1440px — 14" laptop full screen
+  1536px — large monitor / breakpoint boundary
+  1920px — 1080p full HD
+```
+
+**Special test: 900px half-screen on a 1280px monitor.** This is the most common user scenario — browser window at 50% width on a standard laptop. Design must not break here.
+
+---
+
+### Overflow Container Rules
+
+```css
+/* Tables: horizontal scroll, never squash columns */
+.data-table-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Modals: max-height with internal scroll */
+.modal-content {
+  max-height: calc(100vh - 80px); /* leave room for header/footer */
+  overflow-y: auto;
+}
+
+/* Code blocks: horizontal scroll */
+.code-block {
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+/* Charts: maintain aspect ratio, never stretch */
+.chart-container {
+  aspect-ratio: 16 / 9;
+  max-width: 100%;
+  overflow: hidden;
+}
+```
+
+---
+
+### The 5 Anti-Breakage Rules (Summary)
+
+```
+1. BUTTONS: flex-shrink: 0 + min-width — buttons never compress or overlap
+2. NAV: overflow-x: auto — horizontal scroll instead of wrap
+3. GRID: explicit column counts in 768px–1200px range — auto-fit breaks here
+4. TOUCH: min-height 44px — WCAG compliance on all interactive elements
+5. TRUNCATE: text-overflow: ellipsis on labels, NEVER on data/numbers
+```
+
+---
+
 ## PART 14 — VISUAL IDENTITY RULES
 
 ### What Makes Traders Regiment Distinctive
