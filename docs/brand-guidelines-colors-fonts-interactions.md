@@ -2790,3 +2790,26 @@ At the end: one line → `Start paper trading at tradersregiment.com`
 ---
 
 *Document maintained at: `docs/brand-guidelines-colors-fonts-interactions.md`*
+
+---
+
+## TODO — START EXECUTION
+
+Before writing any component code, read this file in full. This is the source of truth.
+
+**Steps to execute:**
+
+```
+STEP 1.  Read full brand guidelines doc
+STEP 2.  Run audit: grep all hardcoded hex colors in src/ → replace with CSS vars
+STEP 3.  Run audit: grep all Inter font references in src/ → replace per PART 13
+STEP 4.  Add Google Fonts <link> to index.html (Cormorant + DM Sans priority preload)
+STEP 5.  Wire theme switcher to 4-button layout (LUMIERE / AMBER / OBSIDIAN / MIDNIGHT)
+STEP 6.  Implement live price tick animation JS (data-price--up/down classes)
+STEP 7.  Add skip link + ARIA live region to App.jsx shell
+STEP 8.  Implement focus trap in modal components
+STEP 9.  Run visual smoke test: all 4 modes at 320 / 768 / 1024 / 1280px
+STEP 10. A/B test blog section redesign per aesthetic in PART 1
+STEP 11. Publish blog post "Our New Logo" per PART 22
+STEP 12. Swap favicon / manifest / PWA icons per brand guidelines
+```
