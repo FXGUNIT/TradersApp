@@ -73,9 +73,6 @@ jobs:
           grep -q 'DEVELOPER_PREVIEW_PATH' src/App.jsx
 
       - name: Deploy to Cloudflare Pages via Wrangler v3
-        env:
-          CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
-          CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_GLOBAL_KEY }}
         run: |
           set -euo pipefail
           # Wrangler v3 authenticates via CLOUDFLARE_API_TOKEN env var directly.
