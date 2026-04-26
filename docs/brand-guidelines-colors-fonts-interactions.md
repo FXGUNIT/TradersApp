@@ -2179,6 +2179,521 @@ Every new component must implement and pass this checklist:
 
 ---
 
+## PART 19 — LIVE DATA ANIMATION
+
+### The Core Problem
+
+Price feeds, consensus scores, and vote counts update every tick. Without animation, numbers snap — users can't tell if a price went up or down, or if the number changed at all. Animation makes data changes *legible*, not just visible.
+
+### The 3 Data Update Animations
+
+#### 1. Price Tick Flash
+**Trigger:** Price value changes by any amount.
+**Behavior:** Brief background flash on the number. Green for up, red for down. Fades out over 600ms.
+
+```css
+/* Base: price text */
+.data-price {
+  font-family: var(--font-data);
+  font-weight: 600;
+  font-size: var(--text-data-lg);
+  font-variant-numeric: tabular-nums;
+  transition: color 200ms ease;
+}
+
+/* Up tick: green flash */
+.data-price--up {
+  color: #10B981;
+  animation: price-flash-up 600ms ease-out forwards;
+}
+
+@keyframes price-flash-up {
+  0%   { background-color: rgba(16, 185, 129, 0.25); }
+  40%  { background-color: rgba(16, 185, 129, 0.15); }
+  100% { background-color: transparent; }
+}
+
+/* Down tick: red flash */
+.data-price--down {
+  color: #EF4444;
+  animation: price-flash-down 600ms ease-out forwards;
+}
+
+@keyframes price-flash-down {
+  0%   { background-color: rgba(239, 68, 68, 0.25); }
+  40%  { background-color: rgba(239, 68, 68, 0.15); }
+  100% { background-color: transparent; }
+}
+```
+
+**Per mode adaptation:**
+
+```css
+/* MIDNIGHT: slightly brighter for visibility on dark */
+[data-aura-theme="midnight"] .data-price--up {
+  animation: price-flash-up-midnight 600ms ease-out forwards;
+}
+@keyframes price-flash-up-midnight {
+  0%   { background-color: rgba(16, 185, 129, 0.35); }
+  100% { background-color: transparent; }
+}
+
+[data-aura-theme="midnight"] .data-price--down {
+  animation: price-flash-down-midnight 600ms ease-out forwards;
+}
+@keyframes price-flash-down-midnight {
+  0%   { background-color: rgba(239, 68, 68, 0.35); }
+  100% { background-color: transparent; }
+}
+```
+
+**Rule: Flash duration is 600ms, not faster.** Anything under 400ms is invisible on a 60Hz display. 600ms gives enough time for the eye to catch the change without feeling slow.
+
+#### 2. Number Roll (Count Up/Down)
+**Trigger:** Large value change (confidence score, vote count, P&L).
+**Behavior:** Numbers count up or down from old value to new value over 400ms. Creates a "rolling ticker" effect.
+
+```css
+/* Number roll: old value slides out, new value rolls in */
+.data-roll {
+  position: relative;
+  overflow: hidden;
+  display: inline-block;
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums;
+}
+
+.data-roll__digit {
+  display: inline-block;
+  transition: transform 400ms var(--ease-enter);
+}
+
+/* Up roll: digits move up */
+.data-roll--up .data-roll__digit--new {
+  animation: roll-up 400ms var(--ease-enter) forwards;
+}
+.data-roll--up .data-roll__digit--old {
+  position: absolute;
+  animation: roll-out-up 400ms var(--ease-enter) forwards;
+}
+
+/* Down roll: digits move down */
+.data-roll--down .data-roll__digit--new {
+  animation: roll-down 400ms var(--ease-enter) forwards;
+}
+.data-roll--down .data-roll__digit--old {
+  position: absolute;
+  animation: roll-out-down 400ms var(--ease-enter) forwards;
+}
+
+@keyframes roll-up {
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+@keyframes roll-out-up {
+  from { transform: translateY(0); opacity: 1; }
+  to   { transform: translateY(-100%); opacity: 0; }
+}
+@keyframes roll-down {
+  from { transform: translateY(-100%); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+@keyframes roll-out-down {
+  from { transform: translateY(0); opacity: 1; }
+  to   { transform: translateY(100%); opacity: 0; }
+}
+```
+
+**When to use roll vs flash:**
+```
+Price tick (every tick, small change)     → Flash only (600ms)
+Confidence score change (>5% delta)     → Roll (400ms)
+Vote count change                        → Flash (immediate feedback)
+P&L change (large monetary value)        → Roll + Flash combined
+Consensus percentage change              → Flash (always)
+```
+
+#### 3. Confidence Arc Animation
+**Trigger:** Consensus confidence percentage changes.
+**Behavior:** SVG arc animates from old percentage to new percentage. Duration: 800ms.
+
+```css
+/* Confidence arc: SVG stroke-dashoffset animation */
+.confidence-arc {
+  transition: stroke-dashoffset 800ms var(--ease-enter);
+}
+
+.confidence-arc--up {
+  stroke: #10B981;
+  filter: drop-shadow(0 0 4px rgba(16, 185, 129, 0.5));
+}
+
+.confidence-arc--down {
+  stroke: #EF4444;
+  filter: drop-shadow(0 0 4px rgba(239, 68, 68, 0.5));
+}
+```
+
+---
+
+### Live Data Update Rules
+
+```
+1. Price flash: 600ms, green/red background, color transition 200ms
+2. Number roll: 400ms, ease-enter, old digit out / new digit in
+3. Confidence arc: 800ms, ease-enter, stroke-dashoffset animation
+4. Never animate data updates with elastic/bounce easing — feels broken
+5. Disable data animations when prefers-reduced-motion is active
+6. Stop animation after 3 consecutive rapid updates (debounce) — flash only once
+7. Directional arrow icon (TrendingUp/Down) pulses once on data change
+```
+
+**Reduced motion override for live data:**
+
+```css
+@media (prefers-reduced-motion: reduce) {
+  .data-price--up,
+  .data-price--down {
+    animation: none;
+  }
+  .data-roll__digit--new,
+  .data-roll__digit--old {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+  .confidence-arc {
+    transition: none;
+  }
+}
+```
+
+---
+
+### Consensus Score Change Animation
+
+```css
+/* Score goes UP: green tint, slide up, confidence arc grows */
+.consensus-score--up {
+  animation: score-up 400ms var(--ease-enter) forwards;
+}
+@keyframes score-up {
+  0%   { color: #10B981; transform: translateY(4px); }
+  60%  { color: #10B981; transform: translateY(-2px); }
+  100% { color: var(--text-primary); transform: translateY(0); }
+}
+
+/* Score goes DOWN: red tint, slide down, confidence arc shrinks */
+.consensus-score--down {
+  animation: score-down 400ms var(--ease-enter) forwards;
+}
+@keyframes score-down {
+  0%   { color: #EF4444; transform: translateY(-4px); }
+  60%  { color: #EF4444; transform: translateY(2px); }
+  100% { color: var(--text-primary); transform: translateY(0); }
+}
+```
+
+---
+
+## PART 20 — DARK LUMIERE VARIANT (OBSIDIAN CLINICAL)
+
+### The Gap
+
+LUMIERE is clinical and clean — but some traders want that Swiss-bank precision in dark mode too. MIDNIGHT has warmth and candlelight, which is its identity. There's no spec for "clinical dark" — the cold, precise version of LUMIERE without the gold warmth.
+
+**This is an optional 4th mode, not replacing MIDNIGHT.**
+
+### When to Use
+
+```
+MIDNIGHT  → Late night trading, focused deep work, candlelight warmth
+OBSIDIAN  → User prefers dark but wants clinical precision (Bloomberg-style dark)
+```
+
+### Color Tokens
+
+```css
+/* OBSIDIAN MODE (Clinical Dark) — Optional 4th mode */
+:root[data-aura-theme="obsidian"],
+:root[data-theme="obsidian"] {
+  --aura-base-layer: #0d0f14;           /* Near black, slight blue undertone */
+  --aura-surface-elevated: #161a24;    /* Dark slate, cooler than MIDNIGHT */
+  --aura-surface-glass: rgba(22, 26, 36, 0.85);
+  --aura-text-primary: #e8e8ec;         /* Cool white */
+  --aura-text-secondary: #8b8fa8;       /* Cool gray */
+  --aura-text-tertiary: #565870;        /* Muted slate */
+  --aura-accent-primary: #3b82f6;       /* Cobalt blue — KEPT from LUMIERE */
+  --aura-accent-glow: rgba(59, 130, 246, 0.15);
+  --aura-accent-red: #ef4444;
+  --aura-accent-purple: #8b5cf6;
+  --aura-accent-red-glow: rgba(239, 68, 68, 0.2);
+  --aura-accent-green-glow: rgba(16, 185, 129, 0.2);
+  --aura-accent-yellow-glow: rgba(245, 158, 11, 0.2);
+  --aura-border-subtle: rgba(255, 255, 255, 0.06);
+  --aura-border-strong: rgba(255, 255, 255, 0.12);
+  --aura-gem-glow: 0 0 15px rgba(59, 130, 246, 0.5);  /* Blue gem glow */
+  --aura-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);     /* Pure black shadow */
+  --aura-overlay: rgba(0, 0, 0, 0.75);
+  --aura-status-success: #10B981;
+  --aura-status-warning: #F59E0B;
+  --aura-status-danger: #EF4444;
+  --aura-status-info: #3B82F6;
+  --aura-amd-accumulation: #0A84FF;
+  --aura-amd-manipulation: #BF5AF2;
+  --aura-amd-distribution: #30D158;
+  --aura-amd-transition: #8E8E93;
+}
+```
+
+### OBSIDIAN vs MIDNIGHT: The Difference
+
+| Property | OBSIDIAN (Clinical Dark) | MIDNIGHT (Vault Dark) |
+|---|---|---|
+| Base background | `#0d0f14` (cooler, blue-tinted) | `#05070a` (warmer, near-black) |
+| Surface | `#161a24` (dark slate) | `#12141c` (slightly lighter) |
+| Accent color | `#3b82f6` (cobalt blue) | `#b8860b` (dark gold) |
+| Gem glow | Cobalt blue | Dark gold |
+| Mood | Bloomberg Terminal dark | Private vault at midnight |
+| Card shadow | Pure black | Gold-tinted on hover |
+| Surface glass | `rgba(22,26,36,0.85)` | `rgba(18,20,28,0.7)` |
+| Text secondary | `#8b8fa8` (cool gray) | `#94a3b8` (blue-gray) |
+
+**Key insight:** OBSIDIAN keeps the LUMIERE accent color (cobalt blue `#3b82f6`) because the accent IS the identity. MIDNIGHT's gold is its signature. OBSIDIAN's signature is the blue-on-dark precision — the Bloomberg terminal feel.
+
+### OBSIDIAN Theme Switcher
+
+The theme switcher in `index.css` currently has 3 modes. Add OBSIDIAN as 4th:
+
+```html
+<!-- Theme switcher: 4 modes -->
+<button data-theme="lumiere">☀</button>
+<button data-theme="amber"> ◐ </button>
+<button data-theme="obsidian"> ◑ </button>
+<button data-theme="midnight"> ◒ </button>
+```
+
+```css
+/* Theme index: 4 buttons at 42px apart */
+/* 0 = LUMIERE, 1 = AMBER, 2 = OBSIDIAN, 3 = MIDNIGHT */
+:root[data-aura-theme="lumiere"]  { --theme-index: 0; }
+:root[data-aura-theme="amber"]   { --theme-index: 1; }
+:root[data-aura-theme="obsidian"] { --theme-index: 2; }
+:root[data-aura-theme="midnight"] { --theme-index: 3; }
+
+/* Glider moves 42px per position: 0, 42, 84, 126 */
+.aura-theme-switcher__glider {
+  transform: translateX(calc(var(--theme-index, 0) * 42px));
+  /* Duration stays 420ms ease-enter */
+}
+```
+
+**Note:** The glider math is `var(--theme-index, 0) * 42px`. With 4 buttons at 36px each + 6px padding each side, the glider is 36px wide and positions at 6, 48, 90, 132px left. Adjust if button sizes change.
+
+---
+
+## PART 21 — KEYBOARD NAVIGATION & ACCESSIBILITY
+
+### Focus Management Rules
+
+```css
+/* Global focus style — always present */
+:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 5px var(--accent-glow);
+}
+
+/* Remove focus ring on mouse click (keep for keyboard) */
+:focus:not(:focus-visible) {
+  outline: none;
+  box-shadow: none;
+}
+```
+
+### Skip Link (First Focusable Element)
+
+```css
+.skip-link {
+  position: absolute;
+  top: -100px;
+  left: var(--space-4);
+  padding: var(--space-2) var(--space-4);
+  background: var(--accent-primary);
+  color: #ffffff;
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: var(--text-ui-md);
+  border-radius: var(--radius-md);
+  z-index: var(--z-tooltip);
+  transition: top var(--duration-smooth) var(--ease-default);
+}
+
+.skip-link:focus {
+  top: var(--space-4);
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 5px var(--accent-glow);
+}
+```
+
+**HTML:** `<a class="skip-link" href="#main-content">Skip to main content</a>` — must be the very first focusable element in the document.
+
+### Focus Trap in Modals
+
+```javascript
+// Modal focus trap — in modal open handler
+function trapFocus(modalEl) {
+  const focusable = modalEl.querySelectorAll(
+    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+  );
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+
+  function handleTab(e) {
+    if (e.key !== 'Tab') return;
+    if (e.shiftKey) {
+      if (document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      }
+    } else {
+      if (document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+  }
+
+  modalEl.addEventListener('keydown', handleTab);
+  first.focus(); // focus first element on open
+  return () => modalEl.removeEventListener('keydown', handleTab);
+}
+```
+
+### Arrow Key Navigation in Data Tables
+
+```css
+/* Table cells: keyboard navigable with arrow keys */
+.data-table td:focus,
+.data-table th:focus {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: -2px;
+  background-color: color-mix(in srgb, var(--accent-primary) 8%, transparent);
+}
+```
+
+### Roving Tabindex for Nav
+
+```jsx
+// Nav keyboard navigation — roving tabindex pattern
+function NavBar() {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const navItems = ['Dashboard', 'Signals', 'Positions', 'Settings'];
+
+  function handleKey(e, index) {
+    if (e.key === 'ArrowRight') {
+      setActiveIndex((index + 1) % navItems.length);
+    }
+    if (e.key === 'ArrowLeft') {
+      setActiveIndex((index - 1 + navItems.length) % navItems.length);
+    }
+  }
+
+  return (
+    <nav>
+      {navItems.map((item, i) => (
+        <button
+          key={item}
+          tabIndex={i === activeIndex ? 0 : -1}
+          onKeyDown={(e) => handleKey(e, i)}
+          onClick={() => setActiveIndex(i)}
+        >
+          {item}
+        </button>
+      ))}
+    </nav>
+  );
+}
+```
+
+**Rule: Only the active nav item has `tabIndex={0}`.** All others have `tabIndex={-1}`. This prevents the keyboard user from tabbing through all nav items on every tab press.
+
+### Escape Key Behavior
+
+```css
+/* Escape closes modals/drawers, resets hover states */
+.modal:focus-trap-escape {
+  /* modal close handler: on Escape key, call closeModal() */
+}
+
+/* Escape key visual feedback */
+.modal.is-closing {
+  animation: modal-escape-out 200ms var(--ease-exit) forwards;
+}
+@keyframes modal-escape-out {
+  from { opacity: 1; transform: scale(1); }
+  to   { opacity: 0; transform: scale(0.96); }
+}
+```
+
+### High Contrast Mode Support
+
+```css
+/* Respect forced-colors (Windows High Contrast Mode) */
+@media (forced-colors: active) {
+  .card {
+    border: 2px solid CanvasText;
+  }
+  .badge-long {
+    background-color: Mark;
+    color: MarkText;
+    border: 2px solid ButtonText;
+  }
+  .badge-short {
+    background-color: Mark;
+    color: MarkText;
+    border: 2px solid ButtonText;
+  }
+  .btn-primary {
+    background-color: ButtonFace;
+    border: 2px solid ButtonText;
+    color: ButtonText;
+  }
+  /* All colors use system tokens — signal colors still visible */
+}
+```
+
+### Screen Reader Announcements
+
+```html
+<!-- Live region: announces price changes to screen readers -->
+<div
+  role="status"
+  aria-live="polite"
+  aria-atomic="true"
+  class="sr-only"
+>
+  <!-- Dynamic: inject "NIFTY at 22,450 up 50 points" on each price update -->
+</div>
+```
+
+```css
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+```
+
+---
+
 ## PART 14 — VISUAL IDENTITY RULES
 
 ### What Makes Traders Regiment Distinctive
