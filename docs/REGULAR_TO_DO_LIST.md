@@ -302,30 +302,32 @@ Where `BLOG_POSTS` is imported from `../../components/BlogSection.jsx`
 
 ## TASK 6 — GOOGLE SIGN IN FIX
 
-### What "unavailable" means
-Need to determine: greyed out button, click error, redirect error, or Firebase issue?
+### Root Cause (confirmed via code trace)
+- Google OAuth uses **Firebase direct OAuth** (`signInWithRedirect`) — BFF is NOT in the path
+- Code: `src/features/identity/authCredentialHandlers.js` → `executeStructuredGoogleAuth()` → `signInWithRedirect(firebaseAuth, googleProvider)`
+- Flow: CleanLoginScreen → Firebase SDK → Google OAuth redirect → back to app
+- **The "unavailable" issue is a Firebase console configuration problem**, not a code issue
 
-### Investigation steps
-1. Open browser dev tools → Network tab
-2. Click "Continue with Google"
-3. Check for failed requests (red in Network tab)
-4. Check `src/features/auth/CleanLoginScreen.jsx` for Google auth button handler
-5. Check Firebase config in `src/config/firebase.js` or similar
+### Fix (Firebase console — no code change)
+1. Go to [Firebase Console](https://console.firebase.google.com) → your project
+2. Authentication → Sign-in method → Google → edit
+3. Under **Authorized redirect domains**, add:
+   - `tradergunit.pages.dev`
+   - `pages.dev` (if not already)
+4. Save
 
-### Likely causes
-- Firebase OAuth credential domain mismatch (production domain not authorized)
-- BFF `/auth/admin/verify` (password route) being called for Google flow too
-- Firebase Web SDK configuration error
+If button is greyed out instead of showing an error:
+- Check: Authentication → Sign-in method → Google → enable it (toggle must be ON)
+- Check: your app's Web OAuth client ID includes `tradergunit.pages.dev` in authorized JavaScript origins
 
-### Files to check
-- `src/features/auth/CleanLoginScreen.jsx` — Google auth button
-- `src/services/adminAuthService.js` — `requestAdminGoogleAuth()` if exists
-- Firebase config files
-- Browser console errors when clicking Google button
+### Files to verify (no changes needed)
+- `src/features/auth/CleanLoginScreen.jsx:336-349` — `handleGoogle()` calls `onGoogleAuth()` which calls `signInWithRedirect` — this is correct
+- `src/features/identity/authCredentialHandlers.js` — Firebase direct OAuth, no BFF call — this is correct
+- No code changes needed
 
 ### Verification
-- "Continue with Google" button works → redirects to Google OAuth
-- If broken: exact error message from browser console
+- Click "Continue with Google" → redirects to Google OAuth consent screen
+- After OAuth: user returns to app, Firebase auth completes, user is logged in
 
 ---
 
