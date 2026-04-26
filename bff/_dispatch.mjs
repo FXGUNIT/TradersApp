@@ -87,6 +87,7 @@ export function createDispatcher({
   listAdminUsers,
   // Route factories
   createAdminRouteHandler,
+  createAdminMfaRouteHandler,
   createContentRouteHandler,
   createConsensusRouteHandler,
   createWatchtowerRouteHandler,
@@ -181,6 +182,20 @@ export function createDispatcher({
     json,
     readJsonBody,
   });
+  const adminMfaHandler =
+    typeof createAdminMfaRouteHandler === "function"
+      ? createAdminMfaRouteHandler({
+          createAdminSession,
+          getAdminMfaStatus,
+          getClientKey,
+          json,
+          readJsonBody,
+          rolesAdmin: ROLES_ADMIN,
+          startAdminEmailOtp,
+          verifyAdminEmailOtp,
+          verifyAdminTotp,
+        })
+      : async () => false;
 
   const boardRoomHandler =
     typeof createBoardRoomRouteHandler === "function"
@@ -222,6 +237,7 @@ export function createDispatcher({
     watchtowerHandler,
     newsHandler,
     tradeCalcHandler,
+    adminMfaHandler,
     adminHandler,
     boardRoomHandler,
     ADMIN_PASS_HASH,

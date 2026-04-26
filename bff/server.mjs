@@ -79,6 +79,7 @@ import {
   listSupportThreads,
 } from "./domains/supportState.mjs";
 import { createAdminRouteHandler } from "./routes/adminRoutes.mjs";
+import { createAdminMfaRouteHandler } from "./routes/adminMfaRoutes.mjs";
 import { createContentRouteHandler } from "./routes/contentRoutes.mjs";
 import { createConsensusRouteHandler } from "./routes/consensusRoutes.mjs";
 import { createWatchtowerRouteHandler } from "./routes/watchtowerRoutes.mjs";
@@ -506,6 +507,7 @@ const dispatcher = createDispatcher({
   getMaintenanceState,
   listAdminUsers,
   createAdminRouteHandler,
+  createAdminMfaRouteHandler,
   createContentRouteHandler,
   createConsensusRouteHandler,
   createWatchtowerRouteHandler,

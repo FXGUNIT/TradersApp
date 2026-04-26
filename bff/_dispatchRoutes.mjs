@@ -21,9 +21,6 @@ export function registerDispatchRoutes({
   validateAdminToken,
   createAdminSession,
   getAdminMfaStatus = null,
-  startAdminEmailOtp = null,
-  verifyAdminEmailOtp = null,
-  verifyAdminTotp = null,
   revokeAdminSession,
   listAdminSessions,
   revokeSessionById,
@@ -43,6 +40,7 @@ export function registerDispatchRoutes({
   watchtowerHandler,
   newsHandler,
   tradeCalcHandler,
+  adminMfaHandler = async () => false,
   adminHandler,
   boardRoomHandler,
   // Admin constants
@@ -84,42 +82,6 @@ export function registerDispatchRoutes({
     upsell: usage.upsell || null,
     usage,
   });
-
-  const resolveAdminDevice = (body = {}, req = {}) => ({
-    fingerprint: String(body.deviceFingerprint || "unknown"),
-    browser: String(
-      body.deviceBrowser || req.headers?.["user-agent"] || "Unknown",
-    ).substring(0, 80),
-    os: String(body.deviceOs || "unknown"),
-    device: String(body.deviceType || "unknown"),
-    ip: req.headers?.["x-forwarded-for"] || req.headers?.["x-real-ip"] || "unknown",
-    rememberDevice: !!body.rememberDevice,
-    authMethod: String(body.authMethod || "mfa"),
-  });
-
-  const createAdminMfaSessionPayload = async (
-    req,
-    body = {},
-    authMethod = "mfa",
-  ) => {
-    const ttlMs = Math.min(
-      Number(body.ttlMs) || 8 * 3600 * 1000,
-      24 * 3600 * 1000,
-    );
-    const token = await createAdminSession(
-      ROLES_ADMIN,
-      ttlMs,
-      resolveAdminDevice({ ...body, authMethod }, req),
-    );
-    return {
-      ok: true,
-      verified: true,
-      token,
-      expiresInMs: ttlMs,
-      role: ROLES_ADMIN,
-      authMethod,
-    };
-  };
 
   return async function dispatchRoutes(req, res, url, pathname, method, origin) {
     // ── Built-in endpoints ────────────────────────────────────────────────────
@@ -193,98 +155,7 @@ export function registerDispatchRoutes({
     if (await newsHandler(req, res, url, origin)) return true;
     if (await tradeCalcHandler(req, res, url, origin)) return true;
 
-    if (method === "GET" && pathname === "/auth/admin/options") {
-      json(res, 200, {
-        ok: true,
-        adminMfa: typeof getAdminMfaStatus === "function"
-          ? getAdminMfaStatus()
-          : {
-              passwordLoginEnabled: ADMIN_PASSWORD_LOGIN_ENABLED,
-              totpConfigured: false,
-              emailOtpEnabled: true,
-            },
-      }, origin);
-      return true;
-    }
-
-    if (method === "POST" && pathname === "/auth/admin/email-otp/start") {
-      if (typeof startAdminEmailOtp !== "function") {
-        json(res, 503, { ok: false, error: "Admin email OTP service unavailable." }, origin);
-        return true;
-      }
-      try {
-        const body = await readJsonBody(req);
-        const result = await startAdminEmailOtp({
-          masterEmail: body.masterEmail || body.email,
-          clientKey: getClientKey(req),
-        });
-        json(res, result.ok ? 200 : result.status || 400, result, origin);
-        return true;
-      } catch (e) {
-        json(res, 400, { ok: false, error: e.message || "Email OTP request failed." }, origin);
-        return true;
-      }
-    }
-
-    if (method === "POST" && pathname === "/auth/admin/email-otp/verify") {
-      if (typeof verifyAdminEmailOtp !== "function") {
-        json(res, 503, { ok: false, error: "Admin email OTP service unavailable." }, origin);
-        return true;
-      }
-      try {
-        const body = await readJsonBody(req);
-        const result = verifyAdminEmailOtp({
-          challengeId: body.challengeId,
-          codes: body.codes || {
-            otp1: body.otp1,
-            otp2: body.otp2,
-            otp3: body.otp3,
-          },
-          clientKey: getClientKey(req),
-        });
-        if (!result.ok) {
-          json(res, result.status || 401, result, origin);
-          return true;
-        }
-        json(
-          res,
-          200,
-          await createAdminMfaSessionPayload(req, body, result.method),
-          origin,
-        );
-        return true;
-      } catch (e) {
-        json(res, 400, { ok: false, error: e.message || "Email OTP verification failed." }, origin);
-        return true;
-      }
-    }
-
-    if (method === "POST" && pathname === "/auth/admin/totp/verify") {
-      if (typeof verifyAdminTotp !== "function") {
-        json(res, 503, { ok: false, error: "Admin authenticator service unavailable." }, origin);
-        return true;
-      }
-      try {
-        const body = await readJsonBody(req);
-        const result = verifyAdminTotp({
-          code: body.code || body.totp || body.authenticatorCode,
-        });
-        if (!result.ok) {
-          json(res, result.status || 401, result, origin);
-          return true;
-        }
-        json(
-          res,
-          200,
-          await createAdminMfaSessionPayload(req, body, result.method),
-          origin,
-        );
-        return true;
-      } catch (e) {
-        json(res, 400, { ok: false, error: e.message || "Authenticator verification failed." }, origin);
-        return true;
-      }
-    }
+    if (await adminMfaHandler(req, res, url, origin)) return true;
 
     // ── Admin auth: password verify ──────────────────────────────────────────
     if (method === "POST" && pathname === "/auth/admin/verify") {
