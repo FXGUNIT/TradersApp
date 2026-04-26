@@ -50,7 +50,7 @@ jobs:
           elif [ -n "${CLOUDFLARE_EMAIL:-}" ] && [ -n "${CLOUDFLARE_API_KEY:-}" ]; then
             echo "Using Cloudflare global API key for authentication"
           else
-            echo "::error::Missing Cloudflare credentials: need CLOUDFLARE_API_TOKEN or CLOUDFLARE_EMAIL + CLOUDFLARE_API_KEY"
+            echo "::error::Missing Cloudflare credentials: need CLOUDFLARE_API_TOKEN or CLOUDFLARE_EMAIL + CLOUDFLARE_API_KEY (GLOBAL_KEY)"
             exit 1
           fi
 
