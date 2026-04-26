@@ -15,44 +15,60 @@ const LEGACY_THEME_MAP = {
 };
 
 const normalizeTheme = (value) => LEGACY_THEME_MAP[value] || "lumiere";
+const readInitialTheme = () => {
+  try {
+    const storedTheme =
+      localStorage.getItem("theme_mode_name") ||
+      localStorage.getItem("appTheme") ||
+      localStorage.getItem("aura-theme");
+
+    if (storedTheme) {
+      return normalizeTheme(storedTheme);
+    }
+
+    const storedMode = localStorage.getItem("theme_mode");
+    if (storedMode === "dark") {
+      return "midnight";
+    }
+    if (storedMode === "light") {
+      return "lumiere";
+    }
+
+    return window.matchMedia("(prefers-color-scheme: dark)").matches
+      ? "midnight"
+      : "lumiere";
+  } catch {
+    return "lumiere";
+  }
+};
 
 export const ThemeProvider = ({ children }) => {
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-    const saved = localStorage.getItem("theme_mode");
-    if (saved) return saved === "dark";
-    return window.matchMedia("(prefers-color-scheme: dark)").matches;
-  });
+  const [currentTheme, setCurrentTheme] = useState(readInitialTheme);
+  const [isDarkMode, setIsDarkMode] = useState(
+    () => readInitialTheme() === "midnight",
+  );
 
   const [accentKey, setAccentKey] = useState(() => {
     return localStorage.getItem("theme_accent") || "BLUE";
   });
 
-  const [currentTheme, setCurrentTheme] = useState(() => {
-    return normalizeTheme(
-      localStorage.getItem("theme_mode_name") ||
-        localStorage.getItem("appTheme") ||
-        localStorage.getItem("aura-theme"),
-    );
-  });
-
   useEffect(() => {
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
     const handleChange = (e) => {
-      if (!localStorage.getItem("theme_mode")) {
+      const hasManualTheme =
+        localStorage.getItem("theme_mode") ||
+        localStorage.getItem("theme_mode_name") ||
+        localStorage.getItem("appTheme") ||
+        localStorage.getItem("aura-theme");
+
+      if (!hasManualTheme) {
         setIsDarkMode(e.matches);
+        setCurrentTheme(e.matches ? "midnight" : "lumiere");
       }
     };
 
     mediaQuery.addEventListener("change", handleChange);
     return () => mediaQuery.removeEventListener("change", handleChange);
-  }, []);
-
-  const toggleDarkMode = useCallback(() => {
-    setIsDarkMode((prev) => {
-      const newValue = !prev;
-      localStorage.setItem("theme_mode", newValue ? "dark" : "light");
-      return newValue;
-    });
   }, []);
 
   const setTheme = useCallback((value) => {
@@ -65,6 +81,10 @@ export const ThemeProvider = ({ children }) => {
     setIsDarkMode(next === "midnight");
     return next;
   }, []);
+
+  const toggleDarkMode = useCallback(() => {
+    setTheme(currentTheme === "midnight" ? "lumiere" : "midnight");
+  }, [currentTheme, setTheme]);
 
   const cycleTheme = useCallback(() => {
     setCurrentTheme((prev) => {
@@ -87,7 +107,7 @@ export const ThemeProvider = ({ children }) => {
     }
   }, []);
 
-  const theme = createTheme(isDarkMode, accentKey);
+  const theme = createTheme(isDarkMode, accentKey, currentTheme);
 
   useEffect(() => {
     const auraTheme = normalizeTheme(currentTheme);
