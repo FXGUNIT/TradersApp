@@ -225,6 +225,13 @@ export default function CleanLoginScreen({
   const [resetMode, setResetMode] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const el = document.documentElement;
+    const bg = getComputedStyle(el).getPropertyValue("--base-layer").trim();
+    setIsDark(bg.includes("0,0,0") || bg.includes("#0") || bg.includes("0 0 0") || bg.includes("05070A") || bg.includes("0, 0, 0") || !bg || bg === "#000" || bg === "#000000");
+  }, []);
 
   useEffect(() => {
     writeDraftSync(LOGIN_DRAFT_KEY, {
