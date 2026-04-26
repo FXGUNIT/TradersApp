@@ -344,64 +344,30 @@ export default function CleanLoginScreen({
     setMessage("");
   };
 
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const el = document.documentElement;
+    const bg = getComputedStyle(el).getPropertyValue("--base-layer").trim();
+    setIsDark(bg.includes("0,0,0") || bg.includes("#0") || bg.includes("0 0 0") || bg.includes("05070A") || bg.includes("0, 0, 0") || !bg || bg === "#000" || bg === "#000000");
+  }, []);
+
   return (
     <div
       style={{
         minHeight: "100vh",
-        background:
-          "linear-gradient(180deg, var(--base-layer, #F8FAFC) 0%, var(--surface-glass, #EEF2FF) 100%)",
+        background: isDark ? "#0A0A0F" : "#F8FAFC",
         display: "flex",
+        flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
         fontFamily: '"Sora", "Segoe UI", sans-serif',
-        padding: "48px 20px 64px",
+        padding: "0 20px 64px",
       }}
     >
       <div style={{ width: "100%", maxWidth: 640, display: "flex", flexDirection: "column", gap: 18 }}>
-        <div style={{ textAlign: "center", paddingInline: 16 }}>
-          <div
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "8px 14px",
-              borderRadius: 999,
-              border: "1px solid rgba(212,165,32,0.24)",
-              background: "rgba(212,165,32,0.06)",
-              color: "#d4a520",
-              fontSize: 10,
-              fontWeight: 800,
-              letterSpacing: 3,
-              textTransform: "uppercase",
-              marginBottom: 12,
-            }}
-          >
-            Traders Regiment
-          </div>
-          <div
-            style={{
-              fontSize: "clamp(26px, 5vw, 42px)",
-              fontWeight: 900,
-              letterSpacing: -1,
-              lineHeight: 1.05,
-              color: CSS_VARS.textPrimary,
-            }}
-          >
-            World's Most Advanced Trading AI
-          </div>
-          <div
-            style={{
-              marginTop: 8,
-              fontSize: 14,
-              lineHeight: 1.7,
-              color: CSS_VARS.textSecondary,
-              maxWidth: 560,
-              marginInline: "auto",
-            }}
-          >
-            Structured sign-in, brand clarity, and visible research credibility from the first screen.
-          </div>
-        </div>
+        {/* Brand Hero — full-page header, above the modal card */}
+        <BrandHero isDark={isDark} />
 
         <div
           style={{
