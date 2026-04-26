@@ -7,7 +7,7 @@
 
 <!-- master-progress:start -->
 ## Progress Dashboard
-Generated: `2026-04-26 04:18`  ·  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-26 07:00`  ·  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
 Master Backlog  49.0%  [############------------]
@@ -31,7 +31,7 @@ How to read this:
 | Tier | Scope | Progress | Status |
 |---|---|---:|---|
 | TIER 1 | Stage P overall |  49.0% | IN PROGRESS |
-| TIER 2 | Active Contabo production path |  80.0% | IN PROGRESS |
+| TIER 2 | Active Contabo production path |  80.0% | BLOCKED |
 
 ### By Phase
 
@@ -39,7 +39,7 @@ How to read this:
 |---|---|---:|---|
 | P23 - 4 GB Performance and Compatibility Certification | [5/5] | 100.0% | DONE |
 | P25 - NY Lunch Trading Block ✅ DONE | [5/5] | 100.0% | DONE |
-| P26 - Pages Root Live + Critical Bug Fixes — LIVE, 2 BLOCKED FOLLOW-UPS | [8/10] |  80.0% | IN PROGRESS |
+| P26 - Pages Root Live + Critical Bug Fixes — LIVE, 2 BLOCKED FOLLOW-UPS | [8/10] |  80.0% | BLOCKED |
 | P27 - Vibing Finance Backtesting Engine - Hidden MVP + Post-MVP Automation | [6/29] |  20.7% | IN PROGRESS |
 
 <!-- master-progress:end -->
@@ -276,19 +276,19 @@ All Stages S1–S6 and ML1–ML8 are background. Implement carefully, update liv
 
 <!-- live-status:start -->
 ## Live Status
-Generated: `2026-04-26 04:18`  -  Run `python scripts/update_todo_progress.py --once` to update
+Generated: `2026-04-26 07:00`  -  Run `python scripts/update_todo_progress.py --once` to update
 
 ```text
-Stage P Backlog  60.0%  [##############----------]
-Sections        done 003 | active 000 | blocked 000 | archived 000 | pending 001 | total 004
-Checklist       done 024 | open 016 | total 040
+Stage P Backlog  49.0%  [############------------]
+Sections        done 002 | active 001 | blocked 001 | archived 000 | pending 000 | total 004
+Checklist       done 024 | in progress 000 | blocked 009 | todo 016 | total 049
 ```
 
 | Section | Tasks | Progress | Status |
 |---|---|---:|---|
 | P23 - 4 GB Performance and Compatibility Certification | [5/5] | 100.0% | DONE |
 | P25 - NY Lunch Trading Block ✅ DONE | [5/5] | 100.0% | DONE |
-| P26 - Pages Root Live + Critical Bug Fixes — LIVE, 2 BLOCKED FOLLOW-UPS | [8/8] | 100.0% | DONE |
-| P27 - Vibing Finance Backtesting Engine - Hidden MVP + Post-MVP Automation | [6/22] |  27.3% | PENDING |
+| P26 - Pages Root Live + Critical Bug Fixes — LIVE, 2 BLOCKED FOLLOW-UPS | [8/10] |  80.0% | BLOCKED |
+| P27 - Vibing Finance Backtesting Engine - Hidden MVP + Post-MVP Automation | [6/29] |  20.7% | IN PROGRESS |
 
 <!-- live-status:end -->

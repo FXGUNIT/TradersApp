@@ -1,7 +1,7 @@
 {
-  "name": "TradersApp - Advanced Admin Dashboard",
-  "short_name": "TradersApp",
-  "description": "Professional trading platform with real-time user management, fraud detection, and institutional admin controls",
+  "name": "Traders Regiment",
+  "short_name": "Regiment",
+  "description": "World's most advanced trading AI with institutional-grade research, governance, and market intelligence",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
@@ -10,47 +10,41 @@
   "background_color": "#0A0A0F",
   "icons": [
     {
-      "src": "/favicon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any"
-    },
-    {
-      "src": "/favicon.svg",
+      "src": "/icon-192.png",
       "sizes": "192x192",
-      "type": "image/svg+xml",
+      "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/favicon.svg",
+      "src": "/icon-512.png",
       "sizes": "512x512",
-      "type": "image/svg+xml",
+      "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/favicon.svg",
-      "sizes": "192x192",
-      "type": "image/svg+xml",
+      "src": "/maskable-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
       "purpose": "maskable"
     },
     {
-      "src": "/favicon.svg",
-      "sizes": "512x512",
-      "type": "image/svg+xml",
-      "purpose": "maskable"
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
     }
   ],
   "screenshots": [
     {
-      "src": "/favicon.svg",
-      "sizes": "540x720",
-      "type": "image/svg+xml",
+      "src": "/logo.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
       "form_factor": "narrow"
     },
     {
-      "src": "/favicon.svg",
-      "sizes": "1280x720",
-      "type": "image/svg+xml",
+      "src": "/logo.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
       "form_factor": "wide"
     }
   ],
@@ -62,9 +56,9 @@
       "url": "/admin",
       "icons": [
         {
-          "src": "/favicon.svg",
+          "src": "/icon-192.png",
           "sizes": "192x192",
-          "type": "image/svg+xml"
+          "type": "image/png"
         }
       ]
     }
@@ -72,9 +66,9 @@
   "categories": ["business", "productivity"],
   "screenshots_dark": [
     {
-      "src": "/favicon.svg",
-      "sizes": "540x720",
-      "type": "image/svg+xml",
+      "src": "/logo.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
       "form_factor": "narrow"
     }
   ],

@@ -244,6 +244,19 @@ export async function verifyAdminTotp(code) {
   );
 }
 
+export async function fetchAdminTotpSetup() {
+  let response;
+  try {
+    response = await fetch(`${resolveBffBaseUrl()}/auth/admin/totp/setup`, {
+      cache: "no-store",
+    });
+  } catch {
+    throw new Error("Authenticator setup service is unavailable.");
+  }
+
+  return parseJsonResponse(response, "Failed to load authenticator setup.");
+}
+
 export async function clearAdminToken() {
   await clearStoredAdminToken();
 }
@@ -252,6 +265,7 @@ export default {
   requestAdminEmailOtp,
   verifyAdminEmailOtp,
   verifyAdminTotp,
+  fetchAdminTotpSetup,
   getAdminToken,
   setAdminToken,
   clearAdminToken,

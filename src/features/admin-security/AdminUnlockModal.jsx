@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
+  fetchAdminTotpSetup,
   getRememberDevice,
   setRememberDevice,
   getDeviceFingerprint,
@@ -29,11 +30,34 @@ export default function AdminUnlockModal({
   const [rememberDevice, setRememberDeviceState] = useState(() =>
     getRememberDevice(),
   );
+  const [totpSetup, setTotpSetup] = useState(null);
+  const [totpSetupError, setTotpSetupError] = useState("");
 
   const handleRememberChange = (checked) => {
     setRememberDeviceState(checked);
     setRememberDevice(checked);
   };
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!show) return undefined;
+
+    fetchAdminTotpSetup()
+      .then((payload) => {
+        if (cancelled) return;
+        setTotpSetup(payload);
+        setTotpSetupError("");
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setTotpSetup(null);
+        setTotpSetupError(error.message || "Authenticator setup unavailable.");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [show]);
 
   if (!show) return null;
 
@@ -198,6 +222,60 @@ export default function AdminUnlockModal({
           >
             UNLOCK WITH AUTHENTICATOR
           </button>
+
+          {totpSetup?.secret ? (
+            <div
+              style={{
+                marginTop: 12,
+                padding: 12,
+                borderRadius: 8,
+                background: "rgba(59,130,246,0.08)",
+                border: "1px solid rgba(59,130,246,0.2)",
+              }}
+            >
+              <div
+                style={{
+                  color: theme.blue || "#3B82F6",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  marginBottom: 8,
+                }}
+              >
+                AUTHENTICATOR SETUP KEY
+              </div>
+              <input
+                readOnly
+                value={totpSetup.secret}
+                style={{
+                  ...inputStyle,
+                  fontFamily: "monospace",
+                  fontSize: 12,
+                  marginBottom: 8,
+                }}
+              />
+              <div
+                style={{
+                  fontSize: 11,
+                  color: theme.muted || "#9CA3AF",
+                  lineHeight: 1.4,
+                }}
+              >
+                Issuer: {totpSetup.issuer} | Account: {totpSetup.accountName}
+              </div>
+            </div>
+          ) : null}
+
+          {totpSetupError ? (
+            <div
+              style={{
+                color: theme.muted || "#9CA3AF",
+                fontSize: 11,
+                marginTop: 10,
+              }}
+            >
+              {totpSetupError}
+            </div>
+          ) : null}
         </div>
 
         <div

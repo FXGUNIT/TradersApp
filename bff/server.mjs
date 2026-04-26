@@ -98,6 +98,7 @@ import { boardRoomService } from "./services/boardRoomService.mjs";
 import boardRoomTelegram from "./services/boardRoomTelegram.mjs";
 import {
   getAdminMfaStatus,
+  getAdminTotpSetup,
   startAdminEmailOtp,
   verifyAdminEmailOtp,
   verifyAdminTotp,
@@ -460,6 +461,7 @@ const dispatcher = createDispatcher({
   validateAdminToken,
   createAdminSession,
   getAdminMfaStatus,
+  getAdminTotpSetup,
   startAdminEmailOtp,
   verifyAdminEmailOtp,
   verifyAdminTotp,

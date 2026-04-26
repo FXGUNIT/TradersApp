@@ -15,6 +15,7 @@ function resolveAdminDevice(body = {}, req = {}) {
 export function createAdminMfaRouteHandler({
   createAdminSession,
   getAdminMfaStatus,
+  getAdminTotpSetup,
   getClientKey,
   json,
   readJsonBody,
@@ -49,6 +50,16 @@ export function createAdminMfaRouteHandler({
 
     if (method === "GET" && pathname === "/auth/admin/options") {
       json(res, 200, { ok: true, adminMfa: getAdminMfaStatus() }, origin);
+      return true;
+    }
+
+    if (method === "GET" && pathname === "/auth/admin/totp/setup") {
+      if (String(process.env.NODE_ENV || "").toLowerCase() === "production") {
+        json(res, 403, { ok: false, error: "Authenticator setup details are disabled in production." }, origin);
+        return true;
+      }
+      const payload = getAdminTotpSetup();
+      json(res, payload.ok ? 200 : payload.status || 400, payload, origin);
       return true;
     }
 

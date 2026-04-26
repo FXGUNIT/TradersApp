@@ -165,6 +165,10 @@ const BLOG_POSTS = [
     tags: ["EDGE", "INSTITUTIONAL", "RETAIL"],
     chart: <FounderStoryChart />,
     stat: "15 Years of Cricket + 7 Years of Sales = This",
+    metric: "01",
+    metricLabel: "Operator origin",
+    summary:
+      "Founder-led product thesis grounded in market pain rather than generic signal-selling.",
   },
   {
     id: "product-vision",
@@ -175,6 +179,10 @@ const BLOG_POSTS = [
     tags: ["QUANT", "ALPHA", "HEDGE FUND"],
     chart: <ProductVisionChart />,
     stat: "78/100 Consensus Score vs 22/100 Signal Service",
+    metric: "02",
+    metricLabel: "Product framing",
+    summary:
+      "Explains why the system is built as a decision engine, not a shallow alert service.",
   },
   {
     id: "architecture",
@@ -186,6 +194,20 @@ const BLOG_POSTS = [
     chart: <ArchitectureChart />,
     stat: "12 Models · Board Room · Watchtower · Self-Improving",
   },
+];
+
+const LINKEDIN_URL = "https://linkedin.com/in/singhgunit";
+
+const CREDIBILITY_METRICS = [
+  { label: "Public operator voice", value: "LinkedIn" },
+  { label: "Research tracks live", value: "3" },
+  { label: "Decision layers", value: "12 AI + Board Room" },
+];
+
+const RESEARCH_PILLARS = [
+  { label: "Founder context", value: "Retail pain translated into product shape" },
+  { label: "Quant framing", value: "Decision support over blind signals" },
+  { label: "Architecture proof", value: "Governed system with active monitoring" },
 ];
 
 export default function RegimentHub({
@@ -811,9 +833,12 @@ export default function RegimentHub({
       <div
         style={{
           width: "100%",
-          maxWidth: 960,
-          marginTop: 72,
+          maxWidth: 1080,
+          marginTop: 80,
           position: "relative",
+          display: "flex",
+          flexDirection: "column",
+          gap: 4,
         }}
       >
         {/* Decorative top separator */}
@@ -856,73 +881,266 @@ export default function RegimentHub({
         <div style={{ textAlign: "center", marginBottom: 36 }}>
           <h2
             style={{
-              fontSize: "clamp(18px, 3vw, 26px)",
+              fontSize: "clamp(24px, 3.8vw, 36px)",
               fontWeight: 800,
               color: textColor,
-              letterSpacing: -0.5,
-              marginBottom: 8,
-              lineHeight: 1.2,
+              letterSpacing: -0.8,
+              marginBottom: 12,
+              lineHeight: 1.08,
             }}
           >
-            Intelligence. Research. Vision.
+            LinkedIn proof above. Editorial research below.
           </h2>
-          <p style={{ fontSize: 13, color: mutedColor, margin: 0 }}>
-            Deep thinking on quant systems, alpha generation, and institutional edge.
+          <p style={{ fontSize: 14, color: mutedColor, margin: 0, lineHeight: 1.8, maxWidth: 760, marginInline: "auto" }}>
+            The home screen now needs a cleaner credibility sequence: public founder proof first, then structured blog research with charts, summaries, and clear reasons to trust the system.
           </p>
+        </div>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+            gap: 20,
+            marginBottom: 24,
+          }}
+        >
+          <div
+            style={{
+              borderRadius: 24,
+              padding: "28px 26px",
+              background: isDark
+                ? "linear-gradient(135deg, rgba(15,23,42,0.84), rgba(2,6,23,0.76))"
+                : "linear-gradient(135deg, rgba(255,255,255,0.94), rgba(248,250,252,0.9))",
+              border: "1px solid rgba(212,165,32,0.18)",
+              boxShadow: isDark
+                ? "0 24px 60px rgba(2,6,23,0.28)"
+                : "0 24px 60px rgba(15,23,42,0.08)",
+            }}
+          >
+            <div
+              style={{
+                fontSize: 10,
+                fontWeight: 800,
+                letterSpacing: 3,
+                color: "#d4a520",
+                textTransform: "uppercase",
+                marginBottom: 12,
+              }}
+            >
+              Credibility map
+            </div>
+            <h3
+              style={{
+                margin: 0,
+                fontSize: "clamp(22px, 3vw, 32px)",
+                lineHeight: 1.08,
+                letterSpacing: -0.7,
+                color: textColor,
+              }}
+            >
+              Public founder voice and product evidence now sit in one visual chain.
+            </h3>
+            <p
+              style={{
+                margin: "14px 0 20px",
+                fontSize: 14,
+                lineHeight: 1.8,
+                color: mutedColor,
+                maxWidth: 560,
+              }}
+            >
+              This block turns the LinkedIn link into a real trust surface, then hands the user directly into chart-led research cards instead of leaving credibility disconnected from the product story.
+            </p>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
+                gap: 12,
+              }}
+            >
+              {CREDIBILITY_METRICS.map((item) => (
+                <div
+                  key={item.label}
+                  style={{
+                    padding: "14px 14px 12px",
+                    borderRadius: 16,
+                    background: isDark ? "rgba(255,255,255,0.03)" : "rgba(255,255,255,0.72)",
+                    border: isDark ? "1px solid rgba(255,255,255,0.06)" : "1px solid rgba(15,23,42,0.06)",
+                  }}
+                >
+                  <div style={{ fontSize: 11, color: mutedColor, marginBottom: 6 }}>{item.label}</div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: textColor }}>{item.value}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <a
+            href={LINKEDIN_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ textDecoration: "none" }}
+          >
+            <div
+              style={{
+                height: "100%",
+                minHeight: 290,
+                borderRadius: 24,
+                padding: "24px 22px",
+                background: isDark
+                  ? "linear-gradient(160deg, rgba(8,47,73,0.68), rgba(15,23,42,0.88))"
+                  : "linear-gradient(160deg, rgba(239,246,255,0.96), rgba(255,255,255,0.92))",
+                border: "1px solid rgba(14,116,144,0.18)",
+                boxShadow: isDark
+                  ? "0 24px 60px rgba(3,7,18,0.34)"
+                  : "0 24px 60px rgba(14,116,144,0.12)",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "space-between",
+                gap: 18,
+                color: textColor,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 3, color: isDark ? "#93c5fd" : "#0369a1", textTransform: "uppercase", marginBottom: 10 }}>
+                    Founder on LinkedIn
+                  </div>
+                  <div style={{ fontSize: 24, fontWeight: 900, lineHeight: 1.05 }}>Gunit Singh</div>
+                  <div style={{ fontSize: 13, color: mutedColor, marginTop: 6 }}>
+                    Public market voice, operator context, and product conviction.
+                  </div>
+                </div>
+                <div
+                  style={{
+                    width: 42,
+                    height: 42,
+                    borderRadius: 12,
+                    display: "grid",
+                    placeItems: "center",
+                    background: "rgba(14,118,168,0.14)",
+                    border: "1px solid rgba(14,118,168,0.22)",
+                    color: isDark ? "#bfdbfe" : "#0369a1",
+                    fontSize: 20,
+                    fontWeight: 900,
+                  }}
+                >
+                  in
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "76px 1fr", gap: 14, alignItems: "center" }}>
+                <div
+                  style={{
+                    width: 76,
+                    height: 76,
+                    borderRadius: 20,
+                    overflow: "hidden",
+                    border: "1px solid rgba(255,255,255,0.18)",
+                    boxShadow: "0 16px 40px rgba(15,23,42,0.18)",
+                  }}
+                >
+                  <img
+                    src="/founder.jpeg"
+                    alt="Gunit Singh"
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  />
+                </div>
+                <div style={{ fontSize: 13, lineHeight: 1.75, color: mutedColor }}>
+                  LinkedIn should not be a loose link. It should feel like the front door to the public proof behind the system.
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(92px, 1fr))", gap: 10 }}>
+                {RESEARCH_PILLARS.map((item) => (
+                  <div
+                    key={item.label}
+                    style={{
+                      padding: "12px 12px 14px",
+                      borderRadius: 16,
+                      background: isDark ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.75)",
+                      border: isDark ? "1px solid rgba(255,255,255,0.06)" : "1px solid rgba(15,23,42,0.06)",
+                    }}
+                  >
+                    <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.4, textTransform: "uppercase", color: "#d4a520", marginBottom: 8 }}>
+                      {item.label}
+                    </div>
+                    <div style={{ fontSize: 11, lineHeight: 1.55, color: mutedColor }}>
+                      {item.value}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", paddingTop: 6, borderTop: isDark ? "1px solid rgba(255,255,255,0.08)" : "1px solid rgba(15,23,42,0.08)" }}>
+                <div style={{ fontSize: 12, color: mutedColor }}>Open founder credibility channel</div>
+                <div style={{ fontSize: 12, fontWeight: 800, color: isDark ? "#93c5fd" : "#0369a1", letterSpacing: 1.2, textTransform: "uppercase" }}>
+                  Visit LinkedIn
+                </div>
+              </div>
+            </div>
+          </a>
         </div>
 
         {/* Blog cards grid */}
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-            gap: 20,
+            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+            gap: 18,
             marginBottom: 36,
           }}
         >
-          {BLOG_POSTS.map((post, index) => (
-            <a
-              key={post.id}
-              href={post.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ textDecoration: "none" }}
-            >
-              <div
-                style={{
-                  height: "100%",
-                  background: isDark
-                    ? "rgba(15,23,42,0.7)"
-                    : "rgba(255,255,255,0.85)",
-                  backdropFilter: "blur(20px)",
-                  WebkitBackdropFilter: "blur(20px)",
-                  border: isDark
-                    ? "1px solid rgba(212,165,32,0.15)"
-                    : "1px solid rgba(212,165,32,0.2)",
-                  borderRadius: 20,
-                  padding: "28px 24px",
-                  cursor: "pointer",
-                  transition: "all 0.35s cubic-bezier(0.4, 0, 0.2, 1)",
-                  position: "relative",
-                  overflow: "hidden",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 12,
-                  animationDelay: `${index * 0.12}s`,
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = "rgba(212,165,32,0.5)";
-                  e.currentTarget.style.transform = "translateY(-4px)";
-                  e.currentTarget.style.boxShadow = "0 16px 48px rgba(212,165,32,0.12)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = isDark
-                    ? "rgba(212,165,32,0.15)"
-                    : "rgba(212,165,32,0.2)";
-                  e.currentTarget.style.transform = "translateY(0)";
-                  e.currentTarget.style.boxShadow = "none";
-                }}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
+              gap: 18,
+            }}
+          >
+            {BLOG_POSTS.map((post, index) => (
+              <a
+                key={post.id}
+                href={post.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ textDecoration: "none" }}
               >
+                <div
+                  style={{
+                    height: "100%",
+                    background: isDark
+                      ? "rgba(15,23,42,0.7)"
+                      : "rgba(255,255,255,0.85)",
+                    backdropFilter: "blur(20px)",
+                    WebkitBackdropFilter: "blur(20px)",
+                    border: isDark
+                      ? "1px solid rgba(212,165,32,0.15)"
+                      : "1px solid rgba(212,165,32,0.2)",
+                    borderRadius: 24,
+                    padding: "24px 22px",
+                    cursor: "pointer",
+                    transition: "all 0.35s cubic-bezier(0.4, 0, 0.2, 1)",
+                    position: "relative",
+                    overflow: "hidden",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 14,
+                    animationDelay: `${index * 0.12}s`,
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = "rgba(212,165,32,0.5)";
+                    e.currentTarget.style.transform = "translateY(-4px)";
+                    e.currentTarget.style.boxShadow = "0 16px 48px rgba(212,165,32,0.12)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = isDark
+                      ? "rgba(212,165,32,0.15)"
+                      : "rgba(212,165,32,0.2)";
+                    e.currentTarget.style.transform = "translateY(0)";
+                    e.currentTarget.style.boxShadow = "none";
+                  }}
+                >
                 {/* Glow accent top */}
                 <div
                   style={{
@@ -1001,33 +1219,57 @@ export default function RegimentHub({
                   </div>
                 </div>
 
-                {/* Title */}
-                <h3
-                  style={{
-                    fontSize: 14,
-                    fontWeight: 700,
-                    color: isDark ? "#f1f5f9" : "#0f172a",
-                    lineHeight: 1.4,
-                    letterSpacing: -0.2,
-                    margin: 0,
-                    flex: 1,
-                  }}
-                >
-                  {post.title}
-                </h3>
+                  <div style={{ display: "grid", gridTemplateColumns: "56px 1fr", gap: 14, alignItems: "start" }}>
+                    <div
+                      style={{
+                        minHeight: 56,
+                        borderRadius: 18,
+                        border: "1px solid rgba(212,165,32,0.18)",
+                        background: "rgba(212,165,32,0.06)",
+                        display: "grid",
+                        placeItems: "center",
+                        color: "#d4a520",
+                      }}
+                    >
+                      <div style={{ textAlign: "center" }}>
+                        <div style={{ fontSize: 20, fontWeight: 900, lineHeight: 1 }}>
+                          {post.metric || String(index + 1).padStart(2, "0")}
+                        </div>
+                        <div style={{ fontSize: 9, letterSpacing: 1.2, textTransform: "uppercase", marginTop: 4 }}>
+                          note
+                        </div>
+                      </div>
+                    </div>
+                    <div>
+                      <h3
+                        style={{
+                          fontSize: 15,
+                          fontWeight: 800,
+                          color: isDark ? "#f1f5f9" : "#0f172a",
+                          lineHeight: 1.4,
+                          letterSpacing: -0.2,
+                          margin: 0,
+                        }}
+                      >
+                        {post.title}
+                      </h3>
+                      <div style={{ fontSize: 11, color: mutedColor, marginTop: 7 }}>
+                        {post.metricLabel || "Research thread"}
+                      </div>
+                    </div>
+                  </div>
 
-                {/* Excerpt */}
-                <p
-                  style={{
-                    fontSize: 12,
-                    color: mutedColor,
-                    lineHeight: 1.6,
-                    margin: 0,
-                    flex: 1,
-                  }}
-                >
-                  {post.excerpt}
-                </p>
+                  <p
+                    style={{
+                      fontSize: 12,
+                      color: mutedColor,
+                      lineHeight: 1.7,
+                      margin: 0,
+                      flex: 1,
+                    }}
+                  >
+                    {post.summary || post.excerpt}
+                  </p>
 
                 {/* Stat + CTA */}
                 <div
@@ -1073,9 +1315,10 @@ export default function RegimentHub({
                     </svg>
                   </div>
                 </div>
-              </div>
-            </a>
-          ))}
+                </div>
+              </a>
+            ))}
+          </div>
 
           {/* Decorative stats card */}
           <div
@@ -1115,24 +1358,35 @@ export default function RegimentHub({
               </div>
               <div
                 style={{
-                  fontSize: 15,
+                  fontSize: 18,
                   fontWeight: 800,
                   color: isDark ? "#fff" : "#0f172a",
-                  letterSpacing: -0.3,
-                  lineHeight: 1.3,
+                  letterSpacing: -0.4,
+                  lineHeight: 1.2,
                 }}
               >
-                World's Most Advanced Trading AI
+                Structured trust story
               </div>
             </div>
+
+            <p
+              style={{
+                margin: 0,
+                fontSize: 12,
+                lineHeight: 1.75,
+                color: mutedColor,
+              }}
+            >
+              LinkedIn carries the public proof. The article cards below translate that proof into clear product, system, and operator evidence.
+            </p>
 
             {/* Inline stat bars */}
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {[
-                { label: "Institutional Intelligence", pct: 95 },
-                { label: "Quant Alpha Detection", pct: 88 },
-                { label: "Self-Improving AI", pct: 92 },
-                { label: "Board Room Governance", pct: 100 },
+                { label: "Public proof", pct: 96 },
+                { label: "Research clarity", pct: 91 },
+                { label: "Visual readability", pct: 93 },
+                { label: "System trust", pct: 98 },
               ].map((item) => (
                 <div key={item.label}>
                   <div

@@ -30,6 +30,12 @@ const ADMIN_TOTP_SECRET = String(
     process.env.BFF_ADMIN_TOTP_SECRET ||
     "",
 ).trim();
+const ADMIN_TOTP_ISSUER = String(
+  process.env.ADMIN_TOTP_ISSUER || "TradersApp Admin",
+).trim();
+const ADMIN_TOTP_ACCOUNT_NAME = String(
+  process.env.ADMIN_TOTP_ACCOUNT_NAME || getMasterAdminEmail() || "admin",
+).trim();
 
 const emailChallenges = new Map();
 
@@ -339,8 +345,31 @@ export function getAdminMfaStatus() {
   };
 }
 
+export function getAdminTotpSetup() {
+  if (!ADMIN_TOTP_SECRET) {
+    return {
+      ok: false,
+      status: 503,
+      error: "Authenticator secret is not configured.",
+    };
+  }
+
+  const accountLabel = encodeURIComponent(ADMIN_TOTP_ACCOUNT_NAME);
+  const issuer = encodeURIComponent(ADMIN_TOTP_ISSUER);
+  return {
+    ok: true,
+    issuer: ADMIN_TOTP_ISSUER,
+    accountName: ADMIN_TOTP_ACCOUNT_NAME,
+    secret: ADMIN_TOTP_SECRET,
+    periodSeconds: TOTP_PERIOD_SECONDS,
+    digits: OTP_DIGITS,
+    otpauthUri: `otpauth://totp/${issuer}:${accountLabel}?secret=${ADMIN_TOTP_SECRET}&issuer=${issuer}&algorithm=SHA1&digits=${OTP_DIGITS}&period=${TOTP_PERIOD_SECONDS}`,
+  };
+}
+
 export default {
   getAdminMfaStatus,
+  getAdminTotpSetup,
   startAdminEmailOtp,
   verifyAdminEmailOtp,
   verifyAdminTotp,

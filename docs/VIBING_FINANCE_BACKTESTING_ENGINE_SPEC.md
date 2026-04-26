@@ -1806,6 +1806,11 @@ Safety constraints:
 - Destructive operations require a policy reason and stronger gate.
 - Secret files are excluded from agent exports and command summaries.
 - Network access defaults off for backtests unless a provider/data-source task explicitly needs it.
+- PowerShell, terminal, filesystem, browser automation, and tool powers are available only through this local runner/CLI surface, not directly inside the browser workbench.
+- The runner may operate unattended when the user is away or asleep, but only within an agenda-bounded run plan and explicit policy scope.
+- Terminal powers must be tied directly or indirectly to the approved agenda for this product: strategy parsing, data handling, backtests, reporting, proofing, testing, implementation, or user-requested research tasks.
+- Out-of-scope terminal usage must be policy-rejected and logged as a rejected tool event.
+- "Same powers as a coding agent" means capability parity through the runner surface, not unrestricted hidden autonomy.
 
 ### 20.8 BYOK Provider Gateway Architecture
 
@@ -1840,6 +1845,33 @@ Rules:
 - BYOK secrets are referenced by credential ID, not copied into events.
 - Cost and token estimates are visible before autonomous remote calls.
 - Autonomous mode cannot spend user/provider quota beyond the configured budget.
+- Every user may supply their own LLM/agent key and choose not to use any platform-owned key.
+- BYOK must be first-class, not an afterthought.
+- The platform default for paid remote providers should be `user_key_preferred`.
+- If the user has not configured a key, the system must degrade to deterministic mode or local-provider mode rather than silently switching to a platform-paid provider.
+- Supported BYOK intent includes OpenAI-compatible, Anthropic, Gemini, OpenRouter, and any local compatible endpoint.
+- The provider profile must let the user choose:
+  - `disabled`
+  - `local_only`
+  - `byok_only`
+  - `allow_platform_key_later`
+- The provider profile must also let the user choose whether autonomous background runs may use their key, and must support hard limits for spend, tokens, and runtime.
+
+Provider profile example:
+
+```json
+{
+  "profile_id": "anthropic_byok_primary",
+  "mode": "byok_only",
+  "provider": "anthropic",
+  "model": "opus-code",
+  "credential_ref": "cred_001",
+  "allow_autonomous_use": true,
+  "max_daily_spend_usd": 5,
+  "max_run_tokens": 200000,
+  "allow_network_tools": false
+}
+```
 
 ### 20.9 Resume, Checkpoint, And Heartbeat Architecture
 
@@ -1941,6 +1973,7 @@ Decisions:
 - There is no shell access directly inside a normal web browser tab.
 - Shell, filesystem, MCP, and Playwright powers require the CLI/local runner/desktop environment.
 - All surfaces write the same artifact schema, tool event schema, report schema, and proof block schema.
+- The unattended/autonomous surface is the CLI/local runner, not the browser tab itself.
 
 ### 20.13 Browser Workbench Decision
 
@@ -1978,6 +2011,309 @@ Browser non-responsibilities:
 Browser storage decision:
 
 - IndexedDB is the local source of browser state.
+
+### 20.13.1 Project Workspace Document Kit
+
+Every user project must start with an editable document kit. The engine should not operate as a floating chat without project memory, rules, and source references.
+
+Final decision:
+
+- Every new project gets a default document kit.
+- Every document remains editable by the user.
+- The user can add attachments and external references.
+- The agent/workbench must read from this kit before acting on the project.
+- The kit is per project, not global.
+
+Required project documents:
+
+1. `TODO_MASTER_LIST.md`
+2. `PLANNING.md`
+3. `RULES.md`
+4. `SPECIAL_REQUESTS.md`
+5. `ARCHITECTURE.md`
+6. `UI_UX_DETAILS.md`
+7. `SECURITY_PROTOCOLS.md`
+8. `API_AND_INTEGRATIONS.md`
+9. `GUIDELINES_AND_ATTACHMENTS.md`
+10. `LEARNING_AND_TRAINING_SOURCES.md`
+
+Project workspace structure:
+
+```text
+project-root/
+  .vibing/
+    project.json
+    docs/
+      TODO_MASTER_LIST.md
+      PLANNING.md
+      RULES.md
+      SPECIAL_REQUESTS.md
+      ARCHITECTURE.md
+      UI_UX_DETAILS.md
+      SECURITY_PROTOCOLS.md
+      API_AND_INTEGRATIONS.md
+      GUIDELINES_AND_ATTACHMENTS.md
+      LEARNING_AND_TRAINING_SOURCES.md
+    memory/
+    artifacts/
+    attachments/
+```
+
+Document roles:
+
+| Document | Purpose |
+|---|---|
+| `TODO_MASTER_LIST.md` | Canonical backlog, stages, status, blockers, priorities |
+| `PLANNING.md` | Current implementation plan, milestones, next actions |
+| `RULES.md` | Project-wide operating rules, constraints, forbidden actions |
+| `SPECIAL_REQUESTS.md` | User-specific preferences and exceptions |
+| `ARCHITECTURE.md` | System design, boundaries, data flow, modules |
+| `UI_UX_DETAILS.md` | Screen behavior, layout contracts, interaction rules |
+| `SECURITY_PROTOCOLS.md` | Secrets, auth, data handling, threat rules, redaction |
+| `API_AND_INTEGRATIONS.md` | External/internal APIs, schemas, keys, adapters, MCP/app details |
+| `GUIDELINES_AND_ATTACHMENTS.md` | Attached files, references, style guides, workflows, imported docs |
+| `LEARNING_AND_TRAINING_SOURCES.md` | Datasets, papers, prompts, lessons, training sources, evaluation refs |
+
+Rules:
+
+- The user can edit any of these docs at any time.
+- The agent can propose edits, but user-authored constraints in these docs take precedence over defaults unless unsafe or contradictory.
+- Every unattended run should reference the current project doc kit snapshot hash.
+- Agent notes export should include the document hashes, not full document content by default.
+- Attachments can be local files, URLs, notes, PDFs, images, or structured references, but must be indexed in `GUIDELINES_AND_ATTACHMENTS.md`.
+
+Minimum project manifest:
+
+```json
+{
+  "project_id": "uuid",
+  "name": "MNQ Post-IB Research",
+  "created_at": "...",
+  "doc_kit_version": 1,
+  "docs_root": ".vibing/docs",
+  "attachments_root": ".vibing/attachments",
+  "artifacts_root": ".vibing/artifacts",
+  "memory_root": ".vibing/memory"
+}
+```
+
+Agent behavior rule:
+
+- Before acting on a project, the agent should load the document kit manifest and the high-priority docs:
+  - `TODO_MASTER_LIST.md`
+  - `PLANNING.md`
+  - `RULES.md`
+  - `SPECIAL_REQUESTS.md`
+- For implementation/design/security/API tasks, it should also load the relevant specialist doc before acting.
+
+### 20.14 CLI And Runner Powers Decision
+
+The CLI/local runner is where agent-grade powers live.
+
+Required powers for the runner surface:
+
+- PowerShell/Bash command execution.
+- Workspace file reads and writes.
+- Structured tool calls.
+- Browser automation/testing tools.
+- Long-running unattended job execution.
+- Resume/checkpoint support.
+- Artifact hashing and proof generation.
+- Optional provider calls using the user's own key.
+
+Power scope rule:
+
+- These powers are allowed only when they serve the active agenda directly or indirectly.
+- "Indirectly" includes testing, validation, refactoring, data preparation, report export, bug fixing, and infrastructure steps necessary to complete the research/job.
+- General-purpose unrelated shell access is not part of the product promise.
+
+Policy levels:
+
+```text
+strict      = only deterministic backtest/report tools
+research    = deterministic tools + provider calls + local analysis scripts
+builder     = research + repo editing + tests + browser automation
+operator    = builder + unattended local runner jobs + controlled terminal access
+```
+
+Default:
+
+- Browser workbench runs in `strict`.
+- Founder/admin local runner may use `operator`.
+- Normal user local runner should default to `research` unless explicitly elevated on their own machine.
+
+Project binding rule:
+
+- Powers, provider profiles, run budgets, and memory capsules must be scoped to the active project workspace.
+- A terminal/tool action must always carry `project_id` and `run_plan_id`.
+- The runner must refuse commands that are not attached to a project and agenda.
+
+### 20.15 Unattended Execution Decision
+
+The system should be able to continue working when the user is away, but the run must be bounded.
+
+Allowed unattended work:
+
+- Finish a started backtest.
+- Run a queued batch of strategy variants.
+- Rebuild reports from existing artifacts.
+- Compare prior runs.
+- Generate agent notes.
+- Execute scheduled local retraining/evaluation jobs.
+- Run local verification/tests for implementation work.
+
+Required guardrails:
+
+- Explicit run budget.
+- Visible queue.
+- Max runtime per job.
+- Max concurrent jobs.
+- Checkpoints and resume.
+- Kill switch.
+- Full event log.
+- Provider budget cap when BYOK is enabled.
+- No hidden escalation from browser to terminal powers.
+
+Run budget example:
+
+```json
+{
+  "mode": "autonomous",
+  "max_runtime_minutes": 180,
+  "max_steps": 50,
+  "max_tool_failures": 5,
+  "max_provider_spend_usd": 3,
+  "allow_terminal": true,
+  "allow_file_writes": true,
+  "allow_network": false
+}
+```
+
+### 20.16 Self-Learning And Training Decision
+
+The system should improve per user over time, but not by mutating the whole engine continuously in an uncontrolled way.
+
+Final decision:
+
+- Per-user learning is allowed.
+- Shared/global learning is gated and delayed.
+- Deterministic backtest rules do not rewrite themselves automatically.
+- Model/provider prompts, memory capsules, scoring heuristics, and suggested defaults may improve over time.
+- Any global/default promotion requires explicit evidence and admin approval.
+
+Learning layers:
+
+| Layer | Scope | Auto-update | Gate |
+|---|---|---|---|
+| Session memory | Per run/user | Yes | None |
+| Preference memory | Per user | Yes | None |
+| Strategy lesson memory | Per user | Yes, from completed runs | Evidence required |
+| Suggestion heuristics | Per user | Yes | Can be reset |
+| Shared default heuristics | Global | No | Admin approval |
+| Deterministic strategy engine | Global | No | Code change + tests + proofable version |
+| ML models later | Per user or global | Scheduled only | Training/eval/promote pipeline |
+
+Rules:
+
+- "Better each minute" means faster retrieval of user-specific lessons, preferences, and validated patterns.
+- It does not mean silently retraining production logic every minute.
+- Online adaptation may update rankings, suggestions, memory summaries, and agenda planning.
+- Any statistical or ML retraining must run as a separate job with its own artifacts, metrics, and promotion decision.
+- A failed or low-confidence run must never poison shared defaults.
+
+Per-user training loop:
+
+```text
+completed run
+  -> extract lessons
+  -> score lesson quality
+  -> store per-user memory capsule
+  -> use capsule in future agent context
+  -> optionally queue retraining/evaluation job
+```
+
+Retraining cadence:
+
+- Memory updates: immediate after completed run.
+- Heuristic re-ranking: immediate or batched hourly.
+- Feature/parameter evaluation: scheduled.
+- ML retraining: scheduled, not continuous.
+- Shared default promotion: manual.
+
+Three-speed continuous-improvement model:
+
+| Speed | Latency | What improves | Scope | Safe because |
+|---|---|---|---|---|
+| Speed 1 | Seconds/minutes | Memory retrieval, user preferences, suggestion ranking, provider routing, agenda planning | Per user/project | Does not change deterministic truth |
+| Speed 2 | Hourly/daily | Heuristics, prompt/context templates, candidate lessons, shadow scorecards | Per user first, optional shared candidates later | Changes are versioned and reversible |
+| Speed 3 | Scheduled offline | Candidate models, global defaults, shared optimization policies | Opt-in shared/global | Requires eval, canary, approval, rollback |
+
+If the goal is to make the whole engine better "each minute," the correct architecture is:
+
+```text
+live usage
+  -> immediate per-user memory update
+  -> periodic heuristic/candidate refresh
+  -> offline candidate training from consented data
+  -> shadow evaluation against fixed benchmarks
+  -> canary release
+  -> promoted default only after pass
+```
+
+Not allowed:
+
+- Directly training the live production default from every user interaction.
+- Updating deterministic metrics or trade logic from raw user feedback.
+- Promoting a shared model/default without benchmark pass and rollback path.
+
+Opt-in shared learning path:
+
+- Users may explicitly opt in to contribute anonymized/approved learning signals.
+- Shared training data must exclude secrets, raw private rows by default, and any non-consented project content.
+- Shared candidate improvements run in shadow mode before they affect anyone else.
+- Users can still choose `local_only` or `byok_only` and opt out entirely.
+
+Reset/ownership:
+
+- Every user must be able to clear their own memory capsules, provider profiles, and learned preferences.
+- One user's data must not train another user's live experience by default.
+- Cross-user learning requires explicit product policy and opt-in later.
+- Learning sources should be editable through the project doc kit, especially `LEARNING_AND_TRAINING_SOURCES.md`.
+- Attachments and user-curated references should influence that project's agent context before any shared/global heuristic.
+
+### 20.17 Project Creation And Editing Flow
+
+Project start flow:
+
+1. User creates or opens a project.
+2. System creates `.vibing/project.json` if missing.
+3. System creates the 10 default docs if missing.
+4. User can edit docs before any run.
+5. Agent reads relevant docs and builds the first run plan.
+6. All artifacts, memory, provider settings, and proof blocks stay attached to that project.
+
+Editing rules:
+
+- Users must always be able to edit any project doc from the workbench.
+- Agent-proposed changes should be shown as edits to project docs, not hidden memory mutations.
+- Important runtime decisions should be written back into the relevant doc when the user approves.
+- Attachments and training sources should have add/remove/index actions inside the workbench.
+
+Doc precedence:
+
+```text
+SPECIAL_REQUESTS.md
+  -> RULES.md
+  -> TODO_MASTER_LIST.md / PLANNING.md
+  -> specialist docs
+  -> product defaults
+```
+
+If docs conflict:
+
+- `SPECIAL_REQUESTS.md` wins for user preference.
+- `RULES.md` wins for project safety/constraints.
+- Product safety policies override both when required.
 - Raw CSV storage is optional; metadata/hash storage is required.
 - Reports, proof blocks, run plans, tool events, and memory capsules are stored by default.
 - Export packages are ZIP/JSON bundles later; MVP can use JSON files.
@@ -3495,6 +3831,8 @@ Memory Manager:
 - Stores useful summaries, not raw unbounded transcripts.
 - Tracks strategy versions and lessons learned.
 - Promotes only validated lessons into reusable defaults.
+- Keeps per-user memory separate by default.
+- Treats shared/global promotion as a gated process, not an automatic side effect of usage.
 
 ### 28.3 Continuous Work Loop
 
@@ -3600,6 +3938,7 @@ Memory capsule example:
 Promotion rule:
 
 - A lesson can become a default only after multiple runs and explicit admin approval.
+- By default, lessons remain attached to the originating user/workspace.
 - User-specific lessons may improve that user's suggestions immediately, but they must be labeled as personal/candidate guidance until validated.
 - Cross-user defaults require aggregation, privacy review, bias/leakage review, rollback support, and explicit promotion.
 
@@ -3662,6 +4001,7 @@ Context budget rule:
 
 - Agent notes export should fit in a normal prompt.
 - For large runs, include summaries plus hashes, not raw artifacts.
+- Include user-specific learned preferences only for that user's context unless an admin explicitly reviews and promotes them.
 
 ### 28.7 Tool Integration Principle
 
@@ -6147,6 +6487,7 @@ The private MVP is done when:
 - Report renders.
 - Proof chain block is generated.
 - Run artifacts can be exported or inspected locally.
+- User can configure a BYOK provider profile and choose not to use any platform key.
 - No paid API is required.
 - No raw CSV is uploaded.
 - Section 41 milestone quality gates pass for M1-M7.
@@ -6161,6 +6502,9 @@ Private alpha is done when:
 - No browser freeze on reasonable CSV size.
 - Report identifies no-trade/weak-edge cases correctly.
 - Agent export is useful for Codex/Claude critique.
+- Local runner can execute an unattended bounded run and resume from checkpoint.
+- PowerShell/tool usage is logged as typed events and policy-rejected when out of scope.
+- Per-user memory improves future runs without changing shared defaults automatically.
 - Section 41 scorecard averages at least 4/5 with no dimension below 3.
 
 ### 37.3 Public Launch Still Blocked Until

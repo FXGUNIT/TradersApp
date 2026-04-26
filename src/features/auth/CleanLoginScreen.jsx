@@ -23,6 +23,7 @@ function GoogleLogo() {
 }
 
 const LOGIN_DRAFT_KEY = "traders-auth-login-draft-v2";
+const LINKEDIN_URL = "https://linkedin.com/in/singhgunit";
 
 const readDraft = () =>
   readDraftSync(LOGIN_DRAFT_KEY, { email: "", stayLoggedIn: false }) || {
@@ -220,8 +221,15 @@ function BrandHero() {
         />
       </div>
 
-      {/* Blog link */}
-      <div style={{ display: "flex", gap: 8, marginTop: 16, marginBottom: 4 }}>
+      <div
+        style={{
+          display: "flex",
+          gap: 8,
+          marginTop: 16,
+          flexWrap: "wrap",
+          justifyContent: "center",
+        }}
+      >
         <a
           href="/blog/"
           target="_blank"
@@ -244,6 +252,56 @@ function BrandHero() {
         >
           Read the Blog →
         </a>
+        <a
+          href={LINKEDIN_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            fontSize: 11,
+            fontWeight: 700,
+            color: isDark ? "#bfdbfe" : "#0369a1",
+            textDecoration: "none",
+            letterSpacing: 1,
+            padding: "6px 18px",
+            border: "1px solid rgba(14,116,144,0.28)",
+            borderRadius: 999,
+            background: isDark ? "rgba(14,116,144,0.12)" : "rgba(14,116,144,0.08)",
+            transition: "all 0.2s ease",
+            textTransform: "uppercase",
+          }}
+        >
+          LinkedIn
+        </a>
+      </div>
+
+      <div
+        style={{
+          width: "100%",
+          marginTop: 16,
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))",
+          gap: 8,
+        }}
+      >
+        {[
+          { label: "Brand", value: "Traders Regiment" },
+          { label: "Positioning", value: "Trading AI" },
+          { label: "Credibility", value: "Research + LinkedIn" },
+        ].map((item) => (
+          <div
+            key={item.label}
+            style={{
+              padding: "10px 12px",
+              borderRadius: 14,
+              border: `1px solid ${dividerCol}`,
+              background: isDark ? "rgba(255,255,255,0.03)" : "rgba(255,255,255,0.62)",
+              textAlign: "left",
+            }}
+          >
+            <div style={{ fontSize: 10, color: mutedCol, marginBottom: 4 }}>{item.label}</div>
+            <div style={{ fontSize: 11, fontWeight: 800, color: textCol, lineHeight: 1.4 }}>{item.value}</div>
+          </div>
+        ))}
       </div>
 
       <style>{`
@@ -410,18 +468,65 @@ export default function CleanLoginScreen({
         padding: "48px 20px 64px",
       }}
     >
-      <div
-        style={{
-          width: "100%",
-          maxWidth: 520,
-          background: CSS_VARS.surfaceElevated,
-          border: `1px solid ${CSS_VARS.borderSubtle}`,
-          borderRadius: 28,
-          boxShadow: "0 30px 80px rgba(15,23,42,0.12)",
-          backdropFilter: "blur(18px)",
-          padding: "36px 28px",
-        }}
-      >
+      <div style={{ width: "100%", maxWidth: 640, display: "flex", flexDirection: "column", gap: 18 }}>
+        <div style={{ textAlign: "center", paddingInline: 16 }}>
+          <div
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "8px 14px",
+              borderRadius: 999,
+              border: "1px solid rgba(212,165,32,0.24)",
+              background: "rgba(212,165,32,0.06)",
+              color: "#d4a520",
+              fontSize: 10,
+              fontWeight: 800,
+              letterSpacing: 3,
+              textTransform: "uppercase",
+              marginBottom: 12,
+            }}
+          >
+            Traders Regiment
+          </div>
+          <div
+            style={{
+              fontSize: "clamp(26px, 5vw, 42px)",
+              fontWeight: 900,
+              letterSpacing: -1,
+              lineHeight: 1.05,
+              color: CSS_VARS.textPrimary,
+            }}
+          >
+            World's Most Advanced Trading AI
+          </div>
+          <div
+            style={{
+              marginTop: 8,
+              fontSize: 14,
+              lineHeight: 1.7,
+              color: CSS_VARS.textSecondary,
+              maxWidth: 560,
+              marginInline: "auto",
+            }}
+          >
+            Structured sign-in, brand clarity, and visible research credibility from the first screen.
+          </div>
+        </div>
+
+        <div
+          style={{
+            width: "100%",
+            maxWidth: 520,
+            marginInline: "auto",
+            background: CSS_VARS.surfaceElevated,
+            border: `1px solid ${CSS_VARS.borderSubtle}`,
+            borderRadius: 28,
+            boxShadow: "0 30px 80px rgba(15,23,42,0.12)",
+            backdropFilter: "blur(18px)",
+            padding: "36px 28px",
+          }}
+        >
         {/* Brand Hero */}
         <BrandHero />
 
@@ -721,6 +826,7 @@ export default function CleanLoginScreen({
             </button>
           </>
         )}
+        </div>
       </div>
     </div>
   );

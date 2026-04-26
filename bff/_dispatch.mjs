@@ -37,6 +37,7 @@ export function createDispatcher({
   validateAdminToken,
   createAdminSession,
   getAdminMfaStatus,
+  getAdminTotpSetup,
   startAdminEmailOtp,
   verifyAdminEmailOtp,
   verifyAdminTotp,
@@ -187,6 +188,7 @@ export function createDispatcher({
       ? createAdminMfaRouteHandler({
           createAdminSession,
           getAdminMfaStatus,
+          getAdminTotpSetup,
           getClientKey,
           json,
           readJsonBody,
