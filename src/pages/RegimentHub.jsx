@@ -816,7 +816,7 @@ export default function RegimentHub({
           maxWidth: 1080,
           marginTop: 80,
           position: "relative",
-          display: "flex",
+          display: "none",
           flexDirection: "column",
           gap: 4,
         }}
