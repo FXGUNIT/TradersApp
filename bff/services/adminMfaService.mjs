@@ -167,6 +167,13 @@ export async function startAdminEmailOtp({ masterEmail, clientKey }) {
   const codes = recipients.map(() => generateOtp());
   const now = Date.now();
   const emailDeliveryConfigured = isEmailDeliveryConfigured();
+  if (!emailDeliveryConfigured && process.env.NODE_ENV === "production") {
+    return {
+      ok: false,
+      status: 503,
+      error: "Admin email OTP delivery is not configured.",
+    };
+  }
 
   const delivery = [];
   for (let index = 0; index < recipients.length; index += 1) {

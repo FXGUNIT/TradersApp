@@ -35,13 +35,18 @@ const isValidGmail = (email) =>
 
 // ─── Brand Hero ────────────────────────────────────────────────────────────────
 // Detects dark mode by reading CSS variable --base-layer
+function readIsDarkMode() {
+  if (typeof document === "undefined") {
+    return false;
+  }
+
+  const el = document.documentElement;
+  const bg = getComputedStyle(el).getPropertyValue("--base-layer").trim();
+  return bg.includes("0,0,0") || bg.includes("#0") || bg.includes("0 0 0") || bg.includes("05070A") || bg.includes("0, 0, 0") || !bg || bg === "#000" || bg === "#000000";
+}
+
 function useIsDarkMode() {
-  const [isDark, setIsDark] = useState(false);
-  useEffect(() => {
-    const el = document.documentElement;
-    const bg = getComputedStyle(el).getPropertyValue("--base-layer").trim();
-    setIsDark(bg.includes("0,0,0") || bg.includes("#0") || bg.includes("0 0 0") || bg.includes("05070A") || bg.includes("0, 0, 0") || !bg || bg === "#000" || bg === "#000000");
-  }, []);
+  const [isDark] = useState(readIsDarkMode);
   return isDark;
 }
 
@@ -664,14 +669,13 @@ export default function CleanLoginScreen({
             <div
               style={{
                 display: "flex",
-                justifyContent: "space-between",
+                justifyContent: "flex-end",
                 alignItems: "center",
                 gap: 12,
                 color: CSS_VARS.textSecondary,
                 fontSize: 12,
               }}
             >
-              <span>Admin access stays on the current protected flow.</span>
               <button
                 onClick={onAdmin}
                 type="button"
