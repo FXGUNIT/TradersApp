@@ -254,6 +254,12 @@ export async function fetchAdminTotpSetup() {
     throw new Error("Authenticator setup service is unavailable.");
   }
 
+  // 403 = TOTP setup disabled in production (expected); pass through as-is
+  if (response.status === 403) {
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(payload.error || "Authenticator setup is disabled in production.");
+  }
+
   return parseJsonResponse(response, "Failed to load authenticator setup.");
 }
 
