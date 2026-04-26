@@ -42,24 +42,27 @@ jobs:
           node-version: "24"
           cache: "npm"
 
-      - name: Validate Cloudflare token
+      - name: Validate Cloudflare credentials
         run: |
           set -euo pipefail
-          if [ -z "${CLOUDFLARE_API_TOKEN:-}" ]; then
-            echo "::error::Missing required GitHub secret: CLOUDFLARE_API_TOKEN"
+          if [ -n "${CLOUDFLARE_API_TOKEN:-}" ]; then
+            echo "Cloudflare API token found (${#CLOUDFLARE_API_TOKEN} chars)"
+          elif [ -n "${CLOUDFLARE_EMAIL:-}" ] && [ -n "${CLOUDFLARE_API_KEY:-}" ]; then
+            echo "Using Cloudflare global API key for authentication"
+          else
+            echo "::error::Missing Cloudflare credentials: need CLOUDFLARE_API_TOKEN or CLOUDFLARE_EMAIL + CLOUDFLARE_API_KEY"
             exit 1
           fi
-          echo "Cloudflare token found (${#CLOUDFLARE_API_TOKEN} chars)"
 
       - name: Install dependencies
         run: npm ci
 
       - name: Build root bundle
         env:
-          VITE_BFF_URL: https://${{ vars.BFF_PUBLIC_HOST || format('bff.{0}', vars.TRADERSAPP_DOMAIN || vars.CONTABO_DOMAIN || '173.249.18.14.sslip.io') }}
+          VITE_BFF_URL: https://${{ vars.BFF_PUBLIC_HOST || format('bff.{0}', vars.CONTABO_DOMAIN || '173.249.18.14.sslip.io') }}
           VITE_PROOF_FRONTEND: https://tradergunit.pages.dev/
-          VITE_PROOF_BFF: https://${{ vars.BFF_PUBLIC_HOST || format('bff.{0}', vars.TRADERSAPP_DOMAIN || vars.CONTABO_DOMAIN || '173.249.18.14.sslip.io') }}/health
-          VITE_PROOF_API: https://${{ vars.API_PUBLIC_HOST || format('api.{0}', vars.TRADERSAPP_DOMAIN || vars.CONTABO_DOMAIN || '173.249.18.14.sslip.io') }}/health
+          VITE_PROOF_BFF: https://${{ vars.BFF_PUBLIC_HOST || format('bff.{0}', vars.CONTABO_DOMAIN || '173.249.18.14.sslip.io') }}/health
+          VITE_PROOF_API: https://${{ vars.API_PUBLIC_HOST || format('api.{0}', vars.CONTABO_DOMAIN || '173.249.18.14.sslip.io') }}/health
         run: npm run build
 
       - name: Verify Pages root contract
@@ -70,10 +73,17 @@ jobs:
           grep -q 'DEVELOPER_PREVIEW_PATH' src/App.jsx
 
       - name: Deploy to Cloudflare Pages via Wrangler v3
+        env:
+          CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+          CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_GLOBAL_KEY }}
         run: |
           set -euo pipefail
           # Wrangler v3 authenticates via CLOUDFLARE_API_TOKEN env var directly.
           # Wrangler v4 calls /user/tokens/verify which blocks cfat_ tokens.
+          # Fall back to global API key if token not available.
+          if [ -z "${CLOUDFLARE_API_TOKEN:-}" ]; then
+            echo "Using Cloudflare global API key auth for wrangler"
+          fi
           npx wrangler@3.103.0 pages deploy dist \
             --project-name tradergunit \
             --branch main \
@@ -103,8 +113,8 @@ jobs:
           mkdir -p .artifacts/pages-root
           python scripts/pages/verify_pages_root_runtime.py \
             --root-url "https://tradergunit.pages.dev" \
-            --bff-base-url "https://${{ vars.BFF_PUBLIC_HOST || format('bff.{0}', vars.TRADERSAPP_DOMAIN || vars.CONTABO_DOMAIN || '173.249.18.14.sslip.io') }}" \
-            --api-base-url "https://${{ vars.API_PUBLIC_HOST || format('api.{0}', vars.TRADERSAPP_DOMAIN || vars.CONTABO_DOMAIN || '173.249.18.14.sslip.io') }}" \
+            --bff-base-url "https://${{ vars.BFF_PUBLIC_HOST || format('bff.{0}', vars.CONTABO_DOMAIN || '173.249.18.14.sslip.io') }}" \
+            --api-base-url "https://${{ vars.API_PUBLIC_HOST || format('api.{0}', vars.CONTABO_DOMAIN || '173.249.18.14.sslip.io') }}" \
             --project-preview-url "https://tradergunit.pages.dev/" \
             --output ".artifacts/pages-root/verification-${{ github.run_id }}.json" \
             --step-summary "${GITHUB_STEP_SUMMARY}"
@@ -143,7 +153,7 @@ jobs:
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           STATUS="success"
           TITLE="Pages root deploy verification passed"
-          BODY="Root: https://tradergunit.pages.dev | Public frontend: https://tradergunit.pages.dev/ | BFF: https://${{ vars.BFF_PUBLIC_HOST || format('bff.{0}', vars.TRADERSAPP_DOMAIN || vars.CONTABO_DOMAIN || '173.249.18.14.sslip.io') }}/health | API: https://${{ vars.API_PUBLIC_HOST || format('api.{0}', vars.TRADERSAPP_DOMAIN || vars.CONTABO_DOMAIN || '173.249.18.14.sslip.io') }}/health"
+          BODY="Root: https://tradergunit.pages.dev | Public frontend: https://tradergunit.pages.dev/ | BFF: https://bff.173.249.18.14.sslip.io/health | API: https://api.173.249.18.14.sslip.io/health"
 
           if [ "${{ job.status }}" != "success" ]; then
             STATUS="error"
