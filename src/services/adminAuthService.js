@@ -8,12 +8,13 @@ import { resolveBffBaseUrl } from "./runtimeConfig.js";
 const ADMIN_DEVICE_KEY = "TradersApp_AdminDeviceId";
 const ADMIN_REMEMBER_KEY = "TradersApp_AdminRemember";
 
-/** Generate or retrieve a persistent device fingerprint for this browser. */
 export function getDeviceFingerprint() {
   try {
     let fp = localStorage.getItem(ADMIN_DEVICE_KEY);
     if (!fp) {
-      fp = "dev_" + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+      fp = `dev_${Math.random().toString(36).slice(2, 15)}${Math.random()
+        .toString(36)
+        .slice(2, 15)}`;
       localStorage.setItem(ADMIN_DEVICE_KEY, fp);
     }
     return fp;
@@ -22,7 +23,6 @@ export function getDeviceFingerprint() {
   }
 }
 
-/** Get stored "remember this device" preference. */
 export function getRememberDevice() {
   try {
     return localStorage.getItem(ADMIN_REMEMBER_KEY) === "true";
@@ -31,7 +31,6 @@ export function getRememberDevice() {
   }
 }
 
-/** Set "remember this device" preference. */
 export function setRememberDevice(value) {
   try {
     if (value) {
@@ -39,13 +38,16 @@ export function setRememberDevice(value) {
     } else {
       localStorage.removeItem(ADMIN_REMEMBER_KEY);
     }
-  } catch { /* best-effort */ }
+  } catch {
+    // best-effort browser preference
+  }
 }
 
-/** Parse user agent for browser/OS info. */
 export function parseUserAgent(ua) {
   ua = ua || (typeof navigator !== "undefined" ? navigator.userAgent : "");
-  let browser = "Unknown Browser", os = "Unknown OS", deviceType = "desktop";
+  let browser = "Unknown Browser";
+  let os = "Unknown OS";
+  let deviceType = "desktop";
   if (/Mobile|Android|iPhone|iPad/i.test(ua)) {
     deviceType = "mobile";
     if (/iPad/i.test(ua)) deviceType = "tablet";
@@ -63,21 +65,20 @@ export function parseUserAgent(ua) {
   return { browser, os, device: deviceType };
 }
 
-/** List all active admin sessions from the BFF. */
 export async function listAdminSessions() {
   try {
     const adminToken = await getAdminToken();
     const res = await fetch(`${resolveBffBaseUrl()}/admin/sessions`, {
       headers: { Authorization: `Bearer ${adminToken}` },
     });
-    const data = await res.json().catch(() => ({}));
-    return data;
+    return await res
+      .json()
+      .catch(() => ({ ok: false, error: "Failed to fetch sessions." }));
   } catch {
     return { ok: false, error: "Failed to fetch sessions." };
   }
 }
 
-/** Revoke a specific admin session by short session id (from list response). */
 export async function revokeAdminSessionRemote(sessionId) {
   try {
     const adminToken = await getAdminToken();
@@ -89,7 +90,9 @@ export async function revokeAdminSessionRemote(sessionId) {
       },
       body: JSON.stringify({ id: sessionId }),
     });
-    return await res.json().catch(() => ({ ok: false, error: "Failed to revoke session." }));
+    return await res
+      .json()
+      .catch(() => ({ ok: false, error: "Failed to revoke session." }));
   } catch {
     return { ok: false, error: "Failed to revoke session." };
   }
@@ -103,93 +106,142 @@ export async function setAdminToken(token) {
   await setStoredAdminToken(token);
 }
 
-export async function verifyAdminPassword(password) {
-  if (
-    typeof window !== "undefined" &&
-    window.__TRADERS_AUDIT_DATA
-  ) {
-    await setAdminToken("audit-simulated-token");
-    return { verified: true, simulated: true };
-  }
+function buildAdminDevicePayload() {
+  const deviceFingerprint = getDeviceFingerprint();
+  const { browser, os, device } = parseUserAgent();
+  const rememberDevice = getRememberDevice();
+  return {
+    deviceFingerprint,
+    deviceBrowser: browser,
+    deviceOs: os,
+    deviceType: device,
+    rememberDevice,
+  };
+}
 
-  const cleanPassword = String(password || "");
-  if (!cleanPassword) {
-    throw new Error("Admin password is required.");
+async function storeAdminSessionFromPayload(payload) {
+  if (payload?.ok && payload?.token) {
+    await setAdminToken(payload.token);
   }
+  return payload;
+}
 
-  let response;
-  try {
-    response = await fetch(`${resolveBffBaseUrl()}/auth/admin/verify`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      cache: "no-store",
-      body: JSON.stringify({
-        password: cleanPassword,
-      }),
-    });
-  } catch {
-    throw new Error("Admin verification service is unavailable.");
-  }
-
+async function parseJsonResponse(response, fallbackError) {
   let payload = {};
   try {
     payload = await response.json();
   } catch {
     payload = {};
   }
-
-  if (!response.ok || payload.verified !== true) {
+  if (!response.ok || payload.ok === false) {
     const retryAfterMs = Number(payload.retryAfterMs || 0);
     const retryMessage =
       retryAfterMs > 0
         ? ` Try again in ${Math.ceil(retryAfterMs / 60000)} minute(s).`
         : "";
-    throw new Error(
-      `${payload.error || "Admin password verification failed."}${retryMessage}`,
-    );
+    throw new Error(`${payload.error || fallbackError}${retryMessage}`);
+  }
+  return payload;
+}
+
+export async function requestAdminEmailOtp(masterEmail) {
+  if (typeof window !== "undefined" && window.__TRADERS_AUDIT_DATA) {
+    return {
+      ok: true,
+      challengeId: "audit-admin-email-otp",
+      recipients: [
+        "g***h@gmail.com",
+        "a***s@gmail.com",
+        "s***t@gmail.com",
+      ],
+      simulated: true,
+    };
   }
 
-  // Now fetch the session token for authenticated admin API calls
-  const deviceFingerprint = getDeviceFingerprint();
-  const { browser, os, device } = parseUserAgent();
-  const rememberDevice = getRememberDevice();
+  const cleanEmail = String(masterEmail || "").trim();
+  if (!cleanEmail) {
+    throw new Error("Master admin email is required.");
+  }
 
-  let tokenResponse;
+  let response;
   try {
-    tokenResponse = await fetch(`${resolveBffBaseUrl()}/admin/session`, {
+    response = await fetch(`${resolveBffBaseUrl()}/auth/admin/email-otp/start`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+      body: JSON.stringify({ masterEmail: cleanEmail }),
+    });
+  } catch {
+    throw new Error("Admin email OTP service is unavailable.");
+  }
+
+  return parseJsonResponse(response, "Admin email OTP request failed.");
+}
+
+export async function verifyAdminEmailOtp({ challengeId, otps }) {
+  if (typeof window !== "undefined" && window.__TRADERS_AUDIT_DATA) {
+    await setAdminToken("audit-simulated-token");
+    return { ok: true, verified: true, simulated: true };
+  }
+
+  if (!challengeId) {
+    throw new Error("OTP session expired. Request new codes.");
+  }
+
+  let response;
+  try {
+    response = await fetch(`${resolveBffBaseUrl()}/auth/admin/email-otp/verify`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       cache: "no-store",
       body: JSON.stringify({
-        password: cleanPassword,
-        deviceFingerprint,
-        deviceBrowser: browser,
-        deviceOs: os,
-        deviceType: device,
-        rememberDevice,
+        challengeId,
+        codes: {
+          otp1: otps?.otp1,
+          otp2: otps?.otp2,
+          otp3: otps?.otp3,
+        },
+        ...buildAdminDevicePayload(),
       }),
     });
   } catch {
-    // Session token is optional — admin APIs may be available without it
-    return payload;
+    throw new Error("Admin email OTP verification service is unavailable.");
   }
 
-  let tokenPayload = {};
+  return storeAdminSessionFromPayload(
+    await parseJsonResponse(response, "Admin email OTP verification failed."),
+  );
+}
+
+export async function verifyAdminTotp(code) {
+  if (typeof window !== "undefined" && window.__TRADERS_AUDIT_DATA) {
+    await setAdminToken("audit-simulated-token");
+    return { ok: true, verified: true, simulated: true };
+  }
+
+  const cleanCode = String(code || "").replace(/\D/g, "").slice(0, 6);
+  if (cleanCode.length !== 6) {
+    throw new Error("Authenticator code is required.");
+  }
+
+  let response;
   try {
-    tokenPayload = await tokenResponse.json();
+    response = await fetch(`${resolveBffBaseUrl()}/auth/admin/totp/verify`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+      body: JSON.stringify({
+        code: cleanCode,
+        ...buildAdminDevicePayload(),
+      }),
+    });
   } catch {
-    tokenPayload = {};
+    throw new Error("Admin authenticator service is unavailable.");
   }
 
-  if (tokenPayload.ok && tokenPayload.token) {
-    await setAdminToken(tokenPayload.token);
-  }
-
-  return payload;
+  return storeAdminSessionFromPayload(
+    await parseJsonResponse(response, "Admin authenticator verification failed."),
+  );
 }
 
 export async function clearAdminToken() {
@@ -197,7 +249,9 @@ export async function clearAdminToken() {
 }
 
 export default {
-  verifyAdminPassword,
+  requestAdminEmailOtp,
+  verifyAdminEmailOtp,
+  verifyAdminTotp,
   getAdminToken,
   setAdminToken,
   clearAdminToken,

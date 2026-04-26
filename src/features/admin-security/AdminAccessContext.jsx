@@ -2,13 +2,17 @@
  * AdminAccessContext — owns all admin gate state
  * Extracted from App.jsx (I07)
  *
- * State: admin password, OTP flow, verified status, error messages.
+ * State: admin MFA flow, verified status, error messages.
  * Consumed by: AppScreenRegistry, AdminUnlockModal, DebugOverlay
  */
 import React, { createContext, useContext, useState } from "react";
 import emailjs from "@emailjs/browser";
 import { useAdminAccessHandlers } from "./useAdminAccessHandlers.js";
-import { verifyAdminPassword } from "../../services/adminAuthService.js";
+import {
+  requestAdminEmailOtp,
+  verifyAdminEmailOtp,
+  verifyAdminTotp,
+} from "../../services/adminAuthService.js";
 import { useToastNotifications } from "../shell/useToastNotifications.js";
 
 export const AdminAccessContext = createContext(null);
@@ -30,6 +34,7 @@ export function AdminAccessProvider({ children, setScreen }) {
   const [adminOtpStep, setAdminOtpStep] = useState(false);
   const [adminOtpsVerified, setAdminOtpsVerified] = useState(false);
   const [adminOtps, setAdminOtps] = useState({ otp1: "", otp2: "", otp3: "" });
+  const [adminOtpChallengeId, setAdminOtpChallengeId] = useState("");
   const [adminOtpErr, setAdminOtpErr] = useState("");
   const [adminPassErr, setAdminPassErr] = useState("");
   const [showAdminPwd, setShowAdminPwd] = useState(false);
@@ -45,15 +50,17 @@ export function AdminAccessProvider({ children, setScreen }) {
   } = useAdminAccessHandlers({
     adminMasterEmail,
     adminOtps,
-    adminOtpsVerified,
+    adminOtpChallengeId,
     adminPassInput,
+    requestAdminEmailOtp,
+    verifyAdminEmailOtp,
+    verifyAdminTotp,
     hasEmailJsConfig: EMAILJS_CONFIG,
     emailjs,
     serviceId: import.meta.env.VITE_EMAILJS_SERVICE_ID,
     templateId: import.meta.env.VITE_EMAILJS_TEMPLATE_ID,
     publicKey: import.meta.env.VITE_EMAILJS_PUBLIC_KEY,
     sendForensicAlert: null, // wired via securityForensicsHandlers
-    verifyAdminPassword,
     showToast,
     setShowAdminPrompt,
     setAdminMasterEmail,
@@ -61,6 +68,7 @@ export function AdminAccessProvider({ children, setScreen }) {
     setAdminOtpStep,
     setAdminOtpsVerified,
     setAdminOtps,
+    setAdminOtpChallengeId,
     setAdminPassInput,
     setAdminPassErr,
     setAdminOtpErr,
@@ -78,6 +86,7 @@ export function AdminAccessProvider({ children, setScreen }) {
     adminOtpStep,
     adminOtpsVerified,
     adminOtps,
+    adminOtpChallengeId,
     adminOtpErr,
     adminPassErr,
     showAdminPwd,
@@ -90,6 +99,7 @@ export function AdminAccessProvider({ children, setScreen }) {
     setAdminOtpStep,
     setAdminOtpsVerified,
     setAdminOtps,
+    setAdminOtpChallengeId,
     setAdminOtpErr,
     setAdminPassErr,
     setShowAdminPwd,

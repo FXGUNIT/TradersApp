@@ -9,15 +9,16 @@ import { executeLogSecurityAlert } from "./securityForensicsHandlers.js";
 export function useAdminAccessHandlers({
   adminMasterEmail,
   adminOtps,
-  adminOtpsVerified,
+  adminOtpChallengeId,
   adminPassInput,
+  requestAdminEmailOtp,
+  verifyAdminEmailOtp,
+  verifyAdminTotp,
   hasEmailJsConfig,
   emailjs,
   serviceId,
   templateId,
   publicKey,
-  sendForensicAlert,
-  verifyAdminPassword,
   showToast,
   setShowAdminPrompt,
   setAdminMasterEmail,
@@ -25,6 +26,7 @@ export function useAdminAccessHandlers({
   setAdminOtpStep,
   setAdminOtpsVerified,
   setAdminOtps,
+  setAdminOtpChallengeId,
   setAdminPassInput,
   setAdminPassErr,
   setAdminOtpErr,
@@ -52,20 +54,20 @@ export function useAdminAccessHandlers({
     async () =>
       executeSendAdminOTPs({
         adminMasterEmail,
-        hasEmailJsConfig,
-        sendForensicAlert,
+        requestAdminEmailOtp,
         logSecurityAlert,
         setAdminMasterEmailVerified,
         setAdminOtpStep,
         setAdminOtpsVerified,
         setAdminOtpErr,
+        setAdminOtpChallengeId,
       }),
     [
       adminMasterEmail,
-      hasEmailJsConfig,
       logSecurityAlert,
-      sendForensicAlert,
+      requestAdminEmailOtp,
       setAdminMasterEmailVerified,
+      setAdminOtpChallengeId,
       setAdminOtpErr,
       setAdminOtpStep,
       setAdminOtpsVerified,
@@ -76,8 +78,7 @@ export function useAdminAccessHandlers({
     async () =>
       executeHandleAdminAccess({
         adminPassInput,
-        adminOtpsVerified,
-        verifyAdminPassword,
+        verifyAdminTotp,
         logSecurityAlert,
         adminMasterEmail,
         showToast,
@@ -89,16 +90,17 @@ export function useAdminAccessHandlers({
         setAdminOtps,
         setAdminMasterEmail,
         setAdminMasterEmailVerified,
+        setAdminOtpChallengeId,
         setIsAdminAuthenticated,
         setScreen,
       }),
     [
       adminMasterEmail,
-      adminOtpsVerified,
       adminPassInput,
       logSecurityAlert,
       setAdminMasterEmail,
       setAdminMasterEmailVerified,
+      setAdminOtpChallengeId,
       setAdminOtpStep,
       setAdminOtps,
       setAdminOtpsVerified,
@@ -108,7 +110,7 @@ export function useAdminAccessHandlers({
       setScreen,
       setShowAdminPrompt,
       showToast,
-      verifyAdminPassword,
+      verifyAdminTotp,
     ],
   );
 
@@ -122,15 +124,16 @@ export function useAdminAccessHandlers({
       setAdminOtpStep(false);
       setAdminOtpsVerified(false);
       setAdminOtps({ otp1: "", otp2: "", otp3: "" });
+      setAdminOtpChallengeId("");
       setAdminOtpErr("");
       setAdminPassErr("");
       setAdminPassInput("");
       setShowAdminPwd(false);
-      sessionStorage.removeItem("adminOtps");
     },
     [
       setAdminMasterEmail,
       setAdminMasterEmailVerified,
+      setAdminOtpChallengeId,
       setAdminOtpErr,
       setAdminOtpStep,
       setAdminOtps,
@@ -142,18 +145,41 @@ export function useAdminAccessHandlers({
     ],
   );
 
-  const handleAdminVerifyCodes = useCallback(() => {
-    const verified = executeHandleAdminVerifyCodes({
+  const handleAdminVerifyCodes = useCallback(
+    async () =>
+      executeHandleAdminVerifyCodes({
+        adminOtps,
+        adminOtpChallengeId,
+        verifyAdminEmailOtp,
+        setAdminOtpErr,
+        setShowAdminPrompt,
+        setAdminPassInput,
+        setAdminOtpsVerified,
+        setAdminOtpStep,
+        setAdminOtps,
+        setAdminMasterEmail,
+        setAdminMasterEmailVerified,
+        setAdminOtpChallengeId,
+        setIsAdminAuthenticated,
+        setScreen,
+      }),
+    [
+      adminOtpChallengeId,
       adminOtps,
-      setAdminOtpStep,
+      setAdminMasterEmail,
+      setAdminMasterEmailVerified,
+      setAdminOtpChallengeId,
       setAdminOtpErr,
-    });
-    if (verified) {
-      setAdminOtpsVerified(true);
-      setAdminOtpErr("");
-    }
-    return verified;
-  }, [adminOtps, setAdminOtpErr, setAdminOtpStep, setAdminOtpsVerified]);
+      setAdminOtpStep,
+      setAdminOtps,
+      setAdminOtpsVerified,
+      setAdminPassInput,
+      setIsAdminAuthenticated,
+      setScreen,
+      setShowAdminPrompt,
+      verifyAdminEmailOtp,
+    ],
+  );
 
   const handleAdminRequestNewCodes = useCallback(() => {
     resetAdminPromptState();
