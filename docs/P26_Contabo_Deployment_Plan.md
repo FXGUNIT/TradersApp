@@ -112,6 +112,7 @@ reviving the retired `is-a.dev` plan.
 - `CONTABO_VPS_HOST`
 - `CONTABO_VPS_USER`
 - `CONTABO_SSH_KEY`
+- `CONTABO_SSH_KNOWN_HOSTS` recommended. Store the pinned output of `ssh-keyscan -H <contabo-host>` so deploys do not depend on live host-key discovery from GitHub Actions.
 - One of:
   - `CONTABO_APP_ENV`
   - `INFISICAL_TOKEN` + `INFISICAL_PROJECT_ID`
@@ -150,6 +151,7 @@ call flaps briefly.
 2. Keep `tradergunit.pages.dev` attached to Cloudflare Pages as the canonical public frontend.
 3. Point `173.249.18.14.sslip.io`, `bff.173.249.18.14.sslip.io`, and `api.173.249.18.14.sslip.io` at the VPS IP.
 4. Add the required GitHub variables and secrets.
+   Include `CONTABO_SSH_KNOWN_HOSTS` with the pinned server host key so production deploys stay stable even if GitHub runners cannot reach the VPS with `ssh-keyscan`.
 5. Run the bootstrap once on the VPS:
 
 ```bash

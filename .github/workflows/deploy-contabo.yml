@@ -367,11 +367,36 @@ jobs:
             StrictHostKeyChecking yes
           EOF
           chmod 600 ~/.ssh/config
-          ssh-keyscan -T 10 -H "${CONTABO_VPS_HOST}" >> ~/.ssh/known_hosts
+          touch ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+          if [ -n "${CONTABO_SSH_KNOWN_HOSTS:-}" ]; then
+            printf '%s\n' "${CONTABO_SSH_KNOWN_HOSTS}" >> ~/.ssh/known_hosts
+          else
+            found_key=0
+            for attempt in 1 2 3; do
+              if ssh-keyscan -T 10 -H "${CONTABO_VPS_HOST}" >> ~/.ssh/known_hosts 2>/dev/null; then
+                found_key=1
+                break
+              fi
+              sleep 5
+            done
+
+            if [ "${found_key}" -ne 1 ]; then
+              echo "::error::Unable to fetch the Contabo SSH host key via ssh-keyscan. Set CONTABO_SSH_KNOWN_HOSTS to the pinned host key to avoid this dependency on live host-key discovery."
+              exit 1
+            fi
+          fi
+
+          if ! ssh -o StrictHostKeyChecking=yes contabo-vps "echo SSH ready" >/dev/null 2>&1; then
+            echo "::error::Unable to establish SSH connectivity to the Contabo VPS after preparing known_hosts."
+            exit 1
+          fi
         env:
           CONTABO_VPS_HOST: ${{ secrets.CONTABO_VPS_HOST }}
           CONTABO_VPS_USER: ${{ secrets.CONTABO_VPS_USER }}
           CONTABO_SSH_KEY: ${{ secrets.CONTABO_SSH_KEY }}
+          CONTABO_SSH_KNOWN_HOSTS: ${{ secrets.CONTABO_SSH_KNOWN_HOSTS }}
 
       - name: Upload Contabo release bundle
         shell: bash
