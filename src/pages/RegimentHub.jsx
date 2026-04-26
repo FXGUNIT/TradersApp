@@ -808,6 +808,158 @@ export default function RegimentHub({
           );
         })}
       </div>
+      <div
+        style={{
+          width: "100%",
+          maxWidth: 960,
+          marginTop: 56,
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+          gap: 18,
+          alignItems: "start",
+        }}
+      >
+        <a
+          href={LINKEDIN_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ textDecoration: "none" }}
+        >
+          <div
+            style={{
+              borderRadius: 22,
+              padding: "18px",
+              background: isDark
+                ? "linear-gradient(160deg, rgba(8,47,73,0.62), rgba(15,23,42,0.88))"
+                : "linear-gradient(160deg, rgba(239,246,255,0.96), rgba(255,255,255,0.92))",
+              border: "1px solid rgba(14,116,144,0.18)",
+              boxShadow: isDark
+                ? "0 20px 48px rgba(3,7,18,0.28)"
+                : "0 20px 48px rgba(14,116,144,0.12)",
+              display: "grid",
+              gap: 14,
+              color: textColor,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "flex-start",
+                justifyContent: "space-between",
+                gap: 12,
+              }}
+            >
+              <div>
+                <div
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 800,
+                    letterSpacing: 3,
+                    color: isDark ? "#93c5fd" : "#0369a1",
+                    textTransform: "uppercase",
+                    marginBottom: 8,
+                  }}
+                >
+                  Founder proof
+                </div>
+                <div style={{ fontSize: 22, fontWeight: 900, lineHeight: 1.05 }}>
+                  Gunit Singh
+                </div>
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: mutedColor,
+                    marginTop: 6,
+                    lineHeight: 1.6,
+                  }}
+                >
+                  Public market voice and operator context before the user opens a full article.
+                </div>
+              </div>
+              <div
+                style={{
+                  width: 42,
+                  height: 42,
+                  borderRadius: 12,
+                  display: "grid",
+                  placeItems: "center",
+                  background: "rgba(14,118,168,0.14)",
+                  border: "1px solid rgba(14,118,168,0.22)",
+                  color: isDark ? "#bfdbfe" : "#0369a1",
+                  fontSize: 20,
+                  fontWeight: 900,
+                  flexShrink: 0,
+                }}
+              >
+                in
+              </div>
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "68px 1fr",
+                gap: 12,
+                alignItems: "center",
+              }}
+            >
+              <div
+                style={{
+                  width: 68,
+                  height: 68,
+                  borderRadius: 18,
+                  overflow: "hidden",
+                  border: "1px solid rgba(255,255,255,0.18)",
+                  boxShadow: "0 12px 28px rgba(15,23,42,0.16)",
+                }}
+              >
+                <img
+                  src="/founder.jpeg"
+                  alt="Gunit Singh"
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                />
+              </div>
+              <div style={{ fontSize: 12, lineHeight: 1.65, color: mutedColor }}>
+                LinkedIn sits ahead of the research buttons so the trust sequence feels deliberate instead of scattered.
+              </div>
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
+                gap: 10,
+              }}
+            >
+              {CREDIBILITY_METRICS.map((item) => (
+                <div
+                  key={item.label}
+                  style={{
+                    padding: "12px",
+                    borderRadius: 16,
+                    background: isDark
+                      ? "rgba(255,255,255,0.04)"
+                      : "rgba(255,255,255,0.75)",
+                    border: isDark
+                      ? "1px solid rgba(255,255,255,0.06)"
+                      : "1px solid rgba(15,23,42,0.06)",
+                  }}
+                >
+                  <div style={{ fontSize: 10, color: mutedColor, marginBottom: 6 }}>
+                    {item.label}
+                  </div>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: textColor }}>
+                    {item.value}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </a>
+        <BlogSection
+          heading="Editorial Research"
+          description="Sharp, smaller blog buttons that can be opened one by one from the home screen."
+          style={{ minHeight: "100%" }}
+        />
+      </div>
 
       {/* ── Blog Insights Section ── */}
       <div
