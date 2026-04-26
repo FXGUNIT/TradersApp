@@ -1093,6 +1093,274 @@ select {
 
 ---
 
+## PART 15 — RESPONSIVE DESIGN & SCREEN BREAKPOINTS
+
+### Breakpoint Scale
+
+```css
+:root {
+  /* ─── Breakpoints ─── */
+  --bp-xs:   375px;   /* Small mobile */
+  --bp-sm:   480px;   /* Large mobile */
+  --bp-md:   768px;   /* Tablet / small laptop */
+  --bp-lg:   1024px;  /* Laptop / desktop */
+  --bp-xl:   1280px;  /* Large desktop */
+  --bp-2xl:  1536px;  /* Extra large / 2K monitor */
+}
+```
+
+### Responsive Type Scale
+
+All sizes use `clamp()` with the breakpoint map below. The format is `clamp(MIN, PREF, MAX)` where PREF uses `vw` units for fluid scaling.
+
+#### Display / Hero Text (Cormorant Garamond)
+
+| Element | Mobile (<768px) | Tablet (768–1024px) | Desktop (>1024px) |
+|---|---|---|---|
+| App logo wordmark | `clamp(1.5rem, 6vw, 2rem)` | `clamp(2rem, 4vw, 3rem)` | `clamp(2.5rem, 3vw, 4rem)` |
+| Page hero title | `clamp(1.75rem, 7vw, 2.5rem)` | `clamp(2rem, 5vw, 3.5rem)` | `clamp(2.5rem, 5vw, 4rem)` |
+| Section banner | `clamp(1.25rem, 5vw, 2rem)` | `clamp(1.5rem, 4vw, 2.5rem)` | `clamp(1.5rem, 3vw, 2.5rem)` |
+
+#### Title / Section Headers (Spectral)
+
+| Element | Mobile | Tablet | Desktop |
+|---|---|---|---|
+| Card title | `clamp(1rem, 4vw, 1.125rem)` | `1.125rem` | `1.125rem` |
+| Section header | `clamp(1.125rem, 4vw, 1.25rem)` | `1.25rem` | `1.25rem` |
+| Page title | `clamp(1.25rem, 5vw, 1.5rem)` | `1.5rem` | `1.5rem` |
+
+#### Data / Prices (IBM Plex Mono)
+
+| Element | Mobile | Tablet | Desktop |
+|---|---|---|---|
+| Hero price (signal card) | `clamp(1.25rem, 6vw, 2rem)` | `clamp(1.5rem, 4vw, 2.5rem)` | `clamp(1.5rem, 3vw, 2.5rem)` |
+| Data price (table row) | `0.875rem` | `1rem` | `1.25rem` |
+| Data timestamp | `0.6875rem` | `0.75rem` | `0.75rem` |
+| Confidence score | `0.75rem` | `0.875rem` | `0.875rem` |
+
+#### UI / Labels (DM Sans) — Note: UI labels do NOT scale with viewport
+
+| Element | Mobile | Tablet | Desktop |
+|---|---|---|---|
+| Nav label | `0.6875rem` | `0.75rem` | `0.75rem` |
+| Status badge | `0.5625rem` | `0.6875rem` | `0.6875rem` |
+| Button label | `0.8125rem` | `0.875rem` | `0.875rem` |
+| Metadata | `0.6875rem` | `0.75rem` | `0.75rem` |
+
+**Rule: UI labels are fixed-size, never fluid.** Labels, badges, and nav items must stay constant — a badge that changes size across breakpoints creates visual noise. Use viewport-scaling only for display text and data numbers.
+
+---
+
+### Layout Changes by Screen
+
+#### Mobile (< 768px)
+
+```
+┌─────────────────────┐
+│ Logo    [≡ Nav]     │ ← Nav collapses to hamburger
+│─────────────────────│
+│                     │
+│  [Signal Card]      │ ← Cards go full-width, stack vertically
+│                     │
+│  [Signal Card]      │
+│                     │
+│  [Signal Card]      │
+│                     │
+└─────────────────────┘
+
+Grid:    1 column (1/1)
+Cards:   full-width, 16px horizontal padding
+Nav:     hamburger icon, slide-in drawer
+Spacing: 16px base unit (--space-4)
+Font:    Cormorant headings at clamp() minimum
+Prices:  data at mobile minimum
+```
+
+#### Tablet (768–1024px)
+
+```
+┌───────────────────────────────┐
+│ Logo   [Nav Items]    [User] │ ← Nav stays horizontal, fewer items
+│───────────────────────────────│
+│                               │
+│  [Signal Card] │ [Signal Card]│ ← 2-column grid
+│                │              │
+│  [Signal Card] │ [Signal Card]│
+│                │              │
+└───────────────────────────────┘
+
+Grid:    2 columns (1/2)
+Cards:   auto-width, 24px padding
+Nav:     condensed horizontal
+Spacing: 20px base unit
+Font:    Cormorant at mid clamp value
+Prices:  data at tablet mid values
+```
+
+#### Desktop (> 1024px)
+
+```
+┌───────────────────────────────────────────┐
+│ Logo  [Nav]        [Search] [User] [?]    │ ← Full nav, all items visible
+│───────────────────────────────────────────│
+│                                           │
+│  [Card] │ [Card] │ [Card] │ [Card] │ [Card] │
+│         │        │        │        │         │
+│                                           │
+└───────────────────────────────────────────┘
+
+Grid:    auto-fit, minmax(280px, 1fr)
+Cards:   flexible columns, 24px padding
+Nav:     full horizontal, all items
+Spacing: 24px base unit
+Font:    Cormorant at clamp() maximum
+Prices:  data at full desktop size
+```
+
+---
+
+### Responsive Shadow Scaling
+
+Shadows reduce on mobile — large shadows look heavy on small screens.
+
+```css
+/* Mobile */
+@media (max-width: 767px) {
+  .card {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06); /* was 0 10px 40px */
+  }
+  .card:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08); /* was 0 20px 60px */
+  }
+}
+
+/* Tablet */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .card {
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.06);
+  }
+  .card:hover {
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08);
+  }
+}
+
+/* Desktop — default (no media query needed) */
+.card {
+  box-shadow: var(--card-shadow); /* 0 10px 40px rgba(0,0,0,0.04) */
+}
+```
+
+AMBER mode shadow color temperature applies across all breakpoints — use `rgba(139,92,24,...)` on mobile/tablet too.
+
+MIDNIGHT mode shadow follows the same reduction pattern, using `rgba(184,134,11,0.15)` for hover at desktop only.
+
+---
+
+### Responsive Border Radius
+
+```css
+/* Mobile — slightly tighter */
+@media (max-width: 767px) {
+  :root {
+    --card-radius: 10px;  /* was 12px */
+    --btn-radius: 6px;   /* was 8px */
+  }
+}
+
+/* Tablet — default */
+@media (min-width: 768px) {
+  :root {
+    --card-radius: 12px;
+    --btn-radius: 8px;
+  }
+}
+```
+
+---
+
+### Responsive Font Loading
+
+```
+MOBILE (< 768px) — performance critical, load only what's needed above fold:
+  Tier 1: Cormorant Garamond (preload hero text visible immediately)
+  Tier 2: DM Sans (preload nav visible immediately)
+  Tier 3: IBM Plex Mono (load async — numbers in first viewport)
+  Defer: Spectral, Libre Baskerville (load after LCP for fast mobile)
+
+DESKTOP (> 1024px) — load all tiers, no bandwidth pressure:
+  Load everything as specified in PART 10
+```
+
+---
+
+### Spacing Scale
+
+```css
+:root {
+  /* ─── 8-Point Spacing Scale (LOCKED) ─── */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;   /* Mobile base unit */
+  --space-5:  20px;   /* Tablet base unit */
+  --space-6:  24px;   /* Desktop base unit */
+  --space-8:  32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-20: 80px;
+  --space-24: 96px;
+}
+```
+
+**Usage:**
+
+```css
+/* Card internal padding */
+.card {
+  padding: var(--space-6);   /* 24px — desktop */
+}
+@media (max-width: 767px) {
+  .card {
+    padding: var(--space-4); /* 16px — mobile */
+  }
+}
+
+/* Section vertical rhythm */
+.section {
+  padding-block: var(--space-16); /* 64px — desktop */
+}
+@media (max-width: 767px) {
+  .section {
+    padding-block: var(--space-8); /* 32px — mobile */
+  }
+}
+
+/* Card grid gap */
+.cc-dashboard-grid {
+  gap: var(--space-6); /* 24px — desktop */
+}
+@media (max-width: 767px) {
+  .cc-dashboard-grid {
+    gap: var(--space-4); /* 16px — mobile */
+  }
+}
+
+/* Nav bar height */
+.nav-bar {
+  height: 64px;        /* desktop */
+}
+@media (max-width: 767px) {
+  .nav-bar {
+    height: 56px;     /* mobile */
+  }
+}
+```
+
+**Rule: All spacing uses the 8-point scale.** No arbitrary values like `13px` or `18px`. If something doesn't fit the scale, round to nearest 4px.
+
+---
+
 ## PART 14 — VISUAL IDENTITY RULES
 
 ### What Makes Traders Regiment Distinctive
