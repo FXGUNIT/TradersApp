@@ -271,7 +271,10 @@ export function createDispatcher({
     if (!req.headers["x-request-id"]) req.headers["x-request-id"] = requestId;
     res.setHeader("X-Request-ID", requestId);
     const origin = resolveOrigin(req, ALLOWED_ORIGINS);
-    const url = new URL(req.url || "/", `http://${req.headers.host || `${HOST}:${PORT}`}`);
+    const baseHost = (req.headers.host && !req.headers.host.includes('*'))
+      ? req.headers.host
+      : `${HOST}:${PORT}`;
+    const url = new URL(req.url || "/", `http://${baseHost}`);
     const pathname = url.pathname;
     const method = req.method || "GET";
 
