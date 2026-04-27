@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
+import { useFocusTrap } from "../../hooks/useFocusTrap.js";
 import { onValue, push, ref, set } from "firebase/database";
 import { resolveBffBaseUrl } from "../../services/runtimeConfig.js";
 

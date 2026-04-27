@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { useFocusTrap } from "../../hooks/useFocusTrap.js";
 
 export default function DebugOverlay({
   logs,
@@ -11,6 +12,7 @@ export default function DebugOverlay({
 }) {
   const [expandedSection, setExpandedSection] = useState(null);
   const [hoveredComponent, setHoveredComponent] = useState(null);
+  const debugPanelRef = useFocusTrap(isOpen);
 
   if (!auth?.uid || auth.uid !== "ADMIN_UID_PLACEHOLDER") return null;
 
@@ -65,6 +67,7 @@ export default function DebugOverlay({
 
       {isOpen && (
         <div
+          ref={debugPanelRef}
           style={{
             position: "fixed",
             bottom: 20,
