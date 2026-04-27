@@ -21,14 +21,14 @@ function FounderStoryChart() {
           <rect
             key={i} x={x} y={y} width={barW} height={bh}
             rx={3}
-            fill={i === bars.length - 1 ? "#d4a520" : "rgba(212,165,32,0.35)"}
+            fill={i === bars.length - 1 ? "var(--aura-accent-primary)" : "color-mix(in srgb, var(--aura-accent-primary) 35%, transparent)"}
           >
             <animate attributeName="height" from="0" to={bh} dur="0.6s" begin={`${i * 0.07}s`} fill="freeze" />
             <animate attributeName="y" from={H} to={y} dur="0.6s" begin={`${i * 0.07}s`} fill="freeze" />
           </rect>
         );
       })}
-      <line x1={0} y1={H + 2} x2={W} y2={H + 2} stroke="rgba(212,165,32,0.2)" strokeWidth={1} />
+      <line x1={0} y1={H + 2} x2={W} y2={H + 2} stroke="color-mix(in srgb, var(--aura-accent-primary) 20%, transparent)" strokeWidth={1} />
     </svg>
   );
 }
@@ -38,7 +38,7 @@ function ProductVisionChart() {
     { label: "Signals", value: 22, color: "rgba(239,68,68,0.5)" },
     { label: "Consensus", value: 78, color: "#4ade80" },
     { label: "Governance", value: 91, color: "#60a5fa" },
-    { label: "Self-Improve", value: 85, color: "#d4a520" },
+    { label: "Self-Improve", value: 85, color: "var(--aura-accent-primary)" },
   ];
   const W = 120, H = 52;
   return (
@@ -73,7 +73,7 @@ function ArchitectureChart() {
       {nodes.filter(n => n.label !== "BFF").map((n, i) => (
         <line
           key={i} x1={cx} y1={cy} x2={n.x} y2={n.y}
-          stroke="rgba(212,165,32,0.3)" strokeWidth={1.5}
+          stroke="color-mix(in srgb, var(--aura-accent-primary) 30%, transparent)" strokeWidth={1.5}
           strokeDasharray="3,3"
         >
           <animate attributeName="stroke-dashoffset" from="100" to="0" dur="0.8s" fill="freeze" />
@@ -81,8 +81,8 @@ function ArchitectureChart() {
       ))}
       {nodes.map((n, i) => (
         <g key={i}>
-          <circle cx={n.x} cy={n.y} r={n.r + 3} fill="none" stroke="rgba(212,165,32,0.2)" strokeWidth={1} />
-          <circle cx={n.x} cy={n.y} r={n.r} fill={n.label === "BFF" ? "#d4a520" : "rgba(212,165,32,0.2)"} stroke="#d4a520" strokeWidth={1.5} />
+          <circle cx={n.x} cy={n.y} r={n.r + 3} fill="none" stroke="color-mix(in srgb, var(--aura-accent-primary) 20%, transparent)" strokeWidth={1} />
+          <circle cx={n.x} cy={n.y} r={n.r} fill={n.label === "BFF" ? "var(--aura-accent-primary)" : "color-mix(in srgb, var(--aura-accent-primary) 20%, transparent)"} stroke="var(--aura-accent-primary)" strokeWidth={1.5} />
           <animate attributeName="opacity" from="0" to="1" dur="0.4s" begin={`${i * 0.12}s`} fill="freeze" />
         </g>
       ))}
@@ -101,17 +101,17 @@ function AnimatedLineChart() {
     <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
       <defs>
         <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#d4a520" stopOpacity={0.4} />
-          <stop offset="100%" stopColor="#d4a520" stopOpacity={0} />
+          <stop offset="0%" stopColor="var(--aura-accent-primary)" stopOpacity={0.4} />
+          <stop offset="100%" stopColor="var(--aura-accent-primary)" stopOpacity={0} />
         </linearGradient>
       </defs>
       <path d={fillD} fill="url(#areaGrad)" />
-      <path d={pathD} fill="none" stroke="#d4a520" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"
+      <path d={pathD} fill="none" stroke="var(--aura-accent-primary)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"
         strokeDasharray="300" strokeDashoffset="300">
         <animate attributeName="stroke-dashoffset" from="300" to="0" dur="1.2s" fill="freeze" />
       </path>
       {points.filter((_, i) => i % 3 === 0).map(([x, y], i) => (
-        <circle key={i} cx={x} cy={H - (y / maxY) * H} r={2.5} fill="#d4a520">
+        <circle key={i} cx={x} cy={H - (y / maxY) * H} r={2.5} fill="var(--aura-accent-primary)">
           <animate attributeName="opacity" from="0" to="1" dur="0.3s" begin={`${0.8 + i * 0.15}s`} fill="freeze" />
         </circle>
       ))}
@@ -136,20 +136,20 @@ function MiniRadarChart() {
       {values.map((_, i) => {
         const ax = cx + R * Math.cos(angles[i]);
         const ay = cy + R * Math.sin(angles[i]);
-        return <line key={i} x1={cx} y1={cy} x2={ax} y2={ay} stroke="rgba(212,165,32,0.2)" strokeWidth={1} />;
+        return <line key={i} x1={cx} y1={cy} x2={ax} y2={ay} stroke="color-mix(in srgb, var(--aura-accent-primary) 20%, transparent)" strokeWidth={1} />;
       })}
       {[0.33, 0.66, 1].map((r, i) => (
         <polygon
           key={i}
           points={angles.map(a => `${cx + R * r * Math.cos(a)},${cy + R * r * Math.sin(a)}`).join(" ")}
-          fill="none" stroke="rgba(212,165,32,0.15)" strokeWidth={1}
+          fill="none" stroke="color-mix(in srgb, var(--aura-accent-primary) 15%, transparent)" strokeWidth={1}
         />
       ))}
       <polygon
         points={pts.map(p => `${p.x},${p.y}`).join(" ")}
-        fill="rgba(212,165,32,0.2)" stroke="#d4a520" strokeWidth={1.5}
+        fill="color-mix(in srgb, var(--aura-accent-primary) 20%, transparent)" stroke="var(--aura-accent-primary)" strokeWidth={1.5}
       />
-      <circle cx={cx} cy={cy} r={3} fill="#d4a520" />
+      <circle cx={cx} cy={cy} r={3} fill="var(--aura-accent-primary)" />
     </svg>
   );
 }
@@ -469,7 +469,7 @@ export default function RegimentHub({
             flexWrap: "wrap",
             padding: "10px 12px",
             borderRadius: 18,
-            border: "1px solid rgba(212,165,32,0.12)",
+            border: "1px solid color-mix(in srgb, var(--aura-accent-primary) 12%, transparent)",
             background: isDark
               ? "rgba(255,255,255,0.03)"
               : "rgba(255,255,255,0.64)",
@@ -511,13 +511,13 @@ export default function RegimentHub({
             style={{
               fontSize: "clamp(30px, 5vw, 54px)",
               fontWeight: 900,
-              color: "#d4a520",
+              color: "var(--aura-accent-primary)",
               margin: "0 0 2px 0",
               letterSpacing: -1.3,
               lineHeight: 0.95,
               textAlign: "center",
               fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
-              textShadow: "0 0 28px rgba(212,165,32,0.24)",
+              textShadow: "0 0 28px color-mix(in srgb, var(--aura-accent-primary) 24%, transparent)",
             }}
           >
             REGIMENT
@@ -536,18 +536,18 @@ export default function RegimentHub({
               style={{
                 width: 40,
                 height: 1,
-                background: "linear-gradient(to right, transparent, rgba(212,165,32,0.5))",
+                background: "linear-gradient(to right, transparent, color-mix(in srgb, var(--aura-accent-primary) 50%, transparent))",
               }}
             />
             <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-              <rect x="1" y="1" width="8" height="8" rx="1.5" stroke="#d4a520" strokeWidth="1.5" />
-              <rect x="3.5" y="3.5" width="3" height="3" rx="0.5" fill="#d4a520" />
+              <rect x="1" y="1" width="8" height="8" rx="1.5" stroke="var(--aura-accent-primary)" strokeWidth="1.5" />
+              <rect x="3.5" y="3.5" width="3" height="3" rx="0.5" fill="var(--aura-accent-primary)" />
             </svg>
             <div
               style={{
                 width: 40,
                 height: 1,
-                background: "linear-gradient(to left, transparent, rgba(212,165,32,0.5))",
+                background: "linear-gradient(to left, transparent, color-mix(in srgb, var(--aura-accent-primary) 50%, transparent))",
               }}
             />
           </div>
@@ -578,7 +578,7 @@ export default function RegimentHub({
               style={{
                 fontSize: "clamp(13px, 2.2vw, 17px)",
                 fontWeight: 900,
-                color: "#d4a520",
+                color: "var(--aura-accent-primary)",
                 letterSpacing: 2.1,
                 textAlign: "center",
                 textTransform: "uppercase",
@@ -611,7 +611,7 @@ export default function RegimentHub({
               height: 1,
               width: "100%",
               maxWidth: 360,
-              background: "rgba(212,165,32,0.2)",
+              background: "color-mix(in srgb, var(--aura-accent-primary) 20%, transparent)",
               borderRadius: 1,
             }}
           />
@@ -951,31 +951,31 @@ export default function RegimentHub({
             marginBottom: 48,
           }}
         >
-          <div style={{ flex: 1, height: 1, background: "linear-gradient(to right, transparent, rgba(212,165,32,0.3))" }} />
+          <div style={{ flex: 1, height: 1, background: "linear-gradient(to right, transparent, color-mix(in srgb, var(--aura-accent-primary) 30%, transparent))" }} />
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-              <circle cx="9" cy="9" r="8" stroke="#d4a520" strokeWidth="1.5" opacity="0.6" />
-              <circle cx="9" cy="9" r="4" fill="#d4a520" opacity="0.4" />
-              <circle cx="9" cy="9" r="1.5" fill="#d4a520" />
+              <circle cx="9" cy="9" r="8" stroke="var(--aura-accent-primary)" strokeWidth="1.5" opacity="0.6" />
+              <circle cx="9" cy="9" r="4" fill="var(--aura-accent-primary)" opacity="0.4" />
+              <circle cx="9" cy="9" r="1.5" fill="var(--aura-accent-primary)" />
             </svg>
             <span
               style={{
                 fontSize: 10,
                 fontWeight: 700,
                 letterSpacing: 4,
-                color: "#d4a520",
+                color: "var(--aura-accent-primary)",
                 textTransform: "uppercase",
               }}
             >
               From the Trading Desk
             </span>
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-              <circle cx="9" cy="9" r="8" stroke="#d4a520" strokeWidth="1.5" opacity="0.6" />
-              <circle cx="9" cy="9" r="4" fill="#d4a520" opacity="0.4" />
-              <circle cx="9" cy="9" r="1.5" fill="#d4a520" />
+              <circle cx="9" cy="9" r="8" stroke="var(--aura-accent-primary)" strokeWidth="1.5" opacity="0.6" />
+              <circle cx="9" cy="9" r="4" fill="var(--aura-accent-primary)" opacity="0.4" />
+              <circle cx="9" cy="9" r="1.5" fill="var(--aura-accent-primary)" />
             </svg>
           </div>
-          <div style={{ flex: 1, height: 1, background: "linear-gradient(to left, transparent, rgba(212,165,32,0.3))" }} />
+          <div style={{ flex: 1, height: 1, background: "linear-gradient(to left, transparent, color-mix(in srgb, var(--aura-accent-primary) 30%, transparent))" }} />
         </div>
 
         {/* Section headline */}
@@ -1012,7 +1012,7 @@ export default function RegimentHub({
               background: isDark
                 ? "linear-gradient(135deg, rgba(15,23,42,0.84), rgba(2,6,23,0.76))"
                 : "linear-gradient(135deg, rgba(255,255,255,0.94), rgba(248,250,252,0.9))",
-              border: "1px solid rgba(212,165,32,0.18)",
+              border: "1px solid color-mix(in srgb, var(--aura-accent-primary) 18%, transparent)",
               boxShadow: isDark
                 ? "0 24px 60px rgba(2,6,23,0.28)"
                 : "0 24px 60px rgba(15,23,42,0.08)",
@@ -1023,7 +1023,7 @@ export default function RegimentHub({
                 fontSize: 10,
                 fontWeight: 800,
                 letterSpacing: 3,
-                color: "#d4a520",
+                color: "var(--aura-accent-primary)",
                 textTransform: "uppercase",
                 marginBottom: 12,
               }}
@@ -1163,7 +1163,7 @@ export default function RegimentHub({
                       border: isDark ? "1px solid rgba(255,255,255,0.06)" : "1px solid rgba(15,23,42,0.06)",
                     }}
                   >
-                    <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.4, textTransform: "uppercase", color: "#d4a520", marginBottom: 8 }}>
+                    <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.4, textTransform: "uppercase", color: "var(--aura-accent-primary)", marginBottom: 8 }}>
                       {item.label}
                     </div>
                     <div style={{ fontSize: 11, lineHeight: 1.55, color: mutedColor }}>
@@ -1216,8 +1216,8 @@ export default function RegimentHub({
                     backdropFilter: "blur(20px)",
                     WebkitBackdropFilter: "blur(20px)",
                     border: isDark
-                      ? "1px solid rgba(212,165,32,0.15)"
-                      : "1px solid rgba(212,165,32,0.2)",
+                      ? "1px solid color-mix(in srgb, var(--aura-accent-primary) 15%, transparent)"
+                      : "1px solid color-mix(in srgb, var(--aura-accent-primary) 20%, transparent)",
                     borderRadius: 24,
                     padding: "24px 22px",
                     cursor: "pointer",
@@ -1230,14 +1230,14 @@ export default function RegimentHub({
                     animationDelay: `${index * 0.12}s`,
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = "rgba(212,165,32,0.5)";
+                    e.currentTarget.style.borderColor = "color-mix(in srgb, var(--aura-accent-primary) 50%, transparent)";
                     e.currentTarget.style.transform = "translateY(-4px)";
-                    e.currentTarget.style.boxShadow = "0 16px 48px rgba(212,165,32,0.12)";
+                    e.currentTarget.style.boxShadow = "0 16px 48px color-mix(in srgb, var(--aura-accent-primary) 12%, transparent)";
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.borderColor = isDark
-                      ? "rgba(212,165,32,0.15)"
-                      : "rgba(212,165,32,0.2)";
+                      ? "color-mix(in srgb, var(--aura-accent-primary) 15%, transparent)"
+                      : "color-mix(in srgb, var(--aura-accent-primary) 20%, transparent)";
                     e.currentTarget.style.transform = "translateY(0)";
                     e.currentTarget.style.boxShadow = "none";
                   }}
@@ -1250,7 +1250,7 @@ export default function RegimentHub({
                     left: "10%",
                     right: "10%",
                     height: 2,
-                    background: "linear-gradient(to right, transparent, #d4a520, transparent)",
+                    background: "linear-gradient(to right, transparent, var(--aura-accent-primary), transparent)",
                     borderRadius: "0 0 4px 4px",
                     opacity: 0.6,
                   }}
@@ -1278,7 +1278,7 @@ export default function RegimentHub({
                         fontSize: 9,
                         fontWeight: 700,
                         letterSpacing: 2.5,
-                        color: "#d4a520",
+                        color: "var(--aura-accent-primary)",
                         textTransform: "uppercase",
                       }}
                     >
@@ -1299,9 +1299,9 @@ export default function RegimentHub({
                             fontWeight: 700,
                             padding: "2px 7px",
                             borderRadius: 20,
-                            background: "rgba(212,165,32,0.08)",
-                            color: "#d4a520",
-                            border: "1px solid rgba(212,165,32,0.2)",
+                            background: "color-mix(in srgb, var(--aura-accent-primary) 8%, transparent)",
+                            color: "var(--aura-accent-primary)",
+                            border: "1px solid color-mix(in srgb, var(--aura-accent-primary) 20%, transparent)",
                             letterSpacing: 0.5,
                           }}
                         >
@@ -1325,11 +1325,11 @@ export default function RegimentHub({
                       style={{
                         minHeight: 56,
                         borderRadius: 18,
-                        border: "1px solid rgba(212,165,32,0.18)",
-                        background: "rgba(212,165,32,0.06)",
+                        border: "1px solid color-mix(in srgb, var(--aura-accent-primary) 18%, transparent)",
+                        background: "color-mix(in srgb, var(--aura-accent-primary) 6%, transparent)",
                         display: "grid",
                         placeItems: "center",
-                        color: "#d4a520",
+                        color: "var(--aura-accent-primary)",
                       }}
                     >
                       <div style={{ textAlign: "center" }}>
@@ -1346,7 +1346,7 @@ export default function RegimentHub({
                         style={{
                           fontSize: 15,
                           fontWeight: 800,
-                          color: isDark ? "#f1f5f9" : "#0f172a",
+                          color: isDark ? "var(--aura-text-inverted, #f1f5f9)" : "var(--aura-text-primary, #0f172a)",
                           lineHeight: 1.4,
                           letterSpacing: -0.2,
                           margin: 0,
@@ -1389,7 +1389,7 @@ export default function RegimentHub({
                   <span
                     style={{
                       fontSize: 10,
-                      color: "#d4a520",
+                      color: "var(--aura-accent-primary)",
                       fontWeight: 600,
                       letterSpacing: 0.3,
                       lineHeight: 1.4,
@@ -1405,14 +1405,14 @@ export default function RegimentHub({
                       gap: 4,
                       fontSize: 10,
                       fontWeight: 700,
-                      color: "#d4a520",
+                      color: "var(--aura-accent-primary)",
                       letterSpacing: 1.5,
                       textTransform: "uppercase",
                     }}
                   >
                     Read
                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                      <path d="M2.5 6H9.5M6.5 3L9.5 6L6.5 9" stroke="#d4a520" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M2.5 6H9.5M6.5 3L9.5 6L6.5 9" stroke="var(--aura-accent-primary)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   </div>
                 </div>
@@ -1424,8 +1424,8 @@ export default function RegimentHub({
           {/* Decorative stats card */}
           <div
             style={{
-              background: "linear-gradient(135deg, rgba(212,165,32,0.08) 0%, rgba(212,165,32,0.03) 100%)",
-              border: "1px solid rgba(212,165,32,0.2)",
+              background: "linear-gradient(135deg, color-mix(in srgb, var(--aura-accent-primary) 8%, transparent) 0%, color-mix(in srgb, var(--aura-accent-primary) 3%, transparent) 100%)",
+              border: "1px solid color-mix(in srgb, var(--aura-accent-primary) 20%, transparent)",
               borderRadius: 20,
               padding: "28px 24px",
               display: "flex",
@@ -1450,7 +1450,7 @@ export default function RegimentHub({
                   fontSize: 9,
                   fontWeight: 700,
                   letterSpacing: 2.5,
-                  color: "#d4a520",
+                  color: "var(--aura-accent-primary)",
                   textTransform: "uppercase",
                   marginBottom: 8,
                 }}
@@ -1461,7 +1461,7 @@ export default function RegimentHub({
                 style={{
                   fontSize: 18,
                   fontWeight: 800,
-                  color: isDark ? "#fff" : "#0f172a",
+                  color: isDark ? "#fff" : "var(--aura-text-primary, #0f172a)",
                   letterSpacing: -0.4,
                   lineHeight: 1.2,
                 }}
@@ -1500,7 +1500,7 @@ export default function RegimentHub({
                     <span style={{ fontSize: 10, color: mutedColor, fontWeight: 500 }}>
                       {item.label}
                     </span>
-                    <span style={{ fontSize: 10, color: "#d4a520", fontWeight: 700 }}>
+                    <span style={{ fontSize: 10, color: "var(--aura-accent-primary)", fontWeight: 700 }}>
                       {item.pct}%
                     </span>
                   </div>
@@ -1516,7 +1516,7 @@ export default function RegimentHub({
                       style={{
                         height: "100%",
                         width: `${item.pct}%`,
-                        background: "linear-gradient(to right, rgba(212,165,32,0.6), #d4a520)",
+                        background: "linear-gradient(to right, color-mix(in srgb, var(--aura-accent-primary) 60%, transparent), var(--aura-accent-primary))",
                         borderRadius: 4,
                       }}
                     />
@@ -1533,21 +1533,21 @@ export default function RegimentHub({
                 justifyContent: "center",
                 gap: 6,
                 padding: "10px 16px",
-                border: "1px solid rgba(212,165,32,0.35)",
+                border: "1px solid color-mix(in srgb, var(--aura-accent-primary) 35%, transparent)",
                 borderRadius: 10,
                 fontSize: 11,
                 fontWeight: 700,
-                color: "#d4a520",
+                color: "var(--aura-accent-primary)",
                 letterSpacing: 1,
                 textTransform: "uppercase",
                 textDecoration: "none",
                 transition: "all 0.2s",
-                background: "rgba(212,165,32,0.05)",
+                background: "color-mix(in srgb, var(--aura-accent-primary) 5%, transparent)",
               }}
             >
               View All Articles
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                <path d="M2.5 6H9.5M6.5 3L9.5 6L6.5 9" stroke="#d4a520" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M2.5 6H9.5M6.5 3L9.5 6L6.5 9" stroke="var(--aura-accent-primary)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </a>
           </div>
@@ -1570,7 +1570,7 @@ export default function RegimentHub({
                 width: i === 2 ? 24 : 6,
                 height: 2,
                 borderRadius: 2,
-                background: i === 2 ? "#d4a520" : "rgba(212,165,32,0.3)",
+                background: i === 2 ? "var(--aura-accent-primary)" : "color-mix(in srgb, var(--aura-accent-primary) 30%, transparent)",
               }}
             />
           ))}
