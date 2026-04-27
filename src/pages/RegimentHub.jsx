@@ -36,8 +36,8 @@ function FounderStoryChart() {
 function ProductVisionChart() {
   const data = [
     { label: "Signals", value: 22, color: "rgba(239,68,68,0.5)" },
-    { label: "Consensus", value: 78, color: "#4ade80" },
-    { label: "Governance", value: 91, color: "#60a5fa" },
+    { label: "Consensus", value: 78, color: "var(--aura-status-success)" },
+    { label: "Governance", value: 91, color: "var(--aura-accent-primary)" },
     { label: "Self-Improve", value: 85, color: "var(--aura-accent-primary)" },
   ];
   const W = 120, H = 52;
@@ -634,7 +634,7 @@ export default function RegimentHub({
           >
             <div
               style={{
-                color: isDark ? "#93C5FD" : "#1D4ED8",
+                color: isDark ? "var(--aura-accent-primary)" : "var(--aura-accent-primary)",
                 fontSize: 11,
                 fontWeight: 700,
                 letterSpacing: 2,
@@ -825,7 +825,7 @@ export default function RegimentHub({
                     fontSize: 10,
                     fontWeight: 800,
                     letterSpacing: 3,
-                    color: isDark ? "#93c5fd" : "#0369a1",
+                    color: isDark ? "var(--aura-accent-primary)" : "var(--aura-accent-primary)",
                     textTransform: "uppercase",
                     marginBottom: 8,
                   }}
@@ -855,7 +855,7 @@ export default function RegimentHub({
                   placeItems: "center",
                   background: "rgba(14,118,168,0.14)",
                   border: "1px solid rgba(14,118,168,0.22)",
-                  color: isDark ? "#bfdbfe" : "#0369a1",
+                  color: isDark ? "var(--aura-surface-elevated)" : "var(--aura-accent-primary)",
                   fontSize: 20,
                   fontWeight: 900,
                   flexShrink: 0,
@@ -1104,7 +1104,7 @@ export default function RegimentHub({
             >
               <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
                 <div>
-                  <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 3, color: isDark ? "#93c5fd" : "#0369a1", textTransform: "uppercase", marginBottom: 10 }}>
+                  <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 3, color: isDark ? "var(--aura-accent-primary)" : "var(--aura-accent-primary)", textTransform: "uppercase", marginBottom: 10 }}>
                     Founder on LinkedIn
                   </div>
                   <div style={{ fontSize: 24, fontWeight: 900, lineHeight: 1.05 }}>Gunit Singh</div>
@@ -1121,7 +1121,7 @@ export default function RegimentHub({
                     placeItems: "center",
                     background: "rgba(14,118,168,0.14)",
                     border: "1px solid rgba(14,118,168,0.22)",
-                    color: isDark ? "#bfdbfe" : "#0369a1",
+                    color: isDark ? "var(--aura-surface-elevated)" : "var(--aura-accent-primary)",
                     fontSize: 20,
                     fontWeight: 900,
                   }}
@@ -1175,7 +1175,7 @@ export default function RegimentHub({
 
               <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", paddingTop: 6, borderTop: isDark ? "1px solid rgba(255,255,255,0.08)" : "1px solid rgba(15,23,42,0.08)" }}>
                 <div style={{ fontSize: 12, color: mutedColor }}>Open founder credibility channel</div>
-                <div style={{ fontSize: 12, fontWeight: 800, color: isDark ? "#93c5fd" : "#0369a1", letterSpacing: 1.2, textTransform: "uppercase" }}>
+                <div style={{ fontSize: 12, fontWeight: 800, color: isDark ? "var(--aura-accent-primary)" : "var(--aura-accent-primary)", letterSpacing: 1.2, textTransform: "uppercase" }}>
                   Visit LinkedIn
                 </div>
               </div>

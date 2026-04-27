@@ -90,12 +90,12 @@ export const getUserLevelBadge = (user) => {
 };
 
 export const ACCENT_COLORS = {
-  TRADING_GREEN: { name: 'Trading Green', hex: '#30D158', primary: '#30D158', light: 'rgba(48,209,88,0.2)', glow: 'rgba(48,209,88,0.6)' },
-  GOLD: { name: 'Gold', hex: '#FFD60A', primary: '#FFD60A', light: 'rgba(255,214,10,0.2)', glow: 'rgba(255,214,10,0.6)' },
-  BLUE: { name: 'Electric Blue', hex: '#0A84FF', primary: '#0A84FF', light: 'rgba(10,132,255,0.2)', glow: 'rgba(10,132,255,0.6)' },
-  PURPLE: { name: 'Purple', hex: '#BF5AF2', primary: '#BF5AF2', light: 'rgba(191,90,242,0.2)', glow: 'rgba(191,90,242,0.6)' },
-  CYAN: { name: 'Cyan', hex: '#64D2FF', primary: '#64D2FF', light: 'rgba(100,210,255,0.2)', glow: 'rgba(100,210,255,0.6)' },
-  PINK: { name: 'Pink', hex: '#FF375F', primary: '#FF375F', light: 'rgba(255,55,95,0.2)', glow: 'rgba(255,55,95,0.6)' }
+  TRADING_GREEN: { name: 'Trading Green', hex: 'var(--aura-status-success, #30D158)', primary: 'var(--aura-status-success, #30D158)', light: 'color-mix(in srgb, var(--aura-status-success, #30D158) 20%, transparent)', glow: 'color-mix(in srgb, var(--aura-status-success, #30D158) 60%, transparent)' },
+  GOLD:          { name: 'Gold',         hex: 'var(--aura-accent-primary, #FFD60A)', primary: 'var(--aura-accent-primary, #FFD60A)', light: 'color-mix(in srgb, var(--aura-accent-primary, #FFD60A) 20%, transparent)', glow: 'color-mix(in srgb, var(--aura-accent-primary, #FFD60A) 60%, transparent)' },
+  BLUE:          { name: 'Electric Blue',hex: 'var(--aura-accent-primary, #0A84FF)', primary: 'var(--aura-accent-primary, #0A84FF)', light: 'color-mix(in srgb, var(--aura-accent-primary, #0A84FF) 20%, transparent)', glow: 'color-mix(in srgb, var(--aura-accent-primary, #0A84FF) 60%, transparent)' },
+  PURPLE:        { name: 'Purple',       hex: 'var(--aura-accent-purple, #BF5AF2)', primary: 'var(--aura-accent-purple, #BF5AF2)', light: 'color-mix(in srgb, var(--aura-accent-purple, #BF5AF2) 20%, transparent)', glow: 'color-mix(in srgb, var(--aura-accent-purple, #BF5AF2) 60%, transparent)' },
+  CYAN:          { name: 'Cyan',        hex: '#64D2FF', primary: '#64D2FF', light: 'rgba(100,210,255,0.2)', glow: 'rgba(100,210,255,0.6)' },
+  PINK:          { name: 'Pink',         hex: '#FF375F', primary: '#FF375F', light: 'rgba(255,55,95,0.2)', glow: 'rgba(255,55,95,0.6)' }
 };
 
 // THEME_PALETTES — All colors now reference CSS variables from index.css
