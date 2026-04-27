@@ -21,7 +21,7 @@ export default function LoadingFallback() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        fontFamily: '"Inter", "Helvetica", sans-serif',
+        fontFamily: "var(--font-ui)",
         flexDirection: "column",
         gap: 24,
       }}

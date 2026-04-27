@@ -130,8 +130,8 @@ export const FounderCard = ({
                 whiteSpace: "nowrap",
                 fontSize: "11px",
                 color: colors.text,
-                fontFamily:
-                  var(--font-ui),
+
+                fontFamily: "var(--font-ui)",
                 fontWeight: 500,
                 zIndex: 1000,
                 boxShadow: "0 8px 32px rgba(0, 0, 0, 0.1)",
