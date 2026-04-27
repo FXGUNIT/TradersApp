@@ -166,7 +166,7 @@ function BrandHero({ themeMode }) {
           style={{
             fontSize: "clamp(14px, 2.3vw, 18px)",
             fontWeight: 900,
-            color: "#D4A520",
+            color: "var(--aura-accent-primary, #d97706)",
             letterSpacing: 2.2,
             textAlign: "center",
             textTransform: "uppercase",
@@ -394,7 +394,7 @@ export default function CleanLoginScreen({
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "flex-start",
-        fontFamily: '"Sora", "Segoe UI", sans-serif',
+        fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif",
         padding: "44px 20px 56px",
       }}
     >
