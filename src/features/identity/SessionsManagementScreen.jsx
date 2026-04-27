@@ -11,7 +11,7 @@ const COLORS = {
   blue: "var(--status-info, #3B82F6)",
   green: "var(--status-success, #10B981)",
   red: "var(--status-danger, #EF4444)",
-  font: "Inter, -apple-system, BlinkMacSystemFont, sans-serif",
+  font: "'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif",
 };
 
 const buttonStyle = (tone = "neutral", disabled = false) => {
