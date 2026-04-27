@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { ChevronLeft, ChevronRight, Maximize2, Print, Download } from "lucide-react";
+import { ChevronLeft, ChevronRight, Maximize2, Printer } from "lucide-react";
 import { PITCH_SLIDES, PITCH_THEME } from "../../data/pitchDeckSlides.js";
 
 export default function AdminPitchDeck({ onClose }) {
@@ -227,7 +227,7 @@ export default function AdminPitchDeck({ onClose }) {
               alignItems: "center",
             }}
           >
-            <Print size={14} />
+            <Printer size={14} />
           </button>
           <button
             onClick={toggleFullscreen}

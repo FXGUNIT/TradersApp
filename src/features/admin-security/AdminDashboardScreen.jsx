@@ -15,6 +15,7 @@ import AdminMirrorPanel from "./AdminMirrorPanel.jsx";
 import AdminUserDocsModal from "./AdminUserDocsModal.jsx";
 import { useUserList } from "./UserListContext.jsx";
 import { Breadcrumbs, MegaMenu, BackToTopButton } from "../shell/ShellPrimitives.jsx";
+import AdminPitchDeck from "./AdminPitchDeck.jsx";
 import { getTimeBasedGreeting, getUserLevelBadge } from "../../utils/userUtils.js";
 import { triggerConfetti } from "../../utils/uiUtils.js";
 import {
@@ -640,6 +641,7 @@ export default function AdminDashboardScreen({
         {[
           { id: "users", label: "User Control", icon: Users },
           { id: "boardRoom", label: "Board Room", icon: MessageSquare },
+          { id: "pitchDeck", label: "Pitch Deck", icon: DollarSign },
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = adminWorkspaceTab === tab.id;
@@ -673,6 +675,8 @@ export default function AdminDashboardScreen({
           <BoardRoom auth={auth} adminEmail={ADMIN_EMAIL} showToast={showToast} />
           <BackToTopButton theme={T} />
         </div>
+      ) : adminWorkspaceTab === "pitchDeck" ? (
+        <AdminPitchDeck onClose={() => setAdminWorkspaceTab("users")} />
       ) : (
         <div style={{ display: "flex", height: "calc(100vh - 75px - 48px)", flexWrap: "wrap" }}>
           <AdminDashboardTable
