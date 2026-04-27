@@ -39,7 +39,7 @@ export default function TermsOfService({ onClose }) {
         justifyContent: "center",
         zIndex: 1000,
         padding: "20px",
-        fontFamily: "Inter, sans-serif",
+        fontFamily: var(--font-ui),
         backdropFilter: "blur(10px)",
       }}
     >

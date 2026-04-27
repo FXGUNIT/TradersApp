@@ -45,7 +45,7 @@ const authBtn = (disabled, tone = "dark") => {
     justifyContent: "center",
     cursor: disabled ? "not-allowed" : "pointer",
     color: disabled ? "rgba(255,255,255,0.6)" : colorByTone[tone],
-    fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif",
+    fontFamily: var(--font-ui),
     fontSize: 14,
     fontWeight: 600,
     letterSpacing: "0.05em",
@@ -92,7 +92,7 @@ function AuthLogo() {
               color: "var(--text-primary, #111827)",
               fontSize: "clamp(16px, 3vw, 18px)",
               letterSpacing: 1.5,
-              fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif",
+              fontFamily: var(--font-ui),
               fontWeight: 700,
             }}
           >
@@ -193,7 +193,7 @@ export default function WaitingRoomScreen({
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif",
+        fontFamily: var(--font-ui),
         padding: 20,
       }}
     >

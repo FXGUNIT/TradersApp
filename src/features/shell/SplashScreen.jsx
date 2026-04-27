@@ -35,7 +35,7 @@ function SplashLogo() {
               color: CSS_VARS.textPrimary,
               fontSize: "clamp(16px, 3vw, 18px)",
               letterSpacing: 1.5,
-              fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif",
+              fontFamily: var(--font-ui),
               fontWeight: 700,
             }}
           >
@@ -56,7 +56,7 @@ export default function SplashScreen() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif",
+        fontFamily: var(--font-ui),
       }}
     >
       <div style={{ textAlign: "center" }}>

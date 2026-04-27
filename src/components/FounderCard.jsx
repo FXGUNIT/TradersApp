@@ -97,7 +97,7 @@ export const FounderCard = ({
               fontSize: "14px",
               fontWeight: 700,
               color: colors.text,
-              fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif",
+              fontFamily: var(--font-ui),
             }}
           >
             Gunit Singh
@@ -106,7 +106,7 @@ export const FounderCard = ({
             style={{
               fontSize: "11px",
               color: colors.subtext,
-              fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif",
+              fontFamily: var(--font-ui),
               marginTop: "4px",
               fontWeight: 500,
             }}
@@ -131,7 +131,7 @@ export const FounderCard = ({
                 fontSize: "11px",
                 color: colors.text,
                 fontFamily:
-                  "Inter, -apple-system, BlinkMacSystemFont, sans-serif",
+                  var(--font-ui),
                 fontWeight: 500,
                 zIndex: 1000,
                 boxShadow: "0 8px 32px rgba(0, 0, 0, 0.1)",

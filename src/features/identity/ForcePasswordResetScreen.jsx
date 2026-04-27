@@ -38,7 +38,7 @@ function AuthLogo() {
               color: "var(--text-primary, #111827)",
               fontSize: "clamp(16px, 3vw, 18px)",
               letterSpacing: 1.5,
-              fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif",
+              fontFamily: var(--font-ui),
               fontWeight: 700,
             }}
           >
