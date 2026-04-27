@@ -172,5 +172,5 @@ export const PITCH_THEME = {
   text: "#f4ebd0",
   muted: "#a89680",
   accent: "#8B4513",
-  border: "rgba(212,165,32,0.15)",
+  border: "color-mix(in srgb, var(--aura-accent-primary) 15%, transparent)",
 };

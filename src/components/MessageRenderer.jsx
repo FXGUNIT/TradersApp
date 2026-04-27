@@ -5,13 +5,13 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 export default function MessageRenderer({ content, isDark = true }) {
-  const textColor = isDark ? '#E2E8F0' : '#1E293B';
-  const mutedColor = isDark ? '#94A3B8' : '#64748B';
-  const borderColor = isDark ? '#334155' : '#CBD5E1';
-  const headerBg = isDark ? '#0F172A' : '#F1F5F9';
-  const codeBg = isDark ? '#0D1117' : '#F8FAFC';
+  const textColor = isDark ? "var(--aura-text-secondary)" : "var(--aura-text-primary)";
+  const mutedColor = isDark ? "var(--aura-text-tertiary)" : "var(--aura-text-secondary)";
+  const borderColor = isDark ? "var(--aura-border-strong)" : "var(--aura-border-subtle)";
+  const headerBg = isDark ? "var(--aura-base-layer)" : "var(--aura-surface-elevated)";
+  const codeBg = isDark ? "var(--aura-surface-elevated)" : "var(--aura-base-layer)";
   const inlineCodeBg = isDark ? 'rgba(148,163,184,0.12)' : 'rgba(15,23,42,0.06)';
-  const blockquoteBorder = isDark ? '#7C3AED' : '#8B5CF6';
+  const blockquoteBorder = isDark ? "var(--aura-accent-purple)" : "var(--aura-accent-purple)";
 
   return (
     <ReactMarkdown
@@ -38,13 +38,13 @@ export default function MessageRenderer({ content, isDark = true }) {
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   padding: '6px 14px',
-                  background: isDark ? '#161B22' : '#E2E8F0',
+                  background: isDark ? "var(--aura-surface-elevated)" : "var(--aura-surface-elevated)",
                   borderBottom: `1px solid ${borderColor}`,
                 }}>
                   <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                    <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#FF5F57' }} />
-                    <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#FEBC2E' }} />
-                    <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#28C840' }} />
+                    <span style={{ width: 10, height: 10, borderRadius: '50%', background: "var(--aura-status-danger)" }} />
+                    <span style={{ width: 10, height: 10, borderRadius: '50%', background: "var(--aura-status-warning)" }} />
+                    <span style={{ width: 10, height: 10, borderRadius: '50%', background: "var(--aura-status-success)" }} />
                   </div>
                   <span style={{
                     fontSize: 10,
