@@ -95,10 +95,10 @@ export const TradersRegimentWatermark = () => {
       transition: 'all 0.3s ease',
       userSelect: 'none',
       textAlign: 'center',
-      fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif'
+      fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif"
     }}>
       <span style={{ marginRight: '4px' }}>�</span>
-      <span style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif' }}>TRADERS REGIMENT</span>
+      <span style={{ fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif" }}>TRADERS REGIMENT</span>
       <span style={{ marginLeft: '4px', fontSize: '10px', opacity: 0.6 }}>™</span>
     </div>
   );
