@@ -36,7 +36,7 @@ export default class ErrorBoundaryAdmin extends React.Component {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            fontFamily: var(--font-ui),
+            fontFamily: "var(--font-ui)",
             padding: 20,
           }}
         >
@@ -103,7 +103,7 @@ export default class ErrorBoundaryAdmin extends React.Component {
                 justifyContent: "center",
                 cursor: "pointer",
                 color: "#FFFFFF",
-                fontFamily: var(--font-ui),
+                fontFamily: "var(--font-ui)",
                 fontSize: 14,
                 fontWeight: 600,
                 letterSpacing: "0.05em",
