@@ -86,30 +86,6 @@ export const getUserLevelBadge = (user) => {
     return { level: '⬆️ Pro', color: 'var(--aura-status-success, #30D158)', bg: 'color-mix(in srgb, var(--aura-status-success, #30D158) 15%, transparent)' };
   }
   if (user.status === 'PENDING') return { level: '🔄 Pending', color: 'var(--aura-accent-primary, #FFD60A)', bg: 'color-mix(in srgb, var(--aura-accent-primary, #FFD60A) 15%, transparent)' };
-  if (user.status === 'BLOCKED') return { level: '⛔ Blocked', color: 'var(--aura-status-danger, #FF453A)', bg: 'color-mix(in srgb, var(--aura-status-danger, #FF453A) 15%, transparent)' };
-  return { level: 'Member', color: 'var(--aura-accent-primary, #0A84FF)', bg: 'color-mix(in srgb, var(--aura-accent-primary, #0A84FF) 15%, transparent)' };
-};
-  
-  if (user.role === 'admin') {
-    return { level: '⭐ Admin', color: '#FFD60A', bg: 'rgba(255,214,10,0.15)' };
-  }
-  
-  if (user.status === 'ACTIVE') {
-    const hasActiveTrading = user.journal && Object.keys(user.journal || {}).length >= 10;
-    if (hasActiveTrading) {
-      return { level: '💎 Elite', color: '#30B0C0', bg: 'rgba(48,176,192,0.15)' };
-    }
-    return { level: '⬆️ Pro', color: '#30D158', bg: 'rgba(48,209,88,0.15)' };
-  }
-  
-  if (user.status === 'PENDING') {
-    return { level: '🔄 Pending', color: '#FFD60A', bg: 'rgba(255,214,10,0.15)' };
-  }
-  
-  if (user.status === 'BLOCKED') {
-    return { level: '⛔ Blocked', color: '#FF453A', bg: 'rgba(255,69,58,0.15)' };
-  }
-  
   return { level: 'Member', color: '#0A84FF', bg: 'rgba(10,132,255,0.15)' };
 };
 
