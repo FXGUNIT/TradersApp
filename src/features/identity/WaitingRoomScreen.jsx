@@ -71,7 +71,7 @@ function AuthLogo() {
         }}
       >
         <img
-          src="/logo.png"
+          src="/icon-512.png"
           alt="Traders Regiment logo"
           style={{
             borderRadius: "50%",
@@ -223,7 +223,7 @@ export default function WaitingRoomScreen({
             "..."
           ) : (
             <video
-              src="/logo.mp4"
+              src="/icon-512.png"
               autoPlay
               loop
               muted

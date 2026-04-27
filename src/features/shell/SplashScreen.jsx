@@ -14,8 +14,8 @@ function SplashLogo() {
         }}
       >
         <img
-          src="/logo.png"
-          alt="Traders Regiment logo"
+          src="/icon-512.png"
+          alt="Traders Regiment brand mark"
           style={{
             borderRadius: "50%",
             overflow: "hidden",
@@ -39,7 +39,7 @@ function SplashLogo() {
               fontWeight: 700,
             }}
           >
-            THE DEPARTMENT OF INSTITUTIONAL ARTILLERY
+            TRADERS REGIMENT
           </div>
         </div>
       </div>

@@ -46,11 +46,9 @@ export default function LoadingFallback() {
         {showVideoFallback ? (
           "..."
         ) : (
-          <video
-            src="/logo.mp4"
-            autoPlay
-            loop
-            muted
+          <img
+            src="/icon-512.png"
+            alt="Traders Regiment"
             style={{
               width: "100%",
               height: "100%",
