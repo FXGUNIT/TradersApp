@@ -221,7 +221,7 @@ export function buildAppShell({
 }) {
   return (
     <AppShellProvider value={{ screen, setScreen, navigateToScreen: setScreen, profile, theme, currentTheme, maintenanceMode: maintenanceModeActive }}>
-      <section className={`app-container theme-${currentTheme}`}>
+      <section id="main-content" className={`app-container theme-${currentTheme}`}>
         <ShellThemeOverlay screen={screen} currentTheme={currentTheme} onThemeChange={handleThemeChange} />
         {maintenanceModeActive && auth?.uid !== ADMIN_UID && screen !== "admin" ? (
           <MaintenanceScreen />

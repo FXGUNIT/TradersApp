@@ -217,7 +217,7 @@ function TradersRegimentInner() {
   const handleThemeChange = useCallback((newTheme) => {
     const normalized = {
       day: "lumiere", eye: "amber", night: "midnight",
-      lumiere: "lumiere", amber: "amber", midnight: "midnight",
+      lumiere: "lumiere", amber: "amber", obsidian: "obsidian", midnight: "midnight",
     };
     setAppTheme(normalized[newTheme] || "lumiere");
   }, [setAppTheme]);
