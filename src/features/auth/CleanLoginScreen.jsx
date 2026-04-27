@@ -83,7 +83,7 @@ function BrandHero({ themeMode }) {
           lineHeight: 0.95,
           textAlign: "center",
           fontFamily:
-            '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
+            "'DM Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif",
         }}
       >
         TRADERS
@@ -92,13 +92,13 @@ function BrandHero({ themeMode }) {
         style={{
           fontSize: "clamp(30px, 6vw, 48px)",
           fontWeight: 900,
-          color: "#D4A520",
+          color: "var(--aura-accent-primary, #d97706)",
           margin: "0 0 14px 0",
           letterSpacing: -1.4,
           lineHeight: 0.95,
           textAlign: "center",
           fontFamily:
-            '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
+            "'DM Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif",
         }}
       >
         REGIMENT
@@ -117,7 +117,7 @@ function BrandHero({ themeMode }) {
           style={{
             width: 48,
             height: 1,
-            background: "rgba(212,165,32,0.4)",
+            background: "color-mix(in srgb, var(--aura-accent-primary, #d97706) 40%, transparent)",
           }}
         />
         <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
@@ -127,10 +127,10 @@ function BrandHero({ themeMode }) {
             width="8"
             height="8"
             rx="2"
-            stroke="#D4A520"
+            stroke="var(--aura-accent-primary, #d97706)"
             strokeWidth="1.5"
           />
-          <rect x="3.5" y="3.5" width="3" height="3" rx="0.75" fill="#D4A520" />
+          <rect x="3.5" y="3.5" width="3" height="3" rx="0.75" fill="var(--aura-accent-primary, #d97706)" />
         </svg>
         <div
           style={{
