@@ -21,6 +21,7 @@ export default function SupportChatModal({
   const [otherUserTyping] = useState(false);
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
+  const modalRef = useFocusTrap(isOpen);
   const canUseDb = Boolean(firebaseDb);
   const chatPath = `support_chats/${userId}`;
 
@@ -119,6 +120,7 @@ export default function SupportChatModal({
 
   return (
     <div
+      ref={modalRef}
       style={{
         position: "fixed",
         top: 0,

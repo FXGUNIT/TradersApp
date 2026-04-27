@@ -33,6 +33,7 @@ export default function AdminUnlockModal({
   );
   const [totpSetup, setTotpSetup] = useState(null);
   const [totpSetupError, setTotpSetupError] = useState("");
+  const modalRef = useFocusTrap(show);
 
   const handleRememberChange = (checked) => {
     setRememberDeviceState(checked);
@@ -92,6 +93,7 @@ export default function AdminUnlockModal({
 
   return (
     <div
+      ref={modalRef}
       style={{
         position: "fixed",
         inset: 0,
