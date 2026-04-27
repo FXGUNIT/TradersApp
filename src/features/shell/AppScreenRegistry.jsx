@@ -43,7 +43,7 @@ function AppRuntimeScreen({
       <div
         style={{
           position: "relative",
-          borderTop: isOnline ? "none" : "2px solid #d4a520",
+          borderTop: isOnline ? "none" : "2px solid var(--aura-accent-primary)",
           transition: "border-color 0.4s ease",
           pointerEvents: tiltLocked ? "none" : "auto",
         }}
@@ -67,7 +67,7 @@ function AppRuntimeScreen({
           >
             <span
               style={{
-                color: "#d4a520",
+                color: "var(--aura-accent-primary)",
                 fontSize: 11,
                 fontWeight: 800,
                 letterSpacing: 2,
