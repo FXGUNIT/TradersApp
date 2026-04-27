@@ -57,7 +57,7 @@ const RegimentEULA = ({ onAccept, onReject }) => {
   const ActiveContentComponent = activeSection.ContentComponent;
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--surface-elevated, #FFFFFF)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: var(--font-ui), padding: '40px 20px' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--surface-elevated, #FFFFFF)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: "var(--font-ui)", padding: '40px 20px' }}>
       <div style={{ maxWidth: 700, width: '100%' }}>
 
         {/* Header */}
