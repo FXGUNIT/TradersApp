@@ -14,7 +14,7 @@ function SplashLogo() {
         }}
       >
         <img
-          src="/icon-512.png"
+          src="/wordmark-512.png"
           alt="Traders Regiment brand mark"
           style={{
             borderRadius: "50%",

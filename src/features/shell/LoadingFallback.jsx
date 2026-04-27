@@ -47,7 +47,7 @@ export default function LoadingFallback() {
           "..."
         ) : (
           <img
-            src="/icon-512.png"
+            src="/wordmark-512.png"
             alt="Traders Regiment"
             style={{
               width: "100%",
