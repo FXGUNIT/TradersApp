@@ -38,6 +38,10 @@ export const getUserLevelBadge = (user) => {
     return { level: '⬆️ Pro', color: 'var(--aura-status-success, #30D158)', bg: 'color-mix(in srgb, var(--aura-status-success, #30D158) 15%, transparent)' };
   }
   if (user.status === 'PENDING') return { level: '🔄 Pending', color: 'var(--aura-accent-primary, #FFD60A)', bg: 'color-mix(in srgb, var(--aura-accent-primary, #FFD60A) 15%, transparent)' };
+  if (user.status === 'BLOCKED') return { level: '⛔ Blocked', color: 'var(--aura-status-danger, #FF453A)', bg: 'color-mix(in srgb, var(--aura-status-danger, #FF453A) 15%, transparent)' };
+  return { level: 'Member', color: 'var(--aura-accent-primary, #0A84FF)', bg: 'color-mix(in srgb, var(--aura-accent-primary, #0A84FF) 15%, transparent)' };
+};
+
 export const cacheUserList = (users) => {
   try {
     const cacheData = {
