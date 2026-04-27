@@ -4,13 +4,14 @@ import { createTheme, ACCENT_COLORS } from "../utils/uiUtils";
 
 const ThemeContext = createContext(null);
 
-const THEME_ORDER = ["lumiere", "amber", "midnight"];
+const THEME_ORDER = ["lumiere", "amber", "obsidian", "midnight"];
 const LEGACY_THEME_MAP = {
   day: "lumiere",
   eye: "amber",
   night: "midnight",
   lumiere: "lumiere",
   amber: "amber",
+  obsidian: "obsidian",
   midnight: "midnight",
 };
 
@@ -28,6 +29,8 @@ const readInitialTheme = () => {
 
     const storedMode = localStorage.getItem("theme_mode");
     if (storedMode === "dark") {
+      const storedName = localStorage.getItem("theme_mode_name");
+      if (storedName === "obsidian") return "obsidian";
       return "midnight";
     }
     if (storedMode === "light") {
@@ -75,15 +78,15 @@ export const ThemeProvider = ({ children }) => {
     const next = normalizeTheme(value);
     setCurrentTheme(next);
     localStorage.setItem("theme_mode_name", next);
-    localStorage.setItem("theme_mode", next === "midnight" ? "dark" : "light");
+    localStorage.setItem("theme_mode", next === "midnight" || next === "obsidian" ? "dark" : "light");
     localStorage.setItem("appTheme", next);
     localStorage.setItem("aura-theme", next);
-    setIsDarkMode(next === "midnight");
+    setIsDarkMode(next === "midnight" || next === "obsidian");
     return next;
   }, []);
 
   const toggleDarkMode = useCallback(() => {
-    setTheme(currentTheme === "midnight" ? "lumiere" : "midnight");
+    setTheme(currentTheme === "midnight" || currentTheme === "obsidian" ? "lumiere" : "midnight");
   }, [currentTheme, setTheme]);
 
   const cycleTheme = useCallback(() => {
@@ -92,10 +95,10 @@ export const ThemeProvider = ({ children }) => {
       const next =
         THEME_ORDER[(THEME_ORDER.indexOf(current) + 1) % THEME_ORDER.length];
       localStorage.setItem("theme_mode_name", next);
-      localStorage.setItem("theme_mode", next === "midnight" ? "dark" : "light");
+      localStorage.setItem("theme_mode", next === "midnight" || next === "obsidian" ? "dark" : "light");
       localStorage.setItem("appTheme", next);
       localStorage.setItem("aura-theme", next);
-      setIsDarkMode(next === "midnight");
+      setIsDarkMode(next === "midnight" || next === "obsidian");
       return next;
     });
   }, []);
@@ -121,6 +124,7 @@ export const ThemeProvider = ({ children }) => {
         "theme-eye",
         "theme-lumiere",
         "theme-amber",
+        "theme-obsidian",
         "theme-midnight",
       );
       document.body.classList.add(`theme-${auraTheme}`);

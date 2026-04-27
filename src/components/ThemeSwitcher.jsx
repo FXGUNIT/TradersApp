@@ -1,9 +1,10 @@
 import React from "react";
 
 const THEMES = [
-  { id: "lumiere", label: "L", description: "Lumiere - Day mode" },
-  { id: "amber", label: "A", description: "Amber - Eye comfort" },
-  { id: "midnight", label: "M", description: "Midnight - Night mode" },
+  { id: "lumiere", label: "☀", description: "Lumiere — Day mode" },
+  { id: "amber", label: "◐", description: "Amber — Eye comfort" },
+  { id: "obsidian", label: "◑", description: "Obsidian — Clinical dark" },
+  { id: "midnight", label: "◒", description: "Midnight — Vault dark" },
 ];
 
 const ThemeSwitcher = ({ currentTheme = "lumiere", onThemeChange = () => {} }) => {
