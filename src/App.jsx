@@ -37,8 +37,24 @@ export default function TradersRegiment() {
   }
 
   return (
-    <AppProviders>
-      <TradersRegimentInner />
-    </AppProviders>
+    <>
+      {/* Skip to main content — first focusable element */}
+      <a className="skip-link" href="#main-content">
+        Skip to main content
+      </a>
+
+      {/* Screen reader live region — announces price updates, status changes */}
+      <div
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className="sr-only"
+        id="live-announcer"
+      />
+
+      <AppProviders>
+        <TradersRegimentInner />
+      </AppProviders>
+    </>
   );
 }
