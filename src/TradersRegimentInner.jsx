@@ -197,7 +197,7 @@ function TradersRegimentInner() {
   useEffect(() => {
     if (!auth?.uid) {
       stopAIStatusScheduler();
-      setAiStatuses(getAIStatusesDetailed());
+      checkAllAIStatus().then(() => setAiStatuses(getAIStatusesDetailed()));
       return () => stopAIStatusScheduler();
     }
     startAIStatusScheduler(setAiStatuses);
