@@ -81,10 +81,14 @@ jobs:
           if [ -z "${CLOUDFLARE_API_TOKEN:-}" ]; then
             echo "Using Cloudflare global API key auth for wrangler"
           fi
-          npx wrangler@3.103.0 pages deploy dist \
+          DEPLOY_OUTPUT=$(npx wrangler@3.103.0 pages deploy dist \
             --project-name tradergunit \
             --branch main \
-            --commit-hash "${GITHUB_SHA}"
+            --commit-hash "${GITHUB_SHA}" 2>&1)
+          echo "${DEPLOY_OUTPUT}"
+          # Extract preview URL and save for downstream steps
+          DEPLOY_URL=$(echo "${DEPLOY_OUTPUT}" | grep -o 'https://[^ ]*\.tradergunit\.pages\.dev' | head -1)
+          echo "DEPLOY_URL=${DEPLOY_URL}" >> "${GITHUB_OUTPUT}"
 
       - name: Setup Python
         uses: actions/setup-python@v5
