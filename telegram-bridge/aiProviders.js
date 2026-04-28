@@ -343,37 +343,89 @@ export async function callOpenAICompatible(provider, model, messages, apiKey) {
   return result.data?.choices?.[0]?.message?.content;
 }
 
+export function getProviderApiKey(config) {
+  const names = config.apiKeyEnvs || (config.apiKeyEnv ? [config.apiKeyEnv] : []);
+  for (const name of names) {
+    const value = process.env[name];
+    if (value) {
+      return { value, envName: name };
+    }
+  }
+  return { value: "", envName: names[0] || "unknown" };
+}
+
+export function getProviderModels(config) {
+  const envModel = config.modelEnv ? process.env[config.modelEnv] : "";
+  const envModels = config.modelsEnv ? process.env[config.modelsEnv] : "";
+  return [
+    ...splitCsv(envModel),
+    config.defaultModel,
+    ...splitCsv(envModels),
+    ...(Array.isArray(config.models) ? config.models : []),
+  ].filter((model, index, models) => model && models.indexOf(model) === index);
+}
+
+export function getPreferredProviderOrder(preferredOrder) {
+  const envOrder = splitCsv(process.env.AI_PROVIDER_ORDER);
+  const order = preferredOrder?.length ? preferredOrder : envOrder;
+  const fallbackOrder = [
+    "groq",
+    "sambanova",
+    "openrouter",
+    "openrouter2",
+    "gemini",
+    "deepseek",
+    "cerebras",
+  ];
+  return (order.length ? order : fallbackOrder).filter(
+    (provider, index, providers) =>
+      AI_PROVIDERS[provider] && providers.indexOf(provider) === index,
+  );
+}
+
+function splitCsv(value) {
+  return String(value || "")
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
 /**
  * Try providers in order of preference until one succeeds.
  * @returns {Promise<{text: string, provider: string, model: string}>}
  */
 export async function callBestAvailableAI(
   messages,
-  preferredOrder = ["gemini", "groq", "deepseek", "sambanova"],
+  preferredOrder,
 ) {
   const errors = [];
 
-  for (const provider of preferredOrder) {
+  for (const provider of getPreferredProviderOrder(preferredOrder)) {
     const config = AI_PROVIDERS[provider];
     if (!config) continue;
 
-    const apiKey = process.env[config.apiKeyEnv];
+    const { value: apiKey, envName } = getProviderApiKey(config);
     if (!apiKey) {
-      errors.push(`${config.name}: no API key (${config.apiKeyEnv})`);
+      errors.push(`${config.name}: no API key (${envName})`);
       continue;
     }
 
-    try {
-      let text;
-      if (provider === "gemini") {
-        text = await callGemini(config.defaultModel, messages, apiKey);
-      } else {
-        text = await callOpenAICompatible(provider, null, messages, apiKey);
+    for (const model of getProviderModels(config)) {
+      try {
+        let text;
+        if (provider === "gemini") {
+          text = await callGemini(model, messages, apiKey);
+        } else {
+          text = await callOpenAICompatible(provider, model, messages, apiKey);
+        }
+        return { text, provider: config.name, model };
+      } catch (e) {
+        errors.push(`${config.name} (${model}): ${e.message}`);
+        console.error(
+          `AI provider ${provider} failed with model ${model}:`,
+          e.message,
+        );
       }
-      return { text, provider: config.name, model: config.defaultModel };
-    } catch (e) {
-      errors.push(`${config.name}: ${e.message}`);
-      console.error(`AI provider ${provider} failed:`, e.message);
     }
   }
 
