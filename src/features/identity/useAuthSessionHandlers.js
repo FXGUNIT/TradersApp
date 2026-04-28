@@ -368,8 +368,8 @@ export function useAuthSessionHandlers({
     setAdminOtpStep(false);
     setAdminOtpsVerified(false);
     setAdminOtps({ otp1: "", otp2: "", otp3: "" });
-    setAdminPassInput("");
-    setAdminPassErr("");
+    setAdminPassInput?.("");
+    setAdminPassErr?.("");
     setAdminOtpErr("");
     setScreen("login");
   }, [
