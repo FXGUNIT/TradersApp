@@ -312,11 +312,15 @@ def admin_verify_negative_check(bff_base_url: str, origin: str, timeout: float) 
     error_text = json_body.get("error") if isinstance(json_body, dict) else None
     is_invalid_password = status == 401 and error_text == "Invalid admin password."
     is_rate_limited = status == 429 and error_text == "Too many attempts. Try again later."
+    is_password_login_disabled = (
+        status == 410
+        and error_text == "Admin password login is disabled. Use authenticator or email OTP."
+    )
     ok = (
         allow_origin == origin
         and isinstance(json_body, dict)
         and json_body.get("verified") is False
-        and (is_invalid_password or is_rate_limited)
+        and (is_invalid_password or is_rate_limited or is_password_login_disabled)
         and "ENOENT" not in body
     )
     return CheckResult(
