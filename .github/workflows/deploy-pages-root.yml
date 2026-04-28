@@ -179,7 +179,7 @@ jobs:
             echo "## Cloudflare Pages root deploy complete"
             echo ""
             echo "- Project: \`tradergunit\`"
-            echo "- URL: \`https://tradergunit.pages.dev\`"
+            echo "- URL: \`${DEPLOY_URL}\`"
             echo "- Commit: \`${GITHUB_SHA}\`"
             echo "- Build command: \`npm ci && npm run build\`"
             echo "- Deploy mode: \`wrangler pages deploy dist --project-name tradergunit\`"
