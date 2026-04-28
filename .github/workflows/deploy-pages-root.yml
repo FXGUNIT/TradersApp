@@ -113,10 +113,10 @@ jobs:
           set -euo pipefail
           mkdir -p .artifacts/pages-root
           python scripts/pages/verify_pages_root_runtime.py \
-            --root-url "https://tradergunit.pages.dev" \
+            --root-url "${DEPLOY_URL}" \
             --bff-base-url "https://${{ vars.BFF_PUBLIC_HOST || format('bff.{0}', vars.CONTABO_DOMAIN || '173.249.18.14.sslip.io') }}" \
             --api-base-url "https://${{ vars.API_PUBLIC_HOST || format('api.{0}', vars.CONTABO_DOMAIN || '173.249.18.14.sslip.io') }}" \
-            --project-preview-url "https://tradergunit.pages.dev/" \
+            --project-preview-url "${DEPLOY_URL}/" \
             --output ".artifacts/pages-root/verification-${{ github.run_id }}.json" \
             --step-summary "${GITHUB_STEP_SUMMARY}"
 
