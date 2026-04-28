@@ -1,6 +1,5 @@
 // bff/services/watchtowerTelegramReporter.mjs
 // Telegram push for every Watchtower fault and resolution.
-// Uses boardRoomTelegram.sendAlert() under the hood.
 
 function istNow() {
   return new Intl.DateTimeFormat("en-IN", {
@@ -10,68 +9,60 @@ function istNow() {
   }).format(new Date());
 }
 
-/**
- * Format a Watchtower fault as a Telegram alert.
- */
 export function formatFaultAlert({ fault, ownerAgent, correctiveAction, threadId }) {
-  const severityEmoji = {
-    critical: "🔴",
-    high: "🟠",
-    medium: "🟡",
-    low: "🟢",
-  }[fault.severity] || "⚪";
+  const severity = fault?.severity || "unknown";
 
   const lines = [
-    `&#128275; <b>WATCHTOWER FAULT DETECTED</b>`,
-    `&#128276; Agent: ${ownerAgent}`,
-    `${severityEmoji} <b>${fault.code}</b>`,
-    `Title: ${fault.title}`,
-    `Detail: ${fault.detail || "—"}`,
-    `Fix: ${correctiveAction}`,
-    threadId ? `Thread: ${threadId}` : "",
+    `<b>Watchtower found a ${escapeHtml(severity)} problem.</b>`,
+    `Agent: ${escapeHtml(ownerAgent || "unknown")}`,
+    `Code: <code>${escapeHtml(fault?.code || "unknown")}</code>`,
+    `What happened: ${escapeHtml(fault?.title || "No title")}`,
+    fault?.detail ? `Details: ${escapeHtml(fault.detail)}` : "",
+    correctiveAction ? `What I will do next: ${escapeHtml(correctiveAction)}` : "",
+    threadId ? `Tracking thread: <code>${escapeHtml(threadId)}</code>` : "",
     `Found: ${istNow()} IST`,
   ].filter(Boolean);
 
   return lines.join("\n");
 }
 
-/**
- * Format a resolution event as a Telegram alert.
- */
 export function formatResolutionAlert({ code, title, ownerAgent, threadId, proof }) {
   const lines = [
-    `&#9989; <b>WATCHTOWER — FAULT RESOLVED</b>`,
-    `&#128276; Agent: ${ownerAgent}`,
-    `Code: ${code}`,
-    `Title: ${title}`,
-    `Thread: ${threadId || "—"}`,
+    "<b>Watchtower closed a problem.</b>",
+    `Agent: ${escapeHtml(ownerAgent || "unknown")}`,
+    `Code: <code>${escapeHtml(code || "unknown")}</code>`,
+    `What was fixed: ${escapeHtml(title || "No title")}`,
+    threadId ? `Tracking thread: <code>${escapeHtml(threadId)}</code>` : "",
     `Resolved: ${istNow()} IST`,
-    proof ? `Proof: ${proof}` : "",
+    proof ? `Proof: ${escapeHtml(proof)}` : "",
   ].filter(Boolean);
 
   return lines.join("\n");
 }
 
-/**
- * Send a Telegram alert for a newly detected fault.
- */
 export async function notifyFault({ fault, ownerAgent, correctiveAction, threadId }) {
   const { boardRoomTelegram } = await import("./boardRoomTelegram.mjs");
   const text = formatFaultAlert({ fault, ownerAgent, correctiveAction, threadId });
   const result = await boardRoomTelegram.sendMessage(text);
-  console.log(`[watchtowerTelegram] Fault alert sent: ${fault.code} → ${result.ok ? "OK" : result.error}`);
+  console.log(`[watchtowerTelegram] Fault alert sent: ${fault?.code || "unknown"} -> ${result.ok ? "OK" : result.error}`);
   return result;
 }
 
-/**
- * Send a Telegram alert when a fault is resolved.
- */
 export async function notifyResolved({ code, title, ownerAgent, threadId, proof }) {
   const { boardRoomTelegram } = await import("./boardRoomTelegram.mjs");
   const text = formatResolutionAlert({ code, title, ownerAgent, threadId, proof });
   const result = await boardRoomTelegram.sendMessage(text);
-  console.log(`[watchtowerTelegram] Resolution alert sent: ${code} → ${result.ok ? "OK" : result.error}`);
+  console.log(`[watchtowerTelegram] Resolution alert sent: ${code || "unknown"} -> ${result.ok ? "OK" : result.error}`);
   return result;
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }
 
 export default { notifyFault, notifyResolved, formatFaultAlert, formatResolutionAlert };

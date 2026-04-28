@@ -5,7 +5,12 @@
  * Imports botState (bot, adminChats) and aiConversation (processConversation).
  */
 
-import { bot, adminChats, registerTelegramUser } from "./botState.js";
+import {
+  bot,
+  adminChats,
+  isAllowedConversationChat,
+  registerTelegramUser,
+} from "./botState.js";
 import { processConversation, sessionStore } from "./aiConversation.js";
 
 // ─── Typing State ─────────────────────────────────────────────────────────────
@@ -43,9 +48,24 @@ export async function handleBotMessage(msg) {
   const chatId = msg.chat.id;
   const text = msg.text.trim();
 
-  // Only allow group chats if they are in adminChats
+  if (text.startsWith("/id") || text.startsWith("/chatid")) {
+    await bot.sendMessage(
+      chatId,
+      `This chat id is ${chatId}. Add it to TELEGRAM_ALLOWED_CHAT_IDS if this group should talk with me.`,
+      { disable_web_page_preview: true },
+    );
+    return;
+  }
+
+  // Private chats are allowed. Groups must be explicitly configured so the bot
+  // does not start talking in every group it is added to.
   if (msg.chat.type === "group" || msg.chat.type === "supergroup") {
-    if (!adminChats.includes(chatId)) return;
+    if (!isAllowedConversationChat(chatId)) {
+      console.log(
+        `[telegram] Ignoring group chat ${chatId}; add it to TELEGRAM_ALLOWED_CHAT_IDS to enable replies.`,
+      );
+      return;
+    }
   }
 
   sendTypingAction(chatId);
@@ -62,17 +82,17 @@ export async function handleBotMessage(msg) {
 
     // Split long messages to stay under Telegram's 4096 char limit
     const chunks = [];
-    if (response.length > 4096) {
-      for (let i = 0; i < response.length; i += 4096 - 10) {
-        chunks.push(response.slice(i, i + 4096 - 10));
+    const reply = String(response || "").trim() || "I am here, but I did not get a response body.";
+    if (reply.length > 4096) {
+      for (let i = 0; i < reply.length; i += 4096 - 10) {
+        chunks.push(reply.slice(i, i + 4096 - 10));
       }
     } else {
-      chunks.push(response);
+      chunks.push(reply);
     }
 
     for (const chunk of chunks) {
       await bot.sendMessage(chatId, chunk, {
-        parse_mode: "Markdown",
         disable_web_page_preview: true,
       });
       if (chunks.length > 1) await new Promise((r) => setTimeout(r, 200));
@@ -110,7 +130,7 @@ export function setupBotPolling() {
         username: query.from?.username,
       });
       await bot.answerCallbackQuery(query.id);
-      await bot.sendMessage(chatId, response, { parse_mode: "Markdown" });
+      await bot.sendMessage(chatId, response, { disable_web_page_preview: true });
     } catch (e) {
       console.error("Callback query error:", e);
       await bot.answerCallbackQuery(query.id, {

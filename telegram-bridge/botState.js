@@ -9,13 +9,21 @@ import TelegramBot from "node-telegram-bot-api";
 import path from "node:path";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
+import dotenv from "dotenv";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const PROJECT_ROOT = path.resolve(__dirname, "..");
+
+dotenv.config({ path: path.resolve(PROJECT_ROOT, ".env.local") });
+dotenv.config({ path: path.resolve(PROJECT_ROOT, ".env") });
 
 // ─── Bot Instance ─────────────────────────────────────────────────────────────
 
-const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const BOT_TOKEN =
+  process.env.TELEGRAM_BOT_TOKEN ||
+  process.env.BFF_TELEGRAM_BOT_TOKEN ||
+  process.env.VITE_TELEGRAM_BOT_TOKEN;
 
 if (!BOT_TOKEN) {
   console.error(
@@ -36,6 +44,29 @@ if (process.env.TELEGRAM_ADMIN_CHAT_IDS) {
   adminChats = process.env.TELEGRAM_ADMIN_CHAT_IDS.split(",")
     .map((id) => Number(id.trim()))
     .filter((n) => !Number.isNaN(n));
+}
+
+export function parseChatIds(value) {
+  return String(value || "")
+    .split(",")
+    .map((id) => Number(id.trim()))
+    .filter((n) => Number.isFinite(n));
+}
+
+export function getAllowedConversationChats() {
+  return [
+    ...adminChats,
+    ...parseChatIds(process.env.TELEGRAM_ALLOWED_CHAT_IDS),
+    ...parseChatIds(process.env.TELEGRAM_CHAT_ID),
+    ...parseChatIds(process.env.BFF_TELEGRAM_CHAT_ID),
+    ...parseChatIds(process.env.BOARD_ROOM_TELEGRAM_CHAT_ID),
+  ];
+}
+
+export function isAllowedConversationChat(chatId) {
+  if (process.env.TELEGRAM_ALLOW_ALL_CHATS === "true") return true;
+  const numericChatId = Number(chatId);
+  return getAllowedConversationChats().includes(numericChatId);
 }
 
 /**
