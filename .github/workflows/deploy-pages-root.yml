@@ -104,7 +104,7 @@ jobs:
           set -euo pipefail
           mkdir -p .artifacts/pages-root
           node scripts/pages/verify_pages_root_browser.mjs \
-            --url "https://tradergunit.pages.dev" \
+            --url "${DEPLOY_URL}" \
             --output ".artifacts/pages-root/browser-${{ github.run_id }}.json"
 
       - name: Verify Pages root runtime
