@@ -88,8 +88,25 @@ jobs:
             --commit-hash "${GITHUB_SHA}" 2>&1)
           echo "${DEPLOY_OUTPUT}"
           # Extract preview URL and save for downstream steps
-          DEPLOY_URL=$(echo "${DEPLOY_OUTPUT}" | grep -o 'https://[^ ]*\.tradergunit\.pages\.dev' | head -1)
+          DEPLOY_URL=$(echo "${DEPLOY_OUTPUT}" | grep -o 'https://[^ ]*\.tradergunit\.pages\.dev' | tail -1)
           echo "DEPLOY_URL=${DEPLOY_URL}" >> "${GITHUB_OUTPUT}"
+
+      - name: Promote preview to production
+        run: |
+          set -euo pipefail
+          if [ -z "${DEPLOY_URL:-}" ]; then
+            echo "::warning::No DEPLOY_URL — skipping promotion"
+            exit 0
+          fi
+          echo "Promoting ${DEPLOY_URL} to production..."
+          # Extract deployment ID from preview URL
+          DEPLOYMENT_ID=$(echo "${DEPLOY_URL}" | grep -o '[a-f0-9]\{10\}' | tail -1)
+          curl -s -X POST \
+            "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/tradergunit/deployments/${DEPLOYMENT_ID}/promote" \
+            -H "X-Auth-Email: ${CLOUDFLARE_EMAIL}" \
+            -H "X-Auth-Key: ${CLOUDFLARE_API_KEY}" \
+            -H "Content-Type: application/json" \
+            -d '{}' | python3 -c "import json,sys; d=json.load(sys.stdin); print('Promotion success:', d.get('success'), d.get('errors', []))"
 
       - name: Setup Python
         uses: actions/setup-python@v5
