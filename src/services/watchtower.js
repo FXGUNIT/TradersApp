@@ -16,6 +16,8 @@ const WATCHTOWER_AGENT = "Watchtower";
 const BOARD_ROOM_REPORT_COOLDOWN_MS = 60 * 60 * 1000;
 const USER_ERROR_RETENTION_MS = 15 * 60 * 1000;
 const MAX_USER_ERRORS = 10;
+const BOARD_ROOM_BROWSER_REPORTING_ENABLED =
+  import.meta.env.VITE_ENABLE_BOARD_ROOM_BROWSER_REPORTER === "true";
 
 let watchtowerInterval = null;
 let watchtowerInflight = null;
@@ -28,6 +30,7 @@ let boardRoomSyncState = {
   lastReportAt: null,
   lastSyncError: null,
   currentThreadId: null,
+  reportingDisabled: !BOARD_ROOM_BROWSER_REPORTING_ENABLED,
 };
 
 const WATCHTOWER_RULES = {
@@ -211,11 +214,14 @@ function severityToBoardRoom(severity) {
 }
 
 function getBoardRoomSyncSnapshot() {
-  return { ...boardRoomSyncState };
+  return {
+    ...boardRoomSyncState,
+    reportingDisabled: !BOARD_ROOM_BROWSER_REPORTING_ENABLED,
+  };
 }
 
 async function postBoardRoomJson(path, payload) {
-  if (!hasBff()) {
+  if (!BOARD_ROOM_BROWSER_REPORTING_ENABLED || !hasBff()) {
     return null;
   }
 
@@ -256,7 +262,12 @@ function shouldReportFault(fault, { force = false } = {}) {
 }
 
 async function reportFaultToBoardRoom(fault, options = {}) {
-  if (!fault || !hasBff() || !shouldReportFault(fault, options)) {
+  if (
+    !BOARD_ROOM_BROWSER_REPORTING_ENABLED ||
+    !fault ||
+    !hasBff() ||
+    !shouldReportFault(fault, options)
+  ) {
     return null;
   }
 
@@ -283,11 +294,22 @@ async function reportFaultToBoardRoom(fault, options = {}) {
 }
 
 async function syncWatchtowerWithBoardRoom(status) {
+  if (!BOARD_ROOM_BROWSER_REPORTING_ENABLED) {
+    boardRoomSyncState = {
+      ...boardRoomSyncState,
+      connected: false,
+      lastSyncError: null,
+      reportingDisabled: true,
+    };
+    return getBoardRoomSyncSnapshot();
+  }
+
   if (!hasBff()) {
     boardRoomSyncState = {
       ...boardRoomSyncState,
       connected: false,
       lastSyncError: "BFF unavailable.",
+      reportingDisabled: false,
     };
     return null;
   }
@@ -312,6 +334,7 @@ async function syncWatchtowerWithBoardRoom(status) {
       connected: true,
       lastHeartbeatAt: new Date().toISOString(),
       lastSyncError: null,
+      reportingDisabled: false,
       currentThreadId:
         heartbeat.heartbeat?.currentThreadId ||
         boardRoomSyncState.currentThreadId ||
@@ -324,6 +347,7 @@ async function syncWatchtowerWithBoardRoom(status) {
       lastSyncError: heartbeat?._authError
         ? "Board Room reporter rejected the heartbeat."
         : "Board Room heartbeat failed.",
+      reportingDisabled: false,
     };
   }
 
@@ -657,7 +681,11 @@ export async function runWatchtowerScan() {
   await syncWatchtowerWithBoardRoom(statusPayload);
   statusPayload.systems.boardRoom = getBoardRoomSyncSnapshot();
 
-  if (!statusPayload.systems.boardRoom.connected && health.ok) {
+  if (
+    !statusPayload.systems.boardRoom.connected &&
+    health.ok &&
+    !statusPayload.systems.boardRoom.reportingDisabled
+  ) {
     statusPayload.faults.push(
       createFault(
         "BOARD_ROOM_SYNC_FAILED",

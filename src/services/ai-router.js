@@ -5,6 +5,8 @@ import { resolveBffBaseUrl } from "./runtimeConfig.js";
 export const AI_STATUS_REFRESH_MS = 30 * 1000;
 const BOARD_ROOM_FRONTEND_AGENT = "FrontendAI.Router";
 const BOARD_ROOM_HEARTBEAT_MS = 90 * 60 * 1000;
+const BOARD_ROOM_BROWSER_REPORTING_ENABLED =
+  import.meta.env.VITE_ENABLE_BOARD_ROOM_BROWSER_REPORTER === "true";
 
 const AI_ENGINE_DEFINITIONS = [
   { key: "gemini", name: "Gemini" },
@@ -167,7 +169,7 @@ async function callBffJson(path, payload) {
 }
 
 async function postBoardRoomJson(path, payload) {
-  if (!hasBff()) {
+  if (!BOARD_ROOM_BROWSER_REPORTING_ENABLED || !hasBff()) {
     return null;
   }
 
@@ -225,7 +227,11 @@ async function sendBoardRoomHeartbeat({
 }
 
 function ensureBoardRoomHeartbeatLoop() {
-  if (boardRoomHeartbeatTimer || !hasBff()) {
+  if (
+    boardRoomHeartbeatTimer ||
+    !BOARD_ROOM_BROWSER_REPORTING_ENABLED ||
+    !hasBff()
+  ) {
     return;
   }
 

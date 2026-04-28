@@ -194,13 +194,23 @@ function TradersRegimentInner() {
     getInitialWatchtowerStatus(),
   );
   useEffect(() => {
+    if (!auth?.uid) {
+      stopAIStatusScheduler();
+      setAiStatuses(getAIStatusesDetailed());
+      return () => stopAIStatusScheduler();
+    }
     startAIStatusScheduler(setAiStatuses);
     return () => stopAIStatusScheduler();
-  }, []);
+  }, [auth?.uid]);
   useEffect(() => {
+    if (!auth?.uid) {
+      stopWatchtower();
+      setWatchtowerStatus(getInitialWatchtowerStatus());
+      return () => stopWatchtower();
+    }
     startWatchtower(setWatchtowerStatus);
     return () => stopWatchtower();
-  }, []);
+  }, [auth?.uid]);
 
   // ── Screen persistence ─────────────────────────────────────────────────────
   const [consciousnessReturnScreen, setConsciousnessReturnScreen] = useState("hub");
