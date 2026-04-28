@@ -3,6 +3,8 @@ import {
   refreshAgentHeartbeat,
   reportGovernanceIncident,
 } from "./boardRoomAgentReporter.mjs";
+import watchtowerScheduler from "./watchtowerScheduler.mjs";
+import { notifyFault as telegramNotifyFault, notifyResolved as telegramNotifyResolved } from "./watchtowerTelegramReporter.mjs";
 
 export const WATCHTOWER_REFRESH_MS = Math.max(
   60_000,
@@ -99,9 +101,16 @@ const WATCHTOWER_RULES = {
 };
 
 let daemonTimer = null;
+let schedulerHandle = null;
+let currentScanTimer = null;
 let inflightScan = null;
 let serviceBaseUrl = null;
+// Tracks cooldown by key → timestamp (original)
 const reportedFaults = new Map();
+// Tracks full fault data by key → { threadId, reportedAt, lastProbedAt, status }
+const reportedFaultsFull = new Map();
+
+const ESCALATION_AGE_MS = 2 * 60 * 60 * 1000; // 2 hours before escalation
 
 let lastStatus = {
   ok: false,
@@ -206,7 +215,7 @@ function faultReportKey(fault) {
   ].join(":");
 }
 
-async function reportFaults(faults) {
+async function reportFaults(faults, systems) {
   await Promise.all(
     faults
       .filter((fault) => fault.reportToBoardRoom !== false)
@@ -230,10 +239,32 @@ async function reportFaults(faults) {
 
         if (result) {
           reportedFaults.set(key, Date.now());
+          reportedFaultsFull.set(key, {
+            ...fault,
+            threadId: result.threadId,
+            reportedAt: Date.now(),
+            lastProbedAt: Date.now(),
+            status: "open",
+          });
+          // Send Telegram alert
+          void telegramNotifyFault({
+            fault,
+            ownerAgent: fault.ownerAgent,
+            correctiveAction: fault.correctiveAction,
+            threadId: result.threadId,
+          });
         }
         return result;
       }),
   );
+  // Re-probe tracked faults for resolution
+  if (systems) {
+    for (const [key, tracked] of reportedFaultsFull) {
+      if (tracked.status !== "resolved") {
+        void probeAndResolve(key, tracked, systems);
+      }
+    }
+  }
 }
 
 export function getWatchtowerStatus() {

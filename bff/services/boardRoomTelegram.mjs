@@ -86,6 +86,7 @@ function formatDigest(digest) {
 }
 
 export const boardRoomTelegram = {
+  sendMessage: (text) => sendTelegramMessage(text),
   sendAlert: (params) => sendTelegramMessage(formatAlert(params)),
   sendEscalation: (params) => sendTelegramMessage(formatEscalation(params)),
   sendDigest: (digest) => sendTelegramMessage(formatDigest(digest)),
