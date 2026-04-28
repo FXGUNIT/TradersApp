@@ -45,6 +45,7 @@ import { useTerminalWorkspaceHydration } from "./features/shell/useTerminalWorks
 import { useTerminalPersistenceHandlers } from "./features/terminal/useTerminalPersistenceHandlers.js";
 import {
   getAIStatusesDetailed,
+  checkAllAIStatus,
   startAIStatusScheduler,
   stopAIStatusScheduler,
   quadCoreStatus as aiQuadCoreStatus,
