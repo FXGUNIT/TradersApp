@@ -91,7 +91,7 @@ function BrandHero({ themeMode }) {
         style={{
           fontSize: "clamp(30px, 6vw, 48px)",
           fontWeight: 900,
-          color: "var(--aura-accent-primary, #d97706)",
+          color: "var(--aura-accent-primary, #0057FF)",
           margin: "0 0 14px 0",
           letterSpacing: -1.4,
           lineHeight: 0.95,
@@ -115,7 +115,7 @@ function BrandHero({ themeMode }) {
           style={{
             width: 48,
             height: 1,
-            background: "color-mix(in srgb, var(--aura-accent-primary, #d97706) 40%, transparent)",
+            background: "color-mix(in srgb, var(--aura-accent-primary, #0057FF) 40%, transparent)",
           }}
         />
         <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
@@ -164,7 +164,7 @@ function BrandHero({ themeMode }) {
           style={{
             fontSize: "clamp(14px, 2.3vw, 18px)",
             fontWeight: 900,
-            color: "var(--aura-accent-primary, #d97706)",
+            color: "var(--aura-accent-primary, #0057FF)",
             letterSpacing: 2.2,
             textAlign: "center",
             textTransform: "uppercase",
