@@ -82,8 +82,7 @@ function BrandHero({ themeMode }) {
           letterSpacing: -1.4,
           lineHeight: 0.95,
           textAlign: "center",
-          fontFamily:
-            "'DM Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif",
+          fontFamily: "var(--font-ui)",
         }}
       >
         TRADERS
@@ -97,8 +96,7 @@ function BrandHero({ themeMode }) {
           letterSpacing: -1.4,
           lineHeight: 0.95,
           textAlign: "center",
-          fontFamily:
-            "'DM Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif",
+          fontFamily: "var(--font-ui)",
         }}
       >
         REGIMENT

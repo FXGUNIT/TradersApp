@@ -502,7 +502,7 @@ export default function RegimentHub({
               letterSpacing: -1.3,
               lineHeight: 0.95,
               textAlign: "center",
-              fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
+              fontFamily: "var(--font-ui)",
             }}
           >
             TRADERS
@@ -516,7 +516,7 @@ export default function RegimentHub({
               letterSpacing: -1.3,
               lineHeight: 0.95,
               textAlign: "center",
-              fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
+              fontFamily: "var(--font-ui)",
               textShadow: "0 0 28px color-mix(in srgb, var(--aura-accent-primary) 24%, transparent)",
             }}
           >
