@@ -82,13 +82,13 @@ jobs:
           if [ -z "${CLOUDFLARE_API_TOKEN:-}" ]; then
             echo "Using Cloudflare global API key auth for wrangler"
           fi
-          DEPLOY_OUTPUT=$(npx wrangler@3.103.0 pages deploy dist \
+          npx wrangler@3.103.0 pages deploy dist \
             --project-name tradergunit \
             --branch main \
-            --commit-hash "${GITHUB_SHA}" 2>&1)
-          echo "${DEPLOY_OUTPUT}"
+            --commit-hash "${GITHUB_SHA}" 2>&1 | tee /tmp/wrangler-output.txt
           # Extract preview URL and save for downstream steps
-          DEPLOY_URL=$(echo "${DEPLOY_OUTPUT}" | grep -o 'https://[^ ]*\.tradergunit\.pages\.dev' | tail -1)
+          DEPLOY_URL=$(grep -o 'https://[^ ]*tradergunit.pages.dev' /tmp/wrangler-output.txt | tail -1)
+          echo "DEPLOY_URL=${DEPLOY_URL}"
           echo "DEPLOY_URL=${DEPLOY_URL}" >> "${GITHUB_OUTPUT}"
 
       - name: Promote preview to production
