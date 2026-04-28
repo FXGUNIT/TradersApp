@@ -267,6 +267,56 @@ async function reportFaults(faults, systems) {
   }
 }
 
+function isSubsystemHealthy(faultCode, systems) {
+  switch (faultCode) {
+    case "BFF_HEALTH_FAILED": return systems.bff?.ok === true;
+    case "ML_HEALTH_FAILED": return systems.ml?.ok === true;
+    case "AI_KEYS_MISSING": return (systems.ai?.configured ?? 0) > 0;
+    case "AI_ALL_OFFLINE": return (systems.ai?.online ?? 0) > 0;
+    case "NEWS_LIVE_OFFLINE": return systems.liveNews?.ok === true;
+    case "NEWS_CALENDAR_OFFLINE": return systems.scheduledNews?.ok === true;
+    default: return false;
+  }
+}
+
+async function probeAndResolve(key, tracked, systems) {
+  const isHealthy = isSubsystemHealthy(tracked.code, systems);
+  if (isHealthy) {
+    tracked.status = "resolved";
+    reportedFaultsFull.set(key, tracked);
+    void telegramNotifyResolved({
+      code: tracked.code,
+      title: `${tracked.code} is now healthy`,
+      ownerAgent: tracked.ownerAgent,
+      threadId: tracked.threadId,
+      proof: `Re-probe at ${new Date().toISOString()}`,
+    });
+    try {
+      await boardRoomService.closeThread({ threadId: tracked.threadId });
+      console.log(`[watchtower] Thread ${tracked.threadId} closed — ${tracked.code} resolved`);
+    } catch (e) {
+      console.error(`[watchtower] Failed to close thread ${tracked.threadId}:`, e.message);
+    }
+  } else {
+    tracked.lastProbedAt = Date.now();
+    if (Date.now() - tracked.reportedAt > ESCALATION_AGE_MS && tracked.status === "open") {
+      tracked.status = "escalated";
+      console.warn(`[watchtower] Fault ${tracked.code} escalated after 2 hours without resolution`);
+    }
+    reportedFaultsFull.set(key, tracked);
+  }
+}
+
+export function getResolvedFaultCount() {
+  let open = 0, resolved = 0, escalated = 0;
+  for (const [, v] of reportedFaultsFull) {
+    if (v.status === "resolved") resolved++;
+    else if (v.status === "escalated") escalated++;
+    else open++;
+  }
+  return { open, resolved, escalated };
+}
+
 export function getWatchtowerStatus() {
   return lastStatus;
 }
@@ -441,10 +491,13 @@ export async function runWatchtowerScan(options = {}) {
         },
         refreshedAt: new Date().toISOString(),
         elapsedMs: Date.now() - startedAt,
-        refreshMs: WATCHTOWER_REFRESH_MS,
+        refreshMs: watchtowerScheduler.getRefreshIntervalMs(),
         daemon: {
-          active: Boolean(daemonTimer),
+          active: Boolean(currentScanTimer || schedulerHandle),
           baseUrl: serviceBaseUrl,
+          nextIntervalMs: watchtowerScheduler.getRefreshIntervalMs(),
+          currentIstHour: watchtowerScheduler.getIstHour(),
+          isDayHours: watchtowerScheduler.isIstDayHours(),
         },
       };
 
@@ -457,7 +510,7 @@ export async function runWatchtowerScan(options = {}) {
             : `Investigating ${faults.length} active fault${faults.length === 1 ? "" : "s"}.`,
       });
 
-      await reportFaults(faults);
+      await reportFaults(faults, lastStatus.systems);
       return lastStatus;
     } catch (error) {
       const fault = createFault(
@@ -475,7 +528,7 @@ export async function runWatchtowerScan(options = {}) {
         refreshedAt: new Date().toISOString(),
         elapsedMs: Date.now() - startedAt,
       };
-      await reportFaults([fault]);
+      await reportFaults([fault], null);
       return lastStatus;
     } finally {
       inflightScan = null;
@@ -490,22 +543,38 @@ export function startWatchtowerDaemon(options = {}) {
     return false;
   }
   serviceBaseUrl = resolveBaseUrl(options);
-  if (daemonTimer) return true;
+  if (currentScanTimer || schedulerHandle) return true;
 
-  const run = () => {
-    void runWatchtowerScan({ baseUrl: serviceBaseUrl });
+  const scheduleNext = () => {
+    const intervalMs = watchtowerScheduler.getRefreshIntervalMs();
+    const nextDelayMs = Math.min(
+      intervalMs,
+      watchtowerScheduler.computeNextBoundaryDelayMs(),
+    );
+    if (currentScanTimer) clearTimeout(currentScanTimer);
+    currentScanTimer = setTimeout(async () => {
+      await runWatchtowerScan({ baseUrl: serviceBaseUrl });
+      scheduleNext();
+    }, nextDelayMs);
+    if (typeof currentScanTimer.unref === "function") currentScanTimer.unref();
   };
 
-  setTimeout(run, Number(process.env.WATCHTOWER_START_DELAY_MS || 2_000));
-  daemonTimer = setInterval(run, WATCHTOWER_REFRESH_MS);
-  if (typeof daemonTimer.unref === "function") daemonTimer.unref();
+  schedulerHandle = setTimeout(() => {
+    void runWatchtowerScan({ baseUrl: serviceBaseUrl });
+    scheduleNext();
+  }, Number(process.env.WATCHTOWER_START_DELAY_MS || 2_000));
+
   return true;
 }
 
 export function stopWatchtowerDaemon() {
-  if (daemonTimer) {
-    clearInterval(daemonTimer);
-    daemonTimer = null;
+  if (currentScanTimer) {
+    clearTimeout(currentScanTimer);
+    currentScanTimer = null;
+  }
+  if (schedulerHandle) {
+    clearTimeout(schedulerHandle);
+    schedulerHandle = null;
   }
 }
 
@@ -514,5 +583,6 @@ export default {
   runWatchtowerScan,
   startWatchtowerDaemon,
   stopWatchtowerDaemon,
+  getResolvedFaultCount,
   WATCHTOWER_REFRESH_MS,
 };
