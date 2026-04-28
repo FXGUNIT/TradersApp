@@ -65,8 +65,6 @@ export function useAuthSessionHandlers({
   setAdminOtpStep,
   setAdminOtpsVerified,
   setAdminOtps,
-  setAdminPassInput,
-  setAdminPassErr,
   setAdminOtpErr,
 }) {
 
@@ -368,8 +366,6 @@ export function useAuthSessionHandlers({
     setAdminOtpStep(false);
     setAdminOtpsVerified(false);
     setAdminOtps({ otp1: "", otp2: "", otp3: "" });
-    setAdminPassInput?.("");
-    setAdminPassErr?.("");
     setAdminOtpErr("");
     setScreen("login");
   }, [
@@ -381,8 +377,6 @@ export function useAuthSessionHandlers({
     setAdminOtpStep,
     setAdminOtps,
     setAdminOtpsVerified,
-    setAdminPassErr,
-    setAdminPassInput,
     setAuth,
     setGoogleUser,
     setIsAdminAuthenticated,

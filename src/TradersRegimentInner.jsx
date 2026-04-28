@@ -265,7 +265,7 @@ function TradersRegimentInner() {
     setIsAdminAuthenticated, setShowAdminPrompt,
     setAdminMasterEmail, setAdminMasterEmailVerified,
     setAdminOtpStep, setAdminOtpsVerified, setAdminOtps,
-    setAdminPassInput, setAdminPassErr, setAdminOtpErr,
+    setAdminOtpErr,
   });
 
   useAuthBootstrap({ checkUserStatus, isAdminAuthenticated, setAuth, setProfile, setGoogleUser, setScreen, setIsInitialLoading, authBootstrapCompleteRef, pendingRedirectResultHandler: handleGoogleRedirectResult });
@@ -302,7 +302,7 @@ function TradersRegimentInner() {
     setIsAudioMuted: (v) => setIsAudioMuted(v),
     handleLogin, handleStructuredGoogleAuth, handleLoginPasswordReset,
     resetAdminPromptState, setShowAdminPrompt, setAdminMasterEmail,
-    setAdminPassInput, setAdminOtps, setAdminOtpStep,
+    setAdminOtps, setAdminOtpStep,
     handleAdminRequestNewCodes, sendAdminOTPs,
     handleAdminAccess, handleAdminVerifyCodes,
     handleStructuredSignup, handleBackToLoginFromSignup,

@@ -48,6 +48,17 @@ async function main() {
 
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage();
+  const pageErrors = [];
+  const consoleErrors = [];
+
+  page.on("pageerror", (error) => {
+    pageErrors.push(collapseWhitespace(error?.stack || error?.message || error));
+  });
+
+  page.on("console", (message) => {
+    if (message.type() !== "error") return;
+    consoleErrors.push(collapseWhitespace(message.text()));
+  });
 
   let report;
   try {
@@ -59,8 +70,42 @@ async function main() {
     const h1 = collapseWhitespace(await page.locator("h1").first().textContent());
     const title = collapseWhitespace(await page.title());
     const hostname = await page.evaluate(() => window.location.hostname);
+    const rootText = collapseWhitespace(
+      await page.locator("#root").textContent({ timeout: 5000 }),
+    );
+    const rootHtmlLength = await page.locator("#root").evaluate(
+      (node) => node.innerHTML.length,
+    );
+    const scriptUrls = await page.locator("script[src]").evaluateAll((nodes) =>
+      nodes.map((node) => node.src).filter(Boolean),
+    );
+    const staleBundleMatches = [];
+
+    for (const scriptUrl of scriptUrls) {
+      const scriptResponse = await page.request.get(scriptUrl, {
+        timeout: args.timeoutMs,
+      });
+      if (!scriptResponse.ok()) continue;
+      const body = await scriptResponse.text();
+      const matches = ["setAdminPassInput", "setAdminPassErr"].filter((token) =>
+        body.includes(token),
+      );
+      if (matches.length > 0) {
+        staleBundleMatches.push({ url: scriptUrl, matches });
+      }
+    }
+
     const status = response?.status() ?? 0;
-    const ok = status === 200 && title === EXPECTED_TITLE && h1 === EXPECTED_H1 && h1 !== REJECTED_H1;
+    const hasRootContent = rootHtmlLength > 0 && rootText.length > 0;
+    const ok =
+      status === 200 &&
+      title === EXPECTED_TITLE &&
+      h1 === EXPECTED_H1 &&
+      h1 !== REJECTED_H1 &&
+      hasRootContent &&
+      pageErrors.length === 0 &&
+      consoleErrors.length === 0 &&
+      staleBundleMatches.length === 0;
 
     report = {
       ok,
@@ -69,6 +114,11 @@ async function main() {
       h1,
       title,
       hostname,
+      hasRootContent,
+      rootHtmlLength,
+      pageErrors,
+      consoleErrors,
+      staleBundleMatches,
       expectedTitle: EXPECTED_TITLE,
       expectedH1: EXPECTED_H1,
       rejectedH1: REJECTED_H1,
