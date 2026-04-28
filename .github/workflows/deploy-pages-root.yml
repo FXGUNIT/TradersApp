@@ -98,22 +98,38 @@ jobs:
           echo "DEPLOY_URL=${DEPLOY_URL}" >> "${GITHUB_OUTPUT}"
           echo "DEPLOY_URL=${DEPLOY_URL}" >> "${GITHUB_ENV}"
 
-      - name: Promote preview to production
+      - name: Confirm production publish path
         run: |
           set -euo pipefail
           if [ -z "${DEPLOY_URL:-}" ]; then
             echo "::warning::No DEPLOY_URL — skipping promotion"
             exit 0
           fi
-          echo "Promoting ${DEPLOY_URL} to production..."
-          # Extract deployment ID from preview URL
-          DEPLOYMENT_ID=$(echo "${DEPLOY_URL}" | grep -o '[a-f0-9]\{10\}' | tail -1)
-          curl -s -X POST \
-            "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/tradergunit/deployments/${DEPLOYMENT_ID}/promote" \
-            -H "X-Auth-Email: ${CLOUDFLARE_EMAIL}" \
-            -H "X-Auth-Key: ${CLOUDFLARE_API_KEY}" \
-            -H "Content-Type: application/json" \
-            -d '{}' | python3 -c "import json,sys; d=json.load(sys.stdin); print('Promotion success:', d.get('success'), d.get('errors', []))"
+          echo "Wrangler uploaded ${DEPLOY_URL} on branch main."
+          echo "Production publish is validated by the live browser/runtime checks below."
+
+      - name: Wait for production bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT_URL="https://tradergunit.pages.dev/"
+          for attempt in {1..18}; do
+            html="$(curl -fsSL "${ROOT_URL}")"
+            bundle_path="$(printf '%s' "${html}" | grep -o "assets/index-[^\"']*\\.js" | head -1 || true)"
+            if [ -n "${bundle_path}" ]; then
+              bundle="$(curl -fsSL "${ROOT_URL}${bundle_path}")"
+              if ! printf '%s' "${bundle}" | grep -Eq 'setAdminPassInput|setAdminPassErr'; then
+                echo "Production bundle is clean: ${bundle_path}"
+                exit 0
+              fi
+              echo "Production still has stale admin password tokens in ${bundle_path}; retrying..."
+            else
+              echo "Production HTML did not expose an index bundle yet; retrying..."
+            fi
+            sleep 10
+          done
+          echo "::error::Production bundle still contains stale admin password crash tokens"
+          exit 1
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -129,7 +145,7 @@ jobs:
           set -euo pipefail
           mkdir -p .artifacts/pages-root
           node scripts/pages/verify_pages_root_browser.mjs \
-            --url "${DEPLOY_URL}" \
+            --url "https://tradergunit.pages.dev/" \
             --output ".artifacts/pages-root/browser-${{ github.run_id }}.json"
 
       - name: Verify Pages root runtime
@@ -138,7 +154,7 @@ jobs:
           set -euo pipefail
           mkdir -p .artifacts/pages-root
           python scripts/pages/verify_pages_root_runtime.py \
-            --root-url "${DEPLOY_URL}" \
+            --root-url "https://tradergunit.pages.dev/" \
             --bff-base-url "https://${{ vars.BFF_PUBLIC_HOST || format('bff.{0}', vars.CONTABO_DOMAIN || '173.249.18.14.sslip.io') }}" \
             --api-base-url "https://${{ vars.API_PUBLIC_HOST || format('api.{0}', vars.CONTABO_DOMAIN || '173.249.18.14.sslip.io') }}" \
             --project-preview-url "${DEPLOY_URL}/" \
