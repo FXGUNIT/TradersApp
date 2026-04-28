@@ -10,7 +10,7 @@ export const NIGHT_INTERVAL_MS = 60 * 60 * 1000; // 60 minutes
 const IST_OFFSET_HOURS = 5.5;  // IST = UTC + 5:30
 
 /**
- * Returns the current IST hour (0-23) for a given UTC Date.
+ * Returns the current IST hour (0-23).
  */
 export function getIstHour(utcDate = new Date()) {
   const utcMs = utcDate.getTime() + utcDate.getTimezoneOffset() * 60 * 1000;
@@ -23,14 +23,14 @@ export function getIstHour(utcDate = new Date()) {
  * Returns true if IST is between 9:00 and 23:59 inclusive.
  */
 export function isIstDayHours(utcDate = new Date()) {
-  const h = getIstHour(utcDate);
-  return h >= IST_DAY_HOUR_START && h <= IST_DAY_HOUR_END;
+  return getRefreshIntervalMs(getIstHour(utcDate)) === DAY_INTERVAL_MS;
 }
 
 /**
- * Returns the correct scan interval in ms for the given IST hour.
+ * Returns the correct scan interval in ms. When called with no arguments,
+ * uses the current IST hour so callers don't need to compute it.
  */
-export function getRefreshIntervalMs(istHour) {
+export function getRefreshIntervalMs(istHour = getIstHour()) {
   if (istHour >= IST_DAY_HOUR_START && istHour <= IST_DAY_HOUR_END) {
     return DAY_INTERVAL_MS;
   }
@@ -38,18 +38,14 @@ export function getRefreshIntervalMs(istHour) {
 }
 
 /**
- * Returns the number of ms until the next IST day/night boundary,
- * so we can schedule a recalculation of the interval.
+ * Returns the number of ms until the next IST day/night boundary.
  */
 export function computeNextBoundaryDelayMs(utcDate = new Date()) {
   const istHour = getIstHour(utcDate);
-  // If in day hours (9-23), next boundary is at hour 24 (midnight IST next day)
-  // If in night hours (0-8), next boundary is at hour 9 (9 AM IST)
   const targetHourIST = (istHour >= IST_DAY_HOUR_START && istHour <= IST_DAY_HOUR_END)
     ? 24  // midnight next
     : IST_DAY_HOUR_START;  // 9 AM
 
-  // Convert target IST hour back to UTC
   const utcMs = utcDate.getTime() + utcDate.getTimezoneOffset() * 60 * 1000;
   const istMs = utcMs + IST_OFFSET_HOURS * 60 * 60 * 1000;
   const istDate = new Date(istMs);
