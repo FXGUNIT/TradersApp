@@ -11,50 +11,37 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Get Contabo auth token
-        id: auth
         run: |
-          TOKEN_RESP=$(curl -s -X POST "${{ env.CONTABO_API_URL }}/v1/oauth/token" \
+          RESP=$(curl -s -X POST "${{ env.CONTABO_API_URL }}/v1/oauth/token" \
             -H "Content-Type: application/x-www-form-urlencoded" \
             -d "grant_type=password&username=${{ secrets.CONTABO_API_USER }}&password=${{ secrets.CONTABO_API_PASSWORD }}&client_id=${{ secrets.CONTABO_API_CLIENT_ID }}&client_secret=${{ secrets.CONTABO_API_CLIENT_SECRET }}" \
           )
-          echo "auth_resp: $TOKEN_RESP"
-          TOKEN=$(echo "$TOKEN_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('token','') or d.get('access_token',''))")
-          if [ -z "$TOKEN" ]; then echo "::error::Failed to get Contabo token"; echo "$TOKEN_RESP"; exit 1; fi
-          echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
+          echo "auth_resp: $RESP"
+          TOKEN=$(echo "$RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('token',d.get('access_token','')))")
+          if [ -z "$TOKEN" ]; then echo "::error::Failed to get Contabo token"; exit 1; fi
+          echo "TOKEN=$TOKEN" >> "$GITHUB_OUTPUT"
 
       - name: Find VPS instance
-        id: instance
         run: |
           RESP=$(curl -s -X GET "${{ env.CONTABO_API_URL }}/v1/compute/instances?size=50" \
-            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.TOKEN }}" \
             -H "x-request-id: $(uuidgen)" \
           )
-          echo "instances_resp: $RESP"
-          INSTANCE_ID=$(echo "$RESP" | python3 -c "
-import sys,json
-d=json.load(sys.stdin)
-for inst in d.get('data',[]):
-  name = inst.get('name','')
-  public = inst.get('relationships',{}).get('public',[{}])[0].get('ipAddress','')
-  if public in ('173.249.18.14','173.249.18.14.sslip.io'):
-    print(inst.get('instanceId',''))
-" 2>/dev/null || echo "")
-          if [ -z "$INSTANCE_ID" ]; then echo "::error::Could not find instance 173.249.18.14"; echo "$RESP"; exit 1; fi
+          echo "instances: $RESP"
+          printf 'import sys,json\nd=json.load(sys.stdin)\nfor inst in d.get("data",[]):\n  for r in inst.get("relationships",{}).get("public",[]):\n    if r.get("ipAddress","") == "173.249.18.14":\n      print(inst.get("instanceId",""))\n' > /tmp/find_instance.py
+          INSTANCE_ID=$(echo "$RESP" | python3 /tmp/find_instance.py)
+          if [ -z "$INSTANCE_ID" ]; then echo "::error::Instance 173.249.18.14 not found"; exit 1; fi
           echo "instance_id=$INSTANCE_ID" >> "$GITHUB_OUTPUT"
+          echo "Found instance: $INSTANCE_ID"
 
       - name: Reboot VPS
         run: |
-          echo "Rebooting instance ${{ steps.instance.outputs.instance_id }} ..."
-          RESP=$(curl -s -X POST "${{ env.CONTABO_API_URL }}/v1/compute/instances/${{ steps.instance.outputs.instance_id }}/reboot" \
-            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+          echo "Rebooting ${{ steps.find.outputs.instance_id }} ..."
+          RESP=$(curl -s -X POST "${{ env.CONTABO_API_URL }}/v1/compute/instances/${{ steps.find.outputs.instance_id }}/reboot" \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.TOKEN }}" \
             -H "Content-Type: application/json" \
             -H "x-request-id: $(uuidgen)" \
             -d '{}' \
           )
-          echo "reboot_resp: $RESP"
-          if echo "$RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); data=d.get('data',[{}])[0]; print(data.get('status',''))" 2>/dev/null | grep -qiE 'stopping|restarting|updating'; then
-            echo "::notice::VPS reboot initiated"
-          else
-            echo "::warning::Reboot response: $RESP"
-          fi
-          echo "::notice::Wait 60-120s then retry SSH to root@173.249.18.14"
+          echo "Response: $RESP"
+          echo "::notice::Reboot sent — wait 90s, then SSH to root@173.249.18.14"
