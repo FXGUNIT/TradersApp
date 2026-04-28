@@ -1739,7 +1739,7 @@ body {
   /* Font Families */
   --font-display: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
   --font-body:    'Spectral', Georgia, 'Times New Roman', serif;
-  --font-ui:      'DM Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --font-ui:      'Darker Grotesque', 'DM Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
   --font-data:    'IBM Plex Mono', 'SF Mono', Menlo, 'Courier New', monospace;
   --font-quote:   'Libre Baskerville', Georgia, 'Times New Roman', serif;
 
