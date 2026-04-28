@@ -297,10 +297,22 @@ export default function OfficersBriefingFooter({
             fontWeight: 600,
             color: CSS_VARS.textSecondary,
           }}
-          title="Watchtower refreshes BFF, AI, ML, consensus, news, user errors, and Board Room sync every 15 minutes."
+          title={`Watchtower refreshes BFF, AI, ML, consensus, news, user errors, and Board Room sync every ${Math.round((watchtowerStatus?.daemon?.nextIntervalMs || 900000) / 60000)} min.`}
         >
-          15 MIN REFRESH
+          {Math.round((watchtowerStatus?.daemon?.nextIntervalMs || 900000) / 60000)} MIN REFRESH
         </span>
+        {watchtowerStatus?.daemon?.currentIstHour != null && (
+          <span
+            style={{
+              fontSize: "0.7rem",
+              fontWeight: 600,
+              color: CSS_VARS.textSecondary,
+              opacity: 0.7,
+            }}
+          >
+            {watchtowerStatus?.daemon?.isDayHours ? "☀️" : "🌙"} IST {watchtowerStatus.daemon.currentIstHour}:00
+          </span>
+        )}
         {allUnconfigured && (
           <span
             style={{
