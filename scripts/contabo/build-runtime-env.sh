@@ -9,6 +9,8 @@ TRADERSAPP_DOMAIN="${TRADERSAPP_DOMAIN:-}"
 BFF_PUBLIC_HOST="${BFF_PUBLIC_HOST:-}"
 API_PUBLIC_HOST="${API_PUBLIC_HOST:-}"
 COMPOSE_PROFILES="${COMPOSE_PROFILES:-core}"
+BFF_TELEGRAM_BOT_TOKEN="${BFF_TELEGRAM_BOT_TOKEN:-}"
+TELEGRAM_AGENT_CHAT_ID="${TELEGRAM_AGENT_CHAT_ID:-}"
 CANONICAL_PUBLIC_FRONTEND="https://tradergunit.pages.dev"
 
 usage() {
@@ -24,6 +26,8 @@ Options:
   --bff-host HOST          Contabo runtime-edge BFF hostname
   --api-host HOST          Contabo runtime-edge API hostname
   --compose-profiles LIST  Optional compose profiles, comma-separated
+  --telegram-token TOKEN  BFF_TELEGRAM_BOT_TOKEN (overrides env var)
+  --telegram-chat-id ID    TELEGRAM_AGENT_CHAT_ID
 EOF
 }
 
@@ -59,6 +63,14 @@ while [ "$#" -gt 0 ]; do
       ;;
     --compose-profiles)
       COMPOSE_PROFILES="$2"
+      shift 2
+      ;;
+    --telegram-token)
+      BFF_TELEGRAM_BOT_TOKEN="$2"
+      shift 2
+      ;;
+    --telegram-chat-id)
+      TELEGRAM_AGENT_CHAT_ID="$2"
       shift 2
       ;;
     --help|-h)
@@ -158,6 +170,9 @@ ML_ANALYSIS_GRPC_ADDR=analysis-service:50051
 ML_ANALYSIS_GRPC_STRICT=false
 ANALYSIS_SERVICE_GRPC_PORT=50051
 ANALYSIS_SERVICE_HEALTH_PORT=8082
+BFF_TELEGRAM_BOT_TOKEN=${BFF_TELEGRAM_BOT_TOKEN}
+TELEGRAM_AGENT_ENABLED=true
+TELEGRAM_AGENT_CHAT_ID=${TELEGRAM_AGENT_CHAT_ID}
 EOF
 
 mv "${tmp_file}" "${OUTPUT}"

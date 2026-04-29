@@ -224,12 +224,16 @@ jobs:
             --domain "${{ steps.context.outputs.domain }}" \
             --bff-host "${{ steps.context.outputs.bff_host }}" \
             --api-host "${{ steps.context.outputs.api_host }}" \
-            --compose-profiles "${{ steps.context.outputs.compose_profiles }}"
+            --compose-profiles "${{ steps.context.outputs.compose_profiles }}" \
+            --telegram-token "${BFF_TELEGRAM_BOT_TOKEN}" \
+            --telegram-chat-id "${TELEGRAM_AGENT_CHAT_ID}"
         env:
           CONTABO_APP_ENV: ${{ secrets.CONTABO_APP_ENV }}
           INFISICAL_TOKEN: ${{ secrets.INFISICAL_TOKEN }}
           INFISICAL_PROJECT_ID: ${{ secrets.INFISICAL_PROJECT_ID || vars.INFISICAL_PROJECT_ID }}
           INFISICAL_ENV: ${{ vars.INFISICAL_ENV || 'dev' }}
+          BFF_TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_AGENT_CHAT_ID: ${{ secrets.TELEGRAM_AGENT_CHAT_ID }}
 
       - name: Export build args from prepared runtime env
         shell: bash
