@@ -251,26 +251,42 @@ async function assertNoHorizontalOverflow(page) {
 }
 
 async function assertText(page, pattern, description) {
-  const locator = page.getByText(pattern, { exact: false }).first();
-  await locator.waitFor({ state: "visible", timeout: 10_000 });
+  const source = pattern instanceof RegExp ? pattern.source : String(pattern);
+  const flags = pattern instanceof RegExp ? pattern.flags : "i";
+  await page.waitForFunction(
+    ({ source: regexSource, flags: regexFlags }) =>
+      new RegExp(regexSource, regexFlags).test(document.body.innerText || ""),
+    { source, flags },
+    { timeout: 10_000 },
+  );
   return description;
 }
 
+async function firstVisibleLocator(locator, description) {
+  await locator.first().waitFor({ state: "attached", timeout: 10_000 });
+  const count = await locator.count();
+  for (let index = 0; index < count; index += 1) {
+    const candidate = locator.nth(index);
+    if (await candidate.isVisible().catch(() => false)) {
+      return candidate;
+    }
+  }
+  throw new Error(`${description} is not visible.`);
+}
+
 async function assertVisible(locator, description) {
-  await locator.first().waitFor({ state: "visible", timeout: 10_000 });
+  await firstVisibleLocator(locator, description);
   return description;
 }
 
 async function assertClickable(locator, description) {
-  const target = locator.first();
-  await target.waitFor({ state: "visible", timeout: 10_000 });
+  const target = await firstVisibleLocator(locator, description);
   await target.click({ trial: true, timeout: 5_000 });
   return description;
 }
 
 async function assertInputReady(locator, description) {
-  const target = locator.first();
-  await target.waitFor({ state: "visible", timeout: 10_000 });
+  const target = await firstVisibleLocator(locator, description);
   const disabled = await target.isDisabled().catch(() => false);
   if (disabled) throw new Error(`${description} is disabled.`);
   return description;
@@ -279,8 +295,14 @@ async function assertInputReady(locator, description) {
 async function runLogin(page) {
   await loadScenario(page, "login");
   await assertText(page, /welcome back/i, "Login screen rendered.");
-  await assertInputReady(page.locator("input[type='email']"), "Email input");
-  await assertInputReady(page.locator("input[type='password']"), "Password input");
+  const emailInput = page.locator("input[type='email']");
+  const passwordInput = page.locator("input[type='password']");
+  const emailTarget = await firstVisibleLocator(emailInput, "Email input");
+  const passwordTarget = await firstVisibleLocator(passwordInput, "Password input");
+  await assertInputReady(emailTarget, "Email input");
+  await assertInputReady(passwordTarget, "Password input");
+  await emailTarget.fill("audit.user@example.com");
+  await passwordTarget.fill("AuditPass123!");
   await assertClickable(
     page.getByRole("button", { name: /^continue$/i }),
     "Continue button",
@@ -317,7 +339,7 @@ async function runWaiting(page) {
 
 async function runHub(page) {
   await loadScenario(page, "hub");
-  await assertText(page, /traders regiment/i, "Hub rendered.");
+  await assertText(page, /traders\s+regiment/i, "Hub rendered.");
   await assertClickable(page.getByText(/trading terminal/i), "Trading terminal card");
   await assertClickable(
     page.getByText(/collective consciousness/i),
@@ -392,7 +414,7 @@ async function runAdmin(page) {
 
 async function runViewport(page, viewportName) {
   await loadScenario(page, "hub");
-  await assertText(page, /traders regiment/i, `${viewportName} hub rendered.`);
+  await assertText(page, /traders\s+regiment/i, `${viewportName} hub rendered.`);
   await assertNoHorizontalOverflow(page);
 }
 

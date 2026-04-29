@@ -1,0 +1,135 @@
+{
+  "ok": true,
+  "target": "live",
+  "baseUrl": "https://tradergunit.pages.dev/",
+  "commit": "local",
+  "startedAt": "2026-04-29T15:23:04.931Z",
+  "scenarios": [
+    {
+      "id": "login",
+      "status": "passed",
+      "durationMs": 3677,
+      "errors": [],
+      "consoleErrors": [],
+      "networkFailures": [],
+      "screenshotPath": "",
+      "tracePath": ""
+    },
+    {
+      "id": "signup",
+      "status": "passed",
+      "durationMs": 2920,
+      "errors": [],
+      "consoleErrors": [],
+      "networkFailures": [],
+      "screenshotPath": "",
+      "tracePath": ""
+    },
+    {
+      "id": "waiting",
+      "status": "passed",
+      "durationMs": 2260,
+      "errors": [],
+      "consoleErrors": [],
+      "networkFailures": [],
+      "screenshotPath": "",
+      "tracePath": ""
+    },
+    {
+      "id": "hub",
+      "status": "passed",
+      "durationMs": 2365,
+      "errors": [],
+      "consoleErrors": [],
+      "networkFailures": [],
+      "screenshotPath": "",
+      "tracePath": ""
+    },
+    {
+      "id": "app",
+      "status": "passed",
+      "durationMs": 2391,
+      "errors": [],
+      "consoleErrors": [],
+      "networkFailures": [],
+      "screenshotPath": "",
+      "tracePath": ""
+    },
+    {
+      "id": "support-chat",
+      "status": "passed",
+      "durationMs": 2459,
+      "errors": [],
+      "consoleErrors": [],
+      "networkFailures": [],
+      "screenshotPath": "",
+      "tracePath": ""
+    },
+    {
+      "id": "consciousness",
+      "status": "passed",
+      "durationMs": 2166,
+      "errors": [],
+      "consoleErrors": [],
+      "networkFailures": [],
+      "screenshotPath": "",
+      "tracePath": ""
+    },
+    {
+      "id": "sessions",
+      "status": "passed",
+      "durationMs": 2104,
+      "errors": [],
+      "consoleErrors": [],
+      "networkFailures": [],
+      "screenshotPath": "",
+      "tracePath": ""
+    },
+    {
+      "id": "admin",
+      "status": "passed",
+      "durationMs": 2523,
+      "errors": [],
+      "consoleErrors": [],
+      "networkFailures": [],
+      "screenshotPath": "",
+      "tracePath": ""
+    },
+    {
+      "id": "viewport-mobile",
+      "status": "passed",
+      "durationMs": 2034,
+      "errors": [],
+      "consoleErrors": [],
+      "networkFailures": [],
+      "screenshotPath": "",
+      "tracePath": ""
+    },
+    {
+      "id": "viewport-tablet",
+      "status": "passed",
+      "durationMs": 2101,
+      "errors": [],
+      "consoleErrors": [],
+      "networkFailures": [],
+      "screenshotPath": "",
+      "tracePath": ""
+    },
+    {
+      "id": "viewport-desktop",
+      "status": "passed",
+      "durationMs": 2057,
+      "errors": [],
+      "consoleErrors": [],
+      "networkFailures": [],
+      "screenshotPath": "",
+      "tracePath": ""
+    }
+  ],
+  "finishedAt": "2026-04-29T15:23:35.151Z",
+  "summary": {
+    "passed": 12,
+    "failed": 0,
+    "total": 12
+  }
+}
