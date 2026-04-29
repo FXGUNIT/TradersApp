@@ -87,7 +87,7 @@ services:
       context: .
       dockerfile: bff/Dockerfile
     container_name: traders-analysis-service
-    command: ["node", "analysis-server.mjs"]
+    command: ["node", "bff/analysis-server.mjs"]
     ports:
       - "50051:50051"
     environment:
