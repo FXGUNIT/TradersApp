@@ -31,6 +31,15 @@ WORKDIR /app
 RUN apt-get update \
     && apt-get upgrade -y \
     && apt-get install -y --no-install-recommends curl libgomp1 \
+    && (python -m pip uninstall -y wheel setuptools pip || true) \
+    && rm -rf /usr/local/lib/python*/site-packages/pip \
+        /usr/local/lib/python*/site-packages/pip-*.dist-info \
+        /usr/local/lib/python*/site-packages/setuptools \
+        /usr/local/lib/python*/site-packages/setuptools-*.dist-info \
+        /usr/local/lib/python*/site-packages/wheel \
+        /usr/local/lib/python*/site-packages/wheel-*.dist-info \
+        /usr/local/bin/pip* \
+        /usr/local/bin/wheel \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /opt/venv /opt/venv
