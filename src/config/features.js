@@ -14,5 +14,19 @@ export const FEATURE_FLAGS = Object.freeze({
   ),
 });
 
+function isAuditModeEnabled() {
+  if (typeof window === "undefined") return false;
+  if (window.__TRADERS_UI_AUDIT__ === true || window.__TradersAppAudit) {
+    return true;
+  }
+
+  try {
+    return localStorage.getItem("TradersApp_AuditMode") === "true";
+  } catch {
+    return false;
+  }
+}
+
 export const isFeatureEnabled = (featureName) =>
-  FEATURE_FLAGS[featureName] === true;
+  Object.hasOwn(FEATURE_FLAGS, featureName) &&
+  (FEATURE_FLAGS[featureName] === true || isAuditModeEnabled());
