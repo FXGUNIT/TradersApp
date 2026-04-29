@@ -534,6 +534,138 @@ BFF pipeline is accepted when:
 - Health-check failure rolls back or blocks promotion.
 - No build-time secrets appear in image history/config.
 
+## Repository Implementation Map
+
+These are the current repo areas expected to change or be verified during implementation.
+
+### Admin Backend
+
+| Path | Expected Work |
+| --- | --- |
+| `bff/routes/adminMfaRoutes.mjs` | Add/adjust chained TOTP -> email OTP route behavior. |
+| `bff/services/adminMfaService.mjs` | Add MFA challenge state machine, hashing, expiry, replay prevention, rate limits, and backend-only setup helpers. |
+| `bff/routes/adminRoutes.mjs` | Verify no admin shortcut creates sessions outside the new MFA gate. |
+| `bff/domains/adminState.mjs` | Verify admin state/session assumptions still match the new unlock flow. |
+| `bff/data/admin-domain.json` | Verify no secret or frontend-owned admin setup data is stored here. |
+
+### Admin Frontend
+
+| Path | Expected Work |
+| --- | --- |
+| `src/features/admin-security/AdminUnlockModal.jsx` | Replace mixed unlock/setup UI with strict two-step gate. |
+| `src/features/admin-security/AdminEmailOtpPanel.jsx` | Keep three-code UI, remove full email leakage, bind it to prior MFA challenge. |
+| `src/features/admin-security/useAdminAccessHandlers.js` | Update unlock handlers to enforce sequence. |
+| `src/features/identity/adminAccessHandlers.js` | Ensure TOTP success does not call final admin unlock directly. |
+| `src/services/adminAuthService.js` | Update client calls to match challenge-based backend contract. |
+| `src/services/clients/AdminSecurityClient.js` | Verify any admin-security API wrapper cannot bypass the new flow. |
+| `src/services/gateways/adminGateway.js` | Verify no old password/admin-token shortcut remains. |
+| `src/features/shell/useAdminSessionRestoreEffect.js` | Ensure remembered sessions are restored only after valid backend session state. |
+
+### Admin Audit and Tests
+
+| Path | Expected Work |
+| --- | --- |
+| `scripts/website-audit/run-website-user-audit.mjs` | Update admin-login scenario to assert the new two-gate flow. |
+| `scripts/website-audit/summarize-website-user-audit.mjs` | Ensure summaries do not include OTPs or secrets. |
+| `bff/package.json` | Add or confirm backend test scripts for admin MFA service/routes. |
+| `package.json` | Add or confirm root scripts for admin audit and remote BFF operations. |
+
+### BFF Image and Deploy
+
+| Path | Expected Work |
+| --- | --- |
+| `bff/Dockerfile` | Keep as canonical runtime Dockerfile with no secret build args. |
+| `.dockerignore` | Keep local artifacts, env files, caches, screenshots, and reports out of image context. |
+| `scripts/images/bff-image.mjs` | Keep hash logic local-safe; add remote trigger helper if needed. |
+| `.github/workflows/ci.yml` | Build or reuse BFF image remotely and publish manifest. |
+| `.github/workflows/deploy-contabo.yml` | Pull verified SHA/digest image; no default rebuild. |
+| `.github/workflows/deploy-ovh.yml` | Pull verified SHA/digest image; no default rebuild. |
+| `.github/workflows/deploy-k8s.yml` | Fail fast if required BFF image is missing. |
+| `.github/workflows/trivy-scan.yml` | Scan the published deployed image. |
+| `.github/workflows/push-bff-ghcr.yml` | Retag existing verified image only; avoid local/VPS rebuild path. |
+| `docker-compose.yml` | Verify runtime env injection and BFF/analysis command compatibility. |
+
+## Implementation Work Breakdown
+
+### Work Package A - Admin MFA Backend
+
+- Add server-side MFA challenge creation, lookup, expiry, consume, and failure tracking.
+- Change TOTP verify behavior to return a challenge only.
+- Change email OTP start to require a valid TOTP challenge.
+- Change email OTP verify to require both valid challenge IDs and all three correct OTPs.
+- Create admin session only in the final email OTP verify step.
+- Disable or hard-fail old password/session shortcut routes.
+- Add backend-only TOTP setup/rotate/verify commands.
+
+Done when backend tests prove no single factor can unlock admin.
+
+### Work Package B - Admin MFA Frontend
+
+- Replace the admin modal with a strict two-step UI.
+- Remove password inputs, setup QR/secret views, reset/setup links, and any frontend-owned enrollment path.
+- Preserve only challenge IDs and masked recipient metadata in frontend state.
+- Add loading, error, resend, and expired-challenge states.
+- Update audit mode fixtures so the user audit can walk through the flow without real secrets.
+
+Done when the browser audit proves the visible admin panel matches the required flow.
+
+### Work Package C - Admin Audit and Regression
+
+- Update website audit admin-login scenario.
+- Assert no password field exists.
+- Assert no TOTP setup data exists in HTML, localStorage, screenshots, or report JSON.
+- Assert TOTP success moves to email gate instead of unlocking admin.
+- Assert email OTP success unlocks admin after prior TOTP challenge.
+
+Done when deterministic audit fails on old behavior and passes on new behavior.
+
+### Work Package D - Remote BFF Image Pipeline
+
+- Ensure hash-only local command remains lightweight.
+- Ensure GitHub Actions builds or reuses the image remotely.
+- Publish SHA tag, context tag, digest, and manifest.
+- Prevent secret build args.
+- Make deploy workflows pull the verified image.
+- Keep local Docker as an optional debug path only.
+
+Done when a normal BFF deploy can happen without Docker Desktop running locally.
+
+### Work Package E - Provenance, SBOM, and Rollback
+
+- Add SBOM generation.
+- Add provenance/signature or GitHub artifact attestation.
+- Verify the image digest before deployment.
+- Store previous known-good digest.
+- Block promotion or roll back on failed `/health`.
+
+Done when production deploy has a traceable image record and safe failure behavior.
+
+## Verification Matrix
+
+| Verification | Command or Location | Required Result |
+| --- | --- | --- |
+| Admin backend tests | `npm.cmd --prefix bff test` or project-specific BFF test command | TOTP-only and email-only unlock attempts fail; chained flow passes. |
+| Frontend build | `npm.cmd run build` | Build succeeds with no admin auth regressions. |
+| Website user audit | `npm.cmd run audit:website:user -- --base-url <target>` | Admin scenario passes and artifacts contain no secrets. |
+| Live website audit | `npm.cmd run audit:website:user:live` | Live critical journeys pass after deployment. |
+| BFF context hash | `npm.cmd run image:bff:hash` | Runs locally without Docker and prints deterministic hash. |
+| BFF remote image workflow | GitHub Actions `ci.yml` or dedicated BFF workflow | Produces SHA tag, context tag, digest, and manifest. |
+| Image secret check | CI image metadata check | No secret values in env/history/config. |
+| Trivy scan | `.github/workflows/trivy-scan.yml` | Scans published SHA/digest image. |
+| VPS deploy smoke | Deploy workflow summary and `/health` | New digest is healthy or rollout is blocked/rolled back. |
+
+## Default Decisions for Implementation
+
+Unless a later repo inspection proves a better local pattern, use these defaults:
+
+- First implementation: TOTP baseline first, passkey/FIDO2 second phase.
+- MFA challenge storage: existing backend/session store if available; otherwise short-lived in-memory only for single-instance dev, with Redis/database required before multi-instance production.
+- Email recipients: backend env only, using existing admin email env names if already present.
+- Production deploy priority: Docker Compose on VPS first, Kubernetes second, unless the active production workflow says otherwise.
+- Attestation choice: GitHub artifact attestations first if available; Sigstore Cosign only if GitHub attestations do not fit the repo.
+- Local Docker: optional debug path only, never required by the normal operator flow.
+- Self-hosted VPS runner: protected branch/manual deploy only, never untrusted PRs.
+
 ## Open Decisions Before Implementation
 
 These are the only decisions that should be confirmed or discovered from the repo before coding:
