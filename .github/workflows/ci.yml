@@ -677,6 +677,13 @@ jobs:
   bff:
     name: BFF Server
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.bff_context.outputs.sha_image }}
+      context_hash: ${{ steps.bff_context.outputs.context_hash }}
+      context_image: ${{ steps.bff_context.outputs.context_image }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -686,7 +693,7 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-          cache-dependency-path: bff/package.json
+          cache-dependency-path: bff/package-lock.json
 
       # ── Pull secrets from Infisical ─────────────────────────────────────
       - name: Pull secrets from Infisical
