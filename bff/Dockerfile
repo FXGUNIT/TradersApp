@@ -22,7 +22,7 @@ COPY bff/routes/ ./routes/
 COPY bff/services/ ./services/
 COPY bff/domains/ ./domains/
 COPY bff/generated/ ./generated/
-COPY bff/data/ ./data/
+COPY bff/data/ ./bff/data/
 COPY bff/board-room/ ./board-room/
 COPY bff/prompts/ ./prompts/
 COPY bff/middleware/ ./middleware/
