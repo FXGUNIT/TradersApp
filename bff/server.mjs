@@ -545,6 +545,12 @@ server.listen(PORT, HOST, () => {
   // Start Board Room cron jobs after server is listening
   startBoardRoomCron(boardRoomService, boardRoomTelegram);
   startWatchtowerDaemon({ host: "127.0.0.1", port: PORT });
+
+  // Start Telegram AI Agent (polling loop)
+  if (String(process.env.TELEGRAM_AGENT_ENABLED || "false") === "true") {
+    const { startTelegramAgent } = await import("./services/telegramAgent.mjs");
+    startTelegramAgent();
+  }
 });
 
 server.on("error", (err) => {
