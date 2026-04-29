@@ -4,6 +4,7 @@
 import { readFileSync } from "fs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
+import { invokeLlm } from "./llmBridge.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -28,8 +29,6 @@ const POLL_INTERVAL_MS = 10_000;
 
 let offset = 0;
 let pollTimer = null;
-
-import { invokeLlm } from "./llmBridge.mjs";
 
 async function getUpdates() {
   const url = `https://api.telegram.org/bot${BOT_TOKEN}/getUpdates?offset=${offset}&timeout=10`;
@@ -82,7 +81,7 @@ async function handleMessage(update) {
   if (cmd === "/ask" || !cmd.startsWith("/")) {
     const query = cmd === "/ask" ? args.join(" ") : text;
     try {
-      const answer = await invokeLlm(query);
+      const answer = await invokeLlm(query, { systemPrompt: SYSTEM_PROMPT });
       await sendMessage(answer || "(no response)", chatId);
     } catch (e) {
       await sendMessage(`_Error: ${e.message}_`);
