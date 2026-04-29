@@ -7,6 +7,20 @@
 - This rule applies to both Claude Code and any Copilot/Codex agent features.
 - Proceed safely and summarize what you did at the end of each major step.
 
+## OpenCode CLI Automation (Claude + Codex + VS Code)
+
+- OpenCode is installed as the project Open CLI.
+- Always launch it through the project wrapper so it uses this repo and Infisical:
+  `powershell -ExecutionPolicy Bypass -File scripts\agents\open-cli.ps1 ...`
+- One-shot automation:
+  `powershell -ExecutionPolicy Bypass -File scripts\agents\open-cli.ps1 run "TASK"`
+- Interactive OpenCode:
+  `powershell -ExecutionPolicy Bypass -File scripts\agents\open-cli.ps1 .`
+- Headless API server:
+  `powershell -ExecutionPolicy Bypass -File scripts\agents\open-cli.ps1 serve --hostname 127.0.0.1 --port 4096`
+- Do not copy provider keys into tracked config files. The wrapper injects Infisical secrets at runtime.
+- Keep existing secret names exactly as they are.
+
 ## Installed Claude Workflow - Always-On Defaults (2026-04-11)
 
 Use the installed Claude plugins and skills automatically whenever relevant. Do not wait for the user to name a plugin or slash-skill if the task clearly matches it.
