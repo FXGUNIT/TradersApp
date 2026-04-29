@@ -287,7 +287,7 @@ jobs:
   integration-tests:
     name: Integration Tests
     runs-on: ubuntu-latest
-    needs: [unit-tests]
+    needs: [unit-tests, bff]
     permissions:
       contents: read
       packages: read
@@ -308,7 +308,23 @@ jobs:
           OWNER_LC="${GITHUB_REPOSITORY_OWNER,,}"
           docker build -t ghcr.io/${OWNER_LC}/ml-engine:latest --file ml-engine/Dockerfile ml-engine/
 
-      - name: Build BFF image
+      - name: Login to GHCR for published BFF image
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull published BFF image
+        if: github.event_name != 'pull_request'
+        run: |
+          OWNER_LC="${GITHUB_REPOSITORY_OWNER,,}"
+          docker pull ghcr.io/${OWNER_LC}/bff:${GITHUB_SHA}
+          docker tag ghcr.io/${OWNER_LC}/bff:${GITHUB_SHA} ghcr.io/${OWNER_LC}/bff:latest
+
+      - name: Build BFF image for PR
+        if: github.event_name == 'pull_request'
         run: |
           OWNER_LC="${GITHUB_REPOSITORY_OWNER,,}"
           docker build -t ghcr.io/${OWNER_LC}/bff:latest --file bff/Dockerfile .
@@ -386,7 +402,23 @@ jobs:
           OWNER_LC="${GITHUB_REPOSITORY_OWNER,,}"
           docker build -t ghcr.io/${OWNER_LC}/ml-engine:latest --file ml-engine/Dockerfile ml-engine/
 
-      - name: Build BFF image
+      - name: Login to GHCR for published BFF image
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull published BFF image
+        if: github.event_name != 'pull_request'
+        run: |
+          OWNER_LC="${GITHUB_REPOSITORY_OWNER,,}"
+          docker pull ghcr.io/${OWNER_LC}/bff:${GITHUB_SHA}
+          docker tag ghcr.io/${OWNER_LC}/bff:${GITHUB_SHA} ghcr.io/${OWNER_LC}/bff:latest
+
+      - name: Build BFF image for PR
+        if: github.event_name == 'pull_request'
         run: |
           OWNER_LC="${GITHUB_REPOSITORY_OWNER,,}"
           docker build -t ghcr.io/${OWNER_LC}/bff:latest --file bff/Dockerfile .
@@ -695,45 +727,105 @@ jobs:
           cache: 'npm'
           cache-dependency-path: bff/package-lock.json
 
-      # ── Pull secrets from Infisical ─────────────────────────────────────
-      - name: Pull secrets from Infisical
-        run: |
-          if [ -z "${{ secrets.INFISICAL_TOKEN }}" ]; then
-            echo "⚠ INFISICAL_TOKEN not set; skipping Infisical secret pull for BFF build."
-            exit 0
-          fi
-          curl -1sLf 'https://artifacts-cli.infisical.com/setup.deb.sh' | sudo -E bash
-          sudo apt-get update && sudo apt-get install -y infisical
-          export INFISICAL_TOKEN=${{ secrets.INFISICAL_TOKEN }}
-          infisical secrets pull \
-            --env=${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }} \
-            --projectId=0e4f9b8b-846e-4e66-a4aa-97c8fa9863ab \
-            --format=env > .infisical_bff.env 2>/dev/null || true
-          if [ -f .infisical_bff.env ]; then
-            grep -v '^#' .infisical_bff.env | grep '=' >> "$GITHUB_ENV" || true
-            echo "Infisical secrets exported to GITHUB_ENV for BFF build."
-          fi
-
-      - name: Install dependencies
-        run: |
-          cd bff/
-          npm ci
-
-      - name: Lint (if eslint config exists)
-        run: |
-          cd bff/
-          npm run lint 2>/dev/null || true
-        continue-on-error: true
-
-      - name: Build Docker image
+      - name: Resolve BFF image context
+        id: bff_context
         run: |
           OWNER_LC="${GITHUB_REPOSITORY_OWNER,,}"
-          docker build \
-            --tag ghcr.io/${OWNER_LC}/bff:${{ github.sha }} \
-            --tag ghcr.io/${OWNER_LC}/bff:latest \
-            --file bff/Dockerfile \
-            .
-        continue-on-error: false
+          node scripts/images/bff-image.mjs hash --owner "${OWNER_LC}" --tag "${GITHUB_SHA}" --json > bff-image-input.json
+          cat bff-image-input.json
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check existing BFF context image
+        id: bff_context_exists
+        if: github.event_name != 'pull_request'
+        run: |
+          if docker buildx imagetools inspect "${{ steps.bff_context.outputs.context_image }}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Reusing existing BFF context image: ${{ steps.bff_context.outputs.context_image }}"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "No existing BFF context image found; building it."
+          fi
+
+      - name: Build BFF image for PR
+        if: github.event_name == 'pull_request'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: bff/Dockerfile
+          load: true
+          tags: |
+            ${{ steps.bff_context.outputs.sha_image }}
+            ${{ steps.bff_context.outputs.context_image }}
+          cache-from: type=gha,scope=bff
+          cache-to: type=gha,mode=max,scope=bff
+
+      - name: Build and push BFF image
+        if: github.event_name != 'pull_request' && steps.bff_context_exists.outputs.exists != 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: bff/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.bff_context.outputs.sha_image }}
+            ${{ steps.bff_context.outputs.context_image }}
+          cache-from: type=gha,scope=bff
+          cache-to: type=gha,mode=max,scope=bff
+
+      - name: Tag commit image from existing context image
+        if: github.event_name != 'pull_request' && steps.bff_context_exists.outputs.exists == 'true'
+        run: |
+          docker buildx imagetools create \
+            -t "${{ steps.bff_context.outputs.sha_image }}" \
+            "${{ steps.bff_context.outputs.context_image }}"
+
+      - name: Pull pushed BFF image for smoke test
+        if: github.event_name != 'pull_request'
+        run: docker pull "${{ steps.bff_context.outputs.sha_image }}"
+
+      - name: Smoke test BFF image and verify image metadata
+        run: npm run image:bff:smoke -- --image "${{ steps.bff_context.outputs.sha_image }}"
+
+      - name: Write BFF image manifest
+        if: always()
+        run: |
+          IMAGE="${{ steps.bff_context.outputs.sha_image }}"
+          DIGEST="$(docker image inspect --format='{{index .RepoDigests 0}}' "${IMAGE}" 2>/dev/null | sed 's/^.*@//' || true)"
+          if [ -z "${DIGEST}" ] && [ "${{ github.event_name }}" != "pull_request" ]; then
+            DIGEST="$(docker buildx imagetools inspect "${IMAGE}" --format '{{json .Manifest.Digest}}' 2>/dev/null | tr -d '"' || true)"
+          fi
+          [ -n "${DIGEST}" ] || DIGEST="local"
+          cat > bff-image-manifest.json <<EOF
+          {
+            "commit": "${GITHUB_SHA}",
+            "contextHash": "${{ steps.bff_context.outputs.context_hash }}",
+            "imageRef": "${IMAGE}",
+            "contextImageRef": "${{ steps.bff_context.outputs.context_image }}",
+            "digest": "${DIGEST}",
+            "built": "${{ github.event_name == 'pull_request' || steps.bff_context_exists.outputs.exists != 'true' }}",
+            "dockerfile": "${{ steps.bff_context.outputs.dockerfile }}"
+          }
+          EOF
+          cat bff-image-manifest.json
+
+      - name: Upload BFF image manifest
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bff-image-manifest
+          path: bff-image-manifest.json
+          retention-days: 14
 
   # -------------------------------------------------------------------------
   # Deploy to Staging (auto on push to staging branch)
@@ -757,11 +849,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Push images to GHCR
+      - name: Publish ML Engine image and verify BFF image
         run: |
           OWNER_LC="${GITHUB_REPOSITORY_OWNER,,}"
+          docker build -t ghcr.io/${OWNER_LC}/ml-engine:${{ github.sha }} --file ml-engine/Dockerfile ml-engine/
           docker push ghcr.io/${OWNER_LC}/ml-engine:${{ github.sha }}
-          docker push ghcr.io/${OWNER_LC}/bff:${{ github.sha }}
+          docker pull ghcr.io/${OWNER_LC}/bff:${{ github.sha }}
         continue-on-error: false
 
       # ── Railway: deploy ML Engine (staging) ──────────────────────────────
@@ -904,28 +997,14 @@ jobs:
           done
         continue-on-error: false
 
-      - name: Build and push BFF image
+      - name: Verify published BFF image
         run: |
           OWNER_LC="${GITHUB_REPOSITORY_OWNER,,}"
           IMAGE_SHA="ghcr.io/${OWNER_LC}/bff:${GITHUB_SHA}"
-          IMAGE_LATEST="ghcr.io/${OWNER_LC}/bff:latest"
-          ATTEMPT=1
-          MAX_ATTEMPTS=3
-          while [ "${ATTEMPT}" -le "${MAX_ATTEMPTS}" ]; do
-            if docker build -t "${IMAGE_SHA}" -t "${IMAGE_LATEST}" --file bff/Dockerfile . \
-              && docker push "${IMAGE_SHA}" \
-              && docker push "${IMAGE_LATEST}"; then
-              exit 0
-            fi
-            if [ "${ATTEMPT}" -eq "${MAX_ATTEMPTS}" ]; then
-              echo "::error::BFF image build/push failed after ${MAX_ATTEMPTS} attempts."
-              exit 1
-            fi
-            echo "BFF image build/push failed. Retrying (attempt $((ATTEMPT + 1))/${MAX_ATTEMPTS})..."
-            docker image rm "${IMAGE_SHA}" "${IMAGE_LATEST}" >/dev/null 2>&1 || true
-            sleep 20
-            ATTEMPT=$((ATTEMPT + 1))
-          done
+          docker pull "${IMAGE_SHA}" || {
+            echo "::error::Missing published BFF image ${IMAGE_SHA}. The bff CI job must publish the SHA image before deploy."
+            exit 1
+          }
         continue-on-error: false
 
       - name: Build and push Frontend image

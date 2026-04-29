@@ -34,6 +34,13 @@ const forbiddenSecretNames = [
   "ADMIN_TOTP_SECRET",
   "ADMIN_MFA_SECRET",
 ];
+const excludedFilePatterns = [
+  /^bff\/\.env(\..*)?$/,
+  /^bff\/tests\//,
+  /^bff\/Dockerfile\.new$/,
+  /^bff\/\.dockerignore$/,
+  /^bff\/railway\.json$/,
+];
 
 function normalizePath(path) {
   return path.split(sep).join("/");
@@ -52,7 +59,10 @@ function collectFiles(inputPath, files = new Set()) {
     return files;
   }
   if (stats.isFile()) {
-    files.add(normalizePath(relative(repoRoot, absolutePath)));
+    const file = normalizePath(relative(repoRoot, absolutePath));
+    if (!excludedFilePatterns.some((pattern) => pattern.test(file))) {
+      files.add(file);
+    }
   }
   return files;
 }

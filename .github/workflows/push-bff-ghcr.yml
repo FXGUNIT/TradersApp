@@ -1,37 +1,45 @@
-name: Push BFF Image to GHCR
+name: Retag Existing BFF Image in GHCR
 
 on:
   workflow_dispatch:
     inputs:
-      image_tag:
-        description: 'Image tag to push'
-        required: false
-        default: 'watchtower-fix'
+      source_tag:
+        description: "Existing BFF image tag to retag"
+        required: true
+        default: "latest"
+      target_tag:
+        description: "New BFF image tag to create"
+        required: true
+        default: "manual-retag"
 
 jobs:
-  push:
+  retag:
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
-
     steps:
-      - name: Check available image on Contabo
-        run: |
-          echo "::notice::Will push to ghcr.io/fxgunit/bff:${{ github.event.inputs.image_tag }}"
-          echo "::notice::SSH to Contabo and run: docker push ghcr.io/fxgunit/bff:${{ github.event.inputs.image_tag }}"
-
-      - name: Setup Docker for GHCR via OIDC
-        uses: docker/login-action@v4
+      - name: Login to GHCR
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Pull image from Contabo via remote Docker
+      - name: Retag existing BFF image
+        shell: bash
         run: |
-          echo "::error::Contabo SSH is down. Run manually when SSH returns:"
-          echo ""
-          echo "ssh root@173.249.18.14"
-          echo "docker push ghcr.io/fxgunit/bff:${{ github.event.inputs.image_tag }}"
-          exit 1
+          set -euo pipefail
+          OWNER_LC="${GITHUB_REPOSITORY_OWNER,,}"
+          SOURCE="ghcr.io/${OWNER_LC}/bff:${{ inputs.source_tag }}"
+          TARGET="ghcr.io/${OWNER_LC}/bff:${{ inputs.target_tag }}"
+
+          docker buildx imagetools inspect "${SOURCE}" >/dev/null
+          docker buildx imagetools create -t "${TARGET}" "${SOURCE}"
+
+          {
+            echo "## BFF image retagged"
+            echo ""
+            echo "- Source: \`${SOURCE}\`"
+            echo "- Target: \`${TARGET}\`"
+          } >> "${GITHUB_STEP_SUMMARY}"

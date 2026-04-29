@@ -221,6 +221,10 @@ jobs:
           for SVC in ml-engine bff frontend analysis-service; do
             echo "Pulling ${IMAGE_REPO}/${SVC}:${TAG}"
             docker pull "${IMAGE_REPO}/${SVC}:${TAG}" || {
+              if [ "${SVC}" = "bff" ]; then
+                echo "::error::Missing required BFF image ${IMAGE_REPO}/${SVC}:${TAG}. The CI BFF image job must publish the SHA image before k8s deploy."
+                exit 1
+              fi
               echo "⚠ Could not pull $SVC:${TAG} — cluster may not have network access to GHCR"
               echo "  Ensure the k3s nodes have GHCR auth configured:"
               echo "  kubectl create secret docker-registry ghcr-secret \\"
