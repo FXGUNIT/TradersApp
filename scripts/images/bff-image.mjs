@@ -202,7 +202,11 @@ function handleSmoke(args) {
         stdio: ["ignore", "pipe", "pipe"],
         text: true,
       });
-      if (result.status === 0 && /"status"\s*:\s*"ok"/.test(result.stdout)) {
+      if (
+        result.status === 0 &&
+        (/"ok"\s*:\s*true/.test(result.stdout) ||
+          /"status"\s*:\s*"ok"/.test(result.stdout))
+      ) {
         console.log(`BFF smoke passed for ${image}`);
         return;
       }

@@ -7,79 +7,8 @@ import {
   setRememberDevice,
 } from "../../services/adminAuthService.js";
 import AdminEmailOtpPanel from "./AdminEmailOtpPanel.jsx";
-
-function StepIndicator({ activeStep, theme }) {
-  const steps = [
-    ["1", "Authenticator"],
-    ["2", "Email OTPs"],
-  ];
-  return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "1fr 1fr",
-        gap: 8,
-        marginBottom: 18,
-      }}
-    >
-      {steps.map(([number, label], index) => {
-        const active = activeStep === index + 1;
-        const complete = activeStep > index + 1;
-        const color = complete
-          ? theme.green || "#22C55E"
-          : active
-            ? theme.purple || "#A855F7"
-            : theme.muted || "#9CA3AF";
-        return (
-          <div
-            key={label}
-            style={{
-              minHeight: 44,
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              padding: "9px 10px",
-              borderRadius: 8,
-              border: `1px solid ${active || complete ? color : theme.border || "#374151"}`,
-              background: active
-                ? "rgba(168,85,247,0.12)"
-                : complete
-                  ? "rgba(34,197,94,0.10)"
-                  : "rgba(255,255,255,0.04)",
-            }}
-          >
-            <div
-              style={{
-                width: 24,
-                height: 24,
-                borderRadius: "50%",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                background: color,
-                color: "#06070A",
-                fontSize: 12,
-                fontWeight: 900,
-              }}
-            >
-              {complete ? "OK" : number}
-            </div>
-            <div
-              style={{
-                color,
-                fontSize: 11,
-                fontWeight: 800,
-                textTransform: "uppercase",
-              }}
-            >
-              {label}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
+import AdminTotpGatePanel from "./AdminTotpGatePanel.jsx";
+import AdminUnlockStepIndicator from "./AdminUnlockStepIndicator.jsx";
 
 export default function AdminUnlockModal({
   authButton,
@@ -224,69 +153,20 @@ export default function AdminUnlockModal({
           backend-sent email OTPs. Authenticator setup is not available here.
         </div>
 
-        <StepIndicator activeStep={activeStep} theme={theme} />
+        <AdminUnlockStepIndicator activeStep={activeStep} theme={theme} />
 
         {!authenticatorVerified ? (
-          <div style={panelStyle}>
-            <div
-              style={{
-                fontSize: 10,
-                fontWeight: 900,
-                letterSpacing: 2,
-                color: theme.muted || "#9CA3AF",
-                marginBottom: 12,
-                textTransform: "uppercase",
-              }}
-            >
-              Gate 1
-            </div>
-            <label style={labelStyle}>AUTHENTICATOR CODE</label>
-            <input
-              type="text"
-              inputMode="numeric"
-              value={totpValue}
-              onChange={(event) =>
-                onTotpCodeChange(event.target.value.replace(/\D/g, "").slice(0, 6))
-              }
-              style={{
-                ...inputStyle,
-                fontFamily: "monospace",
-                textAlign: "center",
-                letterSpacing: 2,
-              }}
-              placeholder="000000"
-              maxLength="6"
-              autoFocus
-              onKeyDown={(event) => {
-                if (event.key === "Enter") onUnlockAdmin();
-              }}
-            />
-            {totpError && (
-              <div
-                style={{
-                  color: theme.red,
-                  fontSize: 11,
-                  marginTop: 8,
-                  fontWeight: 700,
-                }}
-              >
-                {totpError}
-              </div>
-            )}
-
-            <button
-              onClick={onUnlockAdmin}
-              disabled={String(totpValue || "").length !== 6}
-              style={{
-                ...authButton(theme.purple, false),
-                marginTop: 14,
-                opacity: String(totpValue || "").length === 6 ? 1 : 0.55,
-              }}
-              className="btn-glass"
-            >
-              VERIFY AUTHENTICATOR
-            </button>
-          </div>
+          <AdminTotpGatePanel
+            authButton={authButton}
+            inputStyle={inputStyle}
+            labelStyle={labelStyle}
+            onTotpCodeChange={onTotpCodeChange}
+            onUnlockAdmin={onUnlockAdmin}
+            panelStyle={panelStyle}
+            theme={theme}
+            totpError={totpError}
+            totpValue={totpValue}
+          />
         ) : (
           <div style={panelStyle}>
             <div

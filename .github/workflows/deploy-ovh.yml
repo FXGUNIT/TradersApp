@@ -195,19 +195,16 @@ jobs:
           docker push "${IMAGE_SHA}"
           docker push "${IMAGE_LATEST}"
 
-      - name: Build and push BFF image
+      - name: Verify published BFF image
         shell: bash
         run: |
           set -euo pipefail
           IMAGE_SHA="ghcr.io/${{ steps.context.outputs.owner }}/bff:${{ steps.context.outputs.image_tag }}"
-          IMAGE_LATEST="ghcr.io/${{ steps.context.outputs.owner }}/bff:latest"
-          if docker buildx imagetools inspect "${IMAGE_SHA}" >/dev/null 2>&1; then
-            echo "BFF image already exists; reusing ${IMAGE_SHA}"
-            exit 0
+          if ! docker buildx imagetools inspect "${IMAGE_SHA}" >/dev/null 2>&1; then
+            echo "::error::Missing required BFF image ${IMAGE_SHA}. CI must publish this SHA image before OVH deploy."
+            exit 1
           fi
-          docker build -t "${IMAGE_SHA}" -t "${IMAGE_LATEST}" --file bff/Dockerfile .
-          docker push "${IMAGE_SHA}"
-          docker push "${IMAGE_LATEST}"
+          echo "Verified published BFF image: ${IMAGE_SHA}"
 
       - name: Build and push Frontend image
         shell: bash

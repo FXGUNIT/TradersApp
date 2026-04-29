@@ -89,7 +89,7 @@ services:
     logging: *default-logging
 
   analysis-service:
-    image: ghcr.io/${GHCR_OWNER}/bff:${IMAGE_TAG}
+    image: ${BFF_IMAGE:-ghcr.io/${GHCR_OWNER}/bff:${IMAGE_TAG}}
     container_name: traders-analysis-service
     restart: unless-stopped
     pull_policy: always
@@ -121,7 +121,7 @@ services:
     logging: *default-logging
 
   bff:
-    image: ghcr.io/${GHCR_OWNER}/bff:${IMAGE_TAG}
+    image: ${BFF_IMAGE:-ghcr.io/${GHCR_OWNER}/bff:${IMAGE_TAG}}
     container_name: traders-bff
     restart: unless-stopped
     pull_policy: always

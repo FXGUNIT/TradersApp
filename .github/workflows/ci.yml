@@ -712,6 +712,8 @@ jobs:
     permissions:
       contents: read
       packages: write
+      attestations: write
+      id-token: write
     outputs:
       image: ${{ steps.bff_context.outputs.sha_image }}
       context_hash: ${{ steps.bff_context.outputs.context_hash }}
@@ -798,6 +800,7 @@ jobs:
         run: npm run image:bff:smoke -- --image "${{ steps.bff_context.outputs.sha_image }}"
 
       - name: Write BFF image manifest
+        id: bff_manifest
         if: always()
         run: |
           IMAGE="${{ steps.bff_context.outputs.sha_image }}"
@@ -806,6 +809,7 @@ jobs:
             DIGEST="$(docker buildx imagetools inspect "${IMAGE}" --format '{{json .Manifest.Digest}}' 2>/dev/null | tr -d '"' || true)"
           fi
           [ -n "${DIGEST}" ] || DIGEST="local"
+          echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
           cat > bff-image-manifest.json <<EOF
           {
             "commit": "${GITHUB_SHA}",
@@ -819,12 +823,32 @@ jobs:
           EOF
           cat bff-image-manifest.json
 
+      - name: Generate BFF SBOM
+        if: always()
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ steps.bff_context.outputs.sha_image }}
+          format: spdx-json
+          output-file: bff-sbom.spdx.json
+        continue-on-error: true
+
+      - name: Attest BFF image provenance
+        if: github.event_name != 'pull_request' && steps.bff_manifest.outputs.digest != '' && steps.bff_manifest.outputs.digest != 'local'
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-name: ${{ steps.bff_context.outputs.sha_image }}
+          subject-digest: ${{ steps.bff_manifest.outputs.digest }}
+          push-to-registry: true
+        continue-on-error: true
+
       - name: Upload BFF image manifest
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: bff-image-manifest
-          path: bff-image-manifest.json
+          path: |
+            bff-image-manifest.json
+            bff-sbom.spdx.json
           retention-days: 14
 
   # -------------------------------------------------------------------------
