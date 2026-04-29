@@ -204,7 +204,14 @@ jobs:
             echo "::error::Missing required BFF image ${IMAGE_SHA}. CI must publish this SHA image before OVH deploy."
             exit 1
           fi
+          DIGEST="$(docker buildx imagetools inspect "${IMAGE_SHA}" --format '{{json .Manifest.Digest}}' | tr -d '"')"
+          if [ -z "${DIGEST}" ]; then
+            echo "::error::Could not resolve digest for ${IMAGE_SHA}."
+            exit 1
+          fi
+          echo "BFF_IMAGE=ghcr.io/${{ steps.context.outputs.owner }}/bff@${DIGEST}" >> .artifacts/ovh/.env.ovh
           echo "Verified published BFF image: ${IMAGE_SHA}"
+          echo "Resolved BFF digest: ${DIGEST}"
 
       - name: Build and push Frontend image
         shell: bash
