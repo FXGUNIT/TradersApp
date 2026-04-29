@@ -32,6 +32,54 @@ The local machine should be used for code editing, light checks, and triggering 
 | Image identity | Digest-first deploy | Prevents tag drift and makes rollback exact. |
 | Windows VPS | Do not use for this pipeline | Linux containers and BuildKit are the better fit; Windows adds licensing and Docker complexity. |
 
+## Quality Bar
+
+This document is not considered complete until it answers five questions clearly:
+
+1. What exact security state transitions are allowed?
+2. Which frontend actions are impossible by design?
+3. Which backend endpoints issue a real admin session?
+4. Which remote artifact is built, scanned, signed, and deployed?
+5. What happens automatically when auth or deploy verification fails?
+
+The sections below are written to make implementation deterministic instead of relying on memory or manual judgment.
+
+## Threat Model
+
+### Assets to Protect
+
+- Admin session token.
+- Admin TOTP secret or passkey credential metadata.
+- Three admin email OTP codes.
+- Runtime secrets from Infisical, GitHub, VPS env, compose, and Kubernetes.
+- Published BFF image digest and deployment provenance.
+- GHCR package write permissions.
+- VPS deploy credentials.
+
+### Expected Attackers
+
+- Someone who can open the public website and inspect frontend code.
+- Someone who can replay or relay a manually entered OTP.
+- Someone with access to browser devtools on a non-admin client.
+- Someone who obtains one email inbox but not all three admin inboxes.
+- Someone who tries to trigger stale GitHub Actions workflows or old image tags.
+- Someone who can read CI artifacts, screenshots, or logs.
+
+### Security Boundaries
+
+- Frontend is untrusted.
+- Browser localStorage/sessionStorage is untrusted.
+- GitHub Actions can build and publish artifacts, but should not receive unnecessary long-lived secrets.
+- VPS is trusted for runtime, but should pull verified artifacts rather than rebuild source.
+- Infisical/env/compose/Kubernetes secrets are runtime-only.
+
+### Non-Goals
+
+- Do not create a public self-service admin enrollment flow.
+- Do not make the frontend responsible for deciding whether admin auth is complete.
+- Do not rebuild BFF images on the local Windows machine during the normal path.
+- Do not make Windows VPS part of the default BFF pipeline.
+
 ## Admin Authentication Plan
 
 ### Required Baseline Flow
@@ -49,6 +97,45 @@ The local machine should be used for code editing, light checks, and triggering 
 11. Backend verifies all three OTPs and the prior TOTP challenge.
 12. Backend creates the admin session only after both gates pass.
 
+### Backend API Contract
+
+The exact route names can follow existing repository conventions, but the behavior must match this contract.
+
+| Endpoint | Input | Output | Must Not Do |
+| --- | --- | --- | --- |
+| `POST /auth/admin/mfa/totp/verify` | TOTP code | `mfaChallengeId`, expiry, next step | Must not issue admin token. |
+| `POST /auth/admin/mfa/email/start` | `mfaChallengeId` | email challenge ID, masked recipients, expiry | Must not accept raw recipient emails from frontend. |
+| `POST /auth/admin/mfa/email/verify` | `mfaChallengeId`, email challenge ID, three OTP codes | admin session only if both gates pass | Must not verify email OTPs without prior gate 1 success. |
+| `GET /auth/admin/totp/setup` | none | production `404` or `410` | Must not expose secret, QR, or otpauth URI to browser. |
+| Legacy password routes | any | `410 Gone` when password login disabled | Must not silently create admin sessions. |
+
+### MFA State and Data Model
+
+Admin MFA challenge records should be server-side only.
+
+| Field | Requirement |
+| --- | --- |
+| `mfaChallengeId` | Random, unguessable, short-lived, single-use. |
+| `gate1Type` | `totp` initially, later `passkey` or `totp`. |
+| `gate1VerifiedAt` | Required before email OTP start. |
+| `emailChallengeId` | Separate random ID for email OTP stage. |
+| `emailOtpHashes` | Store hashes only, never raw OTPs. |
+| `attemptCount` | Enforce limits for TOTP and email OTP verification. |
+| `clientBinding` | Bind to same browser/session fingerprint where practical. |
+| `expiresAt` | Expire quickly; suggested 5 minutes for TOTP challenge and 10 minutes for email OTP challenge. |
+| `consumedAt` | Set when admin session is issued or challenge is invalidated. |
+
+### Failure and Abuse Handling
+
+- TOTP failures should return a generic failure message and increment rate limits.
+- Email OTP failures should not reveal which of the three codes was wrong.
+- Email resend should be throttled and should invalidate previous email OTPs unless the implementation intentionally supports one active challenge.
+- Reused challenges should fail and trigger a security log event.
+- Expired challenges should require restarting from gate 1.
+- Admin session creation should rotate any temporary MFA state.
+- Security logs should include event type, time, route, request ID, and masked actor context only.
+- Security logs should exclude raw OTPs, TOTP secrets, passkey private material, full email addresses, cookies, and authorization headers.
+
 ### Researched Stronger Flow
 
 The stronger long-term flow is:
@@ -59,6 +146,29 @@ The stronger long-term flow is:
 4. Admin session only after both gates pass.
 
 This is safer because passkeys and FIDO2 security keys are phishing-resistant, while manually entered OTP codes can be relayed by an attacker. The baseline TOTP flow should still be implemented first if passkey support would slow delivery.
+
+### Backend-Only Enrollment
+
+Authenticator and passkey enrollment must be owner-controlled from backend tooling.
+
+Required backend commands:
+
+- `admin:mfa:totp:generate`
+  - creates a new TOTP secret;
+  - prints one-time setup data only to terminal;
+  - writes no secret to repository files;
+  - provides exact Infisical/GitHub/VPS variable names to update.
+- `admin:mfa:totp:verify-setup`
+  - verifies that the owner scanned the secret correctly;
+  - activates the secret only after a valid code is supplied.
+- `admin:mfa:totp:rotate`
+  - generates a replacement secret;
+  - keeps rollback only until the new secret is verified;
+  - invalidates old challenges.
+- Future `admin:mfa:passkey:register`
+  - owner-initiated registration only;
+  - stores public credential metadata backend-side;
+  - never exposes a general admin self-registration page.
 
 ### Backend Requirements
 
@@ -103,6 +213,16 @@ This is safer because passkeys and FIDO2 security keys are phishing-resistant, w
 - If remember-device exists, show it only after both gates pass or as part of the final verification action.
 - Error messages should be specific enough to help the owner, but not reveal which factor was valid to an attacker.
 
+### UI Quality Requirements
+
+- The modal should feel like an operations security surface, not a marketing screen.
+- Use a two-step progress indicator with stable dimensions.
+- Code inputs should support paste, auto-advance, backspace, and clear error recovery.
+- Loading states must not resize buttons or fields.
+- Mobile layout must keep every input and button visible without horizontal scrolling.
+- Failed verification should keep the user in the current gate and preserve non-sensitive entered state only where safe.
+- Success should be explicit and short, then close or unlock without adding extra choices.
+
 ### Admin Tests and Audit
 
 - Unit tests:
@@ -120,6 +240,25 @@ This is safer because passkeys and FIDO2 security keys are phishing-resistant, w
 - Security audit:
   - no OTP/TOTP secret in logs, screenshots, localStorage, artifacts, or HTML.
 
+### Admin Migration Plan
+
+1. Add backend MFA challenge model and tests while keeping the current UI behind existing behavior.
+2. Change TOTP verification so it returns a challenge instead of an admin session.
+3. Change email OTP verification so it requires the prior TOTP challenge.
+4. Replace frontend modal with two-step flow.
+5. Remove frontend setup calls and password UI.
+6. Update audit scenarios.
+7. Enable the new flow for audit/dev.
+8. Enable in production after backend TOTP secret is confirmed through backend-only setup.
+9. Remove or hard-disable any remaining password/session shortcut paths.
+
+### Admin Rollback Plan
+
+- Keep a temporary backend feature flag for old admin unlock only during implementation.
+- The flag must default off in production once the new flow is verified.
+- Any rollback path must still avoid exposing TOTP setup in frontend.
+- Password login must remain disabled unless explicitly reintroduced by a separate security decision.
+
 ## Remote BFF Image Plan
 
 ### Core Rule
@@ -134,6 +273,29 @@ Normal flow:
 4. GHCR stores the immutable image.
 5. VPS pulls the exact image digest.
 6. VPS starts it, health-checks it, and rolls back if needed.
+
+### Remote Execution Options
+
+| Option | Speed | Safety | Recommended Use |
+| --- | --- | --- | --- |
+| GitHub-hosted runner with BuildKit cache | High after cache warms | Strong isolation | Default build path. |
+| VPS self-hosted runner on protected branch only | High | Medium if locked down | Optional emergency/manual deploy path only. |
+| Remote BuildKit daemon on VPS | High | Medium; requires TLS and hardening | Later optimization if GitHub cache is not enough. |
+| Local Windows Docker | Low on this machine | Low operational reliability | Avoid for normal path. |
+| Windows VPS | Medium at best | Adds licensing and Docker complexity | Not recommended. |
+
+### Runner and Workflow Safety
+
+- Do not run untrusted pull request code on a VPS self-hosted runner.
+- PR checks should use GitHub-hosted isolated runners.
+- Protected branch deploys may use VPS runner only if branch protection and required checks are enabled.
+- Workflow permissions should be least privilege:
+  - `contents: read`
+  - `packages: write` only in image publishing jobs
+  - `id-token: write` only when generating attestations/signatures
+  - no broad default write permissions
+- Pin third-party GitHub Actions to stable versions or immutable SHAs where practical.
+- Store deploy secrets in GitHub environments with required reviewers for production if available.
 
 ### Context Hash Strategy
 
@@ -181,6 +343,20 @@ Exclude local-only and non-runtime inputs:
    - Dockerfile path
    - workflow run URL
 
+### Image Promotion Gates
+
+An image can be promoted to VPS only if all required gates pass:
+
+1. Context hash was computed successfully.
+2. Image was built or reused from the matching context hash.
+3. Image digest is known.
+4. BFF smoke test passes against the image.
+5. Image config/history secret check passes.
+6. Trivy scan completes and does not exceed the configured severity policy.
+7. SBOM is generated or attached.
+8. Provenance/signature/attestation is generated.
+9. Deploy job verifies the digest it is about to pull.
+
 ### Supply-Chain Safety
 
 For each production image:
@@ -203,6 +379,19 @@ No BFF secrets should be passed as Docker build args:
 
 Secrets remain runtime-only through Infisical/env/compose/Kubernetes secrets.
 
+### Artifact Contract
+
+Each successful BFF image workflow should upload or publish:
+
+- `bff-image-manifest.json`
+- `bff-sbom.spdx.json` or `bff-sbom.cyclonedx.json`
+- `trivy-bff-image.sarif` or JSON equivalent
+- build provenance or GitHub artifact attestation
+- image digest in job summary
+- deploy target and health result in deploy summary
+
+Artifact files must not contain secret values.
+
 ### VPS Deployment Flow
 
 1. Workflow receives image digest.
@@ -219,6 +408,35 @@ Secrets remain runtime-only through Infisical/env/compose/Kubernetes secrets.
    - health result
    - timestamp
    - workflow run URL
+
+### VPS Hardening Requirements
+
+- GHCR token should have pull-only package scope where possible.
+- Runtime env should come from Infisical/env files/Kubernetes secrets, not image build args.
+- Deploy user should not be the root login account where avoidable.
+- Keep previous known-good image digest on disk or in deployment metadata.
+- Health check should test the real BFF port and expected `/health` payload.
+- Restart policy should be explicit.
+- Logs should redact authorization headers, cookies, OTPs, and provider keys.
+
+### One-Command Operator Experience
+
+The desired operator command is:
+
+```bash
+npm run deploy:bff:remote
+```
+
+Expected behavior:
+
+1. Calculate or request the context hash.
+2. Trigger the GitHub Actions BFF image workflow.
+3. Wait for workflow completion.
+4. Print image digest.
+5. Trigger deploy or report the deploy workflow URL.
+6. Print VPS health result.
+
+This command should not run local Docker.
 
 ### Why Not Windows VPS
 
@@ -242,6 +460,13 @@ Windows VPS is not recommended for this specific problem.
 - Issue admin session only after both gates.
 - Add tests and audit scenario.
 
+Exit criteria:
+
+- No admin session is issued after TOTP alone.
+- No admin session is issued after email OTP alone.
+- Browser UI contains no password or authenticator setup path.
+- Admin audit passes.
+
 ### Phase 2 - Remote-Only BFF Image Pipeline
 
 - Keep one canonical BFF Dockerfile.
@@ -252,6 +477,12 @@ Windows VPS is not recommended for this specific problem.
 - Make Contabo/OVH/Kubernetes pull the SHA/digest image instead of rebuilding.
 - Make Trivy scan the exact published image.
 
+Exit criteria:
+
+- Local Docker is not required for the normal BFF flow.
+- Repeated run with unchanged BFF context reuses the existing context image.
+- VPS pulls the published SHA/digest image.
+
 ### Phase 3 - Attestation, SBOM, Signing, and Rollback
 
 - Generate SBOM for BFF image.
@@ -261,6 +492,11 @@ Windows VPS is not recommended for this specific problem.
 - Add digest-based deploy record.
 - Add automatic rollback on failed health check.
 
+Exit criteria:
+
+- Production deploy has manifest, SBOM, scan result, and provenance/signature or attestation.
+- Failed health check blocks promotion or rolls back automatically.
+
 ### Phase 4 - Passkey/FIDO2 Admin Upgrade
 
 - Add backend WebAuthn/passkey registration command for owner-controlled setup.
@@ -268,6 +504,12 @@ Windows VPS is not recommended for this specific problem.
 - Add passkey verification as gate 1 primary.
 - Keep TOTP as fallback if needed.
 - Keep three email OTPs as gate 2.
+
+Exit criteria:
+
+- Passkey/security key can satisfy gate 1.
+- Passkey enrollment remains backend/owner controlled.
+- Three email OTPs still remain required as gate 2.
 
 ## Acceptance Criteria
 
@@ -292,6 +534,16 @@ BFF pipeline is accepted when:
 - Health-check failure rolls back or blocks promotion.
 - No build-time secrets appear in image history/config.
 
+## Open Decisions Before Implementation
+
+These are the only decisions that should be confirmed or discovered from the repo before coding:
+
+- Whether the first implementation should be TOTP-only baseline or passkey-first.
+- Where server-side MFA challenges should be stored in production: in-memory, Redis, database, or existing session store.
+- Exact names of the three backend-configured admin email env vars.
+- Whether production deploys use Docker Compose, Kubernetes, or both as first priority.
+- Whether GitHub artifact attestations are available for the current repository plan, or whether Sigstore Cosign should be used directly.
+
 ## Research Basis
 
 - NIST SP 800-63B-4: phishing-resistant authenticators are preferred for higher assurance; manually entered OTPs are not phishing-resistant.
@@ -312,4 +564,3 @@ BFF pipeline is accepted when:
   - https://docs.github.com/actions/security-guides/using-artifact-attestations-to-establish-provenance-for-builds
 - CISA SBOM guidance: SBOMs support software transparency and vulnerability response.
   - https://www.cisa.gov/sbom
-
