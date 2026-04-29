@@ -8,6 +8,10 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 Set-Location $repoRoot
 
+$env:OPENCODE_DISABLE_CLAUDE_CODE = "1"
+$env:OPENCODE_DISABLE_CLAUDE_CODE_PROMPT = "1"
+$env:OPENCODE_DISABLE_CLAUDE_CODE_SKILLS = "1"
+
 function Import-DotEnvFile {
   param([Parameter(Mandatory = $true)] [string] $Path)
 
@@ -68,6 +72,9 @@ if (-not $OpenCodeArgs -or $OpenCodeArgs.Count -eq 0) {
   $OpenCodeArgs = @(".")
 }
 
+$commandName = $OpenCodeArgs[0]
+$commandsNeedingSecrets = @(".", "run", "serve", "web", "attach", "pr", "github")
+
 $opencode = Get-Command opencode -ErrorAction SilentlyContinue
 if ($opencode) {
   $runner = @("opencode")
@@ -79,9 +86,11 @@ if ($opencode) {
   $runner = @("npx", "opencode")
 }
 
-$loadedSecrets = Import-InfisicalEnv -ProjectRoot $repoRoot
-if (-not $loadedSecrets) {
-  Import-DotEnvFile -Path (Join-Path $repoRoot ".env.local") | Out-Null
+if ($commandsNeedingSecrets -contains $commandName) {
+  $loadedSecrets = Import-InfisicalEnv -ProjectRoot $repoRoot
+  if (-not $loadedSecrets) {
+    Import-DotEnvFile -Path (Join-Path $repoRoot ".env.local") | Out-Null
+  }
 }
 
 $command = $runner[0]
