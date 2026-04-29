@@ -252,13 +252,13 @@ jobs:
           }
 
           $releaseNotes = @"
-# TradersApp Desktop ${{ steps.version.outputs.desktop_version }}
+          # TradersApp Desktop ${{ steps.version.outputs.desktop_version }}
 
-Built from commit $env:GITHUB_SHA on $(Get-Date -Format "yyyy-MM-dd").
+          Built from commit $env:GITHUB_SHA on $(Get-Date -Format "yyyy-MM-dd").
 
-## Changes
-$recentCommits
-"@
+          ## Changes
+          $recentCommits
+          "@
 
           Set-Content `
             -LiteralPath (Join-Path $changesDir "${{ steps.version.outputs.desktop_version }}.md") `
