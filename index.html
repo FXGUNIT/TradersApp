@@ -2,10 +2,20 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="icon" type="image/x-icon" href="/favicon-dark-32x32.png" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
-    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-dark-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-dark-16x16.png" />
+    <link rel="alternate icon" type="image/png" sizes="32x32" href="/favicon-light-32x32.png" />
+    <link rel="alternate icon" type="image/png" sizes="16x16" href="/favicon-light-16x16.png" />
+    <script>
+      (function(){
+        var dark=fav=>{document.querySelectorAll('link[rel="icon"]').forEach(l=>l.href=fav)};
+        var m=window.matchMedia('(prefers-color-scheme: dark)');
+        dark(m.matches?'/favicon-dark-32x32.png':'/favicon-light-32x32.png');
+        m.addEventListener('change',e=>dark(e.matches?'/favicon-dark-32x32.png':'/favicon-light-32x32.png'));
+      })();
+    </script>
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no, maximum-scale=1.0"
