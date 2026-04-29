@@ -9,8 +9,8 @@
                        "plan_enter":  "allow",
                        "plan_exit":  "allow"
                    },
-    "model":  "groq-traders-regiment/llama-3.3-70b-versatile",
-    "small_model":  "groq-traders-regiment/llama-3.1-8b-instant",
+    "model":  "sambanova/Meta-Llama-3.3-70B-Instruct",
+    "small_model":  "sambanova/Meta-Llama-3.3-70B-Instruct",
     "instructions":  [
                          "AGENTS.md"
                      ],
@@ -121,16 +121,32 @@
                                                     },
                                         "models":  {
                                                        "openrouter/auto":  {
-                                                                               "name":  "OpenRouter Auto"
+                                                                               "name":  "OpenRouter Auto",
+                                                                               "limit":  {
+                                                                                             "context":  32768,
+                                                                                             "output":  1024
+                                                                                         }
                                                                            },
                                                        "anthropic/claude-3.5-sonnet":  {
-                                                                                           "name":  "Claude 3.5 Sonnet"
+                                                                                           "name":  "Claude 3.5 Sonnet",
+                                                                                           "limit":  {
+                                                                                                         "context":  32768,
+                                                                                                         "output":  1024
+                                                                                                     }
                                                                                        },
                                                        "google/gemini-2.0-flash-exp":  {
-                                                                                           "name":  "Gemini 2.0 Flash"
+                                                                                           "name":  "Gemini 2.0 Flash",
+                                                                                           "limit":  {
+                                                                                                         "context":  32768,
+                                                                                                         "output":  1024
+                                                                                                     }
                                                                                        },
                                                        "meta-llama/llama-3.3-70b-instruct":  {
-                                                                                                 "name":  "Llama 3.3 70B Instruct"
+                                                                                                 "name":  "Llama 3.3 70B Instruct",
+                                                                                                 "limit":  {
+                                                                                                               "context":  32768,
+                                                                                                               "output":  1024
+                                                                                                           }
                                                                                              }
                                                    }
                                     },
@@ -143,10 +159,18 @@
                                                          },
                                              "models":  {
                                                             "openrouter/auto":  {
-                                                                                    "name":  "OpenRouter Auto"
+                                                                                    "name":  "OpenRouter Auto",
+                                                                                    "limit":  {
+                                                                                                  "context":  32768,
+                                                                                                  "output":  1024
+                                                                                              }
                                                                                 },
                                                             "meta-llama/llama-3.3-70b-instruct":  {
-                                                                                                      "name":  "Llama 3.3 70B Instruct"
+                                                                                                      "name":  "Llama 3.3 70B Instruct",
+                                                                                                      "limit":  {
+                                                                                                                    "context":  32768,
+                                                                                                                    "output":  1024
+                                                                                                                }
                                                                                                   }
                                                         }
                                          },
@@ -159,13 +183,25 @@
                                                    },
                                        "models":  {
                                                       "Meta-Llama-3.3-70B-Instruct":  {
-                                                                                          "name":  "Meta Llama 3.3 70B Instruct"
+                                                                                          "name":  "Meta Llama 3.3 70B Instruct",
+                                                                                          "limit":  {
+                                                                                                        "context":  32768,
+                                                                                                        "output":  1024
+                                                                                                    }
                                                                                       },
                                                       "DeepSeek-R1":  {
-                                                                          "name":  "DeepSeek R1"
+                                                                          "name":  "DeepSeek R1",
+                                                                          "limit":  {
+                                                                                        "context":  32768,
+                                                                                        "output":  1024
+                                                                                    }
                                                                       },
                                                       "Qwen3-32B":  {
-                                                                        "name":  "Qwen3 32B"
+                                                                        "name":  "Qwen3 32B",
+                                                                        "limit":  {
+                                                                                      "context":  32768,
+                                                                                      "output":  1024
+                                                                                  }
                                                                     }
                                                   }
                                    },
@@ -178,7 +214,11 @@
                                                         },
                                             "models":  {
                                                            "Meta-Llama-3.3-70B-Instruct":  {
-                                                                                               "name":  "Meta Llama 3.3 70B Instruct"
+                                                                                               "name":  "Meta Llama 3.3 70B Instruct",
+                                                                                               "limit":  {
+                                                                                                             "context":  32768,
+                                                                                                             "output":  1024
+                                                                                                         }
                                                                                            }
                                                        }
                                         },
@@ -191,7 +231,11 @@
                                                         },
                                             "models":  {
                                                            "Meta-Llama-3.3-70B-Instruct":  {
-                                                                                               "name":  "Meta Llama 3.3 70B Instruct"
+                                                                                               "name":  "Meta Llama 3.3 70B Instruct",
+                                                                                               "limit":  {
+                                                                                                             "context":  32768,
+                                                                                                             "output":  1024
+                                                                                                         }
                                                                                            }
                                                        }
                                         },
@@ -204,7 +248,11 @@
                                                         },
                                             "models":  {
                                                            "Meta-Llama-3.3-70B-Instruct":  {
-                                                                                               "name":  "Meta Llama 3.3 70B Instruct"
+                                                                                               "name":  "Meta Llama 3.3 70B Instruct",
+                                                                                               "limit":  {
+                                                                                                             "context":  32768,
+                                                                                                             "output":  1024
+                                                                                                         }
                                                                                            }
                                                        }
                                         },
@@ -217,7 +265,11 @@
                                                         },
                                             "models":  {
                                                            "Meta-Llama-3.3-70B-Instruct":  {
-                                                                                               "name":  "Meta Llama 3.3 70B Instruct"
+                                                                                               "name":  "Meta Llama 3.3 70B Instruct",
+                                                                                               "limit":  {
+                                                                                                             "context":  32768,
+                                                                                                             "output":  1024
+                                                                                                         }
                                                                                            }
                                                        }
                                         }
