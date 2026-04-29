@@ -1,0 +1,3 @@
+NAME            IMAGE                COMMAND                  SERVICE   CREATED      STATUS                    PORTS
+traders-edge    caddy:2.9.1-alpine   "caddy run --config …"   edge      3 days ago   Up 20 seconds (healthy)   0.0.0.0:80->80/tcp, [::]:80->80/tcp, 0.0.0.0:443->443/tcp, [::]:443->443/tcp, 443/udp, 2019/tcp
+traders-redis   redis:7-alpine       "docker-entrypoint.s…"   redis     6 days ago   Up 20 seconds (healthy)   127.0.0.1:6379->6379/tcp

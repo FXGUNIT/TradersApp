@@ -1,0 +1,6 @@
+CONTAINER                  REPOSITORY                  TAG                                        PLATFORM            IMAGE ID            SIZE                CREATED
+traders-analysis-service   ghcr.io/fxgunit/bff         a4a4bf6cdb57d4afe217af597251c9a823d05029   linux/amd64         a5a7e1e74c3d        59.3MB              6 minutes ago
+traders-edge               caddy                       2.9.1-alpine                               linux/amd64         b4e3952384eb        18.4MB              15 months ago
+traders-frontend           ghcr.io/fxgunit/frontend    a4a4bf6cdb57d4afe217af597251c9a823d05029   linux/amd64         8c7a04c728c4        29.4MB              6 minutes ago
+traders-ml-engine          ghcr.io/fxgunit/ml-engine   a4a4bf6cdb57d4afe217af597251c9a823d05029   linux/amd64         e6b47311591e        856MB               8 minutes ago
+traders-redis              redis                       7-alpine                                   linux/amd64         7aec734b2bb2        17.3MB              12 days ago

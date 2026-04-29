@@ -1,0 +1,223 @@
+× tradersapp.service - TradersApp Contabo Docker Compose stack
+     Loaded: loaded (/etc/systemd/system/tradersapp.service; enabled; preset: enabled)
+     Active: failed (Result: exit-code) since Wed 2026-04-29 03:38:33 CEST; 17min ago
+   Main PID: 1984 (code=exited, status=1/FAILURE)
+        CPU: 1.136s
+
+Apr 29 03:38:33 vmi3245049 docker[2095]:  Container traders-frontend Running
+Apr 29 03:38:33 vmi3245049 docker[2095]:  Container traders-ml-engine Running
+Apr 29 03:38:33 vmi3245049 docker[2095]:  Container traders-analysis-service Running
+Apr 29 03:38:33 vmi3245049 docker[2095]:  Container traders-bff Creating
+Apr 29 03:38:33 vmi3245049 docker[2095]:  Container traders-bff Error response from daemon: Conflict. The container name "/traders-bff" is already in use by container "2edce8754c0cf6b7d5eefe7eeb3a9ac9c35ee68efaff538d64d82ba1d42d653c". You have to remove (or rename) that container to be able to reuse that name.
+Apr 29 03:38:33 vmi3245049 docker[2095]: Error response from daemon: Conflict. The container name "/traders-bff" is already in use by container "2edce8754c0cf6b7d5eefe7eeb3a9ac9c35ee68efaff538d64d82ba1d42d653c". You have to remove (or rename) that container to be able to reuse that name.
+Apr 29 03:38:33 vmi3245049 systemd[1]: tradersapp.service: Main process exited, code=exited, status=1/FAILURE
+Apr 29 03:38:33 vmi3245049 systemd[1]: tradersapp.service: Failed with result 'exit-code'.
+Apr 29 03:38:33 vmi3245049 systemd[1]: Failed to start tradersapp.service - TradersApp Contabo Docker Compose stack.
+Apr 29 03:38:33 vmi3245049 systemd[1]: tradersapp.service: Consumed 1.136s CPU time.
+
+===== journalctl tradersapp.service =====
+Apr 21 08:20:34 vmi3245049 systemd[1]: tradersapp.service: Unit configuration has fatal error, unit will not be started.
+Apr 21 08:20:34 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:6: ConditionPathExists= path is not absolute, ignoring: C:/Program Files/Git/opt/tradersapp/deploy/contabo/docker-compose.yml
+Apr 21 08:20:34 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:7: ConditionPathExists= path is not absolute, ignoring: C:/Program Files/Git/opt/tradersapp/runtime/.env.contabo
+Apr 21 08:20:34 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:12: WorkingDirectory= path is not absolute: C:/Program Files/Git/opt/tradersapp/deploy/contabo
+Apr 21 08:20:34 vmi3245049 systemd[1]: tradersapp.service: Unit configuration has fatal error, unit will not be started.
+Apr 21 08:20:39 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:6: ConditionPathExists= path is not absolute, ignoring: C:/Program Files/Git/opt/tradersapp/deploy/contabo/docker-compose.yml
+Apr 21 08:20:39 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:7: ConditionPathExists= path is not absolute, ignoring: C:/Program Files/Git/opt/tradersapp/runtime/.env.contabo
+Apr 21 08:20:39 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:12: WorkingDirectory= path is not absolute: C:/Program Files/Git/opt/tradersapp/deploy/contabo
+Apr 21 08:20:39 vmi3245049 systemd[1]: tradersapp.service: Unit configuration has fatal error, unit will not be started.
+Apr 21 08:20:40 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:6: ConditionPathExists= path is not absolute, ignoring: C:/Program Files/Git/opt/tradersapp/deploy/contabo/docker-compose.yml
+Apr 21 08:20:40 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:7: ConditionPathExists= path is not absolute, ignoring: C:/Program Files/Git/opt/tradersapp/runtime/.env.contabo
+Apr 21 08:20:40 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:12: WorkingDirectory= path is not absolute: C:/Program Files/Git/opt/tradersapp/deploy/contabo
+Apr 21 08:20:40 vmi3245049 systemd[1]: tradersapp.service: Unit configuration has fatal error, unit will not be started.
+Apr 21 08:20:40 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:6: ConditionPathExists= path is not absolute, ignoring: C:/Program Files/Git/opt/tradersapp/deploy/contabo/docker-compose.yml
+Apr 21 08:20:40 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:7: ConditionPathExists= path is not absolute, ignoring: C:/Program Files/Git/opt/tradersapp/runtime/.env.contabo
+Apr 21 08:20:40 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:12: WorkingDirectory= path is not absolute: C:/Program Files/Git/opt/tradersapp/deploy/contabo
+Apr 21 08:20:40 vmi3245049 systemd[1]: tradersapp.service: Unit configuration has fatal error, unit will not be started.
+Apr 21 08:20:55 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:6: ConditionPathExists= path is not absolute, ignoring: C:/Program Files/Git/opt/tradersapp/deploy/contabo/docker-compose.yml
+Apr 21 08:20:55 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:7: ConditionPathExists= path is not absolute, ignoring: C:/Program Files/Git/opt/tradersapp/runtime/.env.contabo
+Apr 21 08:20:55 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:12: WorkingDirectory= path is not absolute: C:/Program Files/Git/opt/tradersapp/deploy/contabo
+Apr 21 08:20:55 vmi3245049 systemd[1]: tradersapp.service: Unit configuration has fatal error, unit will not be started.
+Apr 21 08:20:55 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:6: ConditionPathExists= path is not absolute, ignoring: C:/Program Files/Git/opt/tradersapp/deploy/contabo/docker-compose.yml
+Apr 21 08:20:55 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:7: ConditionPathExists= path is not absolute, ignoring: C:/Program Files/Git/opt/tradersapp/runtime/.env.contabo
+Apr 21 08:20:55 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:12: WorkingDirectory= path is not absolute: C:/Program Files/Git/opt/tradersapp/deploy/contabo
+Apr 21 08:20:55 vmi3245049 systemd[1]: tradersapp.service: Unit configuration has fatal error, unit will not be started.
+Apr 21 08:20:55 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:6: ConditionPathExists= path is not absolute, ignoring: C:/Program Files/Git/opt/tradersapp/deploy/contabo/docker-compose.yml
+Apr 21 08:20:55 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:7: ConditionPathExists= path is not absolute, ignoring: C:/Program Files/Git/opt/tradersapp/runtime/.env.contabo
+Apr 21 08:20:55 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:12: WorkingDirectory= path is not absolute: C:/Program Files/Git/opt/tradersapp/deploy/contabo
+Apr 21 08:20:55 vmi3245049 systemd[1]: tradersapp.service: Unit configuration has fatal error, unit will not be started.
+Apr 21 08:20:57 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:6: ConditionPathExists= path is not absolute, ignoring: C:/Program Files/Git/opt/tradersapp/deploy/contabo/docker-compose.yml
+Apr 21 08:20:57 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:7: ConditionPathExists= path is not absolute, ignoring: C:/Program Files/Git/opt/tradersapp/runtime/.env.contabo
+Apr 21 08:20:57 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:12: WorkingDirectory= path is not absolute: C:/Program Files/Git/opt/tradersapp/deploy/contabo
+Apr 21 08:20:57 vmi3245049 systemd[1]: tradersapp.service: Unit configuration has fatal error, unit will not be started.
+Apr 21 08:20:57 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:6: ConditionPathExists= path is not absolute, ignoring: C:/Program Files/Git/opt/tradersapp/deploy/contabo/docker-compose.yml
+Apr 21 08:20:57 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:7: ConditionPathExists= path is not absolute, ignoring: C:/Program Files/Git/opt/tradersapp/runtime/.env.contabo
+Apr 21 08:20:57 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:12: WorkingDirectory= path is not absolute: C:/Program Files/Git/opt/tradersapp/deploy/contabo
+Apr 21 08:20:57 vmi3245049 systemd[1]: tradersapp.service: Unit configuration has fatal error, unit will not be started.
+Apr 21 14:01:41 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:6: ConditionPathExists= path is not absolute, ignoring: C:/Program Files/Git/opt/tradersapp/deploy/contabo/docker-compose.yml
+Apr 21 14:01:41 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:7: ConditionPathExists= path is not absolute, ignoring: C:/Program Files/Git/opt/tradersapp/runtime/.env.contabo
+Apr 21 14:01:41 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:12: WorkingDirectory= path is not absolute: C:/Program Files/Git/opt/tradersapp/deploy/contabo
+Apr 21 14:01:41 vmi3245049 systemd[1]: tradersapp.service: Unit configuration has fatal error, unit will not be started.
+Apr 21 14:01:41 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:6: ConditionPathExists= path is not absolute, ignoring: C:/Program Files/Git/opt/tradersapp/deploy/contabo/docker-compose.yml
+Apr 21 14:01:41 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:7: ConditionPathExists= path is not absolute, ignoring: C:/Program Files/Git/opt/tradersapp/runtime/.env.contabo
+Apr 21 14:01:41 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:12: WorkingDirectory= path is not absolute: C:/Program Files/Git/opt/tradersapp/deploy/contabo
+Apr 21 14:01:41 vmi3245049 systemd[1]: tradersapp.service: Unit configuration has fatal error, unit will not be started.
+Apr 21 14:03:56 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:6: ConditionPathExists= path is not absolute, ignoring: C:/Program Files/Git/opt/tradersapp/deploy/contabo/docker-compose.yml
+Apr 21 14:03:56 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:7: ConditionPathExists= path is not absolute, ignoring: C:/Program Files/Git/opt/tradersapp/runtime/.env.contabo
+Apr 21 14:03:56 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:12: WorkingDirectory= path is not absolute: C:/Program Files/Git/opt/tradersapp/deploy/contabo
+Apr 21 14:03:56 vmi3245049 systemd[1]: tradersapp.service: Unit configuration has fatal error, unit will not be started.
+Apr 21 14:03:57 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:6: ConditionPathExists= path is not absolute, ignoring: C:/Program Files/Git/opt/tradersapp/deploy/contabo/docker-compose.yml
+Apr 21 14:03:57 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:7: ConditionPathExists= path is not absolute, ignoring: C:/Program Files/Git/opt/tradersapp/runtime/.env.contabo
+Apr 21 14:03:57 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:12: WorkingDirectory= path is not absolute: C:/Program Files/Git/opt/tradersapp/deploy/contabo
+Apr 21 14:03:57 vmi3245049 systemd[1]: tradersapp.service: Unit configuration has fatal error, unit will not be started.
+Apr 21 14:06:19 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:6: ConditionPathExists= path is not absolute, ignoring: C:/Program Files/Git/opt/tradersapp/deploy/contabo/docker-compose.yml
+Apr 21 14:06:19 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:7: ConditionPathExists= path is not absolute, ignoring: C:/Program Files/Git/opt/tradersapp/runtime/.env.contabo
+Apr 21 14:06:19 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:12: WorkingDirectory= path is not absolute: C:/Program Files/Git/opt/tradersapp/deploy/contabo
+Apr 21 14:06:19 vmi3245049 systemd[1]: tradersapp.service: Unit configuration has fatal error, unit will not be started.
+Apr 21 14:06:19 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:6: ConditionPathExists= path is not absolute, ignoring: C:/Program Files/Git/opt/tradersapp/deploy/contabo/docker-compose.yml
+Apr 21 14:06:19 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:7: ConditionPathExists= path is not absolute, ignoring: C:/Program Files/Git/opt/tradersapp/runtime/.env.contabo
+Apr 21 14:06:19 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:12: WorkingDirectory= path is not absolute: C:/Program Files/Git/opt/tradersapp/deploy/contabo
+Apr 21 14:06:19 vmi3245049 systemd[1]: tradersapp.service: Unit configuration has fatal error, unit will not be started.
+Apr 21 14:20:44 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:6: ConditionPathExists= path is not absolute, ignoring: C:/Program Files/Git/opt/tradersapp/deploy/contabo/docker-compose.yml
+Apr 21 14:20:44 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:7: ConditionPathExists= path is not absolute, ignoring: C:/Program Files/Git/opt/tradersapp/runtime/.env.contabo
+Apr 21 14:20:44 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:12: WorkingDirectory= path is not absolute: C:/Program Files/Git/opt/tradersapp/deploy/contabo
+Apr 21 14:20:44 vmi3245049 systemd[1]: tradersapp.service: Unit configuration has fatal error, unit will not be started.
+Apr 21 14:20:45 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:6: ConditionPathExists= path is not absolute, ignoring: C:/Program Files/Git/opt/tradersapp/deploy/contabo/docker-compose.yml
+Apr 21 14:20:45 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:7: ConditionPathExists= path is not absolute, ignoring: C:/Program Files/Git/opt/tradersapp/runtime/.env.contabo
+Apr 21 14:20:45 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:12: WorkingDirectory= path is not absolute: C:/Program Files/Git/opt/tradersapp/deploy/contabo
+Apr 21 14:20:45 vmi3245049 systemd[1]: tradersapp.service: Unit configuration has fatal error, unit will not be started.
+Apr 21 14:34:48 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:6: ConditionPathExists= path is not absolute, ignoring: C:/Program Files/Git/opt/tradersapp/deploy/contabo/docker-compose.yml
+Apr 21 14:34:48 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:7: ConditionPathExists= path is not absolute, ignoring: C:/Program Files/Git/opt/tradersapp/runtime/.env.contabo
+Apr 21 14:34:48 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:12: WorkingDirectory= path is not absolute: C:/Program Files/Git/opt/tradersapp/deploy/contabo
+Apr 21 14:34:48 vmi3245049 systemd[1]: tradersapp.service: Unit configuration has fatal error, unit will not be started.
+Apr 21 14:34:48 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:6: ConditionPathExists= path is not absolute, ignoring: C:/Program Files/Git/opt/tradersapp/deploy/contabo/docker-compose.yml
+Apr 21 14:34:48 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:7: ConditionPathExists= path is not absolute, ignoring: C:/Program Files/Git/opt/tradersapp/runtime/.env.contabo
+Apr 21 14:34:48 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:12: WorkingDirectory= path is not absolute: C:/Program Files/Git/opt/tradersapp/deploy/contabo
+Apr 21 14:34:48 vmi3245049 systemd[1]: tradersapp.service: Unit configuration has fatal error, unit will not be started.
+Apr 21 14:34:49 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:6: ConditionPathExists= path is not absolute, ignoring: C:/Program Files/Git/opt/tradersapp/deploy/contabo/docker-compose.yml
+Apr 21 14:34:49 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:7: ConditionPathExists= path is not absolute, ignoring: C:/Program Files/Git/opt/tradersapp/runtime/.env.contabo
+Apr 21 14:34:49 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:12: WorkingDirectory= path is not absolute: C:/Program Files/Git/opt/tradersapp/deploy/contabo
+Apr 21 14:34:49 vmi3245049 systemd[1]: tradersapp.service: Unit configuration has fatal error, unit will not be started.
+Apr 21 14:35:06 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:6: ConditionPathExists= path is not absolute, ignoring: C:/Program Files/Git/opt/tradersapp/deploy/contabo/docker-compose.yml
+Apr 21 14:35:06 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:7: ConditionPathExists= path is not absolute, ignoring: C:/Program Files/Git/opt/tradersapp/runtime/.env.contabo
+Apr 21 14:35:06 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:12: WorkingDirectory= path is not absolute: C:/Program Files/Git/opt/tradersapp/deploy/contabo
+Apr 21 14:35:06 vmi3245049 systemd[1]: tradersapp.service: Unit configuration has fatal error, unit will not be started.
+Apr 21 14:35:06 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:6: ConditionPathExists= path is not absolute, ignoring: C:/Program Files/Git/opt/tradersapp/deploy/contabo/docker-compose.yml
+Apr 21 14:35:06 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:7: ConditionPathExists= path is not absolute, ignoring: C:/Program Files/Git/opt/tradersapp/runtime/.env.contabo
+Apr 21 14:35:06 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:12: WorkingDirectory= path is not absolute: C:/Program Files/Git/opt/tradersapp/deploy/contabo
+Apr 21 14:35:06 vmi3245049 systemd[1]: tradersapp.service: Unit configuration has fatal error, unit will not be started.
+Apr 21 14:35:06 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:6: ConditionPathExists= path is not absolute, ignoring: C:/Program Files/Git/opt/tradersapp/deploy/contabo/docker-compose.yml
+Apr 21 14:35:06 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:7: ConditionPathExists= path is not absolute, ignoring: C:/Program Files/Git/opt/tradersapp/runtime/.env.contabo
+Apr 21 14:35:06 vmi3245049 systemd[1]: /etc/systemd/system/tradersapp.service:12: WorkingDirectory= path is not absolute: C:/Program Files/Git/opt/tradersapp/deploy/contabo
+Apr 21 14:35:06 vmi3245049 systemd[1]: tradersapp.service: Unit configuration has fatal error, unit will not be started.
+-- Boot 73653cf38ccf4bf0baafa29b40c301a6 --
+Apr 28 23:05:09 vmi3245049 systemd[1]: Starting tradersapp.service - TradersApp Contabo Docker Compose stack...
+Apr 28 23:05:14 vmi3245049 docker[2054]:  Image ghcr.io/fxgunit/ml-engine:b7f7045e068d69f0a3b8d635e2b78c84af464682 Pulling
+Apr 28 23:05:14 vmi3245049 docker[2054]:  Image ghcr.io/fxgunit/bff:b7f7045e068d69f0a3b8d635e2b78c84af464682 Pulling
+Apr 28 23:05:14 vmi3245049 docker[2054]:  Image ghcr.io/fxgunit/frontend:b7f7045e068d69f0a3b8d635e2b78c84af464682 Pulling
+Apr 28 23:05:14 vmi3245049 docker[2054]:  Image caddy:2.9.1-alpine Pulling
+Apr 28 23:05:14 vmi3245049 docker[2054]:  Image ghcr.io/fxgunit/bff:b7f7045e068d69f0a3b8d635e2b78c84af464682 Pulling
+Apr 28 23:05:16 vmi3245049 docker[2054]:  Image ghcr.io/fxgunit/bff:b7f7045e068d69f0a3b8d635e2b78c84af464682 Pulled
+Apr 28 23:05:16 vmi3245049 docker[2054]:  Image ghcr.io/fxgunit/frontend:b7f7045e068d69f0a3b8d635e2b78c84af464682 Pulled
+Apr 28 23:05:16 vmi3245049 docker[2054]:  Image ghcr.io/fxgunit/bff:b7f7045e068d69f0a3b8d635e2b78c84af464682 Pulled
+Apr 28 23:05:16 vmi3245049 docker[2054]:  Image ghcr.io/fxgunit/ml-engine:b7f7045e068d69f0a3b8d635e2b78c84af464682 Pulled
+Apr 28 23:05:16 vmi3245049 docker[2054]:  Image caddy:2.9.1-alpine Pulled
+Apr 28 23:05:17 vmi3245049 docker[2054]:  Container traders-frontend Running
+Apr 28 23:05:17 vmi3245049 docker[2054]:  Container traders-redis Running
+Apr 28 23:05:17 vmi3245049 docker[2054]:  Container traders-ml-engine Running
+Apr 28 23:05:17 vmi3245049 docker[2054]:  Container traders-analysis-service Running
+Apr 28 23:05:17 vmi3245049 docker[2054]:  Container traders-bff Creating
+Apr 28 23:05:17 vmi3245049 docker[2054]:  Container traders-bff Error response from daemon: Conflict. The container name "/traders-bff" is already in use by container "2edce8754c0cf6b7d5eefe7eeb3a9ac9c35ee68efaff538d64d82ba1d42d653c". You have to remove (or rename) that container to be able to reuse that name.
+Apr 28 23:05:17 vmi3245049 docker[2054]: Error response from daemon: Conflict. The container name "/traders-bff" is already in use by container "2edce8754c0cf6b7d5eefe7eeb3a9ac9c35ee68efaff538d64d82ba1d42d653c". You have to remove (or rename) that container to be able to reuse that name.
+Apr 28 23:05:17 vmi3245049 systemd[1]: tradersapp.service: Main process exited, code=exited, status=1/FAILURE
+Apr 28 23:05:17 vmi3245049 systemd[1]: tradersapp.service: Failed with result 'exit-code'.
+Apr 28 23:05:17 vmi3245049 systemd[1]: Failed to start tradersapp.service - TradersApp Contabo Docker Compose stack.
+-- Boot d492b62367f945debd4e323aa2ecdc22 --
+Apr 29 01:43:51 vmi3245049 systemd[1]: Starting tradersapp.service - TradersApp Contabo Docker Compose stack...
+Apr 29 01:43:53 vmi3245049 docker[2035]:  Image caddy:2.9.1-alpine Pulling
+Apr 29 01:43:53 vmi3245049 docker[2035]:  Image ghcr.io/fxgunit/bff:b7f7045e068d69f0a3b8d635e2b78c84af464682 Pulling
+Apr 29 01:43:53 vmi3245049 docker[2035]:  Image ghcr.io/fxgunit/ml-engine:b7f7045e068d69f0a3b8d635e2b78c84af464682 Pulling
+Apr 29 01:43:53 vmi3245049 docker[2035]:  Image ghcr.io/fxgunit/bff:b7f7045e068d69f0a3b8d635e2b78c84af464682 Pulling
+Apr 29 01:43:53 vmi3245049 docker[2035]:  Image ghcr.io/fxgunit/frontend:b7f7045e068d69f0a3b8d635e2b78c84af464682 Pulling
+Apr 29 01:43:54 vmi3245049 docker[2035]:  Image ghcr.io/fxgunit/bff:b7f7045e068d69f0a3b8d635e2b78c84af464682 Pulled
+Apr 29 01:43:54 vmi3245049 docker[2035]:  Image ghcr.io/fxgunit/bff:b7f7045e068d69f0a3b8d635e2b78c84af464682 Pulled
+Apr 29 01:43:54 vmi3245049 docker[2035]:  Image ghcr.io/fxgunit/ml-engine:b7f7045e068d69f0a3b8d635e2b78c84af464682 Pulled
+Apr 29 01:43:54 vmi3245049 docker[2035]:  Image ghcr.io/fxgunit/frontend:b7f7045e068d69f0a3b8d635e2b78c84af464682 Pulled
+Apr 29 01:43:55 vmi3245049 docker[2035]:  Image caddy:2.9.1-alpine Pulled
+Apr 29 01:43:55 vmi3245049 docker[2035]:  Container traders-frontend Running
+Apr 29 01:43:55 vmi3245049 docker[2035]:  Container traders-redis Running
+Apr 29 01:43:55 vmi3245049 docker[2035]:  Container traders-ml-engine Running
+Apr 29 01:43:55 vmi3245049 docker[2035]:  Container traders-analysis-service Running
+Apr 29 01:43:55 vmi3245049 docker[2035]:  Container traders-bff Creating
+Apr 29 01:43:55 vmi3245049 docker[2035]:  Container traders-bff Error response from daemon: Conflict. The container name "/traders-bff" is already in use by container "2edce8754c0cf6b7d5eefe7eeb3a9ac9c35ee68efaff538d64d82ba1d42d653c". You have to remove (or rename) that container to be able to reuse that name.
+Apr 29 01:43:55 vmi3245049 docker[2035]: Error response from daemon: Conflict. The container name "/traders-bff" is already in use by container "2edce8754c0cf6b7d5eefe7eeb3a9ac9c35ee68efaff538d64d82ba1d42d653c". You have to remove (or rename) that container to be able to reuse that name.
+Apr 29 01:43:55 vmi3245049 systemd[1]: tradersapp.service: Main process exited, code=exited, status=1/FAILURE
+Apr 29 01:43:55 vmi3245049 systemd[1]: tradersapp.service: Failed with result 'exit-code'.
+Apr 29 01:43:55 vmi3245049 systemd[1]: Failed to start tradersapp.service - TradersApp Contabo Docker Compose stack.
+-- Boot b8f62caae2d14fdbb63378f40d2d94af --
+Apr 29 02:08:48 vmi3245049 systemd[1]: Starting tradersapp.service - TradersApp Contabo Docker Compose stack...
+Apr 29 02:08:49 vmi3245049 docker[2030]:  Image ghcr.io/fxgunit/bff:b7f7045e068d69f0a3b8d635e2b78c84af464682 Pulling
+Apr 29 02:08:49 vmi3245049 docker[2030]:  Image caddy:2.9.1-alpine Pulling
+Apr 29 02:08:49 vmi3245049 docker[2030]:  Image ghcr.io/fxgunit/ml-engine:b7f7045e068d69f0a3b8d635e2b78c84af464682 Pulling
+Apr 29 02:08:49 vmi3245049 docker[2030]:  Image ghcr.io/fxgunit/frontend:b7f7045e068d69f0a3b8d635e2b78c84af464682 Pulling
+Apr 29 02:08:49 vmi3245049 docker[2030]:  Image ghcr.io/fxgunit/bff:b7f7045e068d69f0a3b8d635e2b78c84af464682 Pulling
+Apr 29 02:08:51 vmi3245049 docker[2030]:  Image ghcr.io/fxgunit/bff:b7f7045e068d69f0a3b8d635e2b78c84af464682 Pulled
+Apr 29 02:08:51 vmi3245049 docker[2030]:  Image ghcr.io/fxgunit/ml-engine:b7f7045e068d69f0a3b8d635e2b78c84af464682 Pulled
+Apr 29 02:08:51 vmi3245049 docker[2030]:  Image ghcr.io/fxgunit/bff:b7f7045e068d69f0a3b8d635e2b78c84af464682 Pulled
+Apr 29 02:08:51 vmi3245049 docker[2030]:  Image ghcr.io/fxgunit/frontend:b7f7045e068d69f0a3b8d635e2b78c84af464682 Pulled
+Apr 29 02:08:51 vmi3245049 docker[2030]:  Image caddy:2.9.1-alpine Pulled
+Apr 29 02:08:51 vmi3245049 docker[2030]:  Container traders-redis Running
+Apr 29 02:08:51 vmi3245049 docker[2030]:  Container traders-ml-engine Running
+Apr 29 02:08:51 vmi3245049 docker[2030]:  Container traders-frontend Running
+Apr 29 02:08:51 vmi3245049 docker[2030]:  Container traders-analysis-service Running
+Apr 29 02:08:51 vmi3245049 docker[2030]:  Container traders-bff Creating
+Apr 29 02:08:51 vmi3245049 docker[2030]:  Container traders-bff Error response from daemon: Conflict. The container name "/traders-bff" is already in use by container "2edce8754c0cf6b7d5eefe7eeb3a9ac9c35ee68efaff538d64d82ba1d42d653c". You have to remove (or rename) that container to be able to reuse that name.
+Apr 29 02:08:51 vmi3245049 docker[2030]: Error response from daemon: Conflict. The container name "/traders-bff" is already in use by container "2edce8754c0cf6b7d5eefe7eeb3a9ac9c35ee68efaff538d64d82ba1d42d653c". You have to remove (or rename) that container to be able to reuse that name.
+Apr 29 02:08:51 vmi3245049 systemd[1]: tradersapp.service: Main process exited, code=exited, status=1/FAILURE
+Apr 29 02:08:51 vmi3245049 systemd[1]: tradersapp.service: Failed with result 'exit-code'.
+Apr 29 02:08:51 vmi3245049 systemd[1]: Failed to start tradersapp.service - TradersApp Contabo Docker Compose stack.
+-- Boot 49cb5679b7a34c0b80bbfbdd96d9767e --
+Apr 29 03:16:40 vmi3245049 systemd[1]: Starting tradersapp.service - TradersApp Contabo Docker Compose stack...
+Apr 29 03:16:45 vmi3245049 docker[2131]:  Image ghcr.io/fxgunit/bff:b7f7045e068d69f0a3b8d635e2b78c84af464682 Pulling
+Apr 29 03:16:45 vmi3245049 docker[2131]:  Image ghcr.io/fxgunit/frontend:b7f7045e068d69f0a3b8d635e2b78c84af464682 Pulling
+Apr 29 03:16:45 vmi3245049 docker[2131]:  Image ghcr.io/fxgunit/bff:b7f7045e068d69f0a3b8d635e2b78c84af464682 Pulling
+Apr 29 03:16:45 vmi3245049 docker[2131]:  Image caddy:2.9.1-alpine Pulling
+Apr 29 03:16:45 vmi3245049 docker[2131]:  Image ghcr.io/fxgunit/ml-engine:b7f7045e068d69f0a3b8d635e2b78c84af464682 Pulling
+Apr 29 03:16:48 vmi3245049 docker[2131]:  Image ghcr.io/fxgunit/bff:b7f7045e068d69f0a3b8d635e2b78c84af464682 Pulled
+Apr 29 03:16:48 vmi3245049 docker[2131]:  Image ghcr.io/fxgunit/bff:b7f7045e068d69f0a3b8d635e2b78c84af464682 Pulled
+Apr 29 03:16:48 vmi3245049 docker[2131]:  Image ghcr.io/fxgunit/frontend:b7f7045e068d69f0a3b8d635e2b78c84af464682 Pulled
+Apr 29 03:16:48 vmi3245049 docker[2131]:  Image ghcr.io/fxgunit/ml-engine:b7f7045e068d69f0a3b8d635e2b78c84af464682 Pulled
+Apr 29 03:16:48 vmi3245049 docker[2131]:  Image caddy:2.9.1-alpine Pulled
+Apr 29 03:16:49 vmi3245049 docker[2131]:  Container traders-redis Running
+Apr 29 03:16:49 vmi3245049 docker[2131]:  Container traders-ml-engine Running
+Apr 29 03:16:49 vmi3245049 docker[2131]:  Container traders-analysis-service Running
+Apr 29 03:16:49 vmi3245049 docker[2131]:  Container traders-bff Creating
+Apr 29 03:16:49 vmi3245049 docker[2131]:  Container traders-frontend Running
+Apr 29 03:16:49 vmi3245049 docker[2131]:  Container traders-bff Error response from daemon: Conflict. The container name "/traders-bff" is already in use by container "2edce8754c0cf6b7d5eefe7eeb3a9ac9c35ee68efaff538d64d82ba1d42d653c". You have to remove (or rename) that container to be able to reuse that name.
+Apr 29 03:16:49 vmi3245049 docker[2131]: Error response from daemon: Conflict. The container name "/traders-bff" is already in use by container "2edce8754c0cf6b7d5eefe7eeb3a9ac9c35ee68efaff538d64d82ba1d42d653c". You have to remove (or rename) that container to be able to reuse that name.
+Apr 29 03:16:49 vmi3245049 systemd[1]: tradersapp.service: Main process exited, code=exited, status=1/FAILURE
+Apr 29 03:16:49 vmi3245049 systemd[1]: tradersapp.service: Failed with result 'exit-code'.
+Apr 29 03:16:49 vmi3245049 systemd[1]: Failed to start tradersapp.service - TradersApp Contabo Docker Compose stack.
+Apr 29 03:16:49 vmi3245049 systemd[1]: tradersapp.service: Consumed 1.456s CPU time.
+-- Boot 2e7f5d6aa8684bd39ae6e4a0c03602c8 --
+Apr 29 03:38:24 vmi3245049 systemd[1]: Starting tradersapp.service - TradersApp Contabo Docker Compose stack...
+Apr 29 03:38:30 vmi3245049 docker[2095]:  Image ghcr.io/fxgunit/bff:b7f7045e068d69f0a3b8d635e2b78c84af464682 Pulling
+Apr 29 03:38:30 vmi3245049 docker[2095]:  Image caddy:2.9.1-alpine Pulling
+Apr 29 03:38:30 vmi3245049 docker[2095]:  Image ghcr.io/fxgunit/bff:b7f7045e068d69f0a3b8d635e2b78c84af464682 Pulling
+Apr 29 03:38:31 vmi3245049 docker[2095]:  Image ghcr.io/fxgunit/ml-engine:b7f7045e068d69f0a3b8d635e2b78c84af464682 Pulling
+Apr 29 03:38:31 vmi3245049 docker[2095]:  Image ghcr.io/fxgunit/frontend:b7f7045e068d69f0a3b8d635e2b78c84af464682 Pulling
+Apr 29 03:38:32 vmi3245049 docker[2095]:  Image ghcr.io/fxgunit/bff:b7f7045e068d69f0a3b8d635e2b78c84af464682 Pulled
+Apr 29 03:38:32 vmi3245049 docker[2095]:  Image ghcr.io/fxgunit/bff:b7f7045e068d69f0a3b8d635e2b78c84af464682 Pulled
+Apr 29 03:38:32 vmi3245049 docker[2095]:  Image ghcr.io/fxgunit/ml-engine:b7f7045e068d69f0a3b8d635e2b78c84af464682 Pulled
+Apr 29 03:38:32 vmi3245049 docker[2095]:  Image ghcr.io/fxgunit/frontend:b7f7045e068d69f0a3b8d635e2b78c84af464682 Pulled
+Apr 29 03:38:32 vmi3245049 docker[2095]:  Image caddy:2.9.1-alpine Pulled
+Apr 29 03:38:33 vmi3245049 docker[2095]:  Container traders-redis Running
+Apr 29 03:38:33 vmi3245049 docker[2095]:  Container traders-frontend Running
+Apr 29 03:38:33 vmi3245049 docker[2095]:  Container traders-ml-engine Running
+Apr 29 03:38:33 vmi3245049 docker[2095]:  Container traders-analysis-service Running
+Apr 29 03:38:33 vmi3245049 docker[2095]:  Container traders-bff Creating
+Apr 29 03:38:33 vmi3245049 docker[2095]:  Container traders-bff Error response from daemon: Conflict. The container name "/traders-bff" is already in use by container "2edce8754c0cf6b7d5eefe7eeb3a9ac9c35ee68efaff538d64d82ba1d42d653c". You have to remove (or rename) that container to be able to reuse that name.
+Apr 29 03:38:33 vmi3245049 docker[2095]: Error response from daemon: Conflict. The container name "/traders-bff" is already in use by container "2edce8754c0cf6b7d5eefe7eeb3a9ac9c35ee68efaff538d64d82ba1d42d653c". You have to remove (or rename) that container to be able to reuse that name.
+Apr 29 03:38:33 vmi3245049 systemd[1]: tradersapp.service: Main process exited, code=exited, status=1/FAILURE
+Apr 29 03:38:33 vmi3245049 systemd[1]: tradersapp.service: Failed with result 'exit-code'.
+Apr 29 03:38:33 vmi3245049 systemd[1]: Failed to start tradersapp.service - TradersApp Contabo Docker Compose stack.
+Apr 29 03:38:33 vmi3245049 systemd[1]: tradersapp.service: Consumed 1.136s CPU time.
