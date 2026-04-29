@@ -2,6 +2,8 @@ name: Recover Contabo VPS Disk
 
 on:
   workflow_dispatch:
+  repository_dispatch:
+    types: [recover-contabo]
 
 env:
   CONTABO_API_URL: https://api.contabo.com
