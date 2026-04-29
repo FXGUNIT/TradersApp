@@ -1,4 +1,4 @@
-FROM node:20-alpine
+FROM node:24-alpine
 
 WORKDIR /app
 
@@ -6,11 +6,15 @@ ENV NODE_ENV=production
 ENV PORT=8788
 ENV ML_ENGINE_URL=http://ml-engine:8001
 
-RUN addgroup -S tradersapp && adduser -S tradersapp -G tradersapp
+RUN apk upgrade --no-cache \
+    && addgroup -S tradersapp \
+    && adduser -S tradersapp -G tradersapp
 
 COPY bff/package.json bff/package-lock.json ./bff/
 WORKDIR /app/bff
-RUN npm ci --omit=dev
+RUN npm ci --omit=dev \
+    && npm cache clean --force \
+    && rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 
 WORKDIR /app
 COPY bff/ ./bff/
