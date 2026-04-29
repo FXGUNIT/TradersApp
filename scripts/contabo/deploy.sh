@@ -227,6 +227,10 @@ if [ "${AVAILABLE_KB}" -lt 20000000 ]; then
   exit 1
 fi
 
+echo "[deploy] Removing old tradersapp images to free disk..."
+run_as_app "docker images --format '{{.Repository}}:{{.Tag}} ({{.Size}})' | grep 'ghcr.io/fxgunit' | grep -v "${IMAGE_TAG}" | awk '{print \$3}' | xargs -r docker rmi -f 2>/dev/null || true"
+run_as_app "docker images --format '{{.Repository}}:{{.Tag}} ({{.Size}})' | grep 'ghcr.io/fxgunit/traders-' | awk '{print \$3}' | xargs -r docker rmi -f 2>/dev/null || true"
+
 echo "[deploy] Pulling only images needed for this deployment..."
 OWNER="fxgunit"
 if [ -n "${IMAGE_TAG}" ]; then
