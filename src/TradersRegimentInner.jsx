@@ -313,7 +313,7 @@ function TradersRegimentInner() {
     setIsAudioMuted: (v) => setIsAudioMuted(v),
     handleLogin, handleStructuredGoogleAuth, handleLoginPasswordReset,
     resetAdminPromptState, setShowAdminPrompt, setAdminMasterEmail,
-    setAdminOtps, setAdminOtpStep,
+    setTotpCode, setAdminOtps, setAdminOtpStep,
     handleAdminRequestNewCodes, sendAdminOTPs,
     handleAdminAccess, handleAdminVerifyCodes,
     handleStructuredSignup, handleBackToLoginFromSignup,

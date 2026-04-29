@@ -197,11 +197,11 @@ async function installAuditRuntimeGuards(page, baseUrl) {
 
     if (url.includes("/auth/admin/totp/setup")) {
       await route.fulfill({
-        status: 403,
+        status: 200,
         contentType: "application/json",
         body: JSON.stringify({
-          ok: false,
-          error: "Authenticator setup is disabled during audit.",
+          ok: true,
+          setupAvailable: false,
           audit: true,
         }),
       });
