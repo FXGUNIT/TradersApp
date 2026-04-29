@@ -1,0 +1,72 @@
+name: Recover Contabo VPS Disk
+
+on:
+  workflow_dispatch:
+
+env:
+  CONTABO_API_URL: https://api.contabo.com
+
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check disk space
+        run: |
+          echo "=== Disk before cleanup ==="
+          df -h /
+
+      - name: Remove stale traders-bff container
+        run: |
+          echo "=== Checking existing containers ==="
+          ssh -o StrictHostKeyChecking=no -o ConnectTimeout=15 \
+            root@173.249.18.14 "
+              echo 'Containers:'
+              docker ps -a --format '{{.Names}} {{.Status}}' | grep -E 'bff|ml|frontend|redis' || true
+              echo 'Docker images:'
+              docker images --format '{{.Repository}}:{{.Tag}} ({{.Size}})' | head -10
+              echo 'Disk:'
+              df -h /
+              echo '--- Removing conflicting containers ---'
+              docker rm -f traders-bff 2>/dev/null || true
+              echo 'Removal done.'
+            "
+
+      - name: Aggressive disk cleanup
+        run: |
+          ssh -o StrictHostKeyChecking=no -o ConnectTimeout=15 \
+            root@173.249.18.14 "
+              echo '=== Stopping all tradersapp containers ==='
+              docker stop \$(docker ps -q --filter 'name=traders-') 2>/dev/null || true
+              echo '=== Pruning dangling images ==='
+              docker image prune -af || true
+              echo '=== Pruning all unused images ==='
+              docker image prune -a -f --filter 'until=168h' || true
+              echo '=== System prune ==='
+              docker system prune -af --volumes || true
+              echo '=== Disk after cleanup ==='
+              df -h /
+              echo '=== Docker space reclaimed ==='
+              docker system df
+            "
+
+      - name: Verify disk space
+        run: |
+          AVAILABLE=\$(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=15 \
+            root@173.249.18.14 'df / -BM | awk \"NR==2 {print \$4}\"' | tr -d 'M')
+          echo "Available: \${AVAILABLE}MB"
+          if [ "\${AVAILABLE}" -lt 20000 ]; then
+            echo "::error::Still less than 20GB free after cleanup"
+            exit 1
+          fi
+          echo "Disk recovery successful — \${AVAILABLE}MB free"
+
+      - name: Remove all stale containers
+        run: |
+          ssh -o StrictHostKeyChecking=no -o ConnectTimeout=15 \
+            root@173.249.18.14 "
+              echo '=== Removing ALL stale traders containers ==='
+              docker rm -f \$(docker ps -aq --filter 'name=traders-') 2>/dev/null || true
+              echo '=== Remaining containers ==='
+              docker ps -a --format '{{.Names}} {{.Status}}'
+            "
