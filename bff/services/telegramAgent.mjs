@@ -29,10 +29,7 @@ const POLL_INTERVAL_MS = 10_000;
 let offset = 0;
 let pollTimer = null;
 
-async function invokeLlm(userMessage) {
-  const { invokeProvider } = await import("../server.mjs");
-  return invokeProvider("groq", SYSTEM_PROMPT, userMessage);
-}
+import { invokeLlm } from "./llmBridge.mjs";
 
 async function getUpdates() {
   const url = `https://api.telegram.org/bot${BOT_TOKEN}/getUpdates?offset=${offset}&timeout=10`;
