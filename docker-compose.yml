@@ -85,7 +85,7 @@ services:
   analysis-service:
     build:
       context: .
-      dockerfile: Dockerfile.bff
+      dockerfile: bff/Dockerfile
     container_name: traders-analysis-service
     command: ["node", "analysis-server.mjs"]
     ports:
@@ -110,7 +110,7 @@ services:
   bff:
     build:
       context: .
-      dockerfile: Dockerfile.bff
+      dockerfile: bff/Dockerfile
     container_name: traders-bff
     ports:
       - "8788:8788"

@@ -2,51 +2,40 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Build from repo root so the runtime layout is stable in CI and deploy workflows.
-COPY bff/package.json ./package.json
-RUN npm install --omit=dev --prefer-offline 2>/dev/null || true
-
-# Copy runtime files
-COPY bff/ ./
-COPY proto/ ./proto/
-
-# Build args (secrets injected at Docker build time from GitHub Actions)
-ARG AI_GEMINI_PRO_KEY
-ARG AI_GROQ_TURBO_KEY
-ARG AI_OPENROUTER_MIND_ALPHA
-ARG AI_OPENROUTER_MIND_BETA
-ARG AI_CEREBRAS_KEY
-ARG AI_DEEPSEEK_KEY
-ARG AI_SAMBANOVA_KEY
-ARG FINNHUB_API_KEY
-ARG NEWS_API_KEY
-ARG BFF_ADMIN_PASS_HASH
-ARG MASTER_SALT
-ARG ML_ENGINE_URL
-
-# Environment — use build args if present, otherwise Railway/Infisical will set at runtime
 ENV NODE_ENV=production
 ENV PORT=8788
-ENV ML_ENGINE_URL=${ML_ENGINE_URL:-http://ml-engine:8001}
-# AI Provider keys (injected at Docker build time)
-ENV AI_GEMINI_PRO_KEY=${AI_GEMINI_PRO_KEY:-}
-ENV AI_GROQ_TURBO_KEY=${AI_GROQ_TURBO_KEY:-}
-ENV AI_OPENROUTER_MIND_ALPHA=${AI_OPENROUTER_MIND_ALPHA:-}
-ENV AI_OPENROUTER_MIND_BETA=${AI_OPENROUTER_MIND_BETA:-}
-ENV AI_CEREBRAS_KEY=${AI_CEREBRAS_KEY:-}
-ENV AI_DEEPSEEK_KEY=${AI_DEEPSEEK_KEY:-}
-ENV AI_SAMBANOVA_KEY=${AI_SAMBANOVA_KEY:-}
-ENV FINNHUB_API_KEY=${FINNHUB_API_KEY:-}
-ENV NEWS_API_KEY=${NEWS_API_KEY:-}
-ENV BFF_ADMIN_PASS_HASH=${BFF_ADMIN_PASS_HASH:-}
-ENV MASTER_SALT=${MASTER_SALT:-}
+ENV ML_ENGINE_URL=http://ml-engine:8001
 
-# Expose port
+RUN addgroup -S tradersapp && adduser -S tradersapp -G tradersapp
+
+COPY bff/package.json bff/package-lock.json ./
+RUN npm ci --omit=dev
+
+COPY bff/server.mjs ./
+COPY bff/analysis-server.mjs ./
+COPY bff/analysisFormatters.mjs ./
+COPY bff/analysisMiddleware.mjs ./
+COPY bff/metrics.mjs ./
+COPY bff/_dispatch.mjs ./
+COPY bff/_dispatchRoutes.mjs ./
+COPY bff/routes/ ./routes/
+COPY bff/services/ ./services/
+COPY bff/domains/ ./domains/
+COPY bff/generated/ ./generated/
+COPY bff/data/ ./data/
+COPY bff/board-room/ ./board-room/
+COPY bff/prompts/ ./prompts/
+COPY bff/middleware/ ./middleware/
+COPY proto/ ./proto/
+
+RUN mkdir -p /app/runtime /app/board-room \
+    && chown -R tradersapp:tradersapp /app
+
+USER tradersapp
+
 EXPOSE 8788
 
-# Health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD wget -qO- http://127.0.0.1:8788/health >/dev/null 2>&1 || busybox wget -qO- http://127.0.0.1:8788/health >/dev/null 2>&1 || exit 1
 
-# Start
 CMD ["node", "server.mjs"]
