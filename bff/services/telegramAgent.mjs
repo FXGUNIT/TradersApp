@@ -117,7 +117,11 @@ async function pollLoop() {
 
 export async function startTelegramAgent() {
   if (!BOT_TOKEN) {
-    console.warn("[telegramAgent] No bot token — not starting");
+    console.warn("[telegramAgent] No bot token — not starting (set BFF_TELEGRAM_BOT_TOKEN)");
+    return;
+  }
+  if (BOT_TOKEN === "undefined" || BOT_TOKEN === "null") {
+    console.warn("[telegramAgent] Invalid bot token — not starting");
     return;
   }
   console.log("[telegramAgent] Starting polling loop...");
