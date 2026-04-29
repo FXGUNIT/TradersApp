@@ -13,7 +13,7 @@ RUN apt-get update \
 COPY requirements.txt .
 
 RUN python -m venv "${VIRTUAL_ENV}" \
-    && pip install --no-cache-dir --upgrade pip setuptools wheel \
+    && pip install --no-cache-dir pip==26.1 setuptools==82.0.1 wheel==0.47.0 \
     && pip install --no-cache-dir -r requirements.txt --timeout=300
 
 FROM python:3.11-slim-trixie AS runtime
