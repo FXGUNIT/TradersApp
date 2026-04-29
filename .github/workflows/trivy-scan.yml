@@ -19,6 +19,9 @@ on:
       - ".dockerignore"
       - ".github/workflows/trivy-scan.yml"
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   trivy-scan:
     runs-on: ubuntu-latest
@@ -59,7 +62,7 @@ jobs:
             echo "bff=ghcr.io/${OWNER_LC}/bff:${TAG}" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Build local scan images
+      - name: Prepare scan images
         run: |
           set -euo pipefail
           docker build -t tradersapp/ml-engine:scan --file ml-engine/Dockerfile ml-engine/
@@ -71,6 +74,8 @@ jobs:
           fi
 
       - name: Run Trivy vulnerability scanner (ML Engine)
+        id: trivy_ml
+        continue-on-error: true
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: ${{ steps.images.outputs.ml }}
@@ -80,6 +85,8 @@ jobs:
           exit-code: "1"
 
       - name: Run Trivy vulnerability scanner (BFF)
+        id: trivy_bff
+        continue-on-error: true
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: ${{ steps.images.outputs.bff }}
@@ -89,6 +96,8 @@ jobs:
           exit-code: "1"
 
       - name: Run Trivy vulnerability scanner (Frontend)
+        id: trivy_frontend
+        continue-on-error: true
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: ${{ steps.images.outputs.frontend }}
@@ -99,21 +108,21 @@ jobs:
 
       - name: Upload Trivy ML Engine results
         uses: github/codeql-action/upload-sarif@v3
-        if: always()
+        if: always() && hashFiles('trivy-results-ml-engine.sarif') != ''
         with:
           sarif_file: trivy-results-ml-engine.sarif
           category: trivy-ml-engine
 
       - name: Upload Trivy BFF results
         uses: github/codeql-action/upload-sarif@v3
-        if: always()
+        if: always() && hashFiles('trivy-results-bff.sarif') != ''
         with:
           sarif_file: trivy-results-bff.sarif
           category: trivy-bff
 
       - name: Upload Trivy Frontend results
         uses: github/codeql-action/upload-sarif@v3
-        if: always()
+        if: always() && hashFiles('trivy-results-frontend.sarif') != ''
         with:
           sarif_file: trivy-results-frontend.sarif
           category: trivy-frontend
@@ -123,3 +132,22 @@ jobs:
         run: |
           echo "Trivy scan complete."
           echo "BFF scan target: ${{ steps.images.outputs.bff }}"
+
+      - name: Fail on Trivy findings
+        if: always()
+        run: |
+          set -euo pipefail
+          failed=0
+          if [ "${{ steps.trivy_ml.outcome }}" = "failure" ]; then
+            echo "ML Engine image has HIGH/CRITICAL Trivy findings or scan failed."
+            failed=1
+          fi
+          if [ "${{ steps.trivy_bff.outcome }}" = "failure" ]; then
+            echo "BFF image has HIGH/CRITICAL Trivy findings or scan failed."
+            failed=1
+          fi
+          if [ "${{ steps.trivy_frontend.outcome }}" = "failure" ]; then
+            echo "Frontend image has HIGH/CRITICAL Trivy findings or scan failed."
+            failed=1
+          fi
+          exit "$failed"
