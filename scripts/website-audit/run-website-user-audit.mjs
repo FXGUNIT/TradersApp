@@ -98,6 +98,19 @@ function ensureDir(dir) {
   fs.mkdirSync(dir, { recursive: true });
 }
 
+function resetKnownArtifacts(outputDir) {
+  for (const child of ["screenshots", "traces", "html-report"]) {
+    fs.rmSync(path.join(outputDir, child), { recursive: true, force: true });
+  }
+
+  for (const fileName of [
+    "website-user-audit-report.json",
+    "opencli-summary.md",
+  ]) {
+    fs.rmSync(path.join(outputDir, fileName), { force: true });
+  }
+}
+
 function toRelative(filePath) {
   if (!filePath) return "";
   return path.relative(ROOT, filePath).replace(/\\/g, "/");
@@ -614,6 +627,7 @@ function writeHtmlReport(report, outputPath) {
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
+  resetKnownArtifacts(args.outputDir);
   const dirs = {
     output: args.outputDir,
     screenshots: path.join(args.outputDir, "screenshots"),
