@@ -89,15 +89,13 @@ export const TradersRegimentWatermark = () => {
       padding: '20px',
       fontSize: '13px',
       color: 'var(--subtext)',
-      fontWeight: '600',
-      letterSpacing: '1px',
+      fontWeight: 800,
+      letterSpacing: 2,
       borderTop: 'none',
       transition: 'all 0.3s ease',
       userSelect: 'none',
       textAlign: 'center',
       fontFamily: "var(--font-ui)",
-      fontWeight: 800,
-      letterSpacing: 2,
     }}>
       <span style={{ marginRight: '4px' }}>�</span>
       <span style={{ fontFamily: "var(--font-ui)" }}>TRADERS REGIMENT</span>
