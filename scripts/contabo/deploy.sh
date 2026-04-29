@@ -248,6 +248,10 @@ echo "[deploy] Clearing stale Caddy volumes (autosave.json carries old TLS confi
 run_as_app "docker volume rm tradersapp_caddy_data tradersapp_caddy_config 2>/dev/null || true"
 run_as_app "docker volume rm caddy_data caddy_config 2>/dev/null || true"
 
+echo "[deploy] Removing any stale traders-bff container..."
+run_as_app "docker rm -f traders-bff 2>/dev/null || true"
+run_as_app "docker rm -f \$(docker ps -aq --filter 'name=traders-') 2>/dev/null || true"
+
 echo "[deploy] Starting stack..."
 run_as_app "${COMPOSE_CMD} up -d --remove-orphans"
 
