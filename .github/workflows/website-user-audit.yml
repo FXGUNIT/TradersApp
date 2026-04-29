@@ -1,0 +1,140 @@
+name: Website User Audit
+
+on:
+  pull_request:
+    branches: [main, staging]
+  workflow_run:
+    workflows: ["Deploy Pages Root"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      target_url:
+        description: "Optional URL to audit. Leave empty to audit https://tradergunit.pages.dev/."
+        required: false
+        default: ""
+  schedule:
+    - cron: "17 1 * * *"
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: website-user-audit-${{ github.event_name }}-${{ github.ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  website-user-audit:
+    name: Website user audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    env:
+      WEBSITE_AUDIT_OUTPUT_DIR: output/playwright/website-user-audit
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Resolve audit target
+        id: target
+        shell: bash
+        env:
+          MANUAL_TARGET_URL: ${{ github.event.inputs.target_url }}
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "base_url=http://127.0.0.1:5173" >> "${GITHUB_OUTPUT}"
+            echo "target=pr-build" >> "${GITHUB_OUTPUT}"
+          elif [ -n "${MANUAL_TARGET_URL:-}" ]; then
+            echo "base_url=${MANUAL_TARGET_URL}" >> "${GITHUB_OUTPUT}"
+            echo "target=manual" >> "${GITHUB_OUTPUT}"
+          else
+            echo "base_url=https://tradergunit.pages.dev/" >> "${GITHUB_OUTPUT}"
+            echo "target=live" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Build PR frontend
+        if: ${{ github.event_name == 'pull_request' }}
+        env:
+          VITE_FEATURE_FLOATING_SUPPORT_CHAT: "true"
+          VITE_FEATURE_COLLECTIVE_CONSCIOUSNESS: "true"
+          VITE_FEATURE_MAIN_TERMINAL: "true"
+          VITE_FEATURE_CLEAN_ONBOARDING: "true"
+        run: npm run build
+
+      - name: Serve PR frontend
+        if: ${{ github.event_name == 'pull_request' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run preview -- --host 127.0.0.1 --port 5173 > /tmp/tradersapp-preview.log 2>&1 &
+          for attempt in {1..30}; do
+            if curl -fsS http://127.0.0.1:5173/ > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/tradersapp-preview.log
+          exit 1
+
+      - name: Run website user audit
+        id: audit
+        run: |
+          npm run audit:website:user -- \
+            --base-url "${{ steps.target.outputs.base_url }}" \
+            --target "${{ steps.target.outputs.target }}" \
+            --output-dir "${WEBSITE_AUDIT_OUTPUT_DIR}" \
+            --commit "${GITHUB_SHA}"
+
+      - name: Summarize with OpenCode
+        if: always()
+        continue-on-error: true
+        env:
+          SAMBANOVA_API_KEY: ${{ secrets.SAMBANOVA_API_KEY }}
+          AI_SAMBANOVA_TR_1_KEY: ${{ secrets.AI_SAMBANOVA_TR_1_KEY }}
+          AI_SAMBANOVA_TR_2_KEY: ${{ secrets.AI_SAMBANOVA_TR_2_KEY }}
+          AI_SAMBANOVA_TR_3_KEY: ${{ secrets.AI_SAMBANOVA_TR_3_KEY }}
+          AI_SAMBANOVA_TR_4_KEY: ${{ secrets.AI_SAMBANOVA_TR_4_KEY }}
+        run: |
+          npm run audit:website:user:summary -- \
+            --report "${WEBSITE_AUDIT_OUTPUT_DIR}/website-user-audit-report.json" \
+            --output "${WEBSITE_AUDIT_OUTPUT_DIR}/opencli-summary.md"
+
+      - name: Upload website audit artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: website-user-audit-${{ github.run_id }}
+          path: |
+            output/playwright/website-user-audit/website-user-audit-report.json
+            output/playwright/website-user-audit/opencli-summary.md
+            output/playwright/website-user-audit/screenshots/
+            output/playwright/website-user-audit/traces/
+            output/playwright/website-user-audit/html-report/
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Publish audit summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Website user audit"
+            echo ""
+            echo "- Target: \`${{ steps.target.outputs.target || 'unknown' }}\`"
+            echo "- Base URL: \`${{ steps.target.outputs.base_url || 'unknown' }}\`"
+            echo "- Artifact: \`website-user-audit-${{ github.run_id }}\`"
+            echo "- Deterministic audit status: \`${{ steps.audit.outcome || 'not-run' }}\`"
+          } >> "${GITHUB_STEP_SUMMARY}"
