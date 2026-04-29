@@ -9,6 +9,7 @@ import { executeLogSecurityAlert } from "./securityForensicsHandlers.js";
 export function useAdminAccessHandlers({
   adminMasterEmail,
   adminOtps,
+  adminMfaChallengeId,
   adminOtpChallengeId,
   totpCode,
   requestAdminEmailOtp,
@@ -26,7 +27,9 @@ export function useAdminAccessHandlers({
   setAdminOtpStep,
   setAdminOtpsVerified,
   setAdminOtps,
+  setAdminMfaChallengeId,
   setAdminOtpChallengeId,
+  setAdminOtpRecipients,
   setTotpCode,
   setTotpErr,
   setAdminOtpErr,
@@ -52,7 +55,7 @@ export function useAdminAccessHandlers({
   const sendAdminOTPs = useCallback(
     async () =>
       executeSendAdminOTPs({
-        adminMasterEmail,
+        adminMfaChallengeId,
         requestAdminEmailOtp,
         logSecurityAlert,
         setAdminMasterEmailVerified,
@@ -60,14 +63,16 @@ export function useAdminAccessHandlers({
         setAdminOtpsVerified,
         setAdminOtpErr,
         setAdminOtpChallengeId,
+        setAdminOtpRecipients,
       }),
     [
-      adminMasterEmail,
+      adminMfaChallengeId,
       logSecurityAlert,
       requestAdminEmailOtp,
       setAdminMasterEmailVerified,
       setAdminOtpChallengeId,
       setAdminOtpErr,
+      setAdminOtpRecipients,
       setAdminOtpStep,
       setAdminOtpsVerified,
     ],
@@ -89,7 +94,9 @@ export function useAdminAccessHandlers({
         setAdminOtps,
         setAdminMasterEmail,
         setAdminMasterEmailVerified,
+        setAdminMfaChallengeId,
         setAdminOtpChallengeId,
+        setAdminOtpRecipients,
         setIsAdminAuthenticated,
         setScreen,
       }),
@@ -99,7 +106,9 @@ export function useAdminAccessHandlers({
       logSecurityAlert,
       setAdminMasterEmail,
       setAdminMasterEmailVerified,
+      setAdminMfaChallengeId,
       setAdminOtpChallengeId,
+      setAdminOtpRecipients,
       setAdminOtpStep,
       setAdminOtps,
       setAdminOtpsVerified,
@@ -123,7 +132,9 @@ export function useAdminAccessHandlers({
       setAdminOtpStep(false);
       setAdminOtpsVerified(false);
       setAdminOtps({ otp1: "", otp2: "", otp3: "" });
+      setAdminMfaChallengeId("");
       setAdminOtpChallengeId("");
+      setAdminOtpRecipients([]);
       setAdminOtpErr("");
       setTotpErr("");
       setTotpCode("");
@@ -131,7 +142,9 @@ export function useAdminAccessHandlers({
     [
       setAdminMasterEmail,
       setAdminMasterEmailVerified,
+      setAdminMfaChallengeId,
       setAdminOtpChallengeId,
+      setAdminOtpRecipients,
       setAdminOtpErr,
       setAdminOtpStep,
       setAdminOtps,
@@ -146,6 +159,7 @@ export function useAdminAccessHandlers({
     async () =>
       executeHandleAdminVerifyCodes({
         adminOtps,
+        adminMfaChallengeId,
         adminOtpChallengeId,
         verifyAdminEmailOtp,
         setAdminOtpErr,
@@ -156,16 +170,21 @@ export function useAdminAccessHandlers({
         setAdminOtps,
         setAdminMasterEmail,
         setAdminMasterEmailVerified,
+        setAdminMfaChallengeId,
         setAdminOtpChallengeId,
+        setAdminOtpRecipients,
         setIsAdminAuthenticated,
         setScreen,
       }),
     [
+      adminMfaChallengeId,
       adminOtpChallengeId,
       adminOtps,
       setAdminMasterEmail,
       setAdminMasterEmailVerified,
+      setAdminMfaChallengeId,
       setAdminOtpChallengeId,
+      setAdminOtpRecipients,
       setAdminOtpErr,
       setAdminOtpStep,
       setAdminOtps,
@@ -178,9 +197,14 @@ export function useAdminAccessHandlers({
     ],
   );
 
-  const handleAdminRequestNewCodes = useCallback(() => {
-    resetAdminPromptState();
-  }, [resetAdminPromptState]);
+  const handleAdminRequestNewCodes = useCallback(async () => {
+    if (!adminMfaChallengeId) {
+      resetAdminPromptState();
+      return;
+    }
+    setAdminOtps({ otp1: "", otp2: "", otp3: "" });
+    await sendAdminOTPs();
+  }, [adminMfaChallengeId, resetAdminPromptState, sendAdminOTPs, setAdminOtps]);
 
   return {
     sendAdminOTPs,

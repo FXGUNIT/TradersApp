@@ -6,7 +6,9 @@ function completeAdminUnlock({
   setAdminOtps,
   setAdminMasterEmail,
   setAdminMasterEmailVerified,
+  setAdminMfaChallengeId,
   setAdminOtpChallengeId,
+  setAdminOtpRecipients,
   setIsAdminAuthenticated,
   setScreen,
 }) {
@@ -19,13 +21,15 @@ function completeAdminUnlock({
   setAdminOtps({ otp1: "", otp2: "", otp3: "" });
   setAdminMasterEmail("");
   setAdminMasterEmailVerified(false);
+  setAdminMfaChallengeId("");
   setAdminOtpChallengeId("");
+  setAdminOtpRecipients([]);
   setIsAdminAuthenticated(true);
   setScreen("admin");
 }
 
 export const executeSendAdminOTPs = async ({
-  adminMasterEmail,
+  adminMfaChallengeId,
   requestAdminEmailOtp,
   logSecurityAlert,
   setAdminMasterEmailVerified,
@@ -33,23 +37,23 @@ export const executeSendAdminOTPs = async ({
   setAdminOtpsVerified,
   setAdminOtpErr,
   setAdminOtpChallengeId,
+  setAdminOtpRecipients,
 }) => {
   try {
-    const result = await requestAdminEmailOtp(adminMasterEmail);
+    const result = await requestAdminEmailOtp({
+      mfaChallengeId: adminMfaChallengeId,
+    });
     setAdminOtpChallengeId(result.challengeId || "");
+    setAdminOtpRecipients(result.recipients || []);
     setAdminMasterEmailVerified(true);
     setAdminOtpStep(true);
     setAdminOtpsVerified(false);
-    setAdminOtpErr(
-      result.devCodes
-        ? `Local dev codes: ${Object.values(result.devCodes).join(" / ")}`
-        : "",
-    );
+    setAdminOtpErr("");
   } catch (error) {
     await logSecurityAlert(
-      "Master Email Verification Failed",
-      adminMasterEmail,
-      error.message || "Unauthorized admin identity",
+      "Admin Email OTP Request Failed",
+      "backend-configured-admin-recipients",
+      error.message || "Email OTP request failed",
     );
     setAdminOtpErr(error.message || "Failed to send verification codes.");
   }
@@ -62,19 +66,18 @@ export const executeHandleAdminAccess = async ({
   adminMasterEmail,
   showToast,
   setTotpErr,
-  setShowAdminPrompt,
-  setTotpCode,
   setAdminOtpsVerified,
   setAdminOtpStep,
   setAdminOtps,
   setAdminMasterEmail,
   setAdminMasterEmailVerified,
+  setAdminMfaChallengeId,
   setAdminOtpChallengeId,
-  setIsAdminAuthenticated,
-  setScreen,
+  setAdminOtpRecipients,
 }) => {
+  let result;
   try {
-    await verifyAdminTotp(totpCode);
+    result = await verifyAdminTotp(totpCode);
   } catch (error) {
     await logSecurityAlert(
       "Authenticator Verification Failed",
@@ -87,23 +90,21 @@ export const executeHandleAdminAccess = async ({
   }
 
   setTotpErr("");
-  completeAdminUnlock({
-    setShowAdminPrompt,
-    setTotpCode,
-    setAdminOtpsVerified,
-    setAdminOtpStep,
-    setAdminOtps,
-    setAdminMasterEmail,
-    setAdminMasterEmailVerified,
-    setAdminOtpChallengeId,
-    setIsAdminAuthenticated,
-    setScreen,
-  });
+  setAdminMfaChallengeId(result?.mfaChallengeId || "");
+  setAdminOtpRecipients(result?.recipients || []);
+  setAdminMasterEmailVerified(true);
+  setAdminOtpStep(false);
+  setAdminOtpChallengeId("");
+  setAdminOtpsVerified(false);
+  setAdminOtps({ otp1: "", otp2: "", otp3: "" });
+  setAdminMasterEmail("");
+  showToast("Authenticator verified. Send the three email codes.", "success");
   return true;
 };
 
 export const executeHandleAdminVerifyCodes = async ({
   adminOtps,
+  adminMfaChallengeId,
   adminOtpChallengeId,
   verifyAdminEmailOtp,
   setAdminOtpErr,
@@ -114,12 +115,15 @@ export const executeHandleAdminVerifyCodes = async ({
   setAdminOtps,
   setAdminMasterEmail,
   setAdminMasterEmailVerified,
+  setAdminMfaChallengeId,
   setAdminOtpChallengeId,
+  setAdminOtpRecipients,
   setIsAdminAuthenticated,
   setScreen,
 }) => {
   try {
     await verifyAdminEmailOtp({
+      mfaChallengeId: adminMfaChallengeId,
       challengeId: adminOtpChallengeId,
       otps: adminOtps,
     });
@@ -137,7 +141,9 @@ export const executeHandleAdminVerifyCodes = async ({
     setAdminOtps,
     setAdminMasterEmail,
     setAdminMasterEmailVerified,
+    setAdminMfaChallengeId,
     setAdminOtpChallengeId,
+    setAdminOtpRecipients,
     setIsAdminAuthenticated,
     setScreen,
   });

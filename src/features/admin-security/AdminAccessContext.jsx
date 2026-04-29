@@ -34,7 +34,9 @@ export function AdminAccessProvider({ children, setScreen }) {
   const [adminOtpStep, setAdminOtpStep] = useState(false);
   const [adminOtpsVerified, setAdminOtpsVerified] = useState(false);
   const [adminOtps, setAdminOtps] = useState({ otp1: "", otp2: "", otp3: "" });
+  const [adminMfaChallengeId, setAdminMfaChallengeId] = useState("");
   const [adminOtpChallengeId, setAdminOtpChallengeId] = useState("");
+  const [adminOtpRecipients, setAdminOtpRecipients] = useState([]);
   const [adminOtpErr, setAdminOtpErr] = useState("");
   const [totpErr, setTotpErr] = useState("");
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
@@ -49,6 +51,7 @@ export function AdminAccessProvider({ children, setScreen }) {
   } = useAdminAccessHandlers({
     adminMasterEmail,
     adminOtps,
+    adminMfaChallengeId,
     adminOtpChallengeId,
     totpCode,
     requestAdminEmailOtp,
@@ -67,7 +70,9 @@ export function AdminAccessProvider({ children, setScreen }) {
     setAdminOtpStep,
     setAdminOtpsVerified,
     setAdminOtps,
+    setAdminMfaChallengeId,
     setAdminOtpChallengeId,
+    setAdminOtpRecipients,
     setTotpCode,
     setTotpErr,
     setAdminOtpErr,
@@ -84,7 +89,9 @@ export function AdminAccessProvider({ children, setScreen }) {
     adminOtpStep,
     adminOtpsVerified,
     adminOtps,
+    adminMfaChallengeId,
     adminOtpChallengeId,
+    adminOtpRecipients,
     adminOtpErr,
     totpErr,
     isAdminAuthenticated,
@@ -96,7 +103,9 @@ export function AdminAccessProvider({ children, setScreen }) {
     setAdminOtpStep,
     setAdminOtpsVerified,
     setAdminOtps,
+    setAdminMfaChallengeId,
     setAdminOtpChallengeId,
+    setAdminOtpRecipients,
     setAdminOtpErr,
     setTotpErr,
     setIsAdminAuthenticated,

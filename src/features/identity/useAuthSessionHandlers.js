@@ -65,6 +65,9 @@ export function useAuthSessionHandlers({
   setAdminOtpStep,
   setAdminOtpsVerified,
   setAdminOtps,
+  setAdminMfaChallengeId,
+  setAdminOtpChallengeId,
+  setAdminOtpRecipients,
   setAdminOtpErr,
 }) {
 
@@ -366,6 +369,9 @@ export function useAuthSessionHandlers({
     setAdminOtpStep(false);
     setAdminOtpsVerified(false);
     setAdminOtps({ otp1: "", otp2: "", otp3: "" });
+    setAdminMfaChallengeId("");
+    setAdminOtpChallengeId("");
+    setAdminOtpRecipients([]);
     setAdminOtpErr("");
     setScreen("login");
   }, [
@@ -373,6 +379,9 @@ export function useAuthSessionHandlers({
     clearPendingGoogleSignup,
     setAdminMasterEmail,
     setAdminMasterEmailVerified,
+    setAdminMfaChallengeId,
+    setAdminOtpChallengeId,
+    setAdminOtpRecipients,
     setAdminOtpErr,
     setAdminOtpStep,
     setAdminOtps,

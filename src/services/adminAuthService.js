@@ -144,10 +144,11 @@ async function parseJsonResponse(response, fallbackError) {
   return payload;
 }
 
-export async function requestAdminEmailOtp(masterEmail) {
+export async function requestAdminEmailOtp({ mfaChallengeId }) {
   if (typeof window !== "undefined" && window.__TRADERS_AUDIT_DATA) {
     return {
       ok: true,
+      mfaChallengeId: mfaChallengeId || "audit-admin-mfa",
       challengeId: "audit-admin-email-otp",
       recipients: [
         "g***h@gmail.com",
@@ -158,9 +159,9 @@ export async function requestAdminEmailOtp(masterEmail) {
     };
   }
 
-  const cleanEmail = String(masterEmail || "").trim();
-  if (!cleanEmail) {
-    throw new Error("Master admin email is required.");
+  const cleanChallengeId = String(mfaChallengeId || "").trim();
+  if (!cleanChallengeId) {
+    throw new Error("Authenticator verification expired. Restart admin verification.");
   }
 
   let response;
@@ -169,7 +170,10 @@ export async function requestAdminEmailOtp(masterEmail) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       cache: "no-store",
-      body: JSON.stringify({ masterEmail: cleanEmail }),
+      body: JSON.stringify({
+        mfaChallengeId: cleanChallengeId,
+        ...buildAdminDevicePayload(),
+      }),
     });
   } catch {
     throw new Error("Admin email OTP service is unavailable.");
@@ -178,10 +182,14 @@ export async function requestAdminEmailOtp(masterEmail) {
   return parseJsonResponse(response, "Admin email OTP request failed.");
 }
 
-export async function verifyAdminEmailOtp({ challengeId, otps }) {
+export async function verifyAdminEmailOtp({ mfaChallengeId, challengeId, otps }) {
   if (typeof window !== "undefined" && window.__TRADERS_AUDIT_DATA) {
     await setAdminToken("audit-simulated-token");
     return { ok: true, verified: true, simulated: true };
+  }
+
+  if (!mfaChallengeId) {
+    throw new Error("Authenticator verification expired. Restart admin verification.");
   }
 
   if (!challengeId) {
@@ -195,6 +203,7 @@ export async function verifyAdminEmailOtp({ challengeId, otps }) {
       headers: { "Content-Type": "application/json" },
       cache: "no-store",
       body: JSON.stringify({
+        mfaChallengeId,
         challengeId,
         codes: {
           otp1: otps?.otp1,
@@ -215,8 +224,18 @@ export async function verifyAdminEmailOtp({ challengeId, otps }) {
 
 export async function verifyAdminTotp(code) {
   if (typeof window !== "undefined" && window.__TRADERS_AUDIT_DATA) {
-    await setAdminToken("audit-simulated-token");
-    return { ok: true, verified: true, simulated: true };
+    return {
+      ok: true,
+      verified: true,
+      simulated: true,
+      mfaChallengeId: "audit-admin-mfa",
+      nextStep: "email_otp_start",
+      recipients: [
+        "g***h@gmail.com",
+        "a***s@gmail.com",
+        "s***t@gmail.com",
+      ],
+    };
   }
 
   const cleanCode = String(code || "").replace(/\D/g, "").slice(0, 6);
@@ -239,9 +258,7 @@ export async function verifyAdminTotp(code) {
     throw new Error("Admin authenticator service is unavailable.");
   }
 
-  return storeAdminSessionFromPayload(
-    await parseJsonResponse(response, "Admin authenticator verification failed."),
-  );
+  return parseJsonResponse(response, "Admin authenticator verification failed.");
 }
 
 export async function fetchAdminTotpSetup() {

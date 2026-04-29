@@ -146,6 +146,9 @@ function TradersRegimentInner() {
     adminOtpStep, setAdminOtpStep,
     adminOtpsVerified, setAdminOtpsVerified,
     adminOtps, setAdminOtps,
+    adminMfaChallengeId, setAdminMfaChallengeId,
+    adminOtpChallengeId, setAdminOtpChallengeId,
+    adminOtpRecipients, setAdminOtpRecipients,
     adminOtpErr, setAdminOtpErr,
     totpErr, setTotpErr,
     
@@ -276,6 +279,7 @@ function TradersRegimentInner() {
     setIsAdminAuthenticated, setShowAdminPrompt,
     setAdminMasterEmail, setAdminMasterEmailVerified,
     setAdminOtpStep, setAdminOtpsVerified, setAdminOtps,
+    setAdminMfaChallengeId, setAdminOtpChallengeId, setAdminOtpRecipients,
     setAdminOtpErr,
   });
 
@@ -305,7 +309,8 @@ function TradersRegimentInner() {
     setIsAudioMuted,
     auth, profile, googleUser, currentSessionId,
     adminMasterEmail, adminMasterEmailVerified, adminOtpStep, adminOtps,
-    adminOtpsVerified, totpErr, totpCode, adminOtpErr,
+    adminOtpsVerified, adminMfaChallengeId, adminOtpChallengeId,
+    adminOtpRecipients, totpErr, totpCode, adminOtpErr,
     showAdminPrompt, _SCREEN_IDS, ADMIN_UID, ADMIN_EMAIL,
     listAdminUsers: _listAdminUsers,
     approveAdminUser: _approveAdminUser,

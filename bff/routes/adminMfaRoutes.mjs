@@ -54,20 +54,20 @@ export function createAdminMfaRouteHandler({
     }
 
     if (method === "GET" && pathname === "/auth/admin/totp/setup") {
-      if (String(process.env.NODE_ENV || "").toLowerCase() === "production") {
-        json(res, 403, { ok: false, error: "Authenticator setup details are disabled in production." }, origin);
-        return true;
-      }
       const payload = getAdminTotpSetup();
       json(res, payload.ok ? 200 : payload.status || 400, payload, origin);
       return true;
     }
 
-    if (method === "POST" && pathname === "/auth/admin/email-otp/start") {
+    if (
+      method === "POST" &&
+      (pathname === "/auth/admin/email-otp/start" ||
+        pathname === "/auth/admin/mfa/email/start")
+    ) {
       try {
         const body = await readJsonBody(req);
         const result = await startAdminEmailOtp({
-          masterEmail: body.masterEmail || body.email,
+          mfaChallengeId: body.mfaChallengeId,
           clientKey: getClientKey(req),
         });
         json(res, result.ok ? 200 : result.status || 400, result, origin);
@@ -78,11 +78,16 @@ export function createAdminMfaRouteHandler({
       }
     }
 
-    if (method === "POST" && pathname === "/auth/admin/email-otp/verify") {
+    if (
+      method === "POST" &&
+      (pathname === "/auth/admin/email-otp/verify" ||
+        pathname === "/auth/admin/mfa/email/verify")
+    ) {
       try {
         const body = await readJsonBody(req);
         const result = verifyAdminEmailOtp({
-          challengeId: body.challengeId,
+          mfaChallengeId: body.mfaChallengeId,
+          challengeId: body.challengeId || body.emailChallengeId,
           codes: body.codes || { otp1: body.otp1, otp2: body.otp2, otp3: body.otp3 },
           clientKey: getClientKey(req),
         });
@@ -98,17 +103,22 @@ export function createAdminMfaRouteHandler({
       }
     }
 
-    if (method === "POST" && pathname === "/auth/admin/totp/verify") {
+    if (
+      method === "POST" &&
+      (pathname === "/auth/admin/totp/verify" ||
+        pathname === "/auth/admin/mfa/totp/verify")
+    ) {
       try {
         const body = await readJsonBody(req);
         const result = verifyAdminTotp({
           code: body.code || body.totp || body.authenticatorCode,
+          clientKey: getClientKey(req),
         });
         if (!result.ok) {
           json(res, result.status || 401, result, origin);
           return true;
         }
-        json(res, 200, await createSessionPayload(req, body, result.method), origin);
+        json(res, 200, result, origin);
         return true;
       } catch (error) {
         json(res, 400, { ok: false, error: error.message || "Authenticator verification failed." }, origin);

@@ -1,20 +1,25 @@
 import {
   createHmac,
+  randomBytes,
   randomInt,
   randomUUID,
   timingSafeEqual,
 } from "node:crypto";
 
-const DEFAULT_ADMIN_EMAILS = [
-  "gunitsingh1994@gmail.com",
-  "arkgproductions@gmail.com",
-  "starg.unit@gmail.com",
+const DEV_ADMIN_EMAILS = [
+  "admin-one@example.invalid",
+  "admin-two@example.invalid",
+  "admin-three@example.invalid",
 ];
 
 const OTP_DIGITS = 6;
 const TOTP_PERIOD_SECONDS = 30;
+const ADMIN_MFA_CHALLENGE_TTL_MS = Number.parseInt(
+  process.env.ADMIN_MFA_CHALLENGE_TTL_MS || "300000",
+  10,
+);
 const EMAIL_OTP_TTL_MS = Number.parseInt(
-  process.env.ADMIN_EMAIL_OTP_TTL_MS || "300000",
+  process.env.ADMIN_EMAIL_OTP_TTL_MS || "600000",
   10,
 );
 const EMAIL_OTP_ATTEMPT_LIMIT = Number.parseInt(
@@ -30,13 +35,8 @@ const ADMIN_TOTP_SECRET = String(
     process.env.BFF_ADMIN_TOTP_SECRET ||
     "",
 ).trim();
-const ADMIN_TOTP_ISSUER = String(
-  process.env.ADMIN_TOTP_ISSUER || "TradersApp Admin",
-).trim();
-const ADMIN_TOTP_ACCOUNT_NAME = String(
-  process.env.ADMIN_TOTP_ACCOUNT_NAME || getMasterAdminEmail() || "admin",
-).trim();
 
+const mfaChallenges = new Map();
 const emailChallenges = new Map();
 
 function normalizeEmail(email) {
@@ -51,20 +51,31 @@ function parseCsv(value) {
 }
 
 function getAdminEmailRecipients() {
-  const configured = parseCsv(
+  const csvRecipients = parseCsv(
     process.env.ADMIN_MFA_EMAILS || process.env.ADMIN_EMAIL_OTP_RECIPIENTS,
-  );
-  return configured.length >= 3 ? configured.slice(0, 3) : DEFAULT_ADMIN_EMAILS;
-}
+  ).map(normalizeEmail);
+  if (csvRecipients.length >= 3) return csvRecipients.slice(0, 3);
 
-function getMasterAdminEmail() {
-  return normalizeEmail(process.env.ADMIN_MASTER_EMAIL || getAdminEmailRecipients()[0]);
+  const individualRecipients = [
+    process.env.ADMIN_MFA_EMAIL_1 || process.env.ADMIN_EMAIL_OTP_1,
+    process.env.ADMIN_MFA_EMAIL_2 || process.env.ADMIN_EMAIL_OTP_2,
+    process.env.ADMIN_MFA_EMAIL_3 || process.env.ADMIN_EMAIL_OTP_3,
+  ]
+    .map(normalizeEmail)
+    .filter(Boolean);
+  if (individualRecipients.length >= 3) return individualRecipients.slice(0, 3);
+
+  if (String(process.env.NODE_ENV || "").toLowerCase() === "production") {
+    return [];
+  }
+  return DEV_ADMIN_EMAILS;
 }
 
 function maskEmail(email) {
   const [name, domain] = String(email || "").split("@");
   if (!name || !domain) return "unknown";
-  const visible = name.length <= 2 ? name[0] || "*" : `${name[0]}${name.at(-1)}`;
+  const visible =
+    name.length <= 2 ? name[0] || "*" : `${name[0]}${name.at(-1)}`;
   return `${visible}${"*".repeat(Math.max(2, name.length - visible.length))}@${domain}`;
 }
 
@@ -89,12 +100,79 @@ function generateOtp() {
   return String(randomInt(0, 1_000_000)).padStart(OTP_DIGITS, "0");
 }
 
+function buildClientBinding(clientKey) {
+  return String(clientKey || "unknown-client").trim() || "unknown-client";
+}
+
 function cleanupExpiredChallenges(now = Date.now()) {
+  for (const [challengeId, challenge] of mfaChallenges.entries()) {
+    if (!challenge || challenge.expiresAt <= now || challenge.consumedAt) {
+      mfaChallenges.delete(challengeId);
+    }
+  }
   for (const [challengeId, challenge] of emailChallenges.entries()) {
     if (!challenge || challenge.expiresAt <= now) {
       emailChallenges.delete(challengeId);
     }
   }
+}
+
+function createMfaChallenge({ method, clientKey }) {
+  cleanupExpiredChallenges();
+  const now = Date.now();
+  const mfaChallengeId = randomUUID();
+  const challenge = {
+    mfaChallengeId,
+    gate1Type: method,
+    state: `${method}_verified`,
+    clientBinding: buildClientBinding(clientKey),
+    gate1VerifiedAt: now,
+    emailChallengeId: "",
+    createdAt: now,
+    expiresAt: now + ADMIN_MFA_CHALLENGE_TTL_MS,
+    consumedAt: 0,
+  };
+  mfaChallenges.set(mfaChallengeId, challenge);
+  return challenge;
+}
+
+function getActiveMfaChallenge({ mfaChallengeId, clientKey }) {
+  cleanupExpiredChallenges();
+  const id = String(mfaChallengeId || "").trim();
+  const challenge = mfaChallenges.get(id);
+  if (!challenge) {
+    return {
+      ok: false,
+      status: 400,
+      error: "Admin MFA challenge expired. Restart verification.",
+    };
+  }
+  if (challenge.consumedAt) {
+    mfaChallenges.delete(id);
+    return {
+      ok: false,
+      status: 400,
+      error: "Admin MFA challenge was already used. Restart verification.",
+    };
+  }
+  if (Date.now() > challenge.expiresAt) {
+    mfaChallenges.delete(id);
+    return {
+      ok: false,
+      status: 400,
+      error: "Admin MFA challenge expired. Restart verification.",
+    };
+  }
+  const binding = buildClientBinding(clientKey);
+  if (challenge.clientBinding && binding && challenge.clientBinding !== binding) {
+    mfaChallenges.delete(id);
+    return {
+      ok: false,
+      status: 403,
+      error: "Admin MFA challenge device mismatch. Restart verification.",
+    };
+  }
+  return { ok: true, challenge };
 }
 
 function resolveEmailJsConfig() {
@@ -158,19 +236,20 @@ async function sendEmailOtp({ email, code }) {
   return { sent: true };
 }
 
-export async function startAdminEmailOtp({ masterEmail, clientKey }) {
+export async function startAdminEmailOtp({ mfaChallengeId, clientKey }) {
   cleanupExpiredChallenges();
-  if (normalizeEmail(masterEmail) !== getMasterAdminEmail()) {
+  const mfaResult = getActiveMfaChallenge({ mfaChallengeId, clientKey });
+  if (!mfaResult.ok) return mfaResult;
+
+  const recipients = getAdminEmailRecipients();
+  if (recipients.length < 3) {
     return {
       ok: false,
-      status: 403,
-      error: "Unauthorized admin identity.",
+      status: 503,
+      error: "Admin email OTP recipients are not configured.",
     };
   }
 
-  const recipients = getAdminEmailRecipients();
-  const challengeId = randomUUID();
-  const codes = recipients.map(() => generateOtp());
   const now = Date.now();
   const emailDeliveryConfigured = isEmailDeliveryConfigured();
   if (!emailDeliveryConfigured && process.env.NODE_ENV === "production") {
@@ -181,6 +260,13 @@ export async function startAdminEmailOtp({ masterEmail, clientKey }) {
     };
   }
 
+  const mfaChallenge = mfaResult.challenge;
+  if (mfaChallenge.emailChallengeId) {
+    emailChallenges.delete(mfaChallenge.emailChallengeId);
+  }
+
+  const challengeId = randomUUID();
+  const codes = recipients.map(() => generateOtp());
   const delivery = [];
   for (let index = 0; index < recipients.length; index += 1) {
     const email = recipients[index];
@@ -193,7 +279,8 @@ export async function startAdminEmailOtp({ masterEmail, clientKey }) {
 
   emailChallenges.set(challengeId, {
     challengeId,
-    clientKey,
+    mfaChallengeId: mfaChallenge.mfaChallengeId,
+    clientBinding: mfaChallenge.clientBinding,
     expiresAt: now + EMAIL_OTP_TTL_MS,
     attempts: 0,
     recipients,
@@ -201,68 +288,120 @@ export async function startAdminEmailOtp({ masterEmail, clientKey }) {
     createdAt: now,
   });
 
-  return {
+  mfaChallenge.emailChallengeId = challengeId;
+  mfaChallenge.state = "email_otp_sent";
+
+  const payload = {
     ok: true,
+    mfaChallengeId: mfaChallenge.mfaChallengeId,
     challengeId,
+    emailChallengeId: challengeId,
+    nextStep: "email_otp_verify",
     expiresInMs: EMAIL_OTP_TTL_MS,
     attemptLimit: EMAIL_OTP_ATTEMPT_LIMIT,
     emailDeliveryConfigured,
     delivery,
     recipients: recipients.map(maskEmail),
-    devCodes:
-      process.env.NODE_ENV === "production"
-        ? undefined
-        : recipients.reduce((acc, email, index) => {
-            acc[maskEmail(email)] = codes[index];
-            return acc;
-          }, {}),
   };
+
+  if (
+    process.env.NODE_ENV !== "production" &&
+    String(process.env.ADMIN_MFA_EXPOSE_DEV_CODES || "false").toLowerCase() ===
+      "true"
+  ) {
+    payload.devCodes = recipients.reduce((acc, email, index) => {
+      acc[maskEmail(email)] = codes[index];
+      return acc;
+    }, {});
+  }
+
+  return payload;
 }
 
-export function verifyAdminEmailOtp({ challengeId, codes, clientKey }) {
+export function verifyAdminEmailOtp({
+  mfaChallengeId,
+  challengeId,
+  codes,
+  clientKey,
+}) {
   cleanupExpiredChallenges();
-  const challenge = emailChallenges.get(String(challengeId || ""));
-  if (!challenge) {
+  const mfaResult = getActiveMfaChallenge({ mfaChallengeId, clientKey });
+  if (!mfaResult.ok) return mfaResult;
+
+  const mfaChallenge = mfaResult.challenge;
+  const emailChallenge = emailChallenges.get(String(challengeId || ""));
+  if (!emailChallenge) {
     return { ok: false, status: 400, error: "OTP session expired." };
   }
 
-  if (challenge.clientKey && clientKey && challenge.clientKey !== clientKey) {
-    emailChallenges.delete(challenge.challengeId);
+  if (emailChallenge.mfaChallengeId !== mfaChallenge.mfaChallengeId) {
+    emailChallenges.delete(emailChallenge.challengeId);
+    return {
+      ok: false,
+      status: 403,
+      error: "OTP session does not match the active admin challenge.",
+    };
+  }
+
+  const binding = buildClientBinding(clientKey);
+  if (
+    emailChallenge.clientBinding &&
+    binding &&
+    emailChallenge.clientBinding !== binding
+  ) {
+    emailChallenges.delete(emailChallenge.challengeId);
+    mfaChallenges.delete(mfaChallenge.mfaChallengeId);
     return { ok: false, status: 403, error: "OTP session device mismatch." };
   }
 
-  if (Date.now() > challenge.expiresAt) {
-    emailChallenges.delete(challenge.challengeId);
+  if (Date.now() > emailChallenge.expiresAt) {
+    emailChallenges.delete(emailChallenge.challengeId);
     return { ok: false, status: 400, error: "OTP codes expired." };
   }
 
   const provided = Array.isArray(codes)
     ? codes
     : [codes?.otp1, codes?.otp2, codes?.otp3];
-  if (provided.length < 3 || provided.some((code) => normalizeOtp(code).length !== OTP_DIGITS)) {
-    return { ok: false, status: 400, error: "All three email OTP codes are required." };
+  if (
+    provided.length < 3 ||
+    provided.some((code) => normalizeOtp(code).length !== OTP_DIGITS)
+  ) {
+    return {
+      ok: false,
+      status: 400,
+      error: "All three email OTP codes are required.",
+    };
   }
 
-  const valid = challenge.codeHashes.every((expected, index) =>
-    safeEqual(expected, hashOtp(challenge.challengeId, index, provided[index])),
+  const valid = emailChallenge.codeHashes.every((expected, index) =>
+    safeEqual(expected, hashOtp(emailChallenge.challengeId, index, provided[index])),
   );
 
   if (!valid) {
-    challenge.attempts += 1;
-    if (challenge.attempts >= EMAIL_OTP_ATTEMPT_LIMIT) {
-      emailChallenges.delete(challenge.challengeId);
-      return { ok: false, status: 429, error: "Too many OTP attempts. Request new codes." };
+    emailChallenge.attempts += 1;
+    if (emailChallenge.attempts >= EMAIL_OTP_ATTEMPT_LIMIT) {
+      emailChallenges.delete(emailChallenge.challengeId);
+      mfaChallenge.emailChallengeId = "";
+      mfaChallenge.state = "email_otp_required";
+      return {
+        ok: false,
+        status: 429,
+        error: "Too many OTP attempts. Request new codes.",
+      };
     }
     return {
       ok: false,
       status: 401,
       error: "Invalid verification codes.",
-      attemptsRemaining: EMAIL_OTP_ATTEMPT_LIMIT - challenge.attempts,
+      attemptsRemaining: EMAIL_OTP_ATTEMPT_LIMIT - emailChallenge.attempts,
     };
   }
 
-  emailChallenges.delete(challenge.challengeId);
-  return { ok: true, method: "email_otp_3" };
+  emailChallenges.delete(emailChallenge.challengeId);
+  mfaChallenge.consumedAt = Date.now();
+  mfaChallenge.state = "admin_session_issued";
+  mfaChallenges.delete(mfaChallenge.mfaChallengeId);
+  return { ok: true, method: `${mfaChallenge.gate1Type}_email_otp_3` };
 }
 
 function decodeBase32(secret) {
@@ -297,7 +436,12 @@ function hotp(secretBuffer, counter) {
   return String(binary % 1_000_000).padStart(OTP_DIGITS, "0");
 }
 
-export function verifyAdminTotp({ code, now = Date.now(), window = 1 }) {
+export function verifyAdminTotp({
+  code,
+  clientKey,
+  now = Date.now(),
+  window = 1,
+}) {
   if (!ADMIN_TOTP_SECRET) {
     return {
       ok: false,
@@ -323,7 +467,16 @@ export function verifyAdminTotp({ code, now = Date.now(), window = 1 }) {
   const counter = Math.floor(now / 1000 / TOTP_PERIOD_SECONDS);
   for (let offset = -window; offset <= window; offset += 1) {
     if (safeEqual(cleanCode, hotp(secretBuffer, counter + offset))) {
-      return { ok: true, method: "totp" };
+      const challenge = createMfaChallenge({ method: "totp", clientKey });
+      return {
+        ok: true,
+        verified: true,
+        method: "totp",
+        mfaChallengeId: challenge.mfaChallengeId,
+        expiresInMs: ADMIN_MFA_CHALLENGE_TTL_MS,
+        nextStep: "email_otp_start",
+        recipients: getAdminEmailRecipients().map(maskEmail),
+      };
     }
   }
 
@@ -331,43 +484,50 @@ export function verifyAdminTotp({ code, now = Date.now(), window = 1 }) {
 }
 
 export function getAdminMfaStatus() {
+  const recipients = getAdminEmailRecipients();
   return {
     passwordLoginEnabled:
       String(process.env.ADMIN_PASSWORD_LOGIN_ENABLED || "false")
         .trim()
         .toLowerCase() === "true",
     totpConfigured: Boolean(ADMIN_TOTP_SECRET),
+    totpSetupFrontendEnabled: false,
     emailOtpEnabled: true,
     emailDeliveryConfigured: isEmailDeliveryConfigured(),
-    emailRecipients: getAdminEmailRecipients().map(maskEmail),
+    emailRecipientsConfigured: recipients.length >= 3,
+    emailRecipients: recipients.map(maskEmail),
     emailOtpAttemptLimit: EMAIL_OTP_ATTEMPT_LIMIT,
     emailOtpTtlMs: EMAIL_OTP_TTL_MS,
+    mfaChallengeTtlMs: ADMIN_MFA_CHALLENGE_TTL_MS,
   };
 }
 
 export function getAdminTotpSetup() {
-  if (!ADMIN_TOTP_SECRET) {
-    return {
-      ok: false,
-      status: 503,
-      error: "Authenticator secret is not configured.",
-    };
-  }
-
-  const accountLabel = encodeURIComponent(ADMIN_TOTP_ACCOUNT_NAME);
-  const issuer = encodeURIComponent(ADMIN_TOTP_ISSUER);
   return {
-    ok: true,
-    issuer: ADMIN_TOTP_ISSUER,
-    accountName: ADMIN_TOTP_ACCOUNT_NAME,
-    secret: ADMIN_TOTP_SECRET,
-    periodSeconds: TOTP_PERIOD_SECONDS,
-    digits: OTP_DIGITS,
-    otpauthUri: `otpauth://totp/${issuer}:${accountLabel}?secret=${ADMIN_TOTP_SECRET}&issuer=${issuer}&algorithm=SHA1&digits=${OTP_DIGITS}&period=${TOTP_PERIOD_SECONDS}`,
+    ok: false,
+    status: 410,
+    error: "Authenticator setup is backend-only.",
   };
 }
 
+function encodeBase32(buffer) {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  let bits = "";
+  for (const byte of buffer) bits += byte.toString(2).padStart(8, "0");
+  let output = "";
+  for (let index = 0; index < bits.length; index += 5) {
+    const chunk = bits.slice(index, index + 5).padEnd(5, "0");
+    output += alphabet[Number.parseInt(chunk, 2)];
+  }
+  return output;
+}
+
+export function generateAdminTotpSecret() {
+  return encodeBase32(randomBytes(20));
+}
+
 export default {
+  generateAdminTotpSecret,
   getAdminMfaStatus,
   getAdminTotpSetup,
   startAdminEmailOtp,

@@ -243,6 +243,9 @@ export default function AppScreenRegistry({
   adminOtpStep,
   adminOtps,
   adminOtpsVerified,
+  adminMfaChallengeId,
+  adminOtpChallengeId,
+  adminOtpRecipients,
   adminOtpErr,
   showToast,
   handleLogin,
@@ -323,6 +326,9 @@ export default function AppScreenRegistry({
               otpStep: adminOtpStep,
               otps: adminOtps,
               otpsVerified: adminOtpsVerified,
+              mfaChallengeId: adminMfaChallengeId,
+              otpChallengeId: adminOtpChallengeId,
+              recipients: adminOtpRecipients,
             }}
           />
         </>

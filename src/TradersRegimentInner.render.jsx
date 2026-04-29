@@ -77,6 +77,9 @@ export function buildScreenContent({
   adminOtpStep,
   adminOtps,
   adminOtpsVerified,
+  adminMfaChallengeId,
+  adminOtpChallengeId,
+  adminOtpRecipients,
   totpCode,
   totpErr,
   adminOtpErr,
@@ -162,6 +165,9 @@ export function buildScreenContent({
       adminOtpStep={adminOtpStep}
       adminOtps={adminOtps}
       adminOtpsVerified={adminOtpsVerified}
+      adminMfaChallengeId={adminMfaChallengeId}
+      adminOtpChallengeId={adminOtpChallengeId}
+      adminOtpRecipients={adminOtpRecipients}
       adminOtpErr={adminOtpErr}
       showToast={showToast}
       handleLogin={handleLogin}

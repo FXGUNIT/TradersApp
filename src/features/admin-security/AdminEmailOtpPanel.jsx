@@ -4,29 +4,64 @@ export default function AdminEmailOtpPanel({
   authButton,
   inputStyle,
   labelStyle,
-  masterEmail,
-  masterEmailVerified,
-  onMasterEmailChange,
   onOtpChange,
   onRequestNew,
   onSendVerificationCodes,
   onVerifyCodes,
   otpStep,
   otps,
+  recipients = [],
   theme,
   verificationError,
 }) {
-  if (!masterEmailVerified || !otpStep) {
+  const fields = ["otp1", "otp2", "otp3"];
+  const allCodesReady = fields.every(
+    (field) => String(otps?.[field] || "").length === 6,
+  );
+  const recipientLabel = (index) =>
+    recipients[index] || `Admin email ${index + 1}`;
+
+  if (!otpStep) {
     return (
-      <div style={{ marginBottom: 20 }}>
-        <label style={labelStyle}>MASTER ADMIN EMAIL</label>
-        <input
-          type="email"
-          value={masterEmail}
-          onChange={(event) => onMasterEmailChange(event.target.value)}
-          style={inputStyle}
-          placeholder="Enter master admin email"
-        />
+      <div style={{ marginBottom: 4 }}>
+        <div
+          style={{
+            color: theme.muted || "#9CA3AF",
+            fontSize: 12,
+            lineHeight: 1.5,
+            marginBottom: 14,
+          }}
+        >
+          Authenticator accepted. Send the second-gate codes to the
+          backend-configured admin email recipients.
+        </div>
+
+        {recipients.length > 0 && (
+          <div
+            style={{
+              display: "grid",
+              gap: 8,
+              marginBottom: 14,
+            }}
+          >
+            {recipients.slice(0, 3).map((recipient, index) => (
+              <div
+                key={`${recipient}-${index}`}
+                style={{
+                  padding: "8px 10px",
+                  borderRadius: 8,
+                  border: `1px solid ${theme.border || "#374151"}`,
+                  color: theme.muted || "#9CA3AF",
+                  fontSize: 12,
+                  background: "rgba(255,255,255,0.035)",
+                }}
+              >
+                {`Email ${index + 1}: ${recipient}`}
+              </div>
+            ))}
+          </div>
+        )}
+
         {verificationError && (
           <div
             style={{
@@ -34,18 +69,16 @@ export default function AdminEmailOtpPanel({
               fontSize: 11,
               marginTop: 8,
               marginBottom: 12,
-              fontWeight: 600,
+              fontWeight: 700,
             }}
           >
             {verificationError}
           </div>
         )}
+
         <button
           onClick={onSendVerificationCodes}
-          style={{
-            ...authButton(theme.green || theme.purple, false),
-            marginTop: 12,
-          }}
+          style={authButton(theme.green || theme.purple, false)}
           className="btn-glass"
         >
           SEND THREE EMAIL OTP CODES
@@ -55,16 +88,16 @@ export default function AdminEmailOtpPanel({
   }
 
   return (
-    <div style={{ marginBottom: 20 }}>
+    <div style={{ marginBottom: 4 }}>
       <div
         style={{
-          color: theme.muted,
+          color: theme.muted || "#9CA3AF",
           fontSize: 12,
           marginBottom: 16,
-          textAlign: "center",
+          lineHeight: 1.5,
         }}
       >
-        Enter the 6-digit codes sent to the three admin email endpoints.
+        Enter all three 6-digit codes. The backend verifies them together.
       </div>
 
       <div
@@ -75,13 +108,11 @@ export default function AdminEmailOtpPanel({
           marginBottom: 16,
         }}
       >
-        {[
-          ["otp1", "gunitsingh1994@gmail.com"],
-          ["otp2", "arkgproductions@gmail.com"],
-          ["otp3", "starg.unit@gmail.com"],
-        ].map(([field, email]) => (
+        {fields.map((field, index) => (
           <div key={field}>
-            <label style={{ ...labelStyle, fontSize: 11 }}>{email}</label>
+            <label style={{ ...labelStyle, fontSize: 11 }}>
+              {recipientLabel(index)}
+            </label>
             <input
               type="text"
               inputMode="numeric"
@@ -101,6 +132,9 @@ export default function AdminEmailOtpPanel({
               }}
               placeholder="000000"
               maxLength="6"
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && allCodesReady) onVerifyCodes();
+              }}
             />
           </div>
         ))}
@@ -112,17 +146,21 @@ export default function AdminEmailOtpPanel({
             color: theme.red,
             fontSize: 11,
             marginBottom: 12,
-            fontWeight: 600,
+            fontWeight: 700,
           }}
         >
           {verificationError}
         </div>
       )}
 
-      <div style={{ display: "flex", gap: 8 }}>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         <button
           onClick={onVerifyCodes}
-          style={authButton(theme.green, false)}
+          disabled={!allCodesReady}
+          style={{
+            ...authButton(theme.green, false),
+            opacity: allCodesReady ? 1 : 0.55,
+          }}
           className="btn-glass"
         >
           VERIFY THREE CODES
@@ -135,7 +173,7 @@ export default function AdminEmailOtpPanel({
           }}
           className="btn-glass"
         >
-          REQUEST NEW
+          SEND NEW CODES
         </button>
       </div>
     </div>
