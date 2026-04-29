@@ -14,16 +14,19 @@ if (-not $OpenCodeArgs -or $OpenCodeArgs.Count -eq 0) {
 
 $opencode = Get-Command opencode -ErrorAction SilentlyContinue
 if ($opencode) {
-  $runner = @($opencode.Source)
+  $runner = @("opencode")
 } else {
   $npx = Get-Command npx -ErrorAction SilentlyContinue
   if (-not $npx) {
     throw "OpenCode CLI is not available and npx was not found. Run npm install first."
   }
-  $runner = @($npx.Source, "opencode")
+  $runner = @("npx", "opencode")
 }
 
-$infisical = Get-Command infisical -ErrorAction SilentlyContinue
+$infisical = Get-Command infisical.cmd -ErrorAction SilentlyContinue
+if (-not $infisical) {
+  $infisical = Get-Command infisical -ErrorAction SilentlyContinue
+}
 $hasInfisicalProject = Test-Path (Join-Path $repoRoot ".infisical.json")
 
 if ($infisical -and $hasInfisicalProject) {
