@@ -32,6 +32,46 @@ The local machine should be used for code editing, light checks, and triggering 
 | Image identity | Digest-first deploy | Prevents tag drift and makes rollback exact. |
 | Windows VPS | Do not use for this pipeline | Linux containers and BuildKit are the better fit; Windows adds licensing and Docker complexity. |
 
+## Plan of Record
+
+This is the recommended final direction:
+
+1. Implement the TOTP -> three-email OTP admin flow first because it matches the required product decision and can be delivered fastest.
+2. Design the MFA state machine so passkey/FIDO2 can replace or precede TOTP later without rewriting the second gate.
+3. Remove all frontend admin enrollment/setup paths now.
+4. Keep password login disabled.
+5. Make GitHub Actions and GHCR the BFF image source of truth.
+6. Make the VPS pull verified image digests only.
+7. Keep local Docker out of the normal developer/operator workflow.
+8. Do not move this pipeline to Windows VPS.
+
+## Decision Matrix
+
+### Admin Authentication Options
+
+| Option | Security | Speed to Implement | Operational Fit | Decision |
+| --- | --- | --- | --- | --- |
+| Password only | Low | Fast | Poor | Reject. |
+| Password + OTP | Medium | Medium | Poor because password remains attack surface | Reject. |
+| TOTP only | Medium | Fast | Incomplete because one factor unlocks admin | Reject as final flow. |
+| Three email OTPs only | Medium | Medium | Incomplete because email compromise risk remains | Reject as final flow. |
+| TOTP -> three email OTPs | High | Fastest acceptable | Strong fit for current requirement | Implement first. |
+| Passkey/FIDO2 -> three email OTPs | Highest | Slower | Best long-term fit for admin access | Implement after baseline. |
+| Frontend authenticator setup | Low | Fast | Dangerous for admin | Reject. |
+| Backend-only authenticator setup | High | Medium | Correct owner-controlled setup | Required. |
+
+### BFF Build and Deploy Options
+
+| Option | Speed | Safety | Cost/Effort | Decision |
+| --- | --- | --- | --- | --- |
+| Local Windows Docker | Poor on this machine | Fragile | High effort | Reject as normal path. |
+| Windows VPS Docker | Medium | More complexity | Higher licensing/ops cost | Reject. |
+| Linux VPS rebuild every deploy | Medium | Risky source/build drift | Medium | Avoid. |
+| GitHub Actions build + GHCR + VPS pull | High | Strong | Low/medium | Implement first. |
+| GitHub Actions with context-hash reuse | Very high after first build | Strong | Medium | Required. |
+| VPS self-hosted runner | High | Safe only on protected branches | Medium/high | Optional emergency path only. |
+| Remote BuildKit daemon | Very high | Needs careful hardening | High | Later optimization only if needed. |
+
 ## Quality Bar
 
 This document is not considered complete until it answers five questions clearly:
@@ -79,6 +119,42 @@ The sections below are written to make implementation deterministic instead of r
 - Do not make the frontend responsible for deciding whether admin auth is complete.
 - Do not rebuild BFF images on the local Windows machine during the normal path.
 - Do not make Windows VPS part of the default BFF pipeline.
+
+## Risk Register
+
+| Risk | Impact | Likelihood | Mitigation |
+| --- | --- | --- | --- |
+| TOTP verify still creates admin session somewhere | Critical admin bypass | Medium | Route tests, service tests, grep/audit for direct session creation, browser audit. |
+| Email OTP verify can run without prior TOTP challenge | Critical admin bypass | Medium | Server-side challenge binding and tests for email-only failure. |
+| Frontend still exposes TOTP setup route or secret | Critical secret exposure | Medium | Remove setup UI, production route `404`/`410`, artifact scan. |
+| Full admin email addresses leak in frontend | Privacy and targeting risk | Medium | Return masked labels only; never hard-code full emails in React. |
+| OTP values appear in logs or audit artifacts | Secret leakage | Medium | Structured redaction, test artifacts scan, avoid screenshotting entered OTPs. |
+| In-memory challenge storage breaks multi-instance production | Admin login instability | Medium | Use existing shared store/Redis/database before multi-instance production. |
+| GitHub workflow rebuilds BFF unnecessarily | Time/cost waste | High | Context-hash reuse and manifest artifact. |
+| VPS deploy rebuilds instead of pulling verified image | Drift and wasted compute | Medium | Deploy workflow fails unless digest/SHA image exists. |
+| Tag points to unexpected image | Wrong artifact deployed | Medium | Deploy by digest and record manifest. |
+| Image contains secrets in config/history | Critical leak | Low/medium | No secret build args, image metadata scan, runtime-only secrets. |
+| Self-hosted runner executes untrusted PR code | VPS compromise | Low if avoided | Use GitHub-hosted PR runners; VPS runner only for protected/manual workflows. |
+| Health check is too shallow | Broken deploy marked healthy | Medium | `/health` plus one lightweight BFF/admin-auth smoke check. |
+
+## Success Metrics
+
+### Admin MFA
+
+- `0` backend paths issue admin session before both gates pass.
+- `0` password fields visible in admin unlock UI.
+- `0` frontend routes expose TOTP setup secrets, QR data, or otpauth URIs.
+- `0` raw OTPs, TOTP secrets, full admin emails, cookies, or auth headers in logs/artifacts.
+- Admin audit covers TOTP gate, email OTP gate, expired challenge, and single-factor failure.
+
+### BFF Image and Deploy
+
+- Normal BFF delivery requires `0` local Docker builds.
+- Unchanged BFF context reuses an existing image instead of rebuilding.
+- Every production deploy records an immutable image digest.
+- Trivy scans the same digest that deploys.
+- SBOM and provenance/signature/attestation exist for production images.
+- Failed health check blocks promotion or rolls back without manual rebuild.
 
 ## Admin Authentication Plan
 
