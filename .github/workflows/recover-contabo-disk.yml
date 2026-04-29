@@ -6,69 +6,98 @@ on:
     types: [recover-contabo]
 
 env:
-  CONTABO_API_URL: https://api.contabo.com
+  CONTABO_VPS_HOST: "173.249.18.14"
+  CONTABO_VPS_USER: "root"
 
 jobs:
   recover:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - name: Check disk space
+      - name: Setup SSH access
+        shell: bash
         run: |
-          echo "=== Disk before cleanup ==="
-          df -h /
-
-      - name: Remove stale traders-bff container
-        run: |
-          echo "=== Checking existing containers ==="
-          ssh -o StrictHostKeyChecking=no -o ConnectTimeout=15 \
-            root@173.249.18.14 "
-              echo 'Containers:'
-              docker ps -a --format '{{.Names}} {{.Status}}' | grep -E 'bff|ml|frontend|redis' || true
-              echo 'Docker images:'
-              docker images --format '{{.Repository}}:{{.Tag}} ({{.Size}})' | head -10
-              echo 'Disk:'
-              df -h /
-              echo '--- Removing conflicting containers ---'
-              docker rm -f traders-bff 2>/dev/null || true
-              echo 'Removal done.'
-            "
-
-      - name: Aggressive disk cleanup
-        run: |
-          ssh -o StrictHostKeyChecking=no -o ConnectTimeout=15 \
-            root@173.249.18.14 "
-              echo '=== Stopping all tradersapp containers ==='
-              docker stop \$(docker ps -q --filter 'name=traders-') 2>/dev/null || true
-              echo '=== Pruning dangling images ==='
-              docker image prune -af || true
-              echo '=== Pruning all unused images ==='
-              docker image prune -a -f --filter 'until=168h' || true
-              echo '=== System prune ==='
-              docker system prune -af --volumes || true
-              echo '=== Disk after cleanup ==='
-              df -h /
-              echo '=== Docker space reclaimed ==='
-              docker system df
-            "
-
-      - name: Verify disk space
-        run: |
-          AVAILABLE=\$(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=15 \
-            root@173.249.18.14 'df / -BM | awk \"NR==2 {print \$4}\"' | tr -d 'M')
-          echo "Available: \${AVAILABLE}MB"
-          if [ "\${AVAILABLE}" -lt 20000 ]; then
-            echo "::error::Still less than 20GB free after cleanup"
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s' "$CONTABO_SSH_KEY" | base64 -d > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          cat > ~/.ssh/config <<EOF
+          Host contabo-vps
+            HostName $CONTABO_VPS_HOST
+            User $CONTABO_VPS_USER
+            IdentityFile ~/.ssh/id_ed25519
+            IdentitiesOnly yes
+            BatchMode yes
+            ConnectTimeout 20
+            ServerAliveInterval 15
+            ServerAliveCountMax 3
+            StrictHostKeyChecking no
+          EOF
+          chmod 600 ~/.ssh/config
+          touch ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+          found_key=0
+          for attempt in 1 2 3; do
+            if ssh-keyscan -T 10 -H $CONTABO_VPS_HOST >> ~/.ssh/known_hosts 2>/dev/null; then
+              found_key=1
+              break
+            fi
+            sleep 5
+          done
+          if [ "${found_key}" -ne 1 ]; then
+            echo "::warning::ssh-keyscan failed, trying anyway..."
+          fi
+          if ! ssh -o StrictHostKeyChecking=no contabo-vps "echo SSH ready" >/dev/null 2>&1; then
+            echo "::error::Cannot reach Contabo VPS via SSH"
             exit 1
           fi
-          echo "Disk recovery successful — \${AVAILABLE}MB free"
+          echo "SSH connectivity confirmed"
+        env:
+          CONTABO_SSH_KEY: ${{ secrets.CONTABO_SSH_KEY }}
 
-      - name: Remove all stale containers
+      - name: Remove stale container and check disk
+        shell: bash
         run: |
-          ssh -o StrictHostKeyChecking=no -o ConnectTimeout=15 \
-            root@173.249.18.14 "
-              echo '=== Removing ALL stale traders containers ==='
-              docker rm -f \$(docker ps -aq --filter 'name=traders-') 2>/dev/null || true
-              echo '=== Remaining containers ==='
-              docker ps -a --format '{{.Names}} {{.Status}}'
-            "
+          set -euo pipefail
+          ssh contabo-vps bash -lc "
+            echo '=== Containers ==='
+            docker ps -a --format '{{.Names}} ({{.Status}})' | head -10
+            echo '=== Disk before ==='
+            df -h /
+            echo '=== Removing traders-bff ==='
+            docker rm -f traders-bff 2>/dev/null || true
+            echo '=== All traders containers ==='
+            docker ps -a --format '{{.Names}}' | grep -E 'traders|bff|ml|redis|frontend' || echo 'none'
+          "
+
+      - name: Aggressive Docker cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh contabo-vps bash -lc "
+            echo '=== Stopping all traders containers ==='
+            docker ps -q --filter 'name=traders-' | xargs -r docker stop 2>/dev/null || true
+            echo '=== Removing all traders containers ==='
+            docker ps -aq --filter 'name=traders-' | xargs -r docker rm -f 2>/dev/null || true
+            echo '=== Prune dangling images ==='
+            docker image prune -af 2>/dev/null || true
+            echo '=== Prune all unused images (keep last 48h) ==='
+            docker image prune -a -f --filter 'until=168h' 2>/dev/null || true
+            echo '=== System prune with volumes ==='
+            docker system prune -af --volumes 2>/dev/null || true
+            echo '=== Disk after ==='
+            df -h /
+            echo '=== Docker space ==='
+            docker system df
+          "
+
+      - name: Verify disk recovery
+        run: |
+          set -euo pipefail
+          AVAILABLE=$(ssh contabo-vps 'df / -BM | awk "NR==2 {print \$4}"' | tr -d 'M')
+          echo "Available: ${AVAILABLE}MB"
+          if [ "${AVAILABLE}" -lt 20000 ]; then
+            echo "::error::Still less than 20GB free (${AVAILABLE}MB)"
+            exit 1
+          fi
+          echo "Recovery successful — ${AVAILABLE}MB free"
