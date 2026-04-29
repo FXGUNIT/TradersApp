@@ -548,8 +548,9 @@ server.listen(PORT, HOST, () => {
 
   // Start Telegram AI Agent (polling loop)
   if (String(process.env.TELEGRAM_AGENT_ENABLED || "false") === "true") {
-    const { startTelegramAgent } = await import("./services/telegramAgent.mjs");
-    startTelegramAgent();
+    import("./services/telegramAgent.mjs").then(({ startTelegramAgent }) => {
+      startTelegramAgent();
+    });
   }
 });
 
