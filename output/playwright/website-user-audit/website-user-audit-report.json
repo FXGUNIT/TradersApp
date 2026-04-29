@@ -1,135 +1,58 @@
 {
-  "ok": true,
+  "ok": false,
   "target": "local-build",
   "baseUrl": "http://127.0.0.1:5173/",
   "commit": "local",
-  "startedAt": "2026-04-29T15:21:55.674Z",
+  "startedAt": "2026-04-29T15:36:10.392Z",
   "scenarios": [
     {
-      "id": "login",
-      "status": "passed",
-      "durationMs": 2415,
-      "errors": [],
-      "consoleErrors": [],
+      "id": "admin-login-panel",
+      "status": "failed",
+      "durationMs": 13789,
+      "errors": [
+        "Page error: TypeError: a is not a function\n    at onChange (http://127.0.0.1:5173/assets/index-DSm12WLD.js:156:36640)\n    at bd (http://127.0.0.1:5173/assets/vendor-3vN2ROu6.js:8:125889)\n    at http://127.0.0.1:5173/assets/vendor-3vN2ROu6.js:8:130882\n    at yn (http://127.0.0.1:5173/assets/vendor-3vN2ROu6.js:8:15080)\n    at Td (http://127.0.0.1:5173/assets/vendor-3vN2ROu6.js:8:127116)\n    at up (http://127.0.0.1:5173/assets/vendor-3vN2ROu6.js:9:28420)\n    at cp (http://127.0.0.1:5173/assets/vendor-3vN2ROu6.js:9:28242)",
+        "Console error: Failed to load resource: the server responded with a status of 403 (Forbidden)",
+        "Console error: Failed to load resource: the server responded with a status of 403 (Forbidden)",
+        "Console error: Failed to load resource: the server responded with a status of 403 (Forbidden)"
+      ],
+      "consoleErrors": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 403 (Forbidden)",
+          "location": {
+            "url": "http://127.0.0.1:8788/auth/admin/totp/setup",
+            "lineNumber": 0,
+            "columnNumber": 0
+          }
+        },
+        {
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 403 (Forbidden)",
+          "location": {
+            "url": "http://127.0.0.1:8788/auth/admin/totp/setup",
+            "lineNumber": 0,
+            "columnNumber": 0
+          }
+        },
+        {
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 403 (Forbidden)",
+          "location": {
+            "url": "http://127.0.0.1:8788/auth/admin/totp/setup",
+            "lineNumber": 0,
+            "columnNumber": 0
+          }
+        }
+      ],
       "networkFailures": [],
-      "screenshotPath": "",
-      "tracePath": ""
-    },
-    {
-      "id": "signup",
-      "status": "passed",
-      "durationMs": 2177,
-      "errors": [],
-      "consoleErrors": [],
-      "networkFailures": [],
-      "screenshotPath": "",
-      "tracePath": ""
-    },
-    {
-      "id": "waiting",
-      "status": "passed",
-      "durationMs": 2028,
-      "errors": [],
-      "consoleErrors": [],
-      "networkFailures": [],
-      "screenshotPath": "",
-      "tracePath": ""
-    },
-    {
-      "id": "hub",
-      "status": "passed",
-      "durationMs": 2222,
-      "errors": [],
-      "consoleErrors": [],
-      "networkFailures": [],
-      "screenshotPath": "",
-      "tracePath": ""
-    },
-    {
-      "id": "app",
-      "status": "passed",
-      "durationMs": 2184,
-      "errors": [],
-      "consoleErrors": [],
-      "networkFailures": [],
-      "screenshotPath": "",
-      "tracePath": ""
-    },
-    {
-      "id": "support-chat",
-      "status": "passed",
-      "durationMs": 2371,
-      "errors": [],
-      "consoleErrors": [],
-      "networkFailures": [],
-      "screenshotPath": "",
-      "tracePath": ""
-    },
-    {
-      "id": "consciousness",
-      "status": "passed",
-      "durationMs": 1955,
-      "errors": [],
-      "consoleErrors": [],
-      "networkFailures": [],
-      "screenshotPath": "",
-      "tracePath": ""
-    },
-    {
-      "id": "sessions",
-      "status": "passed",
-      "durationMs": 1937,
-      "errors": [],
-      "consoleErrors": [],
-      "networkFailures": [],
-      "screenshotPath": "",
-      "tracePath": ""
-    },
-    {
-      "id": "admin",
-      "status": "passed",
-      "durationMs": 2031,
-      "errors": [],
-      "consoleErrors": [],
-      "networkFailures": [],
-      "screenshotPath": "",
-      "tracePath": ""
-    },
-    {
-      "id": "viewport-mobile",
-      "status": "passed",
-      "durationMs": 1879,
-      "errors": [],
-      "consoleErrors": [],
-      "networkFailures": [],
-      "screenshotPath": "",
-      "tracePath": ""
-    },
-    {
-      "id": "viewport-tablet",
-      "status": "passed",
-      "durationMs": 1952,
-      "errors": [],
-      "consoleErrors": [],
-      "networkFailures": [],
-      "screenshotPath": "",
-      "tracePath": ""
-    },
-    {
-      "id": "viewport-desktop",
-      "status": "passed",
-      "durationMs": 1893,
-      "errors": [],
-      "consoleErrors": [],
-      "networkFailures": [],
-      "screenshotPath": "",
-      "tracePath": ""
+      "screenshotPath": "output/playwright/website-user-audit/screenshots/admin-login-panel.png",
+      "tracePath": "output/playwright/website-user-audit/traces/admin-login-panel.zip"
     }
   ],
-  "finishedAt": "2026-04-29T15:22:21.887Z",
+  "finishedAt": "2026-04-29T15:36:25.258Z",
   "summary": {
-    "passed": 12,
-    "failed": 0,
-    "total": 12
+    "passed": 0,
+    "failed": 1,
+    "total": 1
   }
 }

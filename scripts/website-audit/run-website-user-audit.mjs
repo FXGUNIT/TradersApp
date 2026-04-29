@@ -31,6 +31,7 @@ const DEFAULT_SCENARIOS = [
   "support-chat",
   "consciousness",
   "sessions",
+  "admin-login-panel",
   "admin",
   "viewport-mobile",
   "viewport-tablet",
@@ -193,6 +194,19 @@ async function installAuditRuntimeGuards(page, baseUrl) {
     const request = route.request();
     const method = request.method().toUpperCase();
     const url = request.url();
+
+    if (url.includes("/auth/admin/totp/setup")) {
+      await route.fulfill({
+        status: 403,
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: false,
+          error: "Authenticator setup is disabled during audit.",
+          audit: true,
+        }),
+      });
+      return;
+    }
 
     if (
       ["POST", "PUT", "PATCH", "DELETE"].includes(method) &&
@@ -412,6 +426,62 @@ async function runSessions(page) {
   );
 }
 
+async function openAdminLoginPanel(page) {
+  await loadScenario(page, "login");
+  await assertClickable(
+    page.getByRole("button", { name: /admin panel/i }),
+    "Admin panel entry button",
+  );
+  await page.getByRole("button", { name: /admin panel/i }).click();
+  await assertText(page, /admin mfa login/i, "Admin MFA login modal");
+  await assertText(page, /restricted admin area/i, "Admin security notice");
+  await assertText(page, /authenticator app/i, "Authenticator column");
+  await assertText(page, /email verification/i, "Email verification column");
+}
+
+async function runAdminLoginPanel(page) {
+  await openAdminLoginPanel(page);
+
+  const authenticatorInput = page.locator("input[placeholder='000000']").first();
+  await assertInputReady(authenticatorInput, "Authenticator code input");
+  await authenticatorInput.fill("111111");
+  await assertVisible(page.locator("input[type='checkbox']").first(), "Remember device checkbox");
+  await assertClickable(
+    page.getByRole("button", { name: /unlock with authenticator/i }),
+    "Unlock with authenticator button",
+  );
+  await page.getByRole("button", { name: /unlock with authenticator/i }).click();
+  await assertText(page, /master admin dashboard/i, "Authenticator route reached admin dashboard.");
+
+  await openAdminLoginPanel(page);
+  await page.getByPlaceholder("Enter master admin email").fill("audit.admin@example.com");
+  await assertClickable(
+    page.getByRole("button", { name: /send three email otp codes/i }),
+    "Send three email OTP codes button",
+  );
+  await page.getByRole("button", { name: /send three email otp codes/i }).click();
+  await assertText(page, /enter the 6-digit codes/i, "Email OTP entry step");
+
+  const codeInputs = page.locator("input[placeholder='000000']");
+  await codeInputs.nth(1).fill("111111");
+  await codeInputs.nth(2).fill("222222");
+  await codeInputs.nth(3).fill("333333");
+  await assertClickable(
+    page.getByRole("button", { name: /verify three codes/i }),
+    "Verify three codes button",
+  );
+  await page.getByRole("button", { name: /verify three codes/i }).click();
+  await assertText(page, /master admin dashboard/i, "Email OTP route reached admin dashboard.");
+
+  await openAdminLoginPanel(page);
+  await assertClickable(
+    page.getByRole("button", { name: /^cancel$/i }),
+    "Admin login cancel button",
+  );
+  await page.getByRole("button", { name: /^cancel$/i }).click();
+  await assertText(page, /welcome back/i, "Cancel returned to login screen.");
+}
+
 async function runAdmin(page) {
   await loadScenario(page, "admin");
   await assertText(page, /master admin dashboard/i, "Admin fixture dashboard rendered.");
@@ -440,6 +510,7 @@ const SCENARIO_RUNNERS = {
   "support-chat": { viewport: "desktop", run: runSupportChat },
   consciousness: { viewport: "desktop", run: runConsciousness },
   sessions: { viewport: "desktop", run: runSessions },
+  "admin-login-panel": { viewport: "desktop", run: runAdminLoginPanel },
   admin: { viewport: "desktop", run: runAdmin },
   "viewport-mobile": { viewport: "mobile", run: (page) => runViewport(page, "Mobile") },
   "viewport-tablet": { viewport: "tablet", run: (page) => runViewport(page, "Tablet") },
