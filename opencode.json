@@ -2,9 +2,183 @@
   "$schema": "https://opencode.ai/config.json",
   "shell": "powershell",
   "permission": "allow",
+  "model": "groq/llama-3.3-70b-versatile",
+  "small_model": "groq/llama-3.1-8b-instant",
   "instructions": [
     "CLAUDE.md"
   ],
+  "provider": {
+    "groq": {
+      "options": {
+        "apiKey": "{env:GROQ_API_KEY}"
+      },
+      "models": {
+        "llama-3.3-70b-versatile": {
+          "name": "Llama 3.3 70B Versatile"
+        },
+        "llama-3.1-8b-instant": {
+          "name": "Llama 3.1 8B Instant"
+        },
+        "mixtral-8x7b-32768": {
+          "name": "Mixtral 8x7B 32768"
+        }
+      }
+    },
+    "groq-traders-regiment": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Groq Traders Regiment",
+      "options": {
+        "baseURL": "https://api.groq.com/openai/v1",
+        "apiKey": "{env:TRADERS_REGIMENT_GROQ_API_KEY}"
+      },
+      "models": {
+        "llama-3.3-70b-versatile": {
+          "name": "Llama 3.3 70B Versatile"
+        },
+        "llama-3.1-8b-instant": {
+          "name": "Llama 3.1 8B Instant"
+        }
+      }
+    },
+    "groq-watchtower": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Groq Watchtower",
+      "options": {
+        "baseURL": "https://api.groq.com/openai/v1",
+        "apiKey": "{env:WATCHTOWER_GROQ_API_KEY}"
+      },
+      "models": {
+        "llama-3.3-70b-versatile": {
+          "name": "Llama 3.3 70B Versatile"
+        },
+        "llama-3.1-8b-instant": {
+          "name": "Llama 3.1 8B Instant"
+        }
+      }
+    },
+    "groq-ml-engine": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Groq ML Engine",
+      "options": {
+        "baseURL": "https://api.groq.com/openai/v1",
+        "apiKey": "{env:ML_ENGINE_GROQ_API_KEY}"
+      },
+      "models": {
+        "llama-3.3-70b-versatile": {
+          "name": "Llama 3.3 70B Versatile"
+        },
+        "llama-3.1-8b-instant": {
+          "name": "Llama 3.1 8B Instant"
+        }
+      }
+    },
+    "openrouter": {
+      "options": {
+        "apiKey": "{env:AI_OPENROUTER_MIND_ALPHA}"
+      },
+      "models": {
+        "openrouter/auto": {
+          "name": "OpenRouter Auto"
+        },
+        "anthropic/claude-3.5-sonnet": {
+          "name": "Claude 3.5 Sonnet"
+        },
+        "google/gemini-2.0-flash-exp": {
+          "name": "Gemini 2.0 Flash"
+        },
+        "meta-llama/llama-3.3-70b-instruct": {
+          "name": "Llama 3.3 70B Instruct"
+        }
+      }
+    },
+    "openrouter-beta": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "OpenRouter Beta",
+      "options": {
+        "baseURL": "https://openrouter.ai/api/v1",
+        "apiKey": "{env:AI_OPENROUTER_MIND_BETA}"
+      },
+      "models": {
+        "openrouter/auto": {
+          "name": "OpenRouter Auto"
+        },
+        "meta-llama/llama-3.3-70b-instruct": {
+          "name": "Llama 3.3 70B Instruct"
+        }
+      }
+    },
+    "sambanova": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "SambaNova",
+      "options": {
+        "baseURL": "https://api.sambanova.ai/v1",
+        "apiKey": "{env:SAMBANOVA_API_KEY}"
+      },
+      "models": {
+        "Meta-Llama-3.3-70B-Instruct": {
+          "name": "Meta Llama 3.3 70B Instruct"
+        },
+        "DeepSeek-R1": {
+          "name": "DeepSeek R1"
+        },
+        "Qwen3-32B": {
+          "name": "Qwen3 32B"
+        }
+      }
+    },
+    "sambanova-tr-1": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "SambaNova TR 1",
+      "options": {
+        "baseURL": "https://api.sambanova.ai/v1",
+        "apiKey": "{env:AI_SAMBANOVA_TR_1_KEY}"
+      },
+      "models": {
+        "Meta-Llama-3.3-70B-Instruct": {
+          "name": "Meta Llama 3.3 70B Instruct"
+        }
+      }
+    },
+    "sambanova-tr-2": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "SambaNova TR 2",
+      "options": {
+        "baseURL": "https://api.sambanova.ai/v1",
+        "apiKey": "{env:AI_SAMBANOVA_TR_2_KEY}"
+      },
+      "models": {
+        "Meta-Llama-3.3-70B-Instruct": {
+          "name": "Meta Llama 3.3 70B Instruct"
+        }
+      }
+    },
+    "sambanova-tr-3": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "SambaNova TR 3",
+      "options": {
+        "baseURL": "https://api.sambanova.ai/v1",
+        "apiKey": "{env:AI_SAMBANOVA_TR_3_KEY}"
+      },
+      "models": {
+        "Meta-Llama-3.3-70B-Instruct": {
+          "name": "Meta Llama 3.3 70B Instruct"
+        }
+      }
+    },
+    "sambanova-tr-4": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "SambaNova TR 4",
+      "options": {
+        "baseURL": "https://api.sambanova.ai/v1",
+        "apiKey": "{env:AI_SAMBANOVA_TR_4_KEY}"
+      },
+      "models": {
+        "Meta-Llama-3.3-70B-Instruct": {
+          "name": "Meta Llama 3.3 70B Instruct"
+        }
+      }
+    }
+  },
   "mcp": {
     "code-review-graph": {
       "type": "local",
