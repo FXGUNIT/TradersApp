@@ -98,7 +98,7 @@ function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
     cwd: repoRoot,
     stdio: options.capture ? ["ignore", "pipe", "pipe"] : "inherit",
-    text: true,
+    encoding: "utf8",
   });
   if (result.status !== 0) {
     const detail = options.capture ? `\n${result.stdout || ""}${result.stderr || ""}` : "";
@@ -115,8 +115,18 @@ function gitSha() {
   }
 }
 
+function ownerFromGitRemote() {
+  try {
+    const remoteUrl = run("git", ["config", "--get", "remote.origin.url"], { capture: true }).trim();
+    const match = remoteUrl.match(/github\.com[:/](?<owner>[^/]+)\/[^/]+(?:\.git)?$/i);
+    return match?.groups?.owner || "";
+  } catch {
+    return "";
+  }
+}
+
 function defaultOwner() {
-  return (process.env.GHCR_OWNER || process.env.GITHUB_REPOSITORY_OWNER || "tradersapp").toLowerCase();
+  return (process.env.GHCR_OWNER || process.env.GITHUB_REPOSITORY_OWNER || ownerFromGitRemote() || "tradersapp").toLowerCase();
 }
 
 function imageRef(args, hash) {
@@ -200,7 +210,7 @@ function handleSmoke(args) {
       const result = spawnSync("docker", ["exec", name, "wget", "-qO-", "http://127.0.0.1:8788/health"], {
         cwd: repoRoot,
         stdio: ["ignore", "pipe", "pipe"],
-        text: true,
+        encoding: "utf8",
       });
       if (
         result.status === 0 &&

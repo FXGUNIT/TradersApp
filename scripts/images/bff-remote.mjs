@@ -5,7 +5,7 @@ function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
     cwd: process.cwd(),
     stdio: options.capture ? ["ignore", "pipe", "pipe"] : "inherit",
-    text: true,
+    encoding: "utf8",
   });
   if (result.status !== 0) {
     const detail = options.capture ? `\n${result.stdout || ""}${result.stderr || ""}` : "";
