@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "admin:hash": "node scripts/admin/generate-admin-pass-hash.mjs",
+    "admin:mfa:totp": "node scripts/admin/admin-mfa-totp.mjs",
     "bff:dev": "node bff/server.mjs",
     "bff:dev:infisical": "infisical run -- node bff/server.mjs",
     "bff:dev:local": "node bff/server.mjs",

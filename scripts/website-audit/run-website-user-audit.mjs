@@ -434,9 +434,14 @@ async function openAdminLoginPanel(page) {
   );
   await page.getByRole("button", { name: /admin panel/i }).click();
   await assertText(page, /admin mfa login/i, "Admin MFA login modal");
-  await assertText(page, /restricted admin area/i, "Admin security notice");
-  await assertText(page, /authenticator app/i, "Authenticator column");
-  await assertText(page, /email verification/i, "Email verification column");
+  await assertText(page, /two-gate admin verification/i, "Admin MFA title");
+  await assertText(page, /authenticator/i, "Authenticator gate");
+  await assertText(page, /email otps/i, "Email OTP gate");
+  await assertText(
+    page,
+    /authenticator setup is not available here/i,
+    "No frontend authenticator setup notice",
+  );
 }
 
 async function runAdminLoginPanel(page) {
@@ -445,33 +450,34 @@ async function runAdminLoginPanel(page) {
   const authenticatorInput = page.locator("input[placeholder='000000']").first();
   await assertInputReady(authenticatorInput, "Authenticator code input");
   await authenticatorInput.fill("111111");
-  await assertVisible(page.locator("input[type='checkbox']").first(), "Remember device checkbox");
   await assertClickable(
-    page.getByRole("button", { name: /unlock with authenticator/i }),
-    "Unlock with authenticator button",
+    page.getByRole("button", { name: /verify authenticator/i }),
+    "Verify authenticator button",
   );
-  await page.getByRole("button", { name: /unlock with authenticator/i }).click();
-  await assertText(page, /master admin dashboard/i, "Authenticator route reached admin dashboard.");
-
-  await openAdminLoginPanel(page);
-  await page.getByPlaceholder("Enter master admin email").fill("audit.admin@example.com");
+  await page.getByRole("button", { name: /verify authenticator/i }).click();
+  await assertText(
+    page,
+    /send the second-gate codes/i,
+    "Authenticator success reached email gate, not dashboard",
+  );
+  await assertVisible(page.locator("input[type='checkbox']").first(), "Remember device checkbox");
   await assertClickable(
     page.getByRole("button", { name: /send three email otp codes/i }),
     "Send three email OTP codes button",
   );
   await page.getByRole("button", { name: /send three email otp codes/i }).click();
-  await assertText(page, /enter the 6-digit codes/i, "Email OTP entry step");
+  await assertText(page, /enter all three 6-digit codes/i, "Email OTP entry step");
 
   const codeInputs = page.locator("input[placeholder='000000']");
-  await codeInputs.nth(1).fill("111111");
-  await codeInputs.nth(2).fill("222222");
-  await codeInputs.nth(3).fill("333333");
+  await codeInputs.nth(0).fill("111111");
+  await codeInputs.nth(1).fill("222222");
+  await codeInputs.nth(2).fill("333333");
   await assertClickable(
     page.getByRole("button", { name: /verify three codes/i }),
     "Verify three codes button",
   );
   await page.getByRole("button", { name: /verify three codes/i }).click();
-  await assertText(page, /master admin dashboard/i, "Email OTP route reached admin dashboard.");
+  await assertText(page, /master admin dashboard/i, "Chained MFA reached admin dashboard.");
 
   await openAdminLoginPanel(page);
   await assertClickable(
