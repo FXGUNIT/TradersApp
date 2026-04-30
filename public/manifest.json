@@ -10,6 +10,24 @@
   "background_color": "#0A0A0F",
   "icons": [
     {
+      "src": "/favicon.ico",
+      "sizes": "any",
+      "type": "image/x-icon",
+      "purpose": "any"
+    },
+    {
+      "src": "/favicon-dark-16x16.png",
+      "sizes": "16x16",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/favicon-light-16x16.png",
+      "sizes": "16x16",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
       "src": "/favicon-dark-256x256.png",
       "sizes": "256x256",
       "type": "image/png",
