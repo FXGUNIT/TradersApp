@@ -206,7 +206,7 @@ read_env_value() {
   if [ ! -f "${file}" ]; then
     return 0
   fi
-  grep -E "^${key}=" "${file}" | tail -1 | cut -d= -f2-
+  grep -E "^${key}=" "${file}" | tail -1 | cut -d= -f2- || true
 }
 
 write_deploy_record() {
