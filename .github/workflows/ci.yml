@@ -936,23 +936,28 @@ jobs:
 
       - name: Build and push ML Engine image
         run: |
+          OWNER_LC="${GITHUB_REPOSITORY_OWNER,,}"
+          ML_IMAGE_SHA="ghcr.io/${OWNER_LC}/ml-engine:${GITHUB_SHA}"
+          ML_IMAGE_LATEST="ghcr.io/${OWNER_LC}/ml-engine:latest"
           docker build \
-            --tag ghcr.io/${{ github.repository }}/ml-engine:${{ github.sha }} \
-            --tag ghcr.io/${{ github.repository }}/ml-engine:latest \
+            --tag "${ML_IMAGE_SHA}" \
+            --tag "${ML_IMAGE_LATEST}" \
             --file ml-engine/Dockerfile \
             ml-engine/
-          docker push ghcr.io/${{ github.repository }}/ml-engine:${{ github.sha }}
-          docker push ghcr.io/${{ github.repository }}/ml-engine:latest
+          docker push "${ML_IMAGE_SHA}"
+          docker push "${ML_IMAGE_LATEST}"
         continue-on-error: false
 
       - name: Verify published BFF image
         run: |
-          docker buildx imagetools inspect ghcr.io/${{ github.repository }}/bff:${{ github.sha }} >/dev/null
+          OWNER_LC="${GITHUB_REPOSITORY_OWNER,,}"
+          docker buildx imagetools inspect "ghcr.io/${OWNER_LC}/bff:${GITHUB_SHA}" >/dev/null
         continue-on-error: false
 
       # ── Railway: deploy ML Engine (staging) ──────────────────────────────
       - name: Deploy ML Engine to Railway (staging)
         run: |
+          OWNER_LC="${GITHUB_REPOSITORY_OWNER,,}"
           ENV_ID="${{ vars.RAILWAY_STAGING_ENV_ID }}"
           SVC_ID="${{ vars.RAILWAY_STAGING_ML_SERVICE_ID }}"
           if [ -z "$ENV_ID" ] || [ -z "$SVC_ID" ]; then
@@ -962,13 +967,14 @@ jobs:
               --url "https://api.railway.app/v0/environments/$ENV_ID/services/$SVC_ID/deployments" \
               --header 'Authorization: Bearer ${{ secrets.RAILWAY_TOKEN }}' \
               --header 'Content-Type: application/json' \
-              --data "{\"image\": \"ghcr.io/${{ github.repository }}/ml-engine:${{ github.sha }}\", \"branch\": \"staging\", \"healthCheckPath\": \"/health\"}"
+              --data "{\"image\": \"ghcr.io/${OWNER_LC}/ml-engine:${GITHUB_SHA}\", \"branch\": \"staging\", \"healthCheckPath\": \"/health\"}"
           fi
         continue-on-error: true
 
       # ── Railway: deploy BFF (staging) ────────────────────────────────────
       - name: Deploy BFF to Railway (staging)
         run: |
+          OWNER_LC="${GITHUB_REPOSITORY_OWNER,,}"
           ENV_ID="${{ vars.RAILWAY_STAGING_ENV_ID }}"
           SVC_ID="${{ vars.RAILWAY_STAGING_BFF_SERVICE_ID }}"
           if [ -z "$ENV_ID" ] || [ -z "$SVC_ID" ]; then
@@ -978,7 +984,7 @@ jobs:
               --url "https://api.railway.app/v0/environments/$ENV_ID/services/$SVC_ID/deployments" \
               --header 'Authorization: Bearer ${{ secrets.RAILWAY_TOKEN }}' \
               --header 'Content-Type: application/json' \
-              --data "{\"image\": \"ghcr.io/${{ github.repository }}/bff:${{ github.sha }}\", \"branch\": \"staging\"}"
+              --data "{\"image\": \"ghcr.io/${OWNER_LC}/bff:${GITHUB_SHA}\", \"branch\": \"staging\"}"
           fi
         continue-on-error: true
 
@@ -1044,18 +1050,22 @@ jobs:
 
       - name: Build and push ML Engine image
         run: |
-          docker build -t ghcr.io/${{ github.repository }}/ml-engine:latest ml-engine/
-          docker push ghcr.io/${{ github.repository }}/ml-engine:latest
+          OWNER_LC="${GITHUB_REPOSITORY_OWNER,,}"
+          ML_IMAGE_LATEST="ghcr.io/${OWNER_LC}/ml-engine:latest"
+          docker build -t "${ML_IMAGE_LATEST}" ml-engine/
+          docker push "${ML_IMAGE_LATEST}"
         continue-on-error: false
 
       - name: Verify published BFF image
         run: |
-          docker buildx imagetools inspect ghcr.io/${{ github.repository }}/bff:${{ github.sha }} >/dev/null
+          OWNER_LC="${GITHUB_REPOSITORY_OWNER,,}"
+          docker buildx imagetools inspect "ghcr.io/${OWNER_LC}/bff:${GITHUB_SHA}" >/dev/null
         continue-on-error: false
 
       # ── Railway: deploy ML Engine (production) ──────────────────────────
       - name: Deploy ML Engine to Railway (production)
         run: |
+          OWNER_LC="${GITHUB_REPOSITORY_OWNER,,}"
           ENV_ID="${{ vars.RAILWAY_PROD_ENV_ID }}"
           SVC_ID="${{ vars.RAILWAY_PROD_ML_SERVICE_ID }}"
           if [ -z "$ENV_ID" ] || [ -z "$SVC_ID" ]; then
@@ -1066,13 +1076,14 @@ jobs:
               --url "https://api.railway.app/v0/environments/$ENV_ID/services/$SVC_ID/deployments" \
               --header 'Authorization: Bearer ${{ secrets.RAILWAY_TOKEN }}' \
               --header 'Content-Type: application/json' \
-              --data '{"image": "ghcr.io/${{ github.repository }}/ml-engine:latest", "branch": "main"}'
+              --data "{\"image\": \"ghcr.io/${OWNER_LC}/ml-engine:latest\", \"branch\": \"main\"}"
           fi
         continue-on-error: true
 
       # ── Railway: deploy BFF (production) ─────────────────────────────────
       - name: Deploy BFF to Railway (production)
         run: |
+          OWNER_LC="${GITHUB_REPOSITORY_OWNER,,}"
           ENV_ID="${{ vars.RAILWAY_PROD_ENV_ID }}"
           SVC_ID="${{ vars.RAILWAY_PROD_BFF_SERVICE_ID }}"
           if [ -z "$ENV_ID" ] || [ -z "$SVC_ID" ]; then
@@ -1082,7 +1093,7 @@ jobs:
               --url "https://api.railway.app/v0/environments/$ENV_ID/services/$SVC_ID/deployments" \
               --header 'Authorization: Bearer ${{ secrets.RAILWAY_TOKEN }}' \
               --header 'Content-Type: application/json' \
-              --data '{"image": "ghcr.io/${{ github.repository }}/bff:${{ github.sha }}", "branch": "main"}'
+              --data "{\"image\": \"ghcr.io/${OWNER_LC}/bff:${GITHUB_SHA}\", \"branch\": \"main\"}"
           fi
         continue-on-error: true
 
