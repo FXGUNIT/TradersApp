@@ -76,6 +76,8 @@ export const executeHandleAdminAccess = async ({
   setAdminMfaChallengeId,
   setAdminOtpChallengeId,
   setAdminOtpRecipients,
+  gateLabel = "Authenticator",
+  successMessage = "Authenticator verified. Send the three email codes.",
 }) => {
   let result;
   try {

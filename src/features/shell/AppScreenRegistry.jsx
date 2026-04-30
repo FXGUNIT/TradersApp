@@ -260,6 +260,7 @@ export default function AppScreenRegistry({
   handleAdminRequestNewCodes,
   sendAdminOTPs,
   handleAdminAccess,
+  handleAdminPasskeyAccess,
   handleAdminVerifyCodes,
   handleStructuredSignup,
   handleBackToLoginFromSignup,

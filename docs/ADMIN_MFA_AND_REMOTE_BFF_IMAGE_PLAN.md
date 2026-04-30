@@ -539,6 +539,8 @@ Windows VPS is not recommended for this specific problem.
 | BFF image digest-first deploy | **WORKING** | Deploy workflow pulls by digest (`ghcr.io/fxgunit/bff@sha256:...`); `BFF_IMAGE` env var in docker-compose supports digest ref. |
 | CI merge conflict | **FIXED** | Unresolved `<<<<<<< HEAD` conflict markers in ci.yml resolved. CI is no longer blocked by YAML conflict markers. |
 | CI infisical-action failure | **FIXED LOCALLY - pending push and rerun** | Latest completed main run checked on 2026-04-30: `25171044853` failed only in Frontend Build, ML Engine Tests, and BFF Server during job setup because `infisical/infisical-action` could not be resolved. The workflow now removes that dead action from build/test jobs because runtime secrets should not be required to build or publish the BFF image. |
+| BFF image publishing | **UNBLOCKED** | Run `25172231313` for commit `a269b0c4` passed BFF Server, published the BFF image to GHCR, ran Trivy, generated the SBOM, and created attestations. |
+| Remaining CI failures after BFF unblock | **FIXED LOCALLY - pending push and rerun** | Run `25172231313` still failed overall because frontend lint found stale admin MFA/passkey handler wiring and ML Engine Tests did not install `pytest`. Local patch wires `handleAdminPasskeyAccess`, restores authenticator/passkey labels, and installs `pytest` in the ML test job. |
 | Remote deploy Telegram wiring | **FIXED** | Telegram env vars (`BFF_TELEGRAM_BOT_TOKEN`, `TELEGRAM_AGENT_CHAT_ID`, `TELEGRAM_AGENT_ENABLED`) added to `deploy/contabo/docker-compose.yml` bff service environment block. Build-runtime-env.sh passes them through. GitHub Actions passes secrets to script. |
 | Deploy speed (CI layer caching) | **Already done** | CI uses `cache-from: type=gha,scope=bff` / `cache-to: type=gha,mode=max` for BFF image. No further action needed. |
 | SBOM, scan, provenance, attestation | Implemented for CI image | CI scans the published image, generates an SPDX SBOM, and creates GitHub artifact attestations for the image and SBOM. |
@@ -550,9 +552,9 @@ Windows VPS is not recommended for this specific problem.
 
 ### What Remains Right Now - 2026-04-30
 
-1. Push the local CI workflow fix and rerun `CI/CD Pipeline` on `main`.
-2. Confirm the BFF job publishes the GHCR image tag and digest for the fixed commit.
-3. Trigger the Contabo deploy workflow after the BFF image digest exists.
+1. Push the remaining frontend lint and ML pytest CI fixes, then rerun `CI/CD Pipeline` on `main`.
+2. Confirm the full CI run reaches Deploy Production, or manually trigger Contabo deploy against a commit whose BFF image digest exists.
+3. Trigger/monitor the Contabo deploy workflow after the BFF image digest exists for the selected commit.
 4. Complete backend-only authenticator activation: generate or reuse the owner TOTP secret, scan it into the authenticator app, verify a live code with `verify-setup`, then store it as GitHub/Infisical `ADMIN_TOTP_SECRET`. Contabo deploy will pass that secret into BFF runtime env.
 5. Keep ConsensusEngine live ops open until ML Engine has candle data available.
 

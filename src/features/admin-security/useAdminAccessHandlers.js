@@ -100,8 +100,6 @@ export function useAdminAccessHandlers({
         setAdminOtpRecipients,
         setIsAdminAuthenticated,
         setScreen,
-        gateLabel: "Passkey",
-        successMessage: "Passkey verified. Send the three email codes.",
       }),
     [
       adminMasterEmail,
@@ -146,6 +144,8 @@ export function useAdminAccessHandlers({
         setAdminOtpRecipients,
         setIsAdminAuthenticated,
         setScreen,
+        gateLabel: "Passkey",
+        successMessage: "Passkey verified. Send the three email codes.",
       }),
     [
       adminMasterEmail,

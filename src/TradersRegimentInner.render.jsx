@@ -102,6 +102,7 @@ export function buildScreenContent({
   handleAdminRequestNewCodes,
   sendAdminOTPs,
   handleAdminAccess,
+  handleAdminPasskeyAccess,
   handleAdminVerifyCodes,
   handleStructuredSignup,
   handleBackToLoginFromSignup,
@@ -182,6 +183,7 @@ export function buildScreenContent({
       handleAdminRequestNewCodes={handleAdminRequestNewCodes}
       sendAdminOTPs={sendAdminOTPs}
       handleAdminAccess={handleAdminAccess}
+      handleAdminPasskeyAccess={handleAdminPasskeyAccess}
       handleAdminVerifyCodes={handleAdminVerifyCodes}
       handleStructuredSignup={handleStructuredSignup}
       handleBackToLoginFromSignup={handleBackToLoginFromSignup}
