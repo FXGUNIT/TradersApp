@@ -533,7 +533,7 @@ Windows VPS is not recommended for this specific problem.
 | --- | --- | --- |
 | Telegram AI Agent | **LIVE on Contabo VPS** | Bot token, CHAT_ID, TELEGRAM_AGENT_ENABLED all propagated to container. `[telegramAgent] Starting polling loop...` confirmed in BFF logs. Bot responds at `@tradersapp_bot`. |
 | Admin baseline MFA | Implemented | TOTP gate issues only a short-lived MFA challenge; three-email OTP remains the only admin-session issuing step; chained-flow tests pass. |
-| Admin TOTP secret setup | **AVAILABLE - needs owner activation** | Backend-only CLI exists: `node scripts/admin/admin-mfa-totp.mjs generate` and `verify-setup`. Remaining work is owner scan/verification, then storing `ADMIN_TOTP_SECRET` in GitHub/Infisical and propagating it to the Contabo runtime env. |
+| Admin TOTP secret setup | **AVAILABLE - needs owner activation** | Backend-only CLI exists: `node scripts/admin/admin-mfa-totp.mjs generate` and `verify-setup`. Contabo deploy now accepts `ADMIN_TOTP_SECRET` and `ADMIN_MFA_EMAILS` from GitHub secrets/vars as runtime env overrides. Remaining owner step is scanning/verifying the TOTP secret, then storing it as `ADMIN_TOTP_SECRET`. |
 | Board Room volume fix | **FIXED** | `board_room_data` volume permissions corrected; BFF no longer shows `EACCES permission denied` errors. |
 | Production-safe MFA challenge storage | Implemented | Admin MFA challenge state uses the shared session-store path instead of process-only memory, with Redis-backed operation when configured and file-backed local fallback. |
 | BFF image digest-first deploy | **WORKING** | Deploy workflow pulls by digest (`ghcr.io/fxgunit/bff@sha256:...`); `BFF_IMAGE` env var in docker-compose supports digest ref. |
@@ -553,7 +553,7 @@ Windows VPS is not recommended for this specific problem.
 1. Push the local CI workflow fix and rerun `CI/CD Pipeline` on `main`.
 2. Confirm the BFF job publishes the GHCR image tag and digest for the fixed commit.
 3. Trigger the Contabo deploy workflow after the BFF image digest exists.
-4. Complete backend-only authenticator activation: generate or reuse the owner TOTP secret, scan it into the authenticator app, verify a live code with `verify-setup`, then propagate `ADMIN_TOTP_SECRET` to GitHub/Infisical and the Contabo runtime env.
+4. Complete backend-only authenticator activation: generate or reuse the owner TOTP secret, scan it into the authenticator app, verify a live code with `verify-setup`, then store it as GitHub/Infisical `ADMIN_TOTP_SECRET`. Contabo deploy will pass that secret into BFF runtime env.
 5. Keep ConsensusEngine live ops open until ML Engine has candle data available.
 
 ### Phase 1 - Admin Baseline MFA

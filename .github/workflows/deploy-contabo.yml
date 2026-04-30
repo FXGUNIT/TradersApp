@@ -227,7 +227,9 @@ jobs:
             --api-host "${{ steps.context.outputs.api_host }}" \
             --compose-profiles "${{ steps.context.outputs.compose_profiles }}" \
             --telegram-token "${BFF_TELEGRAM_BOT_TOKEN}" \
-            --telegram-chat-id "${TELEGRAM_AGENT_CHAT_ID}"
+            --telegram-chat-id "${TELEGRAM_AGENT_CHAT_ID}" \
+            --admin-totp-secret "${ADMIN_TOTP_SECRET}" \
+            --admin-mfa-emails "${ADMIN_MFA_EMAILS}"
         env:
           CONTABO_APP_ENV: ${{ secrets.CONTABO_APP_ENV }}
           INFISICAL_TOKEN: ${{ secrets.INFISICAL_TOKEN }}
@@ -235,6 +237,8 @@ jobs:
           INFISICAL_ENV: ${{ vars.INFISICAL_ENV || 'dev' }}
           BFF_TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_AGENT_CHAT_ID: ${{ secrets.TELEGRAM_AGENT_CHAT_ID }}
+          ADMIN_TOTP_SECRET: ${{ secrets.ADMIN_TOTP_SECRET }}
+          ADMIN_MFA_EMAILS: ${{ secrets.ADMIN_MFA_EMAILS || vars.ADMIN_MFA_EMAILS }}
 
       - name: Login to GHCR
         uses: docker/login-action@v4

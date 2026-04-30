@@ -11,6 +11,8 @@ API_PUBLIC_HOST="${API_PUBLIC_HOST:-}"
 COMPOSE_PROFILES="${COMPOSE_PROFILES:-core}"
 BFF_TELEGRAM_BOT_TOKEN="${BFF_TELEGRAM_BOT_TOKEN:-}"
 TELEGRAM_AGENT_CHAT_ID="${TELEGRAM_AGENT_CHAT_ID:-}"
+ADMIN_TOTP_SECRET="${ADMIN_TOTP_SECRET:-}"
+ADMIN_MFA_EMAILS="${ADMIN_MFA_EMAILS:-}"
 CANONICAL_PUBLIC_FRONTEND="https://tradergunit.pages.dev"
 
 usage() {
@@ -28,6 +30,9 @@ Options:
   --compose-profiles LIST  Optional compose profiles, comma-separated
   --telegram-token TOKEN  BFF_TELEGRAM_BOT_TOKEN (overrides env var)
   --telegram-chat-id ID    TELEGRAM_AGENT_CHAT_ID
+  --admin-totp-secret SECRET
+                          ADMIN_TOTP_SECRET for backend-only admin MFA
+  --admin-mfa-emails LIST  Comma-separated backend-controlled MFA recipients
 EOF
 }
 
@@ -71,6 +76,14 @@ while [ "$#" -gt 0 ]; do
       ;;
     --telegram-chat-id)
       TELEGRAM_AGENT_CHAT_ID="$2"
+      shift 2
+      ;;
+    --admin-totp-secret)
+      ADMIN_TOTP_SECRET="$2"
+      shift 2
+      ;;
+    --admin-mfa-emails)
+      ADMIN_MFA_EMAILS="$2"
       shift 2
       ;;
     --help|-h)
@@ -132,11 +145,25 @@ if [ -n "${BASE_ENV}" ] && [ -f "${BASE_ENV}" ]; then
         printf '%s\n' "${line}" >> "${tmp_file}"
         continue
         ;;
-      EMAILJS_SERVICE_ID|EMAILJS_TEMPLATE_ID|EMAILJS_PUBLIC_KEY|EMAILJS_PRIVATE_KEY|ADMIN_EMAILJS_SERVICE_ID|ADMIN_EMAILJS_TEMPLATE_ID|ADMIN_EMAILJS_PUBLIC_KEY|ADMIN_EMAILJS_PRIVATE_KEY|ADMIN_MFA_EMAILS)
+      EMAILJS_SERVICE_ID|EMAILJS_TEMPLATE_ID|EMAILJS_PUBLIC_KEY|EMAILJS_PRIVATE_KEY|ADMIN_EMAILJS_SERVICE_ID|ADMIN_EMAILJS_TEMPLATE_ID|ADMIN_EMAILJS_PUBLIC_KEY|ADMIN_EMAILJS_PRIVATE_KEY)
         printf '%s\n' "${line}" >> "${tmp_file}"
         continue
         ;;
-    ADMIN_TOTP_SECRET|ADMIN_MASTER_EMAIL)
+      ADMIN_MFA_EMAILS)
+        if [ -n "${ADMIN_MFA_EMAILS}" ]; then
+          continue
+        fi
+        printf '%s\n' "${line}" >> "${tmp_file}"
+        continue
+        ;;
+      ADMIN_TOTP_SECRET)
+        if [ -n "${ADMIN_TOTP_SECRET}" ]; then
+          continue
+        fi
+        printf '%s\n' "${line}" >> "${tmp_file}"
+        continue
+        ;;
+      ADMIN_MASTER_EMAIL)
         printf '%s\n' "${line}" >> "${tmp_file}"
         continue
         ;;
@@ -178,6 +205,14 @@ BFF_TELEGRAM_BOT_TOKEN=${BFF_TELEGRAM_BOT_TOKEN}
 TELEGRAM_AGENT_ENABLED=true
 TELEGRAM_AGENT_CHAT_ID=${TELEGRAM_AGENT_CHAT_ID}
 EOF
+
+if [ -n "${ADMIN_TOTP_SECRET}" ]; then
+  printf 'ADMIN_TOTP_SECRET=%s\n' "${ADMIN_TOTP_SECRET}" >> "${tmp_file}"
+fi
+
+if [ -n "${ADMIN_MFA_EMAILS}" ]; then
+  printf 'ADMIN_MFA_EMAILS=%s\n' "${ADMIN_MFA_EMAILS}" >> "${tmp_file}"
+fi
 
 mv "${tmp_file}" "${OUTPUT}"
 chmod 600 "${OUTPUT}"
