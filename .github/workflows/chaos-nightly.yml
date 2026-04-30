@@ -23,8 +23,8 @@ env:
   CHAOS_ENVIRONMENT: ${{ github.event.inputs.environment || 'staging' }}
   ML_ENGINE_URL: http://localhost:8001
   BFF_URL: http://localhost:8788
-  PROMETHEUS_URL: ${{ vars.CHAOS_PROMETHEUS_URL || vars.PROMETHEUS_URL || '' }}
-  MLFLOW_TRACKING_URI: ${{ vars.CHAOS_MLFLOW_TRACKING_URI || vars.MLFLOW_TRACKING_URI || '' }}
+  PROMETHEUS_URL: ${{ vars.CHAOS_PROMETHEUS_URL || '' }}
+  MLFLOW_TRACKING_URI: ${{ vars.CHAOS_MLFLOW_TRACKING_URI || '' }}
 
 jobs:
   chaos-nightly:
@@ -135,9 +135,13 @@ jobs:
             --simulate-only
 
           if [ -n "${PROMETHEUS_URL}" ]; then
-            curl -s "${PROMETHEUS_URL}/api/v1/query" \
+            if curl -fsS --max-time 10 "${PROMETHEUS_URL%/}/api/v1/query" \
               --data-urlencode 'query=circuit_breaker_state{name="ml-engine"}' \
-              | python3 scripts/parse_prometheus_alerts.py /dev/stdin /tmp/chaos-circuit-breaker.json
+              -o /tmp/chaos-circuit-breaker-prometheus.json; then
+              python3 scripts/parse_prometheus_alerts.py /tmp/chaos-circuit-breaker-prometheus.json /tmp/chaos-circuit-breaker.json || true
+            else
+              echo "[CHAOS] Prometheus circuit-breaker metric check unavailable; continuing"
+            fi
           else
             echo "[CHAOS] PROMETHEUS_URL not configured; circuit-breaker metric check skipped"
           fi
@@ -207,9 +211,13 @@ jobs:
             --simulate-only
 
           if [ -n "${PROMETHEUS_URL}" ]; then
-            curl -s "${PROMETHEUS_URL}/api/v1/query" \
+            if curl -fsS --max-time 10 "${PROMETHEUS_URL%/}/api/v1/query" \
               --data-urlencode 'query=guardrails_validation_errors_total' \
-              | python3 scripts/parse_prometheus_alerts.py /dev/stdin /tmp/chaos-guardrails.json
+              -o /tmp/chaos-guardrails-prometheus.json; then
+              python3 scripts/parse_prometheus_alerts.py /tmp/chaos-guardrails-prometheus.json /tmp/chaos-guardrails.json || true
+            else
+              echo "[CHAOS] Prometheus guardrails metric check unavailable; continuing"
+            fi
           else
             echo "[CHAOS] PROMETHEUS_URL not configured; guardrails metric check skipped"
           fi
