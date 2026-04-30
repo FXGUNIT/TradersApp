@@ -5,7 +5,7 @@
  * Exported so modules can import what they need without circular deps.
  */
 
-import TelegramBot from "node-telegram-bot-api";
+import { EventEmitter } from "node:events";
 import path from "node:path";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -31,9 +31,109 @@ if (!BOT_TOKEN) {
   );
 }
 
-/** @type {TelegramBot | null} */
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+class TelegramApiError extends Error {
+  constructor(method, payload) {
+    super(payload?.description || `Telegram API ${method} failed`);
+    this.name = "TelegramApiError";
+    this.method = method;
+    this.payload = payload;
+  }
+}
+
+class TelegramBotClient extends EventEmitter {
+  constructor(token) {
+    super();
+    this.token = token;
+    this.apiBase = `https://api.telegram.org/bot${token}`;
+    this.polling = false;
+    this.nextUpdateId = 0;
+  }
+
+  async request(method, payload = {}) {
+    const response = await fetch(`${this.apiBase}/${method}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await response.json().catch(() => null);
+    if (!response.ok || !data?.ok) {
+      throw new TelegramApiError(method, data);
+    }
+    return data.result;
+  }
+
+  sendMessage(chatId, text, options = {}) {
+    return this.request("sendMessage", {
+      chat_id: chatId,
+      text,
+      ...options,
+    });
+  }
+
+  sendChatAction(chatId, action) {
+    return this.request("sendChatAction", {
+      chat_id: chatId,
+      action,
+    });
+  }
+
+  setWebHook(url) {
+    return this.request("setWebhook", { url });
+  }
+
+  answerCallbackQuery(callbackQueryId, options = {}) {
+    return this.request("answerCallbackQuery", {
+      callback_query_id: callbackQueryId,
+      ...options,
+    });
+  }
+
+  async processUpdate(update) {
+    if (update?.message) this.emit("message", update.message);
+    if (update?.edited_message) this.emit("edited_message", update.edited_message);
+    if (update?.callback_query) this.emit("callback_query", update.callback_query);
+  }
+
+  startPolling({ timeout = 30, intervalMs = 500 } = {}) {
+    if (this.polling) return;
+    this.polling = true;
+    this.pollUpdates({ timeout, intervalMs }).catch((err) => {
+      this.emit("polling_error", err);
+    });
+  }
+
+  stopPolling() {
+    this.polling = false;
+  }
+
+  async pollUpdates({ timeout, intervalMs }) {
+    while (this.polling) {
+      try {
+        const updates = await this.request("getUpdates", {
+          offset: this.nextUpdateId || undefined,
+          timeout,
+          allowed_updates: ["message", "edited_message", "callback_query"],
+        });
+        for (const update of updates || []) {
+          if (Number.isFinite(update?.update_id)) {
+            this.nextUpdateId = update.update_id + 1;
+          }
+          await this.processUpdate(update);
+        }
+      } catch (err) {
+        this.emit("polling_error", err);
+        await sleep(5000);
+      }
+      await sleep(intervalMs);
+    }
+  }
+}
+
+/** @type {TelegramBotClient | null} */
 export const bot = BOT_TOKEN
-  ? new TelegramBot(BOT_TOKEN, { polling: false })
+  ? new TelegramBotClient(BOT_TOKEN)
   : null;
 
 // ─── Admin Chat IDs ───────────────────────────────────────────────────────────
