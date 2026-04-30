@@ -1,0 +1,45 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Auto-update TradersApp dependencies via Renovate",
+  "extends": [
+    "config:recommended",
+    "docker:enableAutoMajorUpgrades",
+    "github>FXGUNIT/renovate-config"
+  ],
+  "labels": ["dependencies", "renovate"],
+  "packageRules": [
+    {
+      "matchPackagePatterns": ["*"],
+      "groupName": "all dependencies",
+      "schedule": ["before 8am on Monday"],
+      "automerge": false,
+      "vulnerabilityAlerts": true
+    },
+    {
+      "matchDepTypes": ["devDependencies"],
+      "labels": ["dependencies", "dev"],
+      "automerge": false
+    },
+    {
+      "matchPackagePatterns": ["node:*", "npm:*"],
+      "groupName": "npm packages",
+      "schedule": ["before 8am on Monday"]
+    },
+    {
+      "matchPackagePatterns": ["python*", "numpy", "pandas", "scikit"],
+      "groupName": "Python packages",
+      "schedule": ["before 8am on Monday"]
+    },
+    {
+      "matchPackagePatterns": ["docker:*", "ghcr.io/*"],
+      "labels": ["docker", "dependencies"],
+      "groupName": "Docker base images"
+    }
+  ],
+  "separateMajorMinor": true,
+  "separateMinorPatch": false,
+  "rebaseWhen": "behind-base-branch",
+  "dependencyDashboard": true,
+  "dependencyDashboardTitle": "📦 Renovate Dependency Dashboard",
+  "commitMessagePrefix": "chore(deps)"
+}
