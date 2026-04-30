@@ -294,20 +294,23 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          body="## Chaos Engineering SLO Breach
+          body="$(cat <<EOF
+          ## Chaos Engineering SLO Breach
 
-Chaos experiment **chaos-pod-kill** failed.
-Recovery time exceeded 60s SLO.
+          Chaos experiment **chaos-pod-kill** failed.
+          Recovery time exceeded 60s SLO.
 
-**Run:** ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
-**Environment:** ${CHAOS_ENVIRONMENT}
+          **Run:** ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
+          **Environment:** ${CHAOS_ENVIRONMENT}
 
-### Required Actions
-- [ ] Investigate recovery path for ML Engine pod kill
-- [ ] Add circuit breaker or retry logic if missing
-- [ ] Update SLO if 60s is insufficient
+          ### Required Actions
+          - [ ] Investigate recovery path for ML Engine pod kill
+          - [ ] Add circuit breaker or retry logic if missing
+          - [ ] Update SLO if 60s is insufficient
 
-Auto-created by chaos-nightly.yml"
+          Auto-created by chaos-nightly.yml
+          EOF
+          )"
           gh issue create \
             --title "Chaos SLO Breach: ML Engine recovery >60s" \
             --body "${body}" \
