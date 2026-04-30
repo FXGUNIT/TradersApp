@@ -629,14 +629,6 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
-      # ── Pull secrets from Infisical (injected as env vars) ──────────────
-      - name: Pull secrets from Infisical
-        uses: infisical/infisical-action@v2
-        with:
-          space-id: '0e4f9b8b-846e-4e66-a4aa-97c8fa9863ab'
-          env: ${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }}
-          secrets-output-format: env
-
       - name: Install dependencies
         run: npm ci
 
@@ -673,14 +665,6 @@ jobs:
           key: ${{ runner.os }}-pip-ml-${{ hashFiles('ml-engine/requirements.txt') }}
           restore-keys: |
             ${{ runner.os }}-pip-ml-
-
-      # ── Pull secrets from Infisical ─────────────────────────────────────
-      - name: Pull secrets from Infisical
-        uses: infisical/infisical-action@v2
-        with:
-          space-id: '0e4f9b8b-846e-4e66-a4aa-97c8fa9863ab'
-          env: ${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }}
-          secrets-output-format: env
 
       - name: Install dependencies
         run: |
@@ -742,14 +726,6 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
           cache-dependency-path: bff/package-lock.json
-
-      # ── Pull secrets from Infisical ─────────────────────────────────────
-      - name: Pull secrets from Infisical
-        uses: infisical/infisical-action@v2
-        with:
-          space-id: '0e4f9b8b-846e-4e66-a4aa-97c8fa9863ab'
-          env: ${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }}
-          secrets-output-format: env
 
       - name: Install dependencies
         run: npm ci

@@ -533,12 +533,12 @@ Windows VPS is not recommended for this specific problem.
 | --- | --- | --- |
 | Telegram AI Agent | **LIVE on Contabo VPS** | Bot token, CHAT_ID, TELEGRAM_AGENT_ENABLED all propagated to container. `[telegramAgent] Starting polling loop...` confirmed in BFF logs. Bot responds at `@tradersapp_bot`. |
 | Admin baseline MFA | Implemented | TOTP gate issues only a short-lived MFA challenge; three-email OTP remains the only admin-session issuing step; chained-flow tests pass. |
-| Admin TOTP secret setup | **AVAILABLE — needs owner activation** | `node scripts/admin/admin-mfa-totp.mjs generate` produces secret. Secret stored in GitHub secret `ADMIN_TOTP_SECRET`. Still needs propagation to Contabo VPS runtime env and verification via `verify-setup`. |
+| Admin TOTP secret setup | **AVAILABLE - needs owner activation** | Backend-only CLI exists: `node scripts/admin/admin-mfa-totp.mjs generate` and `verify-setup`. Remaining work is owner scan/verification, then storing `ADMIN_TOTP_SECRET` in GitHub/Infisical and propagating it to the Contabo runtime env. |
 | Board Room volume fix | **FIXED** | `board_room_data` volume permissions corrected; BFF no longer shows `EACCES permission denied` errors. |
 | Production-safe MFA challenge storage | Implemented | Admin MFA challenge state uses the shared session-store path instead of process-only memory, with Redis-backed operation when configured and file-backed local fallback. |
 | BFF image digest-first deploy | **WORKING** | Deploy workflow pulls by digest (`ghcr.io/fxgunit/bff@sha256:...`); `BFF_IMAGE` env var in docker-compose supports digest ref. |
-| CI merge conflict | **FIXED** | Unresolved `<<<<<<< HEAD` conflict markers in ci.yml resolved; CI now passes all jobs. |
-| CI infisical-action failure | **OPEN** | `infisical/infisical-action@v2` resolves as not found on GitHub; CI BFF Server job fails at setup. Needs migration to `infisical/infisical-action@v4` or alternate secret pull method. |
+| CI merge conflict | **FIXED** | Unresolved `<<<<<<< HEAD` conflict markers in ci.yml resolved. CI is no longer blocked by YAML conflict markers. |
+| CI infisical-action failure | **FIXED LOCALLY - pending push and rerun** | Latest completed main run checked on 2026-04-30: `25171044853` failed only in Frontend Build, ML Engine Tests, and BFF Server during job setup because `infisical/infisical-action` could not be resolved. The workflow now removes that dead action from build/test jobs because runtime secrets should not be required to build or publish the BFF image. |
 | Remote deploy Telegram wiring | **FIXED** | Telegram env vars (`BFF_TELEGRAM_BOT_TOKEN`, `TELEGRAM_AGENT_CHAT_ID`, `TELEGRAM_AGENT_ENABLED`) added to `deploy/contabo/docker-compose.yml` bff service environment block. Build-runtime-env.sh passes them through. GitHub Actions passes secrets to script. |
 | Deploy speed (CI layer caching) | **Already done** | CI uses `cache-from: type=gha,scope=bff` / `cache-to: type=gha,mode=max` for BFF image. No further action needed. |
 | SBOM, scan, provenance, attestation | Implemented for CI image | CI scans the published image, generates an SPDX SBOM, and creates GitHub artifact attestations for the image and SBOM. |
@@ -547,6 +547,14 @@ Windows VPS is not recommended for this specific problem.
 | ConsensusEngine live ops | Still open | ML Engine health probe times out — no candles available. No action needed until trading data is loaded. |
 | Kubernetes deploy parity | Partially hardened | `.github/workflows/deploy-k8s.yml` now verifies the BFF image attestation before pulling images; digest-pinned Helm rollout remains the remaining parity item if Kubernetes is active production. |
 | NewsService live ops | Improved | Forex Factory HTML 403s now fall back to weekly JSON export; live probe works with fallback. |
+
+### What Remains Right Now - 2026-04-30
+
+1. Push the local CI workflow fix and rerun `CI/CD Pipeline` on `main`.
+2. Confirm the BFF job publishes the GHCR image tag and digest for the fixed commit.
+3. Trigger the Contabo deploy workflow after the BFF image digest exists.
+4. Complete backend-only authenticator activation: generate or reuse the owner TOTP secret, scan it into the authenticator app, verify a live code with `verify-setup`, then propagate `ADMIN_TOTP_SECRET` to GitHub/Infisical and the Contabo runtime env.
+5. Keep ConsensusEngine live ops open until ML Engine has candle data available.
 
 ### Phase 1 - Admin Baseline MFA
 
