@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 ## Autonomy & No-Permission Rule (Highest Priority - Applies to Claude and Copilot Agents)
 
 - After I give any to-do list or task, work completely autonomously.
@@ -94,22 +95,34 @@ These should not be suggested or preferred unless the user explicitly asks for t
 - **Grep before read** — never read a file before grepping it
 - **Specific reads over globbing** — `Read file:123` not `glob **/*.js`
 - **Never load archives** — skip `.bak`, `.backup`, `archive/` files
+=======
+# TradersApp — Claude Code Architectural Guide
+
+**Last Updated:** 2026-04-02
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 
 ---
 
 ## Core Principles
 
 ### 1. Never Create a Monolith
+<<<<<<< HEAD
 
 Every component is a **separate, independently deployable unit** with its own:
 
+=======
+Every component is a **separate, independently deployable unit** with its own:
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 - Clear input/output contract
 - Own directory (`src/features/X/`, `ml-engine/X/`, `bff/services/`)
 - Own tests (`tests/`, `*.test.ts`, `pytest tests/X/`)
 - Own README if complex
 
 ### 2. Module Naming — Be Explicit, Not Clever
+<<<<<<< HEAD
 
+=======
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 ```
 Good:  src/features/consensus/sessionProbabilityEngine.js
 Bad:   src/features/consensus/engine.js
@@ -118,14 +131,20 @@ Bad:   ml-engine/opt.py
 ```
 
 ### 3. File Size Hard Limit
+<<<<<<< HEAD
 
+=======
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 - **Python files**: ≤ 600 lines. If exceeding, split into `_core.py`, `_utils.py`, `_api.py`
 - **JS/TS files**: ≤ 500 lines. Split at logical boundaries.
 - **React components**: ≤ 300 lines. Extract sub-components to sibling files.
 - **Shell scripts**: ≤ 200 lines.
 
 ### 4. Every New Feature Gets Its Own Directory
+<<<<<<< HEAD
 
+=======
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 ```
 New Feature: "Session Fatigue Tracker"
 CREATE:
@@ -145,7 +164,10 @@ DONT: append to existing files like CollectiveConsciousness.jsx
 ```
 
 ### 5. Async-First, Concurrent by Default
+<<<<<<< HEAD
 
+=======
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 ```javascript
 // BAD — sequential
 const news = await fetchNews();
@@ -161,7 +183,10 @@ const [news, consensus, regime] = await Promise.all([
 ```
 
 ### 6. Fail-Secure at Every Layer
+<<<<<<< HEAD
 
+=======
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 ```
 Layer: Frontend Component
   - Show loading state immediately
@@ -180,9 +205,13 @@ Layer: ML Engine
 ```
 
 ### 7. Typed Boundaries Between Services
+<<<<<<< HEAD
 
 Every cross-service call has explicit types:
 
+=======
+Every cross-service call has explicit types:
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 ```typescript
 // BFF → ML Engine (mjs)
 interface MLConsensusRequest {
@@ -202,23 +231,33 @@ class ConsensusResponse(BaseModel):
 ```
 
 ### 8. Test at Boundaries, Not Internals
+<<<<<<< HEAD
 
+=======
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 ```
 Priority 1: Test BFF routes (does /ml/consensus return correct shape?)
 Priority 2: Test ML Engine endpoints (does /predict return valid signal?)
 Priority 3: Test React components with mocked services
 Priority 4: Unit tests for pure utility functions
 ```
+<<<<<<< HEAD
 
 Never test private methods. Test public contracts only.
 
 ### 9. Configuration Over Hardcoding
 
+=======
+Never test private methods. Test public contracts only.
+
+### 9. Configuration Over Hardcoding
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 ```
 BAD:  const SL_TICKS = 20;
 GOOD: const SL_TICKS = parseInt(import.meta.env.VITE_DEFAULT_SL_TICKS ?? '20', 10);
       // In ML Engine: from config import SL_TICKS_DEFAULT
 ```
+<<<<<<< HEAD
 
 All magic numbers live in `config.py`, `.env.local`, or environment variables. Never hardcode a threshold, multiplier, or limit inline.
 
@@ -230,6 +269,15 @@ After completing any feature, run:
 python scripts/auto_backup.py "Add Session Fatigue Tracker"
 ```
 
+=======
+All magic numbers live in `config.py`, `.env.local`, or environment variables. Never hardcode a threshold, multiplier, or limit inline.
+
+### 10. Backup Before Every Significant Change
+After completing any feature, run:
+```bash
+python scripts/auto_backup.py "Add Session Fatigue Tracker"
+```
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 The pre-commit hook (`git/hooks/pre-commit`) auto-creates a backup tag. The auto_backup script creates an annotated commit with the message. Both run independently.
 
 ---
@@ -349,12 +397,17 @@ TradersApp/
 
 ## ML Engine Architecture Rules
 
+<<<<<<< HEAD
 **Board Room compliance:** All signal/output code must respect `.claude/rules/board-room.md`. Never output a LONG/SHORT signal without going through `DeliberativeBoardRoom.deliberate()`. RiskOfficer veto = final.
 
 ### Models Follow Strict Patterns
 
 Every ML model follows one of these patterns:
 
+=======
+### Models Follow Strict Patterns
+Every ML model follows one of these patterns:
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 ```python
 # Pattern 1: Classifier
 class DirectionModel:
@@ -373,7 +426,10 @@ class RegimeEnsemble:
 ```
 
 ### Every Model Has:
+<<<<<<< HEAD
 
+=======
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 1. `train(X, y)` — with TimeSeriesSplit CV
 2. `predict(X) -> dict` — with explicit return shape
 3. `get_feature_importance()` — SHAP or permutation importance
@@ -381,7 +437,10 @@ class RegimeEnsemble:
 5. Graceful fallback when data insufficient
 
 ### No Global State in ML Engine
+<<<<<<< HEAD
 
+=======
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 ```
 BAD:  global_model = None
       def get_model(): ...
@@ -390,7 +449,10 @@ GOOD: class DirectionModel:
           @classmethod
           def get_instance(cls): ...
 ```
+<<<<<<< HEAD
 
+=======
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 Use singletons or dependency injection. No global mutable state.
 
 ---
@@ -398,7 +460,10 @@ Use singletons or dependency injection. No global mutable state.
 ## React Architecture Rules
 
 ### Component Hierarchy
+<<<<<<< HEAD
 
+=======
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 ```
 Page (CollectiveConsciousness.jsx)
   └─ Feature Container (ConsensusSignal.jsx)       # Fetches data, owns state
@@ -409,14 +474,20 @@ Page (CollectiveConsciousness.jsx)
 ```
 
 ### State Ownership
+<<<<<<< HEAD
 
+=======
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 - **Feature Container** owns all API calls and state
 - **Sub-components** are pure: `props -> UI`
 - **Never** fetch data in a sub-component (except with `useQuery`/`useSuspenseQuery`)
 - **Always** wrap sub-components in `React.memo()` when they receive stable props
 
 ### Error Handling Contract
+<<<<<<< HEAD
 
+=======
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 ```javascript
 // Feature Container: always has these states
 const { data, isLoading, error } = useQuery(...);
@@ -431,9 +502,13 @@ const { data, isLoading, error } = useQuery(...);
 ## API Design Rules
 
 ### BFF → ML Engine Contract
+<<<<<<< HEAD
 
 All ML Engine endpoints return:
 
+=======
+All ML Engine endpoints return:
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 ```python
 class BaseResponse(BaseModel):
     ok: bool
@@ -443,7 +518,10 @@ class BaseResponse(BaseModel):
 ```
 
 ### Every Endpoint Has:
+<<<<<<< HEAD
 
+=======
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 - Input validation (Pydantic/Zod)
 - Timeout (5s default)
 - Circuit breaker
@@ -455,19 +533,26 @@ class BaseResponse(BaseModel):
 ## Dependency Rules
 
 ### Python Dependencies
+<<<<<<< HEAD
 
+=======
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 - Core: `numpy`, `pandas`, `scikit-learn`, `lightgbm`, `xgboost`, `fastapi`, `uvicorn`
 - Optional: `torch` (Mamba), `redis` (cache), `hmmlearn`, `shap`, `kernc-backtesting`
 - Import guard: `try: import torch` / `except ImportError: ...`
 
 ### JS Dependencies
+<<<<<<< HEAD
 
+=======
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 - Core: `react`, `vite`, `axios`, `zustand`
 - Optional: `@tanstack/react-query`, `firebase`
 - No jQuery, no lodash full import (use `lodash-es` or direct imports)
 
 ---
 
+<<<<<<< HEAD
 ## Data Versioning (DVC)
 
 **Every dataset, model, and experiment is versioned with DVC + Git.** No exception — reproducibility is non-negotiable.
@@ -573,6 +658,17 @@ None → Staging → Production → Archived
 - `promote_model()` moves Staging → Production after paper trade review
 - `archive_stale_models()` auto-archives production models older than 7 days
 - DVC commit hash is logged as `dvc_commit` tag on every run (data lineage)
+=======
+## Performance Rules
+
+1. **No blocking operations on the main thread** in React
+2. **All external calls are concurrent** in BFF (Promise.all)
+3. **ML prediction is cached** with Redis (TTL per endpoint type)
+4. **Heavy ML operations** run in thread pool or separate worker
+5. **React renders** use `React.memo` + `useMemo` + `useCallback` aggressively
+6. **No inline styles** — use CSS classes or CSS-in-JS with `styled()`
+7. **Images and heavy assets** lazy-loaded with `React.lazy()`
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 
 ---
 
@@ -606,6 +702,7 @@ None → Staging → Production → Archived
 - [ ] Never catch `Exception` broadly — catch specific exceptions
 - [ ] Never use `eval()` or `new Function()` — use `JSON.parse` for JSON
 - [ ] Never make the ML engine depend on the BFF — BFF calls ML, never reverse
+<<<<<<< HEAD
 - [ ] Never output a trading signal without Board Room deliberation
 
 ---
@@ -781,3 +878,5 @@ This project uses Claude model tiers for different task types. **Sub-agents MUST
 - Planning a new feature or architecture? → Use **Opus**
 - Writing or editing code? → Use **Sonnet**
 - Finding files, grep, understanding code structure? → Use **Haiku**
+=======
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37

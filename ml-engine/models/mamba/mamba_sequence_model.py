@@ -105,9 +105,13 @@ class MambaConfig:
     device: str = "auto"       # auto, cpu, cuda, mps
     quantization: str = "none"  # none, int8, float16
     max_seq_len: int = MAX_SEQ_LEN
+<<<<<<< HEAD
     cache_dir: str = field(
         default_factory=lambda: os.environ.get("MAMBA_CACHE_DIR", "ml-engine/models/mamba_cache")
     )
+=======
+    cache_dir: str = "ml-engine/models/mamba_cache"
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
     load_in_8bit: bool = False
     torch_dtype: str = "float32"  # float32, float16, bfloat16
 

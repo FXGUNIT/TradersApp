@@ -12,10 +12,15 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Radio, TrendingUp, TrendingDown, Minus, AlertTriangle, ChevronDown, ChevronUp, ExternalLink, Zap } from 'lucide-react';
+<<<<<<< HEAD
 import { hasBff } from '../services/gateways/base.js';
 import { resolveBffBaseUrl } from '../services/runtimeConfig.js';
 
 const BFF_BASE = resolveBffBaseUrl();
+=======
+
+const BFF_BASE = import.meta.env.VITE_BFF_URL || '';
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 
 const IMPACT_COLORS = {
   HIGH: { bg: 'rgba(255,69,58,0.08)', border: 'rgba(255,69,58,0.3)', text: '#FF453A', badge: '#FF453A' },
@@ -29,6 +34,7 @@ const SENTIMENT_COLORS = {
   neutral: { color: '#8E8E93', Icon: Minus },
 };
 
+<<<<<<< HEAD
 function formatRelativeTime(isoString) {
   const diffMs = Date.now() - new Date(isoString).getTime();
   const future = diffMs < 0;
@@ -40,6 +46,16 @@ function formatRelativeTime(isoString) {
   if (hrs < 24) return future ? `in ${hrs}h` : `${hrs}h ago`;
   const days = Math.floor(hrs / 24);
   return future ? `in ${days}d` : `${days}d ago`;
+=======
+function formatTimeAgo(isoString) {
+  const diff = Date.now() - new Date(isoString).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 }
 
 function NewsItem({ item, isNew, onReactionLogged }) {
@@ -52,7 +68,10 @@ function NewsItem({ item, isNew, onReactionLogged }) {
 
   const logReaction = useCallback(async (interval) => {
     if (loggingReaction) return;
+<<<<<<< HEAD
     if (!hasBff()) return;
+=======
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
     setLoggingReaction(true);
     try {
       const res = await fetch(`${BFF_BASE}/news/reactions`, {
@@ -121,7 +140,11 @@ function NewsItem({ item, isNew, onReactionLogged }) {
               {item.sourceName}
             </span>
             <span style={{ fontSize: 9.5, color: 'var(--text-tertiary)' }}>
+<<<<<<< HEAD
               {formatRelativeTime(item.publishedAt)}
+=======
+              {formatTimeAgo(item.publishedAt)}
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
             </span>
             {item.keywords?.slice(0, 2).map(kw => (
               <span key={kw} style={{
@@ -215,14 +238,21 @@ function NewsItem({ item, isNew, onReactionLogged }) {
   );
 }
 
+<<<<<<< HEAD
 export default function BreakingNewsPanel({ mathEngine: _mathEngine, recentCandles: _recentCandles }) {
+=======
+export default function BreakingNewsPanel({ mathEngine, recentCandles }) {
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
   const [news, setNews] = useState([]);
   const [breakingCount, setBreakingCount] = useState(0);
   const [highImpactCount, setHighImpactCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [lastFetch, setLastFetch] = useState(null);
   const [newsSentiment, setNewsSentiment] = useState(null);
+<<<<<<< HEAD
   const [failureDetail, setFailureDetail] = useState(null);
+=======
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
   const [panelOpen, setPanelOpen] = useState(true);
   const [newItems, setNewItems] = useState(new Set());
   const intervalRef = useRef(null);
@@ -231,6 +261,7 @@ export default function BreakingNewsPanel({ mathEngine: _mathEngine, recentCandl
   const fetchNews = useCallback(async () => {
     setLoading(true);
     try {
+<<<<<<< HEAD
       if (!hasBff()) {
         setNews([]);
         setBreakingCount(0);
@@ -240,6 +271,8 @@ export default function BreakingNewsPanel({ mathEngine: _mathEngine, recentCandl
         return;
       }
 
+=======
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
       // Try /ml/consensus first (has breaking news embedded)
       let res = await fetch(`${BFF_BASE}/ml/consensus?session=1`, {
         signal: AbortSignal.timeout(8000),
@@ -267,10 +300,16 @@ export default function BreakingNewsPanel({ mathEngine: _mathEngine, recentCandl
         setHighImpactCount(data.breaking_news?.highImpactCount || 0);
         setNewsSentiment(sentiment);
         setLastFetch(new Date());
+<<<<<<< HEAD
         setFailureDetail(null);
       } else {
         // Fallback to direct /news/breaking
         res = await fetch(`${BFF_BASE}/news/breaking?max=15`, {
+=======
+      } else {
+        // Fallback to direct /news/breaking
+        res = await fetch(`${BFF_BASE}/news/breaking?fresh=true`, {
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
           signal: AbortSignal.timeout(8000),
         });
         if (res.ok) {
@@ -301,14 +340,20 @@ export default function BreakingNewsPanel({ mathEngine: _mathEngine, recentCandl
             bias: bullish > bearish ? 'bullish' : bearish > bullish ? 'bearish' : 'neutral',
             highImpactCount: data.highImpactCount || 0,
           });
+<<<<<<< HEAD
           setFailureDetail(null);
         } else {
           setFailureDetail(`News endpoint failed: ${res.status}`);
+=======
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
         }
       }
     } catch (err) {
       console.error('[BreakingNewsPanel] fetch error:', err);
+<<<<<<< HEAD
       setFailureDetail(err?.message || 'News fetch failed.');
+=======
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
     } finally {
       setLoading(false);
     }
@@ -317,7 +362,11 @@ export default function BreakingNewsPanel({ mathEngine: _mathEngine, recentCandl
   // Poll every 30 seconds
   useEffect(() => {
     fetchNews();
+<<<<<<< HEAD
     intervalRef.current = setInterval(fetchNews, 30_000);
+=======
+    intervalRef.current = setInterval(fetchNews, 10 * 60_000);
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
     return () => clearInterval(intervalRef.current);
   }, [fetchNews]);
 
@@ -417,7 +466,11 @@ export default function BreakingNewsPanel({ mathEngine: _mathEngine, recentCandl
               textAlign: 'center', padding: '24px 0',
               fontSize: 11, color: 'var(--text-tertiary)',
             }}>
+<<<<<<< HEAD
               {failureDetail || 'No breaking news - markets may be closed or sources unavailable.'}
+=======
+              No breaking news — markets may be closed or sources unavailable.
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
               <div style={{ marginTop: 4, fontSize: 10 }}>
                 Sources: Finnhub · NewsData.io · Yahoo Finance · GDELT
               </div>

@@ -17,6 +17,7 @@ on:
           - bff
           - frontend
 
+<<<<<<< HEAD
 # Prevent overlapping runs (e.g., if a previous run takes >5min)
 concurrency:
   group: ${{ github.workflow }}
@@ -36,6 +37,19 @@ env:
   RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
   # MLflow backup
   MLFLOW_TRACKING_URI: ${{ vars.MLFLOW_TRACKING_URI || 'http://localhost:5000' }}
+=======
+env:
+  # URLs pulled from GitHub Variables (set via setup-production.ps1)
+  # These are NOT secrets — they're public endpoint URLs
+  ML_ENGINE_URL: ${{ vars.ML_ENGINE_URL || 'https://api.traders.app' }}
+  BFF_URL: ${{ vars.BFF_URL || 'https://bff.traders.app' }}
+  FRONTEND_URL: ${{ vars.FRONTEND_URL || 'https://traders.app' }}
+  # Alert webhooks from GitHub Secrets (set via setup-infisical.ps1)
+  SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+  DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+  # Railway token from GitHub Secrets (set via setup-production.ps1)
+  RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 
 jobs:
   # -------------------------------------------------------------------------
@@ -48,14 +62,21 @@ jobs:
     steps:
       - name: Check ML Engine /health
         run: |
+<<<<<<< HEAD
           RESP=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "${ML_ENGINE_URL}/health" 2>/dev/null || echo "000")
           echo "ML Engine status: $RESP"
           if [ "$RESP" != "200" ]; then
+=======
+          response=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "${{ env.ML_ENGINE_URL }}/health" 2>/dev/null || echo "000")
+          echo "ML Engine status: $response"
+          if [ "$response" != "200" ]; then
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
             echo "ML_ENGINE_DOWN=true" >> $GITHUB_ENV
           fi
 
       - name: Check ML Engine /model-status
         run: |
+<<<<<<< HEAD
           RESP=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "${ML_ENGINE_URL}/model-status" 2>/dev/null || echo "000")
           echo "Model status: $RESP"
 
@@ -133,6 +154,39 @@ jobs:
                 }
               ]
             }' "${SLACK_WEBHOOK_URL}" || true
+=======
+          response=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "${{ env.ML_ENGINE_URL }}/model-status" 2>/dev/null || echo "000")
+          echo "Model status: $response"
+
+      - name: Send alert on ML Engine failure
+        if: env.ML_ENGINE_DOWN == 'true'
+        run: |
+          payload=$(cat <<'PAYLOAD'
+          {
+            "text": ":red_alert: ML Engine DOWN",
+            "blocks": [
+              {
+                "type": "section",
+                "text": {
+                  "type": "mrkdwn",
+                  "text": ":rotating_light: *ML Engine Health Check Failed*\nEndpoint: ${{ env.ML_ENGINE_URL }}/health\nStatus: NON-200"
+                }
+              },
+              {
+                "type": "context",
+                "elements": [
+                  { "type": "mrkdwn", "text": "Checked at: ${{ github.event.repository.updated_at }}" }
+                ]
+              }
+            ]
+          }
+          PAYLOAD)
+          curl -s -X POST -H "Content-Type: application/json" \
+            -d "$payload" "${{ env.SLACK_WEBHOOK_URL }}" 2>/dev/null || true
+          curl -s -X POST -H "Content-Type: application/json" \
+            -d "{\"content\": \":red_alert: ML Engine DOWN - ${{ env.ML_ENGINE_URL }}/health non-200 response\"}" \
+            "${{ env.DISCORD_WEBHOOK_URL }}" 2>/dev/null || true
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 
   # -------------------------------------------------------------------------
   # Health Check — BFF Server
@@ -144,6 +198,7 @@ jobs:
     steps:
       - name: Check BFF /health
         run: |
+<<<<<<< HEAD
           RESP=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "${BFF_URL}/health" 2>/dev/null || echo "000")
           echo "BFF status: $RESP"
           if [ "$RESP" != "200" ]; then
@@ -190,6 +245,33 @@ jobs:
           curl -s -X POST -H "Content-Type: application/json" \
             -d "{\"content\": \":red_alert: BFF Server DOWN - ${BFF_URL}/health non-200 response\"}" \
             "${DISCORD_WEBHOOK_URL}" || true
+=======
+          response=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "${{ env.BFF_URL }}/health" 2>/dev/null || echo "000")
+          echo "BFF status: $response"
+          if [ "$response" != "200" ]; then
+            echo "BFF_DOWN=true" >> $GITHUB_ENV
+          fi
+
+      - name: Send alert on BFF failure
+        if: env.BFF_DOWN == 'true'
+        run: |
+          payload=$(cat <<'PAYLOAD'
+          {
+            "text": ":red_alert: BFF Server DOWN",
+            "blocks": [
+              {
+                "type": "section",
+                "text": {
+                  "type": "mrkdwn",
+                  "text": ":rotating_light: *BFF Server Health Check Failed*\nEndpoint: ${{ env.BFF_URL }}/health\nStatus: NON-200"
+                }
+              }
+            ]
+          }
+          PAYLOAD)
+          curl -s -X POST -H "Content-Type: application/json" \
+            -d "$payload" "${{ env.SLACK_WEBHOOK_URL }}" 2>/dev/null || true
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 
   # -------------------------------------------------------------------------
   # Health Check — Frontend (Vercel)
@@ -201,6 +283,7 @@ jobs:
     steps:
       - name: Check Frontend
         run: |
+<<<<<<< HEAD
           RESP=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "${FRONTEND_URL}" 2>/dev/null || echo "000")
           echo "Frontend status: $RESP"
           if [ "$RESP" != "200" ] && [ "$RESP" != "304" ]; then
@@ -270,6 +353,23 @@ jobs:
 
   # -------------------------------------------------------------------------
   # ML Model Staleness Check
+=======
+          response=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "${{ env.FRONTEND_URL }}" 2>/dev/null || echo "000")
+          echo "Frontend status: $response"
+          if [ "$response" != "200" ] && [ "$response" != "304" ]; then
+            echo "FRONTEND_DOWN=true" >> $GITHUB_ENV
+          fi
+
+      - name: Send alert on Frontend failure
+        if: env.FRONTEND_DOWN == 'true'
+        run: |
+          curl -s -X POST -H "Content-Type: application/json" \
+            -d "{\"content\": \":red_alert: Frontend DOWN - ${{ env.FRONTEND_URL }} non-200 response\"}" \
+            "${{ env.DISCORD_WEBHOOK_URL }}" 2>/dev/null || true
+
+  # -------------------------------------------------------------------------
+  # ML Model Staleness Check — warn if models not retrained in 7 days
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
   # -------------------------------------------------------------------------
   model-freshness:
     name: ML Model Freshness
@@ -278,6 +378,7 @@ jobs:
     steps:
       - name: Check model last trained date
         run: |
+<<<<<<< HEAD
           RESP=$(curl -s --max-time 15 "${ML_ENGINE_URL}/model-status" 2>/dev/null || echo '{"last_trained":null}')
           echo "Model status response: $RESP"
           LAST_TRAINED=$(echo "$RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('last_trained','unknown') or 'unknown')" 2>/dev/null || echo "unknown")
@@ -311,6 +412,24 @@ jobs:
               --title "ML Models Stale: ${DAYS_OLD} days" \
               --body "$ISSUE_BODY" \
               --label "mlops,bug" 2>/dev/null || echo "gh CLI not available or not authenticated — skipping issue creation"
+=======
+          response=$(curl -s --max-time 15 "${{ env.ML_ENGINE_URL }}/model-status" 2>/dev/null)
+          echo "Model status response: $response"
+          last_trained=$(echo "$response" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('last_trained','unknown'))" 2>/dev/null || echo "unknown")
+          echo "Last trained: $last_trained"
+          echo "last_trained=$last_trained" >> $GITHUB_ENV
+
+      - name: Alert if models stale (>7 days)
+        if: env.last_trained != 'unknown' && env.last_trained != ''
+        run: |
+          python_script="from datetime import datetime,timezone; d='${{ env.last_trained }}'.replace('Z','+00:00'); print((datetime.now(timezone.utc)-datetime.fromisoformat(d)).days)"
+          days_old=$(python3 -c "$python_script" 2>/dev/null || echo "-1")
+          echo "Model age: $days_old days"
+          if [ "$days_old" -gt 7 ]; then
+            curl -s -X POST -H 'Content-Type: application/json' \
+              -d '{"content": ":warning: ML Models are '"$days_old"' days old (>7 day threshold) - consider retraining"}' \
+              "${{ env.DISCORD_WEBHOOK_URL }}" 2>/dev/null || true
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
           fi
 
   # -------------------------------------------------------------------------
@@ -323,6 +442,7 @@ jobs:
     # Run daily at 2 AM
     steps:
       - name: Checkout
+<<<<<<< HEAD
         uses: actions/checkout@v6
 
       - name: Setup Python
@@ -357,16 +477,33 @@ jobs:
           python3 scripts/parse_prometheus_alerts.py \
             /tmp/mlflow_models.json models_backup/mlflow_models.txt 2>/dev/null || true
           cat models_backup/mlflow_models.txt
+=======
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Download trained models from ML Engine
+        run: |
+          mkdir -p models_backup
+          curl -sf "${{ env.ML_ENGINE_URL }}/model-status" > models_backup/status.json 2>/dev/null || echo '{}' > models_backup/status.json
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: models-$(date +%Y-%m-%d)
           name: ML Models $(date +%Y-%m-%d)
+<<<<<<< HEAD
           body: |
             Automated daily ML model backup.
             Includes: model status, monitoring snapshot, config.
             MLflow artifacts (model binaries) are available in the MLflow UI.
+=======
+          body: Automated daily ML model backup.
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
           files: models_backup/*
           draft: false
           prerelease: false
@@ -375,6 +512,7 @@ jobs:
         continue-on-error: true
 
   # -------------------------------------------------------------------------
+<<<<<<< HEAD
   # Cleanup: Prune GitHub releases older than 30 days
   # -------------------------------------------------------------------------
   cleanup-releases:
@@ -396,6 +534,8 @@ jobs:
           done
 
   # -------------------------------------------------------------------------
+=======
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
   # Vercel Deployment Status Check
   # -------------------------------------------------------------------------
   vercel-status:
@@ -410,7 +550,13 @@ jobs:
       - name: Alert on failed Vercel deployment
         if: github.event.deployment_status.state == 'failure'
         run: |
+<<<<<<< HEAD
           set -e
           curl -s -X POST -H "Content-Type: application/json" \
             -d "{\"content\": \":x: Vercel deployment FAILED for ${{ github.event.deployment.url }}\"}" \
             "${DISCORD_WEBHOOK_URL}" || true
+=======
+          curl -s -X POST -H "Content-Type: application/json" \
+            -d "{\"content\": \":x: Vercel deployment FAILED for ${{ github.event.deployment.url }}\"}" \
+            "${{ env.DISCORD_WEBHOOK_URL }}" 2>/dev/null || true
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37

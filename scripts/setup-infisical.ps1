@@ -107,7 +107,11 @@ foreach ($key in @(
     'VITE_FIREBASE_API_KEY','VITE_FIREBASE_AUTH_DOMAIN','VITE_FIREBASE_PROJECT_ID',
     'VITE_FIREBASE_STORAGE_BUCKET','VITE_FIREBASE_MESSAGING_SENDER_ID',
     'VITE_FIREBASE_APP_ID','VITE_FIREBASE_DATABASE_URL',
+<<<<<<< HEAD
     'VITE_BFF_URL',
+=======
+    'VITE_BFF_URL','VITE_TELEGRAM_BOT_TOKEN','VITE_TELEGRAM_CHAT_ID',
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
     'VITE_TELEGRAM_BOT_USERNAME',
     'VITE_FEATURE_FLOATING_SUPPORT_CHAT','VITE_FEATURE_COLLECTIVE_CONSCIOUSNESS',
     'VITE_FEATURE_MAIN_TERMINAL','VITE_FEATURE_CLEAN_ONBOARDING'
@@ -119,7 +123,11 @@ foreach ($key in @(
 $bffSecrets = @{}
 foreach ($key in @(
     'BFF_ADMIN_PASS_HASH','MASTER_SALT','BFF_HOST','BFF_PORT',
+<<<<<<< HEAD
     'BFF_ALLOWED_ORIGINS','BFF_TELEGRAM_BOT_TOKEN','BFF_TELEGRAM_CHAT_ID','ML_ENGINE_URL',
+=======
+    'BFF_ALLOWED_ORIGINS','ML_ENGINE_URL',
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
     'AI_GEMINI_PRO_KEY','AI_GROQ_TURBO_KEY','AI_OPENROUTER_MIND_ALPHA',
     'AI_OPENROUTER_MIND_BETA','AI_CEREBRAS_KEY','AI_DEEPSEEK_KEY','AI_SAMBANOVA_KEY',
     'FINNHUB_API_KEY','NEWS_API_KEY',
@@ -178,8 +186,13 @@ foreach ($env in $environments) {
     if ($env -eq 'staging') {
         # Staging overrides: different URLs
         $envSecrets = @{
+<<<<<<< HEAD
             'VITE_BFF_URL' = 'https://bff.173.249.18.14.sslip.io'
             'ML_ENGINE_URL' = 'https://api.173.249.18.14.sslip.io'
+=======
+            'VITE_BFF_URL' = 'https://staging-bff.traders.app'
+            'ML_ENGINE_URL' = 'https://staging-api.traders.app'
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
         }
     }
     foreach ($entry in $envSecrets.GetEnumerator()) {
@@ -250,4 +263,8 @@ Write-Host ""
 Write-Host "  GitHub Actions (runtime secrets for CI)" -ForegroundColor Cyan
 Write-Host "    └─ INFISICAL_TOKEN + AI keys (synced from Infisical)" -ForegroundColor White
 Write-Host ""
+<<<<<<< HEAD
 Write-Host "  NEVER commit .env.local to Git — all secrets stay in Infisical" -ForegroundColor Yellow
+=======
+Write-Host "  NEVER commit .env.local to Git — all secrets stay in Infisical" -ForegroundColor Yellow
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37

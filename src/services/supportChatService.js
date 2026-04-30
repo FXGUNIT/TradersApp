@@ -5,6 +5,7 @@
  * Saves admin responses to Firebase (user sees them in real-time).
  *
  * Flow:
+<<<<<<< HEAD
  *   User sends message → Firebase → BFF → Telegram notification to admin
  *   Admin replies (web or Telegram) → Firebase → User sees in real-time
  *
@@ -15,6 +16,14 @@
 import { ref, push, set, onValue, get } from 'firebase/database';
 import { db } from '../firebase-config.js';
 import { bffFetch } from './gateways/base.js';
+=======
+ *   User sends message → Firebase → Telegram notification to admin
+ *   Admin replies (web or Telegram) → Firebase → User sees in real-time
+ */
+
+import { ref, push, set, onValue, off, get } from 'firebase/database';
+import { db } from '../firebase-config.js';
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 
 const SUPPORT_CHATS_PATH = 'support_chats';
 
@@ -55,16 +64,35 @@ function getTypingRef(userId) {
 
 /**
  * Send a Telegram notification to admin about a new user message.
+<<<<<<< HEAD
  * Routes through BFF at /telegram/send-message — token lives server-side only.
+=======
+ * Uses the BFF server (port 8788) to send via the Telegram Bot API.
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
  *
  * @param {string} userEmail - User's email
  * @param {string} userName  - User's display name
  * @param {string} userId    - User's UID
  * @param {string} message    - Message text
+<<<<<<< HEAD
  * @param {string} [chatId]   - Admin's Telegram chat ID override (optional)
  * @returns {Promise<boolean>} success
  */
 export async function notifyAdminOfNewMessage(userEmail, userName, userId, message, chatId = null) {
+=======
+ * @param {string} chatId     - Admin's Telegram chat ID (optional)
+ * @returns {Promise<boolean>} success
+ */
+export async function notifyAdminOfNewMessage(userEmail, userName, userId, message, chatId = null) {
+  const TELEGRAM_BOT_TOKEN = import.meta.env.VITE_TELEGRAM_BOT_TOKEN;
+  const TELEGRAM_ADMIN_CHAT_ID = chatId || import.meta.env.VITE_TELEGRAM_ADMIN_CHAT_ID;
+
+  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_ADMIN_CHAT_ID) {
+    console.warn('[SupportChat] Telegram not configured for notifications');
+    return false;
+  }
+
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
   const text = `💬 *New Support Message*
 
 *From:* ${userName} (${userEmail})
@@ -78,6 +106,7 @@ ${message.slice(0, 500)}${message.length > 500 ? '...' : ''}
 Reply to this chat to respond directly.`;
 
   try {
+<<<<<<< HEAD
     // J01: Route through BFF — token never leaves browser
     const payload = {
       text,
@@ -101,6 +130,33 @@ Reply to this chat to respond directly.`;
       return false;
     }
     return true;
+=======
+    const response = await fetch(
+      `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: TELEGRAM_ADMIN_CHAT_ID,
+          text,
+          parse_mode: 'Markdown',
+          disable_web_page_preview: true,
+          reply_markup: {
+            inline_keyboard: [
+              [
+                {
+                  text: `Reply via Telegram`,
+                  url: `https://t.me/${import.meta.env.VITE_TELEGRAM_BOT_USERNAME || 'your_bot'}`,
+                },
+              ],
+            ],
+          },
+        }),
+      },
+    );
+    const data = await response.json();
+    return data.ok === true;
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
   } catch (error) {
     console.error('[SupportChat] Telegram notification failed:', error);
     return false;
@@ -113,9 +169,15 @@ Reply to this chat to respond directly.`;
  * @param {string} userEmail
  * @param {string} message
  */
+<<<<<<< HEAD
 export async function notifyUserOfAdminReply(_adminName, _userEmail, _message) {
   // This would notify the user via email/push — for now Firebase handles real-time
   return true;
+=======
+export async function notifyUserOfAdminReply(adminName, userEmail, message) {
+  // This would notify the user via email/push — for now Firebase handles real-time
+  console.log('[SupportChat] Admin reply delivered via Firebase Realtime Database');
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 }
 
 // ─── Send Admin Reply ────────────────────────────────────────────────────────
@@ -142,7 +204,11 @@ export async function sendAdminReply(userId, userEmail, userName, adminName, tex
     await set(newMsgRef, {
       sender: 'admin',
       senderName: adminName || 'Support Team',
+<<<<<<< HEAD
       senderEmail: 'support@tradersapp.local',
+=======
+      senderEmail: 'admin@traders.app',
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
       text: text.trim(),
       timestamp: Date.now(),
       read: false,
@@ -199,8 +265,13 @@ export function subscribeToSupportChat(userId, onMessages, onTyping) {
   });
 
   return () => {
+<<<<<<< HEAD
     unsubMessages();
     unsubTyping();
+=======
+    off(messagesRef);
+    off(typingRef);
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
   };
 }
 

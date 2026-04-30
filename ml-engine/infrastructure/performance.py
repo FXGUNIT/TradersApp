@@ -25,12 +25,19 @@ import asyncio
 import logging
 from datetime import datetime, timezone, timedelta
 from dataclasses import dataclass, field
+<<<<<<< HEAD
 from typing import Callable, Any, Optional, Literal, TYPE_CHECKING
+=======
+from typing import Callable, Any, Optional, Literal
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 from collections import defaultdict, deque
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 import functools
+<<<<<<< HEAD
 import inspect
+=======
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 
 # ─── Redis Cache ───────────────────────────────────────────────────────────────
 
@@ -42,12 +49,15 @@ except ImportError:
     redis = None
 
 
+<<<<<<< HEAD
 # ─── Cache Key Versioning ───────────────────────────────────────────────────────
 # Bump this when cache schema changes to automatically invalidate all cached keys.
 # Format: v{N} — appended to all cache key prefixes.
 CACHE_KEY_VERSION = "v1"
 
 
+=======
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 @dataclass
 class CacheConfig:
     host: str = "localhost"
@@ -57,6 +67,7 @@ class CacheConfig:
     socket_timeout: float = 0.5
     socket_connect_timeout: float = 0.5
     max_connections: int = 20
+<<<<<<< HEAD
     default_ttl: int = 30        # seconds — generic cached data
     prediction_ttl: int = 10    # ML predictions cached for 10s (live data)
     regime_ttl: int = 60        # Regime predictions cached for 60s
@@ -67,6 +78,13 @@ class CacheConfig:
     position_ttl: int = 60     # Position sizing cached for 60s
     key_prefix: str = "tradersapp:"
     stampede_lock_ttl: int = 30  # Lock TTL for cache stampede protection
+=======
+    default_ttl: int = 30        # seconds
+    prediction_ttl: int = 10     # ML predictions cached for 10s (live data)
+    regime_ttl: int = 60        # Regime predictions cached for 60s
+    mamba_ttl: int = 30         # Mamba predictions cached for 30s
+    key_prefix: str = "tradersapp:"
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
     compression: bool = True   # Compress cached values
 
 
@@ -75,6 +93,7 @@ class RedisCache:
     High-performance Redis cache for ML predictions.
 
     Features:
+<<<<<<< HEAD
     - Per-endpoint TTL (shorter for live data, longer for regime)
     - Compression for large payloads
     - Automatic reconnection on failure
@@ -93,12 +112,28 @@ class RedisCache:
     # All RedisCache instances sharing the same host/port/db share one pool.
     _global_pools: dict[tuple, Any] = {}
     _pools_lock = threading.Lock()
+=======
+    - LRU eviction when memory is high
+    - Per-endpoint TTL (shorter for live data, longer for regime)
+    - Compression for large payloads
+    - Automatic reconnection on failure
+    - Fallback to in-memory LRU when Redis unavailable
+    - Request coalescing: identical concurrent requests share one computation
+    """
+
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
     _instances: dict[str, "RedisCache"] = {}
     _lock = threading.Lock()
 
     def __init__(self, config: CacheConfig):
         self.config = config
+<<<<<<< HEAD
         self._client: redis.Redis | None = None
+=======
+        self._client = None
+        self._local_cache: dict[str, tuple[Any, float]] = {}  # key → (value, expiry)
+        self._local_lock = threading.Lock()
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
         self._coalescing: dict[str, asyncio.Future] = {}
         self._coalescing_lock = threading.Lock()
         self._stats = {"hits": 0, "misses": 0, "errors": 0}
@@ -106,6 +141,7 @@ class RedisCache:
         if REDIS_AVAILABLE:
             self._connect()
 
+<<<<<<< HEAD
     def _pool_key(self) -> tuple:
         """Pool identity — (host, port, db)."""
         return (self.config.host, self.config.port, self.config.db)
@@ -240,6 +276,96 @@ class RedisCache:
             self._client.delete(lock_key)
         except Exception:
             self._stats["errors"] += 1
+=======
+    def _connect(self):
+        """Connect to Redis with automatic reconnection."""
+        try:
+            self._client = redis.Redis(
+                host=self.config.host,
+                port=self.config.port,
+                db=self.config.db,
+                password=self.config.password,
+                socket_timeout=self.config.socket_timeout,
+                socket_connect_timeout=self.config.socket_connect_timeout,
+                max_connections=self.config.max_connections,
+                decode_responses=False,  # We handle bytes ourselves
+                retry_on_timeout=True,
+                health_check_interval=30,
+            )
+            self._client.ping()
+            print(f"[RedisCache] Connected to {self.config.host}:{self.config.port}")
+        except Exception as e:
+            print(f"[RedisCache] Redis unavailable ({e}) — falling back to in-memory LRU")
+            self._client = None
+
+    def _make_key(self, endpoint: str, params: dict) -> str:
+        """Create a deterministic cache key."""
+        param_str = json.dumps(params, sort_keys=True, default=str)
+        param_hash = hashlib.sha256(param_str.encode()).hexdigest()[:16]
+        return f"{self.config.key_prefix}{endpoint}:{param_hash}"
+
+    def get(self, key: str) -> Any | None:
+        """Get value from cache. Tries Redis first, then local LRU."""
+        # Try Redis
+        if self._client:
+            try:
+                val = self._client.get(key)
+                if val is not None:
+                    self._stats["hits"] += 1
+                    if self.config.compression:
+                        import zlib
+                        return json.loads(zlib.decompress(val))
+                    return json.loads(val)
+            except Exception:
+                self._stats["errors"] += 1
+
+        # Fallback to local LRU
+        with self._local_lock:
+            if key in self._local_cache:
+                val, expiry = self._local_cache[key]
+                if time.time() < expiry:
+                    self._stats["hits"] += 1
+                    return val
+                del self._local_cache[key]
+
+        self._stats["misses"] += 1
+        return None
+
+    def set(self, key: str, value: Any, ttl: int | None = None):
+        """Set value in cache."""
+        ttl = ttl or self.config.default_ttl
+        expiry = time.time() + ttl
+
+        # Store in local LRU (always available)
+        with self._local_lock:
+            self._local_cache[key] = (value, expiry)
+            # Prune expired
+            now = time.time()
+            self._local_cache = {
+                k: v for k, v in self._local_cache.items() if v[1] > now
+            }
+
+        # Try Redis
+        if self._client:
+            try:
+                serialized = json.dumps(value, default=str)
+                if self.config.compression:
+                    import zlib
+                    serialized = zlib.compress(serialized.encode())
+                self._client.setex(key, ttl, serialized)
+            except Exception:
+                self._stats["errors"] += 1
+
+    def invalidate(self, pattern: str):
+        """Invalidate all keys matching pattern."""
+        if self._client:
+            try:
+                keys = list(self._client.scan_iter(f"{self.config.key_prefix}{pattern}"))
+                if keys:
+                    self._client.delete(*keys)
+            except Exception:
+                self._stats["errors"] += 1
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 
     async def get_or_compute(
         self,
@@ -281,6 +407,7 @@ class RedisCache:
                     self._coalescing[key].set_result(None)
                     del self._coalescing[key]
 
+<<<<<<< HEAD
     def get_or_compute_sync(
         self,
         key: str,
@@ -324,6 +451,8 @@ class RedisCache:
         finally:
             self.release_stampede_lock(key)
 
+=======
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
     def get_stats(self) -> dict:
         total = self._stats["hits"] + self._stats["misses"]
         hit_rate = self._stats["hits"] / total if total > 0 else 0
@@ -331,6 +460,7 @@ class RedisCache:
             **self._stats,
             "hit_rate": round(hit_rate, 4),
             "total_requests": total,
+<<<<<<< HEAD
             "pool_key": self._pool_key(),
         }
 
@@ -361,6 +491,10 @@ class RedisCache:
                 for key, pool in cls._global_pools.items()
             }
 
+=======
+        }
+
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 
 # ─── Circuit Breaker ─────────────────────────────────────────────────────────
 
@@ -404,15 +538,22 @@ class CircuitBreaker:
 
     @property
     def state(self) -> str:
+<<<<<<< HEAD
         """Return current circuit state. Triggers OPEN→HALF_OPEN transition if recovery timeout passed."""
         with self._lock:
             if self._state == CircuitState.OPEN:
+=======
+        with self._lock:
+            if self._state == CircuitState.OPEN:
+                # Check if recovery timeout passed
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
                 if self._last_failure_time and \
                    time.time() - self._last_failure_time > self.recovery_timeout:
                     self._state = CircuitState.HALF_OPEN
                     self._half_open_calls = 0
             return self._state
 
+<<<<<<< HEAD
     def _try_transition_to_half_open(self):
         """Idempotent OPEN→HALF_OPEN transition. Call at start of public methods."""
         with self._lock:
@@ -422,6 +563,8 @@ class CircuitBreaker:
                     self._state = CircuitState.HALF_OPEN
                     self._half_open_calls = 0
 
+=======
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
     def record_success(self):
         with self._lock:
             self._failure_count = 0
@@ -431,9 +574,13 @@ class CircuitBreaker:
                     self._state = CircuitState.CLOSED
                     self._failure_count = 0
                     self._success_count = 0
+<<<<<<< HEAD
                     self._half_open_calls = 0
                     self._last_failure_time = None  # prevent state property from re-triggering transition
                     print(f"[CircuitBreaker:{self.name}] CLOSED -> recovery successful")
+=======
+                    print(f"[CircuitBreaker:{self.name}] CLOSED → recovery successful")
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 
     def record_failure(self):
         with self._lock:
@@ -442,6 +589,7 @@ class CircuitBreaker:
             if self._state == CircuitState.HALF_OPEN:
                 self._state = CircuitState.OPEN
                 self._success_count = 0
+<<<<<<< HEAD
                 print(f"[CircuitBreaker:{self.name}] HALF_OPEN -> OPEN (still failing)")
             elif self._failure_count >= self.failure_threshold:
                 self._state = CircuitState.OPEN
@@ -458,6 +606,12 @@ class CircuitBreaker:
                     return False
                 self._half_open_calls += 1
             return True
+=======
+                print(f"[CircuitBreaker:{self.name}] HALF_OPEN → OPEN (still failing)")
+            elif self._failure_count >= self.failure_threshold:
+                self._state = CircuitState.OPEN
+                print(f"[CircuitBreaker:{self.name}] CLOSED → OPEN ({self._failure_count} failures)")
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 
     @contextmanager
     def call(self, fallback: Any = None):
@@ -468,7 +622,10 @@ class CircuitBreaker:
             with cb.call(fallback={"ok": False}):
                 result = external_api_call()
         """
+<<<<<<< HEAD
         # state property triggers OPEN→HALF_OPEN if timeout passed
+=======
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
         if self.state == CircuitState.OPEN:
             print(f"[CircuitBreaker:{self.name}] OPEN — rejecting request")
             yield fallback
@@ -482,6 +639,7 @@ class CircuitBreaker:
         else:
             self.record_success()
 
+<<<<<<< HEAD
     def get_state(self) -> dict:
         """Return a snapshot of the circuit breaker state."""
         with self._lock:
@@ -498,6 +656,10 @@ class CircuitBreaker:
 
     def __repr__(self) -> str:
         return f"CircuitBreaker(name={self.name!r}, state={self.state!r})"
+=======
+    def is_available(self) -> bool:
+        return self.state != CircuitState.OPEN
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 
 
 # ─── SLA Monitor ──────────────────────────────────────────────────────────────
@@ -530,6 +692,7 @@ class SLAMonitor:
     }
 
     SLA_TARGETS = {
+<<<<<<< HEAD
         "/predict":             {"p50_ms": 50,   "p95_ms": 200,    "p99_ms": 500,    "max_err_rate": 0.01},
         "/mamba/predict":       {"p50_ms": 2000, "p95_ms": 5000,  "p99_ms": 10000,  "max_err_rate": 0.05},
         "/inference/predict":   {"p50_ms": 20,   "p95_ms": 50,    "p99_ms": 100,    "max_err_rate": 0.01},
@@ -541,6 +704,13 @@ class SLAMonitor:
         "/backtest/full":      {"p50_ms": 5000, "p95_ms": 30000, "p99_ms": 90000,  "max_err_rate": 0.05},
         "/backtest/returns":    {"p50_ms": 50,   "p95_ms": 200,   "p99_ms": 500,    "max_err_rate": 0.01},
         "ALL":                 {"p50_ms": 100,  "p95_ms": 500,    "p99_ms": 1000,   "max_err_rate": 0.01},
+=======
+        "/predict":         {"p50_ms": 50,   "p95_ms": 200,  "p99_ms": 500,  "max_err_rate": 0.01},
+        "/mamba/predict":   {"p50_ms": 2000, "p95_ms": 5000, "p99_ms": 10000, "max_err_rate": 0.05},
+        "/regime":          {"p50_ms": 100,  "p95_ms": 500,  "p99_ms": 1000,  "max_err_rate": 0.02},
+        "/consensus":       {"p50_ms": 100,  "p95_ms": 500,  "p99_ms": 1000,  "max_err_rate": 0.02},
+        "ALL":             {"p50_ms": 100,  "p95_ms": 500,  "p99_ms": 1000,  "max_err_rate": 0.01},
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
     }
 
     def __init__(self, max_samples: int = 100_000):
@@ -561,6 +731,7 @@ class SLAMonitor:
         metric = SLAMetric(endpoint, latency_ms, status_code, now)
 
         with self._lock:
+<<<<<<< HEAD
             # Lazily initialize bucket for unknown endpoints
             if endpoint not in self._buckets:
                 self._buckets[endpoint] = {
@@ -568,6 +739,8 @@ class SLAMonitor:
                     for window in self.WINDOWS
                 }
 
+=======
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
             for window_name, window_sec in self.WINDOWS.items():
                 cutoff = now - window_sec
                 # Prune old entries
@@ -587,7 +760,11 @@ class SLAMonitor:
             return 0.0
         sorted_vals = sorted(values)
         idx = int(len(sorted_vals) * p)
+<<<<<<< HEAD
         return sorted_vals[min(max(idx - 1, 0), len(sorted_vals) - 1)]
+=======
+        return sorted_vals[min(idx, len(sorted_vals) - 1)]
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 
     def get_sla_report(self, endpoint: str = "ALL") -> dict:
         """Get SLA compliance report for an endpoint."""
@@ -709,6 +886,7 @@ def cached_endpoint(ttl: int = 10, key_prefix: str = ""):
 
 
 def sla_monitored(endpoint: str):
+<<<<<<< HEAD
     """Decorator to track endpoint SLA metrics. Works for sync and async functions."""
     def decorator(fn):
         if inspect.iscoroutinefunction(fn):
@@ -753,4 +931,31 @@ def sla_monitored(endpoint: str):
                     elif latency_ms > target["p95_ms"]:
                         print(f"[SLA WARNING] {endpoint}: {latency_ms:.0f}ms > {target['p95_ms']}ms (P95)")
             return sync_wrapper
+=======
+    """Decorator to track endpoint SLA metrics."""
+    def decorator(fn):
+        @functools.wraps(fn)
+        async def wrapper(*args, **kwargs):
+            monitor = get_sla_monitor()
+            start = time.time()
+            status = 200
+            try:
+                result = await fn(*args, **kwargs)
+                return result
+            except Exception as e:
+                status = 500
+                raise
+            finally:
+                latency_ms = (time.time() - start) * 1000
+                monitor.record(endpoint, latency_ms, status)
+
+                # Log SLA violations
+                target = SLAMonitor.SLA_TARGETS.get(endpoint, SLAMonitor.SLA_TARGETS["ALL"])
+                if latency_ms > target["p99_ms"]:
+                    print(f"[SLA VIOLATION] {endpoint}: {latency_ms:.0f}ms > {target['p99_ms']}ms (P99)")
+                elif latency_ms > target["p95_ms"]:
+                    print(f"[SLA WARNING] {endpoint}: {latency_ms:.0f}ms > {target['p95_ms']}ms (P95)")
+
+        return wrapper
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
     return decorator

@@ -17,6 +17,7 @@ import {
   getMLNewsReactions,
 } from "../services/consensusEngine.mjs";
 import { fetchBreakingNews } from "../services/breakingNewsService.mjs";
+<<<<<<< HEAD
 import {
   recordSuccess as cbRecordSuccess,
   recordFailure as cbRecordFailure,
@@ -27,6 +28,8 @@ import {
   resolveInstrumentSymbol,
   getInstrumentConfig,
 } from "../services/instrumentRegistry.mjs";
+=======
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 
 export function createConsensusRouteHandler({
   json,
@@ -60,15 +63,21 @@ export function createConsensusRouteHandler({
         const sessionId = parseInt(url.searchParams.get("session") || "1", 10);
 
         // Fetch ML consensus + breaking news in parallel (news non-blocking, 3s timeout)
+<<<<<<< HEAD
         let result;
         let consensusError = null;
         try {
           result = await getMlConsensus({
+=======
+        const [result, newsResult] = await Promise.all([
+          getMlConsensus({
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
             mathEngine,
             recentCandles,
             keyLevels,
             sessionId: isNaN(sessionId) ? 1 : sessionId,
             symbol,
+<<<<<<< HEAD
             requestId,
             idempotencyKey,
           });
@@ -80,6 +89,11 @@ export function createConsensusRouteHandler({
         }
 
         const newsResult = await fetchBreakingNews({ maxItems: 15, minImpact: 'LOW' }).catch(() => ({ items: [], total: 0 }));
+=======
+          }),
+          fetchBreakingNews({ maxItems: 15, minImpact: 'LOW' }).catch(() => ({ items: [], total: 0 })),
+        ]);
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 
         // Merge breaking news into consensus response
         result.breaking_news = {
@@ -116,6 +130,7 @@ export function createConsensusRouteHandler({
         // Fire-and-forget: trigger ML self-training on HIGH impact news
         // (non-blocking — doesn't delay the consensus response)
         const highImpactItems = newsResult.items?.filter(i => i.impact === 'HIGH') || [];
+<<<<<<< HEAD
         for (const [index, item] of highImpactItems.slice(0, 2).entries()) {
           triggerMLNewsTraining(item, {
             requestId: requestId ? `${requestId}:news:${index}` : null,
@@ -126,16 +141,27 @@ export function createConsensusRouteHandler({
         const newsReactions = await getMLNewsReactions(30, {
           requestId,
         }).catch(() => ({ ok: false, entries: [] }));
+=======
+        for (const item of highImpactItems.slice(0, 2)) {
+          triggerMLNewsTraining(item).catch(() => {});
+        }
+
+        // Include recent news reactions for ML training context
+        const newsReactions = await getMLNewsReactions(30).catch(() => ({ ok: false, entries: [] }));
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
         result.news_reactions = {
           entries: newsReactions.entries || [],
           total: newsReactions.total || 0,
           avg_alpha_ticks: newsReactions.avg_alpha_ticks || 0,
           validated_pct: newsReactions.validated_pct || 0,
         };
+<<<<<<< HEAD
 
         // Attach per-instrument metadata
         result.instrument = getInstrumentConfig(symbol);
         result.circuitBreakerState = cbIsOpen(symbol) ? "open" : "closed";
+=======
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 
         json(res, result.ok ? 200 : 503, result, origin);
         return true;
@@ -221,6 +247,19 @@ export function createConsensusRouteHandler({
       } catch (err) {
         console.error('[consensusRoutes] ML route error:', err?.message, err?.stack);
         json(res, 500, { ok: false, error: 'ML service unavailable.' }, origin);
+        return true;
+      }
+    }
+
+    // GET /ml/regime — full physics-based regime (HMM + FP-FK + Tsallis q + Hurst)
+    if (req.method === "GET" && pathname === "/ml/regime") {
+      try {
+        const candles = _parseQueryJson(url.searchParams.get("candles")) || [];
+        const result = await getPhysicsRegime(candles);
+        json(res, result.ok !== false ? 200 : 503, result, origin);
+        return true;
+      } catch (err) {
+        json(res, 500, { ok: false, error: err.message }, origin);
         return true;
       }
     }

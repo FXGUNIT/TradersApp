@@ -12,6 +12,7 @@ python-multipart==0.0.27
 pydantic==2.10.5
 pydantic-settings==2.7.1
 httpx==0.28.1
+<<<<<<< HEAD
 scipy==1.12.0
 redis==5.2.1
 sqlalchemy==2.0.44
@@ -37,3 +38,6 @@ opentelemetry-exporter-otlp-proto-grpc==1.29.0
 opentelemetry-instrumentation-fastapi==0.50b0
 opentelemetry-instrumentation-httpx==0.50b0
 opentelemetry-instrumentation-redis==0.50b0
+=======
+scipy==1.14.1
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37

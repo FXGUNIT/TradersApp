@@ -1,9 +1,14 @@
 import { useEffect, useRef, useState, useCallback } from "react";
+<<<<<<< HEAD
 import { useFocusTrap } from "../../hooks/useFocusTrap.js";
+=======
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 import { onValue, push, ref, set } from "firebase/database";
 import { resolveBffBaseUrl } from "../../services/runtimeConfig.js";
 
 const BFF_BASE = resolveBffBaseUrl();
+
+const BFF_BASE = import.meta.env.VITE_BFF_URL || "";
 
 export default function SupportChatModal({
   isOpen,
@@ -215,6 +220,7 @@ export default function SupportChatModal({
           ) : (
             messages.map((msg, idx) => {
               const isAdmin = msg.sender === "admin";
+              const isUser  = msg.sender === "user";
               return (
                 <div
                   key={`msg_${msg.timestamp}_${idx}`}

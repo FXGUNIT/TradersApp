@@ -1,4 +1,5 @@
 
+<<<<<<< HEAD
 # SQLite databases (generated at runtime)
 *.db
 *.db-shm
@@ -9,6 +10,8 @@
 .dvc/tmp/
 .dvc/plots/
 
+=======
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 # Python bytecode (never commit compiled .pyc files)
 __pycache__/
 *.py[cod]

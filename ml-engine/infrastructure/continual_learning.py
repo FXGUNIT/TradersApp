@@ -18,11 +18,19 @@ Anti-Forgetting Checks (run after every training):
 - If any metric degrades beyond threshold → rollback + alert
 
 Key Files:
+<<<<<<< HEAD
 - `${CONTINUAL_LEARNING_DIR}/experience_replay.jsonl` — rolling buffer of all historical trades
 - `${CONTINUAL_LEARNING_DIR}/fisher_matrices/` — one Fisher matrix per training round
 - `${CONTINUAL_LEARNING_DIR}/training_history.jsonl` — every training run's metrics
 - `${CONTINUAL_LEARNING_DIR}/model_checkpoints/` — saved checkpoints before each retrain
 - `${CONTINUAL_LEARNING_DIR}/rollbacks/` — previous checkpoints for emergency rollback
+=======
+- `data/experience_replay.jsonl` — rolling buffer of all historical trades
+- `data/fisher_matrices/` — one Fisher matrix per training round
+- `data/training_history.jsonl` — every training run's metrics
+- `data/model_checkpoints/` — saved checkpoints before each retrain
+- `data/rollbacks/` — previous checkpoints for emergency rollback
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 
 This is NOT optional. Every training run goes through this pipeline.
 """
@@ -43,6 +51,7 @@ from pathlib import Path
 from collections import deque
 import joblib
 import tempfile
+<<<<<<< HEAD
 from contextlib import contextmanager
 
 # Cross-process file locking (Linux/k8s only; no-op on Windows dev)
@@ -74,10 +83,13 @@ try:
         sys.stdout.reconfigure(errors="replace")
 except Exception:
     pass
+=======
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 
 # ─── Paths ─────────────────────────────────────────────────────────────────────
 
 BASE_DIR = Path(__file__).parent.parent
+<<<<<<< HEAD
 DEFAULT_CONTINUAL_LEARNING_DIR = BASE_DIR / "data" / "continual_learning"
 CONTINUAL_LEARNING_DIR = Path(
     os.environ.get("CONTINUAL_LEARNING_DIR", str(DEFAULT_CONTINUAL_LEARNING_DIR))
@@ -87,6 +99,14 @@ FISHER_DIR = CONTINUAL_LEARNING_DIR / "fisher_matrices"
 CHECKPOINT_DIR = CONTINUAL_LEARNING_DIR / "model_checkpoints"
 TRAINING_HISTORY_PATH = CONTINUAL_LEARNING_DIR / "training_history.jsonl"
 ROLLBACK_DIR = CONTINUAL_LEARNING_DIR / "rollbacks"
+=======
+DATA_DIR = BASE_DIR / "data"
+EXPERIENCE_REPLAY_PATH = DATA_DIR / "experience_replay.jsonl"
+FISHER_DIR = DATA_DIR / "fisher_matrices"
+CHECKPOINT_DIR = DATA_DIR / "model_checkpoints"
+TRAINING_HISTORY_PATH = DATA_DIR / "training_history.jsonl"
+ROLLBACK_DIR = DATA_DIR / "rollbacks"
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 
 for _d in [EXPERIENCE_REPLAY_PATH.parent, FISHER_DIR, CHECKPOINT_DIR, ROLLBACK_DIR]:
     _d.mkdir(parents=True, exist_ok=True)
@@ -227,11 +247,19 @@ class ExperienceReplayBuffer:
             }
 
     def _save_to_disk(self):
+<<<<<<< HEAD
         """Append latest trade to disk with cross-process locking."""
         if not self._buffer:
             return
         try:
             with _exclusive_append(EXPERIENCE_REPLAY_PATH) as f:
+=======
+        """Append latest trades to disk (append-only for persistence)."""
+        if not self._buffer:
+            return
+        try:
+            with open(EXPERIENCE_REPLAY_PATH, "a") as f:
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
                 f.write(json.dumps(self._buffer[-1], default=str) + "\n")
         except Exception as e:
             print(f"[ExperienceReplay] Save failed: {e}")
@@ -327,11 +355,19 @@ class AntiForgettingValidator:
             print(f"[AntiForgetting] History load failed: {e}")
 
     def _save_training_round(self, report: AntiForgettingReport):
+<<<<<<< HEAD
         """Log a training round to history with cross-process locking."""
         with self._lock:
             self._training_history.append(asdict(report))
             try:
                 with _exclusive_append(TRAINING_HISTORY_PATH) as f:
+=======
+        """Log a training round to history."""
+        with self._lock:
+            self._training_history.append(asdict(report))
+            try:
+                with open(TRAINING_HISTORY_PATH, "a") as f:
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
                     f.write(json.dumps(asdict(report), default=str) + "\n")
             except Exception as e:
                 print(f"[AntiForgetting] History save failed: {e}")
@@ -536,6 +572,7 @@ class ContinualLearningOrchestrator:
     8. Log to training history
     """
 
+<<<<<<< HEAD
     _instance: "ContinualLearningOrchestrator | None" = None
     _instance_lock = threading.Lock()
 
@@ -548,6 +585,9 @@ class ContinualLearningOrchestrator:
         return cls._instance
 
     def __init__(self, config: ContinualLearningConfig | None = None):
+=======
+    def __init__(self, config: ContinualLearningConfig = None):
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
         self.config = config or ContinualLearningConfig()
         self.validator = AntiForgettingValidator(self.config)
         self.replay_buffer = self.validator.replay_buffer
@@ -634,8 +674,24 @@ class ContinualLearningOrchestrator:
         }
 
 
+<<<<<<< HEAD
 # ─── Singleton Accessor ───────────────────────────────────────────────────────
 
 
 def get_continual_learning_orchestrator() -> ContinualLearningOrchestrator:
     return ContinualLearningOrchestrator.get_instance()
+=======
+# ─── Global Instance ─────────────────────────────────────────────────────────
+
+_global_orchestrator: ContinualLearningOrchestrator | None = None
+_orchestrator_lock = threading.Lock()
+
+
+def get_continual_learning_orchestrator() -> ContinualLearningOrchestrator:
+    global _global_orchestrator
+    if _global_orchestrator is None:
+        with _orchestrator_lock:
+            if _global_orchestrator is None:
+                _global_orchestrator = ContinualLearningOrchestrator()
+    return _global_orchestrator
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37

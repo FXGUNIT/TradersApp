@@ -22,10 +22,17 @@ jobs:
     if: github.event.inputs.confirm == 'yes'
     steps:
       - name: Checkout
+<<<<<<< HEAD
         uses: actions/checkout@v6
 
       - name: Setup Python
         uses: actions/setup-python@v6
+=======
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+>>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
         with:
           python-version: '3.11'
 
