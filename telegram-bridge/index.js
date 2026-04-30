@@ -162,12 +162,72 @@ async function notifyAdminSupport(userEmail, userName, userId, message) {
   return true;
 }
 
-async function saveAdminReplyToFirebase(userId, adminName, text) {
+function normalizeMessage(message) {
+  const timestamp = Number(message.timestamp) || Date.now();
+  return {
+    ...message,
+    text: String(message.text || "").trim(),
+    timestamp,
+    read: Boolean(message.read),
+  };
+}
+
+async function saveSupportMessage(userId, message) {
   if (!adminDb) return false;
   try {
-    const { ref, push, set } = await import("firebase-admin/firestore");
-    const msgRef = push(ref(adminDb, `support_chats/${userId}/messages`));
-    await set(msgRef, {
+    const uid = String(userId);
+    const normalized = normalizeMessage(message);
+    const threadRef = adminDb.collection("support_chats").doc(uid);
+    await threadRef.set(
+      {
+        uid,
+        updatedAt: normalized.timestamp,
+        lastMessage: normalized,
+      },
+      { merge: true },
+    );
+    await threadRef.collection("messages").add(normalized);
+    return true;
+  } catch (e) {
+    console.error("Firestore save support message error", e);
+    return false;
+  }
+}
+
+async function listSupportThreads() {
+  if (!adminDb) return [];
+  const snapshot = await adminDb.collection("support_chats").get();
+  const threads = await Promise.all(
+    snapshot.docs.map(async (doc) => {
+      const messages = await getSupportMessages(doc.id, "desc");
+      const unread = messages.filter((m) => m.sender === "user" && !m.read).length;
+      return {
+        uid: doc.id,
+        messages,
+        lastMessage: messages[0] || doc.data()?.lastMessage || {},
+        unreadCount: unread,
+        totalMessages: messages.length,
+      };
+    }),
+  );
+  return threads.sort(
+    (a, b) => (b.lastMessage.timestamp || 0) - (a.lastMessage.timestamp || 0),
+  );
+}
+
+async function getSupportMessages(userId, direction = "asc") {
+  if (!adminDb) return [];
+  const snapshot = await adminDb
+    .collection("support_chats")
+    .doc(String(userId))
+    .collection("messages")
+    .orderBy("timestamp", direction)
+    .get();
+  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+}
+
+async function saveAdminReplyToFirebase(userId, adminName, text) {
+  return saveSupportMessage(userId, {
       sender: "admin",
       senderName: adminName || "Support Team",
       senderEmail: "admin@traders.app",
@@ -176,11 +236,6 @@ async function saveAdminReplyToFirebase(userId, adminName, text) {
       read: false,
       fromTelegram: true,
     });
-    return true;
-  } catch (e) {
-    console.error("Firebase save reply error", e);
-    return false;
-  }
 }
 
 app.post("/support/message", requireSupportKey, async (req, res) => {
@@ -190,21 +245,15 @@ app.post("/support/message", requireSupportKey, async (req, res) => {
   }
   try {
     if (adminDb) {
-      try {
-        const { ref, push, set } = await import("firebase-admin/firestore");
-        const msgRef = push(ref(adminDb, `support_chats/${userId}/messages`));
-        await set(msgRef, {
-          sender: "user",
-          senderName: userName || "User",
-          senderEmail: userEmail || "",
-          text: text.trim(),
-          timestamp: Date.now(),
-          read: false,
-          fromTelegram: false,
-        });
-      } catch (e) {
-        console.error("Firestore save error (support/message)", e);
-      }
+      await saveSupportMessage(userId, {
+        sender: "user",
+        senderName: userName || "User",
+        senderEmail: userEmail || "",
+        text: text.trim(),
+        timestamp: Date.now(),
+        read: false,
+        fromTelegram: false,
+      });
     }
     const notified = await notifyAdminSupport(userEmail, userName, userId, text.trim());
     res.json({ ok: true, notified, timestamp: Date.now() });
@@ -234,24 +283,14 @@ app.post("/support/telegram-reply", requireSupportKey, async (req, res) => {
 app.get("/support/chats", requireSupportKey, async (req, res) => {
   if (!adminDb) return res.json({ ok: false, chats: [], source: "fallback" });
   try {
-    const { ref, get } = await import("firebase-admin/firestore");
-    const snapshot = await get(ref(adminDb, "support_chats"));
-    const data = snapshot.data() || {};
-    const chats = Object.entries(data)
-      .map(([uid, chatData]) => {
-        const messages = chatData.messages || {};
-        const msgList = Object.values(messages).sort(
-          (a, b) => (b.timestamp || 0) - (a.timestamp || 0),
-        );
-        const unread = msgList.filter((m) => m.sender === "user" && !m.read).length;
-        return {
-          uid,
-          lastMessage: msgList[0] || {},
-          unreadCount: unread,
-          totalMessages: msgList.length,
-        };
-      })
-      .sort((a, b) => (b.lastMessage.timestamp || 0) - (a.lastMessage.timestamp || 0));
+    const chats = (await listSupportThreads()).map(
+      ({ uid, lastMessage, unreadCount, totalMessages }) => ({
+        uid,
+        lastMessage,
+        unreadCount,
+        totalMessages,
+      }),
+    );
     res.json({ ok: true, chats, source: "firestore" });
   } catch (e) {
     console.error("/support/chats error:", e);
@@ -264,10 +303,7 @@ app.get("/support/chats/:userId", requireSupportKey, async (req, res) => {
   if (!userId) return res.status(400).json({ ok: false, error: "userId required" });
   if (!adminDb) return res.json({ ok: false, messages: [], source: "fallback" });
   try {
-    const { ref, get } = await import("firebase-admin/firestore");
-    const snapshot = await get(ref(adminDb, `support_chats/${userId}/messages`));
-    const data = snapshot.data() || {};
-    const messages = Object.values(data).sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+    const messages = await getSupportMessages(userId, "asc");
     res.json({ ok: true, messages, source: "firestore" });
   } catch (e) {
     console.error("/support/chats/:userId error:", e);
@@ -295,25 +331,15 @@ app.post("/support/chats/:userId/reply", requireSupportKey, async (req, res) => 
 app.get("/support/threads", requireSupportKey, async (req, res) => {
   if (!adminDb) return res.json({ ok: false, thread: null, threads: [], source: "fallback" });
   try {
-    const { ref, get } = await import("firebase-admin/firestore");
-    const snapshot = await get(ref(adminDb, "support_chats"));
-    const data = snapshot.data() || {};
-    const threads = Object.entries(data)
-      .map(([uid, chatData]) => {
-        const messages = chatData.messages || {};
-        const msgList = Object.values(messages).sort(
-          (a, b) => (b.timestamp || 0) - (a.timestamp || 0),
-        );
-        const unread = msgList.filter((m) => m.sender === "user" && !m.read).length;
-        return {
-          uid,
-          thread: { messages: msgList },
-          unreadCount: unread,
-          totalMessages: msgList.length,
-          lastMessage: msgList[0] || {},
-        };
-      })
-      .sort((a, b) => (b.lastMessage.timestamp || 0) - (a.lastMessage.timestamp || 0));
+    const threads = (await listSupportThreads()).map(
+      ({ uid, messages, unreadCount, totalMessages, lastMessage }) => ({
+        uid,
+        thread: { messages },
+        unreadCount,
+        totalMessages,
+        lastMessage,
+      }),
+    );
     res.json({ ok: true, threads, source: "firestore" });
   } catch (e) {
     console.error("/support/threads error:", e);
@@ -326,12 +352,7 @@ app.get("/support/threads/:uid", requireSupportKey, async (req, res) => {
   if (!uid) return res.status(400).json({ ok: false, error: "uid required" });
   if (!adminDb) return res.json({ ok: false, thread: null, source: "fallback" });
   try {
-    const { ref, get } = await import("firebase-admin/firestore");
-    const snapshot = await get(ref(adminDb, `support_chats/${uid}/messages`));
-    const data = snapshot.data() || {};
-    const messages = Object.values(data).sort(
-      (a, b) => (a.timestamp || 0) - (b.timestamp || 0),
-    );
+    const messages = await getSupportMessages(uid, "asc");
     res.json({ ok: true, thread: { messages }, source: "firestore" });
   } catch (e) {
     console.error("/support/threads/:uid error:", e);
@@ -347,9 +368,7 @@ app.post("/support/threads/:uid/messages", requireSupportKey, async (req, res) =
   }
   try {
     if (adminDb) {
-      const { ref, push, set } = await import("firebase-admin/firestore");
-      const msgRef = push(ref(adminDb, `support_chats/${uid}/messages`));
-      await set(msgRef, {
+      await saveSupportMessage(uid, {
         sender: sender || "user",
         senderName:
           sender === "admin"
