@@ -7,6 +7,145 @@
 - This rule applies to both Claude Code and any Copilot/Codex agent features.
 - Proceed safely and summarize what you did at the end of each major step.
 
+## GitHub Actions Self-Hosted Runner
+
+**Always use the self-hosted runner on Contabo VPS for ALL CI/CD workflows.**
+
+Benefits: Docker layer cache persists across builds (8 min → 90 sec builds), zero GitHub Actions minutes consumed, ~$0.62/month for runner time.
+
+**How it works:**
+```
+You push to main
+    ↓
+Self-hosted runner on Contabo VPS picks up the job (NOT GitHub cloud)
+    ↓
+Local Docker cache hits — build ~2 min instead of 8+
+    ↓
+BFF image pushed to GHCR with SHA tag
+    ↓
+Watchtower detects new image → auto-restarts container on VPS
+    ↓
+Live in ~3 min total, $0 GitHub Actions minutes
+```
+
+**Never:**
+- Push directly to the VPS bypassing CI (bypasses tests, Trivy scan, SBOM)
+- Trigger deploys manually via SSH without going through the runner
+- Use `workflow_dispatch` from the web UI as a regular workflow — only use it for emergency rollback
+
+**Emergency rollback:**
+```bash
+# Roll back to a known-good image SHA
+docker pull ghcr.io/FXGUNIT/bff:<sha>
+docker compose -f deploy/contabo/docker-compose.yml up -d --no-deps bff
+docker compose -f deploy/contabo/docker-compose.yml exec bff sh -c 'kill -HUP 1'
+```
+
+**Adding a new service to the deploy:**
+1. Add image to `deploy/contabo/docker-compose.yml`
+2. Add image build to `.github/workflows/ci.yml` with `cache-from: type=gha,scope=<service>`
+3. Add health check to the service
+4. Update `docs/DEPLOY.md` runbook
+
+---
+
+## Deploy Process — Enforced on All Agents
+
+This section is **binding on every agent** — Claude Code, Codex, Copilot, and human. No exceptions.
+
+### The One True Deploy Path
+
+```
+Push to main → CI passes → BFF image published to GHCR → Watchtower detects → Live
+```
+
+**No other path is valid.** Every backend change follows this chain. Never skip steps.
+
+### Step-by-step for every backend change
+
+**Step 1 — Write the code**
+- Make your changes in the appropriate microservice directory
+- Follow architecture rules, security checklist, and board room rules
+
+**Step 2 — Test locally**
+```bash
+# BFF changes
+docker build --target test -t bff:test bff/ 2>&1 | tail -5
+docker run --rm bff:test npm test -- --reporter dot 2>&1 | tail -20
+
+# ML Engine changes
+cd ml-engine && pytest tests/ -q --tb=short 2>&1 | tail -10
+```
+
+**Step 3 — Commit and push**
+```bash
+git add <changed-files>
+git commit -m "$(cat <<'EOF'
+<type>: <short description>
+
+<why this change, what it fixes or adds>
+EOF
+)"
+git push origin main  # pushes to both origin (Gitea) and old-origin (GitHub)
+```
+
+**Step 4 — Wait for CI**
+- Watch the run at: https://github.com/FXGUNIT/TRADERS-REGIMENT/actions
+- CI runs on self-hosted runner — BFF build ~90 sec with cache
+- If CI fails: fix the failure first, do not bypass or force-push
+
+**Step 5 — Watchtower auto-deploys**
+- Watchtower polls GHCR every 5 minutes
+- When it detects a new `bff:<sha>` image, it pulls it and restarts the container
+- Manual check: `curl -s https://bff.173.249.18.14.sslip.io/health`
+
+**Step 6 — Verify**
+```bash
+# BFF is live
+curl -s https://bff.173.249.18.14.sslip.io/health | python3 -c "import sys,json; d=json.load(sys.stdin); print('BFF:', 'OK' if d.get('ok') else 'FAIL')"
+
+# Frontend auto-updated via Cloudflare Pages (no action needed)
+curl -s https://tradergunit.pages.dev/ | grep -o '<title>[^<]*' | head -1
+```
+
+### What NEVER to do
+
+| Forbidden | Why | Correct |
+|---|---|---|
+| Build image locally and `docker run` on VPS | Bypasses CI, no Trivy scan, no SBOM | Push code, let CI build |
+| `workflow_dispatch` from web UI for normal deploys | Wastes Actions minutes, skips test gate | Let watchtower auto-deploy |
+| SSH into VPS and edit files directly | Changes get overwritten on next deploy | Change code, push, wait for deploy |
+| `docker commit` to modify running container | Not reproducible, lost on restart | Change Dockerfile, push, rebuild |
+| Force-push to main | Destroys history, bypasses all checks | Revert commit, push new fix |
+
+### CI Failure Protocol
+
+When CI fails, fix in this order:
+1. Read the failing job logs from GitHub Actions UI
+2. Fix the root cause — do not skip the test or mark it "optional"
+3. Push a new commit
+4. Wait for CI to pass
+5. Do not manually trigger deploy — watchtower handles it
+
+**Exception — emergency hotfix when CI is broken for non-BFF reasons:**
+```bash
+# Only if ML Engine tests fail but BFF code is unchanged
+# Use skip_build to pull existing BFF image and only restart services
+gh workflow run deploy-contabo.yml \
+  --field skip_build=true \
+  --field image_tag=<last-known-good-sha>
+```
+
+### Adding or changing environment secrets
+
+1. Add secret to GitHub Secrets: `gh secret set SECRET_NAME --body "value" --repo FXGUNIT/TRADERS-REGIMENT`
+2. Update `scripts/contabo/build-runtime-env.sh` allowlist if the secret needs to reach the BFF container
+3. Update `CONTABO_APP_ENV` base64 secret if using that path
+4. Commit and push — deploy auto-restarts the BFF container
+5. Verify: `ssh contabo-vps 'docker exec traders-bff env | grep SECRET_NAME'`
+
+---
+
 ## OpenCode CLI Automation (Claude + Codex + VS Code)
 
 - OpenCode is installed as the project Open CLI.
