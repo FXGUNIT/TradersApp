@@ -224,7 +224,7 @@ jobs:
     if: github.event_name == 'schedule'
     steps:
       - name: Checkout scripts
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           sparse-checkout: |
             scripts/parse_prometheus_alerts.py
@@ -323,10 +323,10 @@ jobs:
     # Run daily at 2 AM
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
 
@@ -341,7 +341,7 @@ jobs:
           curl -sf "${ML_ENGINE_URL}/monitoring/config" > models_backup/config.json 2>/dev/null || echo '{}' > models_backup/config.json
 
       - name: Checkout scripts
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           sparse-checkout: |
             scripts/parse_prometheus_alerts.py

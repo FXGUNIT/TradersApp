@@ -39,10 +39,10 @@ jobs:
       desktop_bff_url: ${{ steps.desktop_urls.outputs.desktop_bff_url }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -307,7 +307,7 @@ jobs:
             )
 
       - name: Upload Windows release payload
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: windows-release-payload
           path: artifacts/windows-release/
@@ -322,13 +322,13 @@ jobs:
       security-events: write
     steps:
       - name: Download Windows release payload
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: windows-release-payload
           path: windows-release
 
       - name: Scan release payload with Trivy
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
           scan-ref: windows-release
@@ -338,7 +338,7 @@ jobs:
           exit-code: 1
 
       - name: Generate SBOM for release payload
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
           scan-ref: windows-release
@@ -348,13 +348,13 @@ jobs:
 
       - name: Upload Trivy results to GitHub Security
         if: always()
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-windows-release.sarif
 
       - name: Upload security artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: windows-release-security
           path: |
@@ -371,13 +371,13 @@ jobs:
       contents: write
     steps:
       - name: Download release payload
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: windows-release-payload
           path: release-assets
 
       - name: Download security artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: windows-release-security
           path: release-assets

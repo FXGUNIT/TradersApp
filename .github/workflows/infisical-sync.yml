@@ -25,7 +25,7 @@ jobs:
       name: ${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install Infisical CLI
         run: |
@@ -62,7 +62,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install Infisical CLI
         run: |

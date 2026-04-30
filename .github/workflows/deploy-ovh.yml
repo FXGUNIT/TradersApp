@@ -141,7 +141,7 @@ jobs:
           INFISICAL_PROJECT_ID: ${{ secrets.INFISICAL_PROJECT_ID }}
 
       - name: Checkout deploy commit
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ steps.context.outputs.ref }}
 
@@ -179,7 +179,7 @@ jobs:
           INFISICAL_PROJECT_ID: ${{ secrets.INFISICAL_PROJECT_ID }}
 
       - name: Login to GHCR
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -308,7 +308,7 @@ jobs:
           EOF
 
       - name: Upload OVH deploy evidence
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ovh-deploy-evidence-${{ github.run_id }}
           path: .artifacts/ovh/

@@ -32,16 +32,16 @@ jobs:
       security-events: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Login to GHCR
         if: github.event_name != 'pull_request'
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -76,7 +76,7 @@ jobs:
       - name: Run Trivy vulnerability scanner (ML Engine)
         id: trivy_ml
         continue-on-error: true
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ steps.images.outputs.ml }}
           format: sarif
@@ -88,7 +88,7 @@ jobs:
       - name: Run Trivy vulnerability scanner (BFF)
         id: trivy_bff
         continue-on-error: true
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ steps.images.outputs.bff }}
           format: sarif
@@ -100,7 +100,7 @@ jobs:
       - name: Run Trivy vulnerability scanner (Frontend)
         id: trivy_frontend
         continue-on-error: true
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ steps.images.outputs.frontend }}
           format: sarif
@@ -110,21 +110,21 @@ jobs:
           exit-code: "1"
 
       - name: Upload Trivy ML Engine results
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         if: always() && hashFiles('trivy-results-ml-engine.sarif') != ''
         with:
           sarif_file: trivy-results-ml-engine.sarif
           category: trivy-ml-engine
 
       - name: Upload Trivy BFF results
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         if: always() && hashFiles('trivy-results-bff.sarif') != ''
         with:
           sarif_file: trivy-results-bff.sarif
           category: trivy-bff
 
       - name: Upload Trivy Frontend results
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         if: always() && hashFiles('trivy-results-frontend.sarif') != ''
         with:
           sarif_file: trivy-results-frontend.sarif
