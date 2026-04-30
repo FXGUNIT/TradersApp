@@ -16,6 +16,7 @@ import { processConversation, sessionStore } from "./aiConversation.js";
 // ─── Typing State ─────────────────────────────────────────────────────────────
 
 const typingState = new Map();
+let botHandlersRegistered = false;
 
 /**
  * @param {number|string} chatId
