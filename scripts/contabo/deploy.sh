@@ -349,9 +349,13 @@ wait_for_health traders-bff
 wait_for_health traders-frontend
 
 echo "[deploy] Running smoke checks..."
-set -a
-. "${RUNTIME_ENV}"
-set +a
+TRADERSAPP_DOMAIN="$(read_env_value "${RUNTIME_ENV}" TRADERSAPP_DOMAIN)"
+TRADERSAPP_DOMAIN="${TRADERSAPP_DOMAIN:-173.249.18.14.sslip.io}"
+BFF_PUBLIC_HOST="$(read_env_value "${RUNTIME_ENV}" BFF_PUBLIC_HOST)"
+BFF_PUBLIC_HOST="${BFF_PUBLIC_HOST:-bff.${TRADERSAPP_DOMAIN}}"
+API_PUBLIC_HOST="$(read_env_value "${RUNTIME_ENV}" API_PUBLIC_HOST)"
+API_PUBLIC_HOST="${API_PUBLIC_HOST:-api.${TRADERSAPP_DOMAIN}}"
+EDGE_SMOKE_STRICT="$(read_env_value "${RUNTIME_ENV}" EDGE_SMOKE_STRICT)"
 EDGE_SMOKE_STRICT="${EDGE_SMOKE_STRICT:-false}"
 
 echo "  - localhost bff /health"

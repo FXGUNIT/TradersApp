@@ -128,13 +128,20 @@ install -d "$(dirname "${OUTPUT}")"
 tmp_file="$(mktemp)"
 
 if [ -n "${BASE_ENV}" ] && [ -f "${BASE_ENV}" ]; then
+  line_number=0
   while IFS= read -r line; do
-    line="$(printf '%s' "${line}" | tr -d '\r' | sed -E 's/^export[[:space:]]+//')"
+    line_number=$((line_number + 1))
+    line="$(printf '%s' "${line}" | tr -d '\r' | sed -E 's/^[[:space:]]*export[[:space:]]+//')"
     case "${line}" in
       ""|\#*)
         continue
         ;;
     esac
+
+    if ! [[ "${line}" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]]; then
+      echo "::warning::Skipping malformed base env line ${line_number}; expected KEY=value." >&2
+      continue
+    fi
 
     key="${line%%=*}"
     case "${key}" in
