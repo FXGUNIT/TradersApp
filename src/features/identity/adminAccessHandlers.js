@@ -38,8 +38,6 @@ export const executeSendAdminOTPs = async ({
   setAdminOtpErr,
   setAdminOtpChallengeId,
   setAdminOtpRecipients,
-  gateLabel = "Authenticator",
-  successMessage = "Authenticator verified. Send the three email codes.",
 }) => {
   try {
     const result = await requestAdminEmailOtp({
