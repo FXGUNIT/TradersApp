@@ -21,7 +21,11 @@ COPY bff/ ./bff/
 COPY proto/ ./proto/
 
 RUN mkdir -p /app/runtime /app/board-room /app/bff/data \
-    && chown -R tradersapp:tradersapp /app
+    && chown -R tradersapp:tradersapp /app \
+    && chmod -R 755 /app/runtime /app/board-room /app/bff/data
+
+COPY bff/docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN chmod 755 /app/docker-entrypoint.sh
 
 USER tradersapp
 
@@ -30,4 +34,5 @@ EXPOSE 8788
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD wget -qO- http://127.0.0.1:8788/health >/dev/null 2>&1 || busybox wget -qO- http://127.0.0.1:8788/health >/dev/null 2>&1 || exit 1
 
+ENTRYPOINT ["sh", "/app/docker-entrypoint.sh"]
 CMD ["node", "bff/server.mjs"]
