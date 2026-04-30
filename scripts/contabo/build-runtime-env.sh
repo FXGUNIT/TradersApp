@@ -132,7 +132,11 @@ if [ -n "${BASE_ENV}" ] && [ -f "${BASE_ENV}" ]; then
         printf '%s\n' "${line}" >> "${tmp_file}"
         continue
         ;;
-      EMAILJS_SERVICE_ID|EMAILJS_TEMPLATE_ID|EMAILJS_PUBLIC_KEY|EMAILJS_PRIVATE_KEY|ADMIN_TOTP_SECRET|ADMIN_MASTER_EMAIL)
+      EMAILJS_SERVICE_ID|EMAILJS_TEMPLATE_ID|EMAILJS_PUBLIC_KEY|EMAILJS_PRIVATE_KEY|ADMIN_EMAILJS_SERVICE_ID|ADMIN_EMAILJS_TEMPLATE_ID|ADMIN_EMAILJS_PUBLIC_KEY|ADMIN_EMAILJS_PRIVATE_KEY|ADMIN_MFA_EMAILS)
+        printf '%s\n' "${line}" >> "${tmp_file}"
+        continue
+        ;;
+    ADMIN_TOTP_SECRET|ADMIN_MASTER_EMAIL)
         printf '%s\n' "${line}" >> "${tmp_file}"
         continue
         ;;

@@ -1,24 +1,37 @@
 /**
- * Firebase Admin — Firestore initialization for Telegram Bridge
- * Migrated from CommonJS to ESM (I08)
+ * Firestore initialization for Telegram Bridge.
  */
-import admin from 'firebase-admin';
+import { Firestore } from '@google-cloud/firestore';
 
 let db = null;
 let initialized = false;
 
+function parseServiceAccount() {
+  const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+  if (!raw) return null;
+  return typeof raw === 'string' ? JSON.parse(raw) : raw;
+}
+
 function initFirestore() {
   if (initialized) return db;
   try {
-    const sa = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
-    const dbURL = process.env.FIREBASE_DATABASE_URL || '';
-    if (sa) {
-      const serviceAccount = typeof sa === 'string' ? JSON.parse(sa) : sa;
-      admin.initializeApp({ credential: admin.credential.cert(serviceAccount), databaseURL: dbURL });
-    } else {
-      admin.initializeApp();
+    const serviceAccount = parseServiceAccount();
+    const projectId =
+      process.env.FIREBASE_PROJECT_ID ||
+      process.env.GOOGLE_CLOUD_PROJECT ||
+      process.env.GCLOUD_PROJECT ||
+      serviceAccount?.project_id;
+
+    const options = {};
+    if (projectId) options.projectId = projectId;
+    if (serviceAccount?.client_email && serviceAccount?.private_key) {
+      options.credentials = {
+        client_email: serviceAccount.client_email,
+        private_key: serviceAccount.private_key,
+      };
     }
-    db = admin.firestore();
+
+    db = new Firestore(options);
     initialized = true;
     console.log('Telegram Bridge: Firestore initialized');
   } catch (err) {
