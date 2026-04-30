@@ -5,7 +5,6 @@ on:
     branches: [main, staging]
   pull_request:
     branches: [main, staging]
-<<<<<<< HEAD
   workflow_dispatch:
     inputs:
       bootstrap_edge:
@@ -612,15 +611,6 @@ jobs:
           fi
 
   # -------------------------------------------------------------------------
-=======
-
-env:
-  NODE_VERSION: '20'
-  PYTHON_VERSION: '3.11'
-
-jobs:
-  # -------------------------------------------------------------------------
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
   # Frontend: React + Vite
   # -------------------------------------------------------------------------
   frontend:
@@ -631,47 +621,21 @@ jobs:
         working-directory: .
     steps:
       - name: Checkout
-<<<<<<< HEAD
-        uses: actions/checkout@v6
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-=======
         uses: actions/checkout@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
       # ── Pull secrets from Infisical (injected as env vars) ──────────────
       - name: Pull secrets from Infisical
-<<<<<<< HEAD
-        run: |
-          if [ -z "${{ secrets.INFISICAL_TOKEN }}" ]; then
-            echo "⚠ INFISICAL_TOKEN not set; skipping Infisical secret pull for frontend build."
-            exit 0
-          fi
-          curl -1sLf 'https://artifacts-cli.infisical.com/setup.deb.sh' | sudo -E bash
-          sudo apt-get update && sudo apt-get install -y infisical
-          export INFISICAL_TOKEN=${{ secrets.INFISICAL_TOKEN }}
-          infisical secrets pull \
-            --env=${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }} \
-            --projectId=0e4f9b8b-846e-4e66-a4aa-97c8fa9863ab \
-            --format=env > .infisical_frontend.env 2>/dev/null || true
-          if [ -f .infisical_frontend.env ]; then
-            grep -v '^#' .infisical_frontend.env | grep '=' >> "$GITHUB_ENV" || true
-            echo "Infisical secrets exported to GITHUB_ENV for frontend build."
-          fi
-=======
         uses: infisical/infisical-action@v2
         with:
           space-id: '0e4f9b8b-846e-4e66-a4aa-97c8fa9863ab'
           env: ${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }}
           secrets-output-format: env
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 
       - name: Install dependencies
         run: npm ci
@@ -680,13 +644,6 @@ jobs:
         run: npm run lint
         continue-on-error: false
 
-<<<<<<< HEAD
-      - name: ESLint
-        run: npx eslint src/ --max-warnings=0 || true
-        continue-on-error: true
-
-=======
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
       - name: Build
         run: npm run build
         continue-on-error: false
@@ -695,14 +652,6 @@ jobs:
   # ML Engine: Python FastAPI
   # -------------------------------------------------------------------------
   ml-engine:
-<<<<<<< HEAD
-    name: ML Engine Docker Build
-    runs-on: ubuntu-latest
-    needs: [unit-tests, security-bandit, type-check, file-size-gate]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-=======
     name: ML Engine Tests
     runs-on: ubuntu-latest
     defaults:
@@ -741,31 +690,18 @@ jobs:
       - name: Run pytest
         run: pytest tests/ -v --tb=short
         continue-on-error: false
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 
       # ── Build Docker with secrets as runtime env (not baked into image) ─
       - name: Build Docker image
         run: |
-<<<<<<< HEAD
-          OWNER_LC="${GITHUB_REPOSITORY_OWNER,,}"
-          docker build \
-            --tag ghcr.io/${OWNER_LC}/ml-engine:${{ github.sha }} \
-            --tag ghcr.io/${OWNER_LC}/ml-engine:latest \
-            --file ml-engine/Dockerfile \
-=======
           docker build \
             --tag ghcr.io/${{ github.repository }}/ml-engine:${{ github.sha }} \
             --tag ghcr.io/${{ github.repository }}/ml-engine:latest \
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
             ml-engine/
         continue-on-error: false
 
       - name: Docker health check
         run: |
-<<<<<<< HEAD
-          OWNER_LC="${GITHUB_REPOSITORY_OWNER,,}"
-=======
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
           docker run -d --name ml-engine-test -p 8001:8001 \
             -e AI_GEMINI_PRO_KEY \
             -e AI_GROQ_TURBO_KEY \
@@ -776,11 +712,7 @@ jobs:
             -e AI_SAMBANOVA_KEY \
             -e FINNHUB_API_KEY \
             -e NEWS_API_KEY \
-<<<<<<< HEAD
-            ghcr.io/${OWNER_LC}/ml-engine:latest
-=======
             ghcr.io/${{ github.repository }}/ml-engine:latest
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
           sleep 15
           docker exec ml-engine-test python -c "import httpx; r=httpx.get('http://localhost:8001/health', timeout=5); assert r.status_code == 200, r.text"
           docker stop ml-engine-test || true
@@ -791,149 +723,6 @@ jobs:
   bff:
     name: BFF Server
     runs-on: ubuntu-latest
-<<<<<<< HEAD
-    permissions:
-      contents: read
-      packages: write
-      attestations: write
-      id-token: write
-    outputs:
-      image: ${{ steps.bff_context.outputs.sha_image }}
-      context_hash: ${{ steps.bff_context.outputs.context_hash }}
-      context_image: ${{ steps.bff_context.outputs.context_image }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-          cache-dependency-path: bff/package-lock.json
-
-      - name: Resolve BFF image context
-        id: bff_context
-        run: |
-          OWNER_LC="${GITHUB_REPOSITORY_OWNER,,}"
-          node scripts/images/bff-image.mjs hash --owner "${OWNER_LC}" --tag "${GITHUB_SHA}" --json > bff-image-input.json
-          cat bff-image-input.json
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
-      - name: Login to GHCR
-        if: github.event_name != 'pull_request'
-        uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Check existing BFF context image
-        id: bff_context_exists
-        if: github.event_name != 'pull_request'
-        run: |
-          if docker buildx imagetools inspect "${{ steps.bff_context.outputs.context_image }}" >/dev/null 2>&1; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-            echo "Reusing existing BFF context image: ${{ steps.bff_context.outputs.context_image }}"
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-            echo "No existing BFF context image found; building it."
-          fi
-
-      - name: Build BFF image for PR
-        if: github.event_name == 'pull_request'
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: bff/Dockerfile
-          load: true
-          tags: |
-            ${{ steps.bff_context.outputs.sha_image }}
-            ${{ steps.bff_context.outputs.context_image }}
-          cache-from: type=gha,scope=bff
-          cache-to: type=gha,mode=max,scope=bff
-
-      - name: Build and push BFF image
-        if: github.event_name != 'pull_request' && steps.bff_context_exists.outputs.exists != 'true'
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: bff/Dockerfile
-          push: true
-          tags: |
-            ${{ steps.bff_context.outputs.sha_image }}
-            ${{ steps.bff_context.outputs.context_image }}
-          cache-from: type=gha,scope=bff
-          cache-to: type=gha,mode=max,scope=bff
-
-      - name: Tag commit image from existing context image
-        if: github.event_name != 'pull_request' && steps.bff_context_exists.outputs.exists == 'true'
-        run: |
-          docker buildx imagetools create \
-            -t "${{ steps.bff_context.outputs.sha_image }}" \
-            "${{ steps.bff_context.outputs.context_image }}"
-
-      - name: Pull pushed BFF image for smoke test
-        if: github.event_name != 'pull_request'
-        run: docker pull "${{ steps.bff_context.outputs.sha_image }}"
-
-      - name: Smoke test BFF image and verify image metadata
-        run: npm run image:bff:smoke -- --image "${{ steps.bff_context.outputs.sha_image }}"
-
-      - name: Write BFF image manifest
-        id: bff_manifest
-        if: always()
-        run: |
-          IMAGE="${{ steps.bff_context.outputs.sha_image }}"
-          DIGEST="$(docker image inspect --format='{{index .RepoDigests 0}}' "${IMAGE}" 2>/dev/null | sed 's/^.*@//' || true)"
-          if [ -z "${DIGEST}" ] && [ "${{ github.event_name }}" != "pull_request" ]; then
-            DIGEST="$(docker buildx imagetools inspect "${IMAGE}" --format '{{json .Manifest.Digest}}' 2>/dev/null | tr -d '"' || true)"
-          fi
-          [ -n "${DIGEST}" ] || DIGEST="local"
-          echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
-          cat > bff-image-manifest.json <<EOF
-          {
-            "commit": "${GITHUB_SHA}",
-            "contextHash": "${{ steps.bff_context.outputs.context_hash }}",
-            "imageRef": "${IMAGE}",
-            "contextImageRef": "${{ steps.bff_context.outputs.context_image }}",
-            "digest": "${DIGEST}",
-            "built": "${{ github.event_name == 'pull_request' || steps.bff_context_exists.outputs.exists != 'true' }}",
-            "dockerfile": "${{ steps.bff_context.outputs.dockerfile }}"
-          }
-          EOF
-          cat bff-image-manifest.json
-
-      - name: Generate BFF SBOM
-        if: always()
-        uses: anchore/sbom-action@v0
-        with:
-          image: ${{ steps.bff_context.outputs.sha_image }}
-          format: spdx-json
-          output-file: bff-sbom.spdx.json
-        continue-on-error: true
-
-      - name: Attest BFF image provenance
-        if: github.event_name != 'pull_request' && steps.bff_manifest.outputs.digest != '' && steps.bff_manifest.outputs.digest != 'local'
-        uses: actions/attest-build-provenance@v2
-        with:
-          subject-name: ${{ steps.bff_context.outputs.sha_image }}
-          subject-digest: ${{ steps.bff_manifest.outputs.digest }}
-          push-to-registry: true
-        continue-on-error: true
-
-      - name: Upload BFF image manifest
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: bff-image-manifest
-          path: |
-            bff-image-manifest.json
-            bff-sbom.spdx.json
-          retention-days: 14
-=======
     defaults:
       run:
         working-directory: bff
@@ -970,7 +759,6 @@ jobs:
             --tag ghcr.io/${{ github.repository }}/bff:latest \
             bff/
         continue-on-error: false
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 
   # -------------------------------------------------------------------------
   # Deploy to Staging (auto on push to staging branch)
@@ -982,15 +770,6 @@ jobs:
     if: github.ref == 'refs/heads/staging' && github.event_name == 'push'
     environment:
       name: staging
-<<<<<<< HEAD
-      url: https://tradergunit.pages.dev
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Login to GHCR
-        uses: docker/login-action@v4
-=======
       url: https://staging.traders.app
     steps:
       - name: Checkout
@@ -998,34 +777,20 @@ jobs:
 
       - name: Login to GHCR
         uses: docker/login-action@v3
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-<<<<<<< HEAD
-      - name: Publish ML Engine image and verify BFF image
-        run: |
-          OWNER_LC="${GITHUB_REPOSITORY_OWNER,,}"
-          docker build -t ghcr.io/${OWNER_LC}/ml-engine:${{ github.sha }} --file ml-engine/Dockerfile ml-engine/
-          docker push ghcr.io/${OWNER_LC}/ml-engine:${{ github.sha }}
-          docker pull ghcr.io/${OWNER_LC}/bff:${{ github.sha }}
-=======
       - name: Push images to GHCR
         run: |
           docker push ghcr.io/${{ github.repository }}/ml-engine:${{ github.sha }}
           docker push ghcr.io/${{ github.repository }}/bff:${{ github.sha }}
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
         continue-on-error: false
 
       # ── Railway: deploy ML Engine (staging) ──────────────────────────────
       - name: Deploy ML Engine to Railway (staging)
         run: |
-<<<<<<< HEAD
-          OWNER_LC="${GITHUB_REPOSITORY_OWNER,,}"
-=======
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
           ENV_ID="${{ vars.RAILWAY_STAGING_ENV_ID }}"
           SVC_ID="${{ vars.RAILWAY_STAGING_ML_SERVICE_ID }}"
           if [ -z "$ENV_ID" ] || [ -z "$SVC_ID" ]; then
@@ -1035,21 +800,13 @@ jobs:
               --url "https://api.railway.app/v0/environments/$ENV_ID/services/$SVC_ID/deployments" \
               --header 'Authorization: Bearer ${{ secrets.RAILWAY_TOKEN }}' \
               --header 'Content-Type: application/json' \
-<<<<<<< HEAD
-              --data "{\"image\": \"ghcr.io/${OWNER_LC}/ml-engine:${{ github.sha }}\", \"branch\": \"staging\", \"healthCheckPath\": \"/health\"}"
-=======
               --data "{\"image\": \"ghcr.io/${{ github.repository }}/ml-engine:${{ github.sha }}\", \"branch\": \"staging\", \"healthCheckPath\": \"/health\"}"
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
           fi
         continue-on-error: true
 
       # ── Railway: deploy BFF (staging) ────────────────────────────────────
       - name: Deploy BFF to Railway (staging)
         run: |
-<<<<<<< HEAD
-          OWNER_LC="${GITHUB_REPOSITORY_OWNER,,}"
-=======
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
           ENV_ID="${{ vars.RAILWAY_STAGING_ENV_ID }}"
           SVC_ID="${{ vars.RAILWAY_STAGING_BFF_SERVICE_ID }}"
           if [ -z "$ENV_ID" ] || [ -z "$SVC_ID" ]; then
@@ -1059,11 +816,7 @@ jobs:
               --url "https://api.railway.app/v0/environments/$ENV_ID/services/$SVC_ID/deployments" \
               --header 'Authorization: Bearer ${{ secrets.RAILWAY_TOKEN }}' \
               --header 'Content-Type: application/json' \
-<<<<<<< HEAD
-              --data "{\"image\": \"ghcr.io/${OWNER_LC}/bff:${{ github.sha }}\", \"branch\": \"staging\"}"
-=======
               --data "{\"image\": \"ghcr.io/${{ github.repository }}/bff:${{ github.sha }}\", \"branch\": \"staging\"}"
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
           fi
         continue-on-error: true
 
@@ -1082,12 +835,7 @@ jobs:
             echo "⚠ Skipping Railway secret sync — INFISICAL_TOKEN or RAILWAY_TOKEN not set in GitHub Secrets"
             exit 0
           fi
-<<<<<<< HEAD
-          curl -1sLf 'https://artifacts-cli.infisical.com/setup.deb.sh' | sudo -E bash
-          sudo apt-get update && sudo apt-get install -y infisical
-=======
           curl -fsSL https://raw.githubusercontent.com/Infisical/infisical/main/install-cli-deb.sh | bash
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
           export INFISICAL_TOKEN=${{ secrets.INFISICAL_TOKEN }}
           infisical secrets pull \
             --env=staging \
@@ -1112,58 +860,21 @@ jobs:
   deploy-production:
     name: Deploy Production
     runs-on: ubuntu-latest
-<<<<<<< HEAD
-    needs: [frontend, browser-tests, ui-quality-matrix, ml-engine, bff, unit-tests, security-bandit, type-check, dockerfile-lint, helm-lint, file-size-gate, architecture-contracts, load-tests]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && vars.PRODUCTION_DEPLOY_PLATFORM != 'ovh' && vars.PRODUCTION_DEPLOY_PLATFORM != 'contabo'
-    concurrency:
-      group: deploy-production-main
-      cancel-in-progress: false
-    environment:
-      name: production
-      url: https://tradergunit.pages.dev
-=======
     needs: [frontend, ml-engine, bff]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     environment:
       name: production
       url: https://traders.app
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
     permissions:
       contents: read
       packages: write
     steps:
       - name: Checkout
-<<<<<<< HEAD
-        uses: actions/checkout@v6
-
-      - name: Validate production deploy contract
-        run: |
-          MISSING=0
-
-          # Oracle Cloud k3s kubeconfig (required for backend deploy)
-          if [ -z "${{ secrets.KUBE_CONFIG }}" ] && [ -z "${{ secrets.KUBECONFIG_B64 }}" ]; then
-            echo "::error::Missing secret: KUBE_CONFIG or KUBECONFIG_B64 - Oracle Cloud kubeconfig required"
-            MISSING=1
-          fi
-          # Infisical for secrets sync to k8s
-          [ -n "${{ secrets.INFISICAL_TOKEN }}" ] || { echo "::error::Missing secret: INFISICAL_TOKEN"; MISSING=1; }
-
-          if [ "$MISSING" -ne 0 ]; then
-            echo "Production deploy contract validation failed."
-            exit 1
-          fi
-          echo "Production deploy contract validation passed."
-
-      # Push Docker images to GHCR
-      - name: Login to GHCR
-        uses: docker/login-action@v4
-=======
         uses: actions/checkout@v4
 
       # Push Docker images to GHCR
       - name: Login to GHCR
         uses: docker/login-action@v3
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -1171,655 +882,6 @@ jobs:
 
       - name: Build and push ML Engine image
         run: |
-<<<<<<< HEAD
-          OWNER_LC="${GITHUB_REPOSITORY_OWNER,,}"
-          IMAGE_SHA="ghcr.io/${OWNER_LC}/ml-engine:${GITHUB_SHA}"
-          IMAGE_LATEST="ghcr.io/${OWNER_LC}/ml-engine:latest"
-          ATTEMPT=1
-          MAX_ATTEMPTS=3
-          while [ "${ATTEMPT}" -le "${MAX_ATTEMPTS}" ]; do
-            if docker build -t "${IMAGE_SHA}" -t "${IMAGE_LATEST}" --file ml-engine/Dockerfile ml-engine/ \
-              && docker push "${IMAGE_SHA}" \
-              && docker push "${IMAGE_LATEST}"; then
-              exit 0
-            fi
-            if [ "${ATTEMPT}" -eq "${MAX_ATTEMPTS}" ]; then
-              echo "::error::ML Engine image build/push failed after ${MAX_ATTEMPTS} attempts."
-              exit 1
-            fi
-            echo "ML Engine image build/push failed. Retrying (attempt $((ATTEMPT + 1))/${MAX_ATTEMPTS})..."
-            docker image rm "${IMAGE_SHA}" "${IMAGE_LATEST}" >/dev/null 2>&1 || true
-            sleep 20
-            ATTEMPT=$((ATTEMPT + 1))
-          done
-        continue-on-error: false
-
-      - name: Verify published BFF image
-        run: |
-          OWNER_LC="${GITHUB_REPOSITORY_OWNER,,}"
-          IMAGE_SHA="ghcr.io/${OWNER_LC}/bff:${GITHUB_SHA}"
-          docker pull "${IMAGE_SHA}" || {
-            echo "::error::Missing published BFF image ${IMAGE_SHA}. The bff CI job must publish the SHA image before deploy."
-            exit 1
-          }
-        continue-on-error: false
-
-      - name: Build and push Frontend image
-        run: |
-          OWNER_LC="${GITHUB_REPOSITORY_OWNER,,}"
-          IMAGE_SHA="ghcr.io/${OWNER_LC}/frontend:${GITHUB_SHA}"
-          IMAGE_LATEST="ghcr.io/${OWNER_LC}/frontend:latest"
-          ATTEMPT=1
-          MAX_ATTEMPTS=3
-          while [ "${ATTEMPT}" -le "${MAX_ATTEMPTS}" ]; do
-            if docker build -t "${IMAGE_SHA}" -t "${IMAGE_LATEST}" \
-              --file Dockerfile.frontend . \
-              && docker push "${IMAGE_SHA}" \
-              && docker push "${IMAGE_LATEST}"; then
-              exit 0
-            fi
-            if [ "${ATTEMPT}" -eq "${MAX_ATTEMPTS}" ]; then
-              echo "::error::Frontend image build/push failed after ${MAX_ATTEMPTS} attempts."
-              exit 1
-            fi
-            echo "Frontend image build/push failed. Retrying (attempt $((ATTEMPT + 1))/${MAX_ATTEMPTS})..."
-            docker image rm "${IMAGE_SHA}" "${IMAGE_LATEST}" >/dev/null 2>&1 || true
-            sleep 20
-            ATTEMPT=$((ATTEMPT + 1))
-          done
-        continue-on-error: false
-
-      # ── Setup kubectl for Oracle Cloud k3s ───────────────────────────────
-      - name: Setup kubectl
-        run: |
-          set -euo pipefail
-
-          TMP_FILE=/tmp/kubeconfig
-          RAW="${KUBE_CONFIG:-}"
-          B64="${KUBECONFIG_B64:-}"
-
-          if [ -z "$RAW" ] && [ -z "$B64" ]; then
-            echo "::error::KUBE_CONFIG and KUBECONFIG_B64 are both empty"
-            exit 1
-          fi
-
-          write_if_yaml() {
-            local content="$1"
-            if printf '%s' "$content" | grep -qE '(^|[[:space:]])apiVersion:[[:space:]]*v1'; then
-              printf '%s\n' "$content" > "$TMP_FILE"
-              return 0
-            fi
-            return 1
-          }
-
-          if [ -n "$RAW" ] && write_if_yaml "$RAW"; then
-            echo "Using KUBE_CONFIG as raw kubeconfig YAML"
-          elif [ -n "$RAW" ]; then
-            if printf '%s' "$RAW" | base64 -d > "$TMP_FILE" 2>/dev/null; then
-              echo "Decoded KUBE_CONFIG from base64"
-            else
-              echo "::error::KUBE_CONFIG is not valid kubeconfig YAML or base64-encoded kubeconfig"
-              exit 1
-            fi
-          elif printf '%s' "$B64" | base64 -d > "$TMP_FILE" 2>/dev/null; then
-            echo "Decoded KUBECONFIG_B64"
-          else
-            echo "::error::KUBECONFIG_B64 is not valid base64 kubeconfig"
-            exit 1
-          fi
-
-          if ! grep -qE '(^|[[:space:]])apiVersion:[[:space:]]*v1' "$TMP_FILE"; then
-            echo "::error::Decoded kubeconfig does not appear valid (missing apiVersion: v1)"
-            exit 1
-          fi
-
-          chmod 600 "$TMP_FILE"
-          echo "KUBECONFIG=$TMP_FILE" >> "$GITHUB_ENV"
-        env:
-          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
-          KUBECONFIG_B64: ${{ secrets.KUBECONFIG_B64 }}
-
-      - name: Install Helm
-        uses: azure/setup-helm@v5
-        with:
-          version: '3.16.3'
-
-      - name: Wait for Kubernetes API (pre-secret sync)
-        run: |
-          set -euo pipefail
-
-          wait_for_kube_api() {
-            local max_tries="${1:-30}"
-            local sleep_seconds="${2:-10}"
-            local attempt=1
-            while [ "${attempt}" -le "${max_tries}" ]; do
-              if kubectl --kubeconfig /tmp/kubeconfig --request-timeout=10s get --raw='/version' >/dev/null 2>&1; then
-                echo "Kubernetes API reachable (attempt ${attempt}/${max_tries})."
-                return 0
-              fi
-              echo "Waiting for Kubernetes API (attempt ${attempt}/${max_tries})..."
-              sleep "${sleep_seconds}"
-              attempt=$((attempt + 1))
-            done
-            echo "::error::Kubernetes API remained unreachable after ${max_tries} attempts."
-            return 1
-          }
-
-          wait_for_kube_api 30 10
-
-      - name: Sync runtime secrets to k8s (pre-deploy)
-        run: |
-          set -euo pipefail
-          NS="tradersapp"
-          RUNTIME_ENV="/tmp/runtime-secrets.env"
-          INFISICAL_ENV="/tmp/infisical-runtime.env"
-
-          wait_for_kube_api() {
-            local max_tries="${1:-24}"
-            local sleep_seconds="${2:-10}"
-            local attempt=1
-            while [ "${attempt}" -le "${max_tries}" ]; do
-              if kubectl --kubeconfig /tmp/kubeconfig --request-timeout=10s get --raw='/version' >/dev/null 2>&1; then
-                return 0
-              fi
-              echo "Waiting for Kubernetes API (attempt ${attempt}/${max_tries})..."
-              sleep "${sleep_seconds}"
-              attempt=$((attempt + 1))
-            done
-            echo "::error::Kubernetes API remained unreachable after ${max_tries} attempts."
-            return 1
-          }
-
-          kubectl_retry() {
-            local max_tries="${1:-18}"
-            shift
-            local attempt=1
-            while [ "${attempt}" -le "${max_tries}" ]; do
-              if "$@"; then
-                return 0
-              fi
-              echo "kubectl command failed (attempt ${attempt}/${max_tries}), retrying..."
-              wait_for_kube_api 6 5 || true
-              sleep 5
-              attempt=$((attempt + 1))
-            done
-            echo "::error::kubectl command failed after ${max_tries} attempts: $*"
-            return 1
-          }
-
-          wait_for_kube_api 24 10
-
-          kubectl --kubeconfig /tmp/kubeconfig create namespace "${NS}" --dry-run=client -o yaml > /tmp/tradersapp-namespace.yaml
-          kubectl_retry 24 kubectl --kubeconfig /tmp/kubeconfig apply --validate=false -f /tmp/tradersapp-namespace.yaml
-
-          : > "${RUNTIME_ENV}"
-          if [ -n "${{ secrets.INFISICAL_TOKEN }}" ]; then
-            curl -1sLf 'https://artifacts-cli.infisical.com/setup.deb.sh' | sudo -E bash
-            sudo apt-get update && sudo apt-get install -y infisical
-            export INFISICAL_TOKEN=${{ secrets.INFISICAL_TOKEN }}
-            infisical secrets pull \
-              --env=production \
-              --projectId=0e4f9b8b-846e-4e66-a4aa-97c8fa9863ab \
-              --format=env > "${INFISICAL_ENV}" 2>/dev/null || true
-
-            if [ -s "${INFISICAL_ENV}" ]; then
-              sed -E 's/^export[[:space:]]+//' "${INFISICAL_ENV}" | \
-                awk '/^[A-Za-z_][A-Za-z0-9_]*=.*/ {print $0}' > "${RUNTIME_ENV}"
-            fi
-          else
-            echo "::warning::INFISICAL_TOKEN not set - using fallback runtime secrets for bootability"
-          fi
-
-          if ! grep -q '^DATABASE_URL=' "${RUNTIME_ENV}" 2>/dev/null; then
-            echo "DATABASE_URL=sqlite:////tmp/trading_data.db" >> "${RUNTIME_ENV}"
-          fi
-          if ! grep -q '^NODE_ENV=' "${RUNTIME_ENV}" 2>/dev/null; then
-            echo "NODE_ENV=production" >> "${RUNTIME_ENV}"
-          fi
-
-          for secret_name in ml-engine-secrets bff-secrets tradersapp-secrets; do
-            kubectl --kubeconfig /tmp/kubeconfig -n "${NS}" create secret generic "${secret_name}" \
-              --from-env-file="${RUNTIME_ENV}" \
-              --dry-run=client -o yaml > "/tmp/${secret_name}.yaml"
-            kubectl_retry 24 kubectl --kubeconfig /tmp/kubeconfig apply --validate=false -f "/tmp/${secret_name}.yaml"
-          done
-
-      - name: Resolve OCI edge bootstrap mode (production)
-        id: edge_mode
-        run: |
-          ENABLE_EDGE_BOOTSTRAP="false"
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.bootstrap_edge }}" = "true" ]; then
-            ENABLE_EDGE_BOOTSTRAP="true"
-          fi
-          echo "enabled=${ENABLE_EDGE_BOOTSTRAP}" >> "$GITHUB_OUTPUT"
-          if [ "${ENABLE_EDGE_BOOTSTRAP}" = "true" ]; then
-            echo "OCI edge bootstrap enabled for this run."
-          else
-            echo "::notice::Skipping OCI edge bootstrap in the automatic deploy path so the free-tier node can stabilize the core runtime first."
-          fi
-
-      # ── Deploy ML Engine + BFF via Helm on Oracle Cloud k3s ────────────
-      - name: Deploy to Oracle Cloud k3s (production)
-        run: |
-          set -euo pipefail
-          OWNER_LC="${GITHUB_REPOSITORY_OWNER,,}"
-          IMAGE_REPO="ghcr.io/${OWNER_LC}"
-
-          wait_for_kube_api() {
-            local max_tries="${1:-24}"
-            local sleep_seconds="${2:-10}"
-            local attempt=1
-            while [ "${attempt}" -le "${max_tries}" ]; do
-              if kubectl --kubeconfig /tmp/kubeconfig --request-timeout=10s get --raw='/version' >/dev/null 2>&1; then
-                echo "Kubernetes API reachable (attempt ${attempt}/${max_tries})."
-                return 0
-              fi
-              echo "Waiting for Kubernetes API (attempt ${attempt}/${max_tries})..."
-              sleep "${sleep_seconds}"
-              attempt=$((attempt + 1))
-            done
-            echo "::error::Kubernetes API remained unreachable after ${max_tries} attempts."
-            return 1
-          }
-
-          kubectl_retry() {
-            local max_tries="${1:-6}"
-            shift
-            local attempt=1
-            while [ "${attempt}" -le "${max_tries}" ]; do
-              if "$@"; then
-                return 0
-              fi
-              echo "kubectl command failed (attempt ${attempt}/${max_tries}), retrying..."
-              wait_for_kube_api 4 5 || true
-              sleep 5
-              attempt=$((attempt + 1))
-            done
-            echo "::error::kubectl command failed after ${max_tries} attempts: $*"
-            return 1
-          }
-
-          force_purge_helm_metadata() {
-            echo "Force-purging stale Helm metadata for tradersapp."
-            kubectl_retry 6 kubectl --kubeconfig /tmp/kubeconfig -n tradersapp delete secret \
-              -l owner=helm,name=tradersapp --ignore-not-found=true || true
-            kubectl_retry 6 kubectl --kubeconfig /tmp/kubeconfig -n tradersapp delete configmap \
-              -l OWNER=TILLER,NAME=tradersapp --ignore-not-found=true || true
-          }
-
-          cleanup_stale_release_workloads() {
-            echo "Cleaning stale workloads for tradersapp release."
-            kubectl_retry 6 kubectl --kubeconfig /tmp/kubeconfig -n tradersapp delete \
-              deployment,statefulset,daemonset,replicaset,pod,job,cronjob,ingress,service,configmap,horizontalpodautoscaler,poddisruptionbudget \
-              -l app.kubernetes.io/instance=tradersapp --ignore-not-found=true || true
-            kubectl_retry 6 kubectl --kubeconfig /tmp/kubeconfig -n tradersapp delete persistentvolumeclaim \
-              redis-pvc ml-models-pvc ml-state-pvc mlflow-postgres-pvc minio-pvc tradersapp-feast-features data-kafka-0 \
-              --ignore-not-found=true || true
-          }
-
-          cleanup_legacy_disabled_stack() {
-            echo "Cleaning stale legacy workloads disabled by the micro profile."
-            kubectl_retry 6 kubectl --kubeconfig /tmp/kubeconfig -n tradersapp delete \
-              deployment,statefulset,daemonset,replicaset,pod,job,cronjob,service,persistentvolumeclaim,poddisruptionbudget \
-              -l 'app in (analysis-service,mlflow,mlflow-postgres,minio,feast,triton)' --ignore-not-found=true || true
-            kubectl_retry 6 kubectl --kubeconfig /tmp/kubeconfig -n tradersapp delete job minio-setup \
-              --ignore-not-found=true || true
-            kubectl_retry 6 kubectl --kubeconfig /tmp/kubeconfig -n tradersapp delete persistentvolumeclaim \
-              redis-pvc ml-models-pvc ml-state-pvc mlflow-postgres-pvc minio-pvc tradersapp-feast-features tradersapp-tradersapp-feast-features tradersapp-tradersapp-triton-models data-kafka-0 \
-              --ignore-not-found=true || true
-          }
-
-          dump_cluster_diagnostics() {
-            echo "Collecting tradersapp cluster diagnostics."
-            wait_for_kube_api 6 5 || true
-            kubectl --kubeconfig /tmp/kubeconfig get nodes -o wide || true
-            kubectl --kubeconfig /tmp/kubeconfig get --raw='/readyz?verbose' || true
-            kubectl --kubeconfig /tmp/kubeconfig -n tradersapp get deployment,pod,service,ingress,pvc -o wide || true
-            kubectl --kubeconfig /tmp/kubeconfig -n tradersapp get events --sort-by=.metadata.creationTimestamp || true
-            for node in $(kubectl --kubeconfig /tmp/kubeconfig get nodes -o name 2>/dev/null); do
-              echo "--- describe ${node}"
-              kubectl --kubeconfig /tmp/kubeconfig describe "${node}" || true
-            done
-            for pod in $(kubectl --kubeconfig /tmp/kubeconfig -n tradersapp get pods -o name 2>/dev/null); do
-              pod_name="${pod#pod/}"
-              echo "--- logs ${pod}"
-              kubectl --kubeconfig /tmp/kubeconfig -n tradersapp logs "${pod_name}" --all-containers=true --tail=200 || true
-              echo "--- previous logs ${pod}"
-              kubectl --kubeconfig /tmp/kubeconfig -n tradersapp logs "${pod_name}" --all-containers=true --tail=200 --previous || true
-              echo "--- describe ${pod}"
-              kubectl --kubeconfig /tmp/kubeconfig -n tradersapp describe "${pod}" || true
-            done
-          }
-
-          recover_helm_release_state() {
-            local release_status=""
-            local last_deployed_rev=""
-            local history_json=""
-            local total_count=0
-            local deployed_count=0
-
-            release_status="$(helm status tradersapp \
-              --namespace tradersapp \
-              --kubeconfig /tmp/kubeconfig 2>/dev/null | awk '/^STATUS:/{print $2}' || true)"
-
-            if [[ "${release_status}" == pending-* ]] || [[ "${release_status}" == uninstalling ]]; then
-              echo "Detected locked Helm release state: ${release_status}. Attempting recovery."
-              last_deployed_rev="$(helm history tradersapp \
-                --namespace tradersapp \
-                --kubeconfig /tmp/kubeconfig \
-                -o json 2>/dev/null | python3 -c "import sys,json; h=json.load(sys.stdin); d=[x for x in h if str(x.get('status','')).lower()=='deployed']; print(d[-1].get('revision','') if d else '')" 2>/dev/null || true)"
-              if [ -n "${last_deployed_rev}" ]; then
-                echo "Rolling back to last deployed revision: ${last_deployed_rev}"
-                helm rollback tradersapp "${last_deployed_rev}" \
-                  --namespace tradersapp \
-                  --wait \
-                  --timeout 5m \
-                  --kubeconfig /tmp/kubeconfig || true
-              else
-                echo "No previously deployed revision found. Uninstalling locked release before reinstall."
-                if ! helm uninstall tradersapp \
-                  --namespace tradersapp \
-                  --kubeconfig /tmp/kubeconfig; then
-                  echo "Helm uninstall failed, forcing metadata purge."
-                  force_purge_helm_metadata
-                fi
-                cleanup_stale_release_workloads
-              fi
-            fi
-
-            # If history exists but there is no deployed revision, Helm upgrade can fail with:
-            # "has no deployed releases". Purge once to allow clean install.
-            history_json="$(helm history tradersapp \
-              --namespace tradersapp \
-              --kubeconfig /tmp/kubeconfig \
-              -o json 2>/dev/null || true)"
-            if [ -n "${history_json}" ]; then
-              read -r total_count deployed_count <<< "$(printf '%s' "${history_json}" | python3 -c "import sys,json; h=json.load(sys.stdin); print(len(h), sum(1 for x in h if str(x.get('status','')).lower()=='deployed'))" 2>/dev/null || echo '0 0')"
-              if [ "${total_count}" -gt 0 ] && [ "${deployed_count}" -eq 0 ]; then
-                echo "Release history has no deployed revisions. Uninstalling stale release metadata before fresh install."
-                if ! helm uninstall tradersapp \
-                  --namespace tradersapp \
-                  --kubeconfig /tmp/kubeconfig; then
-                  echo "Helm uninstall failed, forcing metadata purge."
-                  force_purge_helm_metadata
-                fi
-                force_purge_helm_metadata
-                cleanup_stale_release_workloads
-              fi
-            fi
-          }
-
-          collect_progress_snapshots() {
-            local interval_seconds="${1:-60}"
-            while true; do
-              echo "===== tradersapp progress snapshot $(date -u +"%Y-%m-%dT%H:%M:%SZ") ====="
-              kubectl --kubeconfig /tmp/kubeconfig get nodes -o wide || true
-              kubectl --kubeconfig /tmp/kubeconfig get --raw='/readyz?verbose' 2>/dev/null | tail -n 20 || true
-              kubectl --kubeconfig /tmp/kubeconfig -n tradersapp get deployment,replicaset,pod,service,pvc -o wide || true
-              kubectl --kubeconfig /tmp/kubeconfig -n tradersapp get events --sort-by=.metadata.creationTimestamp 2>/dev/null | tail -n 60 || true
-              for pod in $(kubectl --kubeconfig /tmp/kubeconfig -n tradersapp get pods -o name 2>/dev/null); do
-                pod_name="${pod#pod/}"
-                echo "--- live logs ${pod}"
-                kubectl --kubeconfig /tmp/kubeconfig -n tradersapp logs "${pod_name}" --all-containers=true --tail=80 || true
-                echo "--- previous logs ${pod}"
-                kubectl --kubeconfig /tmp/kubeconfig -n tradersapp logs "${pod_name}" --all-containers=true --tail=80 --previous || true
-              done
-              sleep "${interval_seconds}"
-            done
-          }
-
-          wait_for_kube_api 24 10
-          DEPLOY_TAG="${GITHUB_SHA}"
-          echo "Deploying minimal core runtime with image tag ${DEPLOY_TAG}."
-
-          ATTEMPT=1
-          MAX_ATTEMPTS=3
-          while true; do
-            DEPLOY_LOG="$(mktemp)"
-            PROGRESS_LOG="$(mktemp)"
-            collect_progress_snapshots 45 >"${PROGRESS_LOG}" 2>&1 &
-            COLLECTOR_PID=$!
-            set +e
-            bash ./scripts/k8s/deploy-core-minimal.sh \
-              --kubeconfig /tmp/kubeconfig \
-              --namespace tradersapp \
-              --image-repo "${IMAGE_REPO}" \
-              --image-tag "${DEPLOY_TAG}" >"${DEPLOY_LOG}" 2>&1
-            DEPLOY_RC=$?
-            set -e
-            kill "${COLLECTOR_PID}" 2>/dev/null || true
-            wait "${COLLECTOR_PID}" 2>/dev/null || true
-            DEPLOY_OUTPUT="$(cat "${DEPLOY_LOG}")"
-            if [ "${DEPLOY_RC}" -ne 0 ] && [ -s "${PROGRESS_LOG}" ]; then
-              echo "===== deployment progress snapshots ====="
-              cat "${PROGRESS_LOG}"
-            fi
-            printf '%s\n' "${DEPLOY_OUTPUT}"
-            rm -f "${DEPLOY_LOG}" "${PROGRESS_LOG}"
-
-            if [ "${DEPLOY_RC}" -eq 0 ]; then
-              break
-            fi
-
-            if printf '%s' "${DEPLOY_OUTPUT}" | grep -qiE "diskpressure|node\.kubernetes\.io/disk-pressure|untolerated taint|failedscheduling|The node had condition: \[DiskPressure\]" && [ "${ATTEMPT}" -lt "${MAX_ATTEMPTS}" ]; then
-              ATTEMPT=$((ATTEMPT + 1))
-              echo "Node pressure detected during rollout. Running OCI node recovery before retry (attempt ${ATTEMPT}/${MAX_ATTEMPTS})..."
-              bash ./scripts/k8s/recover-node-pressure.sh \
-                --kubeconfig /tmp/kubeconfig \
-                --namespace tradersapp \
-                --wait-seconds 300 || true
-              wait_for_kube_api 12 10 || true
-              sleep 20
-              continue
-            fi
-
-            if printf '%s' "${DEPLOY_OUTPUT}" | grep -qiE "failed to stat parent: stat .*/io\.containerd\.snapshotter\.v1\.overlayfs/snapshots/.*/fs: no such file or directory|parent snapshot .* does not exist|failed to create prepare snapshot dir|FailedCreatePodSandBox" && [ "${ATTEMPT}" -lt "${MAX_ATTEMPTS}" ]; then
-              ATTEMPT=$((ATTEMPT + 1))
-              echo "Containerd overlayfs snapshot corruption detected during rollout. Running OCI runtime repair before retry (attempt ${ATTEMPT}/${MAX_ATTEMPTS})..."
-              bash ./scripts/k8s/recover-node-pressure.sh \
-                --kubeconfig /tmp/kubeconfig \
-                --namespace tradersapp \
-                --wait-seconds 300 || true
-              wait_for_kube_api 24 10 || true
-              sleep 30
-              continue
-            fi
-
-            if printf '%s' "${DEPLOY_OUTPUT}" | grep -qiE "cluster unreachable|connect: connection refused|i/o timeout|unexpected EOF|context deadline exceeded|apiserver not ready" && [ "${ATTEMPT}" -lt "${MAX_ATTEMPTS}" ]; then
-              ATTEMPT=$((ATTEMPT + 1))
-              echo "Transient cluster/runtime failure detected. Retrying minimal deploy (attempt ${ATTEMPT}/${MAX_ATTEMPTS})..."
-              wait_for_kube_api 12 10 || true
-              sleep 30
-              continue
-            fi
-
-            dump_cluster_diagnostics
-            exit "${DEPLOY_RC}"
-          done
-
-          echo "Deployment complete."
-
-      - name: Upload staged deploy evidence
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: k8s-core-deploy-evidence-${{ github.run_id }}
-          path: artifacts/k8s/deploy-core-minimal/
-          if-no-files-found: ignore
-
-      - name: Bootstrap ingress-nginx + cert-manager (post-core, manual opt-in)
-        if: steps.edge_mode.outputs.enabled == 'true'
-        env:
-          CERT_MANAGER_EMAIL: ${{ vars.CERT_MANAGER_EMAIL || 'admin@example.com' }}
-        run: |
-          bash ./scripts/k8s/bootstrap-oci-edge.sh \
-            --kubeconfig /tmp/kubeconfig \
-            --cert-email "${CERT_MANAGER_EMAIL}"
-
-      - name: Summarize deferred OCI edge bootstrap
-        if: steps.edge_mode.outputs.enabled != 'true'
-        run: |
-          {
-            echo "### Production Deploy Summary"
-            echo "- Core runtime: deployed via direct kubectl apply"
-            echo "- OCI edge bootstrap: deferred"
-            echo "- Reason: on the OCI E2.1.Micro free node, ingress-nginx + cert-manager cause k3s API flaps before the core pods settle"
-            echo "- Next step: rerun this workflow manually with \`bootstrap_edge=true\` after redis, ml-engine, bff, and frontend stay Ready"
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Verify OCI production ingress resources
-        if: steps.edge_mode.outputs.enabled == 'true'
-        run: |
-          kubectl --kubeconfig /tmp/kubeconfig -n tradersapp get ingress,service,pod -o wide || true
-          kubectl --kubeconfig /tmp/kubeconfig -n ingress-nginx get daemonset,pod -o wide || true
-        continue-on-error: false
-
-      # ── Sync secrets from Infisical to k8s via External Secrets Operator ─
-      - name: Sync Infisical secrets to k8s (production)
-        run: |
-          if [ -z "${{ secrets.INFISICAL_TOKEN }}" ]; then
-            echo "⚠ INFISICAL_TOKEN not set — skipping k8s secret sync"
-            exit 0
-          fi
-          curl -1sLf 'https://artifacts-cli.infisical.com/setup.deb.sh' | sudo -E bash
-          sudo apt-get update && sudo apt-get install -y infisical
-          export INFISICAL_TOKEN=${{ secrets.INFISICAL_TOKEN }}
-          # Create/update k8s secret directly via kubectl
-          infisical secrets pull \
-            --env=production \
-            --projectId=0e4f9b8b-846e-4e66-a4aa-97c8fa9863ab \
-            --format=json > /tmp/infisical_secrets.json 2>/dev/null || {
-            echo "⚠ Could not pull Infisical secrets — check INFISICAL_TOKEN and project ID"
-            exit 0
-          }
-          if [ -s /tmp/infisical_secrets.json ]; then
-            echo "Infisical secrets pulled ✓"
-            # Trigger External Secrets Operator to sync (it watches the cluster)
-            kubectl --kubeconfig /tmp/kubeconfig -n tradersapp \
-              annotate externalsecret tradersapp-secrets \
-              force-sync=$(date +%s) --overwrite 2>/dev/null || \
-              kubectl --kubeconfig /tmp/kubeconfig -n tradersapp \
-              get externalsecret 2>/dev/null || \
-              echo "External Secrets Operator not deployed — secrets may need manual sync"
-          fi
-        continue-on-error: false
-  # -------------------------------------------------------------------------
-  # Browser Compatibility Tests (R15 gap fix -- Playwright)
-  # -------------------------------------------------------------------------
-  browser-tests:
-    name: Browser Compatibility -- Playwright
-    runs-on: ubuntu-latest
-    needs: [frontend]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Install Playwright browsers (Chromium + Firefox)
-        run: npx playwright install --with-deps chromium firefox webkit
-
-      - name: Build frontend
-        run: npm run build
-
-      - name: Serve built frontend for Playwright
-        run: |
-          npx serve dist -l 5173 &
-          sleep 5
-          curl -sf http://localhost:5173 > /dev/null && echo "Frontend ready" || exit 1
-
-      - name: Run Playwright browser compatibility tests
-        run: npx playwright test tests/e2e/playwright/browser-compatibility.spec.js
-        env:
-          PLAYWRIGHT_BASE_URL: http://localhost:5173
-          CI: true
-
-      - name: Upload Playwright report
-        uses: actions/upload-artifact@v7
-        with:
-          name: playwright-report
-          path: playwright-report/
-          retention-days: 14
-        if: always()
-
-  # -------------------------------------------------------------------------
-  # UI Quality Matrix (RC10/RS02/RS04/RS05/RS06/RS07 hard gate)
-  # -------------------------------------------------------------------------
-  ui-quality-matrix:
-    name: UI Quality Matrix -- Playwright
-    runs-on: ubuntu-latest
-    needs: [frontend]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
-
-      - name: Build frontend
-        run: npm run build
-
-      - name: Serve built frontend for Playwright
-        run: |
-          npx serve dist -l 5173 &
-          sleep 5
-          curl -sf http://localhost:5173 > /dev/null && echo "Frontend ready" || exit 1
-
-      - name: Run Playwright UI quality matrix tests
-        run: npx playwright test tests/e2e/playwright/ui-quality-matrix.spec.js --project=chromium --workers=1
-        env:
-          PLAYWRIGHT_BASE_URL: http://localhost:5173
-          CI: true
-
-      - name: Upload UI quality Playwright report
-        uses: actions/upload-artifact@v7
-        with:
-          name: playwright-report-ui-quality
-          path: playwright-report/
-          retention-days: 14
-        if: always()
-
-  # -------------------------------------------------------------------------
-  # Trigger Contabo Deploy (on push to main when platform = contabo)
-  # -------------------------------------------------------------------------
-  trigger-contabo-deploy:
-    name: Trigger Contabo Deploy
-    runs-on: ubuntu-latest
-    needs: [frontend, browser-tests, ui-quality-matrix, ml-engine, bff, unit-tests, security-bandit, type-check, dockerfile-lint, file-size-gate, architecture-contracts, integration-tests]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && vars.PRODUCTION_DEPLOY_PLATFORM == 'contabo'
-    permissions:
-      contents: write
-      packages: write
-      actions: write
-    steps:
-      - name: Trigger deploy-contabo workflow
-        run: |
-          set -euo pipefail
-          echo "Triggering deploy-contabo repository_dispatch for commit $GITHUB_SHA"
-          # Use GitHub API directly — no git checkout needed
-          curl -fsS -X POST \
-            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            -H "Accept: application/vnd.github+json" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            "https://api.github.com/repos/$GITHUB_REPOSITORY/dispatches" \
-            -d "{\"event_type\":\"deploy-contabo\",\"client_payload\":{\"ref\":\"$GITHUB_SHA\",\"image_tag\":\"$GITHUB_SHA\"}}"
-=======
           docker build -t ghcr.io/${{ github.repository }}/ml-engine:latest ml-engine/
           docker push ghcr.io/${{ github.repository }}/ml-engine:latest
         continue-on-error: false
@@ -1896,4 +958,3 @@ jobs:
             echo "Railway production secrets synced from Infisical ✓"
           fi
         continue-on-error: true
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
