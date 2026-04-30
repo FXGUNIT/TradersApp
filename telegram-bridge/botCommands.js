@@ -110,13 +110,8 @@ export async function handleBotMessage(msg) {
   }
 }
 
-// ─── Polling Setup ───────────────────────────────────────────────────────────
-
-export function setupBotPolling() {
-  if (!bot) {
-    console.log("Telegram bot not initialized (no BOT_TOKEN)");
-    return;
-  }
+function registerBotHandlers() {
+  if (!bot || botHandlersRegistered) return;
   bot.on("message", handleBotMessage);
   bot.on("edited_message", handleBotMessage);
   bot.on("callback_query", async (query) => {
@@ -144,6 +139,20 @@ export function setupBotPolling() {
   bot.on("polling_error", (err) => {
     console.error("Polling error:", err.message);
   });
+  botHandlersRegistered = true;
+}
+
+// ─── Polling Setup ───────────────────────────────────────────────────────────
+
+export function setupBotPolling() {
+  if (!bot) {
+    console.log("Telegram bot not initialized (no BOT_TOKEN)");
+    return;
+  }
+  registerBotHandlers();
+  if (typeof bot.startPolling === "function") {
+    bot.startPolling();
+  }
   console.log("Telegram bot initialized in polling mode");
 }
 
@@ -154,6 +163,7 @@ export function setupBotWebhook() {
     console.log("Telegram bot not initialized (no BOT_TOKEN)");
     return;
   }
+  registerBotHandlers();
   const webhookUrl = process.env.TELEGRAM_WEBHOOK_URL;
   if (!webhookUrl) {
     console.warn("TELEGRAM_WEBHOOK_URL not set — falling back to polling");

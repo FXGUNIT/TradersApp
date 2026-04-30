@@ -377,8 +377,12 @@ app.post("/support/threads/:uid/messages", requireSupportKey, async (req, res) =
 
 app.post("/telegram/webhook", async (req, res) => {
   try {
-    if (bot && req.body && req.body.message) {
-      handleBotMessage(req.body.message).catch(console.error);
+    if (bot && req.body) {
+      if (typeof bot.processUpdate === "function") {
+        await bot.processUpdate(req.body);
+      } else if (req.body.message) {
+        handleBotMessage(req.body.message).catch(console.error);
+      }
     }
     res.json({ ok: true });
   } catch (e) {
