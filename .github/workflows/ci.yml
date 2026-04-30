@@ -679,14 +679,20 @@ jobs:
       # ── Build Docker with secrets as runtime env (not baked into image) ─
       - name: Build Docker image
         run: |
+          OWNER_LC="${GITHUB_REPOSITORY_OWNER,,}"
+          ML_IMAGE_SHA="ghcr.io/${OWNER_LC}/ml-engine:${GITHUB_SHA}"
+          ML_IMAGE_LATEST="ghcr.io/${OWNER_LC}/ml-engine:latest"
           docker build \
-            --tag ghcr.io/${{ github.repository }}/ml-engine:${{ github.sha }} \
-            --tag ghcr.io/${{ github.repository }}/ml-engine:latest \
-            ml-engine/
+            --tag "${ML_IMAGE_SHA}" \
+            --tag "${ML_IMAGE_LATEST}" \
+            --file Dockerfile \
+            .
         continue-on-error: false
 
       - name: Docker health check
         run: |
+          OWNER_LC="${GITHUB_REPOSITORY_OWNER,,}"
+          ML_IMAGE_LATEST="ghcr.io/${OWNER_LC}/ml-engine:latest"
           docker run -d --name ml-engine-test -p 8001:8001 \
             -e AI_GEMINI_PRO_KEY \
             -e AI_GROQ_TURBO_KEY \
@@ -697,7 +703,7 @@ jobs:
             -e AI_SAMBANOVA_KEY \
             -e FINNHUB_API_KEY \
             -e NEWS_API_KEY \
-            ghcr.io/${{ github.repository }}/ml-engine:latest
+            "${ML_IMAGE_LATEST}"
           sleep 15
           docker exec ml-engine-test python -c "import httpx; r=httpx.get('http://localhost:8001/health', timeout=5); assert r.status_code == 200, r.text"
           docker stop ml-engine-test || true
