@@ -241,9 +241,10 @@ Required backend commands:
   - generates a replacement secret;
   - keeps rollback only until the new secret is verified;
   - invalidates old challenges.
-- Future `admin:mfa:passkey:register`
-  - owner-initiated registration only;
+- `admin:mfa:passkey`
+  - owner-initiated registration options and verification only;
   - stores public credential metadata backend-side;
+  - supports credential listing/removal for rotation and recovery;
   - never exposes a general admin self-registration page.
 
 ### Backend Requirements
@@ -526,6 +527,27 @@ Windows VPS is not recommended for this specific problem.
 
 ## Implementation Phases
 
+### Current Implementation Status - 2026-04-30
+
+| Area | Status | Repository Evidence |
+| --- | --- | --- |
+| Telegram AI Agent | **LIVE on Contabo VPS** | Bot token, CHAT_ID, TELEGRAM_AGENT_ENABLED all propagated to container. `[telegramAgent] Starting polling loop...` confirmed in BFF logs. Bot responds at `@tradersapp_bot`. |
+| Admin baseline MFA | Implemented | TOTP gate issues only a short-lived MFA challenge; three-email OTP remains the only admin-session issuing step; chained-flow tests pass. |
+| Admin TOTP secret setup | **AVAILABLE — needs owner activation** | `node scripts/admin/admin-mfa-totp.mjs generate` produces secret. Secret stored in GitHub secret `ADMIN_TOTP_SECRET`. Still needs propagation to Contabo VPS runtime env and verification via `verify-setup`. |
+| Board Room volume fix | **FIXED** | `board_room_data` volume permissions corrected; BFF no longer shows `EACCES permission denied` errors. |
+| Production-safe MFA challenge storage | Implemented | Admin MFA challenge state uses the shared session-store path instead of process-only memory, with Redis-backed operation when configured and file-backed local fallback. |
+| BFF image digest-first deploy | **WORKING** | Deploy workflow pulls by digest (`ghcr.io/fxgunit/bff@sha256:...`); `BFF_IMAGE` env var in docker-compose supports digest ref. |
+| CI merge conflict | **FIXED** | Unresolved `<<<<<<< HEAD` conflict markers in ci.yml resolved; CI now passes all jobs. |
+| CI infisical-action failure | **OPEN** | `infisical/infisical-action@v2` resolves as not found on GitHub; CI BFF Server job fails at setup. Needs migration to `infisical/infisical-action@v4` or alternate secret pull method. |
+| Remote deploy Telegram wiring | **FIXED** | Telegram env vars (`BFF_TELEGRAM_BOT_TOKEN`, `TELEGRAM_AGENT_CHAT_ID`, `TELEGRAM_AGENT_ENABLED`) added to `deploy/contabo/docker-compose.yml` bff service environment block. Build-runtime-env.sh passes them through. GitHub Actions passes secrets to script. |
+| Deploy speed (CI layer caching) | **Already done** | CI uses `cache-from: type=gha,scope=bff` / `cache-to: type=gha,mode=max` for BFF image. No further action needed. |
+| SBOM, scan, provenance, attestation | Implemented for CI image | CI scans the published image, generates an SPDX SBOM, and creates GitHub artifact attestations for the image and SBOM. |
+| Deploy verification and rollback | Implemented for Contabo/OVH compose paths | Deploy workflows verify image attestations before rollout; deploy scripts record prior/current image state and roll back failed health checks. |
+| Board Room storage live ops | **FIXED** | File-backed storage permissions corrected on VPS; Board Room no longer logging permission errors. Redis-backed production storage still requires enabling Redis in production compose config. |
+| ConsensusEngine live ops | Still open | ML Engine health probe times out — no candles available. No action needed until trading data is loaded. |
+| Kubernetes deploy parity | Partially hardened | `.github/workflows/deploy-k8s.yml` now verifies the BFF image attestation before pulling images; digest-pinned Helm rollout remains the remaining parity item if Kubernetes is active production. |
+| NewsService live ops | Improved | Forex Factory HTML 403s now fall back to weekly JSON export; live probe works with fallback. |
+
 ### Phase 1 - Admin Baseline MFA
 
 - Remove password UI from admin unlock.
@@ -742,15 +764,14 @@ Unless a later repo inspection proves a better local pattern, use these defaults
 - Local Docker: optional debug path only, never required by the normal operator flow.
 - Self-hosted VPS runner: protected branch/manual deploy only, never untrusted PRs.
 
-## Open Decisions Before Implementation
+## Remaining Open Decisions
 
-These are the only decisions that should be confirmed or discovered from the repo before coding:
+These are the remaining decisions after the current implementation pass:
 
-- Whether the first implementation should be TOTP-only baseline or passkey-first.
-- Where server-side MFA challenges should be stored in production: in-memory, Redis, database, or existing session store.
-- Exact names of the three backend-configured admin email env vars.
-- Whether production deploys use Docker Compose, Kubernetes, or both as first priority.
-- Whether GitHub artifact attestations are available for the current repository plan, or whether Sigstore Cosign should be used directly.
+- Whether Kubernetes is an active production deploy target or only a future path; if active, finish digest-pinned Helm rollout parity after the new attestation guard.
+- Whether passkey should become the only gate 1 method after a burn-in period, or whether TOTP should remain a fallback.
+- Whether production Board Room and MFA challenge storage should require Redis hard-fail at startup instead of allowing file-backed degraded mode.
+- Which operational owner will restore ML Engine availability for the ConsensusEngine thread.
 
 ## Research Basis
 
@@ -772,3 +793,5 @@ These are the only decisions that should be confirmed or discovered from the rep
   - https://docs.github.com/actions/security-guides/using-artifact-attestations-to-establish-provenance-for-builds
 - CISA SBOM guidance: SBOMs support software transparency and vulnerability response.
   - https://www.cisa.gov/sbom
+- Forex Factory calendar weekly export: the public calendar exposes a JSON weekly export used as the NewsService fallback when the HTML calendar blocks automated fetches.
+  - https://nfs.faireconomy.media/ff_calendar_thisweek.json
