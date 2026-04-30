@@ -8,7 +8,8 @@ ENV ML_ENGINE_URL=http://ml-engine:8001
 
 RUN apk upgrade --no-cache \
     && addgroup -S tradersapp \
-    && adduser -S tradersapp -G tradersapp
+    && adduser -S tradersapp -G tradersapp \
+    && apk add --no-cache gosu
 
 COPY bff/package.json bff/package-lock.json ./bff/
 WORKDIR /app/bff
@@ -26,8 +27,6 @@ RUN mkdir -p /app/runtime /app/board-room /app/bff/data \
 
 COPY bff/docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod 755 /app/docker-entrypoint.sh
-
-USER tradersapp
 
 EXPOSE 8788
 
