@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Cloudflare Wrangler Config - optional free workers.dev experiments.
 # Do not configure traders.app routes here; that domain is not owned.
 # Used for managing Workers via CLI after Cloudflare auth is available.
@@ -24,35 +23,6 @@ ENVIRONMENT = "production"
 # wrangler secret put ML_ENGINE_URL
 # DO NOT commit actual values here.
 
-=======
-# Cloudflare Wrangler Config — traders.app
-# Used for managing DNS, WAF rules, and Workers via CLI.
-# Copy to wrangler.toml (without .example) and add your CLOUDFLARE_API_TOKEN.
-#
-# Install: npm install -g wrangler
-# Auth:    wrangler auth
-# Deploy:  wrangler deploy
-#
-# NOTE: This config manages Cloudflare Workers/routes for the app.
-# DNS records and WAF rules are managed via the Cloudflare Dashboard.
-# See docs/DEPLOYMENT.md for the full WAF setup guide.
-
-name = "traders-app"
-main = "src/index.ts"
-compatibility_date = "2024-01-01"
-compatibility_flags = ["nodejs_compat"]
-
-# Environment variables (set via `wrangler secret put` or Cloudflare dashboard)
-[vars]
-ENVIRONMENT = "production"
-
-# Secrets — set via:
-# wrangler secret put BFF_URL
-# wrangler secret put ML_ENGINE_URL
-# DO NOT commit actual values here
-
-# Workers KV for caching
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 [[kv_namespaces]]
 binding = "MODEL_CACHE"
 id = "<KV_NAMESPACE_ID>"
@@ -61,29 +31,15 @@ id = "<KV_NAMESPACE_ID>"
 binding = "SESSION_CACHE"
 id = "<KV_NAMESPACE_ID>"
 
-<<<<<<< HEAD
-=======
-# D1 Database (SQLite on Cloudflare edge — optional upgrade path)
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 # [[d1_databases]]
 # binding = "TRADING_DB"
 # database_name = "traders-app"
 # database_id = "<D1_DATABASE_ID>"
 
-<<<<<<< HEAD
-=======
-# Custom build for Workers
-# Workers don't run Node.js natively — use edge-compatible code
-# This is for future Cloudflare Workers features (rate limiting, edge auth)
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 [build]
 command = "npm run build:worker"
 cwd = "."
 
-<<<<<<< HEAD
-=======
-# Dev settings
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 [dev]
 port = 8787
 local_protocol = "http"

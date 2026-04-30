@@ -128,12 +128,9 @@ def auto_backup(
             "*.pyc",
             ".pytest_cache/",
             "*.egg-info/",
-<<<<<<< HEAD
             "htmlcov/",
             ".coverage",
             "coverage/",
-=======
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
             ".env",
             ".env.local",
             "*.log",

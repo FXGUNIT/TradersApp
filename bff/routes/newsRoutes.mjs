@@ -17,13 +17,6 @@ import {
   triggerMLRetrainOnNews,
   getNewsReactions,
 } from "../services/breakingNewsService.mjs";
-<<<<<<< HEAD
-=======
-
-// In-process cache for breaking news (30s TTL)
-let _breakingCache = null;
-let _breakingCacheTs = 0;
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 
 export function createNewsRouteHandler({
   json,
@@ -86,37 +79,18 @@ export function createNewsRouteHandler({
       }
     }
 
-<<<<<<< HEAD
     // GET /news/breaking — real-time breaking news backed by shared Redis cache
-=======
-    // GET /news/breaking — real-time breaking news (30s polling safe)
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
     if (req.method === "GET" && pathname === "/news/breaking") {
       try {
         const fresh = url.searchParams.get("fresh") === "true";
         const minImpact = url.searchParams.get("minImpact") || "LOW";
         const maxItems = parseInt(url.searchParams.get("max") || "30", 10);
-<<<<<<< HEAD
         const data = await fetchBreakingNews({ fresh, maxItems, minImpact });
 
         // Fire-and-forget ML retrain on HIGH impact items
         const highImpact = data.items.filter(
           (item) => item.impact === 'HIGH' && !item.reactionLogged && item.source !== 'forexfactory',
         );
-=======
-
-        let data;
-        if (fresh || !_breakingCache || (Date.now() - _breakingCacheTs) > 600_000) {
-          data = await fetchBreakingNews({ maxItems, minImpact });
-          _breakingCache = data;
-          _breakingCacheTs = Date.now();
-        } else {
-          data = _breakingCache;
-        }
-
-        // Fire-and-forget ML retrain on HIGH impact items
-        const highImpact = data.items.filter(i => i.impact === 'HIGH' && !i.reactionLogged);
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
         for (const item of highImpact.slice(0, 2)) {
           triggerMLRetrainOnNews(item).catch(() => {});
         }
@@ -124,22 +98,13 @@ export function createNewsRouteHandler({
         json(res, 200, {
           ok: true,
           ...data,
-<<<<<<< HEAD
-=======
-          cached: !fresh,
-          cacheAgeMs: fresh ? 0 : (Date.now() - _breakingCacheTs),
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
         }, origin);
         return true;
       } catch (err) {
         console.error('[newsRoutes] /news/breaking error:', err.message);
         json(res, 200, {
           ok: false,
-<<<<<<< HEAD
           error: 'News service temporarily unavailable.',
-=======
-          error: err.message,
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
           items: [],
           total: 0,
           highImpactCount: 0,
@@ -153,30 +118,17 @@ export function createNewsRouteHandler({
       try {
         const minutes = parseInt(url.searchParams.get("minutes") || "120", 10);
         const reactions = getRecentNewsReactions(minutes);
-<<<<<<< HEAD
         const cached = await getCachedNews({ maxItems: 20 });
-=======
-        const cached = getCachedNews();
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 
         json(res, 200, {
           ok: true,
           reactions,
-<<<<<<< HEAD
           recentNews: cached.items,
           fetchedAt: cached.fetchedAt,
         }, origin);
         return true;
       } catch (err) {
         json(res, 200, { ok: false, error: 'News service temporarily unavailable.', reactions: [], recentNews: [] }, origin);
-=======
-          recentNews: cached.items.slice(0, 20),
-          fetchedAt: new Date().toISOString(),
-        }, origin);
-        return true;
-      } catch (err) {
-        json(res, 200, { ok: false, error: err.message, reactions: [], recentNews: [] }, origin);
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
         return true;
       }
     }
@@ -210,11 +162,7 @@ export function createNewsRouteHandler({
         json(res, 200, { ok: true, reaction: reactionData }, origin);
         return true;
       } catch (err) {
-<<<<<<< HEAD
         json(res, 500, { ok: false, error: "News service temporarily unavailable." }, origin);
-=======
-        json(res, 500, { ok: false, error: err.message }, origin);
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
         return true;
       }
     }
@@ -229,11 +177,7 @@ export function createNewsRouteHandler({
         json(res, 200, { ok: true }, origin);
         return true;
       } catch (err) {
-<<<<<<< HEAD
         json(res, 500, { ok: false, error: "News service temporarily unavailable." }, origin);
-=======
-        json(res, 500, { ok: false, error: err.message }, origin);
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
         return true;
       }
     }

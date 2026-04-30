@@ -4,16 +4,11 @@
  *
  * Provides:
  * - Security headers (CSP, HSTS, X-Frame, etc.)
-<<<<<<< HEAD
  * - Per-IP rate limiting configuration
-=======
- * - Per-IP rate limiting (sliding window, in-memory)
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
  * - Role-Based Access Control (RBAC)
  * - Admin session token management
  */
 
-<<<<<<< HEAD
 import {
   ADMIN_SESSION_PREFIX,
   createSession,
@@ -23,8 +18,6 @@ import {
 } from "./redis-session-store.mjs";
 import { verifyKeycloakToken } from "./keycloakJwtVerifier.mjs";
 
-=======
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 // ---------------------------------------------------------------------------
 // Security headers — injected on every response
 // ---------------------------------------------------------------------------
@@ -43,13 +36,8 @@ export const SECURITY_HEADERS = {
   "Referrer-Policy": "strict-origin-when-cross-origin",
   // Disable caching of sensitive responses
   "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
-<<<<<<< HEAD
   Pragma: "no-cache",
   Expires: "0",
-=======
-  "Pragma": "no-cache",
-  "Expires": "0",
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
   // Permissions policy (disable unnecessary browser features)
   "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=()",
 };
@@ -65,12 +53,8 @@ export const CSP_HEADER = [
 ].join("; ");
 
 export function addSecurityHeaders(headers) {
-<<<<<<< HEAD
   headers["X-Content-Type-Options"] =
     SECURITY_HEADERS["X-Content-Type-Options"];
-=======
-  headers["X-Content-Type-Options"] = SECURITY_HEADERS["X-Content-Type-Options"];
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
   headers["X-Frame-Options"] = SECURITY_HEADERS["X-Frame-Options"];
   headers["X-XSS-Protection"] = SECURITY_HEADERS["X-XSS-Protection"];
   headers["Referrer-Policy"] = SECURITY_HEADERS["Referrer-Policy"];
@@ -109,15 +93,11 @@ export class RateLimiter {
 
     if (!entry || entry.length === 0) {
       this._store.set(clientKey, [{ ts: now, count: 1 }]);
-<<<<<<< HEAD
       return {
         allowed: true,
         remaining: this.maxRequests - 1,
         resetMs: this.windowMs,
       };
-=======
-      return { allowed: true, remaining: this.maxRequests - 1, resetMs: this.windowMs };
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
     }
 
     // Filter to requests within current window
@@ -126,15 +106,11 @@ export class RateLimiter {
     if (valid.length === 0) {
       // All expired — start fresh
       this._store.set(clientKey, [{ ts: now, count: 1 }]);
-<<<<<<< HEAD
       return {
         allowed: true,
         remaining: this.maxRequests - 1,
         resetMs: this.windowMs,
       };
-=======
-      return { allowed: true, remaining: this.maxRequests - 1, resetMs: this.windowMs };
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
     }
 
     const totalCount = valid.reduce((sum, r) => sum + r.count, 0);
@@ -149,15 +125,11 @@ export class RateLimiter {
     valid.push({ ts: now, count: 1 });
     this._store.set(clientKey, valid);
 
-<<<<<<< HEAD
     return {
       allowed: true,
       remaining: this.maxRequests - totalCount - 1,
       resetMs: this.windowMs,
     };
-=======
-    return { allowed: true, remaining: this.maxRequests - totalCount - 1, resetMs: this.windowMs };
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
   }
 
   /** Remove expired entries from all clients. */
@@ -205,19 +177,12 @@ export const ROUTE_PERMISSIONS = {
   // Public read-only endpoints (no auth needed)
   "/health": null,
   "/ai/status": null,
-<<<<<<< HEAD
   "/content": null, // GET /content/* — public read-only
-=======
-  "/content": null,       // GET /content/* — public read-only
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
   "/news/upcoming": null,
   "/news/countdown": null,
   "/ml/health": null,
   "/ml/status": null,
-<<<<<<< HEAD
   "/watchtower/status": null,
-=======
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 
   // ML endpoints — open (ML engine handles its own auth)
   "/ml/consensus": null,
@@ -239,22 +204,16 @@ export const ROUTE_PERMISSIONS = {
   "/admin/verify-password": ROLES.ADMIN,
   "/admin/": ROLES.ADMIN,
   "/terminal/admin": ROLES.ADMIN,
-<<<<<<< HEAD
   "/watchtower/scan": ROLES.ADMIN,
   "/admin": ROLES.ADMIN,
 
   // Board Room — CEO oversight layer, requires ADMIN role
   "/board-room": ROLES.ADMIN,
 
-=======
-  "/admin": ROLES.ADMIN,
-
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
   // Default: any authenticated user
   null: ROLES.TRADER,
 };
 
-<<<<<<< HEAD
 /** Map of valid admin sessions: token → {role, createdAt, expiresAt, device} */
 /**
  * Create an admin session and return the token.
@@ -290,36 +249,12 @@ export async function createAdminSession(
   if (!token) {
     throw new Error("Admin session store unavailable.");
   }
-=======
-/** Map of valid admin sessions: token → {role, createdAt, expiresAt} */
-const _adminSessions = new Map();
-
-/** Generate a cryptographically random session token. */
-function _generateToken() {
-  const bytes = new Uint8Array(32);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-/**
- * Create an admin session and return the token.
- * Token expires after ADMIN_SESSION_TTL_MS.
- */
-export function createAdminSession(role = ROLES.ADMIN, ttlMs = 8 * 60 * 60 * 1000) {
-  const token = _generateToken();
-  _adminSessions.set(token, {
-    role,
-    createdAt: Date.now(),
-    expiresAt: Date.now() + ttlMs,
-  });
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
   return token;
 }
 
 /**
  * Validate an admin token. Returns {valid, role} or {valid: false}.
  */
-<<<<<<< HEAD
 export async function validateAdminToken(token) {
   if (!token) return { valid: false };
 
@@ -330,22 +265,12 @@ export async function validateAdminToken(token) {
   if (!session) return { valid: false };
   if (Date.now() > session.expiresAt) {
     await deleteSession(token, { prefix: ADMIN_SESSION_PREFIX });
-=======
-export function validateAdminToken(token) {
-  if (!token) return { valid: false };
-
-  const session = _adminSessions.get(token);
-  if (!session) return { valid: false };
-  if (Date.now() > session.expiresAt) {
-    _adminSessions.delete(token);
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
     return { valid: false };
   }
   return { valid: true, role: session.role };
 }
 
 /** Revoke an admin session. */
-<<<<<<< HEAD
 export async function revokeAdminSession(token) {
   await deleteSession(token, { prefix: ADMIN_SESSION_PREFIX });
 }
@@ -381,29 +306,11 @@ export async function revokeSessionById(token) {
 /** Clean up expired sessions (call periodically). */
 export async function cleanupExpiredSessions() {
   // Redis TTL handles expiry automatically.
-=======
-export function revokeAdminSession(token) {
-  _adminSessions.delete(token);
-}
-
-/** Clean up expired sessions (call periodically). */
-export function cleanupExpiredSessions() {
-  const now = Date.now();
-  for (const [token, session] of _adminSessions.entries()) {
-    if (now > session.expiresAt) {
-      _adminSessions.delete(token);
-    }
-  }
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 }
 
 /** Check if `grantedRole` satisfies `requiredRole`. */
 export function hasPermission(grantedRole, requiredRole) {
-<<<<<<< HEAD
   if (requiredRole === null) return true; // Public
-=======
-  if (requiredRole === null) return true;  // Public
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
   if (!grantedRole) return false;
   return ROLE_RANK[grantedRole] >= ROLE_RANK[requiredRole];
 }
@@ -426,7 +333,6 @@ export function getRequiredRole(pathname) {
   return ROUTE_PERMISSIONS[null]; // Default: TRADER
 }
 
-<<<<<<< HEAD
 /** Timing-safe string comparison. */
 const constantTimeMatch = (left, right) => {
   const a = Buffer.from(String(left || ""), "utf8");
@@ -472,24 +378,11 @@ export async function authenticateRequest(req) {
   if (authHeader.startsWith("Bearer ")) {
     const token = authHeader.slice(7).trim();
     const result = await validateAdminToken(token);
-=======
-/**
- * Authenticate a request using Bearer token or admin password session.
- * Returns {authenticated: bool, role: string|null}.
- */
-export function authenticateRequest(req) {
-  const authHeader = req.headers.authorization || req.headers.Authorization || "";
-
-  if (authHeader.startsWith("Bearer ")) {
-    const token = authHeader.slice(7).trim();
-    const result = validateAdminToken(token);
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
     if (result.valid) {
       return { authenticated: true, role: result.role };
     }
   }
 
-<<<<<<< HEAD
   // 3. Service key (trusted services like Telegram bridge)
   const serviceKey = req.headers["x-support-key"] || "";
   if (serviceKey) {
@@ -499,8 +392,6 @@ export function authenticateRequest(req) {
     }
   }
 
-=======
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
   // No valid bearer token — treat as unauthenticated
   return { authenticated: false, role: null };
 }
@@ -509,17 +400,10 @@ export function authenticateRequest(req) {
  * Authorize a request: check that the request's role satisfies the route requirement.
  * Returns {authorized: bool, error: string|null}.
  */
-<<<<<<< HEAD
 export async function authorizeRequest(req) {
   const pathname = new URL(req.url || "/", "http://x").pathname;
   const requiredRole = getRequiredRole(pathname);
   const { authenticated, role } = await authenticateRequest(req);
-=======
-export function authorizeRequest(req) {
-  const pathname = new URL(req.url || "/", "http://x").pathname;
-  const requiredRole = getRequiredRole(pathname);
-  const { authenticated, role } = authenticateRequest(req);
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 
   if (requiredRole === null) {
     return { authorized: true, role: role || ROLES.TRADER };
@@ -530,14 +414,10 @@ export function authorizeRequest(req) {
   }
 
   if (!hasPermission(role, requiredRole)) {
-<<<<<<< HEAD
     return {
       authorized: false,
       error: `Insufficient permissions. Required: ${requiredRole}`,
     };
-=======
-    return { authorized: false, error: `Insufficient permissions. Required: ${requiredRole}` };
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
   }
 
   return { authorized: true, role };
@@ -566,19 +446,15 @@ export const RATE_LIMIT_CONFIGS = {
   /** Terminal writes: 60 / minute per IP */
   terminalWrite: { windowMs: 60_000, maxRequests: 60 },
 
-<<<<<<< HEAD
   /** Monte Carlo trade sim: 60 / minute per IP (pure CPU math, no I/O) */
   tradeCalc: { windowMs: 60_000, maxRequests: 60 },
 
-=======
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
   /** Health/status: 300 / minute per IP (cheap) */
   health: { windowMs: 60_000, maxRequests: 300 },
 };
 
 /** Determine rate limit config based on request path. */
 export function getRateLimitConfig(pathname) {
-<<<<<<< HEAD
   if (
     pathname.startsWith("/ml/consensus") ||
     pathname.startsWith("/ml/train")
@@ -666,22 +542,4 @@ export function isOutboundUrlAllowed(url) {
     return false;
   }
   return true;
-=======
-  if (pathname.startsWith("/ml/consensus") || pathname.startsWith("/ml/train")) {
-    return RATE_LIMIT_CONFIGS.mlPredict;
-  }
-  if (pathname.startsWith("/news/")) {
-    return RATE_LIMIT_CONFIGS.news;
-  }
-  if (pathname.startsWith("/admin/")) {
-    return RATE_LIMIT_CONFIGS.admin;
-  }
-  if (pathname.startsWith("/ai/")) {
-    return RATE_LIMIT_CONFIGS.aiChat;
-  }
-  if (pathname === "/health" || pathname === "/ai/status") {
-    return RATE_LIMIT_CONFIGS.health;
-  }
-  return RATE_LIMIT_CONFIGS.global;
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 }

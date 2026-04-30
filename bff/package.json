@@ -1,7 +1,6 @@
 {
   "name": "tradersapp-bff",
   "version": "1.0.0",
-<<<<<<< HEAD
   "type": "module",
   "main": "server.mjs",
   "scripts": {
@@ -28,16 +27,5 @@
   },
   "devDependencies": {
     "grpc-tools": "^1.12.4"
-=======
-  "description": "Backend-for-Frontend for TradersApp",
-  "type": "module",
-  "main": "server.mjs",
-  "scripts": {
-    "start": "node server.mjs",
-    "dev": "node server.mjs"
-  },
-  "engines": {
-    "node": ">=18.0.0"
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
   }
 }

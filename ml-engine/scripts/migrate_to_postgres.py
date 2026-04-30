@@ -42,7 +42,6 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(mess
 log = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-<<<<<<< HEAD
 # Schema — load from canonical source to avoid drift
 # ---------------------------------------------------------------------------
 
@@ -66,12 +65,6 @@ def _load_schema() -> str:
 #   CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;
 #   SELECT create_hypertable('candles_5min', 'timestamp', migrate_data => TRUE);
 SCHEMA_SQL_LEGACY = """
-=======
-# Schema — PostgreSQL + TimescaleDB
-# ---------------------------------------------------------------------------
-
-SCHEMA_SQL = """
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 -- Enable TimescaleDB extension (Neon has it pre-installed)
 CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;
 
@@ -334,15 +327,10 @@ def run_migration(source_db: str, target_url: str, verify: bool = False):
         return
 
     log.info("=== CREATING SCHEMA ===")
-<<<<<<< HEAD
     # Load canonical schema from schema_postgres.sql
     schema_sql = _load_schema()
     # Execute schema statement by statement (some may fail on re-run — non-fatal)
     for stmt in schema_sql.split(";"):
-=======
-    # Execute schema (TimescaleDB commands may need superuser)
-    for stmt in SCHEMA_SQL.split(";"):
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
         stmt = stmt.strip()
         if not stmt or stmt.startswith("--"):
             continue
@@ -407,7 +395,6 @@ def run_migration(source_db: str, target_url: str, verify: bool = False):
     # feature_importance
     migrate_table(
         src, dst, "feature_importance",
-<<<<<<< HEAD
         ["id", "model_name", "feature", "importance", "computed_at"],
         batch_size=5000,
     )
@@ -439,12 +426,6 @@ def run_migration(source_db: str, target_url: str, verify: bool = False):
     else:
         log.info("  signal_outcome not in source — skipping")
 
-=======
-        ["id", "model_name", "version", "feature", "importance", "recorded_at"],
-        batch_size=5000,
-    )
-
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
     src.close()
     dst.close()
     log.info("=== MIGRATION COMPLETE ===")

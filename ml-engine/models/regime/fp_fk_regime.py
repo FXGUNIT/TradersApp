@@ -78,20 +78,13 @@ import pandas as pd
 import sys, os
 from typing import Optional, Tuple
 from dataclasses import dataclass, field
-<<<<<<< HEAD
 from math import gamma as gamma_func
-=======
-from scipy.special import gamma as gamma_func
-from scipy.optimize import brentq
-from scipy.ndimage import gaussian_filter
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 import warnings
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 import config
 
 
-<<<<<<< HEAD
 def _brentq(func, a: float, b: float, xtol: float = 1e-4, maxiter: int = 100) -> float:
     """Small bisection root finder to avoid importing SciPy at service startup."""
     fa = func(a)
@@ -143,8 +136,6 @@ def _gaussian_filter(values: np.ndarray, sigma: float = 1.0) -> np.ndarray:
     return out
 
 
-=======
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 # =============================================================================
 # Tsallis q-Gaussian utilities
 # =============================================================================
@@ -303,11 +294,7 @@ def estimate_q_from_returns(log_returns: np.ndarray,
                 best_q = q_try
 
         try:
-<<<<<<< HEAD
             result = _brentq(
-=======
-            result = brentq(
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
                 lambda q: neg_log_likelihood(q) - best_ll - 0.5,
                 0.6, 2.8, xtol=1e-4
             )
@@ -450,11 +437,7 @@ def find_wave_front_position(f: np.ndarray, axis: int = 0) -> float:
     grad = np.gradient(f, axis=axis)
     # Find inflection point (zero crossing of second derivative)
     grad2 = np.gradient(grad, axis=axis)
-<<<<<<< HEAD
     grad2_smooth = _gaussian_filter(grad2, sigma=1)
-=======
-    grad2_smooth = gaussian_filter(grad2, sigma=1)
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 
     # Find peak of |second derivative| (inflection point)
     abs_grad2 = np.abs(grad2_smooth)

@@ -13,7 +13,6 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-<<<<<<< HEAD
 import { resolveBffBaseUrl } from '../services/runtimeConfig.js';
 
 const BFF_BASE = resolveBffBaseUrl();
@@ -38,28 +37,6 @@ function ChatListItem({ chat, isSelected, onClick }) {
   const lastMsg = chat.lastMessage || {};
   const hasUnread = chat.unreadCount > 0;
 
-=======
-
-const BFF_BASE = import.meta.env.VITE_BFF_URL || '';
-const POLL_INTERVAL_MS = 5_000;
-
-function formatTime(ts) {
-  if (!ts) return '';
-  const d = new Date(ts);
-  const now = new Date();
-  const diffMs = now - d;
-  const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 1) return 'just now';
-  if (diffMin < 60) return `${diffMin}m ago`;
-  if (diffMin < 1440) return `${Math.floor(diffMin / 60)}h ago`;
-  return d.toLocaleDateString();
-}
-
-function ChatListItem({ chat, isSelected, onClick }) {
-  const lastMsg = chat.lastMessage || {};
-  const hasUnread = chat.unreadCount > 0;
-
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
   return (
     <div
       onClick={onClick}
@@ -196,30 +173,15 @@ export default function AdminMessagePanel({ adminName = 'Admin' }) {
   const [inputText, setInputText] = useState('');
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
-<<<<<<< HEAD
   const [_error, setError] = useState(null);
   const messagesEndRef = useRef(null);
   const intervalRef = useRef(null);
 
-=======
-  const [error, setError] = useState(null);
-  const messagesEndRef = useRef(null);
-  const intervalRef = useRef(null);
-
-  const headers = {
-    'Content-Type': 'application/json',
-  };
-
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
   // ── Fetch all chats ───────────────────────────────────────────────
   const fetchChats = useCallback(async () => {
     try {
       const res = await fetch(`${BFF_BASE}/support/threads`, {
-<<<<<<< HEAD
         headers: JSON_HEADERS,
-=======
-        headers,
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
         signal: AbortSignal.timeout(8000),
       });
       if (res.ok) {
@@ -248,11 +210,7 @@ export default function AdminMessagePanel({ adminName = 'Admin' }) {
   const fetchMessages = useCallback(async (uid) => {
     try {
       const res = await fetch(`${BFF_BASE}/support/threads/${encodeURIComponent(uid)}`, {
-<<<<<<< HEAD
         headers: JSON_HEADERS,
-=======
-        headers,
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
         signal: AbortSignal.timeout(8000),
       });
       if (res.ok) {
@@ -303,11 +261,7 @@ export default function AdminMessagePanel({ adminName = 'Admin' }) {
         `${BFF_BASE}/support/threads/${encodeURIComponent(selectedChat.uid)}/messages`,
         {
           method: 'POST',
-<<<<<<< HEAD
           headers: JSON_HEADERS,
-=======
-          headers,
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
           body: JSON.stringify({
             text,
             sender: 'admin',

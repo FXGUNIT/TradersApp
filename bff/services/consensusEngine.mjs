@@ -352,77 +352,8 @@ export async function getMlConsensus({
   const resolvedSymbol = symbol;
   const features = buildMlFeatureVector(mathEngine, recentCandles, keyLevels, sessionId);
 
-<<<<<<< HEAD
   // Per-instrument circuit breaker gate
   if (!cbShouldAllowRequest(resolvedSymbol)) {
-=======
-  try {
-    // Call ML Engine prediction
-    const mlResult = await mlRequest("/predict", {
-      features,
-      candles: recentCandles.slice(-50),
-      session: sessionId,
-      symbol,
-    });
-
-    // Enrich with session context
-    const sessionNames = ["Pre-Market", "Main Trading", "Post-Market"];
-    const sessionLabels = {
-      0: "pre_market",
-      1: "main_trading",
-      2: "post_market",
-    };
-
-    return {
-      ok: true,
-      source: "ml_engine",
-      timestamp: new Date().toISOString(),
-      signal: mlResult.signal || "NEUTRAL",
-      confidence: mlResult.confidence || 0.5,
-
-      // Voting breakdown
-      votes: mlResult.votes || {},
-
-      // Session context
-      session: {
-        id: sessionId,
-        name: sessionNames[sessionId] || "Main Trading",
-        session_pct: features.session_pct,
-        minutes_into_session: features.minutes_into_session,
-      },
-
-      // Alpha
-      alpha: mlResult.alpha || null,
-
-      // Expected move
-      expected_move: mlResult.expected_move || null,
-
-      // RRR
-      rrr: mlResult.rrr || null,
-
-      // Exit strategy
-      exit_plan: mlResult.exit_plan || null,
-
-      // Position sizing
-      position_sizing: mlResult.position_sizing || null,
-
-      // Physics-based regime (FP-FK PDE + Tsallis q-Gaussians + Anomalous Diffusion + Hurst)
-      regime: mlResult.physics_regime || null,
-
-      // Timing
-      timing: mlResult.timing || null,
-
-      // Model metadata
-      models_used: mlResult.models_used || 0,
-      data_trades_analyzed: mlResult.data_trades_analyzed || 0,
-      model_freshness: mlResult.model_freshness || "unknown",
-      feature_vector: features,
-    };
-  } catch (err) {
-    // Graceful degradation: return fallback signal when ML Engine unavailable
-    console.error("[consensusEngine] ML Engine unavailable:", err.message);
-
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
     return {
       ok: false,
       source: "circuit_breaker_fallback",
@@ -656,7 +587,6 @@ export async function triggerMlTraining(mode = "incremental", options = {}) {
 /**
  * Check if ML Engine is healthy.
  */
-<<<<<<< HEAD
 export async function checkMlHealth() {
   const cacheEntry = mlHealthCacheState.current;
   const cacheAgeMs = getMlHealthCacheAgeMs(cacheEntry);
@@ -669,59 +599,6 @@ export async function checkMlHealth() {
     return buildMlHealthCachePayload(cacheEntry, "cached");
   }
 
-=======
-/**
- * Send HIGH impact breaking news to ML Engine for classification + self-training.
- * Called automatically when breaking news is detected in consensus response.
- */
-export async function triggerMLNewsTraining(newsItem) {
-  if (!newsItem || newsItem.impact !== 'HIGH') return { triggered: false };
-  try {
-    const res = await mlRequest('/news-trigger', {
-      news: newsItem,
-      trigger_type: 'breaking_news_high_impact',
-    }, 8000);
-    return { triggered: true, response: res };
-  } catch (err) {
-    console.error('[consensusEngine] news-trigger failed:', err.message);
-    return { triggered: false, error: err.message };
-  }
-}
-
-/**
- * Log market reaction to a breaking news item (called at 5/15/30/60 min intervals).
- */
-export async function logNewsReaction(newsId, reactionData) {
-  try {
-    const res = await mlRequest('/news/reaction', {
-      news_id: newsId,
-      reaction_5m: reactionData.reaction5m,
-      reaction_15m: reactionData.reaction15m,
-      reaction_30m: reactionData.reaction30m,
-      reaction_60m: reactionData.reaction60m,
-      direction: reactionData.direction,
-      magnitude: reactionData.magnitude,
-    }, 5000);
-    return { ok: true, ...res };
-  } catch (err) {
-    console.error('[consensusEngine] news/reaction failed:', err.message);
-    return { ok: false, error: err.message };
-  }
-}
-
-/**
- * Fetch recent news reactions from ML Engine (ML training data).
- */
-export async function getMLNewsReactions(limit = 50) {
-  try {
-    const res = await mlRequest(`/news/reactions?limit=${limit}`, null, 5000);
-    return res;
-  } catch (err) {
-    console.error('[consensusEngine] news/reactions failed:', err.message);
-    return { ok: false, entries: [], error: err.message };
-  }
-}
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
   try {
     return await refreshMlHealthCache();
   } catch (err) {
@@ -902,12 +779,9 @@ export function createConsensusEngineService() {
     getMlModelStatus,
     triggerMlTraining,
     checkMlHealth,
-<<<<<<< HEAD
     getMlCircuitStatus,
     getMlSlaReport,
     getMlCacheStats,
-=======
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
     getPhysicsRegime,
     buildMlFeatureVector,
   };

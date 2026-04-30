@@ -1,6 +1,5 @@
 # Deployment Guide — TradersApp
 
-<<<<<<< HEAD
 **Last updated:** 2026-04-23
 **Status:** Contabo VPS + Docker Compose is the active production path. OCI k3s is archived fallback only. See `docs/P26_Contabo_Deployment_Plan.md`.
 
@@ -34,12 +33,6 @@ frontend entry point is `https://tradergunit.pages.dev/`.
 
 The rest of this document describes the old OCI k3s path kept for audit and rollback context. It is no longer the active production route.
 
-=======
-**Last updated:** 2026-04-02
-
----
-
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 ## Infrastructure Overview
 
 ```
@@ -47,7 +40,6 @@ The rest of this document describes the old OCI k3s path kept for audit and roll
 │                        Cloudflare WAF                              │
 │  (DDoS protection, SSL/TLS 1.3, CDN, OWASP rules, bot management)│
 │  Proxy mode: Full (strict) SSL for all traffic                     │
-<<<<<<< HEAD
 └───────────────────────────────┬────────────────────────────────────┘
                                 │
                     ┌───────────▼────────────┐
@@ -67,36 +59,16 @@ The rest of this document describes the old OCI k3s path kept for audit and roll
 
 > **Archived topology:** OCI Always Free k3s only. This is retained as historical context. The active production route is the Contabo runbook above.
 
-=======
-└──────────────┬──────────────────┬───────────────────┬──────────────┘
-               │                  │                   │
-        ┌──────▼──────┐   ┌──────▼──────┐    ┌──────▼──────┐
-        │   Vercel    │   │   Railway   │    │   Railway   │
-        │  (Frontend) │   │  (BFF :8788)│    │(ML :8001)   │
-        │   Port 443  │   │  Port 8788  │    │  Port 8001  │
-        │   CDN edge  │   │  Persistent │    │  Persistent  │
-        └─────────────┘   └─────────────┘    └─────────────┘
-```
-
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 ---
 
 ## 1. Prerequisites
 
 ### Accounts Required
 - [ ] GitHub account (already have)
-<<<<<<< HEAD
 - [ ] Oracle Cloud Infrastructure account (https://cloud.oracle.com) — OCI Always Free tier
 - [ ] Cloudflare account (https://cloudflare.com) — add domain
 - [ ] Infisical account (https://infisical.com) — secrets management
 - [ ] Neon account (https://neon.tech) — PostgreSQL *(optional — not in core runtime)*
-=======
-- [ ] Vercel account (https://vercel.com) — connect GitHub repo
-- [ ] Railway account (https://railway.app) — connect GitHub repo
-- [ ] Cloudflare account (https://cloudflare.com) — add domain
-- [ ] Infisical account (https://infisical.com) — secrets management
-- [ ] Neon account (https://neon.tech) — PostgreSQL (optional, dev uses SQLite)
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 
 ### Domain
 - [ ] Purchase domain or use existing (e.g., `traders.app`)
@@ -108,7 +80,6 @@ The rest of this document describes the old OCI k3s path kept for audit and roll
 
 ### DNS Configuration
 
-<<<<<<< HEAD
 After OCI ingress is live (P11/P12), add these records in Cloudflare DNS:
 
 | Type | Name | Content | Proxy | SSL |
@@ -119,17 +90,6 @@ After OCI ingress is live (P11/P12), add these records in Cloudflare DNS:
 | CNAME | bff | `144.24.112.249` | Proxied | Strict |
 
 > **Before P12 completes:** These records may still point to old Vercel/Railway edges. Update only after OCI ingress is confirmed healthy.
-=======
-Add these records in Cloudflare DNS:
-
-| Type | Name | Content | Proxy | SSL |
-|---|---|---|---|---|
-| A | traders.app | [Vercel IP] | Proxied | Strict |
-| A | www | [Vercel IP] | Proxied | Strict |
-| CNAME | api | [Railway ML Engine URL] | Proxied | Strict |
-| CNAME | bff | [Railway BFF URL] | Proxied | Strict |
-| A | ml-engine | [Railway ML IP] | Proxied | Strict |
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 
 ### SSL/TLS Configuration (Cloudflare Dashboard)
 
@@ -139,16 +99,9 @@ Add these records in Cloudflare DNS:
    - Enable **Automatic HTTPS Rewrites**
    - TLS version: **1.3** (Cloudflare handles downgrades)
 3. **SSL/TLS → Origin Server:**
-<<<<<<< HEAD
    - Generate origin certificate (free, 15-year) for OCI k3s edge
    - After cert-manager is deployed (P11/P12), TLS certs are managed automatically via Let's Encrypt
    - Until then, terminate TLS at Cloudflare edge only
-=======
-   - Generate origin certificate (free, 15-year)
-   - Download and upload to Railway environment variables:
-     - `SSL_CERT` (full certificate chain)
-     - `SSL_KEY` (private key)
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 4. **DDoS → L7 DDoS Mitigation:** Set to **ON**
 5. **Security → WAF:**
    - Enable **OWASP ModSecurity Core Rule Set**
@@ -175,7 +128,6 @@ Then:
 
 ---
 
-<<<<<<< HEAD
 ## 3. OCI k3s Node Setup
 
 > Full details in `docs/TODO_MASTER_LIST.md` — P01 through P09.
@@ -263,108 +215,6 @@ Deployments are driven by `.github/workflows/deploy-k8s.yml`.
 
 **Triggering a deploy:**
 Push to `main` branch → GitHub Actions runs `deploy-k8s.yml` automatically.
-=======
-## 3. Vercel (Frontend)
-
-### Connect Repository
-1. Go to https://vercel.com → New Project
-2. Import `traders-app` GitHub repo
-3. Framework: **Vite** (detected automatically)
-4. Root directory: `/`
-5. Build command: `npm run build`
-6. Output directory: `dist`
-
-### Environment Variables (Vercel Dashboard → Settings → Environment Variables)
-
-| Name | Value |
-|---|---|
-| `VITE_MASTER_SALT` | `<generate: openssl rand -hex 32>` |
-| `VITE_ADMIN_PASS_HASH` | `<hash from: npm run admin:hash>` |
-| `VITE_BFF_URL` | `https://bff.traders.app` |
-| `VITE_ML_ENGINE_URL` | `https://api.traders.app` |
-| `VITE_NEWS_API_KEY` | NewsData.io key (free tier) |
-
-### Custom Domain
-1. Settings → Domains → Add `traders.app`
-2. Add CNAME from Vercel dashboard to Cloudflare
-3. Cloudflare: change CNAME proxy mode to **Proxied**
-
-### Deployment
-- Auto-deploy on push to `main` branch
-- Preview deployments for PRs
-
----
-
-## 4. Railway (BFF + ML Engine)
-
-### Create Project
-1. https://railway.app → New Project → Deploy from GitHub repo
-2. Add both services:
-   - `bff` — directory: `bff`
-   - `ml-engine` — directory: `ml-engine`
-
-### BFF Service (Railway)
-
-**Settings → Environment:**
-```
-NODE_ENV=production
-PORT=8788
-BFF_HOST=0.0.0.0
-BFF_PORT=8788
-ML_ENGINE_URL=https://api.traders.app
-BFF_ALLOWED_ORIGINS=https://traders.app,https://www.traders.app
-```
-
-**Settings → Health Check:**
-- Path: `/health`
-- Port: `8788`
-
-**Settings → Custom Domain:**
-- Add `bff.traders.app` → CNAME to Railway URL
-
-### ML Engine Service (Railway)
-
-**Settings → Environment:**
-```
-PYTHONUNBUFFERED=1
-PYTHONDONTWRITEBYTECODE=1
-PORT=8001
-```
-
-**Settings → Health Check:**
-- Path: `/health`
-- Port: `8001`
-
-**Settings → Custom Domain:**
-- Add `api.traders.app` → CNAME to Railway URL
-
-### Persistent Disk (ML Engine)
-1. Railway → ML Engine → Settings → Add Persistent Disk
-2. Mount at: `/app/data`
-3. This persists the SQLite database across deploys
-
-### Infisical Integration
-
-1. Install Infisical CLI: `npm install -g infisical`
-2. Connect Infisical to GitHub repo
-3. Create secrets:
-   - `FIREBASE_API_KEY`, `FIREBASE_PROJECT_ID`, etc.
-   - `NEWS_API_KEY`
-   - `NEWS_API_KEY` (backup)
-4. In Railway: Settings → Variables → Reference from Infisical
-   ```
-   ${{ infisical.FIREBASE_API_KEY }}
-   ```
-
-### Deploy
-- Railway auto-deploys on push to linked branch
-- Use Railway CLI for manual deploys:
-  ```bash
-  railway login
-  railway up --service ml-engine
-  railway up --service bff
-  ```
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 
 ---
 
@@ -436,21 +286,7 @@ In GitHub repo → Settings → Secrets and variables → Actions:
 
 | Secret | Where Used | How to Get |
 |---|---|---|
-<<<<<<< HEAD
 | `KUBECONFIG_B64` | CI/CD | `sed 's\|127.0.0.1\|144.24.112.249\|g' /tmp/k3s-server.yaml \| base64 -w0` on OCI node |
-=======
-| `VERCEL_TOKEN` | CI/CD | Vercel → Settings → Tokens |
-| `VERCEL_ORG_ID` | CI/CD | `vercel org ls` |
-| `VERCEL_PROJECT_ID` | CI/CD | `vercel project ls` |
-| `RAILWAY_TOKEN` | CI/CD | Railway → Account Settings → Tokens |
-| `RAILWAY_STAGING_ENV_ID` | Deploy | Railway staging env ID |
-| `RAILWAY_STAGING_BFF_SERVICE_ID` | Deploy | Railway staging BFF service ID |
-| `RAILWAY_STAGING_ML_SERVICE_ID` | Deploy | Railway staging ML service ID |
-| `RAILWAY_PROD_ENV_ID` | Deploy | Railway production env ID |
-| `RAILWAY_PROD_BFF_SERVICE_ID` | Deploy | Railway production BFF service ID |
-| `RAILWAY_PROD_ML_SERVICE_ID` | Deploy | Railway production ML service ID |
-| `SLACK_WEBHOOK_URL` | Monitor | Slack → Workspace → Apps → Incoming Webhooks |
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 | `DISCORD_WEBHOOK_URL` | Monitor | Discord → Server Settings → Integrations → Webhooks |
 | `INFISICAL_PROJECT_ID` | Secrets | Infisical project settings |
 
@@ -480,7 +316,6 @@ python ml-engine/scripts/version_models.py --restore ./backups/models_backup_202
 gh workflow run rollback.yml -f version=2026-04-01
 ```
 
-<<<<<<< HEAD
 ### OCI k3s Rollback (Primary)
 
 ```bash
@@ -502,29 +337,6 @@ python ml-engine/scripts/version_models.py --restore ./backups/models_backup_202
 
 # GitHub Actions: trigger rollback
 gh workflow run rollback.yml -f version=2026-04-01
-=======
-### Railway Deployments
-
-**Via Railway Dashboard:**
-1. Railway → ML Engine → Deployments
-2. Find the working deployment → click "Revert to this deployment"
-
-**Via Railway CLI:**
-```bash
-railway login
-railway status
-railway rollback --service ml-engine
-railway rollback --service bff
-```
-
-### Vercel Frontend
-```bash
-# List deployments
-vercel list
-
-# Rollback to previous deployment
-vercel rollback [deployment-url]
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 ```
 
 ### Database Rollback (if using Neon PostgreSQL)
@@ -539,16 +351,10 @@ vercel rollback [deployment-url]
 
 | Service | URL | Expected |
 |---|---|---|
-<<<<<<< HEAD
 | Canonical frontend | `https://tradergunit.pages.dev` | HTTP 200 + app shell (`Welcome back`) |
 | Runtime edge | `https://173.249.18.14.sslip.io` | HTTP 200 |
 | BFF | `https://bff.173.249.18.14.sslip.io/health` | `{"ok": true, ...}` |
 | ML Engine | `https://api.173.249.18.14.sslip.io/health` | `{"ok": true, ...}` |
-=======
-| ML Engine | `https://api.traders.app/health` | `{"ok": true, ...}` |
-| BFF | `https://bff.traders.app/health` | `{"ok": true, ...}` |
-| Frontend | `https://traders.app` | HTTP 200 |
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 
 ---
 
@@ -556,28 +362,18 @@ vercel rollback [deployment-url]
 
 After every deployment, verify:
 
-<<<<<<< HEAD
 - [ ] `https://tradergunit.pages.dev` returns 200 with the live app shell (`Welcome back` + `Continue with Google`)
 - [ ] Pages root security headers are present (CSP, `X-Frame-Options`, `X-Content-Type-Options`, `Permissions-Policy`)
 - [ ] Optional diagnostics page stays isolated at `https://tradergunit.pages.dev/developer`
 - [ ] `https://173.249.18.14.sslip.io` returns 200 for the current runtime edge
 - [ ] `GET /health` returns 200 on all runtime services
-=======
-- [ ] `GET /health` returns 200 on all services
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
 - [ ] `GET /ai/status` returns AI provider configuration
 - [ ] `GET /news/countdown` returns news event data
 - [ ] `GET /ml/health` returns ML engine status
 - [ ] Frontend loads without console errors
 - [ ] No CORS errors in browser
-<<<<<<< HEAD
 - [ ] BFF routes called from the Pages root origin return the expected CORS header
 - [ ] Negative admin verify returns a normal auth failure, not a filesystem/runtime error
 - [ ] Rate limit headers present (`X-RateLimit-Remaining`)
 - [ ] Security headers present (CSP, X-Frame-Options, etc.)
 - [ ] No 5xx errors in k3s pod logs (`kubectl get pods -n tradersapp`)
-=======
-- [ ] Rate limit headers present (`X-RateLimit-Remaining`)
-- [ ] Security headers present (CSP, X-Frame-Options, etc.)
-- [ ] No 5xx errors in Railway logs
->>>>>>> 65489ec280873cad2e5e4f17df1eb44c4a4a2a37
