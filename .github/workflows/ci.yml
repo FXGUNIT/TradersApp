@@ -121,7 +121,17 @@ jobs:
             else
               echo "  ✓ $file — $lines lines"
             fi
-          done < <(find . \( -name "*.py" -not -path "./.git/*" -not -path "./venv/*" -not -path "./.venv/*" -not -path "./env/*" -not -path "*/node_modules/*" -not -path "*/site-packages/*" -not -path "*/.pytest_tmp/*" \) 2>/dev/null | sort)
+          done < <(find . \( -name "*.py" \
+            -not -path "./.git/*" \
+            -not -path "./venv/*" \
+            -not -path "./.venv/*" \
+            -not -path "./env/*" \
+            -not -path "*/node_modules/*" \
+            -not -path "*/site-packages/*" \
+            -not -path "*/.pytest_tmp/*" \
+            -not -path "./scripts/*" \
+            -not -path "./docs/*" \
+            \) 2>/dev/null | sort)
 
           # JS/TS modules: hard limit 500 lines
           echo ""
