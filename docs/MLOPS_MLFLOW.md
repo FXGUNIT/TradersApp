@@ -19,7 +19,7 @@ This repo uses self-hosted MLflow as the central MLOps control plane for experim
 - Default values: [values.yaml](../k8s/helm/tradersapp/values.yaml)
 - Production values: [values.prod.yaml](../k8s/helm/tradersapp/values.prod.yaml)
 
-The custom MLflow image extends the official `ghcr.io/mlflow/mlflow:v2.21.3` image and adds:
+The custom MLflow image extends the official `ghcr.io/mlflow/mlflow:v2.22.4` image and adds:
 
 - `psycopg2-binary` for PostgreSQL backend connectivity
 - `boto3` for S3 / MinIO artifact storage

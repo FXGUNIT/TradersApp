@@ -40,10 +40,13 @@ export function createDispatcher({
   authorizeRequest,
   validateAdminToken,
   createAdminSession,
+  createVerifiedAdminMfaChallenge,
   getAdminMfaStatus,
   getAdminTotpSetup,
+  startAdminPasskeyAuthentication,
   startAdminEmailOtp,
   verifyAdminEmailOtp,
+  verifyAdminPasskeyAuthentication,
   verifyAdminTotp,
   revokeAdminSession,
   listAdminSessions,
@@ -191,14 +194,17 @@ export function createDispatcher({
     typeof createAdminMfaRouteHandler === "function"
       ? createAdminMfaRouteHandler({
           createAdminSession,
+          createVerifiedAdminMfaChallenge,
           getAdminMfaStatus,
           getAdminTotpSetup,
           getClientKey,
           json,
           readJsonBody,
           rolesAdmin: ROLES_ADMIN,
+          startAdminPasskeyAuthentication,
           startAdminEmailOtp,
           verifyAdminEmailOtp,
+          verifyAdminPasskeyAuthentication,
           verifyAdminTotp,
         })
       : async () => false;

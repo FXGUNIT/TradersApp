@@ -5,8 +5,6 @@ import { resolveBffBaseUrl } from "../../services/runtimeConfig.js";
 
 const BFF_BASE = resolveBffBaseUrl();
 
-const BFF_BASE = import.meta.env.VITE_BFF_URL || "";
-
 export default function SupportChatModal({
   isOpen,
   userId,

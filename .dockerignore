@@ -33,6 +33,8 @@ screenshots
 reports
 *.log
 *.sarif
+runtime
+bff/runtime
 
 # Python and test caches
 .pytest_cache

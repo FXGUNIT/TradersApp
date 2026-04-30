@@ -47,6 +47,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      attestations: read
     steps:
       - name: Resolve deploy context
         id: context
@@ -196,6 +197,7 @@ jobs:
           docker push "${IMAGE_LATEST}"
 
       - name: Verify published BFF image
+        id: bff_image
         shell: bash
         run: |
           set -euo pipefail
@@ -210,8 +212,23 @@ jobs:
             exit 1
           fi
           echo "BFF_IMAGE=ghcr.io/${{ steps.context.outputs.owner }}/bff@${DIGEST}" >> .artifacts/ovh/.env.ovh
+          {
+            echo "image=ghcr.io/${{ steps.context.outputs.owner }}/bff:${{ steps.context.outputs.image_tag }}"
+            echo "digest=${DIGEST}"
+            echo "digest_ref=ghcr.io/${{ steps.context.outputs.owner }}/bff@${DIGEST}"
+          } >> "${GITHUB_OUTPUT}"
           echo "Verified published BFF image: ${IMAGE_SHA}"
           echo "Resolved BFF digest: ${DIGEST}"
+
+      - name: Verify BFF image attestation
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh attestation verify \
+            "oci://${{ steps.bff_image.outputs.digest_ref }}" \
+            -R "${GITHUB_REPOSITORY}"
 
       - name: Build and push Frontend image
         shell: bash

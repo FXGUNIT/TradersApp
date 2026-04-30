@@ -127,13 +127,13 @@ services:
       ML_ANALYSIS_GRPC_STRICT: ${ML_ANALYSIS_GRPC_STRICT}
       REDIS_HOST: ${REDIS_HOST}
       REDIS_PORT: ${REDIS_PORT}
-      BOARD_ROOM_STORAGE_MODE: ${BOARD_ROOM_STORAGE_MODE:-file}
+      BOARD_ROOM_STORAGE_MODE: ${BOARD_ROOM_STORAGE_MODE:-redis}
       BOARD_ROOM_FALLBACK_STORE: ${BOARD_ROOM_FALLBACK_STORE:-/app/board-room/fallback-store.json}
-      SESSION_STORAGE_MODE: ${SESSION_STORAGE_MODE:-file}
+      SESSION_STORAGE_MODE: ${SESSION_STORAGE_MODE:-redis}
       SESSION_FALLBACK_STORE: ${SESSION_FALLBACK_STORE:-/app/runtime/session-store.json}
       ADMIN_PASSWORD_LOGIN_ENABLED: ${ADMIN_PASSWORD_LOGIN_ENABLED:-false}
-      ADMIN_MASTER_EMAIL: ${ADMIN_MASTER_EMAIL:-gunitsingh1994@gmail.com}
-      ADMIN_MFA_EMAILS: ${ADMIN_MFA_EMAILS:-gunitsingh1994@gmail.com,arkgproductions@gmail.com,starg.unit@gmail.com}
+      ADMIN_MASTER_EMAIL: ${ADMIN_MASTER_EMAIL:-admin-owner@example.invalid}
+      ADMIN_MFA_EMAILS: ${ADMIN_MFA_EMAILS:-admin-one@example.invalid,admin-two@example.invalid,admin-three@example.invalid}
       ADMIN_TOTP_SECRET: ${ADMIN_TOTP_SECRET:-}
       ADMIN_MFA_SECRET: ${ADMIN_MFA_SECRET:-}
       ADMIN_EMAILJS_SERVICE_ID: ${ADMIN_EMAILJS_SERVICE_ID:-}
@@ -219,7 +219,7 @@ services:
     logging: *default-logging
 
   mlflow:
-    image: ghcr.io/mlflow/mlflow:v2.21.3
+    image: ghcr.io/mlflow/mlflow:v2.22.4
     container_name: traders-mlflow
     restart: unless-stopped
     profiles: ["mlops"]

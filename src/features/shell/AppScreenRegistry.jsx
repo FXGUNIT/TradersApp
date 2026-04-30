@@ -313,6 +313,7 @@ export default function AppScreenRegistry({
             }
             onRequestNew={handleAdminRequestNewCodes}
             onSendVerificationCodes={sendAdminOTPs}
+            onUnlockPasskey={handleAdminPasskeyAccess}
             onUnlockAdmin={handleAdminAccess}
             onVerifyCodes={handleAdminVerifyCodes}
             totpError={totpErr}

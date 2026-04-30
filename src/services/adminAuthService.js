@@ -3,6 +3,7 @@ import {
   getAdminToken as getStoredAdminToken,
   setAdminToken as setStoredAdminToken,
 } from "./sessionStore.js";
+import { startAuthentication } from "@simplewebauthn/browser";
 import { resolveBffBaseUrl } from "./runtimeConfig.js";
 
 const ADMIN_DEVICE_KEY = "TradersApp_AdminDeviceId";
@@ -261,6 +262,68 @@ export async function verifyAdminTotp(code) {
   return parseJsonResponse(response, "Admin authenticator verification failed.");
 }
 
+export async function verifyAdminPasskey() {
+  if (typeof window !== "undefined" && window.__TRADERS_AUDIT_DATA) {
+    return {
+      ok: true,
+      verified: true,
+      simulated: true,
+      method: "passkey",
+      mfaChallengeId: "audit-admin-mfa",
+      nextStep: "email_otp_start",
+      recipients: ["g***h@gmail.com", "a***s@gmail.com", "s***t@gmail.com"],
+    };
+  }
+
+  if (typeof window === "undefined" || !window.PublicKeyCredential) {
+    throw new Error("Passkey verification is not available in this browser.");
+  }
+
+  let optionsResponse;
+  try {
+    optionsResponse = await fetch(`${resolveBffBaseUrl()}/auth/admin/mfa/passkey/options`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+      body: JSON.stringify(buildAdminDevicePayload()),
+    });
+  } catch {
+    throw new Error("Admin passkey service is unavailable.");
+  }
+
+  const optionsPayload = await parseJsonResponse(
+    optionsResponse,
+    "Admin passkey challenge failed.",
+  );
+
+  let assertion;
+  try {
+    assertion = await startAuthentication({
+      optionsJSON: optionsPayload.options,
+    });
+  } catch (error) {
+    throw new Error(error.message || "Passkey verification was cancelled.");
+  }
+
+  let verifyResponse;
+  try {
+    verifyResponse = await fetch(`${resolveBffBaseUrl()}/auth/admin/mfa/passkey/verify`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+      body: JSON.stringify({
+        challengeId: optionsPayload.challengeId,
+        response: assertion,
+        ...buildAdminDevicePayload(),
+      }),
+    });
+  } catch {
+    throw new Error("Admin passkey verification service is unavailable.");
+  }
+
+  return parseJsonResponse(verifyResponse, "Admin passkey verification failed.");
+}
+
 export async function fetchAdminTotpSetup() {
   let response;
   try {
@@ -287,6 +350,7 @@ export async function clearAdminToken() {
 export default {
   requestAdminEmailOtp,
   verifyAdminEmailOtp,
+  verifyAdminPasskey,
   verifyAdminTotp,
   fetchAdminTotpSetup,
   getAdminToken,

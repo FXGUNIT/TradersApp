@@ -8,6 +8,9 @@ Usage:
     --namespace tradersapp \
     --image-repo ghcr.io/<owner> \
     --image-tag <sha> \
+    [--bff-image-digest sha256:...] \
+    [--frontend-image-digest sha256:...] \
+    [--ml-engine-image-digest sha256:...] \
     [--output-dir /path/to/output] \
     [--kubeconfig /path/to/kubeconfig] \
     [--services redis,ml-engine,bff,frontend] \
@@ -30,6 +33,9 @@ EOF
 NAMESPACE="tradersapp"
 IMAGE_REPO=""
 IMAGE_TAG=""
+BFF_IMAGE_DIGEST=""
+FRONTEND_IMAGE_DIGEST=""
+ML_ENGINE_IMAGE_DIGEST=""
 KUBECONFIG_PATH=""
 VALIDATE_CLIENT="false"
 SELECTED_SERVICES_ARG=""
@@ -62,6 +68,18 @@ while [[ $# -gt 0 ]]; do
       ;;
     --image-tag)
       IMAGE_TAG="${2:-}"
+      shift 2
+      ;;
+    --bff-image-digest)
+      BFF_IMAGE_DIGEST="${2:-}"
+      shift 2
+      ;;
+    --frontend-image-digest)
+      FRONTEND_IMAGE_DIGEST="${2:-}"
+      shift 2
+      ;;
+    --ml-engine-image-digest)
+      ML_ENGINE_IMAGE_DIGEST="${2:-}"
       shift 2
       ;;
     --output-dir)
@@ -97,6 +115,22 @@ if [[ -z "${IMAGE_REPO}" || -z "${IMAGE_TAG}" ]]; then
   usage >&2
   exit 1
 fi
+
+validate_image_digest() {
+  local service="$1"
+  local digest="$2"
+  if [[ -z "${digest}" ]]; then
+    return 0
+  fi
+  if [[ ! "${digest}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+    echo "::error::Invalid ${service} image digest: ${digest}" >&2
+    exit 1
+  fi
+}
+
+validate_image_digest "bff" "${BFF_IMAGE_DIGEST}"
+validate_image_digest "frontend" "${FRONTEND_IMAGE_DIGEST}"
+validate_image_digest "ml-engine" "${ML_ENGINE_IMAGE_DIGEST}"
 
 normalize_selected_services() {
   local service=""
@@ -212,15 +246,67 @@ write_selected_services() {
 }
 
 render_full_manifest() {
-  helm template tradersapp "${REPO_ROOT}/k8s/helm/tradersapp" \
-    --namespace "${NAMESPACE}" \
-    -f "${VALUES_FILE}" \
-    --set "bff.image.repository=${IMAGE_REPO}/bff" \
-    --set "bff.image.tag=${IMAGE_TAG}" \
-    --set "frontend.image.repository=${IMAGE_REPO}/frontend" \
-    --set "frontend.image.tag=${IMAGE_TAG}" \
-    --set "mlEngine.image.repository=${IMAGE_REPO}/ml-engine" \
-    --set "mlEngine.image.tag=${IMAGE_TAG}" > "${FULL_MANIFEST_PATH}"
+  local helm_args=(
+    helm template tradersapp "${REPO_ROOT}/k8s/helm/tradersapp"
+    --namespace "${NAMESPACE}"
+    -f "${VALUES_FILE}"
+    --set-string "bff.image.repository=${IMAGE_REPO}/bff"
+    --set-string "bff.image.tag=${IMAGE_TAG}"
+    --set-string "frontend.image.repository=${IMAGE_REPO}/frontend"
+    --set-string "frontend.image.tag=${IMAGE_TAG}"
+    --set-string "mlEngine.image.repository=${IMAGE_REPO}/ml-engine"
+    --set-string "mlEngine.image.tag=${IMAGE_TAG}"
+  )
+
+  if [[ -n "${BFF_IMAGE_DIGEST}" ]]; then
+    helm_args+=(--set-string "bff.image.digest=${BFF_IMAGE_DIGEST}")
+  fi
+  if [[ -n "${FRONTEND_IMAGE_DIGEST}" ]]; then
+    helm_args+=(--set-string "frontend.image.digest=${FRONTEND_IMAGE_DIGEST}")
+  fi
+  if [[ -n "${ML_ENGINE_IMAGE_DIGEST}" ]]; then
+    helm_args+=(--set-string "mlEngine.image.digest=${ML_ENGINE_IMAGE_DIGEST}")
+  fi
+
+  "${helm_args[@]}" > "${FULL_MANIFEST_PATH}"
+}
+
+replace_literal_in_file() {
+  local from="$1"
+  local to="$2"
+  local path="$3"
+  local tmp_path
+  tmp_path="$(mktemp)"
+  awk -v from="${from}" -v to="${to}" '
+    function replace_all(line, from, to, pos, result) {
+      result = ""
+      while ((pos = index(line, from)) > 0) {
+        result = result substr(line, 1, pos - 1) to
+        line = substr(line, pos + length(from))
+      }
+      return result line
+    }
+    { print replace_all($0, from, to) }
+  ' "${path}" > "${tmp_path}"
+  mv "${tmp_path}" "${path}"
+}
+
+pin_service_image_digest() {
+  local service="$1"
+  local digest="$2"
+  if [[ -z "${digest}" ]]; then
+    return 0
+  fi
+
+  local tagged_ref="${IMAGE_REPO}/${service}:${IMAGE_TAG}"
+  local digest_ref="${IMAGE_REPO}/${service}@${digest}"
+  replace_literal_in_file "${tagged_ref}" "${digest_ref}" "${FULL_MANIFEST_PATH}"
+}
+
+apply_digest_pins() {
+  pin_service_image_digest "bff" "${BFF_IMAGE_DIGEST}"
+  pin_service_image_digest "frontend" "${FRONTEND_IMAGE_DIGEST}"
+  pin_service_image_digest "ml-engine" "${ML_ENGINE_IMAGE_DIGEST}"
 }
 
 split_into_documents() {
@@ -362,6 +448,7 @@ generate_budget_report() {
 write_apply_order
 write_selected_services
 render_full_manifest
+apply_digest_pins
 split_into_documents
 classify_documents
 assert_expected_outputs

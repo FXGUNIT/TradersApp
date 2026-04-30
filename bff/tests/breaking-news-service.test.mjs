@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 const ORIGINAL_FETCH = globalThis.fetch;
 const ORIGINAL_FINNHUB = process.env.FINNHUB_API_KEY;
 const ORIGINAL_NEWSDATA = process.env.NEWS_API_KEY;
+const ORIGINAL_FOREX_FACTORY_JSON_URLS = process.env.FOREX_FACTORY_JSON_URLS;
 
 function restoreEnv() {
   if (ORIGINAL_FINNHUB === undefined) {
@@ -16,6 +17,12 @@ function restoreEnv() {
     delete process.env.NEWS_API_KEY;
   } else {
     process.env.NEWS_API_KEY = ORIGINAL_NEWSDATA;
+  }
+
+  if (ORIGINAL_FOREX_FACTORY_JSON_URLS === undefined) {
+    delete process.env.FOREX_FACTORY_JSON_URLS;
+  } else {
+    process.env.FOREX_FACTORY_JSON_URLS = ORIGINAL_FOREX_FACTORY_JSON_URLS;
   }
 }
 
@@ -105,6 +112,64 @@ test("fetchBreakingNews includes Yahoo and GDELT items when optional providers s
     assert.ok(requests.some((url) => url.includes("forexfactory.com")));
     assert.ok(requests.some((url) => url.includes("feeds.finance.yahoo.com")));
     assert.ok(requests.some((url) => url.includes("gdeltproject.org")));
+  } finally {
+    globalThis.fetch = ORIGINAL_FETCH;
+    restoreEnv();
+  }
+});
+
+test("scrapeForexFactory falls back to the weekly JSON export when HTML is blocked", async () => {
+  process.env.FOREX_FACTORY_JSON_URLS = "https://nfs.faireconomy.media/ff_calendar_thisweek.json";
+
+  const requests = [];
+  globalThis.fetch = async (url) => {
+    requests.push(String(url));
+    if (String(url).includes("forexfactory.com")) {
+      return {
+        ok: false,
+        status: 403,
+        text: async () => "",
+      };
+    }
+    if (String(url).includes("nfs.faireconomy.media")) {
+      return {
+        ok: true,
+        json: async () => [
+          {
+            title: "FOMC Statement",
+            country: "USD",
+            date: "2026-04-30T14:00:00-04:00",
+            impact: "High",
+            forecast: "",
+            previous: "",
+          },
+        ],
+      };
+    }
+    return {
+      ok: false,
+      status: 404,
+      text: async () => "",
+      json: async () => ({}),
+    };
+  };
+
+  try {
+    const moduleUrl = new URL("../services/forexFactoryScraper.mjs", import.meta.url);
+    const scraper = await import(`${moduleUrl.href}?ts=${Date.now()}-${Math.random()}`);
+
+    const events = await scraper.scrapeForexFactory({
+      daysAhead: 1,
+      minImpact: 3,
+      now: new Date("2026-04-30T15:00:00Z"),
+    });
+
+    assert.equal(events.length, 1);
+    assert.equal(events[0].currency, "USD");
+    assert.equal(events[0].title, "FOMC Statement");
+    assert.equal(events[0].impactLabel, "HIGH");
+    assert.ok(requests.some((url) => url.includes("forexfactory.com")));
+    assert.ok(requests.some((url) => url.includes("nfs.faireconomy.media")));
   } finally {
     globalThis.fetch = ORIGINAL_FETCH;
     restoreEnv();

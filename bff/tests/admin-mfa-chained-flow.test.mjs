@@ -16,6 +16,10 @@ const {
   verifyAdminEmailOtp,
   verifyAdminTotp,
 } = await import("../services/adminMfaService.mjs");
+const {
+  startAdminPasskeyAuthentication,
+  verifyAdminPasskeyAuthentication,
+} = await import("../services/adminPasskeyService.mjs");
 
 function decodeBase32(secret) {
   const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
@@ -58,8 +62,8 @@ function codesFromStartResult(result) {
   return Object.values(result.devCodes || {});
 }
 
-test("admin TOTP success returns challenge only, not an admin token", () => {
-  const result = verifyAdminTotp({
+test("admin TOTP success returns challenge only, not an admin token", async () => {
+  const result = await verifyAdminTotp({
     code: currentTotp(),
     clientKey: "client-a",
   });
@@ -82,8 +86,8 @@ test("email OTP cannot start without prior TOTP challenge", async () => {
   assert.equal(result.status, 400);
 });
 
-test("email OTP verify cannot create session without prior TOTP challenge", () => {
-  const result = verifyAdminEmailOtp({
+test("email OTP verify cannot create session without prior TOTP challenge", async () => {
+  const result = await verifyAdminEmailOtp({
     mfaChallengeId: "",
     challengeId: "missing",
     codes: ["111111", "222222", "333333"],
@@ -95,7 +99,7 @@ test("email OTP verify cannot create session without prior TOTP challenge", () =
 });
 
 test("admin session is allowed only after TOTP challenge and all three email OTPs", async () => {
-  const totpResult = verifyAdminTotp({
+  const totpResult = await verifyAdminTotp({
     code: currentTotp(),
     clientKey: "client-d",
   });
@@ -108,7 +112,7 @@ test("admin session is allowed only after TOTP challenge and all three email OTP
   assert.equal(emailStart.ok, true);
   assert.match(emailStart.challengeId, /^[0-9a-f-]{36}$/i);
 
-  const finalResult = verifyAdminEmailOtp({
+  const finalResult = await verifyAdminEmailOtp({
     mfaChallengeId: totpResult.mfaChallengeId,
     challengeId: emailStart.challengeId,
     codes: codesFromStartResult(emailStart),
@@ -120,7 +124,7 @@ test("admin session is allowed only after TOTP challenge and all three email OTP
 });
 
 test("consumed MFA challenge cannot be reused", async () => {
-  const totpResult = verifyAdminTotp({
+  const totpResult = await verifyAdminTotp({
     code: currentTotp(),
     clientKey: "client-e",
   });
@@ -128,13 +132,13 @@ test("consumed MFA challenge cannot be reused", async () => {
     mfaChallengeId: totpResult.mfaChallengeId,
     clientKey: "client-e",
   });
-  const first = verifyAdminEmailOtp({
+  const first = await verifyAdminEmailOtp({
     mfaChallengeId: totpResult.mfaChallengeId,
     challengeId: emailStart.challengeId,
     codes: codesFromStartResult(emailStart),
     clientKey: "client-e",
   });
-  const second = verifyAdminEmailOtp({
+  const second = await verifyAdminEmailOtp({
     mfaChallengeId: totpResult.mfaChallengeId,
     challengeId: emailStart.challengeId,
     codes: codesFromStartResult(emailStart),
@@ -153,9 +157,26 @@ test("frontend TOTP setup payload is disabled", () => {
   assert.equal("otpauthUri" in setup, false);
 });
 
+test("passkey gate cannot create admin session when no passkey is configured", async () => {
+  const start = await startAdminPasskeyAuthentication({ clientKey: "client-passkey" });
+  assert.equal(start.ok, false);
+  assert.equal(start.status, 503);
+  assert.equal(start.token, undefined);
+
+  const verify = await verifyAdminPasskeyAuthentication({
+    challengeId: "missing",
+    response: {},
+    clientKey: "client-passkey",
+  });
+  assert.equal(verify.ok, false);
+  assert.equal(verify.token, undefined);
+});
+
 test("MFA status masks recipients", () => {
   const status = getAdminMfaStatus();
   assert.equal(status.totpSetupFrontendEnabled, false);
   assert.equal(status.emailRecipients.length, 3);
   assert.equal(status.emailRecipients.some((email) => email.includes("admin-one")), false);
+  assert.equal(status.challengeStorage, "session-store");
+  assert.equal(status.passkeyRegistrationBackendOnly, true);
 });

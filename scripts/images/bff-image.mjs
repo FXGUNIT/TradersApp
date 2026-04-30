@@ -13,6 +13,7 @@ const skipDirs = new Set([
   ".pytest_tmp",
   ".tmp_pytest",
   ".tmp_pytest_r08",
+  "runtime",
   ".venv",
   "venv",
 ]);
@@ -33,6 +34,8 @@ const forbiddenSecretNames = [
   "MASTER_SALT",
   "ADMIN_TOTP_SECRET",
   "ADMIN_MFA_SECRET",
+  "ADMIN_PASSKEY_CREDENTIALS_JSON",
+  "ADMIN_PASSKEY_CREDENTIALS_FILE",
 ];
 const excludedFilePatterns = [
   /^bff\/\.env(\..*)?$/,

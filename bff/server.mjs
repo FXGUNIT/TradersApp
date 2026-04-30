@@ -18,18 +18,6 @@ import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import { getMetrics, getContentType, recordHttpRequest } from "./metrics.mjs";
 import {
   addSecurityHeaders,
-  ROLES,
-  authorizeRequest,
-  createAdminSession,
-  validateAdminToken,
-  revokeAdminSession,
-  listAdminSessions,
-  revokeSessionById,
-  getRateLimitConfig,
-} from "./services/security.mjs";
-import { checkRateLimit } from "./services/redis-session-store.mjs";
-import {
-  addSecurityHeaders,
   RateLimiter,
   ROLES,
   authorizeRequest,
@@ -37,8 +25,11 @@ import {
   validateAdminToken,
   revokeAdminSession,
   cleanupExpiredSessions,
+  listAdminSessions,
+  revokeSessionById,
   getRateLimitConfig,
 } from "./services/security.mjs";
+import { checkRateLimit } from "./services/redis-session-store.mjs";
 import {
   getDocumentMeta,
   getHubContent,
@@ -108,12 +99,17 @@ import { startWatchtowerDaemon } from "./services/watchtowerService.mjs";
 import { boardRoomService } from "./services/boardRoomService.mjs";
 import boardRoomTelegram from "./services/boardRoomTelegram.mjs";
 import {
+  createVerifiedAdminMfaChallenge,
   getAdminMfaStatus,
   getAdminTotpSetup,
   startAdminEmailOtp,
   verifyAdminEmailOtp,
   verifyAdminTotp,
 } from "./services/adminMfaService.mjs";
+import {
+  startAdminPasskeyAuthentication,
+  verifyAdminPasskeyAuthentication,
+} from "./services/adminPasskeyService.mjs";
 // Telegram proxy — J01: token removed from browser bundles
 import {
   handleTelegramSendMessage,
@@ -494,10 +490,13 @@ const dispatcher = createDispatcher({
   authorizeRequest,
   validateAdminToken,
   createAdminSession,
+  createVerifiedAdminMfaChallenge,
   getAdminMfaStatus,
   getAdminTotpSetup,
+  startAdminPasskeyAuthentication,
   startAdminEmailOtp,
   verifyAdminEmailOtp,
+  verifyAdminPasskeyAuthentication,
   verifyAdminTotp,
   revokeAdminSession,
   listAdminSessions,

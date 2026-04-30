@@ -9,6 +9,9 @@ Usage:
     --namespace tradersapp \
     --image-repo ghcr.io/<owner> \
     --image-tag <sha> \
+    [--bff-image-digest sha256:...] \
+    [--frontend-image-digest sha256:...] \
+    [--ml-engine-image-digest sha256:...] \
     [--services redis,ml-engine,bff,frontend] \
     [--run-label run-slug]
 
@@ -23,6 +26,9 @@ KUBECONFIG_PATH=""
 NAMESPACE="tradersapp"
 IMAGE_REPO=""
 IMAGE_TAG=""
+BFF_IMAGE_DIGEST=""
+FRONTEND_IMAGE_DIGEST=""
+ML_ENGINE_IMAGE_DIGEST=""
 SELECTED_SERVICES=""
 RUN_LABEL_ARG="${DEPLOY_RUN_LABEL:-}"
 OCI_NODE_NAME="${OCI_NODE_NAME:-tradersapp-oci}"
@@ -56,6 +62,18 @@ while [[ $# -gt 0 ]]; do
       IMAGE_TAG="${2:-}"
       shift 2
       ;;
+    --bff-image-digest)
+      BFF_IMAGE_DIGEST="${2:-}"
+      shift 2
+      ;;
+    --frontend-image-digest)
+      FRONTEND_IMAGE_DIGEST="${2:-}"
+      shift 2
+      ;;
+    --ml-engine-image-digest)
+      ML_ENGINE_IMAGE_DIGEST="${2:-}"
+      shift 2
+      ;;
     --services)
       SELECTED_SERVICES="${2:-}"
       shift 2
@@ -81,6 +99,22 @@ if [[ -z "${KUBECONFIG_PATH}" || -z "${IMAGE_REPO}" || -z "${IMAGE_TAG}" ]]; the
   usage >&2
   exit 1
 fi
+
+validate_image_digest() {
+  local service="$1"
+  local digest="$2"
+  if [[ -z "${digest}" ]]; then
+    return 0
+  fi
+  if [[ ! "${digest}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+    echo "::error::Invalid ${service} image digest: ${digest}" >&2
+    exit 1
+  fi
+}
+
+validate_image_digest "bff" "${BFF_IMAGE_DIGEST}"
+validate_image_digest "frontend" "${FRONTEND_IMAGE_DIGEST}"
+validate_image_digest "ml-engine" "${ML_ENGINE_IMAGE_DIGEST}"
 
 if [[ ! -f "${KUBECONFIG_PATH}" ]]; then
   echo "::error::Kubeconfig not found: ${KUBECONFIG_PATH}" >&2
@@ -129,6 +163,9 @@ runLabel=${RUN_LABEL}
 namespace=${NAMESPACE}
 imageRepo=${IMAGE_REPO}
 imageTag=${IMAGE_TAG}
+bffImageDigest=${BFF_IMAGE_DIGEST}
+frontendImageDigest=${FRONTEND_IMAGE_DIGEST}
+mlEngineImageDigest=${ML_ENGINE_IMAGE_DIGEST}
 selectedServices=${SELECTED_SERVICES:-all}
 artifactDir=${RUN_ARTIFACT_DIR}
 EOF
@@ -291,13 +328,22 @@ render_manifests() {
 
   local render_cmd=(
     bash "${RENDER_SCRIPT}"
-    --namespace "${NAMESPACE}" \
-    --image-repo "${IMAGE_REPO}" \
-    --image-tag "${IMAGE_TAG}" \
-    --output-dir "${MANIFEST_DIR}" \
-    --kubeconfig "${KUBECONFIG_PATH}" \
+    --namespace "${NAMESPACE}"
+    --image-repo "${IMAGE_REPO}"
+    --image-tag "${IMAGE_TAG}"
+    --output-dir "${MANIFEST_DIR}"
+    --kubeconfig "${KUBECONFIG_PATH}"
     --validate-client
   )
+  if [[ -n "${BFF_IMAGE_DIGEST}" ]]; then
+    render_cmd+=(--bff-image-digest "${BFF_IMAGE_DIGEST}")
+  fi
+  if [[ -n "${FRONTEND_IMAGE_DIGEST}" ]]; then
+    render_cmd+=(--frontend-image-digest "${FRONTEND_IMAGE_DIGEST}")
+  fi
+  if [[ -n "${ML_ENGINE_IMAGE_DIGEST}" ]]; then
+    render_cmd+=(--ml-engine-image-digest "${ML_ENGINE_IMAGE_DIGEST}")
+  fi
   if [[ -n "${SELECTED_SERVICES}" ]]; then
     render_cmd+=(--services "${SELECTED_SERVICES}")
   fi

@@ -20,6 +20,7 @@ export default function AdminUnlockModal({
   onRequestNew,
   onSendVerificationCodes,
   onUnlockAdmin,
+  onUnlockPasskey,
   onVerifyCodes,
   totpError,
   totpValue,
@@ -162,6 +163,7 @@ export default function AdminUnlockModal({
             labelStyle={labelStyle}
             onTotpCodeChange={onTotpCodeChange}
             onUnlockAdmin={onUnlockAdmin}
+            onUnlockPasskey={onUnlockPasskey}
             panelStyle={panelStyle}
             theme={theme}
             totpError={totpError}

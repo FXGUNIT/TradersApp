@@ -6,6 +6,7 @@ export default function AdminTotpGatePanel({
   labelStyle,
   onTotpCodeChange,
   onUnlockAdmin,
+  onUnlockPasskey,
   panelStyle,
   theme,
   totpError,
@@ -73,6 +74,19 @@ export default function AdminTotpGatePanel({
       >
         VERIFY AUTHENTICATOR
       </button>
+      {onUnlockPasskey && (
+        <button
+          onClick={onUnlockPasskey}
+          style={{
+            ...authButton(theme.blue || theme.purple, false),
+            marginTop: 8,
+            background: "transparent",
+          }}
+          className="btn-glass"
+        >
+          USE PASSKEY
+        </button>
+      )}
     </div>
   );
 }

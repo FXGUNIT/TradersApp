@@ -14,6 +14,11 @@ function resolveAdminDevice(body = {}, req = {}) {
 
 export function createAdminMfaRouteHandler({
   createAdminSession,
+  createVerifiedAdminMfaChallenge = async () => ({
+    ok: false,
+    status: 503,
+    error: "Admin MFA challenge store is unavailable.",
+  }),
   getAdminMfaStatus,
   getAdminTotpSetup,
   getClientKey,
@@ -21,7 +26,17 @@ export function createAdminMfaRouteHandler({
   readJsonBody,
   rolesAdmin,
   startAdminEmailOtp,
+  startAdminPasskeyAuthentication = async () => ({
+    ok: false,
+    status: 503,
+    error: "Admin passkey is not configured.",
+  }),
   verifyAdminEmailOtp,
+  verifyAdminPasskeyAuthentication = async () => ({
+    ok: false,
+    status: 503,
+    error: "Admin passkey is not configured.",
+  }),
   verifyAdminTotp,
 }) {
   const createSessionPayload = async (req, body = {}, authMethod = "mfa") => {
@@ -85,7 +100,7 @@ export function createAdminMfaRouteHandler({
     ) {
       try {
         const body = await readJsonBody(req);
-        const result = verifyAdminEmailOtp({
+        const result = await verifyAdminEmailOtp({
           mfaChallengeId: body.mfaChallengeId,
           challengeId: body.challengeId || body.emailChallengeId,
           codes: body.codes || { otp1: body.otp1, otp2: body.otp2, otp3: body.otp3 },
@@ -105,12 +120,57 @@ export function createAdminMfaRouteHandler({
 
     if (
       method === "POST" &&
+      (pathname === "/auth/admin/passkey/options" ||
+        pathname === "/auth/admin/mfa/passkey/options")
+    ) {
+      try {
+        const result = await startAdminPasskeyAuthentication({
+          clientKey: getClientKey(req),
+        });
+        json(res, result.ok ? 200 : result.status || 400, result, origin);
+        return true;
+      } catch (error) {
+        json(res, 400, { ok: false, error: error.message || "Passkey challenge failed." }, origin);
+        return true;
+      }
+    }
+
+    if (
+      method === "POST" &&
+      (pathname === "/auth/admin/passkey/verify" ||
+        pathname === "/auth/admin/mfa/passkey/verify")
+    ) {
+      try {
+        const body = await readJsonBody(req);
+        const result = await verifyAdminPasskeyAuthentication({
+          challengeId: body.challengeId,
+          response: body.response,
+          clientKey: getClientKey(req),
+        });
+        if (!result.ok) {
+          json(res, result.status || 401, result, origin);
+          return true;
+        }
+        const challenge = await createVerifiedAdminMfaChallenge({
+          method: "passkey",
+          clientKey: getClientKey(req),
+        });
+        json(res, challenge.ok ? 200 : challenge.status || 400, challenge, origin);
+        return true;
+      } catch (error) {
+        json(res, 400, { ok: false, error: error.message || "Passkey verification failed." }, origin);
+        return true;
+      }
+    }
+
+    if (
+      method === "POST" &&
       (pathname === "/auth/admin/totp/verify" ||
         pathname === "/auth/admin/mfa/totp/verify")
     ) {
       try {
         const body = await readJsonBody(req);
-        const result = verifyAdminTotp({
+        const result = await verifyAdminTotp({
           code: body.code || body.totp || body.authenticatorCode,
           clientKey: getClientKey(req),
         });

@@ -621,10 +621,10 @@ jobs:
         working-directory: .
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
@@ -659,10 +659,10 @@ jobs:
         working-directory: ml-engine
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -723,19 +723,25 @@ jobs:
   bff:
     name: BFF Server
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+      artifact-metadata: write
     defaults:
       run:
         working-directory: bff
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-          cache-dependency-path: bff/package.json
+          cache-dependency-path: bff/package-lock.json
 
       # ── Pull secrets from Infisical ─────────────────────────────────────
       - name: Pull secrets from Infisical
@@ -748,17 +754,180 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Run BFF tests
+        run: npm test
+
       - name: Lint (if eslint config exists)
         run: npm run lint 2>/dev/null || true
         continue-on-error: true
 
-      - name: Build Docker image
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Compute BFF image context
+        id: bff_context
+        working-directory: .
+        shell: bash
         run: |
-          docker build \
-            --tag ghcr.io/${{ github.repository }}/bff:${{ github.sha }} \
-            --tag ghcr.io/${{ github.repository }}/bff:latest \
-            bff/
-        continue-on-error: false
+          set -euo pipefail
+          OWNER_LC="${GITHUB_REPOSITORY_OWNER,,}"
+          node scripts/images/bff-image.mjs hash \
+            --owner "${OWNER_LC}" \
+            --tag "${GITHUB_SHA}" \
+            --json > bff-image-context.json
+          cat bff-image-context.json
+
+      - name: Login to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build BFF image for PR smoke
+        if: github.event_name == 'pull_request'
+        working-directory: .
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker buildx build \
+            --file bff/Dockerfile \
+            --tag tradersapp/bff:pr \
+            --load \
+            .
+          node scripts/images/bff-image.mjs smoke --image tradersapp/bff:pr
+
+      - name: Build or reuse and publish BFF image
+        id: bff_publish
+        if: github.event_name != 'pull_request'
+        working-directory: .
+        shell: bash
+        run: |
+          set -euo pipefail
+          SHA_IMAGE="${{ steps.bff_context.outputs.sha_image }}"
+          CONTEXT_IMAGE="${{ steps.bff_context.outputs.context_image }}"
+          BUILT="true"
+
+          if docker buildx imagetools inspect "${CONTEXT_IMAGE}" >/dev/null 2>&1; then
+            BUILT="false"
+            docker buildx imagetools create -t "${SHA_IMAGE}" "${CONTEXT_IMAGE}"
+          else
+            docker buildx build \
+              --file bff/Dockerfile \
+              --tag "${SHA_IMAGE}" \
+              --tag "${CONTEXT_IMAGE}" \
+              --cache-from type=gha,scope=bff \
+              --cache-to type=gha,scope=bff,mode=max \
+              --push \
+              .
+          fi
+
+          DIGEST="$(docker buildx imagetools inspect "${SHA_IMAGE}" --format '{{json .Manifest.Digest}}' | tr -d '"')"
+          if [ -z "${DIGEST}" ]; then
+            echo "::error::Unable to resolve BFF image digest for ${SHA_IMAGE}"
+            exit 1
+          fi
+
+          docker pull "${SHA_IMAGE}"
+          node scripts/images/bff-image.mjs smoke --image "${SHA_IMAGE}"
+
+          {
+            echo "built=${BUILT}"
+            echo "digest=${DIGEST}"
+            echo "image=${SHA_IMAGE}"
+            echo "subject_name=${SHA_IMAGE%:*}"
+            echo "context_image=${CONTEXT_IMAGE}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Prepare BFF image artifact directory
+        if: github.event_name != 'pull_request'
+        working-directory: .
+        run: mkdir -p .artifacts/bff-image
+
+      - name: Run Trivy vulnerability scanner for BFF image
+        id: trivy_bff_image
+        if: github.event_name != 'pull_request'
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ steps.bff_publish.outputs.image }}
+          format: sarif
+          output: .artifacts/bff-image/trivy-bff-image.sarif
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+
+      - name: Generate BFF image SBOM
+        if: github.event_name != 'pull_request'
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ steps.bff_publish.outputs.image }}
+          format: spdx-json
+          output: .artifacts/bff-image/bff-sbom.spdx.json
+          exit-code: "0"
+
+      - name: Attest BFF image provenance
+        if: github.event_name != 'pull_request'
+        uses: actions/attest@v4
+        with:
+          subject-name: ${{ steps.bff_publish.outputs.subject_name }}
+          subject-digest: ${{ steps.bff_publish.outputs.digest }}
+          push-to-registry: true
+
+      - name: Attest BFF image SBOM
+        if: github.event_name != 'pull_request'
+        uses: actions/attest@v4
+        with:
+          subject-name: ${{ steps.bff_publish.outputs.subject_name }}
+          subject-digest: ${{ steps.bff_publish.outputs.digest }}
+          sbom-path: .artifacts/bff-image/bff-sbom.spdx.json
+          push-to-registry: true
+
+      - name: Upload BFF image manifest
+        if: github.event_name != 'pull_request'
+        working-directory: .
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .artifacts/bff-image
+          cat > .artifacts/bff-image/bff-image-manifest.json <<EOF
+          {
+            "commitSha": "${GITHUB_SHA}",
+            "contextHash": "${{ steps.bff_context.outputs.context_hash }}",
+            "image": "${{ steps.bff_publish.outputs.image }}",
+            "subjectName": "${{ steps.bff_publish.outputs.subject_name }}",
+            "contextImage": "${{ steps.bff_publish.outputs.context_image }}",
+            "digest": "${{ steps.bff_publish.outputs.digest }}",
+            "built": ${{ steps.bff_publish.outputs.built }},
+            "dockerfile": "${{ steps.bff_context.outputs.dockerfile }}",
+            "trivySarif": "trivy-bff-image.sarif",
+            "sbom": "bff-sbom.spdx.json",
+            "provenanceAttested": true,
+            "sbomAttested": true,
+            "workflowRunUrl": "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          }
+          EOF
+          if [ -f "${RUNNER_TEMP}/created_attestation_paths.txt" ]; then
+            cp "${RUNNER_TEMP}/created_attestation_paths.txt" .artifacts/bff-image/created-attestation-paths.txt
+          fi
+          cat .artifacts/bff-image/bff-image-manifest.json
+
+      - name: Upload BFF image manifest artifact
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v7
+        with:
+          name: bff-image-manifest
+          path: .artifacts/bff-image/
+          retention-days: 30
+
+      - name: Fail on BFF Trivy findings
+        if: github.event_name != 'pull_request' && always()
+        run: |
+          if [ "${{ steps.trivy_bff_image.outcome }}" = "failure" ]; then
+            echo "BFF image has HIGH/CRITICAL Trivy findings or scan failed."
+            exit 1
+          fi
 
   # -------------------------------------------------------------------------
   # Deploy to Staging (auto on push to staging branch)
@@ -773,19 +942,29 @@ jobs:
       url: https://staging.traders.app
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Login to GHCR
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Push images to GHCR
+      - name: Build and push ML Engine image
         run: |
+          docker build \
+            --tag ghcr.io/${{ github.repository }}/ml-engine:${{ github.sha }} \
+            --tag ghcr.io/${{ github.repository }}/ml-engine:latest \
+            --file ml-engine/Dockerfile \
+            ml-engine/
           docker push ghcr.io/${{ github.repository }}/ml-engine:${{ github.sha }}
-          docker push ghcr.io/${{ github.repository }}/bff:${{ github.sha }}
+          docker push ghcr.io/${{ github.repository }}/ml-engine:latest
+        continue-on-error: false
+
+      - name: Verify published BFF image
+        run: |
+          docker buildx imagetools inspect ghcr.io/${{ github.repository }}/bff:${{ github.sha }} >/dev/null
         continue-on-error: false
 
       # ── Railway: deploy ML Engine (staging) ──────────────────────────────
@@ -870,11 +1049,11 @@ jobs:
       packages: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       # Push Docker images to GHCR
       - name: Login to GHCR
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -886,10 +1065,9 @@ jobs:
           docker push ghcr.io/${{ github.repository }}/ml-engine:latest
         continue-on-error: false
 
-      - name: Build and push BFF image
+      - name: Verify published BFF image
         run: |
-          docker build -t ghcr.io/${{ github.repository }}/bff:latest bff/
-          docker push ghcr.io/${{ github.repository }}/bff:latest
+          docker buildx imagetools inspect ghcr.io/${{ github.repository }}/bff:${{ github.sha }} >/dev/null
         continue-on-error: false
 
       # ── Railway: deploy ML Engine (production) ──────────────────────────
@@ -921,7 +1099,7 @@ jobs:
               --url "https://api.railway.app/v0/environments/$ENV_ID/services/$SVC_ID/deployments" \
               --header 'Authorization: Bearer ${{ secrets.RAILWAY_TOKEN }}' \
               --header 'Content-Type: application/json' \
-              --data '{"image": "ghcr.io/${{ github.repository }}/bff:latest", "branch": "main"}'
+              --data '{"image": "ghcr.io/${{ github.repository }}/bff:${{ github.sha }}", "branch": "main"}'
           fi
         continue-on-error: true
 

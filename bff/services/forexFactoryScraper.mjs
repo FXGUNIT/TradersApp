@@ -11,6 +11,12 @@ const NEW_YORK_TIME_ZONE = "America/New_York";
 const DEFAULT_TIMEOUT_MS = 8000;
 
 export const FOREX_FACTORY_URL = "https://www.forexfactory.com/calendar";
+export const FOREX_FACTORY_JSON_URLS = Object.freeze(
+  String(process.env.FOREX_FACTORY_JSON_URLS || "https://nfs.faireconomy.media/ff_calendar_thisweek.json")
+    .split(",")
+    .map((url) => url.trim())
+    .filter(Boolean),
+);
 export const RELEVANT_FOREX_CURRENCIES = Object.freeze([
   "USD",
   "EUR",
@@ -73,6 +79,23 @@ function extractImpact(rowHtml) {
     return Number.parseInt(impactMatch[1], 10);
   }
 
+  return 0;
+}
+
+function parseImpactValue(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (!normalized || normalized === "holiday" || normalized === "non-economic") {
+    return 0;
+  }
+  if (/^high\b|impact--high|\b3\b/.test(normalized)) {
+    return 3;
+  }
+  if (/^medium\b|^med\b|impact--medium|\b2\b/.test(normalized)) {
+    return 2;
+  }
+  if (/^low\b|impact--low|\b1\b/.test(normalized)) {
+    return 1;
+  }
   return 0;
 }
 
@@ -299,6 +322,59 @@ export function parseForexFactoryHTML(html, options = {}) {
   return events;
 }
 
+export function parseForexFactoryJSON(payload, options = {}) {
+  const {
+    now = new Date(),
+    minImpact = 3,
+  } = options;
+  const rows = Array.isArray(payload)
+    ? payload
+    : Array.isArray(payload?.events)
+      ? payload.events
+      : Array.isArray(payload?.calendar)
+        ? payload.calendar
+        : [];
+
+  const events = [];
+  for (const row of rows) {
+    const title = stripHtml(row?.title || row?.event || row?.name);
+    const currency = String(row?.country || row?.currency || row?.ccy || "")
+      .trim()
+      .toUpperCase();
+    const impact = parseImpactValue(row?.impact || row?.impactLabel || row?.importance);
+    const scheduledAt = new Date(row?.date || row?.datetime || row?.time || "");
+
+    if (!title || impact < minImpact || Number.isNaN(scheduledAt.getTime())) {
+      continue;
+    }
+    if (!isRelevantForexCurrency(currency)) {
+      continue;
+    }
+
+    const timeUntilMin = Math.round((scheduledAt.getTime() - now.getTime()) / 60000);
+    const impactLabel = impact >= 3 ? "HIGH" : impact === 2 ? "MEDIUM" : "LOW";
+
+    events.push({
+      source: "forexfactory",
+      title,
+      currency,
+      impact,
+      impactLabel,
+      datetime: scheduledAt.toISOString(),
+      time_until_min: timeUntilMin,
+      timeUntil_min: timeUntilMin,
+      volatility: impactLabel,
+      category: "economic_calendar",
+      scheduled: true,
+      actual: row?.actual || "",
+      forecast: row?.forecast || "",
+      previous: row?.previous || "",
+    });
+  }
+
+  return events;
+}
+
 async function fetchForexFactoryHtml(timeoutMs = DEFAULT_TIMEOUT_MS) {
   if (!isOutboundUrlAllowed(FOREX_FACTORY_URL)) {
     throw new Error("Forex Factory URL blocked by SSRF guard.");
@@ -328,6 +404,71 @@ async function fetchForexFactoryHtml(timeoutMs = DEFAULT_TIMEOUT_MS) {
   }
 }
 
+async function fetchForexFactoryJson(url, timeoutMs = DEFAULT_TIMEOUT_MS) {
+  if (!isOutboundUrlAllowed(url)) {
+    throw new Error(`Forex Factory JSON URL blocked by SSRF guard: ${url}`);
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+        Accept: "application/json,text/plain;q=0.9,*/*;q=0.8",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Forex Factory JSON responded ${response.status}`);
+    }
+
+    return await response.json();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function fetchForexFactoryJsonCalendars(options = {}) {
+  const {
+    now = new Date(),
+    minImpact = 3,
+    timeoutMs = DEFAULT_TIMEOUT_MS,
+    urls = FOREX_FACTORY_JSON_URLS,
+  } = options;
+
+  const events = [];
+  const errors = [];
+  let fetched = false;
+
+  for (const url of urls) {
+    try {
+      const payload = await fetchForexFactoryJson(url, timeoutMs);
+      fetched = true;
+      events.push(...parseForexFactoryJSON(payload, { now, minImpact }));
+    } catch (err) {
+      errors.push(`${url}: ${err.message}`);
+    }
+  }
+
+  return {
+    fetched,
+    errors,
+    events: dedupeForexFactoryEvents(events),
+  };
+}
+
+function dedupeForexFactoryEvents(events) {
+  const byKey = new Map();
+  for (const event of events) {
+    byKey.set(`${event.currency}|${event.datetime}|${event.title}`, event);
+  }
+  return [...byKey.values()];
+}
+
 export async function scrapeForexFactory(options = {}) {
   const {
     daysAhead = 7,
@@ -336,19 +477,42 @@ export async function scrapeForexFactory(options = {}) {
     timeoutMs = DEFAULT_TIMEOUT_MS,
   } = options;
 
-  const html = await fetchForexFactoryHtml(timeoutMs);
   const maxMinutes = Math.max(1, daysAhead) * 24 * 60;
+  const keepUpcoming = (event) => event.time_until_min >= 0 && event.time_until_min <= maxMinutes;
+  const byTime = (left, right) => left.time_until_min - right.time_until_min;
 
-  return parseForexFactoryHTML(html, { now, minImpact })
-    .filter((event) => event.time_until_min >= 0 && event.time_until_min <= maxMinutes)
-    .sort((left, right) => left.time_until_min - right.time_until_min);
+  try {
+    const html = await fetchForexFactoryHtml(timeoutMs);
+    return parseForexFactoryHTML(html, { now, minImpact })
+      .filter(keepUpcoming)
+      .sort(byTime);
+  } catch (htmlError) {
+    const jsonResult = await fetchForexFactoryJsonCalendars({
+      now,
+      minImpact,
+      timeoutMs,
+    });
+
+    if (jsonResult.fetched) {
+      return jsonResult.events
+        .filter(keepUpcoming)
+        .sort(byTime);
+    }
+
+    const fallbackReason = jsonResult.errors.length > 0
+      ? jsonResult.errors.join("; ")
+      : "no JSON calendar URLs configured";
+    throw new Error(`Forex Factory HTML failed (${htmlError.message}); JSON fallback failed (${fallbackReason})`);
+  }
 }
 
 export default {
   FOREX_FACTORY_URL,
+  FOREX_FACTORY_JSON_URLS,
   RELEVANT_FOREX_CURRENCIES,
   isRelevantForexCurrency,
   parseForexFactoryDateTime,
   parseForexFactoryHTML,
+  parseForexFactoryJSON,
   scrapeForexFactory,
 };

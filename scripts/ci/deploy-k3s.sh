@@ -35,6 +35,33 @@ bff_repo="${REGISTRY_HOST}/${CI_REPO_OWNER}/bff"
 ml_engine_repo="${REGISTRY_HOST}/${CI_REPO_OWNER}/ml-engine"
 mlflow_repo="${REGISTRY_HOST}/${CI_REPO_OWNER}/mlflow"
 image_tag="${CI_COMMIT_SHA}"
+frontend_digest="${FRONTEND_IMAGE_DIGEST:-}"
+bff_digest="${BFF_IMAGE_DIGEST:-}"
+ml_engine_digest="${ML_ENGINE_IMAGE_DIGEST:-}"
+mlflow_digest="${MLFLOW_IMAGE_DIGEST:-}"
+require_image_digests="${K8S_REQUIRE_IMAGE_DIGESTS:-false}"
+
+validate_image_digest() {
+  service="$1"
+  digest="$2"
+  if [ -z "$digest" ]; then
+    if [ "$require_image_digests" = "true" ]; then
+      printf 'Missing required %s image digest. Set %s_IMAGE_DIGEST or disable K8S_REQUIRE_IMAGE_DIGESTS.\n' "$service" "$service" >&2
+      exit 1
+    fi
+    return 0
+  fi
+
+  if ! printf '%s' "$digest" | grep -Eq '^sha256:[0-9a-f]{64}$'; then
+    printf 'Invalid %s image digest: %s\n' "$service" "$digest" >&2
+    exit 1
+  fi
+}
+
+validate_image_digest "FRONTEND" "$frontend_digest"
+validate_image_digest "BFF" "$bff_digest"
+validate_image_digest "ML_ENGINE" "$ml_engine_digest"
+validate_image_digest "MLFLOW" "$mlflow_digest"
 
 kubectl create namespace "$K8S_NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
 
@@ -61,10 +88,13 @@ helm upgrade --install "$release_name" "$chart_dir" \
   --set-string imagePullSecrets[0].name="$K8S_REGISTRY_SECRET" \
   --set-string frontend.image.repository="$frontend_repo" \
   --set-string frontend.image.tag="$image_tag" \
+  --set-string frontend.image.digest="$frontend_digest" \
   --set-string bff.image.repository="$bff_repo" \
   --set-string bff.image.tag="$image_tag" \
+  --set-string bff.image.digest="$bff_digest" \
   --set-string mlEngine.image.repository="$ml_engine_repo" \
   --set-string mlEngine.image.tag="$image_tag" \
+  --set-string mlEngine.image.digest="$ml_engine_digest" \
   --set-string mlEngine.dataQuality.alertWebhook="$dq_alert_webhook" \
   --set-string mlEngine.dataQuality.quarantineDir="$dq_quarantine_dir" \
   --set-string mlflow.secretRef.existingSecret="$mlflow_secret_name" \
@@ -72,6 +102,7 @@ helm upgrade --install "$release_name" "$chart_dir" \
   --set-string mlflow.postgres.user="$mlflow_postgres_user" \
   --set-string mlflow.image.repository="$mlflow_repo" \
   --set-string mlflow.image.tag="$image_tag" \
+  --set-string mlflow.image.digest="$mlflow_digest" \
   --wait \
   --timeout 10m
 

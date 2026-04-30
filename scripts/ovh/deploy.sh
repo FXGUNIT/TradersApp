@@ -72,6 +72,8 @@ fi
 APP_USER="tradersapp"
 DEPLOY_ROOT="${APP_ROOT}/deploy/ovh"
 RUNTIME_ENV="${APP_ROOT}/runtime/.env.ovh"
+PREVIOUS_RUNTIME_ENV="${APP_ROOT}/runtime/.env.ovh.previous"
+DEPLOY_RECORD_ROOT="${APP_ROOT}/deploy-records"
 GHCR_TOKEN=""
 
 if [ "${GHCR_TOKEN_STDIN}" = "1" ]; then
@@ -125,8 +127,73 @@ wait_for_https_host() {
   fi
 }
 
+read_env_value() {
+  local file="$1"
+  local key="$2"
+  if [ ! -f "${file}" ]; then
+    return 0
+  fi
+  grep -E "^${key}=" "${file}" | tail -1 | cut -d= -f2-
+}
+
+write_deploy_record() {
+  local status="$1"
+  local health="$2"
+  local previous_bff="$3"
+  local new_bff="$4"
+  local path="${DEPLOY_RECORD_ROOT}/deploy-$(date -u +%Y%m%dT%H%M%SZ).json"
+  install -d -m 0750 -o "${APP_USER}" -g "${APP_USER}" "${DEPLOY_RECORD_ROOT}"
+  cat > "${path}" <<EOF
+{
+  "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "status": "${status}",
+  "health": "${health}",
+  "previousBffImage": "${previous_bff}",
+  "newBffImage": "${new_bff}"
+}
+EOF
+  chown "${APP_USER}:${APP_USER}" "${path}"
+  ln -sfn "$(basename "${path}")" "${DEPLOY_RECORD_ROOT}/last-${status}.json"
+}
+
+rollback_failed_deploy() {
+  if [ -z "${COMPOSE_CMD:-}" ] || [ ! -f "${PREVIOUS_RUNTIME_ENV}" ]; then
+    return 0
+  fi
+  local previous_bff
+  local failed_bff
+  previous_bff="$(read_env_value "${PREVIOUS_RUNTIME_ENV}" BFF_IMAGE)"
+  failed_bff="$(read_env_value "${RUNTIME_ENV}" BFF_IMAGE)"
+  if [ -z "${previous_bff}" ]; then
+    return 0
+  fi
+  echo "[deploy] Rolling back to previous BFF image ${previous_bff}..." >&2
+  install -m 0600 -o "${APP_USER}" -g "${APP_USER}" "${PREVIOUS_RUNTIME_ENV}" "${RUNTIME_ENV}"
+  run_as_app "${COMPOSE_CMD} up -d --remove-orphans" >&2 || true
+  wait_for_health traders-bff 24 >&2 || true
+  wait_for_http "rollback localhost bff /health" "http://127.0.0.1:8788/health" >&2 || true
+  write_deploy_record "rollback" "failed_deploy_rolled_back" "${previous_bff}" "${failed_bff}"
+}
+
+dump_failure_context() {
+  local exit_code="$?"
+  trap - ERR
+  set +e
+  echo "[deploy] Failure detected. Capturing container diagnostics..." >&2
+  docker ps -a --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' >&2 || true
+  if [ -n "${COMPOSE_CMD:-}" ]; then
+    run_as_app "${COMPOSE_CMD} ps" >&2 || true
+    run_as_app "${COMPOSE_CMD} logs --tail 120" >&2 || true
+  fi
+  rollback_failed_deploy || true
+  exit "${exit_code}"
+}
+
 echo "[deploy] Installing bundle into ${DEPLOY_ROOT}..."
 install -d -m 0755 -o "${APP_USER}" -g "${APP_USER}" "${APP_ROOT}" "${APP_ROOT}/deploy" "${DEPLOY_ROOT}" "${APP_ROOT}/runtime" "${APP_ROOT}/logs"
+if [ -f "${RUNTIME_ENV}" ]; then
+  install -m 0600 -o "${APP_USER}" -g "${APP_USER}" "${RUNTIME_ENV}" "${PREVIOUS_RUNTIME_ENV}"
+fi
 rsync -a --delete "${BUNDLE_ROOT}/deploy/ovh/" "${DEPLOY_ROOT}/"
 install -m 0600 -o "${APP_USER}" -g "${APP_USER}" "${ENV_FILE}" "${RUNTIME_ENV}"
 
@@ -136,6 +203,7 @@ if [ -n "${GHCR_USERNAME}" ] && [ -n "${GHCR_TOKEN}" ]; then
 fi
 
 COMPOSE_CMD="docker compose --project-name tradersapp --project-directory '${DEPLOY_ROOT}' --env-file '${RUNTIME_ENV}' -f '${DEPLOY_ROOT}/docker-compose.yml'"
+trap 'dump_failure_context' ERR
 
 echo "[deploy] Pulling images..."
 run_as_app "${COMPOSE_CMD} pull"
@@ -169,5 +237,10 @@ wait_for_https_host "edge route ${API_PUBLIC_HOST}" "${API_PUBLIC_HOST}" "/healt
 
 echo "[deploy] Capturing compose status..."
 run_as_app "${COMPOSE_CMD} ps" | tee "${APP_ROOT}/logs/compose-ps.log"
+write_deploy_record \
+  "success" \
+  "healthy" \
+  "$(read_env_value "${PREVIOUS_RUNTIME_ENV}" BFF_IMAGE)" \
+  "$(read_env_value "${RUNTIME_ENV}" BFF_IMAGE)"
 
 echo "[deploy] Complete."

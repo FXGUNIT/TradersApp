@@ -11,6 +11,7 @@ import { useAdminAccessHandlers } from "./useAdminAccessHandlers.js";
 import {
   requestAdminEmailOtp,
   verifyAdminEmailOtp,
+  verifyAdminPasskey,
   verifyAdminTotp,
 } from "../../services/adminAuthService.js";
 import { useToastNotifications } from "../shell/useToastNotifications.js";
@@ -45,6 +46,7 @@ export function AdminAccessProvider({ children, setScreen }) {
   const {
     sendAdminOTPs,
     handleAdminAccess,
+    handleAdminPasskeyAccess,
     resetAdminPromptState,
     handleAdminVerifyCodes,
     handleAdminRequestNewCodes,
@@ -56,6 +58,7 @@ export function AdminAccessProvider({ children, setScreen }) {
     totpCode,
     requestAdminEmailOtp,
     verifyAdminEmailOtp,
+    verifyAdminPasskey,
     verifyAdminTotp,
     hasEmailJsConfig: EMAILJS_CONFIG,
     emailjs,
@@ -112,6 +115,7 @@ export function AdminAccessProvider({ children, setScreen }) {
     // Handlers
     sendAdminOTPs,
     handleAdminAccess,
+    handleAdminPasskeyAccess,
     resetAdminPromptState,
     handleAdminVerifyCodes,
     handleAdminRequestNewCodes,

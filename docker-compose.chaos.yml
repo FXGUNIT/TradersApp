@@ -87,7 +87,7 @@ services:
       - chaos-net
 
   mlflow:
-    image: ghcr.io/mlflow/mlflow:v2.16.2
+    image: ghcr.io/mlflow/mlflow:v2.22.4
     container_name: mlflow-chaos
     ports:
       - "5000:5000"

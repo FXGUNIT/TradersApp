@@ -27,6 +27,7 @@ logs
 board-room/fallback-store.json
 runtime/session-store.json
 runtime/*.tmp-*
+bff/runtime/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

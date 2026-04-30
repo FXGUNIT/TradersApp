@@ -1,18 +1,18 @@
 # -----------------------------------------------------------------------------
-# TradersApp — Kubernetes Deploy Workflow
+# TradersApp â€” Kubernetes Deploy Workflow
 #
-# Triggered manually via workflow_dispatch. Builds no images — those are built
+# Triggered manually via workflow_dispatch. Builds no images â€” those are built
 # and pushed by ci.yml to GHCR with SHA-tagged references. This workflow is kept
 # as a manual deployment path so the main CI production deploy remains the only
 # automatic rollout on the free-tier cluster.
 #
 # Required GitHub Secrets:
-#   KUBECONFIG_B64   — base64-encoded kubeconfig for the target k3s/API server
-#   HELM_VALUES_SHA  — (optional) override SHA for values.prod.yaml src commit
+#   KUBECONFIG_B64   â€” base64-encoded kubeconfig for the target k3s/API server
+#   HELM_VALUES_SHA  â€” (optional) override SHA for values.prod.yaml src commit
 #
 # Required GitHub Variables (Settings ? Variables):
-#   K8S_CLUSTER_NAME  — e.g. tradersapp-k3s-prod
-#   K8S_NAMESPACE     — e.g. tradersapp (defaults to "tradersapp")
+#   K8S_CLUSTER_NAME  â€” e.g. tradersapp-k3s-prod
+#   K8S_NAMESPACE     â€” e.g. tradersapp (defaults to "tradersapp")
 # -----------------------------------------------------------------------------
 
 name: Deploy to Kubernetes
@@ -72,7 +72,7 @@ jobs:
           else
             CONCLUSION="${{ github.event.workflow_run.conclusion }}"
             if [ "$CONCLUSION" != "success" ]; then
-              echo "CI workflow conclusion: $CONCLUSION — aborting k8s deploy"
+              echo "CI workflow conclusion: $CONCLUSION â€” aborting k8s deploy"
               echo "This is expected if tests failed or were cancelled."
               exit 1
             fi
@@ -88,7 +88,7 @@ jobs:
         id: sha
         run: |
           if [ "${{ github.event_name }}" = "workflow_run" ]; then
-            # Download workflow run artifact — contains CI_SHA env file
+            # Download workflow run artifact â€” contains CI_SHA env file
             gh api repos/${{ github.repository }}/actions/runs/${{ github.event.workflow_run.id }}/artifacts \
               --jq '.artifacts[] | select(.name=="deploy-meta") | .id' \
               | head -1 \
@@ -118,6 +118,7 @@ jobs:
       contents: read
       packages: read
       deployments: write
+      attestations: read
     steps:
       - name: Checkout at deployed SHA
         uses: actions/checkout@v6
@@ -213,6 +214,17 @@ jobs:
           echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "Using image tag: $TAG"
 
+      - name: Verify BFF image attestation
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.image_tag.outputs.tag }}"
+          IMAGE_REPO="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}"
+          BFF_IMAGE="${IMAGE_REPO}/bff:${TAG}"
+          echo "Verifying BFF image attestation: ${BFF_IMAGE}"
+          gh attestation verify "oci://${BFF_IMAGE}" -R "${GITHUB_REPOSITORY}"
+
       # -- Build/pull all service images ------------------------------------
       - name: Pull SHA-tagged images from GHCR
         run: |
@@ -225,7 +237,7 @@ jobs:
                 echo "::error::Missing required BFF image ${IMAGE_REPO}/${SVC}:${TAG}. The CI BFF image job must publish the SHA image before k8s deploy."
                 exit 1
               fi
-              echo "? Could not pull $SVC:${TAG} — cluster may not have network access to GHCR"
+              echo "? Could not pull $SVC:${TAG} â€” cluster may not have network access to GHCR"
               echo "  Ensure the k3s nodes have GHCR auth configured:"
               echo "  kubectl create secret docker-registry ghcr-secret \\"
               echo "    --docker-server=ghcr.io \\"
@@ -234,6 +246,58 @@ jobs:
               echo "    --namespace=${{ vars.K8S_NAMESPACE || 'tradersapp' }}"
             }
           done
+
+      - name: Resolve digest-pinned image refs
+        id: image_digests
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.image_tag.outputs.tag }}"
+          IMAGE_REPO="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}"
+
+          resolve_required_image() {
+            local service="$1"
+            local output_name="${service//-/_}"
+            local image="${IMAGE_REPO}/${service}:${TAG}"
+            docker pull "${image}"
+
+            local digest_ref
+            local digest
+            digest_ref="$(docker image inspect "${image}" --format '{{index .RepoDigests 0}}' | head -n 1)"
+            digest="${digest_ref##*@}"
+            if [ -z "${digest}" ] || [ "${digest}" = "${digest_ref}" ]; then
+              echo "::error::Could not resolve digest for ${image}."
+              exit 1
+            fi
+            case "${digest}" in
+              sha256:*) ;;
+              *)
+                echo "::error::Unexpected digest for ${image}: ${digest}"
+                exit 1
+                ;;
+            esac
+
+            echo "${output_name}_image=${image}" >> "$GITHUB_OUTPUT"
+            echo "${output_name}_digest=${digest}" >> "$GITHUB_OUTPUT"
+            echo "${output_name}_ref=${IMAGE_REPO}/${service}@${digest}" >> "$GITHUB_OUTPUT"
+            echo "Resolved ${service}: ${IMAGE_REPO}/${service}@${digest}"
+          }
+
+          resolve_required_image "ml-engine"
+          resolve_required_image "bff"
+          resolve_required_image "frontend"
+
+      - name: Verify BFF digest attestation
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          BFF_DIGEST_REF="${{ steps.image_digests.outputs.bff_ref }}"
+          if [ -z "${BFF_DIGEST_REF}" ]; then
+            echo "::error::BFF digest ref was not resolved."
+            exit 1
+          fi
+          echo "Verifying BFF image attestation by digest: ${BFF_DIGEST_REF}"
+          gh attestation verify "oci://${BFF_DIGEST_REF}" -R "${GITHUB_REPOSITORY}"
 
       # Tag pulled images so helm values can reference them generically.
       - name: Tag images as tradersapp/*:sha
@@ -263,6 +327,10 @@ jobs:
         run: |
           TAG="${{ steps.image_tag.outputs.tag }}"
           ENV_NAME="${{ needs.gate.outputs.environment }}"
+          IMAGE_REPO="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}"
+          BFF_DIGEST="${{ steps.image_digests.outputs.bff_digest }}"
+          FRONTEND_DIGEST="${{ steps.image_digests.outputs.frontend_digest }}"
+          ML_ENGINE_DIGEST="${{ steps.image_digests.outputs.ml_engine_digest }}"
           VALUES_ARGS=(-f ./k8s/helm/tradersapp/values.prod.yaml)
           if [ "$ENV_NAME" = "production" ]; then
             VALUES_ARGS+=(-f ./k8s/helm/tradersapp/values.prod.micro.yaml)
@@ -270,12 +338,21 @@ jobs:
           helm diff upgrade tradersapp \
             ./k8s/helm/tradersapp \
             --namespace "${{ vars.K8S_NAMESPACE || 'tradersapp' }}" \
-            --set global.imageTag="${TAG}" \
+            --set-string "global.imageTag=${TAG}" \
+            --set-string "bff.image.repository=${IMAGE_REPO}/bff" \
+            --set-string "bff.image.tag=${TAG}" \
+            --set-string "bff.image.digest=${BFF_DIGEST}" \
+            --set-string "frontend.image.repository=${IMAGE_REPO}/frontend" \
+            --set-string "frontend.image.tag=${TAG}" \
+            --set-string "frontend.image.digest=${FRONTEND_DIGEST}" \
+            --set-string "mlEngine.image.repository=${IMAGE_REPO}/ml-engine" \
+            --set-string "mlEngine.image.tag=${TAG}" \
+            --set-string "mlEngine.image.digest=${ML_ENGINE_DIGEST}" \
             "${VALUES_ARGS[@]}" \
             --detailed-exitcode \
             --no-color || DIFF_EXIT=$?
           if [ "${DIFF_EXIT:-0}" -eq 2 ]; then
-            echo "Helm diff found changes — proceeding with upgrade"
+            echo "Helm diff found changes â€” proceeding with upgrade"
           fi
         continue-on-error: true
 
@@ -285,7 +362,11 @@ jobs:
         run: |
           TAG="${{ steps.image_tag.outputs.tag }}"
           NS="${{ vars.K8S_NAMESPACE || 'tradersapp' }}"
-          IMAGE_REPO="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}"
+          ML_ENGINE_DIGEST_REF="${{ steps.image_digests.outputs.ml_engine_ref }}"
+          if [ -z "${ML_ENGINE_DIGEST_REF}" ]; then
+            echo "::error::ML Engine digest ref was not resolved."
+            exit 1
+          fi
 
           cat << MIGRATION_YAML | kubectl apply -f -
           apiVersion: batch/v1
@@ -308,7 +389,7 @@ jobs:
                 restartPolicy: OnFailure
                 containers:
                   - name: migration
-                    image: ${IMAGE_REPO}/ml-engine:${TAG}
+                    image: ${ML_ENGINE_DIGEST_REF}
                     command: ["python", "scripts/migrate_to_postgres.py"]
                     env:
                       - name: DATABASE_URL
@@ -321,12 +402,12 @@ jobs:
                       limits:   { cpu: 250m, memory: 512Mi }
           MIGRATION_YAML
 
-          echo "Migration job submitted — waiting for completion…"
+          echo "Migration job submitted â€” waiting for completionâ€¦"
           kubectl wait --for=condition=complete \
             job/ml-engine-migration -n $NS \
             --timeout=300s
           kubectl logs job/ml-engine-migration -n $NS
-        continue-on-error: true  # Non-fatal — schema may already be up to date
+        continue-on-error: true  # Non-fatal â€” schema may already be up to date
 
       # -- Helm upgrade -----------------------------------------------------
       - name: Deploy core runtime
@@ -335,12 +416,18 @@ jobs:
           NS="${{ vars.K8S_NAMESPACE || 'tradersapp' }}"
           ENV_NAME="${{ needs.gate.outputs.environment }}"
           IMAGE_REPO="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}"
+          BFF_DIGEST="${{ steps.image_digests.outputs.bff_digest }}"
+          FRONTEND_DIGEST="${{ steps.image_digests.outputs.frontend_digest }}"
+          ML_ENGINE_DIGEST="${{ steps.image_digests.outputs.ml_engine_digest }}"
           if [ "$ENV_NAME" = "production" ]; then
             bash ./scripts/k8s/deploy-core-minimal.sh \
               --kubeconfig ~/.kube/config \
               --namespace "$NS" \
               --image-repo "${IMAGE_REPO}" \
-              --image-tag "${TAG}"
+              --image-tag "${TAG}" \
+              --bff-image-digest "${BFF_DIGEST}" \
+              --frontend-image-digest "${FRONTEND_DIGEST}" \
+              --ml-engine-image-digest "${ML_ENGINE_DIGEST}"
           else
             VALUES_ARGS=(-f ./k8s/helm/tradersapp/values.prod.yaml)
             helm upgrade tradersapp \
@@ -348,7 +435,16 @@ jobs:
               --namespace "$NS" \
               --create-namespace \
               --install \
-              --set global.imageTag="${TAG}" \
+              --set-string "global.imageTag=${TAG}" \
+              --set-string "bff.image.repository=${IMAGE_REPO}/bff" \
+              --set-string "bff.image.tag=${TAG}" \
+              --set-string "bff.image.digest=${BFF_DIGEST}" \
+              --set-string "frontend.image.repository=${IMAGE_REPO}/frontend" \
+              --set-string "frontend.image.tag=${TAG}" \
+              --set-string "frontend.image.digest=${FRONTEND_DIGEST}" \
+              --set-string "mlEngine.image.repository=${IMAGE_REPO}/ml-engine" \
+              --set-string "mlEngine.image.tag=${TAG}" \
+              --set-string "mlEngine.image.digest=${ML_ENGINE_DIGEST}" \
               "${VALUES_ARGS[@]}" \
               --wait \
               --timeout "${{ env.HELM_TIMEOUT }}" \
@@ -364,23 +460,23 @@ jobs:
           if-no-files-found: ignore
 
       # -- Rollout status --------------------------------------------------
-      - name: Wait for rollout — bff
+      - name: Wait for rollout â€” bff
         run: |
           NS="${{ vars.K8S_NAMESPACE || 'tradersapp' }}"
           kubectl rollout status deployment/bff -n "$NS" --timeout=120s
 
-      - name: Wait for rollout — ml-engine
+      - name: Wait for rollout â€” ml-engine
         run: |
           NS="${{ vars.K8S_NAMESPACE || 'tradersapp' }}"
           kubectl rollout status deployment/ml-engine -n "$NS" --timeout=120s
 
-      - name: Wait for rollout — frontend
+      - name: Wait for rollout â€” frontend
         run: |
           NS="${{ vars.K8S_NAMESPACE || 'tradersapp' }}"
           kubectl rollout status deployment/frontend -n "$NS" --timeout=120s
 
-      # -- Smoke tests (H02/H03 — ported from deploy-k3s.sh) --------------
-      - name: Smoke test — bff health
+      # -- Smoke tests (H02/H03 â€” ported from deploy-k3s.sh) --------------
+      - name: Smoke test â€” bff health
         run: |
           NS="${{ vars.K8S_NAMESPACE || 'tradersapp' }}"
           BFF_POD=$(kubectl get pod -n "$NS" -l app=bff,track=!canary -o jsonpath='{.items[0].metadata.name}')
@@ -394,13 +490,13 @@ jobs:
               echo "? BFF health OK"
               exit 0
             fi
-            echo "BFF health check $i failed — waiting 10s…"
+            echo "BFF health check $i failed â€” waiting 10sâ€¦"
             sleep 10
           done
           echo "? BFF health check failed after 5 retries"
           exit 1
 
-      - name: Smoke test — ml-engine health
+      - name: Smoke test â€” ml-engine health
         run: |
           NS="${{ vars.K8S_NAMESPACE || 'tradersapp' }}"
           ML_POD=$(kubectl get pod -n "$NS" -l app=ml-engine -o jsonpath='{.items[0].metadata.name}')
@@ -414,13 +510,13 @@ jobs:
               echo "? ML Engine health OK"
               exit 0
             fi
-            echo "ML Engine health check $i failed — waiting 10s…"
+            echo "ML Engine health check $i failed â€” waiting 10sâ€¦"
             sleep 10
           done
           echo "? ML Engine health check failed after 5 retries"
           exit 1
 
-      - name: Smoke test — ingress / external reachability
+      - name: Smoke test â€” ingress / external reachability
         run: |
           NS="${{ vars.K8S_NAMESPACE || 'tradersapp' }}"
           HOST="${{ needs.gate.outputs.environment == 'production' && '173.249.18.14.sslip.io' || 'tradergunit.pages.dev' }}"
@@ -431,10 +527,10 @@ jobs:
             echo "Ingress controller pod found: $INGRESS_POD"
             kubectl logs "$INGRESS_POD" -n ingress-nginx --tail=5
           else
-            echo "? Ingress controller not found in ingress-nginx namespace — skipping L7 check"
+            echo "? Ingress controller not found in ingress-nginx namespace â€” skipping L7 check"
           fi
 
-          echo "Cluster ingress reachable — external DNS + TLS pending cert-manager"
+          echo "Cluster ingress reachable â€” external DNS + TLS pending cert-manager"
 
       # -- Success ---------------------------------------------------------
       - name: Mark deploy success (summary)
@@ -442,6 +538,9 @@ jobs:
           echo "Deployment status: success" >> "$GITHUB_STEP_SUMMARY"
           echo "Environment: ${{ needs.gate.outputs.environment }}" >> "$GITHUB_STEP_SUMMARY"
           echo "Smoke tests: passed" >> "$GITHUB_STEP_SUMMARY"
+          echo "BFF image: ${{ steps.image_digests.outputs.bff_ref }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Frontend image: ${{ steps.image_digests.outputs.frontend_ref }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "ML Engine image: ${{ steps.image_digests.outputs.ml_engine_ref }}" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Deployment summary
         run: |
@@ -452,6 +551,9 @@ jobs:
           echo "  TradersApp k8s deploy SUCCEEDED"
           echo "---------------------------------------"
           echo "  SHA:    $TAG"
+          echo "  BFF:    ${{ steps.image_digests.outputs.bff_ref }}"
+          echo "  Frontend: ${{ steps.image_digests.outputs.frontend_ref }}"
+          echo "  ML Engine: ${{ steps.image_digests.outputs.ml_engine_ref }}"
           echo "  Namespace: $NS"
           echo "  Environment: ${{ needs.gate.outputs.environment }}"
           echo ""
@@ -494,14 +596,14 @@ jobs:
         run: |
           NS="${{ vars.K8S_NAMESPACE || 'tradersapp' }}"
           helm rollback tradersapp -n "$NS" --wait --timeout=5m || {
-            echo "Rollback failed — manual intervention required."
+            echo "Rollback failed â€” manual intervention required."
             echo "Check: helm history tradersapp -n $NS"
           }
 
       - name: Report rollback
         run: |
           NS="${{ vars.K8S_NAMESPACE || 'tradersapp' }}"
-          echo "? Deployment failed — TradersApp rolled back to previous release."
+          echo "? Deployment failed â€” TradersApp rolled back to previous release."
           echo "Previous release history:"
           helm history tradersapp -n "$NS" || true
         continue-on-error: true

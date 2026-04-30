@@ -510,6 +510,7 @@ export const ALLOWED_OUTBOUND_HOSTS = new Set([
   "finnhub.io",
   "gdeltproject.org",
   "forexfactory.com",
+  "nfs.faireconomy.media",
   // ML Engine: allow configured internal/external URLs
 ]);
 

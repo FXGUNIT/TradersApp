@@ -753,26 +753,6 @@ export async function getPhysicsRegime(candles = [], options = {}) {
   }
 }
 
-/**
- * Get full physics-based regime analysis from ML Engine.
- * Combines HMM + FP-FK PDE + Fisher-KPP + Tsallis q-Gaussians + Anomalous Diffusion.
- *
- * @param {object[]} candles - 5-min candle array (min 50 required)
- * @returns {Promise<object>} full regime analysis
- */
-export async function getPhysicsRegime(candles = []) {
-  try {
-    const res = await mlRequest("/regime", {
-      candles: candles.slice(-100),
-      symbol: "MNQ",
-    }, 30_000);
-    return res;
-  } catch (err) {
-    console.error("[consensusEngine] Regime analysis unavailable:", err.message);
-    return { ok: false, error: err.message };
-  }
-}
-
 export function createConsensusEngineService() {
   return {
     getMlConsensus,

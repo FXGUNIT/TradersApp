@@ -44,7 +44,7 @@ Use **MLflow Self-Hosted** as the MLOps platform:
 # docker-compose.mlflow.yml
 services:
   mlflow:
-    image: ghcr.io/mlflow/mlflow:v2.21.3
+    image: ghcr.io/mlflow/mlflow:v2.22.4
     ports:
       - "5000:5000"
     environment:

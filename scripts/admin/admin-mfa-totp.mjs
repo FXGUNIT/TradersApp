@@ -1,112 +1,108 @@
 #!/usr/bin/env node
-import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import {
+  generateAdminTotpSecret,
+  OTP_DIGITS,
+  TOTP_PERIOD_SECONDS,
+  verifyTotpCode,
+} from "../../bff/services/adminTotpUtils.mjs";
 
-const OTP_DIGITS = 6;
-const TOTP_PERIOD_SECONDS = 30;
-
-function encodeBase32(buffer) {
-  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
-  let bits = "";
-  for (const byte of buffer) bits += byte.toString(2).padStart(8, "0");
-  let output = "";
-  for (let index = 0; index < bits.length; index += 5) {
-    const chunk = bits.slice(index, index + 5).padEnd(5, "0");
-    output += alphabet[Number.parseInt(chunk, 2)];
-  }
-  return output;
-}
-
-function decodeBase32(secret) {
-  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
-  const clean = String(secret || "")
-    .toUpperCase()
-    .replace(/[\s=-]/g, "");
-  let bits = "";
-  for (const char of clean) {
-    const value = alphabet.indexOf(char);
-    if (value < 0) continue;
-    bits += value.toString(2).padStart(5, "0");
-  }
-  const bytes = [];
-  for (let index = 0; index + 8 <= bits.length; index += 8) {
-    bytes.push(Number.parseInt(bits.slice(index, index + 8), 2));
-  }
-  return Buffer.from(bytes);
-}
-
-function hotp(secretBuffer, counter) {
-  const counterBuffer = Buffer.alloc(8);
-  counterBuffer.writeUInt32BE(Math.floor(counter / 0x1_0000_0000), 0);
-  counterBuffer.writeUInt32BE(counter >>> 0, 4);
-  const digest = createHmac("sha1", secretBuffer).update(counterBuffer).digest();
-  const offset = digest[digest.length - 1] & 0x0f;
-  const binary =
-    ((digest[offset] & 0x7f) << 24) |
-    ((digest[offset + 1] & 0xff) << 16) |
-    ((digest[offset + 2] & 0xff) << 8) |
-    (digest[offset + 3] & 0xff);
-  return String(binary % 1_000_000).padStart(OTP_DIGITS, "0");
-}
-
-function verifyTotp(secret, code, now = Date.now(), window = 1) {
-  const secretBuffer = decodeBase32(secret);
-  const cleanCode = String(code || "").replace(/\D/g, "").slice(0, OTP_DIGITS);
-  if (!secretBuffer.length || cleanCode.length !== OTP_DIGITS) return false;
-  const counter = Math.floor(now / 1000 / TOTP_PERIOD_SECONDS);
-  for (let offset = -window; offset <= window; offset += 1) {
-    const expected = hotp(secretBuffer, counter + offset);
-    const a = Buffer.from(cleanCode, "utf8");
-    const b = Buffer.from(expected, "utf8");
-    if (a.length === b.length && timingSafeEqual(a, b)) return true;
-  }
-  return false;
+function buildOtpAuthUri(secret, issuer, account) {
+  const issuerParam = encodeURIComponent(issuer);
+  const accountParam = encodeURIComponent(account);
+  return `otpauth://totp/${issuerParam}:${accountParam}?secret=${secret}&issuer=${issuerParam}&algorithm=SHA1&digits=${OTP_DIGITS}&period=${TOTP_PERIOD_SECONDS}`;
 }
 
 function usage() {
   console.log(`Usage:
   node scripts/admin/admin-mfa-totp.mjs generate [issuer] [account]
   node scripts/admin/admin-mfa-totp.mjs verify <code>
+  node scripts/admin/admin-mfa-totp.mjs verify-setup <secret> <code>
+  node scripts/admin/admin-mfa-totp.mjs rotate [issuer] [account]
 
 Environment for verify:
   ADMIN_TOTP_SECRET or BFF_ADMIN_TOTP_SECRET
 
-This script prints setup material only to the terminal. Store the secret in
+This command prints setup material only to the terminal. Store active secrets in
 Infisical/GitHub/VPS runtime env as ADMIN_TOTP_SECRET or BFF_ADMIN_TOTP_SECRET.
+For rotation, set the generated value as ADMIN_TOTP_SECRET_NEXT, run
+verify-setup, then promote it to ADMIN_TOTP_SECRET and redeploy.
 `);
 }
 
-const command = String(process.argv[2] || "").toLowerCase();
-
-if (command === "generate") {
-  const secret = encodeBase32(randomBytes(20));
-  const issuer = String(process.argv[3] || "TradersApp Admin");
-  const account = String(process.argv[4] || "admin");
-  const issuerParam = encodeURIComponent(issuer);
-  const accountParam = encodeURIComponent(account);
-  const otpauthUri = `otpauth://totp/${issuerParam}:${accountParam}?secret=${secret}&issuer=${issuerParam}&algorithm=SHA1&digits=${OTP_DIGITS}&period=${TOTP_PERIOD_SECONDS}`;
-
+function printSetup(secret, issuer, account, mode) {
+  console.log(`${mode}:`);
+  console.log("");
   console.log("ADMIN_TOTP_SECRET:");
   console.log(secret);
   console.log("");
   console.log("OTPAUTH_URI:");
-  console.log(otpauthUri);
+  console.log(buildOtpAuthUri(secret, issuer, account));
   console.log("");
-  console.log("Store the secret as ADMIN_TOTP_SECRET or BFF_ADMIN_TOTP_SECRET in runtime secrets only.");
+  console.log("Runtime secret names to update:");
+  console.log("- ADMIN_TOTP_SECRET");
+  console.log("- BFF_ADMIN_TOTP_SECRET");
+  if (mode === "ROTATE") {
+    console.log("- ADMIN_TOTP_SECRET_NEXT (temporary verification value)");
+  }
+}
+
+function verifySecret(secret, code) {
+  return verifyTotpCode({
+    secret,
+    code,
+    window: 1,
+  });
+}
+
+const [command, ...args] = process.argv.slice(2);
+const issuer = args[0] || "TradersApp Admin";
+const account = args[1] || "admin";
+
+if (command === "generate") {
+  printSetup(generateAdminTotpSecret(), issuer, account, "GENERATE");
+  process.exit(0);
+}
+
+if (command === "rotate") {
+  printSetup(generateAdminTotpSecret(), issuer, account, "ROTATE");
+  console.log("");
+  console.log("Rotation flow:");
+  console.log("1. Add the value above as ADMIN_TOTP_SECRET_NEXT in runtime secrets.");
+  console.log("2. Run verify-setup with the new secret and an authenticator code.");
+  console.log("3. Promote ADMIN_TOTP_SECRET_NEXT to ADMIN_TOTP_SECRET.");
+  console.log("4. Redeploy and remove ADMIN_TOTP_SECRET_NEXT.");
   process.exit(0);
 }
 
 if (command === "verify") {
-  const code = process.argv[3];
-  const secret = process.env.ADMIN_TOTP_SECRET || process.env.BFF_ADMIN_TOTP_SECRET || "";
+  const code = args[0];
+  const secret =
+    process.env.ADMIN_TOTP_SECRET || process.env.BFF_ADMIN_TOTP_SECRET || "";
   if (!secret) {
     console.error("ADMIN_TOTP_SECRET or BFF_ADMIN_TOTP_SECRET is required.");
     process.exit(2);
   }
-  if (!verifyTotp(secret, code)) {
-    console.error("TOTP code rejected.");
+  const result = verifySecret(secret, code);
+  if (!result.ok) {
+    console.error(result.error || "TOTP code rejected.");
     process.exit(1);
   }
-  console.log("TOTP code accepted.");
+  console.log("TOTP code accepted for the active runtime secret.");
+  process.exit(0);
+}
+
+if (command === "verify-setup") {
+  const [secret, code] = args;
+  if (!secret || !code) {
+    usage();
+    process.exit(1);
+  }
+  const result = verifySecret(secret, code);
+  if (!result.ok) {
+    console.error(result.error || "TOTP setup verification failed.");
+    process.exit(1);
+  }
+  console.log("TOTP setup verified. Promote this secret only through runtime secret storage.");
   process.exit(0);
 }
 

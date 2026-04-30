@@ -191,7 +191,7 @@ services:
     logging: *default-logging
 
   mlflow:
-    image: ghcr.io/mlflow/mlflow:v2.21.3
+    image: ghcr.io/mlflow/mlflow:v2.22.4
     container_name: traders-mlflow
     restart: unless-stopped
     profiles: ["mlops"]

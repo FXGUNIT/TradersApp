@@ -38,6 +38,8 @@ export const executeSendAdminOTPs = async ({
   setAdminOtpErr,
   setAdminOtpChallengeId,
   setAdminOtpRecipients,
+  gateLabel = "Authenticator",
+  successMessage = "Authenticator verified. Send the three email codes.",
 }) => {
   try {
     const result = await requestAdminEmailOtp({
@@ -80,12 +82,12 @@ export const executeHandleAdminAccess = async ({
     result = await verifyAdminTotp(totpCode);
   } catch (error) {
     await logSecurityAlert(
-      "Authenticator Verification Failed",
+      `${gateLabel} Verification Failed`,
       adminMasterEmail,
-      error.message || "Invalid authenticator code",
+      error.message || `${gateLabel} verification failed`,
     );
-    setTotpErr(error.message || "Invalid authenticator code.");
-    showToast("Authenticator code rejected.", "error");
+    setTotpErr(error.message || `${gateLabel} verification failed.`);
+    showToast(`${gateLabel} rejected.`, "error");
     return false;
   }
 
@@ -98,7 +100,7 @@ export const executeHandleAdminAccess = async ({
   setAdminOtpsVerified(false);
   setAdminOtps({ otp1: "", otp2: "", otp3: "" });
   setAdminMasterEmail("");
-  showToast("Authenticator verified. Send the three email codes.", "success");
+  showToast(successMessage, "success");
   return true;
 };
 
